@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Activity } from "lucide-react";
+import { Home, Package, Bot, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -41,8 +41,8 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-6">
-        <div className="flex items-center gap-2">
-          <Activity className="h-6 w-6 text-primary" />
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Diabeaters" className="h-10 w-10 object-contain" />
           <span className="text-xl font-semibold">Diabeaters</span>
         </div>
       </SidebarHeader>
