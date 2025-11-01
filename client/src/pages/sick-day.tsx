@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertCircle, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function SickDay() {
   const { toast } = useToast();
@@ -20,6 +22,23 @@ export default function SickDay() {
     snackRatio: string;
   } | null>(null);
 
+  const calculateMutation = useMutation({
+    mutationFn: async (data: { tdd: number; bgLevel: number; severity: string }) => {
+      const response = await apiRequest("POST", "/api/sick-day/calculate", data);
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      setResults(data);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Calculation failed",
+        description: error.message || "Failed to calculate sick day recommendations. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCalculate = () => {
     if (!tdd || !bgLevel || !severity) {
       toast({
@@ -32,27 +51,12 @@ export default function SickDay() {
 
     const tddNum = parseFloat(tdd);
     const bgNum = parseFloat(bgLevel);
-    
-    let severityMultiplier = 1;
-    if (severity === "moderate") severityMultiplier = 1.2;
-    if (severity === "severe") severityMultiplier = 1.5;
 
-    const correctionFactor = 1800 / tddNum;
-    const bgAboveTarget = Math.max(0, bgNum - 100);
-    const correctionDose = Math.round((bgAboveTarget / correctionFactor) * severityMultiplier * 10) / 10;
-
-    const baseRatio = Math.round(450 / tddNum);
-    const adjustedRatio = Math.max(1, Math.round(baseRatio / severityMultiplier));
-
-    setResults({
-      correctionDose,
-      breakfastRatio: `1:${adjustedRatio}`,
-      lunchRatio: `1:${adjustedRatio}`,
-      dinnerRatio: `1:${adjustedRatio}`,
-      snackRatio: `1:${Math.max(1, adjustedRatio + 2)}`,
+    calculateMutation.mutate({
+      tdd: tddNum,
+      bgLevel: bgNum,
+      severity,
     });
-
-    console.log("Sick day calculation completed", { tdd: tddNum, bgLevel: bgNum, severity });
   };
 
   return (
@@ -129,9 +133,14 @@ export default function SickDay() {
               />
             </div>
 
-            <Button onClick={handleCalculate} className="w-full" data-testid="button-calculate">
+            <Button 
+              onClick={handleCalculate} 
+              className="w-full" 
+              data-testid="button-calculate"
+              disabled={calculateMutation.isPending}
+            >
               <Activity className="h-4 w-4 mr-2" />
-              Calculate Recommendations
+              {calculateMutation.isPending ? "Calculating..." : "Calculate Recommendations"}
             </Button>
           </CardContent>
         </Card>
