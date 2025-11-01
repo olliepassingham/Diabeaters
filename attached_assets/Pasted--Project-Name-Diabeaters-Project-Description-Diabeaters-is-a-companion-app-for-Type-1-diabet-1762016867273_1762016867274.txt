@@ -1,0 +1,93 @@
+🩺 Project Name
+
+Diabeaters
+
+💡 Project Description
+
+Diabeaters is a companion app for Type 1 diabetics designed to simplify daily decision-making and management.
+It has two main modules:
+
+Supply Tracker — helps users monitor their prescription supplies (needles, insulin types, CGMs). Based on daily usage inputs, the app estimates remaining quantities and notifies users when supplies are low.
+
+AI Activity Advisor — assists users with insulin and carbohydrate adjustments. Users input their mealtime carb ratio and planned activities; the AI recommends ratio adjustments or pre-activity carbohydrate portions (CP).
+
+The app aims to reduce cognitive load and promote safer, data-driven diabetes self-management.
+
+🧩 Target Platform
+
+Web Application (mobile-responsive).
+
+🌐 Operating Environment
+
+Online (Cloud-based) — enables real-time data sync, cloud storage, and AI integration.
+
+☁️ Hosting Options
+
+Replit Deployments using integrated Flask or Next.js backend.
+Can leverage Firebase or Google Cloud Firestore for real-time data storage (as per Replit integration guide).
+
+🎨 Interface Style
+
+Minimalist and user-friendly with:
+
+Clean dashboards for quick overview of supplies
+
+Soft color palette (pastel blues and whites for calm medical aesthetics)
+
+Accessible design for mobile and desktop
+
+🧭 Example Applications
+
+MySugr (for logging and insights)
+
+Glucose Buddy (for tracking)
+
+Tidepool Loop (for insulin data integration)
+
+📊 Expected Outputs
+
+Supply Tracker Dashboard
+
+Remaining supply estimates
+
+Daily consumption analytics
+
+Reorder alerts (visual + notification)
+
+AI Advisor Panel
+
+Personalized carbohydrate and insulin recommendations
+
+Text-based chat or card-based output from AI model
+
+Optional daily summary report
+
+⚙️ Additional Features
+
+Local user profile & settings (meal ratios, insulin type)
+
+Notification system (browser or email alerts)
+
+Data export (CSV)
+
+Optional AI chat interface using OpenAI API (securely managed via Replit Secrets)
+
+🗣️ Language Preferences
+
+Interaction with Replit Agent: English
+
+App interface: English (with potential for multilingual expansion)
+
+🧠 Technical Setup Suggestions (for Replit Agent)
+
+Frontend: React (Next.js or Vite)
+
+Backend: Flask or Node.js/Express API
+
+Database: Firestore (NoSQL)
+
+AI Integration: OpenAI GPT-4o via API (for advisor logic)
+
+Hosting: Replit Deployments (Always-On enabled)
+
+Secrets: Store API keys (OPENAI_API_KEY, FIREBASE_CONFIG) via Replit Secrets
