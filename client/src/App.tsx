@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemeToggle } from "@/components/theme-toggle";
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
+import SickDay from "@/pages/sick-day";
 import Advisor from "@/pages/advisor";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
@@ -18,6 +19,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/supplies" component={Supplies} />
+      <Route path="/sick-day" component={SickDay} />
       <Route path="/advisor" component={Advisor} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />

@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings } from "lucide-react";
+import { Home, Package, Bot, Settings, Thermometer } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -22,6 +22,11 @@ const items = [
     title: "Supply Tracker",
     url: "/supplies",
     icon: Package,
+  },
+  {
+    title: "Sick Day Adviser",
+    url: "/sick-day",
+    icon: Thermometer,
   },
   {
     title: "AI Advisor",
