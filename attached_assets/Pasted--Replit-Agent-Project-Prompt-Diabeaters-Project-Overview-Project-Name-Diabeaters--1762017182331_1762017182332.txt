@@ -1,0 +1,168 @@
+🩺 Replit Agent Project Prompt — Diabeaters
+## 🧠 Project Overview
+**Project Name:** Diabeaters  
+**Goal:** A smart companion web app for **Type 1 diabetics**, designed to simplify daily management by tracking medical supplies and providing AI-based insulin and carbohydrate advice.  
+**Core Modules:**  
+1. Supply Management Tracker  
+2. AI Activity Advisor  
+
+---
+
+## 🩹 Functional Overview
+
+### 1. Supply Management Tracker
+**Purpose:** Help users monitor prescription supplies and estimate how long they’ll last based on daily usage.
+
+**User Inputs:**
+- Daily usage rate for:
+  - Short-acting insulin (units/day)
+  - Long-acting insulin (units/day)
+  - Needles (pieces/day)
+  - CGM sensors (days per sensor)
+- Current inventory for each item
+
+**System Logic:**
+- Calculates estimated days remaining
+- Displays depletion forecast chart
+- Triggers alerts when supplies < user-defined threshold
+- Option to export data (CSV)
+- Cloud sync of user profile and inventory data
+
+**Expected Outputs:**
+- Remaining supply estimates
+- Reorder alert notifications
+- Dashboard visualizations (bar charts, progress rings)
+
+---
+
+### 2. AI Activity Advisor
+**Purpose:** Offer smart carbohydrate and insulin adjustment advice based on planned daily activity.
+
+**User Inputs:**
+- Mealtime carbohydrate ratio (g/unit)
+- Activity type (e.g., walking, gym, sports)
+- Activity duration and intensity
+- Time of activity (before/after meal)
+
+**AI Logic:**
+- Uses OpenAI GPT-4o (via API) to generate advice:
+  - Adjusted insulin ratio
+  - Recommended carb portion (CP) before activity
+  - Safety notes (risk of hypoglycemia)
+- Option for chat-based Q&A interface
+
+**Expected Outputs:**
+- Text or card-based recommendation summary
+- Optional daily advisory report
+
+---
+
+## 🧩 Technical Configuration
+
+**Platform:** Web  
+**Frameworks:**
+- Frontend: React (Vite or Next.js)
+- Backend: Flask or Node.js/Express (choose one)
+- Database: Google Firestore (real-time NoSQL)
+- Hosting: Replit Deployments (Always-On enabled)
+
+**Integrations:**
+- OpenAI API for AI Advisor  
+- Firebase for authentication + Firestore database  
+- Replit Secrets for API key management
+
+**Required Secrets:**
+- `OPENAI_API_KEY`
+- `FIREBASE_API_KEY`
+- `FIREBASE_AUTH_DOMAIN`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_STORAGE_BUCKET`
+- `FIREBASE_MESSAGING_SENDER_ID`
+- `FIREBASE_APP_ID`
+
+**Suggested File Structure:**
+
+
+/diabeaters
+├── /frontend
+│ ├── src/
+│ ├── components/
+│ ├── pages/
+│ └── App.js
+├── /backend
+│ ├── app.py (Flask) or server.js (Node)
+│ ├── routes/
+│ ├── models/
+│ └── utils/
+├── /static
+├── /templates
+├── replit.nix
+└── .replit
+
+
+**Run Command (Flask):**
+```toml
+[run]
+command = "python3 backend/app.py"
+
+
+Run Command (Node.js):
+
+[run]
+command = "node backend/server.js"
+
+🎨 UI & UX Design
+
+Style: Minimalist, medical-friendly, user-focused
+Palette: Soft blues, whites, and greys for a calm medical theme
+Components:
+
+Dashboard with summary cards
+
+Graphs for usage and forecast
+
+Chat or recommendation card for AI Advisor
+
+Settings and profile page
+
+Accessibility:
+
+Large touch-friendly buttons
+
+Dark/light mode toggle
+
+Language ready (English default, future multilingual)
+
+🗣️ Language Preferences
+
+Agent Communication: English
+
+App Interface: English
+
+⚙️ Development Tasks (Agent Workflow)
+
+Initialize Replit full-stack app (Flask + React or Node + React).
+
+Create Firestore integration for user + supply tracking.
+
+Build UI components for supply dashboard and AI Advisor.
+
+Implement alert logic (based on user thresholds).
+
+Integrate OpenAI GPT-4o API for advisor recommendations.
+
+Set up user authentication via Firebase.
+
+Deploy app to Replit (Always-On) and test alerts + AI responses.
+
+🚀 Output Expectation
+
+Deliver a functioning prototype of Diabeaters with:
+
+Working supply tracker and dashboard visualization
+
+AI-powered activity advisor
+
+Firebase user management
+
+Hosted and accessible Replit URL
