@@ -1,0 +1,418 @@
+🚀 MASTER REPLIT AGENT PROMPT
+Project: Diabeater – Proactive Diabetes Management App
+🔹 ROLE & GOAL
+
+You are Replit Agent, acting as a senior full-stack architect + product engineer.
+
+Your task is to design and build the initial production-ready foundation of a cross-platform mobile application called Diabeater.
+
+Core mission:
+Build a proactive diabetes management app that anticipates risk, reduces cognitive load, and prevents emergencies using AI-driven guidance — not a passive logging app.
+
+⚠️ Critical Constraint:
+This app does NOT provide medical advice.
+All AI outputs must be non-prescriptive, safety-first, clearly labelled.
+
+🔹 PROJECT OVERVIEW
+
+App Name: Diabeater
+Platforms: iOS & Android
+Target Users:
+
+Primary: Type 1 Diabetes
+
+Secondary: Type 2 Diabetes
+
+Gestational Diabetes
+
+Positioning:
+Proactive > Reactive
+Preparedness > Logging
+Anticipation > History
+
+🔹 TECH STACK & ARCHITECTURE (REQUIRED)
+Architecture Principles
+
+Modular, scalable architecture
+
+AI logic fully separated from UI
+
+Future-ready for CGM integrations (Dexcom / Libre)
+
+GDPR & HIPAA-aware data handling
+
+Recommended Stack (unless strong reason otherwise)
+
+Frontend: React Native (Expo)
+
+Backend: Node.js + Express (or equivalent)
+
+Database: Secure cloud DB (user-scoped data)
+
+AI Layer: Dedicated AI service/module (rules + LLM abstraction)
+
+Auth: Secure email/password authentication
+
+State Management: Clean, predictable state handling
+
+🔹 USER AUTHENTICATION & ONBOARDING FLOW
+Entry
+
+Start App → Login / Create Account
+
+First-Time Onboarding (Required Steps)
+
+Personal Info
+
+Name
+
+Email
+
+Date of Birth
+
+Units & Formatting
+
+Blood glucose: mmol/L OR mg/dL
+
+Carb units: grams
+
+Diabetes Type Selection
+
+Type 1
+
+Type 2
+
+Gestational
+
+Conditional Follow-Ups
+
+If Type 1
+
+Insulin delivery:
+
+Injections
+
+Pump
+
+If Type 2 / Gestational
+
+Using insulin? (Yes / No)
+
+Setup Completion Screen
+
+Explicit disclaimer:
+
+“Diabeater does not provide medical advice.”
+
+🔹 MAIN DASHBOARD (CUSTOMISABLE)
+
+Dashboard must use modular widgets (enable/disable/reorder).
+
+Required Widgets
+
+Supply Summary (alerts + remaining stock)
+
+Today’s Activity Overview
+
+AI Recommendations (safety-first)
+
+Quick Actions:
+
+Supply Tracker
+
+Activity Adviser
+
+Scenario Adviser
+
+Ratio Adviser
+
+Help Now (Emergency)
+
+🔹 PRIMARY AI SYSTEMS
+A. AI Coach (Central Intelligence Layer)
+
+Acts as context coordinator, not a chatbot.
+
+Responsibilities:
+
+Combine user data + patterns + context
+
+Surface risk warnings first
+
+Provide high-detail reasoning
+
+Align outputs across all AI modules
+
+Focus on prevention, not reaction
+
+All outputs must:
+
+Be clearly labelled “Not medical advice”
+
+Avoid commands or dosages
+
+Use suggestion-based language
+
+B. Ratio Adviser (ICR & Basal Support)
+
+Features:
+
+Input insulin-to-carb ratios:
+
+Breakfast
+
+Lunch
+
+Dinner
+
+Snacks
+
+Logic:
+
+Detect inconsistent or high-risk ratios
+
+Suggest safe review considerations
+
+Never give direct dosing instructions
+
+Basal Support:
+
+Guided basal-test planning
+
+Clear prep instructions
+
+Pattern-based AI insights
+
+Re-check reminders (e.g. “Review again in X days”)
+
+C. Activity Adviser (Exercise Mode)
+
+Setup:
+
+Typical meal ratios
+
+Usual exercise habits
+
+Daily Use:
+
+Input:
+
+Exercise type
+
+Duration
+
+Intensity
+
+Outputs:
+
+Carb-intake considerations
+
+Dose-adjustment context, not instructions
+
+Hypoglycaemia prevention guidance
+
+D. Scenario Adviser
+1. Sick Day Mode
+
+Inputs:
+
+Illness type
+
+Severity
+
+Current BG
+
+Outputs:
+
+Insulin-related considerations
+
+Hydration reminders
+
+Ketone awareness guidance
+
+Clear red-flag warnings
+
+2. Travel Mode
+
+Inputs:
+
+Travel duration
+
+Destination
+
+Logic:
+
+Estimate supply needs
+
+Add failure buffers
+
+Outputs:
+
+Smart packing list
+
+Emergency replacement plan:
+
+Nearby pharmacies
+
+Backup insulin access
+
+E. Supply Tracker (CORE DIFFERENTIATOR)
+
+Initial Setup:
+
+Insulin types
+
+Pens / cartridges
+
+Needles
+
+CGMs
+
+Test strips
+
+Usage:
+
+Prescription input
+
+Supplier selection
+
+Order date tracking
+
+AI Calculations:
+
+Estimated daily usage
+
+Injection frequency
+
+Short vs long-acting breakdown
+
+Displays:
+
+Remaining supplies
+
+Days remaining
+
+Days since last pickup
+
+Alerts:
+
+Low supply warnings
+
+Smart restock recommendations
+
+F. Help Now (Emergency Mode)
+
+One-tap access.
+
+Features:
+
+Immediate hypo guidance
+
+Clear step-by-step safety actions
+
+Emergency-mode UI
+
+Calm, directive, non-judgmental language
+
+🔹 SETTINGS & PERSONALISATION
+
+User can edit:
+
+Personal info
+
+Units & formatting
+
+Carb ratios
+
+Prescriptions
+
+TDD & habits
+
+Widget layout
+
+Alert preferences
+
+🔹 COMMUNITY MODULE (OPTIONAL)
+
+Peer support
+
+Non-medical discussion
+
+Lived-experience tips
+
+Moderation required
+
+🔹 UX & DESIGN REQUIREMENTS
+
+Calm, reassuring medical-adjacent tone
+
+Zero judgement language
+
+Accessibility-first
+
+Fast emergency access
+
+Persistent disclaimers wherever AI advice appears
+
+🔹 BUSINESS MODEL
+
+Freemium
+
+Free:
+
+Core tracking
+
+Basic AI guidance
+
+Premium:
+
+Scenario Adviser
+
+Advanced AI insights
+
+Smart supply prediction
+
+Travel & Sick-Day modes
+
+🔹 DEVELOPMENT INSTRUCTIONS
+
+First, propose a clear development plan:
+
+File structure
+
+Module boundaries
+
+Data models
+
+AI abstraction layer
+
+Wait for confirmation.
+
+Then proceed with step-by-step implementation:
+
+Auth & onboarding
+
+Core dashboard
+
+Supply tracker
+
+AI framework (rules + LLM ready)
+
+Prioritise:
+
+Safety
+
+Clarity
+
+Extensibility
+
+🔹 FINAL POSITIONING REMINDER
+
+Diabeater is proactive, not reactive.
+It reduces mental load, anticipates risk, and helps users stay prepared — not just log numbers.
+
+🔹 LANGUAGE PREFERENCES
+
+Replit Agent interaction language: English
+
+Application interface language: English (multi-language ready later)
