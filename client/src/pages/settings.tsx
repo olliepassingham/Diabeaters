@@ -250,47 +250,59 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Carb Ratios (1 unit per X grams)</Label>
+              <Label className="text-sm font-medium">Carb Ratios (units per 10g carbs)</Label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
                   <Input
                     id="breakfast-ratio"
-                    placeholder="1:10"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 1.0"
                     value={breakfastRatio}
                     onChange={(e) => setBreakfastRatio(e.target.value)}
                     data-testid="input-breakfast-ratio"
                   />
+                  <p className="text-xs text-muted-foreground">units/10g</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lunch-ratio" className="text-xs text-muted-foreground">Lunch</Label>
                   <Input
                     id="lunch-ratio"
-                    placeholder="1:12"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 0.8"
                     value={lunchRatio}
                     onChange={(e) => setLunchRatio(e.target.value)}
                     data-testid="input-lunch-ratio"
                   />
+                  <p className="text-xs text-muted-foreground">units/10g</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dinner-ratio" className="text-xs text-muted-foreground">Dinner</Label>
                   <Input
                     id="dinner-ratio"
-                    placeholder="1:10"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 1.0"
                     value={dinnerRatio}
                     onChange={(e) => setDinnerRatio(e.target.value)}
                     data-testid="input-dinner-ratio"
                   />
+                  <p className="text-xs text-muted-foreground">units/10g</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="snack-ratio" className="text-xs text-muted-foreground">Snack</Label>
                   <Input
                     id="snack-ratio"
-                    placeholder="1:15"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 0.7"
                     value={snackRatio}
                     onChange={(e) => setSnackRatio(e.target.value)}
                     data-testid="input-snack-ratio"
                   />
+                  <p className="text-xs text-muted-foreground">units/10g</p>
                 </div>
               </div>
             </div>
