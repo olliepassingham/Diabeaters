@@ -1,0 +1,121 @@
+🧭 REPLIT AGENT PROMPT — TAP “DIABEATER” TO RETURN TO DASHBOARD
+CONTEXT
+
+You are continuing development of the Diabeater app.
+
+Users must be able to return to the Dashboard quickly and intuitively from anywhere in the app.
+
+To reduce friction and cognitive load, the app name “Diabeater” at the top of each page must act as a consistent navigation anchor.
+
+🎯 OBJECTIVE
+
+Enable users to tap the “Diabeater” brand element in the page header to immediately return to the Dashboard.
+
+This interaction must:
+
+Be consistent across the entire app
+
+Feel natural and discoverable
+
+Never interfere with emergency access or system navigation
+
+📍 REQUIRED BEHAVIOUR (MANDATORY)
+Global Header Interaction
+
+On every non-dashboard screen:
+
+The app header must display:
+
+The text “Diabeater”
+
+Accompanied by the brand face outline (if present per design system)
+
+When the user taps “Diabeater”:
+
+The app must navigate directly to the Dashboard (Home)
+
+Navigation must:
+
+Reset the stack (no deep back navigation required)
+
+Preserve dashboard widget state and layout
+
+🚫 EXCLUSIONS & SAFETY RULES
+
+On the Dashboard itself:
+
+“Diabeater” remains visible
+
+Tap interaction may be disabled or do nothing
+
+Help Now / Emergency Mode:
+
+Do NOT override emergency flows
+
+If present, the tap should prompt confirmation before exiting
+
+🎨 UX & VISUAL REQUIREMENTS
+
+“Diabeater” must look:
+
+Like a brand anchor, not a button
+
+Subtle but clearly tappable
+
+No underlines, button chrome, or aggressive affordances
+
+Tap target must be:
+
+Accessibility-compliant
+
+Large enough for one-handed use
+
+Optional enhancement:
+
+Very subtle feedback on tap (e.g. opacity change)
+
+🧱 TECHNICAL IMPLEMENTATION REQUIREMENTS
+
+Implement as a global header component
+
+Header must:
+
+Accept a prop to enable/disable dashboard navigation
+
+Use a single navigation handler
+
+Navigation must:
+
+Route to Dashboard consistently
+
+Work from nested and modal screens
+
+Avoid:
+
+Duplicated logic
+
+Screen-specific hacks
+
+🧠 DESIGN INTENT (DO NOT IGNORE)
+
+This interaction should feel:
+
+Reassuring
+
+Predictable
+
+Calm
+
+The user should always know how to “go home” without thinking.
+
+✅ ACCEPTANCE CRITERIA
+
+This task is complete only when:
+
+Tapping “Diabeater” returns to Dashboard from all main screens
+
+Navigation works reliably from deep flows (e.g. Scenario Adviser, Travel Mode)
+
+Emergency flows are protected
+
+Implementation is centralized and reusable

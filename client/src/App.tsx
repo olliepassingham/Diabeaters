@@ -85,10 +85,18 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (location !== "/") {
+                  setLocation("/");
+                }
+              }}
+              className={`flex items-center gap-3 transition-opacity ${location === "/" ? "cursor-default" : "cursor-pointer hover:opacity-80 active:opacity-60"}`}
+              data-testid="button-home-brand"
+            >
               <FaceLogo size={40} />
               <span className="font-semibold text-xl">Diabeaters</span>
-            </div>
+            </button>
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-6">
