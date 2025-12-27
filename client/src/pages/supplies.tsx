@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply } from "@/lib/storage";
+import { storage, Supply, LastPrescription } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
 
 const typeIcons = {
   needle: Syringe,
@@ -31,16 +33,29 @@ function SupplyCard({
   supply, 
   onEdit, 
   onDelete, 
-  onUpdateQuantity 
+  onUpdateQuantity,
+  onLogPickup 
 }: { 
   supply: Supply; 
   onEdit: (supply: Supply) => void;
   onDelete: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  onLogPickup: (supply: Supply) => void;
 }) {
   const daysRemaining = storage.getDaysRemaining(supply);
   const status = storage.getSupplyStatus(supply);
   const Icon = typeIcons[supply.type] || Package;
+
+  const getLastPickupText = () => {
+    if (!supply.lastPickupDate) return null;
+    try {
+      return formatDistanceToNow(new Date(supply.lastPickupDate), { addSuffix: true });
+    } catch {
+      return null;
+    }
+  };
+
+  const lastPickupText = getLastPickupText();
 
   return (
     <Card className={status === "critical" ? "border-red-500/50" : status === "low" ? "border-yellow-500/50" : ""}>
@@ -129,6 +144,25 @@ function SupplyCard({
               {daysRemaining === 999 ? "N/A" : `${daysRemaining} days`}
             </Badge>
           </div>
+
+          <div className="pt-2 border-t space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                {lastPickupText ? `Picked up ${lastPickupText}` : "No pickup logged"}
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={() => onLogPickup(supply)}
+              data-testid={`button-pickup-${supply.id}`}
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Log Pickup / Refill
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -139,18 +173,21 @@ function SupplyDialog({
   supply, 
   open, 
   onOpenChange, 
-  onSave 
+  onSave,
+  lastPrescription 
 }: { 
   supply: Supply | null; 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
   onSave: (data: Omit<Supply, "id">) => void;
+  lastPrescription: LastPrescription | null;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<Supply["type"]>("needle");
   const [quantity, setQuantity] = useState("");
   const [dailyUsage, setDailyUsage] = useState("");
   const [notes, setNotes] = useState("");
+  const [showLastPrescriptionOption, setShowLastPrescriptionOption] = useState(false);
 
   useEffect(() => {
     if (supply) {
@@ -159,14 +196,27 @@ function SupplyDialog({
       setQuantity(supply.currentQuantity.toString());
       setDailyUsage(supply.dailyUsage.toString());
       setNotes(supply.notes || "");
+      setShowLastPrescriptionOption(false);
     } else {
       setName("");
       setType("needle");
       setQuantity("");
       setDailyUsage("");
       setNotes("");
+      setShowLastPrescriptionOption(lastPrescription !== null);
     }
-  }, [supply, open]);
+  }, [supply, open, lastPrescription]);
+
+  const useLastPrescription = () => {
+    if (lastPrescription) {
+      setName(lastPrescription.name);
+      setType(lastPrescription.type);
+      setQuantity(lastPrescription.quantity.toString());
+      setDailyUsage(lastPrescription.dailyUsage.toString());
+      setNotes(lastPrescription.notes || "");
+      setShowLastPrescriptionOption(false);
+    }
+  };
 
   const handleSubmit = () => {
     onSave({
@@ -190,6 +240,26 @@ function SupplyDialog({
             {supply ? "Update the details of your supply item." : "Add a new item to track in your inventory."}
           </DialogDescription>
         </DialogHeader>
+        {!supply && showLastPrescriptionOption && lastPrescription && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Use last prescription?</p>
+                  <p className="text-xs text-muted-foreground truncate">{lastPrescription.name}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setShowLastPrescriptionOption(false)} data-testid="button-add-different">
+                    New
+                  </Button>
+                  <Button size="sm" onClick={useLastPrescription} data-testid="button-use-last">
+                    Use
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
@@ -262,14 +332,79 @@ function SupplyDialog({
   );
 }
 
+function PickupDialog({
+  supply,
+  open,
+  onOpenChange,
+  onConfirm
+}: {
+  supply: Supply | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (quantity: number) => void;
+}) {
+  const [quantity, setQuantity] = useState("");
+
+  useEffect(() => {
+    if (supply) {
+      setQuantity("");
+    }
+  }, [supply, open]);
+
+  const handleConfirm = () => {
+    const qty = parseFloat(quantity) || 0;
+    onConfirm(qty);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Log Pickup / Refill</DialogTitle>
+          <DialogDescription>
+            Record that you picked up {supply?.name}. This will update the quantity and track your pickup history.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="pickup-quantity">Quantity Received</Label>
+            <Input
+              id="pickup-quantity"
+              type="number"
+              placeholder="e.g., 50"
+              value={quantity}
+              onChange={e => setQuantity(e.target.value)}
+              data-testid="input-pickup-quantity"
+            />
+            <p className="text-xs text-muted-foreground">
+              Current: {supply?.currentQuantity || 0}. After pickup: {(supply?.currentQuantity || 0) + (parseFloat(quantity) || 0)}
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleConfirm} disabled={!quantity || parseFloat(quantity) <= 0} data-testid="button-confirm-pickup">
+            Log Pickup
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Supplies() {
   const { toast } = useToast();
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<Supply | null>(null);
+  const [lastPrescription, setLastPrescription] = useState<LastPrescription | null>(null);
+  const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
+  const [pickupSupply, setPickupSupply] = useState<Supply | null>(null);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
+    setLastPrescription(storage.getLastPrescription());
   }, []);
 
   const refreshSupplies = () => {
@@ -292,6 +427,14 @@ export default function Supplies() {
       toast({ title: "Supply updated", description: `${data.name} has been updated.` });
     } else {
       storage.addSupply(data);
+      storage.saveLastPrescription({
+        name: data.name,
+        type: data.type,
+        quantity: data.currentQuantity,
+        dailyUsage: data.dailyUsage,
+        notes: data.notes,
+      });
+      setLastPrescription(storage.getLastPrescription());
       toast({ title: "Supply added", description: `${data.name} has been added to your inventory.` });
     }
     refreshSupplies();
@@ -307,6 +450,24 @@ export default function Supplies() {
   const handleUpdateQuantity = (id: string, quantity: number) => {
     storage.updateSupply(id, { currentQuantity: quantity });
     refreshSupplies();
+  };
+
+  const handleLogPickup = (supply: Supply) => {
+    setPickupSupply(supply);
+    setPickupDialogOpen(true);
+  };
+
+  const handleConfirmPickup = (quantity: number) => {
+    if (pickupSupply) {
+      const newQuantity = pickupSupply.currentQuantity + quantity;
+      storage.updateSupply(pickupSupply.id, { currentQuantity: newQuantity });
+      storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
+      toast({ 
+        title: "Pickup logged", 
+        description: `Added ${quantity} to ${pickupSupply.name}. New total: ${newQuantity}` 
+      });
+      refreshSupplies();
+    }
   };
 
   const filterByType = (type: string) => {
@@ -331,10 +492,18 @@ export default function Supplies() {
             )}
           </p>
         </div>
-        <Button onClick={handleAddNew} data-testid="button-add-new-supply">
-          <Plus className="h-4 w-4 mr-2" />
-          Add New Supply
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/settings#usage-habits">
+            <Button variant="outline" data-testid="button-usage-settings">
+              <Settings className="h-4 w-4 mr-2" />
+              Usage Habits
+            </Button>
+          </Link>
+          <Button onClick={handleAddNew} data-testid="button-add-new-supply">
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Supply
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
@@ -377,6 +546,7 @@ export default function Supplies() {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onUpdateQuantity={handleUpdateQuantity}
+                    onLogPickup={handleLogPickup}
                   />
                 ))}
               </div>
@@ -390,6 +560,14 @@ export default function Supplies() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSave={handleSave}
+        lastPrescription={lastPrescription}
+      />
+
+      <PickupDialog
+        supply={pickupSupply}
+        open={pickupDialogOpen}
+        onOpenChange={setPickupDialogOpen}
+        onConfirm={handleConfirmPickup}
       />
     </div>
   );

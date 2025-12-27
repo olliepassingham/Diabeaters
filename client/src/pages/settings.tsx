@@ -316,7 +316,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="usage-habits">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />

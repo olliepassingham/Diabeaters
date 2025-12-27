@@ -7,6 +7,8 @@ const STORAGE_KEYS = {
   ACTIVITY_LOGS: "diabeater_activity_logs",
   DASHBOARD_WIDGETS: "diabeater_dashboard_widgets",
   SCENARIO_STATE: "diabeater_scenario_state",
+  LAST_PRESCRIPTION: "diabeater_last_prescription",
+  PICKUP_HISTORY: "diabeater_pickup_history",
 } as const;
 
 export interface UserProfile {
@@ -44,6 +46,23 @@ export interface Supply {
   dailyUsage: number;
   lastPickupDate?: string;
   notes?: string;
+}
+
+export interface LastPrescription {
+  name: string;
+  type: Supply["type"];
+  quantity: number;
+  dailyUsage: number;
+  notes?: string;
+  savedAt: string;
+}
+
+export interface PickupRecord {
+  id: string;
+  supplyId: string;
+  supplyName: string;
+  quantity: number;
+  pickupDate: string;
 }
 
 export interface EmergencyContact {
@@ -153,6 +172,46 @@ export const storage = {
     if (filtered.length === supplies.length) return false;
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(filtered));
     return true;
+  },
+
+  getLastPrescription(): LastPrescription | null {
+    const data = localStorage.getItem(STORAGE_KEYS.LAST_PRESCRIPTION);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveLastPrescription(prescription: Omit<LastPrescription, "savedAt">): void {
+    const record: LastPrescription = { ...prescription, savedAt: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.LAST_PRESCRIPTION, JSON.stringify(record));
+  },
+
+  getPickupHistory(supplyId?: string): PickupRecord[] {
+    const data = localStorage.getItem(STORAGE_KEYS.PICKUP_HISTORY);
+    const history: PickupRecord[] = data ? JSON.parse(data) : [];
+    if (supplyId) {
+      return history.filter(r => r.supplyId === supplyId);
+    }
+    return history;
+  },
+
+  addPickupRecord(supplyId: string, supplyName: string, quantity: number): PickupRecord {
+    const history = this.getPickupHistory();
+    const record: PickupRecord = {
+      id: generateId(),
+      supplyId,
+      supplyName,
+      quantity,
+      pickupDate: new Date().toISOString(),
+    };
+    history.unshift(record);
+    if (history.length > 100) history.pop();
+    localStorage.setItem(STORAGE_KEYS.PICKUP_HISTORY, JSON.stringify(history));
+    const supplies = this.getSupplies();
+    const supplyIndex = supplies.findIndex(s => s.id === supplyId);
+    if (supplyIndex !== -1) {
+      supplies[supplyIndex].lastPickupDate = record.pickupDate;
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    }
+    return record;
   },
 
   getEmergencyContacts(): EmergencyContact[] {

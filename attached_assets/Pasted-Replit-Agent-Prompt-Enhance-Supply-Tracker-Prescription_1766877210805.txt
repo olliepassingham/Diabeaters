@@ -1,0 +1,172 @@
+Replit Agent Prompt: Enhance Supply Tracker (Prescription Memory, Pickup History, Settings Shortcut)
+Context
+
+You are working inside an existing diabetes app that includes a Supply Tracker feature.
+Your task is to improve usability and continuity by remembering previously added prescriptions, tracking pickup history, and improving navigation to related settings.
+
+Do not redesign the entire app.
+Only modify and extend the Supply Tracker and its related data handling and navigation.
+
+1. Remember Last Added Prescription (Reduce Repetitive Entry)
+Problem
+
+Users frequently add the same prescription repeatedly (e.g. insulin, sensors, strips).
+Currently, they must re-enter the same information each time, which is unnecessary and error-prone.
+
+Required Behavior
+
+The app should remember the most recently added prescription and make it easy to reuse.
+
+Functional Requirements
+
+Store the last added prescription details, including:
+
+Supply type (e.g. insulin, CGM, test strips)
+
+Brand / name
+
+Quantity
+
+Units (e.g. pens, vials, sensors)
+
+Typical refill amount (if applicable)
+
+When the user opens Add Supply / Add Prescription:
+
+Pre-fill the form with the last used prescription
+
+OR present a clear option:
+
+“Use last prescription”
+
+“Add a different supply”
+
+Allow users to:
+
+Accept the pre-filled data with one tap
+
+Edit any field before saving
+
+UX Constraints
+
+No extra steps during normal use
+
+No modal overload
+
+Default to speed and simplicity
+
+2. Track Prescription Pickup Dates (Historical Memory)
+Problem
+
+Users need to know:
+
+When they last picked up a prescription
+
+How often refills occur
+
+Patterns that affect supply planning
+
+Required Behavior
+
+The app should automatically remember pickup dates for each prescription.
+
+Functional Requirements
+
+Each time a prescription is logged as picked up:
+
+Save the pickup date
+
+Associate it with that specific prescription
+
+For each prescription, store:
+
+Last pickup date
+
+Optional pickup history list (date + quantity)
+
+Display on the Supply Tracker page:
+
+“Last picked up: [date]”
+
+Relative time when useful (e.g. “12 days ago”)
+
+Use pickup dates to support future features (do not implement yet):
+
+Refill reminders
+
+Low-supply predictions
+
+Data Constraints
+
+Data should persist across sessions
+
+Use the app’s existing storage approach (local storage, database, etc.)
+
+Handle missing or legacy data gracefully
+
+3. Add Navigation Shortcut to “Supply Usage Habits” (Settings)
+Problem
+
+Users frequently need to adjust Supply Usage Habits, but it is buried in Settings.
+
+Required UI Change
+
+On the Supply Tracker page, add a clear button or link that navigates directly to:
+
+Settings → Supply Usage Habits
+
+UI Requirements
+
+Button text examples:
+
+“Supply Usage Habits”
+
+“Adjust Usage Settings”
+
+Placement:
+
+Visible but not intrusive
+
+Near supply totals, estimates, or controls
+
+Icon optional but recommended
+
+Navigation Requirements
+
+One-tap navigation
+
+No confirmation dialogs
+
+Preserve back navigation behavior
+
+4. Non-Functional Requirements
+
+Do not break existing supply data
+
+Ensure backward compatibility with existing users
+
+Keep logic modular (supply tracking vs settings)
+
+Comment code clearly where state persistence is handled
+
+5. Output Expectations
+
+Update Supply Tracker UI to support pre-filled prescriptions
+
+Implement persistence for:
+
+Last added prescription
+
+Prescription pickup dates
+
+Add navigation control to Supply Usage Habits settings
+
+Flag any assumptions or limitations clearly
+
+Design Principle Reminder
+
+This feature should feel like:
+
+“The app remembers how I manage my supplies so I don’t have to.”
+
+Speed, memory, and reduced cognitive load are the priority.
