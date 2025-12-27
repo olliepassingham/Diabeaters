@@ -1,0 +1,248 @@
+Replit Agent Prompt: Redesign & Enhance “Help Now” Feature (Hypoglycemia Emergency UX)
+Project Context
+
+You are working inside an existing diabetes management app (Type 1 Diabetes focused).
+Your task is not to rebuild the app, but to redesign and enhance the existing “Help Now” feature so it is:
+
+Extremely easy to use during a hypoglycemic event
+
+Safe and effective even if the user is confused, shaking, or has blurred vision
+
+Informative enough that an unfamiliar bystander can help correctly
+
+This feature is mission-critical and must prioritize speed, clarity, and automatic escalation over visual complexity.
+
+1. Purpose of “Help Now”
+Primary Goal
+
+👉 Get the user safe within seconds, not minutes.
+
+Core Principles
+
+The feature must:
+
+Reduce thinking and decision-making to near zero
+
+Escalate help automatically if the user cannot act
+
+Work even when the user is:
+
+Alone
+
+Confused
+
+Shaking
+
+Visually impaired during a hypo
+
+Design assumption:
+
+“Can someone with a blood glucose of 2.5 mmol/L successfully use this?”
+
+If the answer is no, simplify further.
+
+2. UI / UX Requirements
+Home Screen Placement
+
+“HELP NOW” must be always visible
+
+Large, high-contrast button
+
+Red or emergency color
+
+Clear label:
+
+HELP NOW
+
+Visual & Interaction Rules
+
+One-tap access (no menus before action)
+
+Very large text and icons
+
+Minimal choices initially
+
+High contrast (hypo-friendly)
+
+Haptic feedback when pressed
+
+No fine motor precision required
+
+3. Behavior When “Help Now” Is Pressed
+Step 1: Immediate Automatic Status Check
+
+Immediately and silently perform:
+
+Check CGM data (if connected)
+
+Check last logged glucose value
+
+Check heart rate (if wearable connected)
+
+Start a 30–60 second countdown
+
+On-screen message (large text):
+
+“We’re checking your levels. Help is standing by.”
+
+No user input required.
+
+Step 2: Smart Emergency Actions (Big Buttons Only)
+
+Show 3–4 very large buttons, never a menu.
+
+🧃 Treat a Low
+
+When selected:
+
+Display:
+
+“You may be low”
+
+Exact grams of carbs needed
+
+Visual guidance:
+
+“Drink juice”
+
+“Eat glucose tablets”
+
+Start a 15-minute timer
+
+Automatically re-check CGM when timer ends
+
+📞 Call Emergency Contact
+
+One tap should:
+
+Immediately call the primary emergency contact
+
+Auto-send SMS:
+
+“I need help. My blood sugar may be low. Please check on me.”
+
+Include automatically:
+
+Live location
+
+Live glucose reading (if enabled)
+
+No confirmation loops.
+
+🚑 Call Emergency Services
+
+Immediate call to emergency services
+
+Automatically share:
+
+Live location
+
+Message:
+“Type 1 Diabetes – possible hypoglycemia”
+
+Option (pre-configured) to auto-trigger if user becomes unresponsive
+
+🗣️ Speak Instructions Aloud
+
+Critical for severe hypos.
+
+The app should read instructions out loud, such as:
+
+“You are low. Drink juice now. Sit down. Help is coming.”
+
+This must work when:
+
+Vision is blurred
+
+User cannot read
+
+Screen interaction is difficult
+
+4. Automatic Escalation Logic (Critical Feature)
+
+If any of the following occur:
+
+User does not respond
+
+Glucose does not improve after treatment
+
+CGM shows continued drop
+
+Countdown expires with no interaction
+
+Then the app must automatically:
+
+Notify emergency contact
+
+Share live location + glucose
+
+Call emergency services (if user enabled this setting)
+
+This makes the app proactive, not reactive.
+
+5. Extra Safety Layers (Optional but Strongly Recommended)
+🔒 Lock-Screen Access
+
+“HELP NOW” usable without unlocking the phone
+
+🧠 Hypo Detection Mode
+
+If glucose drops rapidly:
+
+“We think you may be low. Do you need help?”
+
+Auto-opens Help Now if no response
+
+🏟️ Public Place / Bystander Mode
+
+Display a clear screen with:
+
+“I have Type 1 Diabetes”
+
+Simple instructions for bystanders
+
+QR code linking to emergency info
+
+6. Personalization (Configured Once, Never During Emergency)
+
+Allow users to pre-configure (outside emergencies):
+
+Emergency contacts
+
+When emergency services are auto-called
+
+Preferred hypo treatment
+
+Spoken vs silent mode
+
+Location-based profiles (home, work, stadium, etc.)
+
+⚠️ No settings changes allowed during an active emergency flow.
+
+Technical & Design Constraints
+
+Prioritize accessibility over aesthetics
+
+Fail-safe defaults (escalate rather than wait)
+
+Clear state handling for:
+
+Connected vs disconnected CGM
+
+Offline mode
+
+No wearable available
+
+Code should be modular so this feature can evolve independently
+
+Output Expectations
+
+Update UI components related to “Help Now”
+
+Implement logic for automatic checks and escalation
+
+Ensure feature works even with partial data
+
+Comment code clearly, especially around safety logic
+
+Flag any platform limitations that could affect emergency reliability
