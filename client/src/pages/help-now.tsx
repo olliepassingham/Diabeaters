@@ -249,14 +249,13 @@ export default function HelpNow() {
 
         <div className="p-4 border-t">
           <Button
-            variant="outline"
             size="lg"
-            className="w-full"
+            className="w-full h-14 text-lg"
             onClick={() => setMode("main")}
             data-testid="button-exit-bystander"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Exit Bystander Mode
+            Back to Help Now
           </Button>
         </div>
       </div>
@@ -275,26 +274,21 @@ export default function HelpNow() {
             data-testid="button-back-from-treat"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
+            Back to Help Now
           </Button>
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <AlertCircle className="h-20 w-20 text-yellow-600 mb-4" />
-          <h1 className="text-4xl font-bold text-yellow-800 dark:text-yellow-200 mb-2">
+          <AlertCircle className="h-16 w-16 text-yellow-600 mb-4" />
+          <h1 className="text-3xl font-bold text-yellow-800 dark:text-yellow-200 mb-2">
             TREAT YOUR LOW
           </h1>
-          <p className="text-2xl text-yellow-700 dark:text-yellow-300 mb-8">
-            Follow the Rule of 15
+          <p className="text-xl text-yellow-700 dark:text-yellow-300 mb-6">
+            Eat 15g of fast-acting carbs now
           </p>
 
           <Card className="max-w-lg w-full border-yellow-500 border-2 bg-white dark:bg-yellow-950">
             <CardContent className="p-6">
-              <div className="text-center mb-6">
-                <p className="text-6xl font-bold text-yellow-600">15g</p>
-                <p className="text-2xl text-muted-foreground">of fast-acting carbs</p>
-              </div>
-
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="text-center p-4 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
                   <p className="text-3xl font-bold">4</p>
@@ -310,35 +304,14 @@ export default function HelpNow() {
                 </div>
               </div>
 
-              {!treatmentStarted ? (
-                <Button
-                  size="lg"
-                  className="w-full h-16 text-xl bg-yellow-600 hover:bg-yellow-700"
-                  onClick={startTreatmentTimer}
-                  data-testid="button-start-timer"
-                >
-                  <Clock className="h-6 w-6 mr-3" />
-                  I've eaten carbs - Start 15 min timer
-                </Button>
-              ) : (
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <p className="text-lg text-muted-foreground mb-2">Wait before rechecking</p>
-                    <p className="text-6xl font-bold text-yellow-600">{formatTime(treatmentTimer)}</p>
-                  </div>
-                  <Progress value={(treatmentTimer / (15 * 60)) * 100} className="h-4" />
-                  {treatmentTimer === 0 && (
-                    <div className="bg-green-100 dark:bg-green-900 p-4 rounded-lg">
-                      <p className="text-xl font-bold text-green-800 dark:text-green-200 text-center">
-                        Check your blood sugar now!
-                      </p>
-                      <p className="text-center text-green-700 dark:text-green-300 mt-2">
-                        If still below 70, eat another 15g of carbs
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-lg">
+                <p className="text-lg font-medium text-yellow-800 dark:text-yellow-200">
+                  Wait 15 minutes, then recheck your blood sugar
+                </p>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                  If still low, eat another 15g of carbs
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -361,7 +334,6 @@ export default function HelpNow() {
             onClick={callEmergencyServices}
             data-testid="button-treat-call-999"
           >
-            <Ambulance className="h-6 w-6 mr-3" />
             Still feel bad? Call 999
           </Button>
         </div>
@@ -537,15 +509,14 @@ export default function HelpNow() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-3">
         <h1 className="text-2xl font-bold text-red-600 dark:text-red-500">HELP NOW</h1>
-        <p className="text-sm text-muted-foreground">Tap any button for help</p>
       </div>
 
-      <div className="flex-1 grid gap-3">
+      <div className="flex-1 flex flex-col gap-3">
         <Button
           size="lg"
-          className="h-16 text-xl font-bold bg-yellow-500 hover:bg-yellow-600 text-yellow-950"
+          className="flex-1 text-2xl font-bold bg-yellow-500 hover:bg-yellow-600 text-yellow-950"
           onClick={startTreatLow}
           data-testid="button-treat-low"
         >
@@ -554,14 +525,14 @@ export default function HelpNow() {
 
         <Button
           size="lg"
-          className="h-16 text-xl font-bold bg-blue-600 hover:bg-blue-700"
+          className="flex-1 text-2xl font-bold bg-blue-600 hover:bg-blue-700"
           onClick={callPrimaryContact}
           data-testid="button-call-emergency-contact"
         >
           <div className="text-center">
-            <div>CALL EMERGENCY CONTACT</div>
+            <div>CALL CONTACT</div>
             {contacts.length > 0 && (
-              <div className="text-sm font-normal opacity-80">
+              <div className="text-base font-normal opacity-80">
                 {contacts.find(c => c.isPrimary)?.name || contacts[0].name}
               </div>
             )}
@@ -570,26 +541,26 @@ export default function HelpNow() {
 
         <Button
           size="lg"
-          className="h-16 text-xl font-bold bg-red-600 hover:bg-red-700"
+          className="flex-1 text-2xl font-bold bg-red-600 hover:bg-red-700"
           onClick={callEmergencyServices}
           data-testid="button-call-999"
         >
           CALL 999
         </Button>
+      </div>
 
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <Button
-          size="lg"
           variant="outline"
-          className="h-14 text-lg border-2"
+          size="lg"
+          className="h-12"
           onClick={() => speakMessage("You may be having a low blood sugar. Drink juice or eat glucose tablets. If you feel worse, call 999.")}
           data-testid="button-speak-help"
         >
-          <Volume2 className="h-5 w-5 mr-2" />
-          SPEAK INSTRUCTIONS
+          <Volume2 className="h-4 w-4 mr-1" />
+          Speak
         </Button>
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
         <Button
           variant="outline"
           size="lg"
@@ -597,8 +568,8 @@ export default function HelpNow() {
           onClick={() => setMode("bystander")}
           data-testid="button-bystander-mode"
         >
-          <Users className="h-4 w-4 mr-2" />
-          Bystander Mode
+          <Users className="h-4 w-4 mr-1" />
+          Bystander
         </Button>
 
         <Button
@@ -608,12 +579,12 @@ export default function HelpNow() {
           onClick={() => setMode("contacts-setup")}
           data-testid="button-manage-contacts"
         >
-          <User className="h-4 w-4 mr-2" />
-          Contacts ({contacts.length})
+          <User className="h-4 w-4 mr-1" />
+          Contacts
         </Button>
       </div>
 
-      <Card className="mt-4 border-muted">
+      <Card className="mt-3 border-muted">
         <CardContent className="p-4">
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
