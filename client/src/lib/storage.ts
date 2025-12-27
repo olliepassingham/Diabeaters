@@ -218,7 +218,20 @@ export const storage = {
       localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(defaultCopy));
       return defaultCopy;
     }
-    return JSON.parse(data);
+    const savedWidgets: DashboardWidget[] = JSON.parse(data);
+    const savedIds = new Set(savedWidgets.map(w => w.id));
+    let updated = false;
+    for (const defaultWidget of DEFAULT_WIDGETS) {
+      if (!savedIds.has(defaultWidget.id)) {
+        const maxOrder = Math.max(...savedWidgets.map(w => w.order), -1);
+        savedWidgets.push({ ...defaultWidget, order: maxOrder + 1 });
+        updated = true;
+      }
+    }
+    if (updated) {
+      localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(savedWidgets));
+    }
+    return savedWidgets;
   },
 
   saveDashboardWidgets(widgets: DashboardWidget[]): void {
