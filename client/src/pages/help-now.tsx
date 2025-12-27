@@ -74,7 +74,7 @@ export default function HelpNow() {
             if (primary) {
               window.location.href = `tel:${primary.phone}`;
             } else {
-              window.location.href = `tel:911`;
+              window.location.href = `tel:999`;
             }
             return 0;
           }
@@ -182,7 +182,7 @@ export default function HelpNow() {
 
   const callEmergencyServices = () => {
     resetInactivityTimer();
-    handleCall("911");
+    handleCall("999");
   };
 
   const formatTime = (seconds: number) => {
@@ -207,7 +207,7 @@ export default function HelpNow() {
               <ol className="text-left text-xl space-y-3">
                 <li className="flex gap-3">
                   <span className="font-bold text-red-600">1.</span>
-                  <span>Call 911 immediately</span>
+                  <span>Call 999 immediately</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="font-bold text-red-600">2.</span>
@@ -359,10 +359,10 @@ export default function HelpNow() {
             size="lg"
             className="w-full h-14 text-lg bg-red-600 hover:bg-red-700"
             onClick={callEmergencyServices}
-            data-testid="button-treat-call-911"
+            data-testid="button-treat-call-999"
           >
             <Ambulance className="h-6 w-6 mr-3" />
-            Still feel bad? Call 911
+            Still feel bad? Call 999
           </Button>
         </div>
       </div>
@@ -537,35 +537,31 @@ export default function HelpNow() {
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-red-600 dark:text-red-500">HELP NOW</h1>
-        <p className="text-muted-foreground">Emergency assistance - tap any button</p>
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-red-600 dark:text-red-500">HELP NOW</h1>
+        <p className="text-sm text-muted-foreground">Tap any button for help</p>
       </div>
 
-      <div className="flex-1 grid gap-4">
+      <div className="flex-1 grid gap-3">
         <Button
           size="lg"
-          className="h-24 text-2xl bg-yellow-500 hover:bg-yellow-600 text-yellow-950"
+          className="h-16 text-xl font-bold bg-yellow-500 hover:bg-yellow-600 text-yellow-950"
           onClick={startTreatLow}
           data-testid="button-treat-low"
         >
-          <div className="flex flex-col items-center">
-            <span className="text-3xl mb-1">🧃</span>
-            <span>TREAT A LOW</span>
-          </div>
+          TREAT A LOW
         </Button>
 
         <Button
           size="lg"
-          className="h-24 text-2xl bg-blue-600 hover:bg-blue-700"
+          className="h-16 text-xl font-bold bg-blue-600 hover:bg-blue-700"
           onClick={callPrimaryContact}
           data-testid="button-call-emergency-contact"
         >
-          <Phone className="h-8 w-8 mr-4" />
-          <div className="text-left">
+          <div className="text-center">
             <div>CALL EMERGENCY CONTACT</div>
             {contacts.length > 0 && (
-              <div className="text-sm opacity-80">
+              <div className="text-sm font-normal opacity-80">
                 {contacts.find(c => c.isPrimary)?.name || contacts[0].name}
               </div>
             )}
@@ -574,64 +570,55 @@ export default function HelpNow() {
 
         <Button
           size="lg"
-          className="h-24 text-2xl bg-red-600 hover:bg-red-700"
+          className="h-16 text-xl font-bold bg-red-600 hover:bg-red-700"
           onClick={callEmergencyServices}
-          data-testid="button-call-911"
+          data-testid="button-call-999"
         >
-          <Ambulance className="h-8 w-8 mr-4" />
-          CALL 911
+          CALL 999
         </Button>
 
         <Button
           size="lg"
           variant="outline"
-          className="h-20 text-xl border-2"
-          onClick={() => speakMessage("You may be having a low blood sugar. Drink juice or eat glucose tablets. If you feel worse, call 911.")}
+          className="h-14 text-lg border-2"
+          onClick={() => speakMessage("You may be having a low blood sugar. Drink juice or eat glucose tablets. If you feel worse, call 999.")}
           data-testid="button-speak-help"
         >
-          <Volume2 className="h-6 w-6 mr-3" />
-          SPEAK INSTRUCTIONS ALOUD
+          <Volume2 className="h-5 w-5 mr-2" />
+          SPEAK INSTRUCTIONS
         </Button>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-2 gap-3">
         <Button
           variant="outline"
           size="lg"
-          className="h-16"
+          className="h-12"
           onClick={() => setMode("bystander")}
           data-testid="button-bystander-mode"
         >
-          <Users className="h-5 w-5 mr-2" />
-          <div className="text-left">
-            <div className="text-sm">Bystander</div>
-            <div className="text-xs text-muted-foreground">Show info for helpers</div>
-          </div>
+          <Users className="h-4 w-4 mr-2" />
+          Bystander Mode
         </Button>
 
         <Button
           variant="outline"
           size="lg"
-          className="h-16"
+          className="h-12"
           onClick={() => setMode("contacts-setup")}
           data-testid="button-manage-contacts"
         >
-          <User className="h-5 w-5 mr-2" />
-          <div className="text-left">
-            <div className="text-sm">Contacts</div>
-            <div className="text-xs text-muted-foreground">
-              {contacts.length} saved
-            </div>
-          </div>
+          <User className="h-4 w-4 mr-2" />
+          Contacts ({contacts.length})
         </Button>
       </div>
 
-      <Card className="mt-6 border-muted">
+      <Card className="mt-4 border-muted">
         <CardContent className="p-4">
           <div className="flex gap-3">
             <AlertCircle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
             <div className="text-sm text-muted-foreground">
-              <p>This app provides information only. Always call 911 for medical emergencies.</p>
+              <p>This app provides information only. Always call 999 for medical emergencies.</p>
             </div>
           </div>
         </CardContent>
