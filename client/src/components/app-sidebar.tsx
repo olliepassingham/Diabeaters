@@ -56,9 +56,9 @@ export function AppSidebar() {
         <Link href="/">
           <div className="flex items-center gap-3 cursor-pointer">
             <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden">
-              <FaceLogo variant="nav" />
+              <FaceLogo size={32} />
             </div>
-            <span className="text-xl font-semibold">Diabeater</span>
+            <span className="text-xl font-semibold">Diabeaters</span>
           </div>
         </Link>
       </SidebarHeader>

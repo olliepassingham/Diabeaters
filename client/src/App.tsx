@@ -85,9 +85,9 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
-              <FaceLogo size={28} />
-              <span className="font-semibold text-lg">Diabeater</span>
+            <div className="flex items-center gap-3">
+              <FaceLogo size={40} />
+              <span className="font-semibold text-xl">Diabeaters</span>
             </div>
             <ThemeToggle />
           </header>
