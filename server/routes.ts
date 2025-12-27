@@ -1,13 +1,54 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSettingsSchema, insertSupplySchema, updateSupplySchema, insertActivityLogSchema } from "@shared/schema";
+import { insertUserSettingsSchema, insertSupplySchema, updateSupplySchema, insertActivityLogSchema, insertUserProfileSchema } from "@shared/schema";
 import OpenAI from "openai";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // User Profile Routes
+  app.get("/api/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+    
+    try {
+      const profile = await storage.getUserProfile(req.user!.id);
+      res.json(profile || { onboardingCompleted: false });
+    } catch (error) {
+      res.status(500).send("Failed to fetch profile");
+    }
+  });
+
+  app.post("/api/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const validatedData = insertUserProfileSchema.parse({
+        ...req.body,
+        userId: req.user!.id,
+      });
+
+      const existing = await storage.getUserProfile(req.user!.id);
+      let profile;
+      
+      if (existing) {
+        profile = await storage.updateUserProfile(req.user!.id, validatedData);
+      } else {
+        profile = await storage.createUserProfile(validatedData);
+      }
+
+      res.json(profile);
+    } catch (error) {
+      console.error("Profile save error:", error);
+      res.status(400).send("Invalid profile data");
+    }
+  });
+
   // User Settings Routes
   app.get("/api/settings", async (req, res) => {
     if (!req.isAuthenticated()) {

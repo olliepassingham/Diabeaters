@@ -1,6 +1,8 @@
 import { 
   type User, 
   type InsertUser,
+  type UserProfile,
+  type InsertUserProfile,
   type UserSettings,
   type InsertUserSettings,
   type Supply,
@@ -8,6 +10,7 @@ import {
   type ActivityLog,
   type InsertActivityLog,
   users,
+  userProfiles,
   userSettings,
   supplies,
   activityLogs
@@ -19,6 +22,10 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
+  updateUserProfile(userId: string, profile: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
   
   getUserSettings(userId: string): Promise<UserSettings | undefined>;
   createUserSettings(settings: InsertUserSettings): Promise<UserSettings>;
@@ -46,6 +53,24 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const result = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+    return result[0];
+  }
+
+  async createUserProfile(profile: InsertUserProfile): Promise<UserProfile> {
+    const result = await db.insert(userProfiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateUserProfile(userId: string, profile: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
+    const result = await db.update(userProfiles)
+      .set({ ...profile, updatedAt: new Date() })
+      .where(eq(userProfiles.userId, userId))
+      .returning();
     return result[0];
   }
 

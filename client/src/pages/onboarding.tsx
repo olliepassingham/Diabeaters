@@ -7,8 +7,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, ArrowLeft, Check } from "lucide-react";
 
@@ -47,29 +45,16 @@ export default function Onboarding() {
   const currentStepIndex = STEPS.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
 
-  const saveProfileMutation = useMutation({
-    mutationFn: async (profileData: OnboardingData) => {
-      return await apiRequest("/api/profile", {
-        method: "POST",
-        body: JSON.stringify({ ...profileData, onboardingCompleted: true }),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      toast({
-        title: "Welcome to Diabeater!",
-        description: "Your profile has been set up successfully.",
-      });
-      setLocation("/");
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save profile. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  const handleSaveProfile = () => {
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    localStorage.setItem("diabeater_profile", JSON.stringify(data));
+    toast({
+      title: "Welcome to Diabeater!",
+      description: "Your profile has been set up successfully.",
+    });
+    setLocation("/");
+    window.location.reload();
+  };
 
   const handleNext = () => {
     const stepIndex = STEPS.indexOf(currentStep);
@@ -100,7 +85,7 @@ export default function Onboarding() {
       });
       return;
     }
-    saveProfileMutation.mutate(data);
+    handleSaveProfile();
   };
 
   const updateData = (field: keyof OnboardingData, value: string | boolean) => {
@@ -401,11 +386,10 @@ export default function Onboarding() {
           {currentStep === "complete" ? (
             <Button
               onClick={handleComplete}
-              disabled={saveProfileMutation.isPending}
               className="min-w-32"
               data-testid="button-onboarding-complete"
             >
-              {saveProfileMutation.isPending ? "Saving..." : "Get Started"}
+              Get Started
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : currentStep === "disclaimer" ? (
