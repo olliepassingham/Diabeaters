@@ -1,137 +1,119 @@
 interface FaceLogoProps {
   size?: number;
-  opacity?: number;
   className?: string;
-  variant?: "header" | "nav" | "watermark";
+  variant?: "nav" | "watermark";
 }
 
 export function FaceLogo({ 
-  size = 120, 
-  opacity = 0.06, 
+  size = 32, 
   className = "",
-  variant = "header"
+  variant = "nav"
 }: FaceLogoProps) {
-  const variantStyles = {
-    header: { size: size, opacity: opacity },
-    nav: { size: 32, opacity: 0.8 },
-    watermark: { size: size, opacity: 0.04 },
-  };
-
-  const { size: finalSize, opacity: finalOpacity } = variantStyles[variant];
-
-  return (
-    <svg
-      width={finalSize}
-      height={finalSize}
-      viewBox="0 0 200 280"
-      fill="none"
-      className={className}
-      style={{ opacity: finalOpacity }}
-      aria-hidden="true"
-    >
-      <path
-        d="M100 20
-           C70 20, 50 50, 48 80
-           C46 100, 50 120, 55 140
-           C45 145, 40 155, 42 165
-           C44 175, 52 180, 60 178
-           C65 200, 75 220, 90 240
-           C95 248, 100 255, 105 260
-           
-           M95 75
-           C90 72, 82 73, 80 78
-           C78 83, 82 88, 88 88
-           
-           M130 85
-           C125 82, 117 83, 115 88
-           C113 93, 117 98, 123 98
-           
-           M100 100
-           C100 100, 98 120, 100 135
-           C102 140, 105 142, 108 140
-           
-           M85 165
-           C90 172, 100 175, 110 172
-           C115 170, 118 165, 115 162
-           
-           M105 260
-           C115 250, 125 235, 130 215
-           C140 185, 145 155, 142 125
-           C140 100, 135 75, 125 55
-           C115 35, 105 25, 100 20
-           
-           M155 80
-           C158 95, 160 110, 158 125
-           C162 130, 168 135, 172 132
-           C178 128, 180 120, 175 115
-           C172 105, 165 90, 155 80
-           
-           M130 175
-           C135 180, 142 185, 145 190
-           C148 195, 148 202, 145 208
-           C142 215, 135 220, 128 222"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+  if (variant === "nav") {
+    return (
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
         fill="none"
-      />
-    </svg>
-  );
+        className={`text-primary ${className}`}
+        aria-hidden="true"
+      >
+        <path
+          d="M50 10
+             C35 10, 25 25, 24 40
+             C23 50, 25 60, 28 70
+             C23 72, 20 77, 21 82
+             C22 87, 26 90, 30 89
+             C33 100, 40 108, 50 115
+             
+             M45 35
+             C42 33, 38 34, 37 37
+             C36 40, 38 43, 42 43
+             
+             M62 38
+             C59 36, 55 37, 54 40
+             C53 43, 55 46, 59 46
+             
+             M50 48
+             C50 48, 49 58, 50 65
+             C51 68, 53 69, 55 68
+             
+             M42 78
+             C45 82, 50 84, 55 82
+             C58 80, 60 78, 58 76
+             
+             M50 115
+             C60 108, 67 100, 70 90
+             C76 75, 77 60, 76 45
+             C75 35, 70 25, 62 18
+             C55 12, 52 10, 50 10
+             
+             M78 40
+             C80 48, 81 55, 80 62
+             C82 65, 85 67, 87 65
+             C90 63, 91 58, 88 55
+             C86 50, 82 42, 78 40"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    );
+  }
+
+  return null;
 }
 
 export function FaceLogoWatermark({ className = "" }: { className?: string }) {
   return (
     <div className={`absolute inset-0 flex items-start justify-center pointer-events-none overflow-hidden ${className}`}>
-      <div className="relative -top-8 opacity-[0.035]">
+      <div className="relative -top-8">
         <svg
           width="280"
-          height="380"
-          viewBox="0 0 200 280"
+          height="320"
+          viewBox="0 0 100 115"
           fill="none"
           aria-hidden="true"
+          className="text-foreground opacity-[0.03]"
         >
           <path
-            d="M100 20
-               C70 20, 50 50, 48 80
-               C46 100, 50 120, 55 140
-               C45 145, 40 155, 42 165
-               C44 175, 52 180, 60 178
-               C65 200, 75 220, 90 240
-               C95 248, 100 255, 105 260
+            d="M50 10
+               C35 10, 25 25, 24 40
+               C23 50, 25 60, 28 70
+               C23 72, 20 77, 21 82
+               C22 87, 26 90, 30 89
+               C33 100, 40 108, 50 115
                
-               M95 75
-               C90 72, 82 73, 80 78
-               C78 83, 82 88, 88 88
+               M45 35
+               C42 33, 38 34, 37 37
+               C36 40, 38 43, 42 43
                
-               M130 85
-               C125 82, 117 83, 115 88
-               C113 93, 117 98, 123 98
+               M62 38
+               C59 36, 55 37, 54 40
+               C53 43, 55 46, 59 46
                
-               M100 100
-               C100 100, 98 120, 100 135
-               C102 140, 105 142, 108 140
+               M50 48
+               C50 48, 49 58, 50 65
+               C51 68, 53 69, 55 68
                
-               M85 165
-               C90 172, 100 175, 110 172
-               C115 170, 118 165, 115 162
+               M42 78
+               C45 82, 50 84, 55 82
+               C58 80, 60 78, 58 76
                
-               M105 260
-               C115 250, 125 235, 130 215
-               C140 185, 145 155, 142 125
-               C140 100, 135 75, 125 55
-               C115 35, 105 25, 100 20
+               M50 115
+               C60 108, 67 100, 70 90
+               C76 75, 77 60, 76 45
+               C75 35, 70 25, 62 18
+               C55 12, 52 10, 50 10
                
-               M155 80
-               C158 95, 160 110, 158 125
-               C162 130, 168 135, 172 132
-               C178 128, 180 120, 175 115
-               C172 105, 165 90, 155 80
-               
-               M130 175
-               C135 180, 142 185, 145 190
-               C148 195, 148 202, 145 208
-               C142 215, 135 220, 128 222"
+               M78 40
+               C80 48, 81 55, 80 62
+               C82 65, 85 67, 87 65
+               C90 63, 91 58, 88 55
+               C86 50, 82 42, 78 40"
             stroke="currentColor"
             strokeWidth="1"
             strokeLinecap="round"
