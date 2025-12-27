@@ -1,0 +1,185 @@
+const STORAGE_KEYS = {
+  PROFILE: "diabeater_profile",
+  SETTINGS: "diabeater_settings",
+  SUPPLIES: "diabeater_supplies",
+  ONBOARDING: "diabeater_onboarding_completed",
+  EMERGENCY_CONTACTS: "diabeater_emergency_contacts",
+  ACTIVITY_LOGS: "diabeater_activity_logs",
+} as const;
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  dateOfBirth: string;
+  bgUnits: string;
+  carbUnits: string;
+  diabetesType: string;
+  insulinDeliveryMethod: string;
+  usingInsulin: boolean;
+  hasAcceptedDisclaimer: boolean;
+}
+
+export interface UserSettings {
+  tdd?: number;
+  breakfastRatio?: string;
+  lunchRatio?: string;
+  dinnerRatio?: string;
+  snackRatio?: string;
+  correctionFactor?: number;
+  targetBgLow?: number;
+  targetBgHigh?: number;
+  shortActingPensPerDay?: number;
+  longActingPensPerDay?: number;
+  injectionsPerDay?: number;
+  cgmDays?: number;
+}
+
+export interface Supply {
+  id: string;
+  name: string;
+  type: "needle" | "insulin" | "cgm" | "other";
+  currentQuantity: number;
+  dailyUsage: number;
+  lastPickupDate?: string;
+  notes?: string;
+}
+
+export interface EmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
+  relationship?: string;
+  isPrimary: boolean;
+}
+
+export interface ActivityLog {
+  id: string;
+  activityType: string;
+  activityDetails: string;
+  recommendation: string;
+  createdAt: string;
+}
+
+function generateId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+export const storage = {
+  getProfile(): UserProfile | null {
+    const data = localStorage.getItem(STORAGE_KEYS.PROFILE);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveProfile(profile: UserProfile): void {
+    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    localStorage.setItem(STORAGE_KEYS.ONBOARDING, "true");
+  },
+
+  isOnboardingCompleted(): boolean {
+    return localStorage.getItem(STORAGE_KEYS.ONBOARDING) === "true";
+  },
+
+  getSettings(): UserSettings {
+    const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    return data ? JSON.parse(data) : {};
+  },
+
+  saveSettings(settings: UserSettings): void {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+  },
+
+  getSupplies(): Supply[] {
+    const data = localStorage.getItem(STORAGE_KEYS.SUPPLIES);
+    if (!data) {
+      const defaults: Supply[] = [
+        { id: generateId(), name: "Insulin Pen Needles", type: "needle", currentQuantity: 50, dailyUsage: 4 },
+        { id: generateId(), name: "NovoRapid FlexPen", type: "insulin", currentQuantity: 3, dailyUsage: 0.33 },
+        { id: generateId(), name: "CGM Sensor", type: "cgm", currentQuantity: 2, dailyUsage: 0.1 },
+      ];
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(defaults));
+      return defaults;
+    }
+    return JSON.parse(data);
+  },
+
+  addSupply(supply: Omit<Supply, "id">): Supply {
+    const supplies = this.getSupplies();
+    const newSupply = { ...supply, id: generateId() };
+    supplies.push(newSupply);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    return newSupply;
+  },
+
+  updateSupply(id: string, updates: Partial<Supply>): Supply | null {
+    const supplies = this.getSupplies();
+    const index = supplies.findIndex(s => s.id === id);
+    if (index === -1) return null;
+    supplies[index] = { ...supplies[index], ...updates };
+    localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    return supplies[index];
+  },
+
+  deleteSupply(id: string): boolean {
+    const supplies = this.getSupplies();
+    const filtered = supplies.filter(s => s.id !== id);
+    if (filtered.length === supplies.length) return false;
+    localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(filtered));
+    return true;
+  },
+
+  getEmergencyContacts(): EmergencyContact[] {
+    const data = localStorage.getItem(STORAGE_KEYS.EMERGENCY_CONTACTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addEmergencyContact(contact: Omit<EmergencyContact, "id">): EmergencyContact {
+    const contacts = this.getEmergencyContacts();
+    const newContact = { ...contact, id: generateId() };
+    contacts.push(newContact);
+    localStorage.setItem(STORAGE_KEYS.EMERGENCY_CONTACTS, JSON.stringify(contacts));
+    return newContact;
+  },
+
+  updateEmergencyContact(id: string, updates: Partial<EmergencyContact>): EmergencyContact | null {
+    const contacts = this.getEmergencyContacts();
+    const index = contacts.findIndex(c => c.id === id);
+    if (index === -1) return null;
+    contacts[index] = { ...contacts[index], ...updates };
+    localStorage.setItem(STORAGE_KEYS.EMERGENCY_CONTACTS, JSON.stringify(contacts));
+    return contacts[index];
+  },
+
+  deleteEmergencyContact(id: string): boolean {
+    const contacts = this.getEmergencyContacts();
+    const filtered = contacts.filter(c => c.id !== id);
+    if (filtered.length === contacts.length) return false;
+    localStorage.setItem(STORAGE_KEYS.EMERGENCY_CONTACTS, JSON.stringify(filtered));
+    return true;
+  },
+
+  getActivityLogs(): ActivityLog[] {
+    const data = localStorage.getItem(STORAGE_KEYS.ACTIVITY_LOGS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addActivityLog(log: Omit<ActivityLog, "id" | "createdAt">): ActivityLog {
+    const logs = this.getActivityLogs();
+    const newLog = { ...log, id: generateId(), createdAt: new Date().toISOString() };
+    logs.unshift(newLog);
+    if (logs.length > 50) logs.pop();
+    localStorage.setItem(STORAGE_KEYS.ACTIVITY_LOGS, JSON.stringify(logs));
+    return newLog;
+  },
+
+  getDaysRemaining(supply: Supply): number {
+    if (supply.dailyUsage <= 0) return 999;
+    return Math.floor(supply.currentQuantity / supply.dailyUsage);
+  },
+
+  getSupplyStatus(supply: Supply): "critical" | "low" | "ok" {
+    const days = this.getDaysRemaining(supply);
+    if (days <= 3) return "critical";
+    if (days <= 7) return "low";
+    return "ok";
+  },
+};
