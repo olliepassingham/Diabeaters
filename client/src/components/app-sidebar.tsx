@@ -25,14 +25,14 @@ const items = [
     icon: Package,
   },
   {
-    title: "Sick Day Adviser",
-    url: "/sick-day",
-    icon: Thermometer,
-  },
-  {
     title: "AI Advisor",
     url: "/advisor",
     icon: Bot,
+  },
+  {
+    title: "Sick Day Adviser",
+    url: "/sick-day",
+    icon: Thermometer,
   },
   {
     title: "Settings",
