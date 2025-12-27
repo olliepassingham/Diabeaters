@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Thermometer } from "lucide-react";
+import { Home, Package, Bot, Settings, Thermometer, Phone } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -10,6 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 
 const items = [
@@ -46,10 +47,14 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-6">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Diabeaters" className="h-10 w-10 object-contain" />
-          <span className="text-xl font-semibold">Diabeaters</span>
-        </div>
+        <Link href="/">
+          <div className="flex items-center gap-3 cursor-pointer">
+            <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
+              <span className="text-xl font-bold text-primary">D</span>
+            </div>
+            <span className="text-xl font-semibold">Diabeater</span>
+          </div>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -58,7 +63,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(' ', '-')}`}>
+                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                     <Link href={item.url}>
                       <item.icon />
                       <span>{item.title}</span>
@@ -70,6 +75,18 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-4">
+        <Link href="/help-now">
+          <SidebarMenuButton 
+            className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400" 
+            isActive={location === "/help-now"}
+            data-testid="link-help-now"
+          >
+            <Phone className="h-4 w-4" />
+            <span>Help Now</span>
+          </SidebarMenuButton>
+        </Link>
+      </SidebarFooter>
     </Sidebar>
   );
 }

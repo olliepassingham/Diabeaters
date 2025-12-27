@@ -13,6 +13,7 @@ import Supplies from "@/pages/supplies";
 import SickDay from "@/pages/sick-day";
 import Advisor from "@/pages/advisor";
 import Settings from "@/pages/settings";
+import HelpNow from "@/pages/help-now";
 import Onboarding from "@/pages/onboarding";
 import NotFound from "@/pages/not-found";
 
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/sick-day" component={SickDay} />
       <Route path="/advisor" component={Advisor} />
       <Route path="/settings" component={Settings} />
+      <Route path="/help-now" component={HelpNow} />
       <Route component={NotFound} />
     </Switch>
   );

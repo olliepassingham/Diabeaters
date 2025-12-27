@@ -1,43 +1,100 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Activity } from "lucide-react";
+import { AlertCircle, Activity, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { storage, UserSettings } from "@/lib/storage";
+
+interface SickDayResults {
+  correctionDose: number;
+  breakfastRatio: string;
+  lunchRatio: string;
+  dinnerRatio: string;
+  snackRatio: string;
+  basalAdjustment: string;
+  hydrationNote: string;
+  monitoringFrequency: string;
+}
+
+function calculateSickDayRecommendations(
+  tdd: number,
+  bgLevel: number,
+  severity: string,
+  settings: UserSettings
+): SickDayResults {
+  const correctionFactor = settings.correctionFactor || Math.round(1800 / tdd);
+  const targetBg = settings.targetBgHigh || 120;
+  
+  let correctionDose = 0;
+  if (bgLevel > targetBg) {
+    correctionDose = Math.round((bgLevel - targetBg) / correctionFactor * 10) / 10;
+  }
+
+  const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
+    if (!ratio) return `1:${Math.round(10 * multiplier)}`;
+    const match = ratio.match(/1:(\d+)/);
+    if (match) {
+      const originalRatio = parseInt(match[1]);
+      return `1:${Math.round(originalRatio * multiplier)}`;
+    }
+    return ratio;
+  };
+
+  let ratioMultiplier = 1;
+  let basalAdjustment = "No change recommended";
+  let hydrationNote = "Drink plenty of sugar-free fluids";
+  let monitoringFrequency = "Check blood glucose every 4 hours";
+
+  switch (severity) {
+    case "minor":
+      ratioMultiplier = 0.9;
+      basalAdjustment = "Consider 10% increase if blood glucose runs high";
+      monitoringFrequency = "Check blood glucose every 4-6 hours";
+      break;
+    case "moderate":
+      ratioMultiplier = 0.8;
+      basalAdjustment = "Consider 10-20% increase if blood glucose remains elevated";
+      hydrationNote = "Stay well hydrated with sugar-free fluids. Consider electrolyte drinks.";
+      monitoringFrequency = "Check blood glucose every 2-4 hours";
+      break;
+    case "severe":
+      ratioMultiplier = 0.7;
+      basalAdjustment = "Consider 20% increase, but monitor closely for lows if unable to eat";
+      hydrationNote = "Critical: Stay hydrated. If vomiting, seek medical attention.";
+      monitoringFrequency = "Check blood glucose and ketones every 2 hours";
+      break;
+  }
+
+  return {
+    correctionDose,
+    breakfastRatio: adjustRatio(settings.breakfastRatio, ratioMultiplier),
+    lunchRatio: adjustRatio(settings.lunchRatio, ratioMultiplier),
+    dinnerRatio: adjustRatio(settings.dinnerRatio, ratioMultiplier),
+    snackRatio: adjustRatio(settings.snackRatio, ratioMultiplier),
+    basalAdjustment,
+    hydrationNote,
+    monitoringFrequency,
+  };
+}
 
 export default function SickDay() {
   const { toast } = useToast();
+  const [settings, setSettings] = useState<UserSettings>({});
   const [tdd, setTdd] = useState("");
   const [bgLevel, setBgLevel] = useState("");
   const [severity, setSeverity] = useState<string>("");
-  const [results, setResults] = useState<{
-    correctionDose: number;
-    breakfastRatio: string;
-    lunchRatio: string;
-    dinnerRatio: string;
-    snackRatio: string;
-  } | null>(null);
+  const [results, setResults] = useState<SickDayResults | null>(null);
 
-  const calculateMutation = useMutation({
-    mutationFn: async (data: { tdd: number; bgLevel: number; severity: string }) => {
-      const response = await apiRequest("POST", "/api/sick-day/calculate", data);
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      setResults(data);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Calculation failed",
-        description: error.message || "Failed to calculate sick day recommendations. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+  useEffect(() => {
+    const storedSettings = storage.getSettings();
+    setSettings(storedSettings);
+    if (storedSettings.tdd) {
+      setTdd(storedSettings.tdd.toString());
+    }
+  }, []);
 
   const handleCalculate = () => {
     if (!tdd || !bgLevel || !severity) {
@@ -52,10 +109,32 @@ export default function SickDay() {
     const tddNum = parseFloat(tdd);
     const bgNum = parseFloat(bgLevel);
 
-    calculateMutation.mutate({
-      tdd: tddNum,
-      bgLevel: bgNum,
-      severity,
+    if (isNaN(tddNum) || isNaN(bgNum) || tddNum <= 0 || bgNum <= 0) {
+      toast({
+        title: "Invalid values",
+        description: "Please enter valid positive numbers for TDD and blood glucose.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const recommendations = calculateSickDayRecommendations(tddNum, bgNum, severity, settings);
+    
+    if (isNaN(recommendations.correctionDose)) {
+      toast({
+        title: "Calculation error",
+        description: "Unable to calculate recommendations. Please check your input values.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setResults(recommendations);
+
+    storage.addActivityLog({
+      activityType: "sick_day_calculation",
+      activityDetails: `TDD: ${tddNum}, BG: ${bgNum}, Severity: ${severity}`,
+      recommendation: `Correction: ${recommendations.correctionDose}u, Ratios adjusted`,
     });
   };
 
@@ -74,10 +153,11 @@ export default function SickDay() {
             <div className="flex gap-3">
               <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
               <div className="text-sm">
-                <p className="font-medium text-yellow-900 dark:text-yellow-100">Medical Disclaimer</p>
+                <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
                 <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-                  This tool provides estimates only. Always consult your healthcare provider when sick, 
-                  especially if blood glucose is consistently high or you have ketones.
+                  This tool provides educational estimates only based on general guidelines. 
+                  Always consult your healthcare provider when sick, especially if blood glucose 
+                  is consistently high, you have ketones, or symptoms worsen.
                 </p>
               </div>
             </div>
@@ -137,10 +217,9 @@ export default function SickDay() {
               onClick={handleCalculate} 
               className="w-full" 
               data-testid="button-calculate"
-              disabled={calculateMutation.isPending}
             >
               <Activity className="h-4 w-4 mr-2" />
-              {calculateMutation.isPending ? "Calculating..." : "Calculate Recommendations"}
+              Calculate Recommendations
             </Button>
           </CardContent>
         </Card>
@@ -152,52 +231,86 @@ export default function SickDay() {
               <CardDescription>Based on your current condition</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="p-4 bg-primary/5 rounded-lg">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-sm text-muted-foreground">Correction Dose:</span>
-                  <span className="text-2xl font-semibold" data-testid="text-correction-dose">
-                    {results.correctionDose} units
-                  </span>
+              {results.correctionDose > 0 && (
+                <div className="p-4 bg-primary/5 rounded-lg">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm text-muted-foreground">Suggested Correction Dose:</span>
+                    <span className="text-2xl font-semibold" data-testid="text-correction-dose">
+                      {results.correctionDose} units
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    To help bring your current blood glucose toward target
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Immediate correction for current blood glucose
-                </p>
-              </div>
+              )}
 
               <div className="space-y-3">
                 <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Breakfast</p>
-                    <p className="font-semibold mt-1">{results.breakfastRatio}</p>
+                    <p className="font-semibold mt-1" data-testid="text-breakfast-ratio">{results.breakfastRatio}</p>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Lunch</p>
-                    <p className="font-semibold mt-1">{results.lunchRatio}</p>
+                    <p className="font-semibold mt-1" data-testid="text-lunch-ratio">{results.lunchRatio}</p>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Dinner</p>
-                    <p className="font-semibold mt-1">{results.dinnerRatio}</p>
+                    <p className="font-semibold mt-1" data-testid="text-dinner-ratio">{results.dinnerRatio}</p>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Snacks</p>
-                    <p className="font-semibold mt-1">{results.snackRatio}</p>
+                    <p className="font-semibold mt-1" data-testid="text-snack-ratio">{results.snackRatio}</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Ratios show: 1 unit of insulin per X grams of carbohydrates
+                  Ratios show: 1 unit of insulin per X grams of carbohydrates (tighter than usual)
                 </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-primary mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Basal Insulin</p>
+                      <p className="text-xs text-muted-foreground">{results.basalAdjustment}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="font-medium text-sm text-blue-900 dark:text-blue-100">Hydration</p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">{results.hydrationNote}</p>
+                </div>
+
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="font-medium text-sm">Monitoring</p>
+                  <p className="text-xs text-muted-foreground">{results.monitoringFrequency}</p>
+                </div>
               </div>
 
               <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
                 <p className="font-medium">Important Reminders:</p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-                  <li>Check blood glucose every 2-4 hours</li>
-                  <li>Stay hydrated with sugar-free fluids</li>
-                  <li>Check for ketones if BG remains high</li>
+                  <li>Never skip basal insulin, even if not eating</li>
+                  <li>Check for ketones if BG remains above 250 mg/dL</li>
+                  <li>Seek medical help if you have moderate/large ketones</li>
                   <li>Contact your healthcare team if symptoms worsen</li>
                 </ul>
               </div>
+
+              <Card className="border-yellow-500/30 bg-yellow-50/30 dark:bg-yellow-950/10">
+                <CardContent className="p-3">
+                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                    <strong>Disclaimer:</strong> These recommendations are educational estimates based on 
+                    general sick day guidelines. Individual insulin needs vary significantly. Always follow 
+                    your healthcare provider's specific instructions for sick day management.
+                  </p>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         )}
