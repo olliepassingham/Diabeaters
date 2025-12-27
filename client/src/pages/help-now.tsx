@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertCircle, Phone, Plus, User, Trash2, AlertTriangle, Heart, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, EmergencyContact, UserSettings } from "@/lib/storage";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 function EmergencyCard({ 
   title, 
@@ -93,7 +94,8 @@ export default function HelpNow() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <FaceLogoWatermark />
       <div>
         <h1 className="text-3xl font-semibold text-red-600 dark:text-red-500">Help Now</h1>
         <p className="text-muted-foreground mt-1">

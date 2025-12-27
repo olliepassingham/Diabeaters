@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { storage, Supply } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 interface TravelPlan {
   duration: number;
@@ -332,7 +333,8 @@ export default function Travel() {
 
   if (step === "entry") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6 relative">
+        <FaceLogoWatermark />
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
             <Plane className="h-6 w-6 text-primary" />
@@ -394,7 +396,8 @@ export default function Travel() {
 
   if (step === "inputs") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-6 relative">
+        <FaceLogoWatermark />
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -521,7 +524,8 @@ export default function Travel() {
   const checkedCount = packingList.filter(i => i.checked).length;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 relative">
+      <FaceLogoWatermark />
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-new-plan">
           <ArrowLeft className="h-5 w-5" />

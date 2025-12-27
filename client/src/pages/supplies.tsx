@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Pencil, Trash2, Package, Syringe, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply } from "@/lib/storage";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 const typeIcons = {
   needle: Syringe,
@@ -316,7 +317,8 @@ export default function Supplies() {
   const lowStockCount = supplies.filter(s => storage.getSupplyStatus(s) !== "ok").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <FaceLogoWatermark />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">Supply Tracker</h1>

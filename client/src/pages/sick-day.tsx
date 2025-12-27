@@ -8,6 +8,7 @@ import { AlertCircle, Activity, Info, Plane, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings } from "@/lib/storage";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 interface SickDayResults {
   correctionDose: number;
@@ -140,7 +141,8 @@ export default function SickDay() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <FaceLogoWatermark />
       <div>
         <h1 className="text-3xl font-semibold">Sick Day Adviser</h1>
         <p className="text-muted-foreground mt-1">

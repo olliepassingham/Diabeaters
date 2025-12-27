@@ -1,0 +1,186 @@
+🎨 REPLIT AGENT PROMPT — LOGO OUTLINE INTEGRATION (Diabeater)
+CONTEXT
+
+You are continuing development of the Diabeater mobile app.
+
+A minimalist single-line face outline logo (provided asset) must now be integrated deeply and consistently into the app’s visual identity.
+
+This is not a background image or illustration — it is a structural brand element.
+
+🎯 OBJECTIVE
+
+Integrate the face outline logo into the app so that it:
+
+Reinforces brand identity
+
+Feels calm and medical-adjacent
+
+Never distracts from content
+
+Adapts automatically to the app’s background color
+
+Only the outline of the face should be used.
+No fills, no background box, no gradients.
+
+🧩 LOGO USAGE RULES (STRICT)
+
+Use only the outline path of the face
+
+Logo stroke color must:
+
+Match the current page background color
+
+Be rendered at low opacity (subtle, elegant)
+
+Logo must never:
+
+Overlap text
+
+Reduce readability
+
+Compete with primary UI elements
+
+Think: quiet watermark, not decoration
+
+📍 REQUIRED PLACEMENT LOCATIONS
+1. Page Header (ALL SCREENS)
+
+At the top of every screen:
+
+Place the face outline logo:
+
+Centered or subtly offset
+
+Behind or above the page title
+
+Opacity: very low (e.g. 4–8%)
+
+Scale: large enough to be recognisable, never dominant
+
+This must apply to:
+
+Dashboard
+
+AI Adviser screens
+
+Scenario Adviser (including Travel Mode)
+
+Supply Tracker
+
+Settings
+
+Emergency / Help Now screens
+
+2. Navigation Tab Bar (MANDATORY)
+
+In the bottom navigation bar:
+
+Place a simplified version of the face outline:
+
+Small
+
+Clean
+
+Stroke-only
+
+Position:
+
+Next to the app name “Diabeater”
+
+Or as the primary brand icon in the navigation
+
+Rules:
+
+Must remain legible at small sizes
+
+Must adapt to light/dark mode automatically
+
+🎨 VISUAL STYLE REQUIREMENTS
+
+Stroke weight:
+
+Thin to medium
+
+Consistent across all usages
+
+Color logic:
+
+Same hue as background
+
+Slight contrast via opacity or blending
+
+Background:
+
+Transparent
+
+Accessibility-safe (no visual noise)
+
+🧱 TECHNICAL IMPLEMENTATION REQUIREMENTS
+
+Logo must be:
+
+Implemented as SVG or vector
+
+Not rasterized
+
+Scalable across devices
+
+Centralize the logo component:
+
+Single reusable component
+
+Props for size, opacity, placement
+
+Must support:
+
+Light mode
+
+Dark mode
+
+Future themes
+
+🧠 BRAND INTENT (DO NOT IGNORE)
+
+The logo represents:
+
+Duality
+
+Reflection
+
+Inner awareness
+
+Calm vigilance
+
+It should feel:
+
+Thoughtful
+
+Supportive
+
+Non-clinical
+
+Non-corporate
+
+✅ ACCEPTANCE CRITERIA
+
+This task is complete only when:
+
+The logo appears on every screen header
+
+The logo appears in the navigation bar next to the app name
+
+The logo adapts automatically to background color
+
+The logo never interferes with content
+
+The implementation is reusable and theme-aware
+
+🚀 AFTER COMPLETION
+
+Once implemented:
+
+Confirm visual consistency
+
+Validate accessibility
+
+Prepare for brand system expansion

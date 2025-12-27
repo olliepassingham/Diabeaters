@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, AlertCircle, Clock, Plus, Activity, AlertTriangle, Thermometer, Dumbbell, Phone, Plane } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Supply } from "@/lib/storage";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 function StatCard({ title, value, icon: Icon, description, variant }: { 
   title: string; 
@@ -111,7 +112,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <FaceLogoWatermark />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold" data-testid="text-greeting">

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings } from "@/lib/storage";
 import { User, Syringe, Activity, Save } from "lucide-react";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -119,7 +120,8 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      <FaceLogoWatermark />
       <div>
         <h1 className="text-3xl font-semibold">Settings</h1>
         <p className="text-muted-foreground mt-1">Manage your profile and preferences.</p>

@@ -1,5 +1,6 @@
 import { Home, Package, Bot, Settings, Thermometer, Phone, Plane } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { FaceLogo } from "@/components/face-logo";
 import {
   Sidebar,
   SidebarContent,
@@ -54,8 +55,8 @@ export function AppSidebar() {
       <SidebarHeader className="p-6">
         <Link href="/">
           <div className="flex items-center gap-3 cursor-pointer">
-            <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <span className="text-xl font-bold text-primary">D</span>
+            <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center overflow-hidden">
+              <FaceLogo variant="nav" />
             </div>
             <span className="text-xl font-semibold">Diabeater</span>
           </div>

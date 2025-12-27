@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Utensils, Dumbbell, Calculator, AlertCircle, Bot, User } from "lucide-react";
 import { storage, UserSettings } from "@/lib/storage";
+import { FaceLogoWatermark } from "@/components/face-logo";
 
 type Message = {
   role: "user" | "assistant";
@@ -291,7 +292,8 @@ export default function Advisor() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      <FaceLogoWatermark />
       <div className="mb-4">
         <h1 className="text-3xl font-semibold">AI Activity Advisor</h1>
         <p className="text-muted-foreground mt-1">Get personalized recommendations for meals and activities.</p>
