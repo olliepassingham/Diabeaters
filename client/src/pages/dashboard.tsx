@@ -197,11 +197,11 @@ export default function Dashboard() {
         <h2 className="text-xl font-semibold">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionCard
-            title="Sick Day Help"
-            description="Get adjusted ratios when unwell"
-            icon={Thermometer}
-            href="/sick-day"
-            testId="link-sick-day"
+            title="Track Supplies"
+            description="Update your inventory"
+            icon={Package}
+            href="/supplies"
+            testId="link-supplies"
           />
           <QuickActionCard
             title="Exercise Planning"
@@ -211,11 +211,11 @@ export default function Dashboard() {
             testId="link-advisor"
           />
           <QuickActionCard
-            title="Track Supplies"
-            description="Update your inventory"
-            icon={Package}
-            href="/supplies"
-            testId="link-supplies"
+            title="Sick Day Help"
+            description="Get adjusted ratios when unwell"
+            icon={Thermometer}
+            href="/sick-day"
+            testId="link-sick-day"
           />
           <QuickActionCard
             title="Help Now"
