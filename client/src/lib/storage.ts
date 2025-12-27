@@ -5,6 +5,8 @@ const STORAGE_KEYS = {
   ONBOARDING: "diabeater_onboarding_completed",
   EMERGENCY_CONTACTS: "diabeater_emergency_contacts",
   ACTIVITY_LOGS: "diabeater_activity_logs",
+  DASHBOARD_WIDGETS: "diabeater_dashboard_widgets",
+  SCENARIO_STATE: "diabeater_scenario_state",
 } as const;
 
 export interface UserProfile {
@@ -59,6 +61,31 @@ export interface ActivityLog {
   recommendation: string;
   createdAt: string;
 }
+
+export type WidgetType = "supply-summary" | "today-overview" | "ai-recommendations" | "quick-actions" | "scenario-status";
+
+export interface DashboardWidget {
+  id: string;
+  type: WidgetType;
+  enabled: boolean;
+  order: number;
+}
+
+export interface ScenarioState {
+  travelModeActive: boolean;
+  travelDestination?: string;
+  travelEndDate?: string;
+  sickDayActive: boolean;
+  sickDaySeverity?: string;
+}
+
+export const DEFAULT_WIDGETS: DashboardWidget[] = [
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 0 },
+  { id: "today-overview", type: "today-overview", enabled: true, order: 1 },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 3 },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4 },
+];
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -181,5 +208,57 @@ export const storage = {
     if (days <= 3) return "critical";
     if (days <= 7) return "low";
     return "ok";
+  },
+
+  getDashboardWidgets(): DashboardWidget[] {
+    const data = localStorage.getItem(STORAGE_KEYS.DASHBOARD_WIDGETS);
+    if (!data) {
+      localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(DEFAULT_WIDGETS));
+      return DEFAULT_WIDGETS;
+    }
+    return JSON.parse(data);
+  },
+
+  saveDashboardWidgets(widgets: DashboardWidget[]): void {
+    localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(widgets));
+  },
+
+  getScenarioState(): ScenarioState {
+    const data = localStorage.getItem(STORAGE_KEYS.SCENARIO_STATE);
+    return data ? JSON.parse(data) : { travelModeActive: false, sickDayActive: false };
+  },
+
+  saveScenarioState(state: ScenarioState): void {
+    localStorage.setItem(STORAGE_KEYS.SCENARIO_STATE, JSON.stringify(state));
+  },
+
+  activateTravelMode(destination: string, endDate: string): void {
+    const state = this.getScenarioState();
+    state.travelModeActive = true;
+    state.travelDestination = destination;
+    state.travelEndDate = endDate;
+    this.saveScenarioState(state);
+  },
+
+  deactivateTravelMode(): void {
+    const state = this.getScenarioState();
+    state.travelModeActive = false;
+    state.travelDestination = undefined;
+    state.travelEndDate = undefined;
+    this.saveScenarioState(state);
+  },
+
+  activateSickDay(severity: string): void {
+    const state = this.getScenarioState();
+    state.sickDayActive = true;
+    state.sickDaySeverity = severity;
+    this.saveScenarioState(state);
+  },
+
+  deactivateSickDay(): void {
+    const state = this.getScenarioState();
+    state.sickDayActive = false;
+    state.sickDaySeverity = undefined;
+    this.saveScenarioState(state);
   },
 };

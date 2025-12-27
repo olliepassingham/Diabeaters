@@ -1,0 +1,205 @@
+🧩 REPLIT AGENT PROMPT — CUSTOMISABLE DASHBOARD WIDGET SYSTEM
+CONTEXT
+
+You are continuing development of the Diabeater app.
+
+The Dashboard must be rebuilt/refined to function as a modular, widget-based home screen that allows users to:
+
+See critical information at a glance
+
+Access key features quickly
+
+Customise what they see based on their needs
+
+This dashboard is the command centre of the app.
+
+🎯 OBJECTIVE
+
+Create a customisable dashboard made up of independent widgets representing core features of the app.
+
+Each widget must:
+
+Display useful, real-time or contextual information
+
+Provide quick access to deeper functionality
+
+Be optional, movable, and configurable by the user
+
+🧱 DASHBOARD ARCHITECTURE (MANDATORY)
+Widget System Rules
+
+Dashboard must be composed of modular widgets
+
+Widgets must be:
+
+Addable / removable
+
+Reorderable (drag & drop or similar)
+
+Independently refreshable
+
+Widget layout must be:
+
+Persisted per user
+
+Editable at any time via “Edit Dashboard”
+
+🧭 REQUIRED DASHBOARD WIDGETS
+1. Supply Summary Widget
+
+Displays:
+
+Estimated days of supplies remaining
+
+Next restock warning (if applicable)
+
+Quick actions:
+
+“View Supplies”
+
+“Add Order”
+
+2. Today Overview Widget
+
+Displays:
+
+Today’s status summary (e.g. activity planned, scenarios active)
+
+Any flagged risks for today
+
+Quick action:
+
+“View Today”
+
+3. AI Recommendations Widget
+
+Displays:
+
+1–2 concise, safety-first insights
+
+Preventative guidance (non-medical)
+
+Rules:
+
+Always labelled “Not medical advice”
+
+Expandable to view full reasoning
+
+4. Quick Actions Widget
+
+Icon-based or button-based shortcuts to:
+
+Supply Tracker
+
+Activity Adviser
+
+Scenario Adviser (Sick Day / Travel Mode)
+
+Ratio Adviser
+
+Help Now (Emergency)
+
+This widget prioritises speed over information.
+
+5. Scenario Status Widget
+
+Displays:
+
+Active modes (e.g. Travel Mode active)
+
+Quick exit or review options
+
+⚙️ DASHBOARD CUSTOMISATION FLOW
+“Edit Dashboard” Mode
+
+User must be able to:
+
+Add new widgets from a widget library
+
+Remove widgets
+
+Reorder widgets
+
+Resize widgets (if supported)
+
+UI must be:
+
+Simple
+
+Non-technical
+
+Undo-safe
+
+🎨 UX & DESIGN REQUIREMENTS
+
+Calm, uncluttered layout
+
+Clear hierarchy:
+
+Most important info at the top
+
+No judgement language
+
+No data overload
+
+Emergency access always visible
+
+Widgets should feel:
+
+Supportive
+
+Informative
+
+Optional (never overwhelming)
+
+🧠 AI & DATA RULES
+
+Widgets must pull data from:
+
+AI logic layer
+
+Supply Tracker
+
+Scenario states
+
+Widgets must not:
+
+Give medical instructions
+
+Display raw or confusing data
+
+All AI-driven widgets must include disclaimers
+
+🧱 TECH REQUIREMENTS
+
+Widget system must be:
+
+Component-based
+
+Easily extendable for future widgets
+
+Each widget:
+
+Own component
+
+Own data selector
+
+Dashboard layout must be:
+
+Saved per user
+
+Restored on login
+
+✅ ACCEPTANCE CRITERIA
+
+This task is complete only when:
+
+Dashboard consists of modular widgets
+
+Users can customise layout and visibility
+
+Widgets display meaningful, live information
+
+Quick actions work reliably
+
+Emergency access is always available
