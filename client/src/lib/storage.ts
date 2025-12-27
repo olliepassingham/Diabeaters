@@ -213,8 +213,9 @@ export const storage = {
   getDashboardWidgets(): DashboardWidget[] {
     const data = localStorage.getItem(STORAGE_KEYS.DASHBOARD_WIDGETS);
     if (!data) {
-      localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(DEFAULT_WIDGETS));
-      return DEFAULT_WIDGETS;
+      const defaultCopy = JSON.parse(JSON.stringify(DEFAULT_WIDGETS));
+      localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(defaultCopy));
+      return defaultCopy;
     }
     return JSON.parse(data);
   },
