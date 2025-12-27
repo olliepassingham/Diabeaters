@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { GripVertical, Package, Calendar, Brain, Zap, LayoutGrid, X, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, Package, Calendar, Brain, Zap, LayoutGrid, X, ChevronUp, ChevronDown, Settings } from "lucide-react";
 import { DashboardWidget, WidgetType } from "@/lib/storage";
 
 interface WidgetInfo {
@@ -42,6 +42,12 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     name: "Active Scenarios",
     description: "Travel and sick day modes",
     icon: LayoutGrid,
+  },
+  "settings-completion": {
+    type: "settings-completion",
+    name: "Settings Progress",
+    description: "Track your setup completion",
+    icon: Settings,
   },
 };
 

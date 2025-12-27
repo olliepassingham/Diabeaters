@@ -62,7 +62,7 @@ export interface ActivityLog {
   createdAt: string;
 }
 
-export type WidgetType = "supply-summary" | "today-overview" | "ai-recommendations" | "quick-actions" | "scenario-status";
+export type WidgetType = "supply-summary" | "today-overview" | "ai-recommendations" | "quick-actions" | "scenario-status" | "settings-completion";
 
 export interface DashboardWidget {
   id: string;
@@ -80,11 +80,12 @@ export interface ScenarioState {
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 0 },
-  { id: "today-overview", type: "today-overview", enabled: true, order: 1 },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 3 },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4 },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 0 },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1 },
+  { id: "today-overview", type: "today-overview", enabled: true, order: 2 },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 3 },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 4 },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 5 },
 ];
 
 function generateId(): string {

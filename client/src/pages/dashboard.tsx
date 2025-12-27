@@ -9,6 +9,7 @@ import {
   AIRecommendationsWidget,
   QuickActionsWidget,
   ScenarioStatusWidget,
+  SettingsCompletionWidget,
   WidgetLibrary,
 } from "@/components/widgets";
 
@@ -24,6 +25,8 @@ function WidgetRenderer({ type }: { type: string }) {
       return <QuickActionsWidget />;
     case "scenario-status":
       return <ScenarioStatusWidget />;
+    case "settings-completion":
+      return <SettingsCompletionWidget />;
     default:
       return null;
   }
