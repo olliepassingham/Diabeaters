@@ -9,13 +9,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { FaceLogo } from "@/components/face-logo";
 
 type Step = "personal" | "units" | "diabetes" | "delivery" | "disclaimer" | "complete";
 
 interface OnboardingData {
   name: string;
   email: string;
-  dateOfBirth: string;
   bgUnits: string;
   carbUnits: string;
   diabetesType: string;
@@ -33,7 +33,6 @@ export default function Onboarding() {
   const [data, setData] = useState<OnboardingData>({
     name: "",
     email: "",
-    dateOfBirth: "",
     bgUnits: "mmol/L",
     carbUnits: "grams",
     diabetesType: "",
@@ -49,7 +48,7 @@ export default function Onboarding() {
     localStorage.setItem("diabeater_onboarding_completed", "true");
     localStorage.setItem("diabeater_profile", JSON.stringify(data));
     toast({
-      title: "Welcome to Diabeater!",
+      title: "Welcome to Diabeaters!",
       description: "Your profile has been set up successfully.",
     });
     setLocation("/");
@@ -121,16 +120,6 @@ export default function Onboarding() {
                   onChange={(e) => updateData("email", e.target.value)}
                   placeholder="your@email.com"
                   data-testid="input-onboarding-email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
-                <Input
-                  id="dob"
-                  type="date"
-                  value={data.dateOfBirth}
-                  onChange={(e) => updateData("dateOfBirth", e.target.value)}
-                  data-testid="input-onboarding-dob"
                 />
               </div>
             </CardContent>
@@ -297,7 +286,7 @@ export default function Onboarding() {
             <CardContent className="space-y-4">
               <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg text-sm space-y-3">
                 <p className="font-medium text-yellow-900 dark:text-yellow-100">
-                  Diabeater does not provide medical advice.
+                  Diabeaters does not provide medical advice.
                 </p>
                 <ul className="space-y-2 text-yellow-800 dark:text-yellow-200 ml-4 list-disc">
                   <li>All recommendations are for informational purposes only</li>
@@ -318,7 +307,7 @@ export default function Onboarding() {
                     I understand and accept
                   </Label>
                   <p className="text-sm text-muted-foreground mt-1">
-                    I acknowledge that Diabeater is not a substitute for professional medical advice
+                    I acknowledge that Diabeaters is not a substitute for professional medical advice
                   </p>
                 </div>
               </div>
@@ -334,7 +323,7 @@ export default function Onboarding() {
                 <Check className="h-6 w-6 text-primary" />
               </div>
               <CardTitle>You're All Set!</CardTitle>
-              <CardDescription>Your Diabeater profile is ready</CardDescription>
+              <CardDescription>Your Diabeaters profile is ready</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 bg-muted rounded-lg space-y-2 text-sm">
@@ -365,9 +354,11 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="w-full max-w-lg space-y-6">
-        <div className="text-center space-y-2">
-          <img src="/logo.png" alt="Diabeater" className="h-16 w-16 mx-auto object-contain" />
-          <h1 className="text-2xl font-semibold">Welcome to Diabeater</h1>
+        <div className="text-center space-y-3">
+          <div className="flex justify-center">
+            <FaceLogo size={64} />
+          </div>
+          <h1 className="text-2xl font-semibold">Welcome to Diabeaters</h1>
           <p className="text-muted-foreground">Let's set up your profile</p>
         </div>
 

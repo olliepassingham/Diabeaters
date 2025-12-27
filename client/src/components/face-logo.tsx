@@ -12,7 +12,7 @@ export function FaceLogo({
   return (
     <img
       src={logoImage}
-      alt="Diabeater logo"
+      alt="Diabeaters logo"
       width={size}
       height={size}
       className={`object-contain dark:invert ${className}`}
