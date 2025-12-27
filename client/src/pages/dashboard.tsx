@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertCircle, Clock, Plus, Activity, AlertTriangle, Thermometer, Dumbbell, Phone } from "lucide-react";
+import { Package, AlertCircle, Clock, Plus, Activity, AlertTriangle, Thermometer, Dumbbell, Phone, Plane } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Supply } from "@/lib/storage";
 
@@ -216,6 +216,13 @@ export default function Dashboard() {
             icon={Thermometer}
             href="/sick-day"
             testId="link-sick-day"
+          />
+          <QuickActionCard
+            title="Travel Mode"
+            description="Plan supplies for trips"
+            icon={Plane}
+            href="/travel"
+            testId="link-travel"
           />
           <QuickActionCard
             title="Help Now"

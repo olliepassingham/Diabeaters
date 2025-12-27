@@ -1,0 +1,249 @@
+🔧 REPLIT AGENT PROMPT — ADD TRAVEL MODE SECTION
+CONTEXT
+
+You are continuing development of the Diabeater app.
+
+⚠️ Issue to fix:
+Travel Mode was not created in the app.
+This is a required core feature and must now be implemented properly.
+
+Your task is to design and build a dedicated Travel Mode section, fully integrated into the app’s navigation, AI logic layer, and dashboard access.
+
+🎯 OBJECTIVE
+
+Create a Travel Mode feature that helps people with diabetes prepare for travel proactively, reduce risk, and avoid supply-related or access-related emergencies.
+
+This is not medical advice and must be labelled accordingly.
+
+🧭 FEATURE PLACEMENT & ACCESS (MANDATORY)
+
+Travel Mode must be accessible via all of the following:
+
+Main Dashboard
+
+As a Quick Action button: “Travel Mode”
+
+Scenario Adviser Section
+
+As a dedicated sub-section:
+
+Sick Day Mode
+
+Travel Mode
+
+Settings (optional shortcut)
+
+For reviewing past travel plans
+
+Travel Mode must feel like a major app feature, not hidden.
+
+🧩 TRAVEL MODE — STRUCTURE
+1. Travel Mode Entry Screen
+
+Explain clearly (calm tone):
+
+“Travel Mode helps you plan supplies and prepare for unexpected issues while travelling.
+This feature does not provide medical advice.”
+
+Button:
+
+Start Travel Plan
+
+2. Travel Mode Inputs (Required)
+
+User must input:
+
+Travel duration
+
+Number of days
+
+Destination
+
+Country / city
+
+Travel type
+
+Domestic
+
+International
+
+Timezone change
+
+None
+
+Minor (1–3 hours)
+
+Major (4+ hours)
+
+Access risk (optional but encouraged)
+
+Easy access to pharmacies
+
+Limited access
+
+Unsure
+
+3. AI Travel Logic (CORE)
+
+The AI layer must:
+
+Pull data from:
+
+Supply Tracker
+
+User’s insulin types
+
+Daily usage estimates
+
+CGM / testing habits
+
+Calculate:
+
+Estimated insulin needs for trip
+
+Estimated needles / cartridges
+
+CGM sensors / test strips
+
+Safety buffer (extra supplies)
+
+⚠️ Safety rules
+
+Always include failure buffers
+
+Never reduce recommended supplies
+
+Always plan for delays, breakage, loss
+
+📦 TRAVEL MODE OUTPUTS
+A. Smart Packing List
+
+Display a checklist-style list including:
+
+Insulin (with buffer)
+
+Delivery method supplies
+
+CGM / test supplies
+
+Hypo treatment supplies
+
+Backup essentials
+
+Each item should show:
+
+Estimated amount
+
+Reasoning (e.g. “extra added for delays”)
+
+B. Emergency Preparedness Section
+
+Provide non-medical guidance on:
+
+What to do if insulin is lost
+
+What to do if supplies run out
+
+When to seek local medical help
+
+Include:
+
+Nearby pharmacies (if location services allowed)
+
+General advice for international travel (documentation, backups)
+
+C. Risk Warnings (If Applicable)
+
+Examples:
+
+Long travel duration
+
+Limited pharmacy access
+
+Timezone changes
+
+Border crossing risks
+
+Warnings must be:
+
+Calm
+
+Non-alarmist
+
+Actionable
+
+🧠 AI LANGUAGE & SAFETY REQUIREMENTS
+
+All Travel Mode AI outputs must:
+
+Use suggestion-based language
+
+Avoid dosages or medical instructions
+
+Be labelled clearly:
+
+“Not medical advice”
+
+Prioritise safety and preparedness
+
+Reduce cognitive load
+
+🎨 UX REQUIREMENTS
+
+Calm, reassuring tone
+
+Checklist-driven UI
+
+Clear visual separation:
+
+Inputs
+
+Packing list
+
+Emergency plan
+
+Easy return to Dashboard
+
+🧱 TECH REQUIREMENTS
+
+Travel Mode must be:
+
+Modular
+
+Reusable
+
+Extendable (future features like flight reminders)
+
+Logic must live in the AI logic layer, not UI
+
+Data must be user-scoped and privacy-safe
+
+🧪 ACCEPTANCE CRITERIA (MUST PASS)
+
+Travel Mode is considered complete only if:
+
+It has a dedicated UI flow
+
+It appears in Dashboard + Scenario Adviser
+
+It generates:
+
+Packing list
+
+Safety buffers
+
+Emergency plan
+
+It clearly states “Not medical advice”
+
+It uses existing Supply Tracker data
+
+🚀 NEXT STEPS AFTER IMPLEMENTATION
+
+Once Travel Mode is complete:
+
+Confirm integration points
+
+Identify premium gating options
+
+Prepare for future CGM integration

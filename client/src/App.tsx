@@ -12,6 +12,7 @@ import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import SickDay from "@/pages/sick-day";
 import Advisor from "@/pages/advisor";
+import Travel from "@/pages/travel";
 import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
 import Onboarding from "@/pages/onboarding";
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/supplies" component={Supplies} />
       <Route path="/sick-day" component={SickDay} />
       <Route path="/advisor" component={Advisor} />
+      <Route path="/travel" component={Travel} />
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
       <Route component={NotFound} />

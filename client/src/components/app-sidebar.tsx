@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Thermometer, Phone } from "lucide-react";
+import { Home, Package, Bot, Settings, Thermometer, Phone, Plane } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -33,6 +33,11 @@ const items = [
     title: "Sick Day Adviser",
     url: "/sick-day",
     icon: Thermometer,
+  },
+  {
+    title: "Travel Mode",
+    url: "/travel",
+    icon: Plane,
   },
   {
     title: "Settings",
