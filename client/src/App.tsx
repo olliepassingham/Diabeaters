@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FaceLogo } from "@/components/face-logo";
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import SickDay from "@/pages/sick-day";
@@ -84,6 +85,10 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2">
+              <FaceLogo size={28} />
+              <span className="font-semibold text-lg">Diabeater</span>
+            </div>
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto p-6">

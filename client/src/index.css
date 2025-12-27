@@ -20,9 +20,9 @@
 
   --border: 0deg 33.33% 97.06%;
 
-  --card: 35.68deg 78.72% 90.78%;
+  --card: 35.51deg 37.4% 74.31%;
 
-  --card-foreground: 30 15% 15%;
+  --card-foreground: 27.27deg 14.29% 15.1%;
 
   --card-border: 40 20% 88%;
 
@@ -42,9 +42,9 @@
 
   --sidebar-ring: 30 15% 20%;
 
-  --popover: 40 35% 96%;
+  --popover: 355deg 37.5% 93.73%;
 
-  --popover-foreground: 30 15% 15%;
+  --popover-foreground: 27.27deg 14.29% 15.1%;
 
   --popover-border: 40 20% 84%;
 
@@ -52,7 +52,7 @@
 
   --primary-foreground: 40 30% 94%;
 
-  --secondary: 40 25% 90%;
+  --secondary: 42.86deg 53.85% 97.45%;
 
   --secondary-foreground: 30 15% 20%;
 
@@ -60,7 +60,7 @@
 
   --muted-foreground: 30 10% 45%;
 
-  --accent: 40 25% 88%;
+  --accent: 37.5deg 44.44% 96.47%;
 
   --accent-foreground: 30 15% 20%;
 
@@ -70,7 +70,7 @@
 
   --input: 40 20% 75%;
   --ring: 30 15% 20%;
-  --chart-1: 30 15% 25%;
+  --chart-1: 30deg 25% 98.43%;
   --chart-2: 168 30% 45%;
   --chart-3: 43 60% 55%;
   --chart-4: 280 35% 55%;
