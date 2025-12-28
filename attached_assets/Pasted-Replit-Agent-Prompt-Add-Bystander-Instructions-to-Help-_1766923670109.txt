@@ -1,0 +1,196 @@
+Replit Agent Prompt: Add “Bystander Instructions” to Help Now Feature
+Context
+
+You are working inside an existing diabetes app with a critical Help Now emergency feature.
+Your task is to add a new button called “Bystander Instructions” designed specifically for non-diabetic bystanders who may be helping someone experiencing a hypoglycemic episode.
+
+This feature is educational + actionable, not diagnostic, and must prioritize clarity, safety, and simplicity.
+
+Do not redesign Help Now entirely—extend it.
+
+1. New Button: “Bystander Instructions”
+Placement & Priority
+
+Display this button alongside other Help Now actions
+
+Use clear, non-alarming language:
+
+Bystander Instructions
+
+High contrast
+
+Large tap target
+
+Accessible during an active emergency
+
+Available even if the phone is locked (if Help Now already is)
+
+2. Purpose of Bystander Instructions
+Primary Goal
+
+👉 Help a bystander quickly understand what is happening and what to do, without requiring medical knowledge.
+
+The content should:
+
+Explain hypoglycemia in plain language
+
+Distinguish between mild/moderate hypo and severe/extreme hypo
+
+Give clear, step-by-step instructions
+
+Explicitly state what NOT to do
+
+Reinforce when to call emergency services
+
+Assume the reader:
+
+Is stressed
+
+Has never dealt with diabetes
+
+Has limited time
+
+May be afraid of doing harm
+
+3. Content Structure (Very Important)
+Screen 1: What’s Happening?
+
+Plain-language explanation, large text:
+
+“This person has Type 1 Diabetes.
+Their blood sugar may be dangerously low (hypoglycemia).
+Low blood sugar can cause confusion, shaking, loss of consciousness, or seizures.”
+
+Avoid medical jargon unless explained.
+
+Screen 2: Signs of a Low (Hypo)
+
+Use bullet points and icons:
+
+Shaking or trembling
+
+Sweating
+
+Confusion or unusual behavior
+
+Slurred speech
+
+Drowsiness
+
+Pale skin
+
+Screen 3: What To Do — If They Are Awake
+
+Clear, step-by-step:
+
+Give fast sugar
+
+Juice
+
+Regular (non-diet) soda
+
+Glucose tablets
+
+Sugar or honey (if safe)
+
+Stay with them
+
+Do not let them walk alone
+
+Wait 10–15 minutes
+
+Repeat sugar if they do not improve
+
+Screen 4: Extreme Hypo — Call Emergency Services Immediately
+
+Clear warning state (high contrast):
+
+⚠️ CALL EMERGENCY SERVICES NOW IF:
+
+They are unconscious
+
+They cannot swallow
+
+They are having a seizure
+
+Instructions:
+
+Do NOT give food or drink
+
+Do NOT put anything in their mouth
+
+Turn them on their side
+
+Help is on the way
+
+If glucagon is mentioned:
+
+Only include if the app already supports it
+
+Keep instructions extremely simple
+
+Screen 5: Reassurance
+
+End with reassurance to reduce panic:
+
+“You are doing the right thing.
+Low blood sugar is treatable.
+Stay with them until help arrives or they recover.”
+
+4. UX & Accessibility Requirements
+
+Large text
+
+High contrast
+
+Minimal scrolling per screen
+
+Simple language (no abbreviations)
+
+Optional:
+
+Text-to-speech toggle
+
+Auto-read mode
+
+Design assumption:
+
+A stranger should understand this in under 10 seconds.
+
+5. Safety & Legal Considerations
+
+Include a subtle disclaimer:
+
+“This information is for emergency guidance only”
+
+Do not present as medical diagnosis
+
+Default to calling emergency services when unsure
+
+6. Technical Notes
+
+Content should be modular (easy to update medically later)
+
+No network dependency during emergency
+
+Works offline
+
+Reuse existing Help Now styles and state where possible
+
+7. Output Expectations
+
+Add new “Bystander Instructions” button to Help Now
+
+Implement a multi-step instructional flow
+
+Ensure content is readable, accessible, and calm
+
+Comment code where medical assumptions are made
+
+Design Principle Reminder
+
+This feature exists because:
+
+The person who needs help may not be able to explain anything.
+
+Clarity, empathy, and safety come before elegance.

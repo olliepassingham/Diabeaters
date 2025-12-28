@@ -11,10 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 import { storage, EmergencyContact, UserSettings, UserProfile } from "@/lib/storage";
 
 type HelpNowMode = "main" | "treat-low" | "bystander" | "contacts-setup";
+type BystanderStep = 1 | 2 | 3 | 4 | 5;
 
 export default function HelpNow() {
   const { toast } = useToast();
   const [mode, setMode] = useState<HelpNowMode>("main");
+  const [bystanderStep, setBystanderStep] = useState<BystanderStep>(1);
+  const [bystanderSpeaking, setBystanderSpeaking] = useState(false);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -191,72 +194,322 @@ export default function HelpNow() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const speakBystanderContent = (text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.85;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      utterance.onend = () => setBystanderSpeaking(false);
+      utterance.onerror = () => setBystanderSpeaking(false);
+      setBystanderSpeaking(true);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const stopBystanderSpeech = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setBystanderSpeaking(false);
+    }
+  };
+
+  const bystanderContent = {
+    1: {
+      title: "What's Happening?",
+      speech: "This person has Type 1 Diabetes. Their blood sugar may be dangerously low. This is called hypoglycemia. Low blood sugar can cause confusion, shaking, loss of consciousness, or seizures."
+    },
+    2: {
+      title: "Signs of a Low",
+      speech: "Signs of low blood sugar include: Shaking or trembling. Sweating. Confusion or unusual behaviour. Slurred speech. Drowsiness. Pale skin."
+    },
+    3: {
+      title: "If They Are Awake",
+      speech: "If they are awake and can swallow: Give them fast sugar like juice, regular soda, glucose tablets, or sugar. Stay with them. Do not let them walk alone. Wait 10 to 15 minutes. Repeat sugar if they do not improve."
+    },
+    4: {
+      title: "Call 999 Now",
+      speech: "Call 999 immediately if: They are unconscious. They cannot swallow. They are having a seizure. Do NOT give food or drink. Do NOT put anything in their mouth. Turn them on their side. Stay with them until help arrives."
+    },
+    5: {
+      title: "You're Helping",
+      speech: "You are doing the right thing. Low blood sugar is treatable. Stay with them until help arrives or they recover."
+    }
+  };
+
   if (mode === "bystander") {
+    const goToStep = (step: BystanderStep) => {
+      stopBystanderSpeech();
+      setBystanderStep(step);
+    };
+
+    const exitBystander = () => {
+      stopBystanderSpeech();
+      setBystanderStep(1);
+      setMode("main");
+    };
+
     return (
       <div className="fixed inset-0 z-50 bg-white dark:bg-black flex flex-col" onClick={resetInactivityTimer}>
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="mb-8">
-            <Heart className="h-24 w-24 text-red-500 mx-auto mb-4" />
-            <h1 className="text-4xl font-bold text-red-600 mb-2">I HAVE TYPE 1 DIABETES</h1>
-            <p className="text-2xl text-muted-foreground">I may need help</p>
+        <div className="p-3 border-b flex items-center justify-between gap-2 bg-red-50 dark:bg-red-950">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={exitBystander}
+            className="text-red-700 dark:text-red-300"
+            data-testid="button-exit-bystander"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 text-center">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300">BYSTANDER INSTRUCTIONS</p>
+            <p className="text-xs text-red-600 dark:text-red-400">Step {bystanderStep} of 5</p>
           </div>
-          
-          <Card className="max-w-md w-full border-red-500 border-2">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="text-2xl font-bold">IF I AM CONFUSED OR UNRESPONSIVE:</h2>
-              <ol className="text-left text-xl space-y-3">
-                <li className="flex gap-3">
-                  <span className="font-bold text-red-600">1.</span>
-                  <span>Call 999 immediately</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-red-600">2.</span>
-                  <span>Do NOT give food or drink</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-red-600">3.</span>
-                  <span>Place me on my side</span>
-                </li>
-                <li className="flex gap-3">
-                  <span className="font-bold text-red-600">4.</span>
-                  <span>Stay with me until help arrives</span>
-                </li>
-              </ol>
-            </CardContent>
-          </Card>
+          <Button
+            variant={bystanderSpeaking ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              if (bystanderSpeaking) {
+                stopBystanderSpeech();
+              } else {
+                speakBystanderContent(bystanderContent[bystanderStep].speech);
+              }
+            }}
+            className={bystanderSpeaking ? "bg-red-600 hover:bg-red-700" : ""}
+            data-testid="button-speak-bystander"
+          >
+            <Volume2 className="h-4 w-4" />
+          </Button>
+        </div>
 
-          {profile?.name && (
-            <div className="mt-6 text-xl">
-              <p className="text-muted-foreground">My name is</p>
-              <p className="font-bold text-2xl">{profile.name}</p>
+        <div className="flex-1 overflow-y-auto">
+          {bystanderStep === 1 && (
+            <div className="p-6 text-center" data-testid="bystander-step-1">
+              <Heart className="h-20 w-20 text-red-500 mx-auto mb-6" />
+              <h1 className="text-3xl font-bold mb-6 text-foreground">What's Happening?</h1>
+              <div className="space-y-4 text-xl text-left max-w-md mx-auto">
+                <p className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border-l-4 border-red-500">
+                  <strong>This person has Type 1 Diabetes.</strong>
+                </p>
+                <p className="text-lg">
+                  Their blood sugar may be <strong>dangerously low</strong>. This is called <em>hypoglycemia</em>.
+                </p>
+                <p className="text-lg">
+                  Low blood sugar can cause:
+                </p>
+                <ul className="text-lg space-y-2 pl-4">
+                  <li>Confusion</li>
+                  <li>Shaking</li>
+                  <li>Loss of consciousness</li>
+                  <li>Seizures</li>
+                </ul>
+              </div>
+              {profile?.name && (
+                <div className="mt-6 p-4 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">Their name is</p>
+                  <p className="font-bold text-2xl">{profile.name}</p>
+                </div>
+              )}
             </div>
           )}
 
-          {contacts.length > 0 && (
-            <div className="mt-6">
-              <p className="text-lg text-muted-foreground mb-2">Emergency Contact:</p>
+          {bystanderStep === 2 && (
+            <div className="p-6" data-testid="bystander-step-2">
+              <h1 className="text-3xl font-bold mb-6 text-center">Signs of a Low</h1>
+              <p className="text-center text-muted-foreground mb-6">Look for these symptoms:</p>
+              <div className="space-y-3 max-w-md mx-auto">
+                {[
+                  "Shaking or trembling",
+                  "Sweating",
+                  "Confusion or unusual behaviour",
+                  "Slurred speech",
+                  "Drowsiness",
+                  "Pale skin",
+                ].map((symptom, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-muted rounded-lg text-xl">
+                    <div className="h-3 w-3 rounded-full bg-yellow-500 flex-shrink-0" />
+                    <span>{symptom}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {bystanderStep === 3 && (
+            <div className="p-6" data-testid="bystander-step-3">
+              <h1 className="text-3xl font-bold mb-2 text-center text-green-700 dark:text-green-400">If They Are Awake</h1>
+              <p className="text-center text-muted-foreground mb-6">And can swallow safely</p>
+              
+              <div className="space-y-4 max-w-md mx-auto">
+                <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border-2 border-green-500">
+                  <h2 className="font-bold text-xl mb-3 text-green-700 dark:text-green-400">1. Give Fast Sugar</h2>
+                  <ul className="space-y-2 text-lg">
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-600">✓</span> Juice
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-600">✓</span> Regular (non-diet) soda
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-600">✓</span> Glucose tablets
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-green-600">✓</span> Sugar or honey
+                    </li>
+                  </ul>
+                </div>
+                
+                <div className="p-4 bg-muted rounded-lg">
+                  <h2 className="font-bold text-xl mb-2">2. Stay With Them</h2>
+                  <p className="text-lg">Do not let them walk alone</p>
+                </div>
+                
+                <div className="p-4 bg-muted rounded-lg">
+                  <h2 className="font-bold text-xl mb-2">3. Wait 10-15 Minutes</h2>
+                  <p className="text-lg">Repeat sugar if they don't improve</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {bystanderStep === 4 && (
+            <div className="p-6" data-testid="bystander-step-4">
+              <div className="bg-red-600 text-white p-4 rounded-lg mb-6 text-center">
+                <AlertCircle className="h-12 w-12 mx-auto mb-2" />
+                <h1 className="text-2xl font-bold">CALL 999 NOW IF:</h1>
+              </div>
+              
+              <div className="space-y-3 max-w-md mx-auto mb-6">
+                <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border-l-4 border-red-600 text-lg">
+                  They are <strong>unconscious</strong>
+                </div>
+                <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border-l-4 border-red-600 text-lg">
+                  They <strong>cannot swallow</strong>
+                </div>
+                <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border-l-4 border-red-600 text-lg">
+                  They are having a <strong>seizure</strong>
+                </div>
+              </div>
+
+              <div className="max-w-md mx-auto space-y-4">
+                <h2 className="font-bold text-xl text-center">What To Do:</h2>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 p-3 bg-red-100 dark:bg-red-900 rounded-lg text-lg">
+                    <X className="h-6 w-6 text-red-600 flex-shrink-0" />
+                    <span><strong>Do NOT</strong> give food or drink</span>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-red-100 dark:bg-red-900 rounded-lg text-lg">
+                    <X className="h-6 w-6 text-red-600 flex-shrink-0" />
+                    <span><strong>Do NOT</strong> put anything in their mouth</span>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-green-100 dark:bg-green-900 rounded-lg text-lg">
+                    <span className="text-green-600 text-xl flex-shrink-0">✓</span>
+                    <span>Turn them on their side</span>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-green-100 dark:bg-green-900 rounded-lg text-lg">
+                    <span className="text-green-600 text-xl flex-shrink-0">✓</span>
+                    <span>Stay with them until help arrives</span>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 size="lg"
-                className="h-16 text-xl bg-red-600 hover:bg-red-700"
-                onClick={() => handleCall(contacts.find(c => c.isPrimary)?.phone || contacts[0].phone)}
+                className="w-full mt-6 h-16 text-xl bg-red-600 hover:bg-red-700"
+                onClick={() => handleCall("999")}
+                data-testid="button-call-999-bystander"
               >
                 <Phone className="h-6 w-6 mr-3" />
-                Call {contacts.find(c => c.isPrimary)?.name || contacts[0].name}
+                Call 999
               </Button>
+
+              {contacts.length > 0 && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full mt-3 h-14 text-lg"
+                  onClick={() => handleCall(contacts.find(c => c.isPrimary)?.phone || contacts[0].phone)}
+                  data-testid="button-call-contact-bystander"
+                >
+                  <Phone className="h-5 w-5 mr-2" />
+                  Call {contacts.find(c => c.isPrimary)?.name || contacts[0].name}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {bystanderStep === 5 && (
+            <div className="p-6 text-center flex flex-col items-center justify-center min-h-[60vh]" data-testid="bystander-step-5">
+              <Heart className="h-24 w-24 text-green-500 mx-auto mb-6" />
+              <h1 className="text-3xl font-bold mb-6 text-green-700 dark:text-green-400">You're Helping</h1>
+              <div className="space-y-4 text-xl max-w-md">
+                <p className="p-4 bg-green-50 dark:bg-green-950 rounded-lg">
+                  <strong>You are doing the right thing.</strong>
+                </p>
+                <p>Low blood sugar is treatable.</p>
+                <p className="font-semibold">
+                  Stay with them until help arrives or they recover.
+                </p>
+              </div>
+              <p className="mt-8 text-sm text-muted-foreground max-w-sm">
+                This information is for emergency guidance only and is not medical advice.
+              </p>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t">
-          <Button
-            size="lg"
-            className="w-full h-14 text-lg"
-            onClick={() => setMode("main")}
-            data-testid="button-exit-bystander"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Help Now
-          </Button>
+        <div className="p-3 border-t bg-muted/50">
+          <div className="flex gap-2 mb-3">
+            {[1, 2, 3, 4, 5].map((step) => (
+              <button
+                key={step}
+                onClick={() => goToStep(step as BystanderStep)}
+                className={`flex-1 h-2 rounded-full transition-colors ${
+                  step === bystanderStep 
+                    ? "bg-red-500" 
+                    : step < bystanderStep 
+                      ? "bg-red-300 dark:bg-red-700" 
+                      : "bg-muted-foreground/30"
+                }`}
+                data-testid={`bystander-step-indicator-${step}`}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {bystanderStep > 1 && (
+              <Button
+                size="lg"
+                variant="outline"
+                className="flex-1 h-14 text-lg"
+                onClick={() => goToStep((bystanderStep - 1) as BystanderStep)}
+                data-testid="button-bystander-prev"
+              >
+                <ArrowLeft className="h-5 w-5 mr-2" />
+                Back
+              </Button>
+            )}
+            {bystanderStep < 5 ? (
+              <Button
+                size="lg"
+                className="flex-1 h-14 text-lg bg-red-600 hover:bg-red-700"
+                onClick={() => goToStep((bystanderStep + 1) as BystanderStep)}
+                data-testid="button-bystander-next"
+              >
+                Next
+                <ArrowLeft className="h-5 w-5 ml-2 rotate-180" />
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                className="flex-1 h-14 text-lg"
+                onClick={exitBystander}
+                data-testid="button-bystander-done"
+              >
+                Done
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
