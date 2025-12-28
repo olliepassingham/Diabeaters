@@ -516,7 +516,7 @@ export default function HelpNow() {
       <div className="flex-1 flex flex-col gap-3">
         <Button
           size="lg"
-          className="flex-1 text-2xl font-bold bg-yellow-500 hover:bg-yellow-600 text-yellow-950"
+          className="flex-1 text-2xl font-bold bg-yellow-400 hover:bg-yellow-500 text-yellow-950"
           onClick={startTreatLow}
           data-testid="button-treat-low"
         >
@@ -525,7 +525,7 @@ export default function HelpNow() {
 
         <Button
           size="lg"
-          className="flex-1 text-2xl font-bold bg-blue-600 hover:bg-blue-700"
+          className="flex-1 text-2xl font-bold bg-blue-500 hover:bg-blue-600"
           onClick={callPrimaryContact}
           data-testid="button-call-emergency-contact"
         >
@@ -541,7 +541,7 @@ export default function HelpNow() {
 
         <Button
           size="lg"
-          className="flex-1 text-2xl font-bold bg-red-600 hover:bg-red-700"
+          className="flex-1 text-2xl font-bold bg-red-500 hover:bg-red-600"
           onClick={callEmergencyServices}
           data-testid="button-call-999"
         >
