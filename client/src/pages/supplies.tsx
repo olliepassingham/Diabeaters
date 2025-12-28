@@ -43,7 +43,6 @@ function SupplyCard({
   onLogPickup: (supply: Supply) => void;
 }) {
   const daysRemaining = storage.getDaysRemaining(supply);
-  const remainingQuantity = storage.getRemainingQuantity(supply);
   const runOutDate = storage.getRunOutDate(supply);
   const status = storage.getSupplyStatus(supply);
   const Icon = typeIcons[supply.type] || Package;
@@ -118,7 +117,7 @@ function SupplyCard({
                 status === "critical" ? "text-red-600 dark:text-red-500" : 
                 status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
               }`} data-testid={`text-remaining-${supply.id}`}>
-                {remainingQuantity}
+                {supply.currentQuantity}
               </p>
             </div>
             <div className="text-right">

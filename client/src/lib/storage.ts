@@ -260,43 +260,12 @@ export const storage = {
   },
 
   /**
-   * Calculate days remaining based on:
-   * 1. If lastPickupDate exists: Calculate based on pickup date + quantity - days elapsed
-   * 2. Otherwise: Simple division of currentQuantity / dailyUsage
-   * 
-   * This provides time-based depletion tracking when pickup dates are available.
+   * Calculate days remaining based on currentQuantity / dailyUsage.
+   * currentQuantity is the source of truth (manually tracked by user).
    */
   getDaysRemaining(supply: Supply): number {
     if (supply.dailyUsage <= 0) return 999;
-    
-    // If we have a pickup date, calculate remaining based on time elapsed
-    if (supply.lastPickupDate) {
-      const pickupDate = new Date(supply.lastPickupDate);
-      const today = new Date();
-      const daysElapsed = Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
-      const usedSincePickup = daysElapsed * supply.dailyUsage;
-      const remainingQuantity = Math.max(0, supply.currentQuantity - usedSincePickup);
-      return Math.floor(remainingQuantity / supply.dailyUsage);
-    }
-    
-    // Fallback: simple calculation
     return Math.floor(supply.currentQuantity / supply.dailyUsage);
-  },
-
-  /**
-   * Get calculated remaining supply based on pickup date and usage.
-   * Returns the actual remaining quantity accounting for time-based depletion.
-   */
-  getRemainingQuantity(supply: Supply): number {
-    if (!supply.lastPickupDate || supply.dailyUsage <= 0) {
-      return supply.currentQuantity;
-    }
-    
-    const pickupDate = new Date(supply.lastPickupDate);
-    const today = new Date();
-    const daysElapsed = Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
-    const usedSincePickup = daysElapsed * supply.dailyUsage;
-    return Math.max(0, Math.round((supply.currentQuantity - usedSincePickup) * 10) / 10);
   },
 
   /**
