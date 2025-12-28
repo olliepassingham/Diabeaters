@@ -1,0 +1,241 @@
+Replit Agent Prompt: Add Community Feature (Anonymous Questions, Topics, Shared Experiences)
+Context
+
+You are working inside an existing diabetes app.
+Your task is to add a Community feature that allows users to ask questions, share experiences, and discuss challenges related to living with diabetes.
+
+This feature should feel:
+
+Supportive
+
+Low-pressure
+
+Encouraging
+
+Safe for both anonymous and named participation
+
+This is a new feature, but should integrate naturally with the app’s tone and design.
+
+1. Purpose of the Community Feature
+Primary Goal
+
+👉 Create a space where users feel safe and encouraged to discuss real-life challenges, tips, and experiences.
+
+The community is meant to:
+
+Reduce isolation
+
+Share practical, lived experience
+
+Encourage peer-to-peer support
+
+Complement (not replace) medical advice
+
+This is not a medical diagnosis or emergency feature.
+
+2. Core Community Functionality
+Posting Questions / Topics
+
+Users should be able to:
+
+Post a question or discussion topic
+
+Choose to post:
+
+Anonymously
+
+With their name (if profile exists)
+
+Posting should feel easy and low effort.
+
+Question Structure
+
+Each post should include:
+
+Question title (short, clear)
+
+Optional longer description
+
+Selected topic (required)
+
+Posting mode:
+
+Anonymous
+
+Named
+
+Optional metadata:
+
+Date/time
+
+Number of replies (future-proofing)
+
+3. Topics & Filtering (Very Important)
+Topic System
+
+Questions must be categorized by topics so users can browse what’s relevant to them.
+
+Initial example topics:
+
+🌴 Holidays & Travel
+
+🤒 Feeling Unwell / Sick Days
+
+🏃 Exercise & Activity
+
+🍽 Food & Eating Out
+
+🧠 Mental Health & Burnout
+
+🧰 Tips & What Worked for Me
+
+❓ General Questions
+
+Topics should be:
+
+Easy to extend later
+
+Stored as structured data, not hard-coded text
+
+Filtering & Browsing
+
+On the Community page:
+
+Allow users to:
+
+Filter by topic
+
+Browse “All”
+
+Keep filtering simple:
+
+Chips / buttons
+
+Dropdown (mobile-friendly)
+
+Design goal:
+
+“Let me quickly find people talking about the same thing I’m dealing with.”
+
+4. Replies & Discussion (Phase 1 – Simple)
+
+For initial implementation:
+
+Allow users to reply to questions
+
+Replies can also be:
+
+Anonymous
+
+Named
+
+Keep replies chronological
+
+No reactions, likes, or voting (for now)
+
+Focus on conversation, not engagement mechanics.
+
+5. Safety, Tone & Guardrails
+Content Guidelines
+
+Friendly, supportive language
+
+No shaming or judgment
+
+No medical instructions presented as facts
+
+Disclaimer (Subtle)
+
+Somewhere in the Community section:
+
+“Community posts are based on personal experience and are not medical advice.”
+
+Do not show this during emergencies.
+
+Reporting / Moderation (Lightweight)
+
+For now:
+
+Add a simple “Report” option on posts
+
+No heavy moderation tools required in Phase 1
+
+Flag content for future admin review
+
+6. Initial Seed Content (Important for Adoption)
+
+To avoid an empty community, pre-populate with a few starter questions, such as:
+
+🌴 “What holiday destinations have you found easiest to manage diabetes in?”
+
+🤒 “When you’re unwell, what’s helped you manage your blood sugars?”
+
+🧰 “What’s one diabetes tip you wish you’d learned earlier?”
+
+These should be:
+
+Open-ended
+
+Friendly
+
+Non-technical
+
+Encouraging replies
+
+7. UX & Design Requirements
+
+Calm, welcoming design
+
+No social pressure (likes, follower counts, etc.)
+
+Clear indication when a post is anonymous
+
+Large, readable text
+
+Mobile-first layout
+
+Tone should feel like:
+
+“A group of people who get it.”
+
+8. Data & Technical Considerations
+
+Persist posts and replies
+
+Store anonymity as a flag, not separate content
+
+Ensure anonymous posts cannot be reverse-identified
+
+Use existing app authentication where available
+
+Work offline gracefully where possible (read-only)
+
+9. Non-Functional Requirements
+
+Do not impact Help Now or emergency features
+
+Keep community logic modular
+
+Comment code clearly for future expansion
+
+Avoid notification overload
+
+10. Output Expectations
+
+Create a new Community section/page
+
+Implement posting, replying, and topic filtering
+
+Seed with initial example questions
+
+Ensure anonymity works correctly
+
+Flag future enhancements clearly in comments
+
+Design Principle Reminder
+
+This feature exists to say:
+
+“You’re not the only one dealing with this.”
+
+Keep it human, supportive, and simple.

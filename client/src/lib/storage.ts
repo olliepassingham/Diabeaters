@@ -9,6 +9,8 @@ const STORAGE_KEYS = {
   SCENARIO_STATE: "diabeater_scenario_state",
   LAST_PRESCRIPTION: "diabeater_last_prescription",
   PICKUP_HISTORY: "diabeater_pickup_history",
+  COMMUNITY_POSTS: "diabeater_community_posts",
+  COMMUNITY_REPLIES: "diabeater_community_replies",
 } as const;
 
 export interface UserProfile {
@@ -97,6 +99,40 @@ export interface ScenarioState {
   travelEndDate?: string;
   sickDayActive: boolean;
   sickDaySeverity?: string;
+}
+
+export const COMMUNITY_TOPICS = [
+  { id: "holidays-travel", label: "Holidays & Travel" },
+  { id: "sick-days", label: "Feeling Unwell / Sick Days" },
+  { id: "exercise-activity", label: "Exercise & Activity" },
+  { id: "food-eating-out", label: "Food & Eating Out" },
+  { id: "mental-health", label: "Mental Health & Burnout" },
+  { id: "tips-what-worked", label: "Tips & What Worked for Me" },
+  { id: "general-questions", label: "General Questions" },
+] as const;
+
+export type CommunityTopicId = typeof COMMUNITY_TOPICS[number]["id"];
+
+export interface CommunityPost {
+  id: string;
+  title: string;
+  content?: string;
+  topic: CommunityTopicId;
+  authorName?: string;
+  isAnonymous: boolean;
+  isReported: boolean;
+  replyCount: number;
+  createdAt: string;
+}
+
+export interface CommunityReply {
+  id: string;
+  postId: string;
+  content: string;
+  authorName?: string;
+  isAnonymous: boolean;
+  isReported: boolean;
+  createdAt: string;
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -351,5 +387,146 @@ export const storage = {
     state.sickDayActive = false;
     state.sickDaySeverity = undefined;
     this.saveScenarioState(state);
+  },
+
+  getCommunityPosts(topic?: CommunityTopicId): CommunityPost[] {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_POSTS);
+    let posts: CommunityPost[] = data ? JSON.parse(data) : [];
+    
+    if (posts.length === 0) {
+      posts = this.seedCommunityPosts();
+    }
+    
+    if (topic) {
+      posts = posts.filter(p => p.topic === topic);
+    }
+    
+    return posts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  getCommunityPost(id: string): CommunityPost | null {
+    const posts = this.getCommunityPosts();
+    return posts.find(p => p.id === id) || null;
+  },
+
+  addCommunityPost(post: Omit<CommunityPost, "id" | "replyCount" | "isReported" | "createdAt">): CommunityPost {
+    const posts = this.getCommunityPosts();
+    const newPost: CommunityPost = {
+      ...post,
+      id: generateId(),
+      replyCount: 0,
+      isReported: false,
+      createdAt: new Date().toISOString(),
+    };
+    posts.unshift(newPost);
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_POSTS, JSON.stringify(posts));
+    return newPost;
+  },
+
+  reportCommunityPost(id: string): boolean {
+    const posts = this.getCommunityPosts();
+    const index = posts.findIndex(p => p.id === id);
+    if (index === -1) return false;
+    posts[index].isReported = true;
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_POSTS, JSON.stringify(posts));
+    return true;
+  },
+
+  getCommunityReplies(postId: string): CommunityReply[] {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_REPLIES);
+    const replies: CommunityReply[] = data ? JSON.parse(data) : [];
+    return replies
+      .filter(r => r.postId === postId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  addCommunityReply(reply: Omit<CommunityReply, "id" | "isReported" | "createdAt">): CommunityReply {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_REPLIES);
+    const replies: CommunityReply[] = data ? JSON.parse(data) : [];
+    const newReply: CommunityReply = {
+      ...reply,
+      id: generateId(),
+      isReported: false,
+      createdAt: new Date().toISOString(),
+    };
+    replies.push(newReply);
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_REPLIES, JSON.stringify(replies));
+    
+    const posts = this.getCommunityPosts();
+    const postIndex = posts.findIndex(p => p.id === reply.postId);
+    if (postIndex !== -1) {
+      posts[postIndex].replyCount = (posts[postIndex].replyCount || 0) + 1;
+      localStorage.setItem(STORAGE_KEYS.COMMUNITY_POSTS, JSON.stringify(posts));
+    }
+    
+    return newReply;
+  },
+
+  reportCommunityReply(id: string): boolean {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_REPLIES);
+    const replies: CommunityReply[] = data ? JSON.parse(data) : [];
+    const index = replies.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    replies[index].isReported = true;
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_REPLIES, JSON.stringify(replies));
+    return true;
+  },
+
+  seedCommunityPosts(): CommunityPost[] {
+    const seedPosts: CommunityPost[] = [
+      {
+        id: generateId(),
+        title: "What holiday destinations have you found easiest to manage diabetes in?",
+        content: "Planning a trip next summer and wondering where other diabetics have had good experiences. Looking for places with good healthcare access and understanding of T1D.",
+        topic: "holidays-travel",
+        isAnonymous: true,
+        isReported: false,
+        replyCount: 0,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "When you're unwell, what's helped you manage your blood sugars?",
+        content: "I always struggle when I have a cold or flu. My levels go all over the place. What strategies have worked for you?",
+        topic: "sick-days",
+        isAnonymous: true,
+        isReported: false,
+        replyCount: 0,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "What's one diabetes tip you wish you'd learned earlier?",
+        content: "I've been T1D for 5 years now and still learning. Would love to hear the little things that made a big difference for others.",
+        topic: "tips-what-worked",
+        isAnonymous: true,
+        isReported: false,
+        replyCount: 0,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "How do you handle eating out at restaurants?",
+        content: "I find it really hard to estimate carbs when eating out. Any tips for dealing with this?",
+        topic: "food-eating-out",
+        isAnonymous: true,
+        isReported: false,
+        replyCount: 0,
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "Dealing with diabetes burnout - you're not alone",
+        content: "Sometimes it all feels like too much. Just wanted to share that if you're feeling overwhelmed, it's completely normal. What helps you when you're feeling burnt out?",
+        topic: "mental-health",
+        isAnonymous: true,
+        isReported: false,
+        replyCount: 0,
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_POSTS, JSON.stringify(seedPosts));
+    return seedPosts;
   },
 };

@@ -214,3 +214,56 @@ export const insertRatioReviewSchema = createInsertSchema(ratioReviews).omit({
 
 export type InsertRatioReview = z.infer<typeof insertRatioReviewSchema>;
 export type RatioReview = typeof ratioReviews.$inferSelect;
+
+export const COMMUNITY_TOPICS = [
+  "holidays-travel",
+  "sick-days",
+  "exercise-activity",
+  "food-eating-out",
+  "mental-health",
+  "tips-what-worked",
+  "general-questions",
+] as const;
+
+export type CommunityTopic = typeof COMMUNITY_TOPICS[number];
+
+export const communityPosts = pgTable("community_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content"),
+  topic: text("topic").notNull(),
+  authorName: text("author_name"),
+  isAnonymous: boolean("is_anonymous").default(true),
+  isReported: boolean("is_reported").default(false),
+  replyCount: integer("reply_count").default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertCommunityPostSchema = createInsertSchema(communityPosts).omit({
+  id: true,
+  replyCount: true,
+  isReported: true,
+  createdAt: true,
+});
+
+export type InsertCommunityPost = z.infer<typeof insertCommunityPostSchema>;
+export type CommunityPost = typeof communityPosts.$inferSelect;
+
+export const communityReplies = pgTable("community_replies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postId: varchar("post_id").notNull().references(() => communityPosts.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  authorName: text("author_name"),
+  isAnonymous: boolean("is_anonymous").default(true),
+  isReported: boolean("is_reported").default(false),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertCommunityReplySchema = createInsertSchema(communityReplies).omit({
+  id: true,
+  isReported: true,
+  createdAt: true,
+});
+
+export type InsertCommunityReply = z.infer<typeof insertCommunityReplySchema>;
+export type CommunityReply = typeof communityReplies.$inferSelect;
