@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 
 const typeIcons = {
   needle: Syringe,
@@ -43,13 +43,16 @@ function SupplyCard({
   onLogPickup: (supply: Supply) => void;
 }) {
   const daysRemaining = storage.getDaysRemaining(supply);
+  const remainingQuantity = storage.getRemainingQuantity(supply);
+  const runOutDate = storage.getRunOutDate(supply);
   const status = storage.getSupplyStatus(supply);
   const Icon = typeIcons[supply.type] || Package;
 
   const getLastPickupText = () => {
     if (!supply.lastPickupDate) return null;
     try {
-      return formatDistanceToNow(new Date(supply.lastPickupDate), { addSuffix: true });
+      const pickupDate = new Date(supply.lastPickupDate);
+      return `Picked up ${format(pickupDate, "MMM d")}`;
     } catch {
       return null;
     }
@@ -104,63 +107,82 @@ function SupplyCard({
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Quantity</span>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => onUpdateQuantity(supply.id, Math.max(0, supply.currentQuantity - 1))}
-                data-testid={`button-decrease-${supply.id}`}
+        <div className={`p-3 rounded-lg mb-3 ${
+          status === "critical" ? "bg-red-500/10" : 
+          status === "low" ? "bg-yellow-500/10" : "bg-primary/5"
+        }`}>
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
+              <p className={`text-2xl font-bold ${
+                status === "critical" ? "text-red-600 dark:text-red-500" : 
+                status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+              }`} data-testid={`text-remaining-${supply.id}`}>
+                {remainingQuantity}
+              </p>
+            </div>
+            <div className="text-right">
+              <Badge 
+                variant={status === "critical" ? "destructive" : status === "low" ? "secondary" : "outline"}
+                className="mb-1"
+                data-testid={`badge-days-${supply.id}`}
               >
-                -
-              </Button>
-              <span className="w-12 text-center font-medium" data-testid={`text-quantity-${supply.id}`}>
-                {supply.currentQuantity}
-              </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => onUpdateQuantity(supply.id, supply.currentQuantity + 1)}
-                data-testid={`button-increase-${supply.id}`}
-              >
-                +
-              </Button>
+                {status === "critical" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                {daysRemaining === 999 ? "N/A" : `~${daysRemaining} days`}
+              </Badge>
+              {runOutDate && daysRemaining < 999 && (
+                <p className="text-xs text-muted-foreground">
+                  Est. run out: {format(runOutDate, "MMM d")}
+                </p>
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Daily Usage</span>
-            <span className="text-sm">{supply.dailyUsage}/day</span>
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Daily usage</span>
+            <span>{supply.dailyUsage}/day</span>
           </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Days Remaining</span>
-            <Badge 
-              variant={status === "critical" ? "destructive" : status === "low" ? "secondary" : "outline"}
-              data-testid={`badge-days-${supply.id}`}
-            >
-              {daysRemaining === 999 ? "N/A" : `${daysRemaining} days`}
-            </Badge>
-          </div>
-
-          <div className="pt-2 border-t space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                {lastPickupText ? `Picked up ${lastPickupText}` : "No pickup logged"}
-              </div>
+          
+          {lastPickupText && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              {lastPickupText}
             </div>
+          )}
+        </div>
+
+        <div className="pt-3 mt-3 border-t flex gap-2">
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="flex-1"
+            onClick={() => onLogPickup(supply)}
+            data-testid={`button-refill-${supply.id}`}
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Refill
+          </Button>
+          <div className="flex items-center gap-1">
             <Button 
               variant="outline" 
               size="sm" 
-              className="w-full"
-              onClick={() => onLogPickup(supply)}
-              data-testid={`button-pickup-${supply.id}`}
+              onClick={() => onUpdateQuantity(supply.id, Math.max(0, supply.currentQuantity - 1))}
+              data-testid={`button-decrease-${supply.id}`}
             >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Log Pickup / Refill
+              -
+            </Button>
+            <span className="w-8 text-center text-sm" data-testid={`text-quantity-${supply.id}`}>
+              {supply.currentQuantity}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onUpdateQuantity(supply.id, supply.currentQuantity + 1)}
+              data-testid={`button-increase-${supply.id}`}
+            >
+              +
             </Button>
           </div>
         </div>
@@ -332,7 +354,7 @@ function SupplyDialog({
   );
 }
 
-function PickupDialog({
+function RefillDialog({
   supply,
   open,
   onOpenChange,
@@ -341,34 +363,72 @@ function PickupDialog({
   supply: Supply | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (quantity: number) => void;
+  onConfirm: (quantity: number, saveAsTypical: boolean) => void;
 }) {
   const [quantity, setQuantity] = useState("");
+  const [saveAsTypical, setSaveAsTypical] = useState(false);
+  const hasTypicalQuantity = supply?.typicalRefillQuantity && supply.typicalRefillQuantity > 0;
 
   useEffect(() => {
-    if (supply) {
-      setQuantity("");
+    if (supply && open) {
+      if (supply.typicalRefillQuantity && supply.typicalRefillQuantity > 0) {
+        setQuantity(supply.typicalRefillQuantity.toString());
+        setSaveAsTypical(false);
+      } else {
+        setQuantity("");
+        setSaveAsTypical(true);
+      }
     }
   }, [supply, open]);
 
+  const handleQuickRefill = () => {
+    if (supply?.typicalRefillQuantity) {
+      onConfirm(supply.typicalRefillQuantity, false);
+      onOpenChange(false);
+    }
+  };
+
   const handleConfirm = () => {
     const qty = parseFloat(quantity) || 0;
-    onConfirm(qty);
+    onConfirm(qty, saveAsTypical);
     onOpenChange(false);
   };
+
+  const parsedQty = parseFloat(quantity) || 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Pickup / Refill</DialogTitle>
+          <DialogTitle>Refill {supply?.name}</DialogTitle>
           <DialogDescription>
-            Record that you picked up {supply?.name}. This will update the quantity and track your pickup history.
+            Record your prescription refill. This resets your supply count and starts fresh tracking.
           </DialogDescription>
         </DialogHeader>
+        
+        {hasTypicalQuantity && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Quick refill</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your usual: {supply?.typicalRefillQuantity} units
+                  </p>
+                </div>
+                <Button onClick={handleQuickRefill} data-testid="button-quick-refill">
+                  Refill Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="pickup-quantity">Quantity Received</Label>
+            <Label htmlFor="pickup-quantity">
+              {hasTypicalQuantity ? "Or enter different quantity" : "Quantity received"}
+            </Label>
             <Input
               id="pickup-quantity"
               type="number"
@@ -377,15 +437,37 @@ function PickupDialog({
               onChange={e => setQuantity(e.target.value)}
               data-testid="input-pickup-quantity"
             />
-            <p className="text-xs text-muted-foreground">
-              Current: {supply?.currentQuantity || 0}. After pickup: {(supply?.currentQuantity || 0) + (parseFloat(quantity) || 0)}
-            </p>
+            {parsedQty > 0 && (
+              <p className="text-xs text-muted-foreground">
+                New supply level: {parsedQty}
+              </p>
+            )}
           </div>
+          
+          {parsedQty > 0 && !hasTypicalQuantity && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="save-typical"
+                checked={saveAsTypical}
+                onChange={(e) => setSaveAsTypical(e.target.checked)}
+                className="rounded"
+                data-testid="checkbox-save-typical"
+              />
+              <Label htmlFor="save-typical" className="text-sm font-normal cursor-pointer">
+                Remember this as my usual refill amount
+              </Label>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleConfirm} disabled={!quantity || parseFloat(quantity) <= 0} data-testid="button-confirm-pickup">
-            Log Pickup
+          <Button 
+            onClick={handleConfirm} 
+            disabled={parsedQty <= 0} 
+            data-testid="button-confirm-pickup"
+          >
+            Confirm Refill
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -457,14 +539,22 @@ export default function Supplies() {
     setPickupDialogOpen(true);
   };
 
-  const handleConfirmPickup = (quantity: number) => {
+  const handleConfirmRefill = (quantity: number, saveAsTypical: boolean) => {
     if (pickupSupply) {
-      const newQuantity = pickupSupply.currentQuantity + quantity;
-      storage.updateSupply(pickupSupply.id, { currentQuantity: newQuantity });
+      const updates: Partial<Supply> = { 
+        currentQuantity: quantity,
+        lastPickupDate: new Date().toISOString()
+      };
+      
+      if (saveAsTypical) {
+        updates.typicalRefillQuantity = quantity;
+      }
+      
+      storage.updateSupply(pickupSupply.id, updates);
       storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
       toast({ 
-        title: "Pickup logged", 
-        description: `Added ${quantity} to ${pickupSupply.name}. New total: ${newQuantity}` 
+        title: "Refill recorded", 
+        description: `${pickupSupply.name} refilled with ${quantity} units.${saveAsTypical ? " Saved as your typical amount." : ""}` 
       });
       refreshSupplies();
     }
@@ -563,11 +653,11 @@ export default function Supplies() {
         lastPrescription={lastPrescription}
       />
 
-      <PickupDialog
+      <RefillDialog
         supply={pickupSupply}
         open={pickupDialogOpen}
         onOpenChange={setPickupDialogOpen}
-        onConfirm={handleConfirmPickup}
+        onConfirm={handleConfirmRefill}
       />
     </div>
   );
