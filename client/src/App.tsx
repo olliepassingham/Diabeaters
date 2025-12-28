@@ -16,6 +16,7 @@ import Advisor from "@/pages/advisor";
 import Travel from "@/pages/travel";
 import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
+import Community from "@/pages/community";
 import Onboarding from "@/pages/onboarding";
 import NotFound from "@/pages/not-found";
 
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/sick-day" component={SickDay} />
       <Route path="/advisor" component={Advisor} />
       <Route path="/travel" component={Travel} />
+      <Route path="/community" component={Community} />
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
       <Route component={NotFound} />

@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Thermometer, Phone, Plane } from "lucide-react";
+import { Home, Package, Bot, Settings, Thermometer, Phone, Plane, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { FaceLogo } from "@/components/face-logo";
 import {
@@ -39,6 +39,11 @@ const items = [
     title: "Travel Mode",
     url: "/travel",
     icon: Plane,
+  },
+  {
+    title: "Community",
+    url: "/community",
+    icon: Users,
   },
   {
     title: "Settings",
