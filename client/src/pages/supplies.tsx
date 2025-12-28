@@ -113,12 +113,26 @@ function SupplyCard({
           <div className="flex items-baseline justify-between gap-2">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-              <p className={`text-2xl font-bold ${
-                status === "critical" ? "text-red-600 dark:text-red-500" : 
-                status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-              }`} data-testid={`text-remaining-${supply.id}`}>
-                {supply.currentQuantity}
-              </p>
+              {supply.type === "insulin" ? (
+                <div data-testid={`text-remaining-${supply.id}`}>
+                  <p className={`text-2xl font-bold ${
+                    status === "critical" ? "text-red-600 dark:text-red-500" : 
+                    status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                  }`}>
+                    {Math.floor(supply.currentQuantity / 100)} {Math.floor(supply.currentQuantity / 100) === 1 ? "pen" : "pens"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    ({supply.currentQuantity} units)
+                  </p>
+                </div>
+              ) : (
+                <p className={`text-2xl font-bold ${
+                  status === "critical" ? "text-red-600 dark:text-red-500" : 
+                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                }`} data-testid={`text-remaining-${supply.id}`}>
+                  {supply.currentQuantity}
+                </p>
+              )}
             </div>
             <div className="text-right">
               <Badge 
