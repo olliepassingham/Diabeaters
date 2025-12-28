@@ -4,4 +4,5 @@ export { AIRecommendationsWidget } from "./ai-recommendations-widget";
 export { QuickActionsWidget } from "./quick-actions-widget";
 export { ScenarioStatusWidget } from "./scenario-status-widget";
 export { SettingsCompletionWidget } from "./settings-completion-widget";
+export { CommunityWidget } from "./community-widget";
 export { WidgetLibrary, WIDGET_INFO } from "./widget-library";

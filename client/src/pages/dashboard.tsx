@@ -10,6 +10,7 @@ import {
   QuickActionsWidget,
   ScenarioStatusWidget,
   SettingsCompletionWidget,
+  CommunityWidget,
   WidgetLibrary,
 } from "@/components/widgets";
 
@@ -27,6 +28,8 @@ function WidgetRenderer({ type }: { type: string }) {
       return <ScenarioStatusWidget />;
     case "settings-completion":
       return <SettingsCompletionWidget />;
+    case "community":
+      return <CommunityWidget />;
     default:
       return null;
   }
