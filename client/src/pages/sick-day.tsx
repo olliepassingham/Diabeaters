@@ -10,6 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
+// Conversion helpers for blood glucose units
+const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
+const mmolToMgdl = (mmol: number) => Math.round(mmol * 18);
+
 interface SickDayResults {
   correctionDose: number;
   breakfastRatio: string;
@@ -89,12 +93,19 @@ export default function SickDay() {
   const [bgLevel, setBgLevel] = useState("");
   const [severity, setSeverity] = useState<string>("");
   const [results, setResults] = useState<SickDayResults | null>(null);
+  const [bgUnits, setBgUnits] = useState("mg/dL");
 
   useEffect(() => {
     const storedSettings = storage.getSettings();
     setSettings(storedSettings);
     if (storedSettings.tdd) {
       setTdd(storedSettings.tdd.toString());
+    }
+    
+    // Load blood glucose units from profile
+    const profile = storage.getProfile();
+    if (profile?.bgUnits) {
+      setBgUnits(profile.bgUnits);
     }
   }, []);
 
@@ -120,7 +131,9 @@ export default function SickDay() {
       return;
     }
 
-    const recommendations = calculateSickDayRecommendations(tddNum, bgNum, severity, settings);
+    // Convert to mg/dL for internal calculations if user uses mmol/L
+    const bgInMgdl = bgUnits === "mmol/L" ? mmolToMgdl(bgNum) : bgNum;
+    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, settings);
     
     if (isNaN(recommendations.correctionDose)) {
       toast({
@@ -205,11 +218,11 @@ export default function SickDay() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bg-level">Current Blood Glucose (mg/dL)</Label>
+              <Label htmlFor="bg-level">Current Blood Glucose ({bgUnits})</Label>
               <Input
                 id="bg-level"
                 type="number"
-                placeholder="e.g., 180"
+                placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
                 value={bgLevel}
                 onChange={(e) => setBgLevel(e.target.value)}
                 data-testid="input-bg-level"
@@ -299,7 +312,7 @@ export default function SickDay() {
                 <p className="font-medium">Important Reminders:</p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
                   <li>Never skip basal insulin, even if not eating</li>
-                  <li>Check for ketones if BG remains above 250 mg/dL</li>
+                  <li>Check for ketones if BG remains above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}</li>
                   <li>Seek medical help if you have moderate/large ketones</li>
                   <li>Contact your healthcare team if symptoms worsen</li>
                 </ul>
