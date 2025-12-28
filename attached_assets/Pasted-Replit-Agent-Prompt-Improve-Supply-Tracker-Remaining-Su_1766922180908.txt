@@ -1,0 +1,195 @@
+Replit Agent Prompt: Improve Supply Tracker (Remaining Supply, Usage-Based Depletion, Refill Flow)
+Context
+
+You are working inside an existing diabetes app with a Supply Tracker feature.
+Your task is to improve clarity and usability around how much prescription supply remains, based on pickup dates and daily usage habits.
+
+This is an enhancement, not a redesign.
+Preserve existing data and flows wherever possible.
+
+1. Make Remaining Supply Clear and Time-Based
+Problem
+
+Users need to quickly understand:
+
+How much prescription supply they have left
+
+How that amount relates to the date they picked it up
+
+When they are likely to run out
+
+Currently, this is not clearly connected to pickup date + daily usage habits.
+
+Required Behavior
+
+The Supply Tracker should clearly calculate and display remaining supply based on:
+
+Prescription pickup date
+
+Initial quantity picked up
+
+User’s usual daily usage (from Supply Usage Habits)
+
+Calculation Logic
+
+For each prescription:
+
+Identify:
+
+Pickup date
+
+Total quantity picked up
+
+Daily usage rate (units/day)
+
+Calculate:
+
+Days elapsed since pickup
+
+Quantity used = days elapsed × daily usage
+
+Quantity remaining = total − used
+
+Clamp values to avoid negative numbers
+
+UI Requirements (Supply Tracker Page)
+
+For each tracked prescription, display clearly:
+
+Remaining supply (primary, large text)
+
+Estimated days remaining
+
+Pickup date (e.g. “Picked up on Aug 3”)
+
+Optional relative context:
+
+“~7 days left”
+
+“Estimated run out: Sept 2”
+
+Design priority:
+
+A quick glance should answer: “Am I okay right now?”
+
+2. Use “Usual Habits” as the Default Consumption Source
+Requirements
+
+Use the existing Supply Usage Habits settings as the default daily usage rate
+
+Do not ask for usage input during normal supply tracking
+
+If no habit data exists:
+
+Show a clear prompt to set it
+
+Link directly to Supply Usage Habits settings
+
+Error Handling
+
+Gracefully handle:
+
+Missing habit data
+
+Partial data
+
+Recently changed habits (apply changes going forward, not retroactively)
+
+3. Add a “Refill Supply” Flow (Instead of Re-entering Amounts)
+Problem
+
+Users usually pick up the same amount every month, but currently must re-enter quantities each time.
+
+Required Feature: Refill Supply
+
+Replace repetitive input with a Refill Supply action.
+
+Functional Requirements
+
+For each prescription, store:
+
+Typical refill quantity
+
+On refill:
+
+Default to the usual quantity
+
+Default pickup date to “today”
+
+Allow quick confirmation with one tap
+
+Allow editing before saving (optional, not required)
+
+UI Requirements
+
+On the Supply Tracker page:
+
+Add a “Refill” or “Add Refill” button per prescription
+
+Do not require navigating to a full add-supply form
+
+Example flow:
+
+Tap “Refill”
+
+Confirm quantity + date
+
+Supply resets and tracking continues
+
+4. Data & State Requirements
+
+Persist:
+
+Pickup dates
+
+Refill history (at least last refill)
+
+Typical refill quantity
+
+Ensure backward compatibility with existing supply entries
+
+Do not delete or overwrite historical data unintentionally
+
+Use existing storage architecture (local storage / database)
+
+5. Edge Cases to Handle Gracefully
+
+User refills early (remaining supply > 0)
+
+Usage habits change mid-cycle
+
+User skips a refill month
+
+Multiple prescriptions of the same supply type
+
+Supply temporarily not in use (optional future support)
+
+6. Non-Functional Requirements
+
+No added cognitive load during normal use
+
+Calculations should be transparent and explainable
+
+Code should be modular and well-commented
+
+Flag assumptions or limitations clearly
+
+7. Output Expectations
+
+Update Supply Tracker UI to show remaining supply clearly
+
+Implement usage-based depletion logic
+
+Add refill flow using stored typical quantities
+
+Preserve existing user data
+
+Document calculation assumptions in code comments
+
+Design Principle Reminder
+
+This feature should feel like:
+
+“The app understands my routine and keeps track for me.”
+
+Speed, clarity, and trust are more important than flexibility.
