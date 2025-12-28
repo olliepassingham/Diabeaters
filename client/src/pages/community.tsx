@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   MessageCircle, 
   Plus, 
@@ -25,7 +25,11 @@ import {
   Brain,
   Lightbulb,
   HelpCircle,
-  Send
+  Send,
+  Mail,
+  UserPlus,
+  UserMinus,
+  Heart
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -34,7 +38,9 @@ import {
   CommunityReply, 
   COMMUNITY_TOPICS, 
   CommunityTopicId,
-  UserProfile
+  UserProfile,
+  Conversation,
+  DirectMessage
 } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 
@@ -60,12 +66,81 @@ function TopicBadge({ topic }: { topic: CommunityTopicId }) {
   );
 }
 
+function UserActions({ 
+  userName, 
+  isAnonymous,
+  onMessage,
+  currentUserName,
+}: { 
+  userName?: string;
+  isAnonymous: boolean;
+  onMessage: (name: string) => void;
+  currentUserName?: string;
+}) {
+  const [isFollowing, setIsFollowing] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (userName && !isAnonymous) {
+      setIsFollowing(storage.isFollowing(userName));
+    }
+  }, [userName, isAnonymous]);
+
+  if (isAnonymous || !userName) return null;
+  if (userName === currentUserName) return null;
+
+  const handleFollow = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isFollowing) {
+      storage.unfollowUser(userName);
+      setIsFollowing(false);
+      toast({ title: `Unfollowed ${userName}` });
+    } else {
+      storage.followUser(userName);
+      setIsFollowing(true);
+      toast({ title: `Now following ${userName}` });
+    }
+  };
+
+  const handleMessage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMessage(userName);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="h-7 px-2"
+        onClick={handleMessage}
+        data-testid={`button-dm-${userName}`}
+      >
+        <Mail className="h-3 w-3" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className={`h-7 px-2 ${isFollowing ? "text-primary" : ""}`}
+        onClick={handleFollow}
+        data-testid={`button-follow-${userName}`}
+      >
+        {isFollowing ? <UserMinus className="h-3 w-3" /> : <UserPlus className="h-3 w-3" />}
+      </Button>
+    </div>
+  );
+}
+
 function PostCard({ 
   post, 
-  onClick 
+  onClick,
+  onMessage,
+  currentUserName,
 }: { 
   post: CommunityPost; 
   onClick: () => void;
+  onMessage: (name: string) => void;
+  currentUserName?: string;
 }) {
   return (
     <Card 
@@ -91,18 +166,17 @@ function PostCard({
         )}
         
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            {post.isAnonymous ? (
-              <>
-                <User className="h-4 w-4" />
-                <span>Anonymous</span>
-              </>
-            ) : (
-              <>
-                <User className="h-4 w-4" />
-                <span>{post.authorName || "Someone"}</span>
-              </>
-            )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <User className="h-4 w-4" />
+              <span>{post.isAnonymous ? "Anonymous" : (post.authorName || "Someone")}</span>
+            </div>
+            <UserActions 
+              userName={post.authorName} 
+              isAnonymous={post.isAnonymous}
+              onMessage={onMessage}
+              currentUserName={currentUserName}
+            />
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <MessageCircle className="h-4 w-4" />
@@ -114,22 +188,31 @@ function PostCard({
   );
 }
 
-function ReplyCard({ reply, onReport }: { reply: CommunityReply; onReport: () => void }) {
+function ReplyCard({ 
+  reply, 
+  onReport,
+  onMessage,
+  currentUserName,
+}: { 
+  reply: CommunityReply; 
+  onReport: () => void;
+  onMessage: (name: string) => void;
+  currentUserName?: string;
+}) {
   return (
     <div className="p-4 bg-muted/30 rounded-lg" data-testid={`reply-${reply.id}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 text-sm">
-          {reply.isAnonymous ? (
-            <>
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Anonymous</span>
-            </>
-          ) : (
-            <>
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>{reply.authorName || "Someone"}</span>
-            </>
-          )}
+          <User className="h-4 w-4 text-muted-foreground" />
+          <span className={reply.isAnonymous ? "text-muted-foreground" : ""}>
+            {reply.isAnonymous ? "Anonymous" : (reply.authorName || "Someone")}
+          </span>
+          <UserActions 
+            userName={reply.authorName} 
+            isAnonymous={reply.isAnonymous}
+            onMessage={onMessage}
+            currentUserName={currentUserName}
+          />
           <span className="text-muted-foreground">·</span>
           <span className="text-muted-foreground text-xs">
             {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
@@ -150,13 +233,215 @@ function ReplyCard({ reply, onReport }: { reply: CommunityReply; onReport: () =>
   );
 }
 
+function ConversationItem({ 
+  conversation, 
+  onClick,
+  isActive,
+}: { 
+  conversation: Conversation; 
+  onClick: () => void;
+  isActive: boolean;
+}) {
+  return (
+    <div 
+      className={`p-3 rounded-lg cursor-pointer hover-elevate transition-all ${isActive ? "bg-primary/10" : "bg-muted/30"}`}
+      onClick={onClick}
+      data-testid={`conversation-${conversation.id}`}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-medium">{conversation.participantName}</span>
+        {conversation.unreadCount > 0 && (
+          <Badge variant="default" className="h-5 min-w-5 justify-center">
+            {conversation.unreadCount}
+          </Badge>
+        )}
+      </div>
+      {conversation.lastMessage && (
+        <p className="text-sm text-muted-foreground line-clamp-1">
+          {conversation.lastMessage}
+        </p>
+      )}
+      {conversation.lastMessageAt && (
+        <p className="text-xs text-muted-foreground mt-1">
+          {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function MessagesView({ 
+  currentUserName,
+  initialRecipient,
+  onClearRecipient,
+}: { 
+  currentUserName?: string;
+  initialRecipient?: string;
+  onClearRecipient: () => void;
+}) {
+  const { toast } = useToast();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  useEffect(() => {
+    if (initialRecipient && currentUserName) {
+      const conv = storage.getOrCreateConversation(initialRecipient);
+      setSelectedConversation(conv);
+      setMessages(storage.getMessages(conv.id));
+      loadConversations();
+      onClearRecipient();
+    }
+  }, [initialRecipient, currentUserName]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setMessages(storage.getMessages(selectedConversation.id));
+      storage.markConversationRead(selectedConversation.id);
+      loadConversations();
+    }
+  }, [selectedConversation]);
+
+  const loadConversations = () => {
+    setConversations(storage.getConversations());
+  };
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim() || !selectedConversation || !currentUserName) return;
+    
+    storage.sendMessage(selectedConversation.id, newMessage.trim(), currentUserName);
+    setNewMessage("");
+    setMessages(storage.getMessages(selectedConversation.id));
+    loadConversations();
+  };
+
+  if (!currentUserName) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="font-semibold text-lg mb-2">Set up your profile</h3>
+          <p className="text-muted-foreground">
+            To send and receive messages, please complete your profile in Settings with your name.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (selectedConversation) {
+    return (
+      <div className="space-y-4">
+        <Button 
+          variant="ghost" 
+          onClick={() => setSelectedConversation(null)}
+          data-testid="button-back-to-inbox"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Inbox
+        </Button>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {selectedConversation.participantName}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px] mb-4">
+              <div className="space-y-3 pr-4">
+                {messages.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No messages yet. Start the conversation!
+                  </p>
+                ) : (
+                  messages.map((msg) => (
+                    <div 
+                      key={msg.id}
+                      className={`p-3 rounded-lg max-w-[80%] ${
+                        msg.senderName === currentUserName 
+                          ? "bg-primary text-primary-foreground ml-auto" 
+                          : "bg-muted"
+                      }`}
+                      data-testid={`message-${msg.id}`}
+                    >
+                      <p className="text-sm">{msg.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        msg.senderName === currentUserName 
+                          ? "text-primary-foreground/70" 
+                          : "text-muted-foreground"
+                      }`}>
+                        {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+
+            <div className="flex gap-2">
+              <Input
+                placeholder="Type a message..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                data-testid="input-message"
+              />
+              <Button 
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim()}
+                data-testid="button-send-message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {conversations.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="font-semibold text-lg mb-2">No messages yet</h3>
+            <p className="text-muted-foreground">
+              When you message someone from the community, your conversations will appear here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        conversations.map((conv) => (
+          <ConversationItem
+            key={conv.id}
+            conversation={conv}
+            onClick={() => setSelectedConversation(conv)}
+            isActive={false}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
 export default function Community() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("posts");
   const [posts, setPosts] = useState<CommunityPost[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<CommunityTopicId | "all">("all");
+  const [selectedTopic, setSelectedTopic] = useState<CommunityTopicId | "all" | "following">("all");
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
   const [replies, setReplies] = useState<CommunityReply[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [messageRecipient, setMessageRecipient] = useState<string | undefined>();
   
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newPostTitle, setNewPostTitle] = useState("");
@@ -183,8 +468,12 @@ export default function Community() {
   }, [selectedPost]);
 
   const loadPosts = () => {
-    const topic = selectedTopic === "all" ? undefined : selectedTopic;
-    setPosts(storage.getCommunityPosts(topic));
+    if (selectedTopic === "following") {
+      setPosts(storage.getPostsFromFollowed());
+    } else {
+      const topic = selectedTopic === "all" ? undefined : selectedTopic;
+      setPosts(storage.getCommunityPosts(topic));
+    }
   };
 
   const handleCreatePost = () => {
@@ -259,6 +548,11 @@ export default function Community() {
     });
   };
 
+  const handleOpenMessage = (userName: string) => {
+    setMessageRecipient(userName);
+    setActiveTab("messages");
+  };
+
   if (selectedPost) {
     return (
       <div className="min-h-screen bg-background">
@@ -288,17 +582,14 @@ export default function Community() {
               </div>
               <CardTitle className="text-xl">{selectedPost.title}</CardTitle>
               <CardDescription className="flex items-center gap-2">
-                {selectedPost.isAnonymous ? (
-                  <>
-                    <User className="h-4 w-4" />
-                    Anonymous
-                  </>
-                ) : (
-                  <>
-                    <User className="h-4 w-4" />
-                    {selectedPost.authorName || "Someone"}
-                  </>
-                )}
+                <User className="h-4 w-4" />
+                <span>{selectedPost.isAnonymous ? "Anonymous" : (selectedPost.authorName || "Someone")}</span>
+                <UserActions 
+                  userName={selectedPost.authorName} 
+                  isAnonymous={selectedPost.isAnonymous}
+                  onMessage={handleOpenMessage}
+                  currentUserName={profile?.name}
+                />
                 <span>·</span>
                 {formatDistanceToNow(new Date(selectedPost.createdAt), { addSuffix: true })}
               </CardDescription>
@@ -327,6 +618,8 @@ export default function Community() {
                     key={reply.id} 
                     reply={reply} 
                     onReport={() => handleReportReply(reply.id)}
+                    onMessage={handleOpenMessage}
+                    currentUserName={profile?.name}
                   />
                 ))}
               </div>
@@ -468,62 +761,109 @@ export default function Community() {
           </p>
         </div>
 
-        <div className="mb-4">
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="flex gap-2 pb-2">
-              <Button
-                variant={selectedTopic === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedTopic("all")}
-                data-testid="filter-all"
-              >
-                All
-              </Button>
-              {COMMUNITY_TOPICS.map((topic) => {
-                const Icon = TOPIC_ICONS[topic.id];
-                return (
-                  <Button
-                    key={topic.id}
-                    variant={selectedTopic === topic.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedTopic(topic.id)}
-                    className="gap-1"
-                    data-testid={`filter-${topic.id}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {topic.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="posts" data-testid="tab-posts">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Posts
+            </TabsTrigger>
+            <TabsTrigger value="messages" data-testid="tab-messages">
+              <Mail className="h-4 w-4 mr-2" />
+              Messages
+            </TabsTrigger>
+          </TabsList>
 
-        {posts.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="font-semibold text-lg mb-2">No posts yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Be the first to start a conversation!
-              </p>
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Ask a Question
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {posts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                onClick={() => setSelectedPost(post)}
-              />
-            ))}
-          </div>
-        )}
+          <TabsContent value="posts" className="mt-4">
+            <div className="mb-4">
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="flex gap-2 pb-2">
+                  <Button
+                    variant={selectedTopic === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedTopic("all")}
+                    data-testid="filter-all"
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={selectedTopic === "following" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedTopic("following")}
+                    className="gap-1"
+                    data-testid="filter-following"
+                  >
+                    <Heart className="h-4 w-4" />
+                    Following
+                  </Button>
+                  {COMMUNITY_TOPICS.map((topic) => {
+                    const Icon = TOPIC_ICONS[topic.id];
+                    return (
+                      <Button
+                        key={topic.id}
+                        variant={selectedTopic === topic.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedTopic(topic.id)}
+                        className="gap-1"
+                        data-testid={`filter-${topic.id}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {topic.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {posts.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  {selectedTopic === "following" ? (
+                    <>
+                      <Heart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="font-semibold text-lg mb-2">No posts from followed users</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Follow community members to see their posts here.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <h3 className="font-semibold text-lg mb-2">No posts yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        Be the first to start a conversation!
+                      </p>
+                      <Button onClick={() => setCreateDialogOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ask a Question
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {posts.map((post) => (
+                  <PostCard 
+                    key={post.id} 
+                    post={post} 
+                    onClick={() => setSelectedPost(post)}
+                    onMessage={handleOpenMessage}
+                    currentUserName={profile?.name}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="messages" className="mt-4">
+            <MessagesView 
+              currentUserName={profile?.name}
+              initialRecipient={messageRecipient}
+              onClearRecipient={() => setMessageRecipient(undefined)}
+            />
+          </TabsContent>
+        </Tabs>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
           Community posts are based on personal experience and are not medical advice.
