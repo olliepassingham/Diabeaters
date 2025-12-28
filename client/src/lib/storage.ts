@@ -11,6 +11,9 @@ const STORAGE_KEYS = {
   PICKUP_HISTORY: "diabeater_pickup_history",
   COMMUNITY_POSTS: "diabeater_community_posts",
   COMMUNITY_REPLIES: "diabeater_community_replies",
+  DIRECT_MESSAGES: "diabeater_direct_messages",
+  CONVERSATIONS: "diabeater_conversations",
+  FOLLOWING: "diabeater_following",
 } as const;
 
 export interface UserProfile {
@@ -133,6 +136,28 @@ export interface CommunityReply {
   isAnonymous: boolean;
   isReported: boolean;
   createdAt: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderName: string;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  participantName: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount: number;
+}
+
+export interface FollowRelation {
+  userName: string;
+  followedAt: string;
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -529,5 +554,122 @@ export const storage = {
     
     localStorage.setItem(STORAGE_KEYS.COMMUNITY_POSTS, JSON.stringify(seedPosts));
     return seedPosts;
+  },
+
+  getConversations(): Conversation[] {
+    const data = localStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
+    const conversations: Conversation[] = data ? JSON.parse(data) : [];
+    return conversations.sort((a, b) => {
+      if (!a.lastMessageAt) return 1;
+      if (!b.lastMessageAt) return -1;
+      return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+    });
+  },
+
+  getOrCreateConversation(participantName: string): Conversation {
+    const conversations = this.getConversations();
+    let conversation = conversations.find(c => c.participantName === participantName);
+    
+    if (!conversation) {
+      conversation = {
+        id: generateId(),
+        participantName,
+        unreadCount: 0,
+      };
+      conversations.push(conversation);
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+    }
+    
+    return conversation;
+  },
+
+  getMessages(conversationId: string): DirectMessage[] {
+    const data = localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES);
+    const messages: DirectMessage[] = data ? JSON.parse(data) : [];
+    return messages
+      .filter(m => m.conversationId === conversationId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  },
+
+  sendMessage(conversationId: string, content: string, senderName: string): DirectMessage {
+    const data = localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES);
+    const messages: DirectMessage[] = data ? JSON.parse(data) : [];
+    
+    const newMessage: DirectMessage = {
+      id: generateId(),
+      conversationId,
+      senderName,
+      content,
+      createdAt: new Date().toISOString(),
+      isRead: true,
+    };
+    
+    messages.push(newMessage);
+    localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(messages));
+    
+    const conversations = this.getConversations();
+    const convIndex = conversations.findIndex(c => c.id === conversationId);
+    if (convIndex !== -1) {
+      conversations[convIndex].lastMessage = content.substring(0, 50);
+      conversations[convIndex].lastMessageAt = newMessage.createdAt;
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+    }
+    
+    return newMessage;
+  },
+
+  markConversationRead(conversationId: string): void {
+    const conversations = this.getConversations();
+    const convIndex = conversations.findIndex(c => c.id === conversationId);
+    if (convIndex !== -1) {
+      conversations[convIndex].unreadCount = 0;
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+    }
+    
+    const data = localStorage.getItem(STORAGE_KEYS.DIRECT_MESSAGES);
+    const messages: DirectMessage[] = data ? JSON.parse(data) : [];
+    const updated = messages.map(m => 
+      m.conversationId === conversationId ? { ...m, isRead: true } : m
+    );
+    localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(updated));
+  },
+
+  getTotalUnreadCount(): number {
+    const conversations = this.getConversations();
+    return conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  },
+
+  getFollowing(): FollowRelation[] {
+    const data = localStorage.getItem(STORAGE_KEYS.FOLLOWING);
+    return data ? JSON.parse(data) : [];
+  },
+
+  isFollowing(userName: string): boolean {
+    const following = this.getFollowing();
+    return following.some(f => f.userName === userName);
+  },
+
+  followUser(userName: string): void {
+    const following = this.getFollowing();
+    if (!following.some(f => f.userName === userName)) {
+      following.push({
+        userName,
+        followedAt: new Date().toISOString(),
+      });
+      localStorage.setItem(STORAGE_KEYS.FOLLOWING, JSON.stringify(following));
+    }
+  },
+
+  unfollowUser(userName: string): void {
+    const following = this.getFollowing();
+    const filtered = following.filter(f => f.userName !== userName);
+    localStorage.setItem(STORAGE_KEYS.FOLLOWING, JSON.stringify(filtered));
+  },
+
+  getPostsFromFollowed(): CommunityPost[] {
+    const following = this.getFollowing();
+    const followedNames = new Set(following.map(f => f.userName));
+    const posts = this.getCommunityPosts();
+    return posts.filter(p => !p.isAnonymous && p.authorName && followedNames.has(p.authorName));
   },
 };
