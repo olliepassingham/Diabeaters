@@ -1,0 +1,141 @@
+Replit Prompt — Diabeaters Home Screen Redesign
+
+Build a modern, production-ready mobile app home screen for a Type 1 diabetes management app called Diabeaters.
+
+The app should feel calm, human, premium, and proactive, not clinical. Use a warm neutral background (soft beige), rounded cards, subtle shadows, and clear visual hierarchy. Design for iOS and Android.
+
+1. Header & Status
+
+Unified header card at the top
+
+Text on the left:
+
+“Good morning, Ollie”
+
+Subtext: “Here’s your diabetes today”
+
+On the right:
+
+Small circular status indicator with label
+
+Green: “Stable”
+
+Amber: “Watch”
+
+Red: “Action needed”
+
+Header should immediately communicate current safety status
+
+2. Primary Action (Hero Section)
+
+Large elevated hero card below the header
+
+Full-width Help Now button:
+
+Red
+
+Rounded pill shape
+
+Larger height for accessibility
+
+Subtle pulse or glow animation when risk is detected
+
+Secondary action below or beside it:
+
+“Customize Dashboard”
+
+Visually quieter (outlined or muted)
+
+3. Today at a Glance
+
+Card titled “Today”
+
+Status row:
+
+Green check icon
+
+Text: “All systems normal”
+
+Three compact micro-stats in a horizontal row:
+
+💉 Ratios: Stable
+
+🧃 Supplies: 12 days
+
+🏃 Activity: Light
+
+Primary CTA:
+
+Plan Today →
+
+4. Supplies Card
+
+Card titled “Supplies”
+
+Main metric:
+
+“12 days remaining”
+
+Thin horizontal progress bar showing supply usage trend
+
+Small helper text:
+
+“Based on last 14 days”
+
+Actions:
+
+“View Supplies →”
+
+Small cart icon for reorder
+
+5. Quick Actions (Refined)
+
+Do NOT include “Help Now” here
+
+Split actions into two groups:
+
+Primary Actions (larger buttons):
+
+Supplies
+
+Ratios
+
+Sick Day
+
+Secondary Actions (smaller icon row):
+
+Activity
+
+Travel
+
+History
+
+6. AI Insights
+
+Card titled “AI Insight”
+
+Example insight text:
+
+“You’ve had 3 stable mornings in a row. Consider a slightly later breakfast bolus today.”
+
+Footer text:
+
+“Not medical advice · Based on your data”
+
+Insight should feel supportive and confident, not alarmist
+
+7. Visual & UX Guidelines
+
+Warm, non-clinical color palette
+
+Clear elevation hierarchy between cards
+
+Consistent icon style and sizing
+
+Large tap targets and readable text for hypo-safe accessibility
+
+Subtle animations only where meaningful (status, Help Now)
+
+Goal
+
+Create a home screen that feels like a daily diabetes command centre — reassuring, intelligent, and proactive — suitable for a freemium health app users would trust and pay for.
