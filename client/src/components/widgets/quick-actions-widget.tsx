@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Package, Dumbbell, Thermometer, Plane, Phone, Calculator } from "lucide-react";
+import { Package, Dumbbell, Thermometer, Plane, Users, Calculator } from "lucide-react";
 import { Link } from "wouter";
 
 interface QuickAction {
@@ -17,7 +17,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { icon: Thermometer, label: "Sick Day", href: "/sick-day", color: "text-orange-600", testId: "action-sick-day" },
   { icon: Plane, label: "Travel", href: "/travel", color: "text-purple-600", testId: "action-travel" },
   { icon: Calculator, label: "Ratios", href: "/advisor", color: "text-teal-600", testId: "action-ratios" },
-  { icon: Phone, label: "Help Now", href: "/help-now", color: "text-red-600", testId: "action-help-now" },
+  { icon: Users, label: "Community", href: "/community", color: "text-indigo-600", testId: "action-community" },
 ];
 
 export function QuickActionsWidget() {
