@@ -1,26 +1,25 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Phone, 
-  Settings, 
-  CheckCircle2, 
-  Syringe, 
-  Package, 
-  Activity,
-  ArrowRight,
-  ShoppingCart,
-  Thermometer,
-  Plane,
-  History,
-  Sparkles,
-  AlertCircle
-} from "lucide-react";
+import { Phone, Settings } from "lucide-react";
 import { Link } from "wouter";
-import { storage, Supply, ScenarioState, UserProfile, UserSettings } from "@/lib/storage";
-import { WidgetLibrary } from "@/components/widgets";
+import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
+import {
+  SupplySummaryWidget,
+  TodayOverviewWidget,
+  AIRecommendationsWidget,
+  QuickActionsWidget,
+  ScenarioStatusWidget,
+  SettingsCompletionWidget,
+  CommunityWidget,
+  MessagesWidget,
+  ActivityAdviserWidget,
+  RatioAdviserWidget,
+  TravelModeWidget,
+  SickDayWidget,
+  HelpNowInfoWidget,
+  WidgetLibrary,
+} from "@/components/widgets";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -87,7 +86,7 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
   );
 }
 
-function HeroCard({ status }: { status: HealthStatus }) {
+function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
   const isUrgent = status === "action";
 
   return (
@@ -106,7 +105,7 @@ function HeroCard({ status }: { status: HealthStatus }) {
         <Button 
           variant="outline" 
           className="w-full"
-          onClick={() => document.getElementById("customize-trigger")?.click()}
+          onClick={onCustomize}
           data-testid="button-customize"
         >
           <Settings className="h-4 w-4 mr-2" />
@@ -117,194 +116,53 @@ function HeroCard({ status }: { status: HealthStatus }) {
   );
 }
 
-function TodayCard({ supplies, settings }: { supplies: Supply[]; settings: UserSettings }) {
-  const minDays = supplies.length > 0 
-    ? Math.min(...supplies.filter(s => s.dailyUsage > 0).map(s => Math.floor(s.currentQuantity / s.dailyUsage)))
-    : 0;
-
-  const ratioStatus = settings.breakfastRatio ? "Stable" : "Not set";
-  const supplyStatus = `${minDays} days`;
-  const activityStatus = "Light";
-
-  return (
-    <Card data-testid="card-today">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Today</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-          <CheckCircle2 className="h-5 w-5" />
-          <span className="text-sm font-medium" data-testid="text-today-status">All systems normal</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-2 rounded-lg bg-muted/50">
-            <Syringe className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">Ratios</p>
-            <p className="text-sm font-medium" data-testid="text-ratio-status">{ratioStatus}</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/50">
-            <Package className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">Supplies</p>
-            <p className="text-sm font-medium" data-testid="text-supply-status">{supplyStatus}</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/50">
-            <Activity className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-            <p className="text-xs text-muted-foreground">Activity</p>
-            <p className="text-sm font-medium" data-testid="text-activity-status">{activityStatus}</p>
-          </div>
-        </div>
-
-        <Link href="/advisor">
-          <Button variant="secondary" className="w-full" data-testid="button-plan-today">
-            Plan Today
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SuppliesCard({ supplies }: { supplies: Supply[] }) {
-  const minDays = supplies.length > 0 
-    ? Math.min(...supplies.filter(s => s.dailyUsage > 0).map(s => Math.floor(s.currentQuantity / s.dailyUsage)))
-    : 0;
-  
-  const maxDays = 30;
-  const progressValue = Math.min((minDays / maxDays) * 100, 100);
-  const progressColor = minDays < 3 ? "bg-red-500" : minDays < 7 ? "bg-amber-500" : "";
-
-  return (
-    <Card data-testid="card-supplies">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Supplies</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <p className="text-2xl font-bold" data-testid="text-days-remaining">
-            {minDays} days remaining
-          </p>
-          <Progress value={progressValue} className={`h-2 mt-2 ${progressColor}`} />
-          <p className="text-xs text-muted-foreground mt-1">Based on last 14 days</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/supplies" className="flex-1">
-            <Button variant="outline" className="w-full" data-testid="button-view-supplies">
-              View Supplies
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
-          <Link href="/supplies">
-            <Button variant="ghost" size="icon" data-testid="button-reorder">
-              <ShoppingCart className="h-4 w-4" />
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickActionsCard() {
-  return (
-    <Card data-testid="card-quick-actions">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Quick Actions</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
-          <Link href="/supplies">
-            <Button variant="secondary" className="w-full h-16 flex-col gap-1" data-testid="button-action-supplies">
-              <Package className="h-5 w-5" />
-              <span className="text-xs">Supplies</span>
-            </Button>
-          </Link>
-          <Link href="/settings">
-            <Button variant="secondary" className="w-full h-16 flex-col gap-1" data-testid="button-action-ratios">
-              <Syringe className="h-5 w-5" />
-              <span className="text-xs">Ratios</span>
-            </Button>
-          </Link>
-          <Link href="/sick-day">
-            <Button variant="secondary" className="w-full h-16 flex-col gap-1" data-testid="button-action-sick">
-              <Thermometer className="h-5 w-5" />
-              <span className="text-xs">Sick Day</span>
-            </Button>
-          </Link>
-        </div>
-
-        <div className="flex items-center justify-center gap-4">
-          <Link href="/advisor">
-            <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-activity">
-              <Activity className="h-4 w-4" />
-              <span className="text-xs">Activity</span>
-            </Button>
-          </Link>
-          <Link href="/travel">
-            <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-travel">
-              <Plane className="h-4 w-4" />
-              <span className="text-xs">Travel</span>
-            </Button>
-          </Link>
-          <Link href="/advisor">
-            <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-history">
-              <History className="h-4 w-4" />
-              <span className="text-xs">History</span>
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function AIInsightCard() {
-  const insights = [
-    "You've had 3 stable mornings in a row. Consider a slightly later breakfast bolus today.",
-    "Your supplies are well-stocked. No urgent refills needed this week.",
-    "Light activity planned? Remember to check levels before and after.",
-    "Weekend approaching - good time to review your ratios for any adjustments.",
-  ];
-
-  const randomInsight = insights[Math.floor(Math.random() * insights.length)];
-
-  return (
-    <Card data-testid="card-ai-insight">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <CardTitle className="text-lg">AI Insight</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm mb-3" data-testid="text-insight">
-          {randomInsight}
-        </p>
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          Not medical advice · Based on your data
-        </p>
-      </CardContent>
-    </Card>
-  );
+function WidgetRenderer({ type }: { type: string }) {
+  switch (type) {
+    case "supply-summary":
+      return <SupplySummaryWidget />;
+    case "today-overview":
+      return <TodayOverviewWidget />;
+    case "ai-recommendations":
+      return <AIRecommendationsWidget />;
+    case "quick-actions":
+      return <QuickActionsWidget />;
+    case "scenario-status":
+      return <ScenarioStatusWidget />;
+    case "settings-completion":
+      return <SettingsCompletionWidget />;
+    case "community":
+      return <CommunityWidget />;
+    case "messages":
+      return <MessagesWidget />;
+    case "activity-adviser":
+      return <ActivityAdviserWidget />;
+    case "ratio-adviser":
+      return <RatioAdviserWidget />;
+    case "travel-mode":
+      return <TravelModeWidget />;
+    case "sick-day":
+      return <SickDayWidget />;
+    case "help-now-info":
+      return <HelpNowInfoWidget />;
+    default:
+      return null;
+  }
 }
 
 export default function Dashboard() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<Supply[]>([]);
-  const [settings, setSettings] = useState<UserSettings>({});
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
   const [isEditing, setIsEditing] = useState(false);
-  const [widgets, setWidgets] = useState(storage.getDashboardWidgets());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setProfile(storage.getProfile());
     setSupplies(storage.getSupplies());
-    setSettings(storage.getSettings());
     setScenarioState(storage.getScenarioState());
-  }, []);
+    setWidgets(storage.getDashboardWidgets());
+  }, [refreshKey]);
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
@@ -336,32 +194,47 @@ export default function Dashboard() {
     setWidgets(sorted);
   };
 
+  const handleCloseEditor = () => {
+    setIsEditing(false);
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const enabledWidgets = widgets
+    .filter(w => w.enabled)
+    .sort((a, b) => a.order - b.order);
+
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-8">
       <HeaderCard profile={profile} status={healthStatus} />
       
-      <HeroCard status={healthStatus} />
-      
-      <div className="grid grid-cols-1 gap-4">
-        <TodayCard supplies={supplies} settings={settings} />
-        <SuppliesCard supplies={supplies} />
-        <QuickActionsCard />
-        <AIInsightCard />
-      </div>
-
-      <button 
-        id="customize-trigger" 
-        className="hidden"
-        onClick={() => setIsEditing(true)}
-      />
+      <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
 
       {isEditing && (
         <WidgetLibrary
           widgets={widgets}
           onToggleWidget={handleToggleWidget}
           onMoveWidget={handleMoveWidget}
-          onClose={() => setIsEditing(false)}
+          onClose={handleCloseEditor}
         />
+      )}
+      
+      {!isEditing && (
+        <div className="grid grid-cols-1 gap-4">
+          {enabledWidgets.map((widget) => (
+            <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
+              <WidgetRenderer type={widget.type} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isEditing && enabledWidgets.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground mb-4">No widgets enabled. Click "Customize Dashboard" to add some.</p>
+          <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-add-widgets">
+            Add Widgets
+          </Button>
+        </div>
       )}
     </div>
   );

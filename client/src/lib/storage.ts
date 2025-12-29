@@ -87,7 +87,20 @@ export interface ActivityLog {
   createdAt: string;
 }
 
-export type WidgetType = "supply-summary" | "today-overview" | "ai-recommendations" | "quick-actions" | "scenario-status" | "settings-completion" | "community";
+export type WidgetType = 
+  | "supply-summary" 
+  | "today-overview" 
+  | "ai-recommendations" 
+  | "quick-actions" 
+  | "scenario-status" 
+  | "settings-completion" 
+  | "community"
+  | "messages"
+  | "activity-adviser"
+  | "ratio-adviser"
+  | "travel-mode"
+  | "sick-day"
+  | "help-now-info";
 
 export interface DashboardWidget {
   id: string;
@@ -161,13 +174,19 @@ export interface FollowRelation {
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 0 },
+  { id: "today-overview", type: "today-overview", enabled: true, order: 0 },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 1 },
-  { id: "today-overview", type: "today-overview", enabled: true, order: 2 },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 2 },
   { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 3 },
-  { id: "community", type: "community", enabled: true, order: 4 },
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 5 },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 6 },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4 },
+  { id: "community", type: "community", enabled: true, order: 5 },
+  { id: "messages", type: "messages", enabled: true, order: 6 },
+  { id: "activity-adviser", type: "activity-adviser", enabled: true, order: 7 },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 8 },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 9 },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 10 },
+  { id: "settings-completion", type: "settings-completion", enabled: false, order: 11 },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 12 },
 ];
 
 function generateId(): string {

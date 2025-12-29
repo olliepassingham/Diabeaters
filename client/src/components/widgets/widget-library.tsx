@@ -2,7 +2,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { GripVertical, Package, Calendar, Brain, Zap, LayoutGrid, X, ChevronUp, ChevronDown, Settings, Users } from "lucide-react";
+import { 
+  Package, 
+  Calendar, 
+  Brain, 
+  Zap, 
+  LayoutGrid, 
+  X, 
+  ChevronUp, 
+  ChevronDown, 
+  Settings, 
+  Users,
+  Mail,
+  Activity,
+  Syringe,
+  Plane,
+  Thermometer,
+  Phone
+} from "lucide-react";
 import { DashboardWidget, WidgetType } from "@/lib/storage";
 
 interface WidgetInfo {
@@ -13,23 +30,17 @@ interface WidgetInfo {
 }
 
 export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
-  "supply-summary": {
-    type: "supply-summary",
-    name: "Supply Summary",
-    description: "View supply levels and restock alerts",
-    icon: Package,
-  },
   "today-overview": {
     type: "today-overview",
-    name: "Today Overview",
-    description: "Today's status and flagged risks",
+    name: "Today at a Glance",
+    description: "Today's status and micro-stats",
     icon: Calendar,
   },
-  "ai-recommendations": {
-    type: "ai-recommendations",
-    name: "AI Insights",
-    description: "Preventative guidance and tips",
-    icon: Brain,
+  "supply-summary": {
+    type: "supply-summary",
+    name: "Supplies",
+    description: "View supply levels and days remaining",
+    icon: Package,
   },
   "quick-actions": {
     type: "quick-actions",
@@ -37,11 +48,53 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Fast access to all features",
     icon: Zap,
   },
+  "ai-recommendations": {
+    type: "ai-recommendations",
+    name: "AI Insights",
+    description: "Supportive guidance and tips",
+    icon: Brain,
+  },
   "scenario-status": {
     type: "scenario-status",
     name: "Active Scenarios",
     description: "Travel and sick day modes",
     icon: LayoutGrid,
+  },
+  "community": {
+    type: "community",
+    name: "Community",
+    description: "Connect with others who understand",
+    icon: Users,
+  },
+  "messages": {
+    type: "messages",
+    name: "Messages",
+    description: "Your direct message inbox",
+    icon: Mail,
+  },
+  "activity-adviser": {
+    type: "activity-adviser",
+    name: "Activity Adviser",
+    description: "Plan activities with AI guidance",
+    icon: Activity,
+  },
+  "ratio-adviser": {
+    type: "ratio-adviser",
+    name: "Ratio Adviser",
+    description: "Your insulin ratios at a glance",
+    icon: Syringe,
+  },
+  "travel-mode": {
+    type: "travel-mode",
+    name: "Travel Mode",
+    description: "Travel planning and reminders",
+    icon: Plane,
+  },
+  "sick-day": {
+    type: "sick-day",
+    name: "Sick Day Mode",
+    description: "Sick day guidance and monitoring",
+    icon: Thermometer,
   },
   "settings-completion": {
     type: "settings-completion",
@@ -49,11 +102,11 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Track your setup completion",
     icon: Settings,
   },
-  "community": {
-    type: "community",
-    name: "Community",
-    description: "Connect with others who understand",
-    icon: Users,
+  "help-now-info": {
+    type: "help-now-info",
+    name: "Emergency Info",
+    description: "Quick access to emergency contacts",
+    icon: Phone,
   },
 };
 
