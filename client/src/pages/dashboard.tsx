@@ -32,7 +32,10 @@ function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState): Heal
   if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
     return "action";
   }
-  if (minDays < 3 || scenarioState.sickDayActive) {
+  if (minDays < 2) {
+    return "action";
+  }
+  if (minDays < 7 || scenarioState.sickDayActive) {
     return "watch";
   }
   return "stable";
@@ -152,7 +155,7 @@ function TodayCard({ supplies, settings }: { supplies: Supply[]; settings: UserS
           </div>
         </div>
 
-        <Link href="/activity-adviser">
+        <Link href="/advisor">
           <Button variant="secondary" className="w-full" data-testid="button-plan-today">
             Plan Today
             <ArrowRight className="h-4 w-4 ml-2" />
@@ -170,7 +173,7 @@ function SuppliesCard({ supplies }: { supplies: Supply[] }) {
   
   const maxDays = 30;
   const progressValue = Math.min((minDays / maxDays) * 100, 100);
-  const progressColor = minDays < 7 ? "bg-amber-500" : minDays < 3 ? "bg-red-500" : "";
+  const progressColor = minDays < 3 ? "bg-red-500" : minDays < 7 ? "bg-amber-500" : "";
 
   return (
     <Card data-testid="card-supplies">
@@ -218,13 +221,13 @@ function QuickActionsCard() {
               <span className="text-xs">Supplies</span>
             </Button>
           </Link>
-          <Link href="/ratio-adviser">
+          <Link href="/settings">
             <Button variant="secondary" className="w-full h-16 flex-col gap-1" data-testid="button-action-ratios">
               <Syringe className="h-5 w-5" />
               <span className="text-xs">Ratios</span>
             </Button>
           </Link>
-          <Link href="/scenario-adviser?mode=sick">
+          <Link href="/sick-day">
             <Button variant="secondary" className="w-full h-16 flex-col gap-1" data-testid="button-action-sick">
               <Thermometer className="h-5 w-5" />
               <span className="text-xs">Sick Day</span>
@@ -233,19 +236,19 @@ function QuickActionsCard() {
         </div>
 
         <div className="flex items-center justify-center gap-4">
-          <Link href="/activity-adviser">
+          <Link href="/advisor">
             <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-activity">
               <Activity className="h-4 w-4" />
               <span className="text-xs">Activity</span>
             </Button>
           </Link>
-          <Link href="/scenario-adviser?mode=travel">
+          <Link href="/travel">
             <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-travel">
               <Plane className="h-4 w-4" />
               <span className="text-xs">Travel</span>
             </Button>
           </Link>
-          <Link href="/activity-history">
+          <Link href="/advisor">
             <Button variant="ghost" size="sm" className="gap-1" data-testid="button-action-history">
               <History className="h-4 w-4" />
               <span className="text-xs">History</span>
