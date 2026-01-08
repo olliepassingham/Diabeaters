@@ -29,10 +29,27 @@ function calculateSickDayRecommendations(
   tdd: number,
   bgLevel: number,
   severity: string,
-  settings: UserSettings
+  settings: UserSettings,
+  bgUnits: string
 ): SickDayResults {
-  const correctionFactor = settings.correctionFactor || Math.round(1800 / tdd);
-  const targetBg = settings.targetBgHigh || 120;
+  // Default correction factor uses the 1800 rule (for mg/dL)
+  // If user uses mmol/L and has set a correction factor, convert it
+  let correctionFactor = settings.correctionFactor || Math.round(1800 / tdd);
+  
+  // Default target is 120 mg/dL (6.7 mmol/L)
+  // If user has set a target, it's stored in their preferred units, so convert if needed
+  let targetBg = 120; // default in mg/dL
+  if (settings.targetBgHigh) {
+    // If user uses mmol/L, their stored target is in mmol/L, so convert to mg/dL
+    targetBg = bgUnits === "mmol/L" ? mmolToMgdl(settings.targetBgHigh) : settings.targetBgHigh;
+  }
+  
+  // If correction factor was set by user in mmol/L context, it needs conversion
+  // The 1800 rule gives mg/dL per unit; the 100 rule gives mmol/L per unit
+  // If user's correction factor is small (< 10), it's likely in mmol/L terms
+  if (settings.correctionFactor && bgUnits === "mmol/L" && settings.correctionFactor < 10) {
+    correctionFactor = settings.correctionFactor * 18; // convert to mg/dL equivalent
+  }
   
   let correctionDose = 0;
   if (bgLevel > targetBg) {
@@ -133,7 +150,7 @@ export default function SickDay() {
 
     // Convert to mg/dL for internal calculations if user uses mmol/L
     const bgInMgdl = bgUnits === "mmol/L" ? mmolToMgdl(bgNum) : bgNum;
-    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, settings);
+    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, settings, bgUnits);
     
     if (isNaN(recommendations.correctionDose)) {
       toast({
