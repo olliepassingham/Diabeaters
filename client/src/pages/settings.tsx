@@ -179,7 +179,8 @@ export default function Settings() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="grams">Grams</SelectItem>
-                    <SelectItem value="exchanges">Exchanges (15g)</SelectItem>
+                    <SelectItem value="portions-10g">Carb Portion (10g)</SelectItem>
+                    <SelectItem value="portions-15g">Carb Portion (15g)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
