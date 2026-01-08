@@ -164,11 +164,11 @@ export default function Onboarding() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="portions-10g" id="portions-10g" data-testid="radio-portions-10g" />
-                    <Label htmlFor="portions-10g" className="font-normal">Carb Portion (10g) - UK</Label>
+                    <Label htmlFor="portions-10g" className="font-normal">Carb Portion (10g)</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="portions-15g" id="portions-15g" data-testid="radio-portions-15g" />
-                    <Label htmlFor="portions-15g" className="font-normal">Carb Portion (15g) - US</Label>
+                    <Label htmlFor="portions-15g" className="font-normal">Carb Portion (15g)</Label>
                   </div>
                 </RadioGroup>
               </div>
