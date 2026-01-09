@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   EMERGENCY_CONTACTS: "diabeater_emergency_contacts",
   ACTIVITY_LOGS: "diabeater_activity_logs",
   DASHBOARD_WIDGETS: "diabeater_dashboard_widgets",
+  QUICK_ACTIONS: "diabeater_quick_actions",
   SCENARIO_STATE: "diabeater_scenario_state",
   LAST_PRESCRIPTION: "diabeater_last_prescription",
   USUAL_PRESCRIPTION: "diabeater_usual_prescription",
@@ -231,6 +232,44 @@ export interface CommunityReel {
   isActive: boolean;
   createdAt: string;
 }
+
+export type QuickActionId = 
+  | "supplies" 
+  | "activity" 
+  | "sick-day" 
+  | "travel" 
+  | "ratios" 
+  | "community"
+  | "help-now"
+  | "settings"
+  | "ai-coach";
+
+export interface QuickActionConfig {
+  id: QuickActionId;
+  enabled: boolean;
+  order: number;
+}
+
+export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
+  { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
+  { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
+  { id: "sick-day", label: "Sick Day", href: "/sick-day", iconName: "Thermometer", color: "text-orange-600" },
+  { id: "travel", label: "Travel", href: "/travel", iconName: "Plane", color: "text-purple-600" },
+  { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
+  { id: "community", label: "Community", href: "/community", iconName: "Users", color: "text-indigo-600" },
+  { id: "help-now", label: "Help Now", href: "/help", iconName: "AlertCircle", color: "text-red-600" },
+  { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
+  { id: "ai-coach", label: "AI Coach", href: "/ai-coach", iconName: "Bot", color: "text-pink-600" },
+];
+
+export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
+  { id: "supplies", enabled: true, order: 0 },
+  { id: "activity", enabled: true, order: 1 },
+  { id: "sick-day", enabled: true, order: 2 },
+  { id: "travel", enabled: true, order: 3 },
+  { id: "ratios", enabled: true, order: 4 },
+  { id: "community", enabled: true, order: 5 },
+];
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "today-overview", type: "today-overview", enabled: true, order: 0 },
@@ -513,6 +552,20 @@ export const storage = {
 
   saveDashboardWidgets(widgets: DashboardWidget[]): void {
     localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(widgets));
+  },
+
+  getQuickActions(): QuickActionConfig[] {
+    const data = localStorage.getItem(STORAGE_KEYS.QUICK_ACTIONS);
+    if (!data) {
+      const defaultCopy = JSON.parse(JSON.stringify(DEFAULT_QUICK_ACTIONS));
+      localStorage.setItem(STORAGE_KEYS.QUICK_ACTIONS, JSON.stringify(defaultCopy));
+      return defaultCopy;
+    }
+    return JSON.parse(data);
+  },
+
+  saveQuickActions(actions: QuickActionConfig[]): void {
+    localStorage.setItem(STORAGE_KEYS.QUICK_ACTIONS, JSON.stringify(actions));
   },
 
   getScenarioState(): ScenarioState {
