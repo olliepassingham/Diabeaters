@@ -670,16 +670,6 @@ export default function Supplies() {
             </Button>
           </div>
           <div className="flex flex-wrap gap-2 justify-end">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleUndo} 
-              disabled={!previousSupplies}
-              data-testid="button-undo"
-            >
-              <Undo2 className="h-4 w-4 mr-1" />
-              Undo
-            </Button>
             {usualPrescription && usualPrescription.items.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
                 <ClipboardList className="h-4 w-4 mr-1" />
@@ -692,6 +682,16 @@ export default function Supplies() {
                 Save Usual
               </Button>
             )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleUndo} 
+              disabled={!previousSupplies}
+              data-testid="button-undo"
+            >
+              <Undo2 className="h-4 w-4 mr-1" />
+              Undo
+            </Button>
           </div>
         </div>
       </div>
