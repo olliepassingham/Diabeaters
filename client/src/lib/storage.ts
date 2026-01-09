@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   PICKUP_HISTORY: "diabeater_pickup_history",
   COMMUNITY_POSTS: "diabeater_community_posts",
   COMMUNITY_REPLIES: "diabeater_community_replies",
+  COMMUNITY_REELS: "diabeater_community_reels",
   DIRECT_MESSAGES: "diabeater_direct_messages",
   CONVERSATIONS: "diabeater_conversations",
   FOLLOWING: "diabeater_following",
@@ -213,6 +214,22 @@ export interface NotificationSettings {
   criticalThresholdDays: number;
   lowThresholdDays: number;
   browserNotifications: boolean;
+}
+
+export type ReelPlatform = "tiktok" | "instagram" | "youtube";
+
+export interface CommunityReel {
+  id: string;
+  title: string;
+  creatorHandle: string;
+  platform: ReelPlatform;
+  sourceUrl: string;
+  thumbnailUrl?: string;
+  description?: string;
+  tags?: string[];
+  isFeatured: boolean;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -926,5 +943,119 @@ export const storage = {
   getLastNotificationCheck(): Date | null {
     const data = localStorage.getItem(STORAGE_KEYS.LAST_NOTIFICATION_CHECK);
     return data ? new Date(data) : null;
+  },
+
+  getCommunityReels(): CommunityReel[] {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_REELS);
+    let reels: CommunityReel[] = data ? JSON.parse(data) : [];
+    
+    if (reels.length === 0) {
+      reels = this.seedCommunityReels();
+    }
+    
+    return reels
+      .filter(r => r.isActive)
+      .sort((a, b) => {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  },
+
+  seedCommunityReels(): CommunityReel[] {
+    const seedReels: CommunityReel[] = [
+      {
+        id: generateId(),
+        title: "5 Things I Wish I Knew When Diagnosed",
+        creatorHandle: "@type1tips",
+        platform: "tiktok",
+        sourceUrl: "https://www.tiktok.com/@diabetesuk/video/7234567890123456789",
+        description: "Real talk about the early days of T1D management",
+        tags: ["tips", "newly-diagnosed", "t1d"],
+        isFeatured: true,
+        isActive: true,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "How I Manage Hypos at Work",
+        creatorHandle: "@diabeticlife",
+        platform: "instagram",
+        sourceUrl: "https://www.instagram.com/reel/ABC123example",
+        description: "Quick tips for handling low blood sugar in the office",
+        tags: ["hypo", "work", "tips"],
+        isFeatured: true,
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "My CGM Setup Routine",
+        creatorHandle: "@t1dtechie",
+        platform: "tiktok",
+        sourceUrl: "https://www.tiktok.com/@t1dtechie/video/7234567890123456790",
+        description: "Step by step sensor application for best results",
+        tags: ["cgm", "tech", "tutorial"],
+        isFeatured: false,
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "Travelling with Diabetes - Airport Tips",
+        creatorHandle: "@globetrottert1d",
+        platform: "instagram",
+        sourceUrl: "https://www.instagram.com/reel/XYZ789example",
+        description: "What I always pack and how I navigate security",
+        tags: ["travel", "airport", "tips"],
+        isFeatured: false,
+        isActive: true,
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "Carb Counting Made Simple",
+        creatorHandle: "@diabetesdietitian",
+        platform: "youtube",
+        sourceUrl: "https://www.youtube.com/shorts/example123",
+        description: "Quick visual guide to estimating carbs",
+        tags: ["carbs", "food", "tutorial"],
+        isFeatured: false,
+        isActive: true,
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "Exercise and Blood Sugar - What Really Happens",
+        creatorHandle: "@fitdiabetic",
+        platform: "tiktok",
+        sourceUrl: "https://www.tiktok.com/@fitdiabetic/video/7234567890123456791",
+        description: "The science behind exercise-induced glucose changes",
+        tags: ["exercise", "fitness", "education"],
+        isFeatured: false,
+        isActive: true,
+        createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+    ];
+    
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_REELS, JSON.stringify(seedReels));
+    return seedReels;
+  },
+
+  suggestReel(reel: Omit<CommunityReel, "id" | "isFeatured" | "isActive" | "createdAt">): CommunityReel {
+    const data = localStorage.getItem(STORAGE_KEYS.COMMUNITY_REELS);
+    const reels: CommunityReel[] = data ? JSON.parse(data) : [];
+    
+    const newReel: CommunityReel = {
+      ...reel,
+      id: generateId(),
+      isFeatured: false,
+      isActive: false,
+      createdAt: new Date().toISOString(),
+    };
+    
+    reels.push(newReel);
+    localStorage.setItem(STORAGE_KEYS.COMMUNITY_REELS, JSON.stringify(reels));
+    return newReel;
   },
 };

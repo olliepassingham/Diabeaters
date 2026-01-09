@@ -267,3 +267,28 @@ export const insertCommunityReplySchema = createInsertSchema(communityReplies).o
 
 export type InsertCommunityReply = z.infer<typeof insertCommunityReplySchema>;
 export type CommunityReply = typeof communityReplies.$inferSelect;
+
+export const REEL_PLATFORMS = ["tiktok", "instagram", "youtube"] as const;
+export type ReelPlatform = typeof REEL_PLATFORMS[number];
+
+export const communityReels = pgTable("community_reels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  creatorHandle: text("creator_handle").notNull(),
+  platform: text("platform").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  description: text("description"),
+  tags: text("tags").array(),
+  isFeatured: boolean("is_featured").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export const insertCommunityReelSchema = createInsertSchema(communityReels).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCommunityReel = z.infer<typeof insertCommunityReelSchema>;
+export type CommunityReel = typeof communityReels.$inferSelect;

@@ -29,7 +29,11 @@ import {
   Mail,
   UserPlus,
   UserMinus,
-  Heart
+  Heart,
+  Play,
+  ExternalLink,
+  Film,
+  Star
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -40,7 +44,9 @@ import {
   CommunityTopicId,
   UserProfile,
   Conversation,
-  DirectMessage
+  DirectMessage,
+  CommunityReel,
+  ReelPlatform
 } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 
@@ -433,6 +439,116 @@ function MessagesView({
   );
 }
 
+const PLATFORM_COLORS: Record<ReelPlatform, string> = {
+  tiktok: "bg-black text-white",
+  instagram: "bg-gradient-to-r from-purple-500 to-pink-500 text-white",
+  youtube: "bg-red-600 text-white",
+};
+
+const PLATFORM_LABELS: Record<ReelPlatform, string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  youtube: "YouTube",
+};
+
+function ReelCard({ reel }: { reel: CommunityReel }) {
+  const handleWatch = () => {
+    window.open(reel.sourceUrl, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <Card 
+      className="overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-primary/50"
+      onClick={handleWatch}
+      data-testid={`reel-${reel.id}`}
+    >
+      <div className="relative aspect-[9/16] bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+            <Play className="h-8 w-8 text-primary ml-1" />
+          </div>
+          <h3 className="font-semibold text-lg line-clamp-2 mb-2">{reel.title}</h3>
+          {reel.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+              {reel.description}
+            </p>
+          )}
+        </div>
+        
+        {reel.isFeatured && (
+          <div className="absolute top-3 left-3">
+            <Badge className="gap-1 bg-yellow-500 text-yellow-950">
+              <Star className="h-3 w-3" />
+              Featured
+            </Badge>
+          </div>
+        )}
+        
+        <div className="absolute top-3 right-3">
+          <Badge className={PLATFORM_COLORS[reel.platform]}>
+            {PLATFORM_LABELS[reel.platform]}
+          </Badge>
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+          <div className="flex items-center justify-between">
+            <span className="text-white text-sm font-medium">{reel.creatorHandle}</span>
+            <ExternalLink className="h-4 w-4 text-white/70" />
+          </div>
+        </div>
+      </div>
+      
+      {reel.tags && reel.tags.length > 0 && (
+        <div className="p-3 flex flex-wrap gap-1">
+          {reel.tags.slice(0, 3).map((tag) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              #{tag}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ReelsView() {
+  const [reels, setReels] = useState<CommunityReel[]>([]);
+
+  useEffect(() => {
+    setReels(storage.getCommunityReels());
+  }, []);
+
+  if (reels.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Film className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="font-semibold text-lg mb-2">No reels yet</h3>
+          <p className="text-muted-foreground">
+            Check back soon for curated diabetes tips and experiences from the community.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground text-center">
+        Curated clips from diabetes creators. Tap to watch on their platform.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {reels.map((reel) => (
+          <ReelCard key={reel.id} reel={reel} />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground text-center mt-4">
+        Videos are not medical advice. Always consult your healthcare team.
+      </p>
+    </div>
+  );
+}
+
 export default function Community() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("posts");
@@ -762,10 +878,14 @@ export default function Community() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="posts" data-testid="tab-posts">
               <MessageCircle className="h-4 w-4 mr-2" />
               Posts
+            </TabsTrigger>
+            <TabsTrigger value="reels" data-testid="tab-reels">
+              <Film className="h-4 w-4 mr-2" />
+              Reels
             </TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">
               <Mail className="h-4 w-4 mr-2" />
@@ -854,6 +974,10 @@ export default function Community() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="reels" className="mt-4">
+            <ReelsView />
           </TabsContent>
 
           <TabsContent value="messages" className="mt-4">
