@@ -81,19 +81,19 @@ function calculateSickDayRecommendations(
     case "minor":
       // Minor illness: slight increase in resistance, full correction appropriate
       severityModifier = 1.0;
-      severityExplanation = "Full correction (minor illness has minimal impact on insulin sensitivity)";
+      severityExplanation = "Full correction - minor illness has minimal impact on insulin absorption";
       break;
     case "moderate":
       // Moderate illness: noticeable resistance but also absorption concerns
       // Use 80% of calculated dose to avoid stacking risk
       severityModifier = 0.8;
-      severityExplanation = "80% of full dose (balancing increased resistance against absorption variability)";
+      severityExplanation = "80% of calculated dose - being cautious as insulin may absorb unpredictably";
       break;
     case "severe":
       // Severe illness: high resistance but HIGH risk of complications
       // Conservative approach - use only 60% and recommend more frequent monitoring
       severityModifier = 0.6;
-      severityExplanation = "60% of full dose (conservative approach during severe illness)";
+      severityExplanation = "60% of calculated dose - extra caution to prevent dangerous lows if you can't eat";
       break;
   }
 
@@ -139,7 +139,7 @@ function calculateSickDayRecommendations(
 
   // Build explanation
   const correctionExplanation = baseCorrectionDose > 0 
-    ? `Base: ${baseCorrectionDose}u × ${severityModifier} (severity) × ${bgZoneModifier} (BG zone) = ${correctionDose}u`
+    ? `Base: ${baseCorrectionDose}u × ${severityModifier} (safety) × ${bgZoneModifier} (BG zone) = ${correctionDose}u`
     : "No correction needed - blood glucose is within target";
 
   // === RATIO AND OTHER ADJUSTMENTS ===
@@ -399,8 +399,9 @@ export default function SickDay() {
                         <p className="font-semibold text-sm">{results.baseCorrectionDose}u</p>
                       </div>
                       <div className="p-2 bg-background rounded text-center">
-                        <p className="text-[10px] uppercase tracking-wide opacity-70">Severity Factor</p>
+                        <p className="text-[10px] uppercase tracking-wide opacity-70">Safety Factor</p>
                         <p className="font-semibold text-sm">×{results.severityModifier}</p>
+                        <p className="text-[9px] opacity-60">(lower = more caution)</p>
                       </div>
                       <div className="p-2 bg-background rounded text-center">
                         <p className="text-[10px] uppercase tracking-wide opacity-70">BG Zone Factor</p>
