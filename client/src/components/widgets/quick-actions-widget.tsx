@@ -32,11 +32,11 @@ export function QuickActionsWidget() {
             <Link key={action.label} href={action.href}>
               <Button
                 variant="ghost"
-                className="w-full h-auto flex-col py-3 gap-1 hover-elevate"
+                className="w-full h-auto flex-col py-4 gap-2 hover-elevate"
                 data-testid={action.testId}
               >
-                <action.icon className={`h-5 w-5 ${action.color}`} />
-                <span className="text-xs font-normal">{action.label}</span>
+                <action.icon className={`h-7 w-7 ${action.color}`} />
+                <span className="text-sm font-medium">{action.label}</span>
               </Button>
             </Link>
           ))}
