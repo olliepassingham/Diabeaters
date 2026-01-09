@@ -3,6 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Utensils, Dumbbell, Calculator, AlertCircle, Bot, User, BookOpen } from "lucide-react";
 import { storage, UserSettings } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -349,6 +352,14 @@ export default function Advisor() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const [mealDialogOpen, setMealDialogOpen] = useState(false);
+  const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const [mealCarbs, setMealCarbs] = useState("");
+  const [mealType, setMealType] = useState("lunch");
+  const [exerciseDuration, setExerciseDuration] = useState("");
+  const [exerciseIntensity, setExerciseIntensity] = useState("moderate");
+  const [exerciseType, setExerciseType] = useState("cardio");
 
   useEffect(() => {
     setSettings(storage.getSettings());
@@ -362,10 +373,10 @@ export default function Advisor() {
   }, [messages]);
 
   const quickActions = [
-    { icon: Utensils, label: "Plan Meal", prompt: "I'm planning to eat a meal with 60g carbs. What should my insulin dose be?" },
-    { icon: Dumbbell, label: "Before Exercise", prompt: "I'm planning to exercise for 45 minutes. How should I adjust?" },
-    { icon: BookOpen, label: "Exercise Guide", prompt: "Show me how different types of exercise affect blood sugar" },
-    { icon: Calculator, label: "Calculate Ratio", prompt: "Help me calculate my insulin-to-carb ratio." },
+    { icon: Utensils, label: "Plan Meal", action: "meal_dialog" },
+    { icon: Dumbbell, label: "Before Exercise", action: "exercise_dialog" },
+    { icon: BookOpen, label: "Exercise Guide", action: "exercise_guide" },
+    { icon: Calculator, label: "Calculate Ratio", action: "calculate_ratio" },
   ];
 
   const handleSend = async () => {
@@ -455,8 +466,118 @@ export default function Advisor() {
     }
   };
 
-  const handleQuickAction = (prompt: string) => {
-    setInputValue(prompt);
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case "meal_dialog":
+        setMealCarbs("");
+        setMealType("lunch");
+        setMealDialogOpen(true);
+        break;
+      case "exercise_dialog":
+        setExerciseDuration("");
+        setExerciseIntensity("moderate");
+        setExerciseType("cardio");
+        setExerciseDialogOpen(true);
+        break;
+      case "exercise_guide":
+        sendMessage("Show me how different types of exercise affect blood sugar");
+        break;
+      case "calculate_ratio":
+        sendMessage("Help me calculate my insulin-to-carb ratio");
+        break;
+    }
+  };
+
+  const sendMessage = async (message: string) => {
+    const userMessage: Message = {
+      role: "user",
+      content: message,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsTyping(true);
+
+    const lowerMessage = message.toLowerCase();
+    let activityType = "general";
+    if (lowerMessage.includes("exercise") || lowerMessage.includes("run") || lowerMessage.includes("walk") || lowerMessage.includes("gym") || lowerMessage.includes("sport")) {
+      activityType = "exercise";
+    } else if (lowerMessage.includes("eat") || lowerMessage.includes("meal") || lowerMessage.includes("carb") || lowerMessage.includes("food")) {
+      activityType = "meal";
+    } else if (lowerMessage.includes("ratio") || lowerMessage.includes("calculate")) {
+      activityType = "calculation";
+    }
+
+    try {
+      const userProfile = storage.getProfile();
+      const userSettings = storage.getSettings();
+      
+      const response = await fetch("/api/activity/advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityType,
+          activityDetails: message,
+          userProfile,
+          userSettings,
+        }),
+      });
+
+      let aiResponse: string;
+      
+      if (response.ok) {
+        const data = await response.json();
+        aiResponse = data.recommendation + "\n\n⚠️ Not medical advice. Always verify with your own calculations.";
+      } else {
+        aiResponse = processUserMessage(message, settings, profile.bgUnits || "mmol/L");
+      }
+
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: aiResponse,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      storage.addActivityLog({
+        activityType: "advisor_chat",
+        activityDetails: message,
+        recommendation: aiResponse.substring(0, 200),
+      });
+    } catch (error) {
+      const localResponse = processUserMessage(message, settings, profile.bgUnits || "mmol/L");
+      
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: localResponse,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      storage.addActivityLog({
+        activityType: "advisor_chat",
+        activityDetails: message,
+        recommendation: localResponse.substring(0, 200),
+      });
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleMealSubmit = () => {
+    if (!mealCarbs) return;
+    const message = `I'm planning to eat ${mealCarbs}g carbs for ${mealType}. What should my insulin dose be?`;
+    setMealDialogOpen(false);
+    sendMessage(message);
+  };
+
+  const handleExerciseSubmit = () => {
+    if (!exerciseDuration) return;
+    const message = `I'm planning to do ${exerciseType} exercise for ${exerciseDuration} minutes at ${exerciseIntensity} intensity. How should I prepare?`;
+    setExerciseDialogOpen(false);
+    sendMessage(message);
   };
 
   return (
@@ -487,7 +608,7 @@ export default function Advisor() {
               <Card
                 key={action.label}
                 className="hover-elevate active-elevate-2 cursor-pointer"
-                onClick={() => handleQuickAction(action.prompt)}
+                onClick={() => handleQuickAction(action.action)}
                 data-testid={`button-quick-${action.label.toLowerCase().replace(' ', '-')}`}
               >
                 <CardContent className="p-4">
@@ -543,6 +664,115 @@ export default function Advisor() {
           </div>
         </div>
       </Card>
+
+      <Dialog open={mealDialogOpen} onOpenChange={setMealDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Utensils className="h-5 w-5 text-primary" />
+              Plan Your Meal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="meal-carbs">How many carbs will you eat?</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="meal-carbs"
+                  type="number"
+                  placeholder="e.g., 60"
+                  value={mealCarbs}
+                  onChange={(e) => setMealCarbs(e.target.value)}
+                  data-testid="input-meal-carbs"
+                />
+                <span className="text-muted-foreground">grams</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meal-type">What meal is this?</Label>
+              <Select value={mealType} onValueChange={setMealType}>
+                <SelectTrigger id="meal-type" data-testid="select-meal-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="breakfast">Breakfast</SelectItem>
+                  <SelectItem value="lunch">Lunch</SelectItem>
+                  <SelectItem value="dinner">Dinner</SelectItem>
+                  <SelectItem value="snack">Snack</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMealDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleMealSubmit} disabled={!mealCarbs} data-testid="button-get-meal-advice">
+              Get Advice
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={exerciseDialogOpen} onOpenChange={setExerciseDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Dumbbell className="h-5 w-5 text-primary" />
+              Plan Your Exercise
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="exercise-type">What type of exercise?</Label>
+              <Select value={exerciseType} onValueChange={setExerciseType}>
+                <SelectTrigger id="exercise-type" data-testid="select-exercise-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cardio">Cardio (Running, Cycling, Swimming)</SelectItem>
+                  <SelectItem value="strength">Strength Training (Weights)</SelectItem>
+                  <SelectItem value="hiit">HIIT (High Intensity Intervals)</SelectItem>
+                  <SelectItem value="yoga">Yoga / Stretching</SelectItem>
+                  <SelectItem value="walking">Walking</SelectItem>
+                  <SelectItem value="sports">Team Sports (Football, Basketball)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exercise-duration">How long will you exercise?</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="exercise-duration"
+                  type="number"
+                  placeholder="e.g., 45"
+                  value={exerciseDuration}
+                  onChange={(e) => setExerciseDuration(e.target.value)}
+                  data-testid="input-exercise-duration"
+                />
+                <span className="text-muted-foreground">minutes</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exercise-intensity">How intense will it be?</Label>
+              <Select value={exerciseIntensity} onValueChange={setExerciseIntensity}>
+                <SelectTrigger id="exercise-intensity" data-testid="select-exercise-intensity">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light (can easily hold a conversation)</SelectItem>
+                  <SelectItem value="moderate">Moderate (slightly breathless)</SelectItem>
+                  <SelectItem value="intense">Intense (hard to talk)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExerciseDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleExerciseSubmit} disabled={!exerciseDuration} data-testid="button-get-exercise-advice">
+              Get Advice
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
