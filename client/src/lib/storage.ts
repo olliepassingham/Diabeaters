@@ -245,12 +245,28 @@ export const storage = {
     return JSON.parse(data);
   },
 
-  addSupply(supply: Omit<Supply, "id">): Supply {
+  addSupply(supply: Omit<Supply, "id">): { supply: Supply; merged: boolean } {
     const supplies = this.getSupplies();
+    const existingIndex = supplies.findIndex(
+      s => s.name.toLowerCase().trim() === supply.name.toLowerCase().trim()
+    );
+    
+    if (existingIndex !== -1) {
+      supplies[existingIndex].currentQuantity += supply.currentQuantity;
+      if (supply.dailyUsage) {
+        supplies[existingIndex].dailyUsage = supply.dailyUsage;
+      }
+      if (supply.notes) {
+        supplies[existingIndex].notes = supply.notes;
+      }
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+      return { supply: supplies[existingIndex], merged: true };
+    }
+    
     const newSupply = { ...supply, id: generateId() };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
-    return newSupply;
+    return { supply: newSupply, merged: false };
   },
 
   updateSupply(id: string, updates: Partial<Supply>): Supply | null {
@@ -302,22 +318,27 @@ export const storage = {
     this.saveUsualPrescription(items);
   },
 
-  addUsualPrescriptionSupplies(): number {
+  addUsualPrescriptionSupplies(): { added: number; merged: number } {
     const usual = this.getUsualPrescription();
-    if (!usual || usual.items.length === 0) return 0;
+    if (!usual || usual.items.length === 0) return { added: 0, merged: 0 };
     
     let addedCount = 0;
+    let mergedCount = 0;
     for (const item of usual.items) {
-      this.addSupply({
+      const result = this.addSupply({
         name: item.name,
         type: item.type,
         currentQuantity: item.quantity,
         dailyUsage: item.dailyUsage,
         notes: item.notes,
       });
-      addedCount++;
+      if (result.merged) {
+        mergedCount++;
+      } else {
+        addedCount++;
+      }
     }
-    return addedCount;
+    return { added: addedCount, merged: mergedCount };
   },
 
   getPickupHistory(supplyId?: string): PickupRecord[] {

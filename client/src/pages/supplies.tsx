@@ -510,11 +510,14 @@ export default function Supplies() {
   };
 
   const handleAddUsualPrescription = () => {
-    const count = storage.addUsualPrescriptionSupplies();
-    if (count > 0) {
+    const result = storage.addUsualPrescriptionSupplies();
+    if (result.added > 0 || result.merged > 0) {
+      const parts: string[] = [];
+      if (result.added > 0) parts.push(`${result.added} new`);
+      if (result.merged > 0) parts.push(`${result.merged} merged`);
       toast({ 
         title: "Usual prescription added", 
-        description: `Added ${count} item${count > 1 ? "s" : ""} from your usual prescription.` 
+        description: `${parts.join(", ")} item${(result.added + result.merged) > 1 ? "s" : ""} from your usual prescription.` 
       });
       refreshSupplies();
     } else {
@@ -558,7 +561,7 @@ export default function Supplies() {
       storage.updateSupply(editingSupply.id, data);
       toast({ title: "Supply updated", description: `${data.name} has been updated.` });
     } else {
-      storage.addSupply(data);
+      const result = storage.addSupply(data);
       storage.saveLastPrescription({
         name: data.name,
         type: data.type,
@@ -567,7 +570,11 @@ export default function Supplies() {
         notes: data.notes,
       });
       setLastPrescription(storage.getLastPrescription());
-      toast({ title: "Supply added", description: `${data.name} has been added to your inventory.` });
+      if (result.merged) {
+        toast({ title: "Supply merged", description: `Added ${data.currentQuantity} to existing ${data.name}.` });
+      } else {
+        toast({ title: "Supply added", description: `${data.name} has been added to your inventory.` });
+      }
     }
     refreshSupplies();
   };
@@ -632,29 +639,33 @@ export default function Supplies() {
             )}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/settings#usual-habits">
-            <Button variant="outline" data-testid="button-usage-settings">
-              <Settings className="h-4 w-4 mr-2" />
-              Usual Habits
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Link href="/settings#usual-habits">
+              <Button variant="outline" data-testid="button-usage-settings">
+                <Settings className="h-4 w-4 mr-2" />
+                Usual Habits
+              </Button>
+            </Link>
+            <Button onClick={handleAddNew} data-testid="button-add-new-supply">
+              <Plus className="h-4 w-4 mr-2" />
+              Add New Supply
             </Button>
-          </Link>
-          {usualPrescription && usualPrescription.items.length > 0 && (
-            <Button variant="outline" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Add Usual Prescription
-            </Button>
-          )}
-          {supplies.length > 0 && (
-            <Button variant="outline" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
-              <Save className="h-4 w-4 mr-2" />
-              Save as Usual
-            </Button>
-          )}
-          <Button onClick={handleAddNew} data-testid="button-add-new-supply">
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Supply
-          </Button>
+          </div>
+          <div className="flex gap-2">
+            {usualPrescription && usualPrescription.items.length > 0 && (
+              <Button variant="outline" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Add Usual Prescription
+              </Button>
+            )}
+            {supplies.length > 0 && (
+              <Button variant="outline" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
+                <Save className="h-4 w-4 mr-2" />
+                Save as Usual
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
