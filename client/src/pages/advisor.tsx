@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, Calculator, AlertCircle, Bot, User, BookOpen } from "lucide-react";
+import { Send, Utensils, Dumbbell, Calculator, AlertCircle, Bot, User, BookOpen, ArrowLeft } from "lucide-react";
 import { storage, UserSettings } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
@@ -580,6 +580,21 @@ export default function Advisor() {
     sendMessage(message);
   };
 
+  const handleStartNew = () => {
+    setMessages([{
+      role: "assistant",
+      content: "Hello! I'm your AI diabetes advisor. I can help you with:\n\n" +
+        "• Meal planning and bolus calculations\n" +
+        "• Exercise recommendations\n" +
+        "• Insulin ratio calculations\n" +
+        "• Managing highs and lows\n\n" +
+        "How can I assist you today?\n\n" +
+        "⚠️ Remember: All suggestions are educational only and not medical advice.",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+    setInputValue("");
+  };
+
   return (
     <div className="flex flex-col h-full relative">
       <FaceLogoWatermark />
@@ -599,6 +614,20 @@ export default function Advisor() {
           </div>
         </CardContent>
       </Card>
+
+      {messages.length > 1 && (
+        <div className="mb-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleStartNew}
+            data-testid="button-start-new"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Start New Conversation
+          </Button>
+        </div>
+      )}
 
       {messages.length === 1 && (
         <div className="mb-4">
