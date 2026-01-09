@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
@@ -494,16 +494,53 @@ export default function Supplies() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<Supply | null>(null);
   const [lastPrescription, setLastPrescription] = useState<LastPrescription | null>(null);
+  const [usualPrescription, setUsualPrescription] = useState<UsualPrescription | null>(null);
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [pickupSupply, setPickupSupply] = useState<Supply | null>(null);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
     setLastPrescription(storage.getLastPrescription());
+    setUsualPrescription(storage.getUsualPrescription());
   }, []);
 
   const refreshSupplies = () => {
     setSupplies(storage.getSupplies());
+    setUsualPrescription(storage.getUsualPrescription());
+  };
+
+  const handleAddUsualPrescription = () => {
+    const count = storage.addUsualPrescriptionSupplies();
+    if (count > 0) {
+      toast({ 
+        title: "Usual prescription added", 
+        description: `Added ${count} item${count > 1 ? "s" : ""} from your usual prescription.` 
+      });
+      refreshSupplies();
+    } else {
+      toast({ 
+        title: "No usual prescription saved", 
+        description: "Add supplies first, then save them as your usual prescription.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSaveAsUsualPrescription = () => {
+    if (supplies.length === 0) {
+      toast({ 
+        title: "No supplies to save", 
+        description: "Add some supplies first before saving as your usual prescription.",
+        variant: "destructive"
+      });
+      return;
+    }
+    storage.saveCurrentSuppliesAsUsualPrescription();
+    setUsualPrescription(storage.getUsualPrescription());
+    toast({ 
+      title: "Usual prescription saved", 
+      description: `Saved ${supplies.length} item${supplies.length > 1 ? "s" : ""} as your usual prescription.` 
+    });
   };
 
   const handleAddNew = () => {
@@ -596,12 +633,24 @@ export default function Supplies() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/settings#usage-habits">
+          <Link href="/settings#usual-habits">
             <Button variant="outline" data-testid="button-usage-settings">
               <Settings className="h-4 w-4 mr-2" />
-              Usage Habits
+              Usual Habits
             </Button>
           </Link>
+          {usualPrescription && usualPrescription.items.length > 0 && (
+            <Button variant="outline" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Add Usual Prescription
+            </Button>
+          )}
+          {supplies.length > 0 && (
+            <Button variant="outline" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
+              <Save className="h-4 w-4 mr-2" />
+              Save as Usual
+            </Button>
+          )}
           <Button onClick={handleAddNew} data-testid="button-add-new-supply">
             <Plus className="h-4 w-4 mr-2" />
             Add New Supply

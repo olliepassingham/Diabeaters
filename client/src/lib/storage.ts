@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   DASHBOARD_WIDGETS: "diabeater_dashboard_widgets",
   SCENARIO_STATE: "diabeater_scenario_state",
   LAST_PRESCRIPTION: "diabeater_last_prescription",
+  USUAL_PRESCRIPTION: "diabeater_usual_prescription",
   PICKUP_HISTORY: "diabeater_pickup_history",
   COMMUNITY_POSTS: "diabeater_community_posts",
   COMMUNITY_REPLIES: "diabeater_community_replies",
@@ -60,6 +61,19 @@ export interface LastPrescription {
   quantity: number;
   dailyUsage: number;
   notes?: string;
+  savedAt: string;
+}
+
+export interface UsualPrescriptionItem {
+  name: string;
+  type: Supply["type"];
+  quantity: number;
+  dailyUsage: number;
+  notes?: string;
+}
+
+export interface UsualPrescription {
+  items: UsualPrescriptionItem[];
   savedAt: string;
 }
 
@@ -264,6 +278,46 @@ export const storage = {
   saveLastPrescription(prescription: Omit<LastPrescription, "savedAt">): void {
     const record: LastPrescription = { ...prescription, savedAt: new Date().toISOString() };
     localStorage.setItem(STORAGE_KEYS.LAST_PRESCRIPTION, JSON.stringify(record));
+  },
+
+  getUsualPrescription(): UsualPrescription | null {
+    const data = localStorage.getItem(STORAGE_KEYS.USUAL_PRESCRIPTION);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveUsualPrescription(items: UsualPrescriptionItem[]): void {
+    const record: UsualPrescription = { items, savedAt: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.USUAL_PRESCRIPTION, JSON.stringify(record));
+  },
+
+  saveCurrentSuppliesAsUsualPrescription(): void {
+    const supplies = this.getSupplies();
+    const items: UsualPrescriptionItem[] = supplies.map(s => ({
+      name: s.name,
+      type: s.type,
+      quantity: s.currentQuantity,
+      dailyUsage: s.dailyUsage,
+      notes: s.notes,
+    }));
+    this.saveUsualPrescription(items);
+  },
+
+  addUsualPrescriptionSupplies(): number {
+    const usual = this.getUsualPrescription();
+    if (!usual || usual.items.length === 0) return 0;
+    
+    let addedCount = 0;
+    for (const item of usual.items) {
+      this.addSupply({
+        name: item.name,
+        type: item.type,
+        currentQuantity: item.quantity,
+        dailyUsage: item.dailyUsage,
+        notes: item.notes,
+      });
+      addedCount++;
+    }
+    return addedCount;
   },
 
   getPickupHistory(supplyId?: string): PickupRecord[] {

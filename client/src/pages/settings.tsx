@@ -317,11 +317,11 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Card id="usage-habits">
+        <Card id="usual-habits">
           <CardHeader>
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-primary" />
-              <CardTitle>Supply Usage Habits</CardTitle>
+              <CardTitle>Usual Habits</CardTitle>
             </div>
             <CardDescription>Help estimate when you'll need to reorder supplies.</CardDescription>
           </CardHeader>
