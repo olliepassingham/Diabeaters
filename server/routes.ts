@@ -179,26 +179,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Activity Adviser Routes
   app.post("/api/activity/advice", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
     if (!openai) {
       return res.status(503).send("OpenAI API key not configured");
     }
 
     try {
-      const { activityType, activityDetails } = req.body;
+      const { activityType, activityDetails, userProfile, userSettings } = req.body;
       
       if (!activityType || !activityDetails) {
         return res.status(400).send("Missing required fields");
       }
 
-      // Fetch all user data for personalized advice
-      const [profile, settings] = await Promise.all([
-        storage.getUserProfile(req.user!.id),
-        storage.getUserSettings(req.user!.id),
-      ]);
+      // Use profile and settings from request body (sent from client's local storage)
+      const profile = userProfile || {};
+      const settings = userSettings || {};
 
       // Build comprehensive user context for AI
       const userContext = [];
@@ -251,13 +245,6 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
 
       const recommendation = completion.choices[0].message.content || "Unable to generate recommendation";
 
-      await storage.createActivityLog({
-        userId: req.user!.id,
-        activityType,
-        activityDetails,
-        recommendation,
-      });
-
       res.json({ recommendation });
     } catch (error) {
       console.error("Activity advice error:", error);
@@ -265,18 +252,7 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
     }
   });
 
-  app.get("/api/activity/history", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const logs = await storage.getActivityLogs(req.user!.id, 10);
-      res.json(logs);
-    } catch (error) {
-      res.status(500).send("Failed to fetch activity history");
-    }
-  });
+  // Activity history is handled via client-side local storage
 
   const httpServer = createServer(app);
 

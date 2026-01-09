@@ -281,13 +281,18 @@ export default function Advisor() {
 
     try {
       // Try the AI API first for activity-related queries
+      // Send user's local storage data for personalized responses
+      const userProfile = storage.getProfile();
+      const userSettings = storage.getSettings();
+      
       const response = await fetch("/api/activity/advice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           activityType,
           activityDetails: currentInput,
+          userProfile,
+          userSettings,
         }),
       });
 
