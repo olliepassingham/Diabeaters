@@ -658,24 +658,10 @@ export default function Supplies() {
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2 justify-end">
-            <Link href="/settings#usual-habits">
-              <Button variant="outline" size="sm" data-testid="button-usage-settings">
-                <Settings className="h-4 w-4 mr-1" />
-                Habits
-              </Button>
-            </Link>
             <Button size="sm" onClick={handleAddNew} data-testid="button-add-new-supply">
               <Plus className="h-4 w-4 mr-1" />
               Add Supply
             </Button>
-          </div>
-          <div className="flex flex-wrap gap-2 justify-end">
-            {usualPrescription && usualPrescription.items.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
-                <ClipboardList className="h-4 w-4 mr-1" />
-                Add Usual
-              </Button>
-            )}
             {supplies.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
                 <Save className="h-4 w-4 mr-1" />
@@ -692,6 +678,20 @@ export default function Supplies() {
               <Undo2 className="h-4 w-4 mr-1" />
               Undo
             </Button>
+          </div>
+          <div className="flex flex-wrap gap-2 justify-end">
+            {usualPrescription && usualPrescription.items.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
+                <ClipboardList className="h-4 w-4 mr-1" />
+                Add Usual
+              </Button>
+            )}
+            <Link href="/settings#usual-habits">
+              <Button variant="outline" size="sm" data-testid="button-usage-settings">
+                <Settings className="h-4 w-4 mr-1" />
+                Habits
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
