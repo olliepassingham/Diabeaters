@@ -21,6 +21,7 @@ export default function Settings() {
   const [email, setEmail] = useState("");
   const [bgUnits, setBgUnits] = useState("mg/dL");
   const [carbUnits, setCarbUnits] = useState("grams");
+  const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
   
   const [tdd, setTdd] = useState("");
   const [breakfastRatio, setBreakfastRatio] = useState("");
@@ -75,6 +76,7 @@ export default function Settings() {
       setEmail(storedProfile.email || "");
       setBgUnits(storedProfile.bgUnits || "mg/dL");
       setCarbUnits(storedProfile.carbUnits || "grams");
+      setDeliveryMethod((storedProfile.insulinDeliveryMethod as "pen" | "pump") || "pen");
     } else {
       setProfile(defaultProfile);
     }
@@ -120,13 +122,16 @@ export default function Settings() {
 
   const handleSaveProfile = () => {
     if (profile) {
-      storage.saveProfile({
+      const updatedProfile = {
         ...profile,
         name,
         email,
         bgUnits,
         carbUnits,
-      });
+        insulinDeliveryMethod: deliveryMethod,
+      };
+      storage.saveProfile(updatedProfile);
+      setProfile(updatedProfile);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
     }
   };
@@ -164,7 +169,7 @@ export default function Settings() {
     toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
   };
 
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const isPumpUser = deliveryMethod === "pump";
 
   const handleNotifToggle = (key: keyof NotificationSettings, value: boolean) => {
     const updated = { ...notifSettings, [key]: value };
@@ -293,6 +298,23 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="delivery-method">Insulin Delivery Method</Label>
+              <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
+                <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pen">MDI (Multiple Daily Injections)</SelectItem>
+                  <SelectItem value="pump">Insulin Pump</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {deliveryMethod === "pump" 
+                  ? "Using an insulin pump for continuous delivery" 
+                  : "Using pens or syringes for injections"}
+              </p>
             </div>
             <div className="flex justify-end">
               <Button onClick={handleSaveProfile} data-testid="button-save-profile">
