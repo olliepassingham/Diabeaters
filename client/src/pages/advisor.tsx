@@ -254,7 +254,7 @@ export default function Advisor() {
     { icon: Calculator, label: "Calculate Ratio", prompt: "Help me calculate my insulin-to-carb ratio." },
   ];
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage: Message = {
@@ -264,27 +264,76 @@ export default function Advisor() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      const response = processUserMessage(inputValue, settings);
+    // Determine activity type from message content
+    const lowerMessage = currentInput.toLowerCase();
+    let activityType = "general";
+    if (lowerMessage.includes("exercise") || lowerMessage.includes("run") || lowerMessage.includes("walk") || lowerMessage.includes("gym") || lowerMessage.includes("sport")) {
+      activityType = "exercise";
+    } else if (lowerMessage.includes("eat") || lowerMessage.includes("meal") || lowerMessage.includes("carb") || lowerMessage.includes("food") || lowerMessage.includes("breakfast") || lowerMessage.includes("lunch") || lowerMessage.includes("dinner")) {
+      activityType = "meal";
+    } else if (lowerMessage.includes("ratio") || lowerMessage.includes("calculate") || lowerMessage.includes("tdd")) {
+      activityType = "calculation";
+    }
+
+    try {
+      // Try the AI API first for activity-related queries
+      const response = await fetch("/api/activity/advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          activityType,
+          activityDetails: currentInput,
+        }),
+      });
+
+      let aiResponse: string;
       
+      if (response.ok) {
+        const data = await response.json();
+        aiResponse = data.recommendation + "\n\n⚠️ Not medical advice. Always verify with your own calculations.";
+      } else {
+        // Fall back to local processing if API unavailable
+        aiResponse = processUserMessage(currentInput, settings);
+      }
+
       const assistantMessage: Message = {
         role: "assistant",
-        content: response,
+        content: aiResponse,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages(prev => [...prev, assistantMessage]);
-      setIsTyping(false);
-
+      
       storage.addActivityLog({
         activityType: "advisor_chat",
-        activityDetails: inputValue,
-        recommendation: response.substring(0, 200),
+        activityDetails: currentInput,
+        recommendation: aiResponse.substring(0, 200),
       });
-    }, 500 + Math.random() * 500);
+    } catch (error) {
+      // Fall back to local processing on error
+      const localResponse = processUserMessage(currentInput, settings);
+      
+      const assistantMessage: Message = {
+        role: "assistant",
+        content: localResponse,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      storage.addActivityLog({
+        activityType: "advisor_chat",
+        activityDetails: currentInput,
+        recommendation: localResponse.substring(0, 200),
+      });
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleQuickAction = (prompt: string) => {
