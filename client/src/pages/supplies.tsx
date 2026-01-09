@@ -657,7 +657,7 @@ export default function Supplies() {
           </p>
         </div>
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={handleAddNew} data-testid="button-add-new-supply">
               <Plus className="h-4 w-4 mr-1" />
               Add Supply
@@ -679,7 +679,7 @@ export default function Supplies() {
               Undo
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2 justify-end">
+          <div className="flex flex-wrap gap-2">
             {usualPrescription && usualPrescription.items.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
                 <ClipboardList className="h-4 w-4 mr-1" />
