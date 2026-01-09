@@ -356,7 +356,7 @@ export default function Advisor() {
   const [mealDialogOpen, setMealDialogOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [mealCarbs, setMealCarbs] = useState("");
-  const [mealType, setMealType] = useState("lunch");
+  const [currentBg, setCurrentBg] = useState("");
   const [exerciseDuration, setExerciseDuration] = useState("");
   const [exerciseIntensity, setExerciseIntensity] = useState("moderate");
   const [exerciseType, setExerciseType] = useState("cardio");
@@ -470,7 +470,7 @@ export default function Advisor() {
     switch (action) {
       case "meal_dialog":
         setMealCarbs("");
-        setMealType("lunch");
+        setCurrentBg("");
         setMealDialogOpen(true);
         break;
       case "exercise_dialog":
@@ -568,7 +568,8 @@ export default function Advisor() {
 
   const handleMealSubmit = () => {
     if (!mealCarbs) return;
-    const message = `I'm planning to eat ${mealCarbs}g carbs for ${mealType}. What should my insulin dose be?`;
+    const bgInfo = currentBg ? ` My current blood sugar is ${currentBg} ${profile.bgUnits || "mmol/L"}.` : "";
+    const message = `I'm planning to eat ${mealCarbs}g carbs.${bgInfo} What should my insulin dose be?`;
     setMealDialogOpen(false);
     sendMessage(message);
   };
@@ -718,18 +719,19 @@ export default function Advisor() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="meal-type">What meal is this?</Label>
-              <Select value={mealType} onValueChange={setMealType}>
-                <SelectTrigger id="meal-type" data-testid="select-meal-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="breakfast">Breakfast</SelectItem>
-                  <SelectItem value="lunch">Lunch</SelectItem>
-                  <SelectItem value="dinner">Dinner</SelectItem>
-                  <SelectItem value="snack">Snack</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="current-bg">What's your current blood sugar? (optional)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="current-bg"
+                  type="number"
+                  step="0.1"
+                  placeholder={profile.bgUnits === "mg/dL" ? "e.g., 120" : "e.g., 6.5"}
+                  value={currentBg}
+                  onChange={(e) => setCurrentBg(e.target.value)}
+                  data-testid="input-current-bg"
+                />
+                <span className="text-muted-foreground">{profile.bgUnits || "mmol/L"}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
