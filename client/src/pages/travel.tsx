@@ -24,7 +24,7 @@ import {
   Pill,
   Info
 } from "lucide-react";
-import { storage, Supply } from "@/lib/storage";
+import { storage, Supply, UserSettings } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
@@ -51,7 +51,7 @@ interface RiskWarning {
   severity: "low" | "medium" | "high";
 }
 
-function calculatePackingList(plan: TravelPlan, supplies: Supply[]): PackingItem[] {
+function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: UserSettings): PackingItem[] {
   const items: PackingItem[] = [];
   const bufferMultiplier = plan.travelType === "international" ? 2 : 1.5;
   const accessBuffer = plan.accessRisk === "limited" ? 1.5 : plan.accessRisk === "unsure" ? 1.3 : 1;
@@ -60,49 +60,64 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[]): PackingItem
   const needleSupplies = supplies.filter(s => s.type === "needle");
   const cgmSupplies = supplies.filter(s => s.type === "cgm");
 
-  insulinSupplies.forEach(supply => {
-    const baseAmount = Math.ceil(supply.dailyUsage * plan.duration);
-    const withBuffer = Math.ceil(baseAmount * bufferMultiplier * accessBuffer);
-    items.push({
-      name: supply.name,
-      estimatedAmount: withBuffer,
-      unit: "units/pens",
-      reasoning: `Base: ${baseAmount} for ${plan.duration} days + safety buffer for delays/breakage`,
-      category: "insulin",
-      checked: false,
+  // Calculate insulin needs based on TDD from settings
+  // TDD = Total Daily Dose in units, 1 pen = 100 units (standard UK/EU pens)
+  const tdd = settings.tdd || 40; // Default to 40 units if not set
+  const unitsPerPen = 100;
+  
+  // Calculate total units needed for trip
+  const totalUnitsNeeded = tdd * plan.duration;
+  const totalUnitsWithBuffer = Math.ceil(totalUnitsNeeded * bufferMultiplier * accessBuffer);
+  
+  // Convert to pens (round up to ensure enough supply)
+  const pensNeeded = Math.ceil(totalUnitsWithBuffer / unitsPerPen);
+  
+  if (insulinSupplies.length > 0) {
+    // If user has tracked insulin supplies, show their types
+    insulinSupplies.forEach(supply => {
+      items.push({
+        name: supply.name,
+        estimatedAmount: pensNeeded,
+        unit: pensNeeded === 1 ? "pen" : "pens",
+        reasoning: `Based on ${tdd}u/day TDD × ${plan.duration} days = ${totalUnitsNeeded}u (${Math.ceil(totalUnitsNeeded / unitsPerPen)} pens) + safety buffer`,
+        category: "insulin",
+        checked: false,
+      });
     });
-  });
-
-  if (insulinSupplies.length === 0) {
+  } else {
     items.push({
-      name: "Insulin (add to supply tracker)",
-      estimatedAmount: Math.ceil(plan.duration * bufferMultiplier),
-      unit: "days worth",
-      reasoning: "Estimate based on trip duration with buffer",
+      name: "Insulin Pens",
+      estimatedAmount: pensNeeded,
+      unit: pensNeeded === 1 ? "pen" : "pens",
+      reasoning: `Based on ${tdd}u/day TDD × ${plan.duration} days = ${totalUnitsNeeded}u (${Math.ceil(totalUnitsNeeded / unitsPerPen)} pens) + safety buffer`,
       category: "insulin",
       checked: false,
     });
   }
 
-  needleSupplies.forEach(supply => {
-    const baseAmount = Math.ceil(supply.dailyUsage * plan.duration);
-    const withBuffer = Math.ceil(baseAmount * bufferMultiplier * accessBuffer);
-    items.push({
-      name: supply.name,
-      estimatedAmount: withBuffer,
-      unit: "needles",
-      reasoning: `Base: ${baseAmount} + extra for dropped/bent needles`,
-      category: "delivery",
-      checked: false,
-    });
-  });
+  // Calculate needles based on injections per day from settings
+  // This reflects the user's actual daily injection habits
+  const injectionsPerDay = settings.injectionsPerDay || 4; // Default to 4 if not set
+  const baseNeedles = injectionsPerDay * plan.duration;
+  const needlesWithBuffer = Math.ceil(baseNeedles * bufferMultiplier * accessBuffer);
 
-  if (needleSupplies.length === 0) {
+  if (needleSupplies.length > 0) {
+    needleSupplies.forEach(supply => {
+      items.push({
+        name: supply.name,
+        estimatedAmount: needlesWithBuffer,
+        unit: "needles",
+        reasoning: `${injectionsPerDay} injections/day × ${plan.duration} days = ${baseNeedles} + buffer for dropped/bent`,
+        category: "delivery",
+        checked: false,
+      });
+    });
+  } else {
     items.push({
       name: "Pen Needles / Syringes",
-      estimatedAmount: Math.ceil(plan.duration * 4 * bufferMultiplier),
+      estimatedAmount: needlesWithBuffer,
       unit: "needles",
-      reasoning: "Estimated 4 per day with safety buffer",
+      reasoning: `${injectionsPerDay} injections/day × ${plan.duration} days = ${baseNeedles} + buffer for dropped/bent`,
       category: "delivery",
       checked: false,
     });
@@ -268,10 +283,12 @@ export default function Travel() {
   const [packingList, setPackingList] = useState<PackingItem[]>([]);
   const [riskWarnings, setRiskWarnings] = useState<RiskWarning[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [settings, setSettings] = useState<UserSettings>({});
   const { toast } = useToast();
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
+    setSettings(storage.getSettings());
   }, []);
 
   const handleStartPlan = () => {
@@ -297,7 +314,7 @@ export default function Travel() {
       return;
     }
 
-    const list = calculatePackingList(plan, supplies);
+    const list = calculatePackingList(plan, supplies, settings);
     const warnings = calculateRiskWarnings(plan);
     setPackingList(list);
     setRiskWarnings(warnings);
