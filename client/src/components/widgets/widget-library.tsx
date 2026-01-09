@@ -18,7 +18,8 @@ import {
   Syringe,
   Plane,
   Thermometer,
-  Phone
+  Phone,
+  GripVertical
 } from "lucide-react";
 import { DashboardWidget, WidgetType } from "@/lib/storage";
 
@@ -141,30 +142,33 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onClose }
           return (
             <div 
               key={widget.id} 
-              className={`flex items-center gap-3 p-3 rounded-lg border ${widget.enabled ? "bg-muted/30" : "bg-muted/10 opacity-60"}`}
+              className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${widget.enabled ? "bg-muted/30" : "bg-muted/10 opacity-60"}`}
               data-testid={`widget-item-${widget.type}`}
             >
-              <div className="flex flex-col gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0"
-                  disabled={index === 0}
-                  onClick={() => onMoveWidget(widget.id, "up")}
-                  data-testid={`button-move-up-${widget.type}`}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0"
-                  disabled={index === sortedWidgets.length - 1}
-                  onClick={() => onMoveWidget(widget.id, "down")}
-                  data-testid={`button-move-down-${widget.type}`}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center gap-1">
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-5 w-5 p-0"
+                    disabled={index === 0}
+                    onClick={() => onMoveWidget(widget.id, "up")}
+                    data-testid={`button-move-up-${widget.type}`}
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-5 w-5 p-0"
+                    disabled={index === sortedWidgets.length - 1}
+                    onClick={() => onMoveWidget(widget.id, "down")}
+                    data-testid={`button-move-down-${widget.type}`}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
               
               <div className="p-2 bg-primary/10 rounded-lg">
@@ -172,7 +176,12 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onClose }
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm">{info.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-sm">{info.name}</p>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {index + 1}
+                  </Badge>
+                </div>
                 <p className="text-xs text-muted-foreground truncate">{info.description}</p>
               </div>
               

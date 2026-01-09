@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { storage, UserProfile, UserSettings } from "@/lib/storage";
-import { User, Syringe, Activity, Save } from "lucide-react";
+import { storage, UserProfile, UserSettings, NotificationSettings } from "@/lib/storage";
+import { User, Syringe, Activity, Save, Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { requestNotificationPermission } from "@/hooks/use-offline";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -32,6 +34,14 @@ export default function Settings() {
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
   const [injectionsPerDay, setInjectionsPerDay] = useState("");
   const [cgmDays, setCgmDays] = useState("");
+  
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
+    enabled: true,
+    supplyAlerts: true,
+    criticalThresholdDays: 3,
+    lowThresholdDays: 7,
+    browserNotifications: false,
+  });
 
   useEffect(() => {
     const storedProfile = storage.getProfile();
@@ -74,6 +84,8 @@ export default function Settings() {
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
     }
+    
+    setNotifSettings(storage.getNotificationSettings());
   }, []);
 
   const handleSaveProfile = () => {
@@ -117,6 +129,33 @@ export default function Settings() {
     storage.saveSettings(newSettings);
     setSettings(newSettings);
     toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
+  };
+
+  const handleNotifToggle = (key: keyof NotificationSettings, value: boolean) => {
+    const updated = { ...notifSettings, [key]: value };
+    setNotifSettings(updated);
+    storage.saveNotificationSettings(updated);
+  };
+
+  const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
+    const numValue = parseInt(value) || 0;
+    const updated = { ...notifSettings, [key]: numValue };
+    setNotifSettings(updated);
+    storage.saveNotificationSettings(updated);
+  };
+
+  const handleEnableBrowserNotifications = async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      handleNotifToggle("browserNotifications", true);
+      toast({ title: "Notifications enabled", description: "You'll receive browser notifications for important alerts." });
+    } else {
+      toast({ 
+        title: "Permission denied", 
+        description: "Please enable notifications in your browser settings.",
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -379,6 +418,110 @@ export default function Settings() {
                 <Save className="h-4 w-4 mr-2" />
                 Save Usage Settings
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card id="notifications" data-testid="card-notification-settings">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-primary" />
+              <CardTitle>Notifications</CardTitle>
+            </div>
+            <CardDescription>Control when and how you receive alerts about your supplies.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Enable Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive in-app alerts</p>
+              </div>
+              <Switch
+                checked={notifSettings.enabled}
+                onCheckedChange={(checked) => handleNotifToggle("enabled", checked)}
+                data-testid="switch-notifications-enabled"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Supply Alerts</Label>
+                <p className="text-sm text-muted-foreground">Alert when supplies are running low</p>
+              </div>
+              <Switch
+                checked={notifSettings.supplyAlerts}
+                onCheckedChange={(checked) => handleNotifToggle("supplyAlerts", checked)}
+                disabled={!notifSettings.enabled}
+                data-testid="switch-supply-alerts"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="critical-days">Critical Alert (days)</Label>
+                <Select
+                  value={notifSettings.criticalThresholdDays.toString()}
+                  onValueChange={(v) => handleNotifThreshold("criticalThresholdDays", v)}
+                  disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+                >
+                  <SelectTrigger id="critical-days" data-testid="select-critical-days">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 day</SelectItem>
+                    <SelectItem value="2">2 days</SelectItem>
+                    <SelectItem value="3">3 days</SelectItem>
+                    <SelectItem value="5">5 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Urgent alerts when this low</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="low-days">Low Alert (days)</Label>
+                <Select
+                  value={notifSettings.lowThresholdDays.toString()}
+                  onValueChange={(v) => handleNotifThreshold("lowThresholdDays", v)}
+                  disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+                >
+                  <SelectTrigger id="low-days" data-testid="select-low-days">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 days</SelectItem>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="10">10 days</SelectItem>
+                    <SelectItem value="14">14 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Reminder to reorder</p>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Browser Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Get alerts even when the app is in the background</p>
+                </div>
+                {notifSettings.browserNotifications ? (
+                  <Switch
+                    checked={true}
+                    onCheckedChange={(checked) => handleNotifToggle("browserNotifications", checked)}
+                    disabled={!notifSettings.enabled}
+                    data-testid="switch-browser-notifications"
+                  />
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleEnableBrowserNotifications}
+                    disabled={!notifSettings.enabled}
+                    data-testid="button-enable-browser-notifications"
+                  >
+                    Enable
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -15,6 +15,9 @@ const STORAGE_KEYS = {
   DIRECT_MESSAGES: "diabeater_direct_messages",
   CONVERSATIONS: "diabeater_conversations",
   FOLLOWING: "diabeater_following",
+  NOTIFICATIONS: "diabeater_notifications",
+  NOTIFICATION_SETTINGS: "diabeater_notification_settings",
+  LAST_NOTIFICATION_CHECK: "diabeater_last_notification_check",
 } as const;
 
 export interface UserProfile {
@@ -185,6 +188,28 @@ export interface Conversation {
 export interface FollowRelation {
   userName: string;
   followedAt: string;
+}
+
+export type NotificationType = "supply_low" | "supply_critical" | "reminder" | "info" | "activity";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  supplyId?: string;
+  actionUrl?: string;
+  isRead: boolean;
+  isDismissed: boolean;
+  createdAt: string;
+}
+
+export interface NotificationSettings {
+  enabled: boolean;
+  supplyAlerts: boolean;
+  criticalThresholdDays: number;
+  lowThresholdDays: number;
+  browserNotifications: boolean;
 }
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -765,5 +790,138 @@ export const storage = {
     const followedNames = new Set(following.map(f => f.userName));
     const posts = this.getCommunityPosts();
     return posts.filter(p => !p.isAnonymous && p.authorName && followedNames.has(p.authorName));
+  },
+
+  getNotificationSettings(): NotificationSettings {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
+    return data ? JSON.parse(data) : {
+      enabled: true,
+      supplyAlerts: true,
+      criticalThresholdDays: 3,
+      lowThresholdDays: 7,
+      browserNotifications: false,
+    };
+  },
+
+  saveNotificationSettings(settings: NotificationSettings): void {
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATION_SETTINGS, JSON.stringify(settings));
+  },
+
+  getNotifications(): AppNotification[] {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    return notifications
+      .filter(n => !n.isDismissed)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  },
+
+  addNotification(notification: Omit<AppNotification, "id" | "isRead" | "isDismissed" | "createdAt">): AppNotification {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    
+    const existing = notifications.find(
+      n => n.type === notification.type && 
+           n.supplyId === notification.supplyId && 
+           !n.isDismissed
+    );
+    if (existing) return existing;
+    
+    const newNotification: AppNotification = {
+      ...notification,
+      id: generateId(),
+      isRead: false,
+      isDismissed: false,
+      createdAt: new Date().toISOString(),
+    };
+    notifications.unshift(newNotification);
+    
+    if (notifications.length > 100) {
+      notifications.splice(50);
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    return newNotification;
+  },
+
+  markNotificationRead(id: string): void {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    const index = notifications.findIndex(n => n.id === id);
+    if (index !== -1) {
+      notifications[index].isRead = true;
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    }
+  },
+
+  markAllNotificationsRead(): void {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    const updated = notifications.map(n => ({ ...n, isRead: true }));
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+  },
+
+  dismissNotification(id: string): void {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    const index = notifications.findIndex(n => n.id === id);
+    if (index !== -1) {
+      notifications[index].isDismissed = true;
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+    }
+  },
+
+  dismissNotificationsBySupply(supplyId: string): void {
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const notifications: AppNotification[] = data ? JSON.parse(data) : [];
+    const updated = notifications.map(n => 
+      n.supplyId === supplyId ? { ...n, isDismissed: true } : n
+    );
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(updated));
+  },
+
+  getUnreadNotificationCount(): number {
+    return this.getNotifications().filter(n => !n.isRead).length;
+  },
+
+  checkSupplyAlerts(): AppNotification[] {
+    const settings = this.getNotificationSettings();
+    if (!settings.enabled || !settings.supplyAlerts) return [];
+    
+    const supplies = this.getSupplies();
+    const newNotifications: AppNotification[] = [];
+    
+    for (const supply of supplies) {
+      const daysRemaining = this.getDaysRemaining(supply);
+      
+      if (daysRemaining <= settings.criticalThresholdDays && daysRemaining >= 0) {
+        const notification = this.addNotification({
+          type: "supply_critical",
+          title: `${supply.name} running out!`,
+          message: daysRemaining <= 0 
+            ? `You've run out of ${supply.name}. Order refill immediately.`
+            : `Only ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left. Order your refill now.`,
+          supplyId: supply.id,
+          actionUrl: "/supplies",
+        });
+        if (notification) newNotifications.push(notification);
+      } else if (daysRemaining <= settings.lowThresholdDays && daysRemaining > settings.criticalThresholdDays) {
+        const notification = this.addNotification({
+          type: "supply_low",
+          title: `${supply.name} getting low`,
+          message: `${daysRemaining} days remaining. Consider ordering a refill soon.`,
+          supplyId: supply.id,
+          actionUrl: "/supplies",
+        });
+        if (notification) newNotifications.push(notification);
+      }
+    }
+    
+    localStorage.setItem(STORAGE_KEYS.LAST_NOTIFICATION_CHECK, new Date().toISOString());
+    return newNotifications;
+  },
+
+  getLastNotificationCheck(): Date | null {
+    const data = localStorage.getItem(STORAGE_KEYS.LAST_NOTIFICATION_CHECK);
+    return data ? new Date(data) : null;
   },
 };

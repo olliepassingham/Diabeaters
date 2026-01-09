@@ -9,6 +9,8 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
+import { NotificationBell } from "@/components/notification-bell";
+import { OfflineBanner } from "@/components/offline-banner";
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import SickDay from "@/pages/sick-day";
@@ -85,6 +87,7 @@ function AppContent() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
+          <OfflineBanner />
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <button
@@ -99,7 +102,10 @@ function AppContent() {
               <FaceLogo size={40} />
               <span className="font-semibold text-xl">Diabeaters</span>
             </button>
-            <ProfileMenu />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <ProfileMenu />
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
             <Router />
@@ -111,6 +117,19 @@ function AppContent() {
 }
 
 function App() {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/service-worker.js")
+        .then((registration) => {
+          console.log("SW registered:", registration.scope);
+        })
+        .catch((error) => {
+          console.log("SW registration failed:", error);
+        });
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
