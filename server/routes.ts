@@ -194,29 +194,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Missing required fields");
       }
 
-      const settings = await storage.getUserSettings(req.user!.id);
-      if (!settings || !settings.breakfastRatio) {
-        return res.status(400).send("Please complete your settings setup first");
+      // Fetch all user data for personalized advice
+      const [profile, settings] = await Promise.all([
+        storage.getUserProfile(req.user!.id),
+        storage.getUserSettings(req.user!.id),
+      ]);
+
+      // Build comprehensive user context for AI
+      const userContext = [];
+      
+      if (profile) {
+        userContext.push(`Diabetes Type: ${profile.diabetesType || "Type 1"}`);
+        userContext.push(`Insulin Delivery: ${profile.insulinDeliveryMethod || "Not specified"}`);
+        userContext.push(`Blood Glucose Units: ${profile.bgUnits || "mmol/L"}`);
+        userContext.push(`Carb Units: ${profile.carbUnits || "Grams"}`);
+      }
+      
+      if (settings) {
+        if (settings.tdd) userContext.push(`Total Daily Dose (TDD): ${settings.tdd} units`);
+        if (settings.breakfastRatio) userContext.push(`Breakfast Ratio: ${settings.breakfastRatio}`);
+        if (settings.lunchRatio) userContext.push(`Lunch Ratio: ${settings.lunchRatio}`);
+        if (settings.dinnerRatio) userContext.push(`Dinner Ratio: ${settings.dinnerRatio}`);
+        if (settings.snackRatio) userContext.push(`Snack Ratio: ${settings.snackRatio}`);
+        if (settings.correctionFactor) userContext.push(`Correction Factor: 1:${settings.correctionFactor} (1 unit drops BG by ${settings.correctionFactor})`);
+        if (settings.targetBgLow && settings.targetBgHigh) {
+          userContext.push(`Target BG Range: ${settings.targetBgLow}-${settings.targetBgHigh}`);
+        }
+        if (settings.shortActingUnitsPerDay) userContext.push(`Short-Acting Insulin: ~${settings.shortActingUnitsPerDay} units/day`);
+        if (settings.longActingUnitsPerDay) userContext.push(`Long-Acting Insulin: ~${settings.longActingUnitsPerDay} units/day`);
       }
 
-      const prompt = `You are a diabetes management assistant. A person with Type 1 diabetes is planning an activity and needs advice on carbohydrate intake and insulin adjustments.
+      const prompt = `You are a personalised diabetes management assistant. You have access to this person's individual settings and must tailor your advice specifically to them.
 
-Their current mealtime ratios are:
-- Breakfast: ${settings.breakfastRatio}
-- Lunch: ${settings.lunchRatio}
-- Dinner: ${settings.dinnerRatio}
-- Snacks: ${settings.snackRatio}
+**User's Personal Settings:**
+${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"}
 
-Activity details:
+**User's Question/Activity:**
 - Type: ${activityType}
 - Details: ${activityDetails}
 
-Provide practical, concise advice on:
-1. Recommended carb intake before/during the activity
-2. Whether to adjust insulin dose and by how much
-3. Any safety reminders
+**Instructions:**
+1. Use their specific carb ratios, TDD, and correction factor when making calculations
+2. Reference their actual numbers in your response (e.g., "With your 1:10 lunch ratio...")
+3. Consider their insulin delivery method and diabetes type
+4. Use their preferred units (${profile?.bgUnits || "mmol/L"} for blood glucose, ${profile?.carbUnits || "grams"} for carbs)
+5. Give practical, personalised advice based on their unique settings
 
-Keep the response brief (3-4 short bullet points) and actionable.`;
+Keep the response concise (4-5 bullet points) and directly actionable. Always include a safety reminder.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
