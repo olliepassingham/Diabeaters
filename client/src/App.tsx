@@ -7,7 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
@@ -99,7 +99,7 @@ function AppContent() {
               <FaceLogo size={40} />
               <span className="font-semibold text-xl">Diabeaters</span>
             </button>
-            <ThemeToggle />
+            <ProfileMenu />
           </header>
           <main className="flex-1 overflow-auto p-6">
             <Router />
