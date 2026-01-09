@@ -80,7 +80,7 @@ function generateMealAdvice(carbs: number, mealType: string, settings: UserSetti
     `- Monitor your levels 2 hours after eating`;
 }
 
-function generateExerciseAdvice(duration: number, intensity: string, settings: UserSettings): string {
+function generateExerciseAdvice(duration: number, intensity: string, settings: UserSettings, bgUnits: string = "mmol/L"): string {
   let carbsNeeded = 0;
   let insulinReduction = "";
 
@@ -99,15 +99,21 @@ function generateExerciseAdvice(duration: number, intensity: string, settings: U
       break;
   }
 
+  // Use appropriate BG values based on user's units
+  const idealLow = bgUnits === "mmol/L" ? "6.7" : "120";
+  const idealHigh = bgUnits === "mmol/L" ? "10.0" : "180";
+  const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
+  const hypoThreshold = bgUnits === "mmol/L" ? "4.0" : "70";
+
   return `For ${duration} minutes of ${intensity} exercise:\n\n` +
     `**Before Exercise:**\n` +
-    `- Ideal starting BG: 120-180 mg/dL\n` +
-    `- If below 100 mg/dL: eat ${carbsNeeded}g of fast-acting carbs\n` +
+    `- Ideal starting BG: ${idealLow}-${idealHigh} ${bgUnits}\n` +
+    `- If below ${lowThreshold} ${bgUnits}: eat ${carbsNeeded}g of fast-acting carbs\n` +
     `- Consider reducing bolus by ${insulinReduction} for meal within 2 hours before\n\n` +
     `**During Exercise:**\n` +
     `- Carry fast-acting glucose (15-20g)\n` +
     `- Check BG every 30-45 minutes for longer sessions\n` +
-    `- If BG drops below 70 mg/dL, stop and treat\n\n` +
+    `- If BG drops below ${hypoThreshold} ${bgUnits}, stop and treat\n\n` +
     `**After Exercise:**\n` +
     `- Monitor for delayed lows (up to 24 hours later)\n` +
     `- Consider reduced basal/bolus for next meal\n` +
@@ -115,16 +121,19 @@ function generateExerciseAdvice(duration: number, intensity: string, settings: U
     `⚠️ Not medical advice. Individual responses to exercise vary significantly. Track your patterns.`;
 }
 
-function generateRatioAdvice(settings: UserSettings): string {
+function generateRatioAdvice(settings: UserSettings, bgUnits: string = "mmol/L"): string {
   if (settings.tdd) {
     const estimated500Rule = Math.round(500 / settings.tdd);
-    const estimated1800Rule = Math.round(1800 / settings.tdd);
+    // Use 100 rule for mmol/L, 1800 rule for mg/dL
+    const correctionRule = bgUnits === "mmol/L" ? 100 : 1800;
+    const estimatedCorrectionFactor = Math.round(correctionRule / settings.tdd * 10) / 10;
+    const ruleName = bgUnits === "mmol/L" ? "100 Rule" : "1800 Rule";
 
     return `Based on your Total Daily Dose of ${settings.tdd} units:\n\n` +
       `**Estimated Carb Ratio (500 Rule):**\n` +
       `1:${estimated500Rule} (1 unit covers ${estimated500Rule}g of carbs)\n\n` +
-      `**Estimated Correction Factor (1800 Rule):**\n` +
-      `1:${estimated1800Rule} (1 unit lowers BG by ${estimated1800Rule} mg/dL)\n\n` +
+      `**Estimated Correction Factor (${ruleName}):**\n` +
+      `1:${estimatedCorrectionFactor} (1 unit lowers BG by ${estimatedCorrectionFactor} ${bgUnits})\n\n` +
       `**Your Current Settings:**\n` +
       `- Breakfast: ${settings.breakfastRatio || "Not set"}\n` +
       `- Lunch: ${settings.lunchRatio || "Not set"}\n` +
@@ -139,17 +148,21 @@ function generateRatioAdvice(settings: UserSettings): string {
       `⚠️ Not medical advice. Work with your healthcare team to fine-tune your ratios.`;
   }
 
+  const ruleName = bgUnits === "mmol/L" ? "100 Rule" : "1800 Rule";
+  const ruleNum = bgUnits === "mmol/L" ? "100" : "1800";
+  const exampleResult = bgUnits === "mmol/L" ? "2.5" : "45";
+
   return `To calculate insulin ratios, I need your Total Daily Dose (TDD).\n\n` +
     `Please go to Settings and enter your TDD for ratio calculations.\n\n` +
     `**Common Rules of Thumb:**\n` +
     `- 500 Rule: 500 ÷ TDD = grams of carbs covered by 1 unit\n` +
-    `- 1800 Rule: 1800 ÷ TDD = mg/dL drop per 1 unit (correction)\n\n` +
+    `- ${ruleName}: ${ruleNum} ÷ TDD = ${bgUnits} drop per 1 unit (correction)\n\n` +
     `Example: If TDD is 40 units:\n` +
     `- Carb ratio: 500 ÷ 40 = 1:12.5 (round to 1:12)\n` +
-    `- Correction: 1800 ÷ 40 = 45 mg/dL per unit`;
+    `- Correction: ${ruleNum} ÷ 40 = ${exampleResult} ${bgUnits} per unit`;
 }
 
-function processUserMessage(message: string, settings: UserSettings): string {
+function processUserMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): string {
   const lowerMessage = message.toLowerCase();
 
   if (lowerMessage.includes("meal") || lowerMessage.includes("carb") || lowerMessage.includes("eat")) {
@@ -167,36 +180,40 @@ function processUserMessage(message: string, settings: UserSettings): string {
     const duration = durationMatch ? parseInt(durationMatch[1]) : 45;
     const intensity = lowerMessage.includes("intense") || lowerMessage.includes("hard") ? "intense" :
                       lowerMessage.includes("light") || lowerMessage.includes("easy") ? "light" : "moderate";
-    return generateExerciseAdvice(duration, intensity, settings);
+    return generateExerciseAdvice(duration, intensity, settings, bgUnits);
   }
 
   if (lowerMessage.includes("ratio") || lowerMessage.includes("calculate") || lowerMessage.includes("correction") || lowerMessage.includes("icr")) {
-    return generateRatioAdvice(settings);
+    return generateRatioAdvice(settings, bgUnits);
   }
 
+  // Use appropriate BG values based on user's units
+  const hypoThreshold = bgUnits === "mmol/L" ? "4.0 mmol/L" : "70 mg/dL";
+  
   if (lowerMessage.includes("low") || lowerMessage.includes("hypo")) {
     return `**For Low Blood Sugar (Hypoglycemia):**\n\n` +
-      `If BG is below 70 mg/dL, follow the Rule of 15:\n` +
+      `If BG is below ${hypoThreshold}, follow the Rule of 15:\n` +
       `1. Consume 15g of fast-acting carbs (4 glucose tablets, 4oz juice, regular soda)\n` +
       `2. Wait 15 minutes\n` +
       `3. Recheck blood glucose\n` +
-      `4. If still below 70 mg/dL, repeat\n` +
+      `4. If still below ${hypoThreshold}, repeat\n` +
       `5. Once normal, eat a snack with protein\n\n` +
       `**Warning Signs:** Shakiness, sweating, confusion, fast heartbeat\n\n` +
       `⚠️ If you cannot treat yourself or are losing consciousness, this is an emergency. ` +
-      `Have someone call 911 and administer glucagon if available.\n\n` +
+      `Have someone call 999 and administer glucagon if available.\n\n` +
       `Go to Help Now for emergency information.`;
   }
 
   if (lowerMessage.includes("high") || lowerMessage.includes("hyper")) {
+    const ketoneThreshold = bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL";
     const correctionInfo = settings.correctionFactor 
-      ? `Your correction factor is 1:${settings.correctionFactor} (1 unit lowers BG by ${settings.correctionFactor} mg/dL)`
-      : `Set your correction factor in Settings for personalized advice`;
+      ? `Your correction factor is 1:${settings.correctionFactor} (1 unit lowers BG by ${settings.correctionFactor} ${bgUnits})`
+      : `Set your correction factor in Settings for personalised advice`;
 
     return `**For High Blood Sugar (Hyperglycemia):**\n\n` +
       `${correctionInfo}\n\n` +
       `**General Steps:**\n` +
-      `1. Check for ketones if BG > 250 mg/dL\n` +
+      `1. Check for ketones if BG > ${ketoneThreshold}\n` +
       `2. Take correction insulin (based on your factor)\n` +
       `3. Drink plenty of water\n` +
       `4. Recheck in 2-3 hours\n` +
@@ -221,6 +238,7 @@ function processUserMessage(message: string, settings: UserSettings): string {
 
 export default function Advisor() {
   const [settings, setSettings] = useState<UserSettings>({});
+  const [profile, setProfile] = useState<{ bgUnits?: string; carbUnits?: string }>({});
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -240,6 +258,7 @@ export default function Advisor() {
 
   useEffect(() => {
     setSettings(storage.getSettings());
+    setProfile(storage.getProfile() || {});
   }, []);
 
   useEffect(() => {
@@ -303,7 +322,7 @@ export default function Advisor() {
         aiResponse = data.recommendation + "\n\n⚠️ Not medical advice. Always verify with your own calculations.";
       } else {
         // Fall back to local processing if API unavailable
-        aiResponse = processUserMessage(currentInput, settings);
+        aiResponse = processUserMessage(currentInput, settings, profile.bgUnits || "mmol/L");
       }
 
       const assistantMessage: Message = {
@@ -321,7 +340,7 @@ export default function Advisor() {
       });
     } catch (error) {
       // Fall back to local processing on error
-      const localResponse = processUserMessage(currentInput, settings);
+      const localResponse = processUserMessage(currentInput, settings, profile.bgUnits || "mmol/L");
       
       const assistantMessage: Message = {
         role: "assistant",

@@ -218,7 +218,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (settings.longActingUnitsPerDay) userContext.push(`Long-Acting Insulin: ~${settings.longActingUnitsPerDay} units/day`);
       }
 
-      const prompt = `You are a personalised diabetes management assistant. You have access to this person's individual settings and must tailor your advice specifically to them.
+      const bgUnits = profile?.bgUnits || "mmol/L";
+      const carbUnits = profile?.carbUnits || "Grams";
+      
+      const prompt = `You are a personalised diabetes management assistant for a UK user. You MUST tailor your advice to their specific settings.
+
+**CRITICAL - UNITS REQUIREMENT:**
+- Blood glucose: ALWAYS use ${bgUnits} (NEVER use ${bgUnits === "mmol/L" ? "mg/dL" : "mmol/L"})
+- Carbohydrates: ALWAYS use ${carbUnits}
+- This is non-negotiable. Using wrong units could be dangerous.
 
 **User's Personal Settings:**
 ${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"}
@@ -228,10 +236,10 @@ ${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"
 - Details: ${activityDetails}
 
 **Instructions:**
-1. Use their specific carb ratios, TDD, and correction factor when making calculations
-2. Reference their actual numbers in your response (e.g., "With your 1:10 lunch ratio...")
-3. Consider their insulin delivery method and diabetes type
-4. Use their preferred units (${profile?.bgUnits || "mmol/L"} for blood glucose, ${profile?.carbUnits || "grams"} for carbs)
+1. ALWAYS express blood glucose values in ${bgUnits} - never use any other unit
+2. Use their specific carb ratios, TDD, and correction factor when making calculations
+3. Reference their actual numbers in your response (e.g., "With your 1:10 lunch ratio...")
+4. Consider their insulin delivery method and diabetes type
 5. Give practical, personalised advice based on their unique settings
 
 Keep the response concise (4-5 bullet points) and directly actionable. Always include a safety reminder.`;
