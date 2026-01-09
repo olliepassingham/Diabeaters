@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -19,6 +19,8 @@ const typeIcons = {
   needle: Syringe,
   insulin: Package,
   cgm: Activity,
+  infusion_set: Plug,
+  reservoir: Cylinder,
   other: Package,
 };
 
@@ -26,6 +28,8 @@ const typeLabels = {
   needle: "Needles/Lancets",
   insulin: "Insulin",
   cgm: "CGM/Monitors",
+  infusion_set: "Infusion Sets",
+  reservoir: "Reservoirs/Cartridges",
   other: "Other",
 };
 
@@ -316,6 +320,8 @@ function SupplyDialog({
                 <SelectItem value="needle">Needles/Lancets</SelectItem>
                 <SelectItem value="insulin">Insulin</SelectItem>
                 <SelectItem value="cgm">CGM/Monitors</SelectItem>
+                <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
+                <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -697,7 +703,7 @@ export default function Supplies() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="all" data-testid="tab-all">
             All ({supplies.length})
           </TabsTrigger>
@@ -710,9 +716,15 @@ export default function Supplies() {
           <TabsTrigger value="cgm" data-testid="tab-cgm">
             CGM ({filterByType("cgm").length})
           </TabsTrigger>
+          <TabsTrigger value="infusion_set" data-testid="tab-infusion-sets">
+            Infusion ({filterByType("infusion_set").length})
+          </TabsTrigger>
+          <TabsTrigger value="reservoir" data-testid="tab-reservoirs">
+            Reservoirs ({filterByType("reservoir").length})
+          </TabsTrigger>
         </TabsList>
 
-        {["all", "needle", "insulin", "cgm"].map((tabValue) => (
+        {["all", "needle", "insulin", "cgm", "infusion_set", "reservoir"].map((tabValue) => (
           <TabsContent key={tabValue} value={tabValue} className="mt-6">
             {filterByType(tabValue).length === 0 ? (
               <Card>

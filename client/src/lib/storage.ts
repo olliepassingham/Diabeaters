@@ -45,12 +45,15 @@ export interface UserSettings {
   longActingUnitsPerDay?: number;
   injectionsPerDay?: number;
   cgmDays?: number;
+  siteChangeDays?: number;
+  reservoirChangeDays?: number;
+  reservoirCapacity?: number;
 }
 
 export interface Supply {
   id: string;
   name: string;
-  type: "needle" | "insulin" | "cgm" | "other";
+  type: "needle" | "insulin" | "cgm" | "infusion_set" | "reservoir" | "other";
   currentQuantity: number;
   dailyUsage: number;
   lastPickupDate?: string;

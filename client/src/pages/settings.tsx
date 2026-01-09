@@ -35,6 +35,9 @@ export default function Settings() {
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
   const [injectionsPerDay, setInjectionsPerDay] = useState("");
   const [cgmDays, setCgmDays] = useState("");
+  const [siteChangeDays, setSiteChangeDays] = useState("");
+  const [reservoirChangeDays, setReservoirChangeDays] = useState("");
+  const [reservoirCapacity, setReservoirCapacity] = useState("");
   
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -90,6 +93,13 @@ export default function Settings() {
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
+      setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
+      setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
+      setReservoirCapacity(storedSettings.reservoirCapacity?.toString() || "300");
+    } else {
+      setSiteChangeDays("3");
+      setReservoirChangeDays("3");
+      setReservoirCapacity("300");
     }
     
     setNotifSettings(storage.getNotificationSettings());
@@ -145,11 +155,16 @@ export default function Settings() {
       longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
       injectionsPerDay: injectionsPerDay ? parseInt(injectionsPerDay) : undefined,
       cgmDays: cgmDays ? parseInt(cgmDays) : undefined,
+      siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
+      reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
+      reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity) : undefined,
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
     toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
   };
+
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   const handleNotifToggle = (key: keyof NotificationSettings, value: boolean) => {
     const updated = { ...notifSettings, [key]: value };
@@ -417,57 +432,130 @@ export default function Settings() {
               <Activity className="h-5 w-5 text-primary" />
               <CardTitle>Usual Habits</CardTitle>
             </div>
-            <CardDescription>Help estimate when you'll need to reorder supplies.</CardDescription>
+            <CardDescription>
+              Help estimate when you'll need to reorder supplies.
+              {isPumpUser && <span className="ml-1 text-primary">(Pump user settings)</span>}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
-                <Input
-                  id="short-acting-units"
-                  type="number"
-                  placeholder="e.g., 25"
-                  value={shortActingUnitsPerDay}
-                  onChange={(e) => setShortActingUnitsPerDay(e.target.value)}
-                  data-testid="input-short-acting-units"
-                />
-                <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+            {isPumpUser ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="short-acting-units-pump">Total Daily Dose</Label>
+                  <Input
+                    id="short-acting-units-pump"
+                    type="number"
+                    placeholder="e.g., 40"
+                    value={shortActingUnitsPerDay}
+                    onChange={(e) => setShortActingUnitsPerDay(e.target.value)}
+                    data-testid="input-tdd-pump"
+                  />
+                  <p className="text-xs text-muted-foreground">Units/day (basal + bolus)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservoir-capacity">Reservoir Capacity</Label>
+                  <Input
+                    id="reservoir-capacity"
+                    type="number"
+                    placeholder="e.g., 300"
+                    value={reservoirCapacity}
+                    onChange={(e) => setReservoirCapacity(e.target.value)}
+                    data-testid="input-reservoir-capacity"
+                  />
+                  <p className="text-xs text-muted-foreground">Units per cartridge</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="site-change-days">Site Change Interval</Label>
+                  <Select value={siteChangeDays} onValueChange={setSiteChangeDays}>
+                    <SelectTrigger id="site-change-days" data-testid="select-site-change-days">
+                      <SelectValue placeholder="Days" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">Every 2 days</SelectItem>
+                      <SelectItem value="3">Every 3 days</SelectItem>
+                      <SelectItem value="4">Every 4 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">How often you change infusion sets</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservoir-change-days">Reservoir Change Interval</Label>
+                  <Select value={reservoirChangeDays} onValueChange={setReservoirChangeDays}>
+                    <SelectTrigger id="reservoir-change-days" data-testid="select-reservoir-change-days">
+                      <SelectValue placeholder="Days" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">Every 2 days</SelectItem>
+                      <SelectItem value="3">Every 3 days</SelectItem>
+                      <SelectItem value="4">Every 4 days</SelectItem>
+                      <SelectItem value="5">Every 5 days</SelectItem>
+                      <SelectItem value="7">Every 7 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">How often you change reservoirs</p>
+                </div>
+                <div className="space-y-2 col-span-2 md:col-span-1">
+                  <Label htmlFor="cgm-days">CGM Sensor Duration (days)</Label>
+                  <Input
+                    id="cgm-days"
+                    type="number"
+                    placeholder="e.g., 10"
+                    value={cgmDays}
+                    onChange={(e) => setCgmDays(e.target.value)}
+                    data-testid="input-cgm-days"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
-                <Input
-                  id="long-acting-units"
-                  type="number"
-                  placeholder="e.g., 20"
-                  value={longActingUnitsPerDay}
-                  onChange={(e) => setLongActingUnitsPerDay(e.target.value)}
-                  data-testid="input-long-acting-units"
-                />
-                <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
+                  <Input
+                    id="short-acting-units"
+                    type="number"
+                    placeholder="e.g., 25"
+                    value={shortActingUnitsPerDay}
+                    onChange={(e) => setShortActingUnitsPerDay(e.target.value)}
+                    data-testid="input-short-acting-units"
+                  />
+                  <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
+                  <Input
+                    id="long-acting-units"
+                    type="number"
+                    placeholder="e.g., 20"
+                    value={longActingUnitsPerDay}
+                    onChange={(e) => setLongActingUnitsPerDay(e.target.value)}
+                    data-testid="input-long-acting-units"
+                  />
+                  <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="injections-per-day">Injections/Day</Label>
+                  <Input
+                    id="injections-per-day"
+                    type="number"
+                    placeholder="e.g., 4"
+                    value={injectionsPerDay}
+                    onChange={(e) => setInjectionsPerDay(e.target.value)}
+                    data-testid="input-injections-per-day"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cgm-days">CGM Sensor Duration (days)</Label>
+                  <Input
+                    id="cgm-days"
+                    type="number"
+                    placeholder="e.g., 10"
+                    value={cgmDays}
+                    onChange={(e) => setCgmDays(e.target.value)}
+                    data-testid="input-cgm-days"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="injections-per-day">Injections/Day</Label>
-                <Input
-                  id="injections-per-day"
-                  type="number"
-                  placeholder="e.g., 4"
-                  value={injectionsPerDay}
-                  onChange={(e) => setInjectionsPerDay(e.target.value)}
-                  data-testid="input-injections-per-day"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cgm-days">CGM Sensor Duration (days)</Label>
-                <Input
-                  id="cgm-days"
-                  type="number"
-                  placeholder="e.g., 10"
-                  value={cgmDays}
-                  onChange={(e) => setCgmDays(e.target.value)}
-                  data-testid="input-cgm-days"
-                />
-              </div>
-            </div>
+            )}
             <div className="flex justify-end">
               <Button onClick={handleSaveUsage} data-testid="button-save-usage">
                 <Save className="h-4 w-4 mr-2" />
