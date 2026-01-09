@@ -60,36 +60,66 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   const needleSupplies = supplies.filter(s => s.type === "needle");
   const cgmSupplies = supplies.filter(s => s.type === "cgm");
 
-  // Calculate insulin needs based on TDD from settings
-  // TDD = Total Daily Dose in units, 1 pen = 100 units (standard UK/EU pens)
-  const tdd = settings.tdd || 40; // Default to 40 units if not set
-  const unitsPerPen = 100;
+  // Calculate insulin needs separately for short-acting and long-acting
+  // Uses daily pen usage from settings (usual habits)
+  const shortActingPensPerDay = settings.shortActingPensPerDay || 0.2; // Default: ~1 pen every 5 days
+  const longActingPensPerDay = settings.longActingPensPerDay || 0.1; // Default: ~1 pen every 10 days
   
-  // Calculate total units needed for trip
-  const totalUnitsNeeded = tdd * plan.duration;
-  const totalUnitsWithBuffer = Math.ceil(totalUnitsNeeded * bufferMultiplier * accessBuffer);
+  // Calculate short-acting insulin pens needed
+  const baseShortActingPens = shortActingPensPerDay * plan.duration;
+  const shortActingPensNeeded = Math.ceil(baseShortActingPens * bufferMultiplier * accessBuffer);
   
-  // Convert to pens (round up to ensure enough supply)
-  const pensNeeded = Math.ceil(totalUnitsWithBuffer / unitsPerPen);
+  // Calculate long-acting insulin pens needed
+  const baseLongActingPens = longActingPensPerDay * plan.duration;
+  const longActingPensNeeded = Math.ceil(baseLongActingPens * bufferMultiplier * accessBuffer);
   
-  if (insulinSupplies.length > 0) {
-    // If user has tracked insulin supplies, show their types
-    insulinSupplies.forEach(supply => {
-      items.push({
-        name: supply.name,
-        estimatedAmount: pensNeeded,
-        unit: pensNeeded === 1 ? "pen" : "pens",
-        reasoning: `Based on ${tdd}u/day TDD × ${plan.duration} days = ${totalUnitsNeeded}u (${Math.ceil(totalUnitsNeeded / unitsPerPen)} pens) + safety buffer`,
-        category: "insulin",
-        checked: false,
-      });
-    });
-  } else {
+  // Find named supplies from user's tracker if available
+  const shortActingSupply = insulinSupplies.find(s => 
+    s.name.toLowerCase().includes('rapid') || 
+    s.name.toLowerCase().includes('novorapid') || 
+    s.name.toLowerCase().includes('humalog') ||
+    s.name.toLowerCase().includes('fiasp') ||
+    s.name.toLowerCase().includes('short')
+  );
+  const longActingSupply = insulinSupplies.find(s => 
+    s.name.toLowerCase().includes('lantus') || 
+    s.name.toLowerCase().includes('levemir') || 
+    s.name.toLowerCase().includes('tresiba') ||
+    s.name.toLowerCase().includes('long') ||
+    s.name.toLowerCase().includes('basal')
+  );
+
+  // Add short-acting insulin
+  if (shortActingPensNeeded > 0) {
     items.push({
-      name: "Insulin Pens",
-      estimatedAmount: pensNeeded,
-      unit: pensNeeded === 1 ? "pen" : "pens",
-      reasoning: `Based on ${tdd}u/day TDD × ${plan.duration} days = ${totalUnitsNeeded}u (${Math.ceil(totalUnitsNeeded / unitsPerPen)} pens) + safety buffer`,
+      name: shortActingSupply?.name || "Short-Acting Insulin (Rapid)",
+      estimatedAmount: shortActingPensNeeded,
+      unit: shortActingPensNeeded === 1 ? "pen" : "pens",
+      reasoning: `${shortActingPensPerDay} pens/day × ${plan.duration} days = ${baseShortActingPens.toFixed(1)} pens + safety buffer`,
+      category: "insulin",
+      checked: false,
+    });
+  }
+
+  // Add long-acting insulin
+  if (longActingPensNeeded > 0) {
+    items.push({
+      name: longActingSupply?.name || "Long-Acting Insulin (Basal)",
+      estimatedAmount: longActingPensNeeded,
+      unit: longActingPensNeeded === 1 ? "pen" : "pens",
+      reasoning: `${longActingPensPerDay} pens/day × ${plan.duration} days = ${baseLongActingPens.toFixed(1)} pens + safety buffer`,
+      category: "insulin",
+      checked: false,
+    });
+  }
+
+  // Fallback if no insulin usage is configured
+  if (shortActingPensNeeded === 0 && longActingPensNeeded === 0) {
+    items.push({
+      name: "Insulin Pens (configure usage in Settings)",
+      estimatedAmount: Math.ceil(plan.duration / 5 * bufferMultiplier),
+      unit: "pens",
+      reasoning: "Set your daily pen usage in Settings for accurate calculation",
       category: "insulin",
       checked: false,
     });
