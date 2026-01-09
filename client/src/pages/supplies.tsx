@@ -497,7 +497,7 @@ export default function Supplies() {
   const [usualPrescription, setUsualPrescription] = useState<UsualPrescription | null>(null);
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [pickupSupply, setPickupSupply] = useState<Supply | null>(null);
-  const [lastDeletedSupply, setLastDeletedSupply] = useState<Supply | null>(null);
+  const [previousSupplies, setPreviousSupplies] = useState<Supply[] | null>(null);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -510,7 +510,12 @@ export default function Supplies() {
     setUsualPrescription(storage.getUsualPrescription());
   };
 
+  const saveStateForUndo = () => {
+    setPreviousSupplies([...storage.getSupplies()]);
+  };
+
   const handleAddUsualPrescription = () => {
+    saveStateForUndo();
     const result = storage.addUsualPrescriptionSupplies();
     if (result.added > 0 || result.merged > 0) {
       const parts: string[] = [];
@@ -522,6 +527,7 @@ export default function Supplies() {
       });
       refreshSupplies();
     } else {
+      setPreviousSupplies(null);
       toast({ 
         title: "No usual prescription saved", 
         description: "Add supplies first, then save them as your usual prescription.",
@@ -581,28 +587,18 @@ export default function Supplies() {
   };
 
   const handleDelete = (id: string) => {
+    saveStateForUndo();
     const supply = supplies.find(s => s.id === id);
-    if (supply) {
-      setLastDeletedSupply(supply);
-    }
     storage.deleteSupply(id);
     toast({ title: "Supply deleted", description: supply ? `${supply.name} has been removed.` : "Supply removed." });
     refreshSupplies();
   };
 
   const handleUndo = () => {
-    if (lastDeletedSupply) {
-      storage.addSupply({
-        name: lastDeletedSupply.name,
-        type: lastDeletedSupply.type,
-        currentQuantity: lastDeletedSupply.currentQuantity,
-        dailyUsage: lastDeletedSupply.dailyUsage,
-        notes: lastDeletedSupply.notes,
-        lastPickupDate: lastDeletedSupply.lastPickupDate,
-        typicalRefillQuantity: lastDeletedSupply.typicalRefillQuantity,
-      });
-      toast({ title: "Undo successful", description: `${lastDeletedSupply.name} has been restored.` });
-      setLastDeletedSupply(null);
+    if (previousSupplies) {
+      localStorage.setItem("diabeater_supplies", JSON.stringify(previousSupplies));
+      toast({ title: "Undo successful", description: "Changes have been reverted." });
+      setPreviousSupplies(null);
       refreshSupplies();
     }
   };
@@ -674,12 +670,16 @@ export default function Supplies() {
             </Button>
           </div>
           <div className="flex flex-wrap gap-2 justify-end">
-            {lastDeletedSupply && (
-              <Button variant="outline" size="sm" onClick={handleUndo} data-testid="button-undo">
-                <Undo2 className="h-4 w-4 mr-1" />
-                Undo
-              </Button>
-            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleUndo} 
+              disabled={!previousSupplies}
+              data-testid="button-undo"
+            >
+              <Undo2 className="h-4 w-4 mr-1" />
+              Undo
+            </Button>
             {usualPrescription && usualPrescription.items.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
                 <ClipboardList className="h-4 w-4 mr-1" />
