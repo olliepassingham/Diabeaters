@@ -123,85 +123,97 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255,240,220, .12);
+  --badge-outline: rgba(255,240,220, .06);
 
   --opaque-button-border-intensity: 9;  /* In terms of percentages */
 
-  /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  /* Warm espresso overlays for hover/active interactions */
+  --elevate-1: rgba(255,240,220, .06);
+  --elevate-2: rgba(255,230,200, .12);
 
-  --background: 45deg 7.69% 30.59%;
+  /* Deep espresso base - warm and rich */
+  --background: 32 24% 12%;
 
-  --foreground: 40 25% 88%;
+  /* Warm cream text for excellent readability */
+  --foreground: 38 40% 86%;
 
-  --border: 51.11deg 35.37% 55.1%;
+  /* Subtle warm border */
+  --border: 32 18% 24%;
 
-  --card: 44.21deg 9.74% 38.24%;
+  /* Cocoa card surfaces - distinct from background */
+  --card: 30 20% 18%;
 
-  --card-foreground: 40 25% 88%;
+  --card-foreground: 38 40% 86%;
 
-  --card-border: 30 10% 24%;
+  --card-border: 32 20% 26%;
 
-  --sidebar: 30 15% 14%;
+  /* Dark mocha sidebar */
+  --sidebar: 28 22% 16%;
 
-  --sidebar-foreground: 40 25% 88%;
+  --sidebar-foreground: 38 40% 86%;
 
-  --sidebar-border: 30 10% 24%;
+  --sidebar-border: 30 18% 22%;
 
-  --sidebar-primary: 40 30% 85%;
+  --sidebar-primary: 32 58% 58%;
 
-  --sidebar-primary-foreground: 30 15% 12%;
+  --sidebar-primary-foreground: 40 20% 12%;
 
-  --sidebar-accent: 30 10% 22%;
+  --sidebar-accent: 28 16% 24%;
 
-  --sidebar-accent-foreground: 40 25% 88%;
+  --sidebar-accent-foreground: 38 40% 86%;
 
-  --sidebar-ring: 40 30% 85%;
+  --sidebar-ring: 32 58% 58%;
 
-  --popover: 30 15% 18%;
+  /* Warm popover surfaces */
+  --popover: 34 18% 20%;
 
-  --popover-foreground: 40 25% 88%;
+  --popover-foreground: 38 40% 86%;
 
-  --popover-border: 30 10% 26%;
+  --popover-border: 32 16% 28%;
 
-  --primary: 51.67deg 39.13% 81.96%;
+  /* Caramel primary - warm and inviting */
+  --primary: 32 58% 58%;
 
-  --primary-foreground: 30 15% 12%;
+  --primary-foreground: 40 20% 12%;
 
-  --secondary: 36deg 10.31% 38.04%;
+  /* Warm brown secondary */
+  --secondary: 28 36% 40%;
 
-  --secondary-foreground: 40 25% 88%;
+  --secondary-foreground: 38 42% 88%;
 
-  --muted: 30 10% 20%;
+  /* Soft warm muted tones */
+  --muted: 30 16% 22%;
 
-  --muted-foreground: 40 15% 65%;
+  --muted-foreground: 36 26% 65%;
 
-  --accent: 30 10% 22%;
+  /* Terracotta accent for warmth */
+  --accent: 18 54% 46%;
 
-  --accent-foreground: 40 25% 88%;
+  --accent-foreground: 38 42% 92%;
 
-  --destructive: 0 72% 48%;
+  --destructive: 0 72% 52%;
 
-  --destructive-foreground: 0 72% 98%;
+  --destructive-foreground: 0 20% 98%;
 
-  --input: 30 10% 35%;
-  --ring: 40 30% 85%;
-  --chart-1: 40 30% 75%;
-  --chart-2: 168 30% 55%;
-  --chart-3: 43 60% 65%;
-  --chart-4: 280 35% 65%;
-  --chart-5: 340 50% 68%;
+  --input: 30 18% 28%;
+  --ring: 32 58% 58%;
+  
+  /* Warm chart colors */
+  --chart-1: 32 50% 65%;
+  --chart-2: 168 35% 50%;
+  --chart-3: 43 55% 60%;
+  --chart-4: 280 35% 60%;
+  --chart-5: 18 50% 58%;
 
-  --shadow-2xs: 0px 1px 2px 0px hsl(210 10% 0% / 0.15);
-  --shadow-xs: 0px 1px 3px 0px hsl(210 10% 0% / 0.25);
-  --shadow-sm: 0px 2px 4px 0px hsl(210 10% 0% / 0.20), 0px 1px 2px -1px hsl(210 10% 0% / 0.15);
-  --shadow: 0px 4px 6px -1px hsl(210 10% 0% / 0.25), 0px 2px 4px -2px hsl(210 10% 0% / 0.20);
-  --shadow-md: 0px 6px 12px -2px hsl(210 10% 0% / 0.30), 0px 3px 6px -3px hsl(210 10% 0% / 0.25);
-  --shadow-lg: 0px 10px 20px -4px hsl(210 10% 0% / 0.35), 0px 4px 8px -4px hsl(210 10% 0% / 0.30);
-  --shadow-xl: 0px 20px 30px -6px hsl(210 10% 0% / 0.40), 0px 8px 12px -6px hsl(210 10% 0% / 0.35);
-  --shadow-2xl: 0px 30px 50px -12px hsl(210 10% 0% / 0.50);
+  --shadow-2xs: 0px 1px 2px 0px hsl(30 30% 5% / 0.20);
+  --shadow-xs: 0px 1px 3px 0px hsl(30 30% 5% / 0.30);
+  --shadow-sm: 0px 2px 4px 0px hsl(30 30% 5% / 0.25), 0px 1px 2px -1px hsl(30 30% 5% / 0.20);
+  --shadow: 0px 4px 6px -1px hsl(30 30% 5% / 0.30), 0px 2px 4px -2px hsl(30 30% 5% / 0.25);
+  --shadow-md: 0px 6px 12px -2px hsl(30 30% 5% / 0.35), 0px 3px 6px -3px hsl(30 30% 5% / 0.30);
+  --shadow-lg: 0px 10px 20px -4px hsl(30 30% 5% / 0.40), 0px 4px 8px -4px hsl(30 30% 5% / 0.35);
+  --shadow-xl: 0px 20px 30px -6px hsl(30 30% 5% / 0.45), 0px 8px 12px -6px hsl(30 30% 5% / 0.40);
+  --shadow-2xl: 0px 30px 50px -12px hsl(30 30% 5% / 0.55);
 }
 
 @layer base {
