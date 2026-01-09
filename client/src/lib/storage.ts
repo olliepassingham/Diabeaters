@@ -37,8 +37,8 @@ export interface UserSettings {
   correctionFactor?: number;
   targetBgLow?: number;
   targetBgHigh?: number;
-  shortActingPensPerDay?: number;
-  longActingPensPerDay?: number;
+  shortActingUnitsPerDay?: number;
+  longActingUnitsPerDay?: number;
   injectionsPerDay?: number;
   cgmDays?: number;
 }

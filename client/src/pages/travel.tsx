@@ -61,17 +61,21 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   const cgmSupplies = supplies.filter(s => s.type === "cgm");
 
   // Calculate insulin needs separately for short-acting and long-acting
-  // Uses daily pen usage from settings (usual habits)
-  const shortActingPensPerDay = settings.shortActingPensPerDay || 0.2; // Default: ~1 pen every 5 days
-  const longActingPensPerDay = settings.longActingPensPerDay || 0.1; // Default: ~1 pen every 10 days
+  // Uses daily units from settings, then converts to pens (100 units = 1 pen)
+  const unitsPerPen = 100;
+  const shortActingUnitsPerDay = settings.shortActingUnitsPerDay || 20; // Default: 20 units/day
+  const longActingUnitsPerDay = settings.longActingUnitsPerDay || 15; // Default: 15 units/day
   
-  // Calculate short-acting insulin pens needed
-  const baseShortActingPens = shortActingPensPerDay * plan.duration;
-  const shortActingPensNeeded = Math.ceil(baseShortActingPens * bufferMultiplier * accessBuffer);
+  // Calculate total units needed for trip
+  const totalShortActingUnits = shortActingUnitsPerDay * plan.duration;
+  const totalLongActingUnits = longActingUnitsPerDay * plan.duration;
   
-  // Calculate long-acting insulin pens needed
-  const baseLongActingPens = longActingPensPerDay * plan.duration;
-  const longActingPensNeeded = Math.ceil(baseLongActingPens * bufferMultiplier * accessBuffer);
+  // Apply buffer and convert to pens
+  const shortActingUnitsWithBuffer = totalShortActingUnits * bufferMultiplier * accessBuffer;
+  const longActingUnitsWithBuffer = totalLongActingUnits * bufferMultiplier * accessBuffer;
+  
+  const shortActingPensNeeded = Math.ceil(shortActingUnitsWithBuffer / unitsPerPen);
+  const longActingPensNeeded = Math.ceil(longActingUnitsWithBuffer / unitsPerPen);
   
   // Find named supplies from user's tracker if available
   const shortActingSupply = insulinSupplies.find(s => 
@@ -95,7 +99,7 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
       name: shortActingSupply?.name || "Short-Acting Insulin (Rapid)",
       estimatedAmount: shortActingPensNeeded,
       unit: shortActingPensNeeded === 1 ? "pen" : "pens",
-      reasoning: `${shortActingPensPerDay} pens/day × ${plan.duration} days = ${baseShortActingPens.toFixed(1)} pens + safety buffer`,
+      reasoning: `${shortActingUnitsPerDay}u/day × ${plan.duration} days = ${totalShortActingUnits}u (${(totalShortActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
       category: "insulin",
       checked: false,
     });
@@ -107,7 +111,7 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
       name: longActingSupply?.name || "Long-Acting Insulin (Basal)",
       estimatedAmount: longActingPensNeeded,
       unit: longActingPensNeeded === 1 ? "pen" : "pens",
-      reasoning: `${longActingPensPerDay} pens/day × ${plan.duration} days = ${baseLongActingPens.toFixed(1)} pens + safety buffer`,
+      reasoning: `${longActingUnitsPerDay}u/day × ${plan.duration} days = ${totalLongActingUnits}u (${(totalLongActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
       category: "insulin",
       checked: false,
     });

@@ -28,8 +28,8 @@ export default function Settings() {
   const [targetBgLow, setTargetBgLow] = useState("");
   const [targetBgHigh, setTargetBgHigh] = useState("");
   
-  const [shortActingPensPerDay, setShortActingPensPerDay] = useState("");
-  const [longActingPensPerDay, setLongActingPensPerDay] = useState("");
+  const [shortActingUnitsPerDay, setShortActingUnitsPerDay] = useState("");
+  const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
   const [injectionsPerDay, setInjectionsPerDay] = useState("");
   const [cgmDays, setCgmDays] = useState("");
 
@@ -69,8 +69,8 @@ export default function Settings() {
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
       setTargetBgLow(storedSettings.targetBgLow?.toString() || "");
       setTargetBgHigh(storedSettings.targetBgHigh?.toString() || "");
-      setShortActingPensPerDay(storedSettings.shortActingPensPerDay?.toString() || "");
-      setLongActingPensPerDay(storedSettings.longActingPensPerDay?.toString() || "");
+      setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
+      setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
     }
@@ -109,8 +109,8 @@ export default function Settings() {
   const handleSaveUsage = () => {
     const newSettings: UserSettings = {
       ...settings,
-      shortActingPensPerDay: shortActingPensPerDay ? parseInt(shortActingPensPerDay) : undefined,
-      longActingPensPerDay: longActingPensPerDay ? parseInt(longActingPensPerDay) : undefined,
+      shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
+      longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
       injectionsPerDay: injectionsPerDay ? parseInt(injectionsPerDay) : undefined,
       cgmDays: cgmDays ? parseInt(cgmDays) : undefined,
     };
@@ -328,28 +328,28 @@ export default function Settings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="short-acting-pens">Short-Acting Pens/Day</Label>
+                <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
                 <Input
-                  id="short-acting-pens"
+                  id="short-acting-units"
                   type="number"
-                  step="0.1"
-                  placeholder="e.g., 0.5"
-                  value={shortActingPensPerDay}
-                  onChange={(e) => setShortActingPensPerDay(e.target.value)}
-                  data-testid="input-short-acting-pens"
+                  placeholder="e.g., 25"
+                  value={shortActingUnitsPerDay}
+                  onChange={(e) => setShortActingUnitsPerDay(e.target.value)}
+                  data-testid="input-short-acting-units"
                 />
+                <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="long-acting-pens">Long-Acting Pens/Day</Label>
+                <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
                 <Input
-                  id="long-acting-pens"
+                  id="long-acting-units"
                   type="number"
-                  step="0.1"
-                  placeholder="e.g., 0.1"
-                  value={longActingPensPerDay}
-                  onChange={(e) => setLongActingPensPerDay(e.target.value)}
-                  data-testid="input-long-acting-pens"
+                  placeholder="e.g., 20"
+                  value={longActingUnitsPerDay}
+                  onChange={(e) => setLongActingUnitsPerDay(e.target.value)}
+                  data-testid="input-long-acting-units"
                 />
+                <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="injections-per-day">Injections/Day</Label>
