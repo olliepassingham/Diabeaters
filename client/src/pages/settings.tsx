@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { storage, UserProfile, UserSettings, NotificationSettings } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell } from "lucide-react";
+import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
+import { useLocation } from "wouter";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -42,6 +43,12 @@ export default function Settings() {
     lowThresholdDays: 7,
     browserNotifications: false,
   });
+  
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [newContactName, setNewContactName] = useState("");
+  const [newContactPhone, setNewContactPhone] = useState("");
+  const [newContactRelationship, setNewContactRelationship] = useState("");
+  const [showContactForm, setShowContactForm] = useState(false);
 
   useEffect(() => {
     const storedProfile = storage.getProfile();
@@ -86,6 +93,19 @@ export default function Settings() {
     }
     
     setNotifSettings(storage.getNotificationSettings());
+    setContacts(storage.getEmergencyContacts());
+  }, []);
+
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.replace("#", "");
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    }
   }, []);
 
   const handleSaveProfile = () => {
@@ -156,6 +176,41 @@ export default function Settings() {
         variant: "destructive" 
       });
     }
+  };
+
+  const handleAddContact = () => {
+    if (!newContactName.trim() || !newContactPhone.trim()) {
+      toast({ title: "Missing information", description: "Please enter a name and phone number.", variant: "destructive" });
+      return;
+    }
+    const newContact = storage.addEmergencyContact({
+      name: newContactName.trim(),
+      phone: newContactPhone.trim(),
+      relationship: newContactRelationship.trim() || undefined,
+      isPrimary: contacts.length === 0,
+    });
+    setContacts([...contacts, newContact]);
+    setNewContactName("");
+    setNewContactPhone("");
+    setNewContactRelationship("");
+    setShowContactForm(false);
+    toast({ title: "Contact added", description: `${newContact.name} has been added to your emergency contacts.` });
+  };
+
+  const handleDeleteContact = (id: string) => {
+    storage.deleteEmergencyContact(id);
+    setContacts(contacts.filter(c => c.id !== id));
+    toast({ title: "Contact removed" });
+  };
+
+  const handleSetPrimary = (id: string) => {
+    const updated = contacts.map(c => ({ ...c, isPrimary: c.id === id }));
+    updated.forEach(c => {
+      storage.deleteEmergencyContact(c.id);
+      storage.addEmergencyContact(c);
+    });
+    setContacts(storage.getEmergencyContacts());
+    toast({ title: "Primary contact updated" });
   };
 
   return (
@@ -523,6 +578,145 @@ export default function Settings() {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card id="emergency-contacts" data-testid="card-emergency-contacts">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Phone className="h-5 w-5 text-primary" />
+                <CardTitle>Emergency Contacts</CardTitle>
+              </div>
+              {!showContactForm && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowContactForm(true)}
+                  data-testid="button-add-contact"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Contact
+                </Button>
+              )}
+            </div>
+            <CardDescription>People to contact in case of an emergency.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {showContactForm && (
+              <div className="p-4 border rounded-md space-y-4 bg-muted/30">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-name">Name</Label>
+                    <Input
+                      id="contact-name"
+                      placeholder="e.g., Mum"
+                      value={newContactName}
+                      onChange={(e) => setNewContactName(e.target.value)}
+                      data-testid="input-contact-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-phone">Phone Number</Label>
+                    <Input
+                      id="contact-phone"
+                      type="tel"
+                      placeholder="e.g., 07700 900123"
+                      value={newContactPhone}
+                      onChange={(e) => setNewContactPhone(e.target.value)}
+                      data-testid="input-contact-phone"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contact-relationship">Relationship (optional)</Label>
+                  <Input
+                    id="contact-relationship"
+                    placeholder="e.g., Mother, Partner, Friend"
+                    value={newContactRelationship}
+                    onChange={(e) => setNewContactRelationship(e.target.value)}
+                    data-testid="input-contact-relationship"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setShowContactForm(false);
+                      setNewContactName("");
+                      setNewContactPhone("");
+                      setNewContactRelationship("");
+                    }}
+                    data-testid="button-cancel-contact"
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddContact} data-testid="button-save-contact">
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Contact
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {contacts.length === 0 && !showContactForm ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No emergency contacts added yet. Add someone who can help in an emergency.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {contacts.map((contact) => (
+                  <div 
+                    key={contact.id} 
+                    className="flex items-center justify-between p-3 border rounded-md gap-2"
+                    data-testid={`contact-item-${contact.id}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{contact.name}</span>
+                          {contact.isPrimary && (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <Star className="h-3 w-3" />
+                              Primary
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{contact.phone}</p>
+                        {contact.relationship && (
+                          <p className="text-xs text-muted-foreground">{contact.relationship}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {!contact.isPrimary && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSetPrimary(contact.id)}
+                          title="Set as primary contact"
+                          data-testid={`button-set-primary-${contact.id}`}
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteContact(contact.id)}
+                        title="Delete contact"
+                        data-testid={`button-delete-contact-${contact.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -46,7 +46,7 @@ export function HelpNowInfoWidget() {
               Help Now
             </Button>
           </Link>
-          <Link href="/settings">
+          <Link href="/settings#emergency-contacts">
             <Button variant="outline" size="sm" className="w-full" data-testid="button-edit-contacts">
               Edit Contacts
             </Button>
