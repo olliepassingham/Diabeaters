@@ -63,6 +63,7 @@ export interface Supply {
   lastPickupDate?: string;
   typicalRefillQuantity?: number;
   notes?: string;
+  barcode?: string;
 }
 
 export interface LastPrescription {
@@ -378,6 +379,9 @@ export const storage = {
       }
       if (supply.notes) {
         supplies[existingIndex].notes = supply.notes;
+      }
+      if (supply.barcode) {
+        supplies[existingIndex].barcode = supply.barcode;
       }
       localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
       return { supply: supplies[existingIndex], merged: true };
