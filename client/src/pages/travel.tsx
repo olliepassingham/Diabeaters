@@ -22,7 +22,8 @@ import {
   ChevronRight,
   Hospital,
   Pill,
-  Info
+  Info,
+  Globe
 } from "lucide-react";
 import { storage, Supply, UserSettings } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -430,6 +431,27 @@ export default function Travel() {
               Start Travel Plan
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-red-600" />
+              Emergency Card
+            </CardTitle>
+            <CardDescription>
+              A digital medical alert card in 14 languages - perfect for international travel.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/emergency-card">
+              <Button variant="outline" className="w-full" data-testid="button-emergency-card">
+                <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                View Emergency Card
+                <ChevronRight className="h-4 w-4 ml-auto" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
