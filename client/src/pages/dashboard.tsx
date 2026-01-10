@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Settings, AlertCircle, ArrowRight } from "lucide-react";
+import { LayoutGrid, AlertCircle, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
@@ -62,7 +63,15 @@ function StatusIndicator({ status }: { status: HealthStatus }) {
   );
 }
 
-function HeaderCard({ profile, status }: { profile: UserProfile | null; status: HealthStatus }) {
+function HeaderCard({ 
+  profile, 
+  status, 
+  onCustomize 
+}: { 
+  profile: UserProfile | null; 
+  status: HealthStatus;
+  onCustomize: () => void;
+}) {
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -76,48 +85,34 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
     <Card className="bg-card/80 backdrop-blur" data-testid="card-header">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-semibold" data-testid="text-greeting">
               {greeting()}{firstName ? `, ${firstName}` : ""}
             </h1>
             <p className="text-muted-foreground text-sm">Here's your diabetes today</p>
           </div>
-          <StatusIndicator status={status} />
+          <div className="flex items-center gap-3">
+            <StatusIndicator status={status} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={onCustomize}
+                  data-testid="button-customize"
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Customize Dashboard</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
-  const isUrgent = status === "action";
-
-  return (
-    <Card className="overflow-visible" data-testid="card-hero">
-      <CardContent className="p-4 space-y-3">
-        <Link href="/help-now">
-          <Button 
-            variant="destructive" 
-            className={`w-full h-14 text-lg rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
-            data-testid="button-help-now"
-          >
-            <Phone className="h-5 w-5 mr-2" />
-            Help Now
-          </Button>
-        </Link>
-        <Button 
-          variant="outline" 
-          className="w-full"
-          onClick={onCustomize}
-          data-testid="button-customize"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Customize Dashboard
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
 
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
@@ -280,9 +275,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-8">
-      <HeaderCard profile={profile} status={healthStatus} />
-      
-      <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
+      <HeaderCard profile={profile} status={healthStatus} onCustomize={() => setIsEditing(true)} />
 
       {/* Show setup prompt at top when settings incomplete */}
       {!isEditing && !isSettingsComplete && (
