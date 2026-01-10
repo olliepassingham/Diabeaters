@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, AlertCircle, ArrowRight, Phone } from "lucide-react";
+import { LayoutGrid, AlertCircle, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
@@ -92,15 +93,19 @@ function HeaderCard({
           </div>
           <div className="flex items-center gap-3">
             <StatusIndicator status={status} />
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={onCustomize}
-              data-testid="button-customize"
-              title="Customize Dashboard"
-            >
-              <LayoutGrid className="h-5 w-5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={onCustomize}
+                  data-testid="button-customize"
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Customize Dashboard</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </CardContent>
@@ -271,18 +276,6 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-8">
       <HeaderCard profile={profile} status={healthStatus} onCustomize={() => setIsEditing(true)} />
-
-      {/* Help Now button - smaller but always visible */}
-      <Link href="/help-now">
-        <Button 
-          variant="destructive" 
-          className={`w-full h-10 rounded-full ${healthStatus === "action" ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
-          data-testid="button-help-now"
-        >
-          <Phone className="h-4 w-4 mr-2" />
-          Help Now
-        </Button>
-      </Link>
 
       {/* Show setup prompt at top when settings incomplete */}
       {!isEditing && !isSettingsComplete && (
