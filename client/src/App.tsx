@@ -137,12 +137,12 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={0}>
+      <TooltipProvider>
+        <ThemeProvider>
           <AppContent />
           <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
