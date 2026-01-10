@@ -271,19 +271,22 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "community", enabled: true, order: 5 },
 ];
 
+// Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Community, Messages, Ratios, Settings (at bottom)
+// Other widgets start disabled but can be added via customization
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "today-overview", type: "today-overview", enabled: true, order: 0 },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0 },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 1 },
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 2 },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 3 },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4 },
-  { id: "community", type: "community", enabled: true, order: 5 },
-  { id: "messages", type: "messages", enabled: true, order: 6 },
-  { id: "activity-adviser", type: "activity-adviser", enabled: true, order: 7 },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 8 },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 9 },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 10 },
-  { id: "settings-completion", type: "settings-completion", enabled: false, order: 11 },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
+  { id: "community", type: "community", enabled: true, order: 3 },
+  { id: "messages", type: "messages", enabled: true, order: 4 },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5 },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6 },
+  // Disabled by default - can be added via customization
+  { id: "today-overview", type: "today-overview", enabled: false, order: 7 },
+  { id: "scenario-status", type: "scenario-status", enabled: false, order: 8 },
+  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 9 },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 10 },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 11 },
   { id: "help-now-info", type: "help-now-info", enabled: false, order: 12 },
 ];
 
@@ -525,6 +528,49 @@ export const storage = {
     if (days <= 3) return "critical";
     if (days <= 7) return "low";
     return "ok";
+  },
+
+  /**
+   * Check if all required settings are complete.
+   * Used to determine dashboard layout (settings at top vs bottom).
+   */
+  isSettingsComplete(): boolean {
+    const settings = this.getSettings();
+    const contacts = this.getEmergencyContacts();
+    
+    const checks = [
+      !!settings.tdd,
+      !!(settings.breakfastRatio || settings.lunchRatio),
+      !!settings.correctionFactor,
+      !!(settings.targetBgLow && settings.targetBgHigh),
+      contacts.length > 0,
+    ];
+    
+    return checks.every(c => c);
+  },
+
+  /**
+   * Get settings completion percentage and details.
+   */
+  getSettingsCompletion(): { percentage: number; completed: number; total: number } {
+    const settings = this.getSettings();
+    const contacts = this.getEmergencyContacts();
+    
+    const checks = [
+      !!settings.tdd,
+      !!(settings.breakfastRatio || settings.lunchRatio),
+      !!settings.correctionFactor,
+      !!(settings.targetBgLow && settings.targetBgHigh),
+      contacts.length > 0,
+    ];
+    
+    const completed = checks.filter(c => c).length;
+    const total = checks.length;
+    return { 
+      percentage: Math.round((completed / total) * 100), 
+      completed, 
+      total 
+    };
   },
 
   getDashboardWidgets(): DashboardWidget[] {
