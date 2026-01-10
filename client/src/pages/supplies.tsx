@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, ScanLine } from "lucide-react";
-import { BarcodeScanner } from "@/components/barcode-scanner";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -214,15 +213,13 @@ function SupplyDialog({
   open, 
   onOpenChange, 
   onSave,
-  lastPrescription,
-  initialBarcode
+  lastPrescription
 }: { 
   supply: Supply | null; 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
   onSave: (data: Omit<Supply, "id">) => void;
   lastPrescription: LastPrescription | null;
-  initialBarcode?: string;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<Supply["type"]>("needle");
@@ -247,10 +244,10 @@ function SupplyDialog({
       setQuantity("");
       setDailyUsage("");
       setNotes("");
-      setBarcode(initialBarcode || "");
+      setBarcode("");
       setShowLastPrescriptionOption(lastPrescription !== null);
     }
-  }, [supply, open, lastPrescription, initialBarcode]);
+  }, [supply, open, lastPrescription]);
 
   const useLastPrescription = () => {
     if (lastPrescription) {
@@ -524,8 +521,6 @@ export default function Supplies() {
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [pickupSupply, setPickupSupply] = useState<Supply | null>(null);
   const [previousSupplies, setPreviousSupplies] = useState<Supply[] | null>(null);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannedBarcode, setScannedBarcode] = useState<string | undefined>();
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -583,31 +578,7 @@ export default function Supplies() {
 
   const handleAddNew = () => {
     setEditingSupply(null);
-    setScannedBarcode(undefined);
     setDialogOpen(true);
-  };
-
-  const handleBarcodeScan = (barcode: string) => {
-    setScannerOpen(false);
-    
-    const existingSupply = supplies.find(s => s.barcode === barcode);
-    
-    if (existingSupply) {
-      setPickupSupply(existingSupply);
-      setPickupDialogOpen(true);
-      toast({
-        title: "Supply found",
-        description: `${existingSupply.name} - ready to log refill`,
-      });
-    } else {
-      setEditingSupply(null);
-      setScannedBarcode(barcode);
-      setDialogOpen(true);
-      toast({
-        title: "New barcode scanned",
-        description: "Add details for this supply",
-      });
-    }
   };
 
   const handleEdit = (supply: Supply) => {
@@ -714,10 +685,6 @@ export default function Supplies() {
               <Plus className="h-4 w-4 mr-1" />
               Add Supply
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setScannerOpen(true)} data-testid="button-scan-barcode">
-              <ScanLine className="h-4 w-4 mr-1" />
-              Scan
-            </Button>
             {supplies.length > 0 && (
               <Button variant="outline" size="sm" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
                 <Save className="h-4 w-4 mr-1" />
@@ -813,7 +780,6 @@ export default function Supplies() {
         onOpenChange={setDialogOpen}
         onSave={handleSave}
         lastPrescription={lastPrescription}
-        initialBarcode={scannedBarcode}
       />
 
       <RefillDialog
@@ -823,12 +789,6 @@ export default function Supplies() {
         onConfirm={handleConfirmRefill}
       />
 
-      {scannerOpen && (
-        <BarcodeScanner
-          onScan={handleBarcodeScan}
-          onClose={() => setScannerOpen(false)}
-        />
-      )}
     </div>
   );
 }
