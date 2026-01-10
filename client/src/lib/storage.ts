@@ -124,7 +124,8 @@ export type WidgetType =
   | "ratio-adviser"
   | "travel-mode"
   | "sick-day"
-  | "help-now-info";
+  | "help-now-info"
+  | "appointments";
 
 export interface DashboardWidget {
   id: string;
@@ -308,23 +309,24 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "community", enabled: true, order: 5 },
 ];
 
-// Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Community, Messages, Ratios, Settings (at bottom)
+// Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Appointments, Community, Messages, Ratios, Settings (at bottom)
 // Other widgets start disabled but can be added via customization
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "quick-actions", type: "quick-actions", enabled: true, order: 0 },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 1 },
   { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
-  { id: "community", type: "community", enabled: true, order: 3 },
-  { id: "messages", type: "messages", enabled: true, order: 4 },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5 },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6 },
+  { id: "appointments", type: "appointments", enabled: true, order: 3 },
+  { id: "community", type: "community", enabled: true, order: 4 },
+  { id: "messages", type: "messages", enabled: true, order: 5 },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 6 },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7 },
   // Disabled by default - can be added via customization
-  { id: "today-overview", type: "today-overview", enabled: false, order: 7 },
-  { id: "scenario-status", type: "scenario-status", enabled: false, order: 8 },
-  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 9 },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 10 },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 11 },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 12 },
+  { id: "today-overview", type: "today-overview", enabled: false, order: 8 },
+  { id: "scenario-status", type: "scenario-status", enabled: false, order: 9 },
+  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 10 },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 11 },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 12 },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 13 },
 ];
 
 function generateId(): string {

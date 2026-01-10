@@ -109,6 +109,12 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Quick access to emergency contacts",
     icon: Phone,
   },
+  "appointments": {
+    type: "appointments",
+    name: "Appointments",
+    description: "Track clinic visits and check-ups",
+    icon: Calendar,
+  },
 };
 
 interface WidgetLibraryProps {

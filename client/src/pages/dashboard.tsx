@@ -20,6 +20,7 @@ import {
   TravelModeWidget,
   SickDayWidget,
   HelpNowInfoWidget,
+  AppointmentsWidget,
   WidgetLibrary,
 } from "@/components/widgets";
 
@@ -183,6 +184,8 @@ function WidgetRenderer({ type }: { type: string }) {
       return <SickDayWidget />;
     case "help-now-info":
       return <HelpNowInfoWidget />;
+    case "appointments":
+      return <AppointmentsWidget />;
     default:
       return null;
   }
