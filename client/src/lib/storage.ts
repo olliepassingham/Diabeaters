@@ -20,6 +20,8 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: "diabeater_notifications",
   NOTIFICATION_SETTINGS: "diabeater_notification_settings",
   LAST_NOTIFICATION_CHECK: "diabeater_last_notification_check",
+  APPOINTMENTS: "diabeater_appointments",
+  EVENTS: "diabeater_events",
 } as const;
 
 export interface UserProfile {
@@ -217,6 +219,35 @@ export interface NotificationSettings {
   browserNotifications: boolean;
 }
 
+export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
+
+export interface Appointment {
+  id: string;
+  title: string;
+  type: AppointmentType;
+  date: string;
+  time?: string;
+  location?: string;
+  notes?: string;
+  reminderDays?: number;
+  isCompleted: boolean;
+  createdAt: string;
+}
+
+export interface DiabetesEvent {
+  id: string;
+  title: string;
+  description?: string;
+  date: string;
+  time?: string;
+  location?: string;
+  organizer?: string;
+  eventUrl?: string;
+  eventType: "meetup" | "walk" | "awareness" | "conference" | "support_group" | "other";
+  isInterested: boolean;
+  createdAt: string;
+}
+
 export type ReelPlatform = "tiktok" | "instagram" | "youtube";
 
 export interface CommunityReel {
@@ -242,7 +273,10 @@ export type QuickActionId =
   | "community"
   | "help-now"
   | "settings"
-  | "ai-coach";
+  | "ai-coach"
+  | "appointments"
+  | "events"
+  | "emergency-card";
 
 export interface QuickActionConfig {
   id: QuickActionId;
@@ -257,6 +291,9 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
   { id: "travel", label: "Travel", href: "/travel", iconName: "Plane", color: "text-purple-600" },
   { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
   { id: "community", label: "Community", href: "/community", iconName: "Users", color: "text-indigo-600" },
+  { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
+  { id: "events", label: "Events", href: "/events", iconName: "CalendarDays", color: "text-violet-600" },
+  { id: "emergency-card", label: "Emergency Card", href: "/emergency-card", iconName: "AlertTriangle", color: "text-red-600" },
   { id: "help-now", label: "Help Now", href: "/help", iconName: "AlertCircle", color: "text-red-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
   { id: "ai-coach", label: "AI Coach", href: "/ai-coach", iconName: "Bot", color: "text-pink-600" },
@@ -1150,5 +1187,132 @@ export const storage = {
     reels.push(newReel);
     localStorage.setItem(STORAGE_KEYS.COMMUNITY_REELS, JSON.stringify(reels));
     return newReel;
+  },
+
+  // Appointments
+  getAppointments(): Appointment[] {
+    const data = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+    if (!data) return [];
+    const appointments: Appointment[] = JSON.parse(data);
+    return appointments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  addAppointment(appointment: Omit<Appointment, "id" | "createdAt">): Appointment {
+    const appointments = this.getAppointments();
+    const newAppointment: Appointment = {
+      ...appointment,
+      id: generateId(),
+      createdAt: new Date().toISOString(),
+    };
+    appointments.push(newAppointment);
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    return newAppointment;
+  },
+
+  updateAppointment(id: string, updates: Partial<Appointment>): Appointment | null {
+    const appointments = this.getAppointments();
+    const index = appointments.findIndex(a => a.id === id);
+    if (index === -1) return null;
+    appointments[index] = { ...appointments[index], ...updates };
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    return appointments[index];
+  },
+
+  deleteAppointment(id: string): boolean {
+    const appointments = this.getAppointments();
+    const filtered = appointments.filter(a => a.id !== id);
+    if (filtered.length === appointments.length) return false;
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(filtered));
+    return true;
+  },
+
+  getUpcomingAppointments(): Appointment[] {
+    const appointments = this.getAppointments();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return appointments.filter(a => !a.isCompleted && new Date(a.date) >= today);
+  },
+
+  // Events
+  getEvents(): DiabetesEvent[] {
+    const data = localStorage.getItem(STORAGE_KEYS.EVENTS);
+    if (!data) {
+      return this.seedEvents();
+    }
+    const events: DiabetesEvent[] = JSON.parse(data);
+    return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  seedEvents(): DiabetesEvent[] {
+    const today = new Date();
+    const seedEvents: DiabetesEvent[] = [
+      {
+        id: generateId(),
+        title: "JDRF One Walk London",
+        description: "Join thousands walking to fund type 1 diabetes research",
+        date: new Date(today.getFullYear(), today.getMonth() + 2, 15).toISOString().split("T")[0],
+        time: "10:00",
+        location: "Hyde Park, London",
+        organizer: "JDRF UK",
+        eventUrl: "https://jdrf.org.uk/",
+        eventType: "walk",
+        isInterested: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "Diabetes UK Local Meetup - Manchester",
+        description: "Monthly meetup for people living with diabetes",
+        date: new Date(today.getFullYear(), today.getMonth() + 1, 8).toISOString().split("T")[0],
+        time: "18:30",
+        location: "The Meeting House, Manchester",
+        organizer: "Diabetes UK",
+        eventUrl: "https://www.diabetes.org.uk/",
+        eventType: "meetup",
+        isInterested: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "World Diabetes Day",
+        description: "Annual awareness day - activities nationwide",
+        date: new Date(today.getFullYear(), 10, 14).toISOString().split("T")[0],
+        location: "Nationwide",
+        organizer: "International Diabetes Federation",
+        eventType: "awareness",
+        isInterested: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: generateId(),
+        title: "T1D Support Group - Birmingham",
+        description: "Peer support for Type 1 diabetics and families",
+        date: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 14).toISOString().split("T")[0],
+        time: "19:00",
+        location: "Community Centre, Birmingham",
+        organizer: "T1D Warriors",
+        eventType: "support_group",
+        isInterested: false,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(seedEvents));
+    return seedEvents;
+  },
+
+  toggleEventInterest(id: string): DiabetesEvent | null {
+    const events = this.getEvents();
+    const index = events.findIndex(e => e.id === id);
+    if (index === -1) return null;
+    events[index].isInterested = !events[index].isInterested;
+    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
+    return events[index];
+  },
+
+  getUpcomingEvents(): DiabetesEvent[] {
+    const events = this.getEvents();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return events.filter(e => new Date(e.date) >= today);
   },
 };
