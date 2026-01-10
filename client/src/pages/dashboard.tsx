@@ -3,7 +3,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, AlertCircle, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
@@ -93,19 +92,15 @@ function HeaderCard({
           </div>
           <div className="flex items-center gap-3">
             <StatusIndicator status={status} />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={onCustomize}
-                  data-testid="button-customize"
-                >
-                  <LayoutGrid className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Customize Dashboard</TooltipContent>
-            </Tooltip>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={onCustomize}
+              title="Customize Dashboard"
+              data-testid="button-customize"
+            >
+              <LayoutGrid className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </CardContent>
