@@ -213,7 +213,7 @@ function SupplyDialog({
   open, 
   onOpenChange, 
   onSave,
-  lastPrescription
+  lastPrescription 
 }: { 
   supply: Supply | null; 
   open: boolean; 
@@ -226,7 +226,6 @@ function SupplyDialog({
   const [quantity, setQuantity] = useState("");
   const [dailyUsage, setDailyUsage] = useState("");
   const [notes, setNotes] = useState("");
-  const [barcode, setBarcode] = useState("");
   const [showLastPrescriptionOption, setShowLastPrescriptionOption] = useState(false);
 
   useEffect(() => {
@@ -236,7 +235,6 @@ function SupplyDialog({
       setQuantity(supply.currentQuantity.toString());
       setDailyUsage(supply.dailyUsage.toString());
       setNotes(supply.notes || "");
-      setBarcode(supply.barcode || "");
       setShowLastPrescriptionOption(false);
     } else {
       setName("");
@@ -244,7 +242,6 @@ function SupplyDialog({
       setQuantity("");
       setDailyUsage("");
       setNotes("");
-      setBarcode("");
       setShowLastPrescriptionOption(lastPrescription !== null);
     }
   }, [supply, open, lastPrescription]);
@@ -267,7 +264,6 @@ function SupplyDialog({
       currentQuantity: parseFloat(quantity) || 0,
       dailyUsage: parseFloat(dailyUsage) || 0,
       notes: notes || undefined,
-      barcode: barcode || undefined,
     });
     onOpenChange(false);
   };
@@ -364,19 +360,6 @@ function SupplyDialog({
               onChange={e => setNotes(e.target.value)}
               data-testid="input-supply-notes"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="barcode">Barcode (optional)</Label>
-            <Input 
-              id="barcode" 
-              placeholder="Scan or enter barcode" 
-              value={barcode} 
-              onChange={e => setBarcode(e.target.value)}
-              data-testid="input-supply-barcode"
-            />
-            <p className="text-xs text-muted-foreground">
-              Add a barcode to quickly find this supply when scanning
-            </p>
           </div>
         </div>
         <DialogFooter>
@@ -788,7 +771,6 @@ export default function Supplies() {
         onOpenChange={setPickupDialogOpen}
         onConfirm={handleConfirmRefill}
       />
-
     </div>
   );
 }
