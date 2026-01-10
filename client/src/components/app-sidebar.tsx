@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Thermometer, Phone, Plane, Users, Calendar, CalendarDays } from "lucide-react";
+import { Home, Package, Bot, Settings, Thermometer, Phone, Plane, Users, Calendar } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { FaceLogo } from "@/components/face-logo";
 import {
@@ -44,11 +44,6 @@ const items = [
     title: "Appointments",
     url: "/appointments",
     icon: Calendar,
-  },
-  {
-    title: "Events",
-    url: "/events",
-    icon: CalendarDays,
   },
   {
     title: "Community",
