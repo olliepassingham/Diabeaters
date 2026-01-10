@@ -33,10 +33,7 @@ import {
   Play,
   ExternalLink,
   Film,
-  Star,
-  CalendarDays,
-  MapPin,
-  ChevronRight
+  Star
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -49,10 +46,9 @@ import {
   Conversation,
   DirectMessage,
   CommunityReel,
-  ReelPlatform,
-  DiabetesEvent
+  ReelPlatform
 } from "@/lib/storage";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 const TOPIC_ICONS: Record<CommunityTopicId, typeof Plane> = {
   "holidays-travel": Plane,
@@ -553,166 +549,6 @@ function ReelsView() {
   );
 }
 
-const EVENT_TYPE_CONFIG: Record<DiabetesEvent["eventType"], { label: string; color: string }> = {
-  meetup: { label: "Meetup", color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
-  walk: { label: "Charity Walk", color: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" },
-  awareness: { label: "Awareness", color: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300" },
-  conference: { label: "Conference", color: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300" },
-  support_group: { label: "Support Group", color: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300" },
-  other: { label: "Event", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
-};
-
-function EventsView() {
-  const [events, setEvents] = useState<DiabetesEvent[]>([]);
-
-  useEffect(() => {
-    setEvents(storage.getUpcomingEvents());
-  }, []);
-
-  const handleToggleInterest = (id: string) => {
-    storage.toggleEventInterest(id);
-    setEvents(storage.getUpcomingEvents());
-  };
-
-  const handleOpenEvent = (url?: string) => {
-    if (url) {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  };
-
-  if (events.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <CalendarDays className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="font-semibold text-lg mb-2">No upcoming events</h3>
-          <p className="text-muted-foreground">
-            Check back soon for diabetes meetups, walks, and awareness events.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const interestedEvents = events.filter(e => e.isInterested);
-  const otherEvents = events.filter(e => !e.isInterested);
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground text-center">
-        Discover diabetes meetups, charity walks, and awareness events near you.
-      </p>
-
-      {interestedEvents.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm flex items-center gap-2">
-            <Heart className="h-4 w-4 text-primary" />
-            Interested ({interestedEvents.length})
-          </h3>
-          {interestedEvents.map((event) => (
-            <EventCard 
-              key={event.id} 
-              event={event} 
-              onToggleInterest={handleToggleInterest}
-              onOpenEvent={handleOpenEvent}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {interestedEvents.length > 0 && otherEvents.length > 0 && (
-          <h3 className="font-medium text-sm text-muted-foreground">Other Events</h3>
-        )}
-        {otherEvents.map((event) => (
-          <EventCard 
-            key={event.id} 
-            event={event} 
-            onToggleInterest={handleToggleInterest}
-            onOpenEvent={handleOpenEvent}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function EventCard({ 
-  event, 
-  onToggleInterest, 
-  onOpenEvent 
-}: { 
-  event: DiabetesEvent; 
-  onToggleInterest: (id: string) => void;
-  onOpenEvent: (url?: string) => void;
-}) {
-  const config = EVENT_TYPE_CONFIG[event.eventType];
-  const eventDate = new Date(event.date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  return (
-    <Card className="overflow-hidden" data-testid={`event-card-${event.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="font-medium text-sm">{event.title}</span>
-              <Badge variant="outline" className={`text-xs ${config.color}`}>
-                {config.label}
-              </Badge>
-              {daysUntil <= 7 && daysUntil >= 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil}d`}
-                </Badge>
-              )}
-            </div>
-            
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mb-2">
-              <span className="flex items-center gap-1">
-                <CalendarDays className="h-3 w-3" />
-                {format(eventDate, "d MMM yyyy")}
-              </span>
-              {event.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {event.location}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <Button 
-                variant={event.isInterested ? "default" : "outline"}
-                size="sm"
-                onClick={() => onToggleInterest(event.id)}
-                className="h-7 text-xs"
-                data-testid={`button-interest-${event.id}`}
-              >
-                <Heart className={`h-3 w-3 mr-1 ${event.isInterested ? "fill-current" : ""}`} />
-                {event.isInterested ? "Interested" : "I'm Interested"}
-              </Button>
-              {event.eventUrl && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => onOpenEvent(event.eventUrl)}
-                  className="h-7 text-xs"
-                  data-testid={`button-open-event-${event.id}`}
-                >
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  More
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function Community() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("posts");
@@ -1042,22 +878,18 @@ export default function Community() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="posts" data-testid="tab-posts">
-              <MessageCircle className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Posts</span>
-            </TabsTrigger>
-            <TabsTrigger value="events" data-testid="tab-events">
-              <CalendarDays className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Events</span>
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Posts
             </TabsTrigger>
             <TabsTrigger value="reels" data-testid="tab-reels">
-              <Film className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Reels</span>
+              <Film className="h-4 w-4 mr-2" />
+              Reels
             </TabsTrigger>
             <TabsTrigger value="messages" data-testid="tab-messages">
-              <Mail className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Messages</span>
+              <Mail className="h-4 w-4 mr-2" />
+              Messages
             </TabsTrigger>
           </TabsList>
 
@@ -1142,10 +974,6 @@ export default function Community() {
                 ))}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="events" className="mt-4">
-            <EventsView />
           </TabsContent>
 
           <TabsContent value="reels" className="mt-4">

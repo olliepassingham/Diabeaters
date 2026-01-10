@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route, useLocation, Redirect } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,6 +20,7 @@ import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
 import Community from "@/pages/community";
 import Appointments from "@/pages/appointments";
+import Events from "@/pages/events";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
 import NotFound from "@/pages/not-found";
@@ -35,7 +36,7 @@ function Router() {
       <Route path="/travel" component={Travel} />
       <Route path="/community" component={Community} />
       <Route path="/appointments" component={Appointments} />
-      <Route path="/events">{() => <Redirect to="/community" />}</Route>
+      <Route path="/events" component={Events} />
       <Route path="/emergency-card" component={EmergencyCard} />
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />

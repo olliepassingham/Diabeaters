@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, AlertCircle, ArrowRight } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -62,15 +62,7 @@ function StatusIndicator({ status }: { status: HealthStatus }) {
   );
 }
 
-function HeaderCard({ 
-  profile, 
-  status, 
-  onCustomize 
-}: { 
-  profile: UserProfile | null; 
-  status: HealthStatus;
-  onCustomize: () => void;
-}) {
+function HeaderCard({ profile, status }: { profile: UserProfile | null; status: HealthStatus }) {
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -84,30 +76,48 @@ function HeaderCard({
     <Card className="bg-card/80 backdrop-blur" data-testid="card-header">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex-1 min-w-0">
+          <div>
             <h1 className="text-2xl font-semibold" data-testid="text-greeting">
               {greeting()}{firstName ? `, ${firstName}` : ""}
             </h1>
             <p className="text-muted-foreground text-sm">Here's your diabetes today</p>
           </div>
-          <div className="flex items-center gap-3">
-            <StatusIndicator status={status} />
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={onCustomize}
-              title="Customize Dashboard"
-              data-testid="button-customize"
-            >
-              <LayoutGrid className="h-5 w-5" />
-            </Button>
-          </div>
+          <StatusIndicator status={status} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
+function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
+  const isUrgent = status === "action";
+
+  return (
+    <Card className="overflow-visible" data-testid="card-hero">
+      <CardContent className="p-4 space-y-3">
+        <Link href="/help-now">
+          <Button 
+            variant="destructive" 
+            className={`w-full h-14 text-lg rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
+            data-testid="button-help-now"
+          >
+            <Phone className="h-5 w-5 mr-2" />
+            Help Now
+          </Button>
+        </Link>
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={onCustomize}
+          data-testid="button-customize"
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Customize Dashboard
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
@@ -270,7 +280,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 max-w-lg mx-auto pb-8">
-      <HeaderCard profile={profile} status={healthStatus} onCustomize={() => setIsEditing(true)} />
+      <HeaderCard profile={profile} status={healthStatus} />
+      
+      <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
 
       {/* Show setup prompt at top when settings incomplete */}
       {!isEditing && !isSettingsComplete && (
