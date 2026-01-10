@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Globe, Phone, Syringe, Heart, Download, Share2, Info } from "lucide-react";
 import { storage, UserProfile, EmergencyContact } from "@/lib/storage";
 
@@ -229,31 +229,31 @@ export default function EmergencyCard() {
         <p className="text-muted-foreground">Digital medical alert card in multiple languages</p>
       </div>
 
-      <Card className="bg-muted/30">
-        <CardContent className="py-4">
-          <div className="flex items-start gap-3">
-            <Globe className="h-5 w-5 text-primary mt-0.5" />
-            <div>
-              <h4 className="font-medium text-sm mb-2">Select Language</h4>
-              <div className="flex flex-wrap gap-2">
-                {LANGUAGES.map((lang) => (
-                  <Button
-                    key={lang.code}
-                    variant={selectedLang === lang.code ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedLang(lang.code)}
-                    className="gap-1"
-                    data-testid={`button-lang-${lang.code}`}
-                  >
-                    <span>{lang.flag}</span>
-                    <span className="hidden sm:inline">{lang.name}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-3">
+        <Globe className="h-5 w-5 text-primary" />
+        <Select value={selectedLang} onValueChange={setSelectedLang}>
+          <SelectTrigger className="flex-1" data-testid="select-language">
+            <SelectValue>
+              {selectedLangInfo && (
+                <span className="flex items-center gap-2">
+                  <span>{selectedLangInfo.flag}</span>
+                  <span>{selectedLangInfo.name}</span>
+                </span>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {LANGUAGES.map((lang) => (
+              <SelectItem key={lang.code} value={lang.code} data-testid={`option-lang-${lang.code}`}>
+                <span className="flex items-center gap-2">
+                  <span>{lang.flag}</span>
+                  <span>{lang.name}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <Card className="border-2 border-red-500 bg-red-50 dark:bg-red-950/30" data-testid="card-emergency">
         <CardHeader className="bg-red-600 text-white rounded-t-lg">
