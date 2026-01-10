@@ -321,13 +321,7 @@ export const storage = {
   getSupplies(): Supply[] {
     const data = localStorage.getItem(STORAGE_KEYS.SUPPLIES);
     if (!data) {
-      const defaults: Supply[] = [
-        { id: generateId(), name: "Insulin Pen Needles", type: "needle", currentQuantity: 50, dailyUsage: 4 },
-        { id: generateId(), name: "NovoRapid FlexPen", type: "insulin", currentQuantity: 3, dailyUsage: 0.33 },
-        { id: generateId(), name: "CGM Sensor", type: "cgm", currentQuantity: 2, dailyUsage: 0.1 },
-      ];
-      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(defaults));
-      return defaults;
+      return [];
     }
     return JSON.parse(data);
   },
