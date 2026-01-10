@@ -353,12 +353,12 @@ export default function Settings() {
                   id="correction-factor"
                   type="number"
                   step="0.1"
-                  placeholder="e.g., 3"
+                  placeholder={bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
                   value={correctionFactor}
                   onChange={(e) => setCorrectionFactor(e.target.value)}
                   data-testid="input-correction-factor"
                 />
-                <p className="text-xs text-muted-foreground">1 unit drops BG by X mmol/L</p>
+                <p className="text-xs text-muted-foreground">1 unit drops BG by X {bgUnits}</p>
               </div>
               <div className="space-y-2">
                 <Label>Target Range ({bgUnits})</Label>
