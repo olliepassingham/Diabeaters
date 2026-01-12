@@ -6,7 +6,12 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPE
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Health check endpoint
+  // Root health check for deployment (must return 200 quickly)
+  app.get("/health", (_req, res) => {
+    res.status(200).send("OK");
+  });
+
+  // API health check endpoint
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
