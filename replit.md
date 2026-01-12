@@ -43,6 +43,15 @@ Preferred communication style: Simple, everyday language.
 - Local storage fallback for offline capability and onboarding state
 - Keys prefixed with `diabeater_` for profile, settings, supplies, emergency contacts
 
+### Navigation Structure
+- **Dashboard**: Main hub with customizable widgets
+- **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts
+- **AI Advisor**: Activity recommendations and ratio adviser
+- **Scenarios**: Combined Sick Day and Travel Mode with tabbed interface
+- **Appointments**: Healthcare appointment tracking
+- **Community**: Posts, Events, Reels, and Messages tabs
+- **Settings**: User profile and app configuration
+
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
 - **Production**: Vite builds to `dist/public`, Express serves static files
