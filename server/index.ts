@@ -47,6 +47,16 @@ app.use((req, res, next) => {
     throw err;
   });
 
+  // Root health check for deployment - must be before static serving
+  app.get("/", (_req, res, next) => {
+    // If request has accept header for HTML, let static serving handle it
+    if (_req.headers.accept?.includes("text/html")) {
+      return next();
+    }
+    // Otherwise return quick 200 for health checks
+    res.status(200).send("OK");
+  });
+
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
