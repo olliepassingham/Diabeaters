@@ -1,149 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { insertUserSettingsSchema, insertSupplySchema, updateSupplySchema, insertActivityLogSchema, insertUserProfileSchema } from "@shared/schema";
 import OpenAI from "openai";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // User Profile Routes
-  app.get("/api/profile", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-    
-    try {
-      const profile = await storage.getUserProfile(req.user!.id);
-      res.json(profile || { onboardingCompleted: false });
-    } catch (error) {
-      res.status(500).send("Failed to fetch profile");
-    }
-  });
-
-  app.post("/api/profile", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const validatedData = insertUserProfileSchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-      });
-
-      const existing = await storage.getUserProfile(req.user!.id);
-      let profile;
-      
-      if (existing) {
-        profile = await storage.updateUserProfile(req.user!.id, validatedData);
-      } else {
-        profile = await storage.createUserProfile(validatedData);
-      }
-
-      res.json(profile);
-    } catch (error) {
-      console.error("Profile save error:", error);
-      res.status(400).send("Invalid profile data");
-    }
-  });
-
-  // User Settings Routes
-  app.get("/api/settings", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-    
-    try {
-      const settings = await storage.getUserSettings(req.user!.id);
-      res.json(settings || null);
-    } catch (error) {
-      res.status(500).send("Failed to fetch settings");
-    }
-  });
-
-  app.post("/api/settings", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const validatedData = insertUserSettingsSchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-      });
-
-      const existing = await storage.getUserSettings(req.user!.id);
-      let settings;
-      
-      if (existing) {
-        settings = await storage.updateUserSettings(req.user!.id, validatedData);
-      } else {
-        settings = await storage.createUserSettings(validatedData);
-      }
-
-      res.json(settings);
-    } catch (error) {
-      res.status(400).send("Invalid settings data");
-    }
-  });
-
-  // Supply Routes
-  app.get("/api/supplies", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const supplies = await storage.getSupplies(req.user!.id);
-      res.json(supplies);
-    } catch (error) {
-      res.status(500).send("Failed to fetch supplies");
-    }
-  });
-
-  app.post("/api/supplies", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const validatedData = insertSupplySchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-      });
-
-      const supply = await storage.createSupply(validatedData);
-      res.json(supply);
-    } catch (error) {
-      res.status(400).send("Invalid supply data");
-    }
-  });
-
-  app.patch("/api/supplies/:id", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    try {
-      const validatedData = updateSupplySchema.parse(req.body);
-      const supply = await storage.updateSupply(req.user!.id, req.params.id, validatedData);
-      if (!supply) {
-        return res.status(404).send("Supply not found");
-      }
-      res.json(supply);
-    } catch (error) {
-      res.status(400).send("Invalid supply data");
-    }
+  // Health check endpoint
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // Sick Day Calculation Route
   app.post("/api/sick-day/calculate", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
     try {
       const { tdd, bgLevel, severity } = req.body;
       
@@ -177,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Activity Adviser Routes
+  // Activity Adviser Route
   app.post("/api/activity/advice", async (req, res) => {
     if (!openai) {
       return res.status(503).send("OpenAI API key not configured");
@@ -190,11 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Missing required fields");
       }
 
-      // Use profile and settings from request body (sent from client's local storage)
       const profile = userProfile || {};
       const settings = userSettings || {};
 
-      // Build comprehensive user context for AI
       const userContext = [];
       
       if (profile) {
@@ -210,12 +77,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (settings.lunchRatio) userContext.push(`Lunch Ratio: ${settings.lunchRatio}`);
         if (settings.dinnerRatio) userContext.push(`Dinner Ratio: ${settings.dinnerRatio}`);
         if (settings.snackRatio) userContext.push(`Snack Ratio: ${settings.snackRatio}`);
-        if (settings.correctionFactor) userContext.push(`Correction Factor: 1:${settings.correctionFactor} (1 unit drops BG by ${settings.correctionFactor})`);
+        if (settings.correctionFactor) userContext.push(`Correction Factor: 1:${settings.correctionFactor}`);
         if (settings.targetBgLow && settings.targetBgHigh) {
           userContext.push(`Target BG Range: ${settings.targetBgLow}-${settings.targetBgHigh}`);
         }
-        if (settings.shortActingUnitsPerDay) userContext.push(`Short-Acting Insulin: ~${settings.shortActingUnitsPerDay} units/day`);
-        if (settings.longActingUnitsPerDay) userContext.push(`Long-Acting Insulin: ~${settings.longActingUnitsPerDay} units/day`);
       }
 
       const bgUnits = profile?.bgUnits || "mmol/L";
@@ -238,7 +103,7 @@ ${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"
 **Instructions:**
 1. ALWAYS express blood glucose values in ${bgUnits} - never use any other unit
 2. Use their specific carb ratios, TDD, and correction factor when making calculations
-3. Reference their actual numbers in your response (e.g., "With your 1:10 lunch ratio...")
+3. Reference their actual numbers in your response
 4. Consider their insulin delivery method and diabetes type
 5. Give practical, personalised advice based on their unique settings
 
@@ -259,8 +124,6 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
       res.status(500).send("Failed to generate advice");
     }
   });
-
-  // Activity history is handled via client-side local storage
 
   const httpServer = createServer(app);
 
