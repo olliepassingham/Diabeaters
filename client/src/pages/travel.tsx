@@ -775,28 +775,6 @@ export default function Travel() {
         </CardContent>
       </Card>
 
-      <Card className="bg-muted/30">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Other Scenarios</CardTitle>
-          <CardDescription>Explore other situation-specific guidance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link href="/sick-day">
-            <div className="flex items-center justify-between p-3 rounded-lg hover-elevate cursor-pointer bg-background">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500/10 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm">Sick Day Adviser</p>
-                  <p className="text-xs text-muted-foreground">Get adjusted ratios when unwell</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </Link>
-        </CardContent>
-      </Card>
 
       <div className="flex flex-wrap justify-center gap-4">
         <Button variant="outline" onClick={resetPlan} data-testid="button-create-new-plan">

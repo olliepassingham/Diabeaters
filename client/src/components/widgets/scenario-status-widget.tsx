@@ -51,13 +51,13 @@ export function ScenarioStatusWidget() {
             <span data-testid="text-no-scenarios">No active scenarios</span>
           </div>
           <div className="flex gap-2 mt-3">
-            <Link href="/travel" className="flex-1">
+            <Link href="/scenarios" className="flex-1">
               <Button variant="outline" size="sm" className="w-full" data-testid="button-start-travel">
                 <Plane className="h-4 w-4 mr-1" />
                 Travel
               </Button>
             </Link>
-            <Link href="/sick-day" className="flex-1">
+            <Link href="/scenarios" className="flex-1">
               <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
                 <Thermometer className="h-4 w-4 mr-1" />
                 Sick Day
@@ -93,7 +93,7 @@ export function ScenarioStatusWidget() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Link href="/travel">
+              <Link href="/scenarios">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-travel">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -123,7 +123,7 @@ export function ScenarioStatusWidget() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Link href="/sick-day">
+              <Link href="/scenarios">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-sick-day">
                   <ArrowRight className="h-4 w-4" />
                 </Button>

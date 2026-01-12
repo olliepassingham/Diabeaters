@@ -495,28 +495,6 @@ export default function SickDay() {
           </Card>
         )}
 
-        <Card className="bg-muted/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Other Scenarios</CardTitle>
-            <CardDescription>Explore other situation-specific guidance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/travel">
-              <div className="flex items-center justify-between p-3 rounded-lg hover-elevate cursor-pointer bg-background">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-lg">
-                    <Plane className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Travel Mode</p>
-                    <p className="text-xs text-muted-foreground">Plan supplies for your trips</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </Link>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

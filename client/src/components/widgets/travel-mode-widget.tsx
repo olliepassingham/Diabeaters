@@ -46,7 +46,7 @@ export function TravelModeWidget() {
           </p>
         )}
         
-        <Link href="/travel">
+        <Link href="/scenarios">
           <Button variant="secondary" size="sm" className="w-full" data-testid="button-travel-mode">
             {scenario.travelModeActive ? "Manage Travel" : "Plan a Trip"}
             <ArrowRight className="h-4 w-4 ml-1" />

@@ -55,7 +55,7 @@ export function SickDayWidget() {
           </p>
         )}
         
-        <Link href="/sick-day">
+        <Link href="/scenarios">
           <Button variant="secondary" size="sm" className="w-full" data-testid="button-sick-day-mode">
             {scenario.sickDayActive ? "View Guidance" : "Start Sick Day Mode"}
             <ArrowRight className="h-4 w-4 ml-1" />

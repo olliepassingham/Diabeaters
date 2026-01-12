@@ -28,14 +28,12 @@ import { ThemeProvider } from "@/hooks/use-theme";
 // If any are named, change imports accordingly.
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
-import SickDay from "@/pages/sick-day";
+import Scenarios from "@/pages/scenarios";
 import Advisor from "@/pages/advisor";
-import Travel from "@/pages/travel";
 import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
 import Community from "@/pages/community";
 import Appointments from "@/pages/appointments";
-import Events from "@/pages/events";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
 import NotFound from "@/pages/not-found";
@@ -46,12 +44,10 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/supplies" component={Supplies} />
-      <Route path="/sick-day" component={SickDay} />
+      <Route path="/scenarios" component={Scenarios} />
       <Route path="/advisor" component={Advisor} />
-      <Route path="/travel" component={Travel} />
       <Route path="/community" component={Community} />
       <Route path="/appointments" component={Appointments} />
-      <Route path="/events" component={Events} />
       <Route path="/emergency-card" component={EmergencyCard} />
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
