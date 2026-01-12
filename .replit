@@ -1,42 +1,13 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+
+# .replit
+modules = ["nodejs-20", "web"]   # brings back Node 20 + npm for the shell and runner
 run = "npm run dev"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+language = "nodejs"
+entrypoint = "server/index.ts"
 
 [nix]
 channel = "stable-24_05"
 
-[deployment]
-deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[env]
-PORT = "5000"
-
-[workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
-[agent]
-integrations = ["javascript_mem_db:1.0.0", "javascript_openai:1.0.0", "javascript_database:1.0.0"]
+[unit]
+type = "web"

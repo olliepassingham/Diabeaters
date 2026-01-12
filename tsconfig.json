@@ -1,23 +1,42 @@
+
 {
   "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
+    // Build / emit behavior
+    "noEmit": true,
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
-    "noEmit": true,
+
+    // Language / module settings
+    "target": "ES2020",               // good match for modern browsers + Node 18/20
     "module": "ESNext",
+    "moduleResolution": "Bundler",    // best match for Vite
+
+    // React / JSX
+    "jsx": "react-jsx",               // use the automatic React transform (cleaner, faster)
+    // If you prefer strict classic JSX typing, you can keep "preserve", but "react-jsx" is recommended.
+
+    // Strictness & interop
     "strict": true,
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
+
+    // Resolve .ts/.tsx explicitly (you already use it — keeping for clarity)
     "allowImportingTsExtensions": true,
-    "moduleResolution": "bundler",
+
+    // Path aliases (align with Vite)
     "baseUrl": ".",
-    "types": ["node", "vite/client"],
     "paths": {
-      "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
-    }
+      "@/*": ["client/src/*"],
+      "@shared/*": ["shared/*"],
+      "@assets/*": ["attached_assets/*"] // OPTIONAL: add if you import @assets in code
+    },
+
+    // Types available globally
+    "types": ["node", "vite/client"],
+
+    // DOM libs used by UI components
+    "lib": ["ES2020", "DOM", "DOM.Iterable"]
   }
 }

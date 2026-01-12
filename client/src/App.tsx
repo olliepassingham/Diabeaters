@@ -1,16 +1,31 @@
-import { useState, useEffect } from "react";
+
+// client/src/App.tsx
+import React, { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
+
+// ✅ shadcn/ui: Toaster is a named export from ui/toast.tsx (not ui/toaster.tsx)
 import { Toaster } from "@/components/ui/toaster";
+
+// ✅ TooltipProvider is a named export
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+// ✅ SidebarProvider / SidebarTrigger are named exports from ui/sidebar.tsx
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+
+// ✅ App-level components — assumed named exports (adjust to default if your file uses `export default`)
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeProvider } from "@/hooks/use-theme";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
 import { OfflineBanner } from "@/components/offline-banner";
+
+// ✅ Hooks — named exports
+import { ThemeProvider } from "@/hooks/use-theme";
+
+// Pages — your pages appear to be default exports (based on your existing imports)
+// If any are named, change imports accordingly.
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import SickDay from "@/pages/sick-day";
@@ -86,10 +101,10 @@ function AppContent() {
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
-  };
+  } as React.CSSProperties;
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
+    <SidebarProvider style={style}>
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -102,7 +117,11 @@ function AppContent() {
                   setLocation("/");
                 }
               }}
-              className={`flex items-center gap-3 transition-opacity ${location === "/" ? "cursor-default" : "cursor-pointer hover:opacity-80 active:opacity-60"}`}
+              className={`flex items-center gap-3 transition-opacity ${
+                location === "/"
+                  ? "cursor-default"
+                  : "cursor-pointer hover:opacity-80 active:opacity-60"
+              }`}
               data-testid="button-home-brand"
             >
               <FaceLogo size={40} />
@@ -122,7 +141,7 @@ function AppContent() {
   );
 }
 
-function App() {
+export default function App() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
@@ -148,4 +167,3 @@ function App() {
   );
 }
 
-export default App;
