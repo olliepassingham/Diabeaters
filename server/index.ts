@@ -135,7 +135,7 @@ async function attachClient(app: express.Express) {
   if (app.get("env") === "development") {
     // ✅ Force Vite to load your config so aliases/root/plugins apply.
     const vite: ViteDevServer = await createViteServer({
-      configFile: path.resolve(__dirname, "../vite.config.js"),
+      configFile: path.resolve(__dirname, "../vite.config.ts"),
       appType: "custom",
       server: { middlewareMode: true },
     });
