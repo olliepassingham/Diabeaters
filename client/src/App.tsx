@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
@@ -22,6 +23,7 @@ import Community from "@/pages/community";
 import Appointments from "@/pages/appointments";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
+import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -45,6 +47,7 @@ function Router() {
 }
 
 function AppContent() {
+  const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [location] = useLocation();
   const [hasChecked, setHasChecked] = useState(false);
@@ -57,10 +60,24 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (hasChecked && !onboardingCompleted && location !== "/onboarding") {
+    if (hasChecked && isAuthenticated && !onboardingCompleted && location !== "/onboarding") {
       setLocation("/onboarding");
     }
-  }, [hasChecked, onboardingCompleted, location, setLocation]);
+  }, [hasChecked, isAuthenticated, onboardingCompleted, location, setLocation]);
+
+  // Show loading while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show landing page for unauthenticated users
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
 
   if (location === "/onboarding") {
     return <Onboarding />;

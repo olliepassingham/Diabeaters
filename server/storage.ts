@@ -1,6 +1,4 @@
 import { 
-  type User, 
-  type InsertUser,
   type UserProfile,
   type InsertUserProfile,
   type UserSettings,
@@ -9,7 +7,6 @@ import {
   type InsertSupply,
   type ActivityLog,
   type InsertActivityLog,
-  users,
   userProfiles,
   userSettings,
   supplies,
@@ -19,10 +16,6 @@ import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  
   getUserProfile(userId: string): Promise<UserProfile | undefined>;
   createUserProfile(profile: InsertUserProfile): Promise<UserProfile>;
   updateUserProfile(userId: string, profile: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
@@ -35,27 +28,13 @@ export interface IStorage {
   getSupply(userId: string, type: string): Promise<Supply | undefined>;
   createSupply(supply: InsertSupply): Promise<Supply>;
   updateSupply(userId: string, id: string, supply: Partial<InsertSupply>): Promise<Supply | undefined>;
+  deleteSupply(userId: string, id: string): Promise<boolean>;
   
   getActivityLogs(userId: string, limit?: number): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getUser(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result[0];
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
-    return result[0];
-  }
-
   async getUserProfile(userId: string): Promise<UserProfile | undefined> {
     const result = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
     return result[0];
@@ -114,6 +93,13 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(supplies.id, id), eq(supplies.userId, userId)))
       .returning();
     return result[0];
+  }
+
+  async deleteSupply(userId: string, id: string): Promise<boolean> {
+    const result = await db.delete(supplies)
+      .where(and(eq(supplies.id, id), eq(supplies.userId, userId)))
+      .returning();
+    return result.length > 0;
   }
 
   async getActivityLogs(userId: string, limit: number = 10): Promise<ActivityLog[]> {
