@@ -3,6 +3,12 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Health check MUST be first - before any other middleware
+app.get("/health", (_req, res) => {
+  res.status(200).send("OK");
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -45,16 +51,6 @@ app.use((req, res, next) => {
 
     res.status(status).json({ message });
     throw err;
-  });
-
-  // Root health check for deployment - must be before static serving
-  app.get("/", (_req, res, next) => {
-    // If request has accept header for HTML, let static serving handle it
-    if (_req.headers.accept?.includes("text/html")) {
-      return next();
-    }
-    // Otherwise return quick 200 for health checks
-    res.status(200).send("OK");
   });
 
   if (app.get("env") === "development") {
