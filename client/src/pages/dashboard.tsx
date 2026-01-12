@@ -93,29 +93,26 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   const isUrgent = status === "action";
 
   return (
-    <Card className="overflow-visible" data-testid="card-hero">
-      <CardContent className="p-4 space-y-3">
-        <Link href="/help-now">
-          <Button 
-            variant="destructive" 
-            className={`w-full h-14 text-lg rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
-            data-testid="button-help-now"
-          >
-            <Phone className="h-5 w-5 mr-2" />
-            Help Now
-          </Button>
-        </Link>
+    <div className="flex items-center justify-between gap-3" data-testid="card-hero">
+      <Link href="/help-now" className="flex-1">
         <Button 
-          variant="outline" 
-          className="w-full"
-          onClick={onCustomize}
-          data-testid="button-customize"
+          variant="destructive" 
+          className={`w-full rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
+          data-testid="button-help-now"
         >
-          <Settings className="h-4 w-4 mr-2" />
-          Customize Dashboard
+          <Phone className="h-4 w-4 mr-2" />
+          Help Now
         </Button>
-      </CardContent>
-    </Card>
+      </Link>
+      <Button 
+        variant="outline" 
+        size="icon"
+        onClick={onCustomize}
+        data-testid="button-customize"
+      >
+        <Settings className="h-4 w-4" />
+      </Button>
+    </div>
   );
 }
 

@@ -11,3 +11,11 @@ channel = "stable-24_05"
 
 [unit]
 type = "web"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 24678
+externalPort = 80
