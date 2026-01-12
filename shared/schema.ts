@@ -3,9 +3,19 @@ import { pgTable, text, varchar, integer, real, timestamp, boolean, jsonb } from
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Re-export auth models (users and sessions tables are managed by auth integration)
-export * from "./models/auth";
-import { users } from "./models/auth";
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
 
 export const userProfiles = pgTable("user_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -76,13 +86,9 @@ export type DashboardWidget = typeof dashboardWidgets.$inferSelect;
 export const supplies = pgTable("supplies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
   type: text("type").notNull(),
-  currentQuantity: integer("current_quantity").notNull().default(0),
-  dailyUsage: real("daily_usage").notNull().default(0),
-  typicalRefillQuantity: integer("typical_refill_quantity"),
-  lastPickupDate: text("last_pickup_date"),
-  notes: text("notes"),
+  quantity: integer("quantity").notNull().default(0),
+  lastPickupDate: timestamp("last_pickup_date"),
   lastUpdated: timestamp("last_updated").notNull().default(sql`now()`),
 });
 
@@ -286,86 +292,3 @@ export const insertCommunityReelSchema = createInsertSchema(communityReels).omit
 
 export type InsertCommunityReel = z.infer<typeof insertCommunityReelSchema>;
 export type CommunityReel = typeof communityReels.$inferSelect;
-
-// Appointments table
-export const appointments = pgTable("appointments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  type: text("type").notNull(),
-  date: text("date").notNull(),
-  time: text("time"),
-  location: text("location"),
-  notes: text("notes"),
-  reminderDays: integer("reminder_days"),
-  isCompleted: boolean("is_completed").default(false),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
-export type Appointment = typeof appointments.$inferSelect;
-
-// Events table
-export const events = pgTable("events", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  date: text("date").notNull(),
-  time: text("time"),
-  location: text("location"),
-  organizer: text("organizer"),
-  eventUrl: text("event_url"),
-  eventType: text("event_type").notNull(),
-  isInterested: boolean("is_interested").default(false),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-});
-
-export const insertEventSchema = createInsertSchema(events).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertEvent = z.infer<typeof insertEventSchema>;
-export type DiabetesEvent = typeof events.$inferSelect;
-
-// Quick Actions table
-export const quickActions = pgTable("quick_actions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  actionId: text("action_id").notNull(),
-  enabled: boolean("enabled").default(true),
-  actionOrder: integer("action_order").notNull().default(0),
-});
-
-export const insertQuickActionSchema = createInsertSchema(quickActions).omit({
-  id: true,
-});
-
-export type InsertQuickAction = z.infer<typeof insertQuickActionSchema>;
-export type QuickActionRow = typeof quickActions.$inferSelect;
-
-// Scenario State table
-export const scenarioStates = pgTable("scenario_states", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  travelModeActive: boolean("travel_mode_active").default(false),
-  travelDestination: text("travel_destination"),
-  travelEndDate: text("travel_end_date"),
-  sickDayActive: boolean("sick_day_active").default(false),
-  sickDaySeverity: text("sick_day_severity"),
-  updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
-});
-
-export const insertScenarioStateSchema = createInsertSchema(scenarioStates).omit({
-  id: true,
-  updatedAt: true,
-});
-
-export type InsertScenarioState = z.infer<typeof insertScenarioStateSchema>;
-export type ScenarioState = typeof scenarioStates.$inferSelect;

@@ -3,44 +3,41 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertUserSettingsSchema, insertSupplySchema, updateSupplySchema, insertActivityLogSchema, insertUserProfileSchema } from "@shared/schema";
 import OpenAI from "openai";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
-// Helper to get userId from authenticated request
-function getUserId(req: any): string {
-  return req.user?.claims?.sub;
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication BEFORE other routes
-  await setupAuth(app);
-  registerAuthRoutes(app);
   
   // User Profile Routes
-  app.get("/api/profile", isAuthenticated, async (req, res) => {
+  app.get("/api/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+    
     try {
-      const userId = getUserId(req);
-      const profile = await storage.getUserProfile(userId);
+      const profile = await storage.getUserProfile(req.user!.id);
       res.json(profile || { onboardingCompleted: false });
     } catch (error) {
       res.status(500).send("Failed to fetch profile");
     }
   });
 
-  app.post("/api/profile", isAuthenticated, async (req, res) => {
+  app.post("/api/profile", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
-      const userId = getUserId(req);
       const validatedData = insertUserProfileSchema.parse({
         ...req.body,
-        userId,
+        userId: req.user!.id,
       });
 
-      const existing = await storage.getUserProfile(userId);
+      const existing = await storage.getUserProfile(req.user!.id);
       let profile;
       
       if (existing) {
-        profile = await storage.updateUserProfile(userId, validatedData);
+        profile = await storage.updateUserProfile(req.user!.id, validatedData);
       } else {
         profile = await storage.createUserProfile(validatedData);
       }
@@ -53,29 +50,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User Settings Routes
-  app.get("/api/settings", isAuthenticated, async (req, res) => {
+  app.get("/api/settings", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+    
     try {
-      const userId = getUserId(req);
-      const settings = await storage.getUserSettings(userId);
+      const settings = await storage.getUserSettings(req.user!.id);
       res.json(settings || null);
     } catch (error) {
       res.status(500).send("Failed to fetch settings");
     }
   });
 
-  app.post("/api/settings", isAuthenticated, async (req, res) => {
+  app.post("/api/settings", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
-      const userId = getUserId(req);
       const validatedData = insertUserSettingsSchema.parse({
         ...req.body,
-        userId,
+        userId: req.user!.id,
       });
 
-      const existing = await storage.getUserSettings(userId);
+      const existing = await storage.getUserSettings(req.user!.id);
       let settings;
       
       if (existing) {
-        settings = await storage.updateUserSettings(userId, validatedData);
+        settings = await storage.updateUserSettings(req.user!.id, validatedData);
       } else {
         settings = await storage.createUserSettings(validatedData);
       }
@@ -87,22 +90,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Supply Routes
-  app.get("/api/supplies", isAuthenticated, async (req, res) => {
+  app.get("/api/supplies", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
-      const userId = getUserId(req);
-      const supplies = await storage.getSupplies(userId);
+      const supplies = await storage.getSupplies(req.user!.id);
       res.json(supplies);
     } catch (error) {
       res.status(500).send("Failed to fetch supplies");
     }
   });
 
-  app.post("/api/supplies", isAuthenticated, async (req, res) => {
+  app.post("/api/supplies", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
-      const userId = getUserId(req);
       const validatedData = insertSupplySchema.parse({
         ...req.body,
-        userId,
+        userId: req.user!.id,
       });
 
       const supply = await storage.createSupply(validatedData);
@@ -112,11 +121,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/supplies/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/supplies/:id", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
-      const userId = getUserId(req);
       const validatedData = updateSupplySchema.parse(req.body);
-      const supply = await storage.updateSupply(userId, req.params.id, validatedData);
+      const supply = await storage.updateSupply(req.user!.id, req.params.id, validatedData);
       if (!supply) {
         return res.status(404).send("Supply not found");
       }
@@ -126,8 +138,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sick Day Calculation Route (public - uses client-side data)
+  // Sick Day Calculation Route
   app.post("/api/sick-day/calculate", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
     try {
       const { tdd, bgLevel, severity } = req.body;
       
