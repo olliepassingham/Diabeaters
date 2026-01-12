@@ -19,3 +19,14 @@ externalPort = 3000
 [[ports]]
 localPort = 24678
 externalPort = 80
+
+[workflows]
+
+[[workflows.workflow]]
+name = "Start Application"
+mode = "parallel"
+author = 49270312
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
