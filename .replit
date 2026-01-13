@@ -31,3 +31,7 @@ args = "npm run dev"
 [deployment]
 build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "npm start"]
+deploymentTarget = "cloudrun"
+
+[[deployment.healthChecks]]
+path = "/health"
