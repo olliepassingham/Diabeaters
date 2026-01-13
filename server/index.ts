@@ -4,7 +4,15 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Health check MUST be first - before any other middleware
+// Health checks MUST be first - before any other middleware
+// Only respond with OK if not a browser request (no HTML accept header)
+app.get("/", (req, res, next) => {
+  const acceptHeader = req.headers.accept || "";
+  if (!acceptHeader.includes("text/html")) {
+    return res.status(200).send("OK");
+  }
+  next();
+});
 app.get("/health", (_req, res) => {
   res.status(200).send("OK");
 });
