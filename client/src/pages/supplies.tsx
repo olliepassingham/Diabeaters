@@ -46,16 +46,21 @@ function SupplyCard({
   onUpdateQuantity: (id: string, quantity: number) => void;
   onLogPickup: (supply: Supply) => void;
 }) {
+  const adjustedQuantity = storage.getAdjustedQuantity(supply);
   const daysRemaining = storage.getDaysRemaining(supply);
   const runOutDate = storage.getRunOutDate(supply);
   const status = storage.getSupplyStatus(supply);
+  const daysSincePickup = storage.getDaysSincePickup(supply);
   const Icon = typeIcons[supply.type] || Package;
 
   const getLastPickupText = () => {
     if (!supply.lastPickupDate) return null;
     try {
       const pickupDate = new Date(supply.lastPickupDate);
-      return `Picked up ${format(pickupDate, "MMM d")}`;
+      const dayText = daysSincePickup !== null && daysSincePickup > 0 
+        ? ` (${daysSincePickup} day${daysSincePickup !== 1 ? 's' : ''} ago)`
+        : ' (today)';
+      return `Picked up ${format(pickupDate, "MMM d")}${dayText}`;
     } catch {
       return null;
     }
@@ -116,17 +121,17 @@ function SupplyCard({
         }`}>
           <div className="flex items-baseline justify-between gap-2">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Remaining</p>
+              <p className="text-xs text-muted-foreground mb-1">Estimated Remaining</p>
               {supply.type === "insulin" ? (
                 <div data-testid={`text-remaining-${supply.id}`}>
                   <p className={`text-2xl font-bold ${
                     status === "critical" ? "text-red-600 dark:text-red-500" : 
                     status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                   }`}>
-                    {Math.floor(supply.currentQuantity / 100)} {Math.floor(supply.currentQuantity / 100) === 1 ? "pen" : "pens"}
+                    {Math.floor(adjustedQuantity / 100)} {Math.floor(adjustedQuantity / 100) === 1 ? "pen" : "pens"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    ({supply.currentQuantity} units)
+                    (~{Math.round(adjustedQuantity)} units)
                   </p>
                 </div>
               ) : (
@@ -134,7 +139,7 @@ function SupplyCard({
                   status === "critical" ? "text-red-600 dark:text-red-500" : 
                   status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                 }`} data-testid={`text-remaining-${supply.id}`}>
-                  {supply.currentQuantity}
+                  ~{Math.round(adjustedQuantity)}
                 </p>
               )}
             </div>
@@ -166,6 +171,12 @@ function SupplyCard({
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="h-3 w-3" />
               {lastPickupText}
+            </div>
+          )}
+          
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Started with {supply.quantityAtPickup} • Used ~{Math.round(daysSincePickup * supply.dailyUsage)}
             </div>
           )}
         </div>
@@ -623,6 +634,7 @@ export default function Supplies() {
     if (pickupSupply) {
       const updates: Partial<Supply> = { 
         currentQuantity: quantity,
+        quantityAtPickup: quantity,
         lastPickupDate: new Date().toISOString()
       };
       

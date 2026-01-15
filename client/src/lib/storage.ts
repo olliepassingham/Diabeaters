@@ -61,6 +61,7 @@ export interface Supply {
   currentQuantity: number;
   dailyUsage: number;
   lastPickupDate?: string;
+  quantityAtPickup?: number;
   typicalRefillQuantity?: number;
   notes?: string;
 }
@@ -372,7 +373,10 @@ export const storage = {
     );
     
     if (existingIndex !== -1) {
-      supplies[existingIndex].currentQuantity += supply.currentQuantity;
+      const newTotalQuantity = supplies[existingIndex].currentQuantity + supply.currentQuantity;
+      supplies[existingIndex].currentQuantity = newTotalQuantity;
+      supplies[existingIndex].quantityAtPickup = newTotalQuantity;
+      supplies[existingIndex].lastPickupDate = new Date().toISOString();
       if (supply.dailyUsage) {
         supplies[existingIndex].dailyUsage = supply.dailyUsage;
       }
@@ -383,7 +387,12 @@ export const storage = {
       return { supply: supplies[existingIndex], merged: true };
     }
     
-    const newSupply = { ...supply, id: generateId() };
+    const newSupply: Supply = { 
+      ...supply, 
+      id: generateId(),
+      quantityAtPickup: supply.currentQuantity,
+      lastPickupDate: new Date().toISOString()
+    };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
     return { supply: newSupply, merged: false };
@@ -536,12 +545,55 @@ export const storage = {
   },
 
   /**
-   * Calculate days remaining based on currentQuantity / dailyUsage.
-   * currentQuantity is the source of truth (manually tracked by user).
+   * Calculate the adjusted remaining quantity based on days elapsed since pickup.
+   * If pickup date and quantity are set, automatically deducts daily usage for each day passed.
+   */
+  getAdjustedQuantity(supply: Supply): number {
+    if (!supply.lastPickupDate || supply.quantityAtPickup == null) {
+      return supply.currentQuantity;
+    }
+    
+    if (!supply.dailyUsage || supply.dailyUsage <= 0) {
+      return supply.quantityAtPickup;
+    }
+    
+    const pickupDate = new Date(supply.lastPickupDate);
+    const today = new Date();
+    pickupDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    
+    const daysElapsed = Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysElapsed <= 0) {
+      return supply.quantityAtPickup;
+    }
+    
+    const usedAmount = daysElapsed * supply.dailyUsage;
+    const adjusted = supply.quantityAtPickup - usedAmount;
+    return Math.max(0, adjusted);
+  },
+
+  /**
+   * Get days elapsed since pickup date.
+   */
+  getDaysSincePickup(supply: Supply): number | null {
+    if (!supply.lastPickupDate) return null;
+    
+    const pickupDate = new Date(supply.lastPickupDate);
+    const today = new Date();
+    pickupDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    
+    return Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
+  },
+
+  /**
+   * Calculate days remaining based on adjusted quantity / dailyUsage.
+   * Uses the adjusted quantity that accounts for daily usage since pickup.
    */
   getDaysRemaining(supply: Supply): number {
     if (supply.dailyUsage <= 0) return 999;
-    return Math.floor(supply.currentQuantity / supply.dailyUsage);
+    const adjustedQty = this.getAdjustedQuantity(supply);
+    return Math.floor(adjustedQty / supply.dailyUsage);
   },
 
   /**
