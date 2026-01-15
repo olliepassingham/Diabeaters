@@ -131,6 +131,9 @@ function AppContent() {
           <main className="flex-1 overflow-auto p-6">
             <Router />
           </main>
+          <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground">
+            <p>Prototype - Copyright Passingtime {new Date().getFullYear()}</p>
+          </footer>
         </div>
       </div>
     </SidebarProvider>

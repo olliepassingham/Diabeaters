@@ -404,6 +404,10 @@ export default function Onboarding() {
             </Button>
           )}
         </div>
+
+        <p className="text-center text-xs text-muted-foreground pt-4">
+          Prototype - Copyright Passingtime {new Date().getFullYear()}
+        </p>
       </div>
     </div>
   );
