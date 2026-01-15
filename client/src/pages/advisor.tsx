@@ -424,6 +424,8 @@ export default function Advisor() {
     setMealMessages(prev => [...prev, userMessage]);
     setIsMealTyping(true);
 
+    let aiResponse: string;
+
     try {
       const userProfile = storage.getProfile();
       const userSettings = storage.getSettings();
@@ -439,36 +441,35 @@ export default function Advisor() {
         }),
       });
 
-      let aiResponse: string;
-      
       if (response.ok) {
         const data = await response.json();
         aiResponse = data.recommendation + "\n\n[Not medical advice. Always verify with your own calculations.]";
       } else {
+        // API unavailable or error - use local processing
         aiResponse = processUserMessage(message, settings, bgUnits, "meal");
       }
+    } catch {
+      // Network error or other failure - use local processing
+      aiResponse = processUserMessage(message, settings, bgUnits, "meal");
+    }
 
-      setMealMessages(prev => [...prev, {
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }]);
-      
+    setMealMessages(prev => [...prev, {
+      role: "assistant",
+      content: aiResponse,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+    
+    try {
       storage.addActivityLog({
         activityType: "meal_planning",
         activityDetails: message,
         recommendation: aiResponse.substring(0, 200),
       });
     } catch {
-      const localResponse = processUserMessage(message, settings, bgUnits, "meal");
-      setMealMessages(prev => [...prev, {
-        role: "assistant",
-        content: localResponse,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }]);
-    } finally {
-      setIsMealTyping(false);
+      // Ignore logging errors
     }
+
+    setIsMealTyping(false);
   };
 
   const sendExerciseMessage = async (message: string) => {
@@ -479,6 +480,8 @@ export default function Advisor() {
     };
     setExerciseMessages(prev => [...prev, userMessage]);
     setIsExerciseTyping(true);
+
+    let aiResponse: string;
 
     try {
       const userProfile = storage.getProfile();
@@ -495,36 +498,35 @@ export default function Advisor() {
         }),
       });
 
-      let aiResponse: string;
-      
       if (response.ok) {
         const data = await response.json();
         aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses to exercise vary.]";
       } else {
+        // API unavailable or error - use local processing
         aiResponse = processUserMessage(message, settings, bgUnits, "exercise");
       }
+    } catch {
+      // Network error or other failure - use local processing
+      aiResponse = processUserMessage(message, settings, bgUnits, "exercise");
+    }
 
-      setExerciseMessages(prev => [...prev, {
-        role: "assistant",
-        content: aiResponse,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }]);
-      
+    setExerciseMessages(prev => [...prev, {
+      role: "assistant",
+      content: aiResponse,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+    
+    try {
       storage.addActivityLog({
         activityType: "exercise_planning",
         activityDetails: message,
         recommendation: aiResponse.substring(0, 200),
       });
     } catch {
-      const localResponse = processUserMessage(message, settings, bgUnits, "exercise");
-      setExerciseMessages(prev => [...prev, {
-        role: "assistant",
-        content: localResponse,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      }]);
-    } finally {
-      setIsExerciseTyping(false);
+      // Ignore logging errors
     }
+
+    setIsExerciseTyping(false);
   };
 
   const handleMealSend = () => {
@@ -586,12 +588,10 @@ export default function Advisor() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2 max-w-md mb-4">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
-            <Utensils className="h-4 w-4" />
-            Plan Meal
+            <Utensils className="h-4 w-4" />Plan Meal
           </TabsTrigger>
           <TabsTrigger value="exercise" className="gap-2" data-testid="tab-exercise">
-            <Dumbbell className="h-4 w-4" />
-            Exercise
+            <Dumbbell className="h-4 w-4" />Exercise
           </TabsTrigger>
         </TabsList>
 

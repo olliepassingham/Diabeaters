@@ -1,6 +1,6 @@
-const CACHE_NAME = 'diabeaters-v5';
-const STATIC_CACHE = 'diabeaters-static-v5';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v5';
+const CACHE_NAME = 'diabeaters-v6';
+const STATIC_CACHE = 'diabeaters-static-v6';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v6';
 
 const STATIC_ASSETS = [
   '/',
