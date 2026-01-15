@@ -237,6 +237,7 @@ function SupplyDialog({
   const [quantity, setQuantity] = useState("");
   const [dailyUsage, setDailyUsage] = useState("");
   const [notes, setNotes] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
   const [showLastPrescriptionOption, setShowLastPrescriptionOption] = useState(false);
 
   useEffect(() => {
@@ -246,6 +247,7 @@ function SupplyDialog({
       setQuantity(supply.currentQuantity.toString());
       setDailyUsage(supply.dailyUsage.toString());
       setNotes(supply.notes || "");
+      setPickupDate(supply.lastPickupDate ? format(new Date(supply.lastPickupDate), "yyyy-MM-dd") : "");
       setShowLastPrescriptionOption(false);
     } else {
       setName("");
@@ -253,6 +255,7 @@ function SupplyDialog({
       setQuantity("");
       setDailyUsage("");
       setNotes("");
+      setPickupDate(format(new Date(), "yyyy-MM-dd"));
       setShowLastPrescriptionOption(lastPrescription !== null);
     }
   }, [supply, open, lastPrescription]);
@@ -269,12 +272,15 @@ function SupplyDialog({
   };
 
   const handleSubmit = () => {
+    const parsedQuantity = parseFloat(quantity) || 0;
     onSave({
       name,
       type,
-      currentQuantity: parseFloat(quantity) || 0,
+      currentQuantity: parsedQuantity,
       dailyUsage: parseFloat(dailyUsage) || 0,
       notes: notes || undefined,
+      lastPickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
+      quantityAtPickup: parsedQuantity,
     });
     onOpenChange(false);
   };
@@ -361,6 +367,19 @@ function SupplyDialog({
                 data-testid="input-supply-daily-usage"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pickup-date">Pickup Date</Label>
+            <Input 
+              id="pickup-date" 
+              type="date"
+              value={pickupDate} 
+              onChange={e => setPickupDate(e.target.value)}
+              data-testid="input-supply-pickup-date"
+            />
+            <p className="text-xs text-muted-foreground">
+              When you received this supply. Used to estimate remaining quantity.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (optional)</Label>
