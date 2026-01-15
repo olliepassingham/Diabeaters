@@ -233,10 +233,19 @@ export default function SickDay() {
   }, []);
 
   const handleCalculate = () => {
-    if (!tdd || !bgLevel || !severity) {
+    if (!settings.tdd) {
+      toast({
+        title: "TDD not configured",
+        description: "Please set your Total Daily Dose in Settings first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!bgLevel || !severity) {
       toast({
         title: "Missing information",
-        description: "Please fill in all fields to calculate recommendations.",
+        description: "Please fill in blood glucose and severity to calculate recommendations.",
         variant: "destructive",
       });
       return;
@@ -313,14 +322,36 @@ export default function SickDay() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="tdd">Total Daily Dose (TDD) - Units</Label>
-              <Input
-                id="tdd"
-                type="number"
-                placeholder="e.g., 40"
-                value={tdd}
-                onChange={(e) => setTdd(e.target.value)}
-                data-testid="input-tdd"
-              />
+              {settings.tdd ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="tdd"
+                      type="number"
+                      value={tdd}
+                      readOnly
+                      className="bg-muted cursor-default"
+                      data-testid="input-tdd"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    From your <Link href="/settings" className="text-primary hover:underline">Insulin Settings</Link>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="p-3 rounded-md bg-muted border border-dashed">
+                    <p className="text-sm text-muted-foreground">
+                      TDD not configured. Please set your Total Daily Dose in{" "}
+                      <Link href="/settings" className="text-primary hover:underline font-medium">
+                        Settings → Insulin Settings
+                      </Link>{" "}
+                      to use the Sick Day Adviser.
+                    </p>
+                  </div>
+                </>
+              )}
               <p className="text-xs text-muted-foreground">
                 Your typical total insulin dose per day (basal + bolus combined)
               </p>
