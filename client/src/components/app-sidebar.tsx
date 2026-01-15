@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle } from "lucide-react";
+import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { FaceLogo } from "@/components/face-logo";
 import {
@@ -44,6 +44,11 @@ const items = [
     title: "Community",
     url: "/community",
     icon: Users,
+  },
+  {
+    title: "Shop",
+    url: "/shop",
+    icon: ShoppingBag,
   },
   {
     title: "Settings",
