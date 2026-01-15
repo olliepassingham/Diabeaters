@@ -1,11 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Thermometer, Plane } from "lucide-react";
 import SickDay from "./sick-day";
 import Travel from "./travel";
 
 export default function Scenarios() {
-  const [activeTab, setActiveTab] = useState("sick-day");
+  const getInitialTab = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    return tab === "travel" ? "travel" : "sick-day";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "travel" || tab === "sick-day") {
+      setActiveTab(tab);
+    }
+  }, []);
 
   return (
     <div className="space-y-6">

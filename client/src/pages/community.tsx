@@ -734,7 +734,17 @@ function ReelsView() {
 
 export default function Community() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("posts");
+  
+  const getInitialTab = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts") {
+      return tab;
+    }
+    return "posts";
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopicId | "all" | "following">("all");
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
@@ -754,6 +764,12 @@ export default function Community() {
   useEffect(() => {
     loadPosts();
     setProfile(storage.getProfile());
+    
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts") {
+      setActiveTab(tab);
+    }
   }, []);
 
   useEffect(() => {

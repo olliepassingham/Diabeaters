@@ -289,16 +289,16 @@ export interface QuickActionConfig {
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
-  { id: "sick-day", label: "Sick Day", href: "/scenarios", iconName: "Thermometer", color: "text-orange-600" },
-  { id: "travel", label: "Travel", href: "/scenarios", iconName: "Plane", color: "text-purple-600" },
+  { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
+  { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
   { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
-  { id: "community", label: "Community", href: "/community", iconName: "Users", color: "text-indigo-600" },
+  { id: "community", label: "Community", href: "/community?tab=posts", iconName: "Users", color: "text-indigo-600" },
   { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
-  { id: "events", label: "Events", href: "/community", iconName: "CalendarDays", color: "text-violet-600" },
+  { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
   { id: "emergency-card", label: "Emergency Card", href: "/emergency-card", iconName: "AlertTriangle", color: "text-red-600" },
-  { id: "help-now", label: "Help Now", href: "/help", iconName: "AlertCircle", color: "text-red-600" },
+  { id: "help-now", label: "Help Now", href: "/help-now", iconName: "AlertCircle", color: "text-red-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
-  { id: "ai-coach", label: "AI Coach", href: "/ai-coach", iconName: "Bot", color: "text-pink-600" },
+  { id: "ai-coach", label: "AI Coach", href: "/advisor", iconName: "Bot", color: "text-pink-600" },
 ];
 
 export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
