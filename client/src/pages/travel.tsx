@@ -25,7 +25,7 @@ import {
   Info,
   Globe
 } from "lucide-react";
-import { storage, Supply, UserSettings } from "@/lib/storage";
+import { storage, Supply, UserSettings, UserProfile } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
@@ -52,7 +52,7 @@ interface RiskWarning {
   severity: "low" | "medium" | "high";
 }
 
-function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: UserSettings): PackingItem[] {
+function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: UserSettings, isPumpUser: boolean): PackingItem[] {
   const items: PackingItem[] = [];
   const bufferMultiplier = plan.travelType === "international" ? 2 : 1.5;
   const accessBuffer = plan.accessRisk === "limited" ? 1.5 : plan.accessRisk === "unsure" ? 1.3 : 1;
@@ -61,101 +61,191 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   const needleSupplies = supplies.filter(s => s.type === "needle");
   const cgmSupplies = supplies.filter(s => s.type === "cgm");
 
-  // Calculate insulin needs separately for short-acting and long-acting
-  // Uses daily units from settings, then converts to pens (100 units = 1 pen)
-  const unitsPerPen = 100;
-  const shortActingUnitsPerDay = settings.shortActingUnitsPerDay || 20; // Default: 20 units/day
-  const longActingUnitsPerDay = settings.longActingUnitsPerDay || 15; // Default: 15 units/day
-  
-  // Calculate total units needed for trip
-  const totalShortActingUnits = shortActingUnitsPerDay * plan.duration;
-  const totalLongActingUnits = longActingUnitsPerDay * plan.duration;
-  
-  // Apply buffer and convert to pens
-  const shortActingUnitsWithBuffer = totalShortActingUnits * bufferMultiplier * accessBuffer;
-  const longActingUnitsWithBuffer = totalLongActingUnits * bufferMultiplier * accessBuffer;
-  
-  const shortActingPensNeeded = Math.ceil(shortActingUnitsWithBuffer / unitsPerPen);
-  const longActingPensNeeded = Math.ceil(longActingUnitsWithBuffer / unitsPerPen);
-  
-  // Find named supplies from user's tracker if available
-  const shortActingSupply = insulinSupplies.find(s => 
-    s.name.toLowerCase().includes('rapid') || 
-    s.name.toLowerCase().includes('novorapid') || 
-    s.name.toLowerCase().includes('humalog') ||
-    s.name.toLowerCase().includes('fiasp') ||
-    s.name.toLowerCase().includes('short')
-  );
-  const longActingSupply = insulinSupplies.find(s => 
-    s.name.toLowerCase().includes('lantus') || 
-    s.name.toLowerCase().includes('levemir') || 
-    s.name.toLowerCase().includes('tresiba') ||
-    s.name.toLowerCase().includes('long') ||
-    s.name.toLowerCase().includes('basal')
-  );
-
-  // Add short-acting insulin
-  if (shortActingPensNeeded > 0) {
+  if (isPumpUser) {
+    // === PUMP USER PACKING LIST ===
+    const tdd = settings.tdd || 40;
+    const reservoirCapacity = settings.reservoirCapacity || 300;
+    const siteChangeDays = settings.siteChangeDays || 3;
+    const reservoirChangeDays = settings.reservoirChangeDays || 3;
+    
+    // Calculate insulin cartridges/reservoirs needed
+    const totalUnitsNeeded = tdd * plan.duration;
+    const unitsWithBuffer = totalUnitsNeeded * bufferMultiplier * accessBuffer;
+    const reservoirsNeeded = Math.ceil(unitsWithBuffer / reservoirCapacity);
+    
     items.push({
-      name: shortActingSupply?.name || "Short-Acting Insulin (Rapid)",
-      estimatedAmount: shortActingPensNeeded,
-      unit: shortActingPensNeeded === 1 ? "pen" : "pens",
-      reasoning: `${shortActingUnitsPerDay}u/day × ${plan.duration} days = ${totalShortActingUnits}u (${(totalShortActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
+      name: "Insulin Reservoir/Cartridge",
+      estimatedAmount: reservoirsNeeded,
+      unit: reservoirsNeeded === 1 ? "reservoir" : "reservoirs",
+      reasoning: `${tdd}u/day × ${plan.duration} days = ${totalUnitsNeeded}u (${(totalUnitsNeeded / reservoirCapacity).toFixed(1)} reservoirs) + buffer`,
       category: "insulin",
       checked: false,
     });
-  }
-
-  // Add long-acting insulin
-  if (longActingPensNeeded > 0) {
+    
+    // Calculate infusion sets needed
+    const baseSiteChanges = Math.ceil(plan.duration / siteChangeDays);
+    const setsWithBuffer = Math.ceil(baseSiteChanges * bufferMultiplier * accessBuffer);
+    
     items.push({
-      name: longActingSupply?.name || "Long-Acting Insulin (Basal)",
-      estimatedAmount: longActingPensNeeded,
-      unit: longActingPensNeeded === 1 ? "pen" : "pens",
-      reasoning: `${longActingUnitsPerDay}u/day × ${plan.duration} days = ${totalLongActingUnits}u (${(totalLongActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
-      category: "insulin",
+      name: "Infusion Sets",
+      estimatedAmount: setsWithBuffer,
+      unit: "sets",
+      reasoning: `Change every ${siteChangeDays} days × ${plan.duration} day trip = ${baseSiteChanges} changes + spares for failures`,
+      category: "delivery",
       checked: false,
     });
-  }
-
-  // Fallback if no insulin usage is configured
-  if (shortActingPensNeeded === 0 && longActingPensNeeded === 0) {
+    
+    // Pump batteries
+    const batteryChanges = Math.ceil(plan.duration / 7);
+    const batteriesWithBuffer = Math.ceil((batteryChanges + 2) * bufferMultiplier);
+    
     items.push({
-      name: "Insulin Pens (configure usage in Settings)",
-      estimatedAmount: Math.ceil(plan.duration / 5 * bufferMultiplier),
-      unit: "pens",
-      reasoning: "Set your daily pen usage in Settings for accurate calculation",
-      category: "insulin",
+      name: "Pump Batteries",
+      estimatedAmount: batteriesWithBuffer,
+      unit: "batteries",
+      reasoning: "Extra batteries for pump operation + spares",
+      category: "delivery",
       checked: false,
     });
-  }
+    
+    // Skin prep and adhesive
+    items.push({
+      name: "Skin Prep Wipes",
+      estimatedAmount: setsWithBuffer,
+      unit: "wipes",
+      reasoning: "One per infusion site change",
+      category: "delivery",
+      checked: false,
+    });
+    
+    items.push({
+      name: "Extra Adhesive/Tape",
+      estimatedAmount: Math.ceil(plan.duration / 3),
+      unit: "pieces",
+      reasoning: "For securing sites in hot/humid conditions",
+      category: "delivery",
+      checked: false,
+    });
+    
+    // CRITICAL: Backup pen supplies for pump failure
+    const backupPensNeeded = Math.ceil((tdd * plan.duration) / 100 * 0.5);
+    
+    items.push({
+      name: "Backup Insulin Pen (Rapid-Acting)",
+      estimatedAmount: Math.max(1, backupPensNeeded),
+      unit: backupPensNeeded <= 1 ? "pen" : "pens",
+      reasoning: "ESSENTIAL: Backup for pump failure - rapid-acting for bolus",
+      category: "backup",
+      checked: false,
+    });
+    
+    items.push({
+      name: "Backup Insulin Pen (Long-Acting)",
+      estimatedAmount: 1,
+      unit: "pen",
+      reasoning: "ESSENTIAL: Backup for pump failure - basal coverage",
+      category: "backup",
+      checked: false,
+    });
+    
+    const backupNeedles = Math.ceil(plan.duration * 5 * 0.5);
+    items.push({
+      name: "Backup Pen Needles",
+      estimatedAmount: backupNeedles,
+      unit: "needles",
+      reasoning: "For backup pens in case of pump failure",
+      category: "backup",
+      checked: false,
+    });
+    
+  } else {
+    // === PEN/MDI USER PACKING LIST ===
+    const unitsPerPen = 100;
+    const shortActingUnitsPerDay = settings.shortActingUnitsPerDay || 20;
+    const longActingUnitsPerDay = settings.longActingUnitsPerDay || 15;
+    
+    const totalShortActingUnits = shortActingUnitsPerDay * plan.duration;
+    const totalLongActingUnits = longActingUnitsPerDay * plan.duration;
+    
+    const shortActingUnitsWithBuffer = totalShortActingUnits * bufferMultiplier * accessBuffer;
+    const longActingUnitsWithBuffer = totalLongActingUnits * bufferMultiplier * accessBuffer;
+    
+    const shortActingPensNeeded = Math.ceil(shortActingUnitsWithBuffer / unitsPerPen);
+    const longActingPensNeeded = Math.ceil(longActingUnitsWithBuffer / unitsPerPen);
+    
+    const shortActingSupply = insulinSupplies.find(s => 
+      s.name.toLowerCase().includes('rapid') || 
+      s.name.toLowerCase().includes('novorapid') || 
+      s.name.toLowerCase().includes('humalog') ||
+      s.name.toLowerCase().includes('fiasp') ||
+      s.name.toLowerCase().includes('short')
+    );
+    const longActingSupply = insulinSupplies.find(s => 
+      s.name.toLowerCase().includes('lantus') || 
+      s.name.toLowerCase().includes('levemir') || 
+      s.name.toLowerCase().includes('tresiba') ||
+      s.name.toLowerCase().includes('long') ||
+      s.name.toLowerCase().includes('basal')
+    );
 
-  // Calculate needles based on injections per day from settings
-  // This reflects the user's actual daily injection habits
-  const injectionsPerDay = settings.injectionsPerDay || 4; // Default to 4 if not set
-  const baseNeedles = injectionsPerDay * plan.duration;
-  const needlesWithBuffer = Math.ceil(baseNeedles * bufferMultiplier * accessBuffer);
-
-  if (needleSupplies.length > 0) {
-    needleSupplies.forEach(supply => {
+    if (shortActingPensNeeded > 0) {
       items.push({
-        name: supply.name,
+        name: shortActingSupply?.name || "Short-Acting Insulin (Rapid)",
+        estimatedAmount: shortActingPensNeeded,
+        unit: shortActingPensNeeded === 1 ? "pen" : "pens",
+        reasoning: `${shortActingUnitsPerDay}u/day × ${plan.duration} days = ${totalShortActingUnits}u (${(totalShortActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
+        category: "insulin",
+        checked: false,
+      });
+    }
+
+    if (longActingPensNeeded > 0) {
+      items.push({
+        name: longActingSupply?.name || "Long-Acting Insulin (Basal)",
+        estimatedAmount: longActingPensNeeded,
+        unit: longActingPensNeeded === 1 ? "pen" : "pens",
+        reasoning: `${longActingUnitsPerDay}u/day × ${plan.duration} days = ${totalLongActingUnits}u (${(totalLongActingUnits / unitsPerPen).toFixed(1)} pens) + buffer`,
+        category: "insulin",
+        checked: false,
+      });
+    }
+
+    if (shortActingPensNeeded === 0 && longActingPensNeeded === 0) {
+      items.push({
+        name: "Insulin Pens (configure usage in Settings)",
+        estimatedAmount: Math.ceil(plan.duration / 5 * bufferMultiplier),
+        unit: "pens",
+        reasoning: "Set your daily pen usage in Settings for accurate calculation",
+        category: "insulin",
+        checked: false,
+      });
+    }
+
+    const injectionsPerDay = settings.injectionsPerDay || 4;
+    const baseNeedles = injectionsPerDay * plan.duration;
+    const needlesWithBuffer = Math.ceil(baseNeedles * bufferMultiplier * accessBuffer);
+
+    if (needleSupplies.length > 0) {
+      needleSupplies.forEach(supply => {
+        items.push({
+          name: supply.name,
+          estimatedAmount: needlesWithBuffer,
+          unit: "needles",
+          reasoning: `${injectionsPerDay} injections/day × ${plan.duration} days = ${baseNeedles} + buffer for dropped/bent`,
+          category: "delivery",
+          checked: false,
+        });
+      });
+    } else {
+      items.push({
+        name: "Pen Needles / Syringes",
         estimatedAmount: needlesWithBuffer,
         unit: "needles",
         reasoning: `${injectionsPerDay} injections/day × ${plan.duration} days = ${baseNeedles} + buffer for dropped/bent`,
         category: "delivery",
         checked: false,
       });
-    });
-  } else {
-    items.push({
-      name: "Pen Needles / Syringes",
-      estimatedAmount: needlesWithBuffer,
-      unit: "needles",
-      reasoning: `${injectionsPerDay} injections/day × ${plan.duration} days = ${baseNeedles} + buffer for dropped/bent`,
-      category: "delivery",
-      checked: false,
-    });
+    }
   }
 
   cgmSupplies.forEach(supply => {
@@ -319,11 +409,15 @@ export default function Travel() {
   const [riskWarnings, setRiskWarnings] = useState<RiskWarning[]>([]);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [settings, setSettings] = useState<UserSettings>({});
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const { toast } = useToast();
+
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
     setSettings(storage.getSettings());
+    setProfile(storage.getProfile());
   }, []);
 
   const handleStartPlan = () => {
@@ -349,7 +443,7 @@ export default function Travel() {
       return;
     }
 
-    const list = calculatePackingList(plan, supplies, settings);
+    const list = calculatePackingList(plan, supplies, settings, isPumpUser);
     const warnings = calculateRiskWarnings(plan);
     setPackingList(list);
     setRiskWarnings(warnings);
