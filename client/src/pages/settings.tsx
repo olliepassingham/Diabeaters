@@ -464,16 +464,13 @@ export default function Settings() {
             {isPumpUser ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="short-acting-units-pump">Total Daily Dose</Label>
-                  <Input
-                    id="short-acting-units-pump"
-                    type="number"
-                    placeholder="e.g., 40"
-                    value={shortActingUnitsPerDay}
-                    onChange={(e) => setShortActingUnitsPerDay(e.target.value)}
-                    data-testid="input-tdd-pump"
-                  />
-                  <p className="text-xs text-muted-foreground">Units/day (basal + bolus)</p>
+                  <Label>Total Daily Dose</Label>
+                  <div className="h-9 px-3 rounded-md border bg-muted/50 flex items-center">
+                    <span className={tdd ? "" : "text-muted-foreground"}>
+                      {tdd ? `${tdd} units/day` : "Set in Insulin Settings above"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Uses your TDD from Insulin Settings</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="reservoir-capacity">Reservoir Capacity</Label>
