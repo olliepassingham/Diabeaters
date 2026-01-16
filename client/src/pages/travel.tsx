@@ -602,30 +602,75 @@ export default function Travel() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="duration">Travel Duration (days)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={plan.duration}
-                  onChange={(e) => setPlan(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
-                  data-testid="input-duration"
-                />
+            <div className="space-y-2">
+              <Label>Travel Duration</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: "Weekend", days: 3 },
+                  { label: "1 Week", days: 7 },
+                  { label: "2 Weeks", days: 14 },
+                  { label: "3 Weeks", days: 21 },
+                  { label: "1 Month", days: 30 },
+                ].map((preset) => (
+                  <Button
+                    key={preset.days}
+                    type="button"
+                    variant={plan.duration === preset.days ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setPlan(prev => ({ ...prev, duration: preset.days }))}
+                    data-testid={`button-duration-${preset.days}`}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
               </div>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-sm text-muted-foreground">Or enter custom:</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPlan(prev => ({ ...prev, duration: Math.max(1, prev.duration - 1) }))}
+                    data-testid="button-duration-minus"
+                  >
+                    -
+                  </Button>
+                  <Input
+                    id="duration"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={plan.duration}
+                    onChange={(e) => setPlan(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
+                    className="w-20 text-center"
+                    data-testid="input-duration"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPlan(prev => ({ ...prev, duration: Math.min(365, prev.duration + 1) }))}
+                    data-testid="button-duration-plus"
+                  >
+                    +
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-1">days</span>
+                </div>
+              </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="destination">Destination</Label>
-                <Input
-                  id="destination"
-                  placeholder="City, Country"
-                  value={plan.destination}
-                  onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
-                  data-testid="input-destination"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="destination">Destination</Label>
+              <Input
+                id="destination"
+                placeholder="City, Country"
+                value={plan.destination}
+                onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
+                data-testid="input-destination"
+              />
             </div>
 
             <div className="space-y-2">
