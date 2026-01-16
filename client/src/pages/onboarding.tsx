@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
@@ -58,13 +59,7 @@ export default function Onboarding() {
   const handleNext = () => {
     const stepIndex = STEPS.indexOf(currentStep);
     if (stepIndex < STEPS.length - 1) {
-      if (currentStep === "diabetes" && (data.diabetesType === "type2" || data.diabetesType === "gestational")) {
-        setCurrentStep("delivery");
-      } else if (currentStep === "diabetes" && data.diabetesType === "type1") {
-        setCurrentStep("delivery");
-      } else {
-        setCurrentStep(STEPS[stepIndex + 1]);
-      }
+      setCurrentStep(STEPS[stepIndex + 1]);
     }
   };
 
@@ -196,17 +191,23 @@ export default function Onboarding() {
                     <p className="text-sm text-muted-foreground mt-1">Autoimmune condition requiring insulin therapy</p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
-                  <RadioGroupItem value="type2" id="type2" className="mt-1" data-testid="radio-type2" />
-                  <div>
-                    <Label htmlFor="type2" className="font-medium cursor-pointer">Type 2 Diabetes</Label>
+                <div className="flex items-start space-x-3 p-3 rounded-lg border opacity-60 cursor-not-allowed">
+                  <RadioGroupItem value="type2" id="type2" className="mt-1" disabled data-testid="radio-type2" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="type2" className="font-medium text-muted-foreground">Type 2 Diabetes</Label>
+                      <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground mt-1">Metabolic condition, may or may not require insulin</p>
                   </div>
                 </div>
-                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
-                  <RadioGroupItem value="gestational" id="gestational" className="mt-1" data-testid="radio-gestational" />
-                  <div>
-                    <Label htmlFor="gestational" className="font-medium cursor-pointer">Gestational Diabetes</Label>
+                <div className="flex items-start space-x-3 p-3 rounded-lg border opacity-60 cursor-not-allowed">
+                  <RadioGroupItem value="gestational" id="gestational" className="mt-1" disabled data-testid="radio-gestational" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="gestational" className="font-medium text-muted-foreground">Gestational Diabetes</Label>
+                      <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground mt-1">Diabetes during pregnancy</p>
                   </div>
                 </div>
