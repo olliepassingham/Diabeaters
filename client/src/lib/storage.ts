@@ -294,7 +294,7 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
   { id: "community", label: "Community", href: "/community?tab=posts", iconName: "Users", color: "text-indigo-600" },
   { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
   { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
-  { id: "emergency-card", label: "Travel Card", href: "/emergency-card", iconName: "CreditCard", color: "text-purple-600" },
+  { id: "emergency-card", label: "Travel Emergency", href: "/emergency-card", iconName: "ShieldAlert", color: "text-red-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
   { id: "ai-coach", label: "AI Coach", href: "/advisor", iconName: "Bot", color: "text-pink-600" },
 ];
