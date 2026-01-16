@@ -1303,7 +1303,19 @@ export const storage = {
     if (!data) {
       return this.seedEvents();
     }
-    const events: DiabetesEvent[] = JSON.parse(data);
+    let events: DiabetesEvent[] = JSON.parse(data);
+    // Migrate old events without eventSource field
+    let needsSave = false;
+    events = events.map(e => {
+      if (!e.eventSource) {
+        needsSave = true;
+        return { ...e, eventSource: "official" as const };
+      }
+      return e;
+    });
+    if (needsSave) {
+      localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
+    }
     return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
 

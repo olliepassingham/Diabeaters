@@ -38,7 +38,10 @@ import {
   MapPin,
   Footprints,
   Megaphone,
-  Building
+  Building,
+  Trash2,
+  Shield,
+  UsersRound
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -529,11 +532,13 @@ const EVENT_TYPE_CONFIG: Record<DiabetesEvent["eventType"], { label: string; ico
 function EventCard({ 
   event, 
   onToggleInterest, 
-  onOpenEvent 
+  onOpenEvent,
+  onDelete
 }: { 
   event: DiabetesEvent; 
   onToggleInterest: (id: string) => void;
   onOpenEvent: (url?: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const config = EVENT_TYPE_CONFIG[event.eventType];
   const Icon = config.icon;
@@ -541,6 +546,7 @@ function EventCard({
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const isOfficial = event.eventSource === "official";
 
   return (
     <div className="p-4 rounded-lg border bg-card" data-testid={`event-card-${event.id}`}>
@@ -550,10 +556,35 @@ function EventCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
-            <h4 className="font-medium">{event.title}</h4>
-            <Badge variant="outline" className={config.color}>
-              {config.label}
-            </Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-medium">{event.title}</h4>
+              <Badge 
+                variant={isOfficial ? "default" : "secondary"} 
+                className={`text-xs ${isOfficial ? "bg-blue-600 hover:bg-blue-600" : ""}`}
+              >
+                {isOfficial ? (
+                  <><Shield className="h-3 w-3 mr-1" /> Official</>
+                ) : (
+                  <><UsersRound className="h-3 w-3 mr-1" /> Community</>
+                )}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <Badge variant="outline" className={config.color}>
+                {config.label}
+              </Badge>
+              {!isOfficial && onDelete && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7" 
+                  onClick={() => onDelete(event.id)}
+                  data-testid={`button-delete-event-${event.id}`}
+                >
+                  <Trash2 className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
           </div>
           
           {event.description && (
@@ -619,8 +650,27 @@ function EventCard({
   );
 }
 
+const EVENT_TYPES: { value: DiabetesEvent["eventType"]; label: string }[] = [
+  { value: "meetup", label: "Meetup" },
+  { value: "walk", label: "Charity Walk" },
+  { value: "support_group", label: "Support Group" },
+  { value: "awareness", label: "Awareness Event" },
+  { value: "conference", label: "Conference" },
+  { value: "other", label: "Other" },
+];
+
 function EventsView() {
+  const { toast } = useToast();
   const [events, setEvents] = useState<DiabetesEvent[]>([]);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDescription, setNewEventDescription] = useState("");
+  const [newEventDate, setNewEventDate] = useState("");
+  const [newEventTime, setNewEventTime] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventOrganizer, setNewEventOrganizer] = useState("");
+  const [newEventType, setNewEventType] = useState<DiabetesEvent["eventType"]>("meetup");
+  const [newEventUrl, setNewEventUrl] = useState("");
 
   useEffect(() => {
     setEvents(storage.getUpcomingEvents());
@@ -637,59 +687,224 @@ function EventsView() {
     }
   };
 
+  const handleDeleteEvent = (id: string) => {
+    storage.deleteEvent(id);
+    setEvents(storage.getUpcomingEvents());
+    toast({ title: "Event deleted", description: "The event has been removed." });
+  };
+
+  const handleCreateEvent = () => {
+    if (!newEventTitle.trim() || !newEventDate) {
+      toast({ title: "Missing fields", description: "Please provide a title and date.", variant: "destructive" });
+      return;
+    }
+
+    storage.addEvent({
+      title: newEventTitle.trim(),
+      description: newEventDescription.trim() || undefined,
+      date: newEventDate,
+      time: newEventTime || undefined,
+      location: newEventLocation.trim() || undefined,
+      organizer: newEventOrganizer.trim() || undefined,
+      eventUrl: newEventUrl.trim() || undefined,
+      eventType: newEventType,
+      eventSource: "community",
+    });
+
+    setEvents(storage.getUpcomingEvents());
+    setCreateDialogOpen(false);
+    resetForm();
+    toast({ title: "Event created", description: "Your event has been added to the community." });
+  };
+
+  const resetForm = () => {
+    setNewEventTitle("");
+    setNewEventDescription("");
+    setNewEventDate("");
+    setNewEventTime("");
+    setNewEventLocation("");
+    setNewEventOrganizer("");
+    setNewEventType("meetup");
+    setNewEventUrl("");
+  };
+
   const interestedEvents = events.filter(e => e.isInterested);
   const otherEvents = events.filter(e => !e.isInterested);
 
-  if (events.length === 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <CalendarDays className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="font-semibold text-lg mb-2">No upcoming events</h3>
-          <p className="text-muted-foreground">
-            Check back soon for diabetes meetups, walks, and awareness events near you.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground text-center">
-        Discover diabetes meetups, walks, and awareness events in the UK
-      </p>
-
-      {interestedEvents.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-medium flex items-center gap-2">
-            <Heart className="h-4 w-4 text-primary" />
-            Events You're Interested In
-          </h3>
-          {interestedEvents.map((event) => (
-            <EventCard 
-              key={event.id} 
-              event={event} 
-              onToggleInterest={handleToggleInterest}
-              onOpenEvent={handleOpenEvent}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {interestedEvents.length > 0 && (
-          <h3 className="font-medium">Other Upcoming Events</h3>
-        )}
-        {otherEvents.map((event) => (
-          <EventCard 
-            key={event.id} 
-            event={event} 
-            onToggleInterest={handleToggleInterest}
-            onOpenEvent={handleOpenEvent}
-          />
-        ))}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">
+          Discover diabetes meetups, walks, and events in the UK
+        </p>
+        <Dialog open={createDialogOpen} onOpenChange={(open) => { setCreateDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogTrigger asChild>
+            <Button size="sm" data-testid="button-create-event">
+              <Plus className="h-4 w-4 mr-1" />
+              Create Event
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create Community Event</DialogTitle>
+              <DialogDescription>
+                Share a local meetup, walk, or support group with the community.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="event-title">Event Title *</Label>
+                <Input
+                  id="event-title"
+                  placeholder="e.g., Local T1D Coffee Morning"
+                  value={newEventTitle}
+                  onChange={(e) => setNewEventTitle(e.target.value)}
+                  data-testid="input-event-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-type">Event Type</Label>
+                <Select value={newEventType} onValueChange={(v) => setNewEventType(v as DiabetesEvent["eventType"])}>
+                  <SelectTrigger data-testid="select-event-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EVENT_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="event-date">Date *</Label>
+                  <Input
+                    id="event-date"
+                    type="date"
+                    value={newEventDate}
+                    onChange={(e) => setNewEventDate(e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    data-testid="input-event-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="event-time">Time</Label>
+                  <Input
+                    id="event-time"
+                    type="time"
+                    value={newEventTime}
+                    onChange={(e) => setNewEventTime(e.target.value)}
+                    data-testid="input-event-time"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-location">Location</Label>
+                <Input
+                  id="event-location"
+                  placeholder="e.g., Costa Coffee, High Street, Bristol"
+                  value={newEventLocation}
+                  onChange={(e) => setNewEventLocation(e.target.value)}
+                  data-testid="input-event-location"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-organizer">Organizer</Label>
+                <Input
+                  id="event-organizer"
+                  placeholder="e.g., Bristol T1D Group"
+                  value={newEventOrganizer}
+                  onChange={(e) => setNewEventOrganizer(e.target.value)}
+                  data-testid="input-event-organizer"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-description">Description</Label>
+                <Textarea
+                  id="event-description"
+                  placeholder="Tell people what to expect..."
+                  value={newEventDescription}
+                  onChange={(e) => setNewEventDescription(e.target.value)}
+                  rows={3}
+                  data-testid="input-event-description"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="event-url">Link (optional)</Label>
+                <Input
+                  id="event-url"
+                  type="url"
+                  placeholder="https://..."
+                  value={newEventUrl}
+                  onChange={(e) => setNewEventUrl(e.target.value)}
+                  data-testid="input-event-url"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateEvent} data-testid="button-submit-event">
+                Create Event
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {events.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <CalendarDays className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="font-semibold text-lg mb-2">No upcoming events</h3>
+            <p className="text-muted-foreground mb-4">
+              Be the first to share a local meetup or support group.
+            </p>
+            <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-event">
+              <Plus className="h-4 w-4 mr-1" />
+              Create Event
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {interestedEvents.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-medium flex items-center gap-2">
+                <Heart className="h-4 w-4 text-primary" />
+                Events You're Interested In
+              </h3>
+              {interestedEvents.map((event) => (
+                <EventCard 
+                  key={event.id} 
+                  event={event} 
+                  onToggleInterest={handleToggleInterest}
+                  onOpenEvent={handleOpenEvent}
+                  onDelete={handleDeleteEvent}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {interestedEvents.length > 0 && (
+              <h3 className="font-medium">Other Upcoming Events</h3>
+            )}
+            {otherEvents.map((event) => (
+              <EventCard 
+                key={event.id} 
+                event={event} 
+                onToggleInterest={handleToggleInterest}
+                onOpenEvent={handleOpenEvent}
+                onDelete={handleDeleteEvent}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
