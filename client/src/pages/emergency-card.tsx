@@ -205,7 +205,10 @@ export default function EmergencyCard() {
   const selectedLangInfo = LANGUAGES.find(l => l.code === selectedLang);
 
   const handleShare = async () => {
-    const text = `${t.title}\n${t.hasDisease}\n${profile?.usingInsulin ? t.needsInsulin : ""}\n\n${t.ifUnconscious}\n• ${t.doNotGiveInsulin}\n• ${t.giveGlucose}\n• ${t.callEmergency}${primaryContact ? `\n\n${t.emergencyContact}: ${primaryContact.name} - ${primaryContact.phone}` : ""}`;
+    const insulinInfo = profile?.usingInsulin 
+      ? `${t.needsInsulin}${profile.insulinDeliveryMethod === "pump" ? " (Insulin Pump)" : ""}`
+      : "";
+    const text = `${t.title}\n${t.hasDisease}\n${insulinInfo}\n\n${t.ifUnconscious}\n• ${t.doNotGiveInsulin}\n• ${t.giveGlucose}\n• ${t.callEmergency}${primaryContact ? `\n\n${t.emergencyContact}: ${primaryContact.name} - ${primaryContact.phone}` : ""}`;
     
     if (navigator.share) {
       try {
@@ -277,6 +280,7 @@ export default function EmergencyCard() {
               <p className="text-lg font-medium text-red-600 dark:text-red-400 flex items-center justify-center gap-2 mt-2">
                 <Syringe className="h-5 w-5" />
                 {t.needsInsulin}
+                {profile.insulinDeliveryMethod === "pump" && " (Insulin Pump)"}
               </p>
             )}
           </div>

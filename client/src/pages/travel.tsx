@@ -128,13 +128,16 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
     });
     
     // CRITICAL: Backup pen supplies for pump failure
-    const backupPensNeeded = Math.ceil((tdd * plan.duration) / 100 * 0.5);
+    // Calculate for 3 days contingency (reasonable time to get pump replaced/fixed)
+    const contingencyDays = 3;
+    const contingencyUnits = tdd * contingencyDays;
+    const backupRapidPens = Math.max(1, Math.ceil(contingencyUnits / 100));
     
     items.push({
       name: "Backup Insulin Pen (Rapid-Acting)",
-      estimatedAmount: Math.max(1, backupPensNeeded),
-      unit: backupPensNeeded <= 1 ? "pen" : "pens",
-      reasoning: "ESSENTIAL: Backup for pump failure - rapid-acting for bolus",
+      estimatedAmount: backupRapidPens,
+      unit: backupRapidPens === 1 ? "pen" : "pens",
+      reasoning: `ESSENTIAL: Backup for pump failure - ${contingencyDays} days supply (${contingencyUnits}u)`,
       category: "backup",
       checked: false,
     });
@@ -143,17 +146,17 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
       name: "Backup Insulin Pen (Long-Acting)",
       estimatedAmount: 1,
       unit: "pen",
-      reasoning: "ESSENTIAL: Backup for pump failure - basal coverage",
+      reasoning: "ESSENTIAL: For basal coverage if pump fails - discuss dosing with your healthcare team before travel",
       category: "backup",
       checked: false,
     });
     
-    const backupNeedles = Math.ceil(plan.duration * 5 * 0.5);
+    const backupNeedles = Math.ceil(contingencyDays * 6);
     items.push({
       name: "Backup Pen Needles",
       estimatedAmount: backupNeedles,
       unit: "needles",
-      reasoning: "For backup pens in case of pump failure",
+      reasoning: `For backup pens in case of pump failure (${contingencyDays} days)`,
       category: "backup",
       checked: false,
     });
@@ -338,7 +341,7 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   return items;
 }
 
-function calculateRiskWarnings(plan: TravelPlan): RiskWarning[] {
+function calculateRiskWarnings(plan: TravelPlan, isPumpUser: boolean): RiskWarning[] {
   const warnings: RiskWarning[] = [];
 
   if (plan.duration > 14) {
@@ -350,16 +353,32 @@ function calculateRiskWarnings(plan: TravelPlan): RiskWarning[] {
   }
 
   if (plan.timezoneChange === "major") {
-    warnings.push({
-      title: "Significant Timezone Change",
-      description: "Crossing multiple timezones may affect your insulin timing. Consider discussing adjustment strategies with your healthcare team before departure.",
-      severity: "high",
-    });
+    if (isPumpUser) {
+      warnings.push({
+        title: "Pump Basal Rate Adjustment Needed",
+        description: "Crossing multiple timezones will require adjusting your pump's clock and basal rates. Discuss a specific adjustment plan with your healthcare team before departure. Consider keeping the pump on home time for short trips.",
+        severity: "high",
+      });
+    } else {
+      warnings.push({
+        title: "Significant Timezone Change",
+        description: "Crossing multiple timezones may affect your insulin timing. Consider discussing adjustment strategies with your healthcare team before departure.",
+        severity: "high",
+      });
+    }
   } else if (plan.timezoneChange === "minor") {
     warnings.push({
       title: "Minor Timezone Change",
       description: "Small timezone adjustments usually don't require major changes, but monitor your levels more frequently during the first few days.",
       severity: "low",
+    });
+  }
+
+  if (isPumpUser) {
+    warnings.push({
+      title: "Pump Failure Contingency",
+      description: "Pack backup rapid-acting and long-acting insulin pens with needles. Before travelling, consult your healthcare team to establish your injection backup plan including the correct long-acting dose.",
+      severity: "medium",
     });
   }
 
@@ -444,7 +463,7 @@ export default function Travel() {
     }
 
     const list = calculatePackingList(plan, supplies, settings, isPumpUser);
-    const warnings = calculateRiskWarnings(plan);
+    const warnings = calculateRiskWarnings(plan, isPumpUser);
     setPackingList(list);
     setRiskWarnings(warnings);
     setStep("results");
