@@ -399,7 +399,19 @@ export const storage = {
     const supplies = this.getSupplies();
     const index = supplies.findIndex(s => s.id === id);
     if (index === -1) return null;
-    supplies[index] = { ...supplies[index], ...updates };
+    
+    const current = supplies[index];
+    
+    // If currentQuantity is changing but quantityAtPickup is not explicitly set,
+    // adjust quantityAtPickup by the same delta to keep automatic deduction accurate
+    if (updates.currentQuantity !== undefined && 
+        updates.quantityAtPickup === undefined && 
+        current.quantityAtPickup !== undefined) {
+      const delta = updates.currentQuantity - current.currentQuantity;
+      updates.quantityAtPickup = Math.max(0, current.quantityAtPickup + delta);
+    }
+    
+    supplies[index] = { ...current, ...updates };
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
     return supplies[index];
   },
