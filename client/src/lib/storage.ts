@@ -273,7 +273,6 @@ export type QuickActionId =
   | "travel" 
   | "ratios" 
   | "community"
-  | "help-now"
   | "settings"
   | "ai-coach"
   | "appointments"
@@ -295,8 +294,7 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
   { id: "community", label: "Community", href: "/community?tab=posts", iconName: "Users", color: "text-indigo-600" },
   { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
   { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
-  { id: "emergency-card", label: "Emergency Card", href: "/emergency-card", iconName: "AlertTriangle", color: "text-red-600" },
-  { id: "help-now", label: "Help Now", href: "/help-now", iconName: "AlertCircle", color: "text-red-600" },
+  { id: "emergency-card", label: "Travel Card", href: "/emergency-card", iconName: "CreditCard", color: "text-purple-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
   { id: "ai-coach", label: "AI Coach", href: "/advisor", iconName: "Bot", color: "text-pink-600" },
 ];
@@ -306,7 +304,7 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "activity", enabled: true, order: 1 },
   { id: "sick-day", enabled: true, order: 2 },
   { id: "travel", enabled: true, order: 3 },
-  { id: "ratios", enabled: true, order: 4 },
+  { id: "appointments", enabled: true, order: 4 },
   { id: "community", enabled: true, order: 5 },
 ];
 
@@ -318,9 +316,8 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
   { id: "appointments", type: "appointments", enabled: true, order: 3 },
   { id: "community", type: "community", enabled: true, order: 4 },
-  { id: "messages", type: "messages", enabled: true, order: 5 },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 6 },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7 },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5 },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6 },
   // Disabled by default - can be added via customization
   { id: "today-overview", type: "today-overview", enabled: false, order: 8 },
   { id: "scenario-status", type: "scenario-status", enabled: false, order: 9 },

@@ -19,6 +19,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
+import { MessagesIcon } from "@/components/messages-icon";
 import { OfflineBanner } from "@/components/offline-banner";
 
 // ✅ Hooks — named exports
@@ -126,6 +127,7 @@ function AppContent() {
               <span className="font-semibold text-xl">Diabeaters</span>
             </button>
             <div className="flex items-center gap-2">
+              <MessagesIcon />
               <NotificationBell />
               <ProfileMenu />
             </div>
