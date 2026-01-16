@@ -131,7 +131,7 @@ function SupplyCard({
                     {Math.floor(adjustedQuantity / 100)} {Math.floor(adjustedQuantity / 100) === 1 ? "pen" : "pens"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    (~{Math.round(adjustedQuantity)} units)
+                    (~{Math.floor(adjustedQuantity)} units)
                   </p>
                 </div>
               ) : (
@@ -139,7 +139,7 @@ function SupplyCard({
                   status === "critical" ? "text-red-600 dark:text-red-500" : 
                   status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                 }`} data-testid={`text-remaining-${supply.id}`}>
-                  ~{Math.round(adjustedQuantity)}
+                  ~{Math.floor(adjustedQuantity)}
                 </p>
               )}
             </div>
