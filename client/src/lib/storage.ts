@@ -246,6 +246,7 @@ export interface DiabetesEvent {
   organizer?: string;
   eventUrl?: string;
   eventType: "meetup" | "walk" | "awareness" | "conference" | "support_group" | "other";
+  eventSource: "official" | "community";
   isInterested: boolean;
   createdAt: string;
 }
@@ -1319,6 +1320,7 @@ export const storage = {
         organizer: "JDRF UK",
         eventUrl: "https://jdrf.org.uk/",
         eventType: "walk",
+        eventSource: "official",
         isInterested: false,
         createdAt: new Date().toISOString(),
       },
@@ -1332,6 +1334,7 @@ export const storage = {
         organizer: "Diabetes UK",
         eventUrl: "https://www.diabetes.org.uk/",
         eventType: "meetup",
+        eventSource: "official",
         isInterested: false,
         createdAt: new Date().toISOString(),
       },
@@ -1343,6 +1346,7 @@ export const storage = {
         location: "Nationwide",
         organizer: "International Diabetes Federation",
         eventType: "awareness",
+        eventSource: "official",
         isInterested: false,
         createdAt: new Date().toISOString(),
       },
@@ -1355,6 +1359,7 @@ export const storage = {
         location: "Community Centre, Birmingham",
         organizer: "T1D Warriors",
         eventType: "support_group",
+        eventSource: "official",
         isInterested: false,
         createdAt: new Date().toISOString(),
       },
@@ -1377,5 +1382,26 @@ export const storage = {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return events.filter(e => new Date(e.date) >= today);
+  },
+
+  addEvent(event: Omit<DiabetesEvent, "id" | "createdAt" | "isInterested">): DiabetesEvent {
+    const events = this.getEvents();
+    const newEvent: DiabetesEvent = {
+      ...event,
+      id: generateId(),
+      isInterested: false,
+      createdAt: new Date().toISOString(),
+    };
+    events.push(newEvent);
+    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
+    return newEvent;
+  },
+
+  deleteEvent(id: string): boolean {
+    const events = this.getEvents();
+    const filtered = events.filter(e => e.id !== id);
+    if (filtered.length === events.length) return false;
+    localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(filtered));
+    return true;
   },
 };
