@@ -275,7 +275,6 @@ export type QuickActionId =
   | "ratios" 
   | "community"
   | "settings"
-  | "ai-coach"
   | "appointments"
   | "events"
   | "emergency-card";
@@ -297,7 +296,6 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
   { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
   { id: "emergency-card", label: "Travel Emergency", href: "/emergency-card", iconName: "ShieldAlert", color: "text-red-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
-  { id: "ai-coach", label: "AI Coach", href: "/advisor", iconName: "Bot", color: "text-pink-600" },
 ];
 
 export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
