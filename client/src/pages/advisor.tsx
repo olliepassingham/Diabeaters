@@ -610,7 +610,7 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-2 max-w-md mb-4">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
             <Utensils className="h-4 w-4" />Plan Meal
           </TabsTrigger>
