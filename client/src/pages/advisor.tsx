@@ -619,7 +619,7 @@ export default function Advisor() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meal" className="flex-1 flex flex-col min-h-0 !mt-0 !pt-0 gap-4">
+        <TabsContent value="meal" className="flex-1 flex flex-col min-h-0 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -715,7 +715,7 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="exercise" className="flex-1 flex flex-col min-h-0 !mt-0 !pt-0 gap-4">
+        <TabsContent value="exercise" className="flex-1 flex flex-col min-h-0 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
