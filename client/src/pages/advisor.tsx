@@ -619,7 +619,7 @@ export default function Advisor() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meal" className="flex-1 flex flex-col min-h-0 gap-4 -mt-2">
+        <TabsContent value="meal" className="flex-1 flex flex-col min-h-0 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -715,7 +715,7 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="exercise" className="flex-1 flex flex-col min-h-0 gap-4 -mt-2">
+        <TabsContent value="exercise" className="flex-1 flex flex-col min-h-0 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -777,36 +777,31 @@ export default function Advisor() {
             </CardContent>
           </Card>
 
-          <Collapsible open={showExerciseGuide} onOpenChange={setShowExerciseGuide}>
-            <Card>
+          <Card className="border-0 bg-transparent shadow-none">
+            <Collapsible open={showExerciseGuide} onOpenChange={setShowExerciseGuide}>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover-elevate rounded-lg">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Info className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">Exercise Type Guide</CardTitle>
-                    </div>
-                    {showExerciseGuide ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                <Button variant="ghost" className="w-full justify-between p-3 h-auto" data-testid="button-exercise-guide">
+                  <div className="flex items-center gap-2">
+                    <Info className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-sm">Exercise Type Guide</span>
                   </div>
-                  <CardDescription>Learn how different exercises affect blood sugar</CardDescription>
-                </CardHeader>
+                  {showExerciseGuide ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
               </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent>
-                  <ScrollArea className="h-96">
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-sm bg-transparent p-0">
-                        {generateExerciseTypeGuide(bgUnits)}
-                      </pre>
-                    </div>
-                  </ScrollArea>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    Not medical advice. Everyone responds differently to exercise. Track your patterns and work with your healthcare team.
-                  </p>
-                </CardContent>
+              <CollapsibleContent className="px-3 pb-3">
+                <ScrollArea className="h-72">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <pre className="whitespace-pre-wrap font-sans text-sm bg-transparent p-0">
+                      {generateExerciseTypeGuide(bgUnits)}
+                    </pre>
+                  </div>
+                </ScrollArea>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Not medical advice. Everyone responds differently to exercise.
+                </p>
               </CollapsibleContent>
-            </Card>
-          </Collapsible>
+            </Collapsible>
+          </Card>
 
           <ChatSection
             messages={exerciseMessages}
