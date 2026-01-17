@@ -320,14 +320,14 @@ function ChatSection({
   }, [messages]);
 
   return (
-    <Card className="flex-1 flex flex-col min-h-0">
+    <Card className="flex flex-col min-h-[300px]">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Bot className="h-4 w-4 text-primary" />
           Ask the AI Advisor
         </CardTitle>
       </CardHeader>
-      <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-4 max-h-[400px]" ref={scrollRef}>
         <div className="space-y-4 pb-4">
           {messages.map((message, index) => (
             <ChatMessage key={index} {...message} />
