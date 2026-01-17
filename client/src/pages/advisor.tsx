@@ -12,13 +12,19 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
+type MessageAction = {
+  label: string;
+  onClick: () => void;
+};
+
 type Message = {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  action?: MessageAction;
 };
 
-function ChatMessage({ role, content, timestamp }: Message) {
+function ChatMessage({ role, content, timestamp, action }: Message) {
   return (
     <div className={`flex gap-3 ${role === "user" ? "flex-row-reverse" : ""}`}>
       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
@@ -37,6 +43,18 @@ function ChatMessage({ role, content, timestamp }: Message) {
             : "bg-muted"
         }`}>
           <p className="text-sm whitespace-pre-wrap">{content}</p>
+          {action && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="mt-2"
+              onClick={action.onClick}
+              data-testid="button-message-action"
+            >
+              <Dumbbell className="h-3 w-3 mr-1" />
+              {action.label}
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground mt-1">{timestamp}</p>
       </div>
@@ -167,7 +185,6 @@ function processUserMessage(message: string, settings: UserSettings, bgUnits: st
       if (insulinUnits > 0) {
         return `For ${carbs}g carbs at ${mealType}: approximately ${insulinUnits} units\n\n` +
           `Adjust for your current blood glucose if needed.\n\n` +
-          `Planning any exercise after eating? Check the Exercise tab for guidance on timing and adjustments.\n\n` +
           `[Not medical advice. Always verify with your own calculations.]`;
       }
 
@@ -177,7 +194,6 @@ function processUserMessage(message: string, settings: UserSettings, bgUnits: st
         const estimatedUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
         return `For ${carbs}g carbs at ${mealType}: approximately ${estimatedUnits} units (estimated from TDD)\n\n` +
           `Adjust for your current blood glucose if needed.\n\n` +
-          `Planning any exercise after eating? Check the Exercise tab for guidance.\n\n` +
           `[Not medical advice. Always verify with your own calculations.]`;
       }
 
@@ -460,6 +476,10 @@ export default function Advisor() {
       role: "assistant",
       content: aiResponse,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      action: {
+        label: "Plan Exercise",
+        onClick: () => setActiveTab("exercise"),
+      },
     }]);
     
     try {
