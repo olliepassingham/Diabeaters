@@ -254,13 +254,16 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   const cgmDays = settings.cgmDays || 14; // Use setting, default to 14 days
   cgmSupplies.forEach(supply => {
     const sensorsNeeded = Math.ceil(plan.duration / cgmDays);
-    const baseAmount = sensorsNeeded + 1; // Plus 1 spare
-    const withBuffer = Math.ceil(baseAmount * bufferMultiplier * accessBuffer);
+    // For CGMs: domestic = 1 spare, international = 2 spares, limited access = extra 1
+    const spares = plan.travelType === "international" ? 2 : 1;
+    const accessSpare = plan.accessRisk === "limited" ? 1 : 0;
+    const totalSensors = sensorsNeeded + spares + accessSpare;
+    const sparesText = spares + accessSpare;
     items.push({
       name: supply.name,
-      estimatedAmount: withBuffer,
+      estimatedAmount: totalSensors,
       unit: "sensors",
-      reasoning: `${plan.duration} days ÷ ${cgmDays} days/sensor = ${sensorsNeeded} + 1 spare + buffer`,
+      reasoning: `${plan.duration} days ÷ ${cgmDays} days/sensor = ${sensorsNeeded} + ${sparesText} spare${sparesText > 1 ? 's' : ''}`,
       category: "monitoring",
       checked: false,
     });
