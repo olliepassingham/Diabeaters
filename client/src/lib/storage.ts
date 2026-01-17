@@ -374,7 +374,7 @@ export const storage = {
       const newTotalQuantity = supplies[existingIndex].currentQuantity + supply.currentQuantity;
       supplies[existingIndex].currentQuantity = newTotalQuantity;
       supplies[existingIndex].quantityAtPickup = newTotalQuantity;
-      supplies[existingIndex].lastPickupDate = new Date().toISOString();
+      supplies[existingIndex].lastPickupDate = supply.lastPickupDate || new Date().toISOString();
       if (supply.dailyUsage) {
         supplies[existingIndex].dailyUsage = supply.dailyUsage;
       }
@@ -389,7 +389,7 @@ export const storage = {
       ...supply, 
       id: generateId(),
       quantityAtPickup: supply.currentQuantity,
-      lastPickupDate: new Date().toISOString()
+      lastPickupDate: supply.lastPickupDate || new Date().toISOString()
     };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
@@ -563,10 +563,6 @@ export const storage = {
       return supply.currentQuantity;
     }
     
-    if (!supply.dailyUsage || supply.dailyUsage <= 0) {
-      return supply.quantityAtPickup;
-    }
-    
     const pickupDate = new Date(supply.lastPickupDate);
     const today = new Date();
     pickupDate.setHours(0, 0, 0, 0);
@@ -574,6 +570,22 @@ export const storage = {
     
     const daysElapsed = Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24));
     if (daysElapsed <= 0) {
+      return supply.quantityAtPickup;
+    }
+    
+    // For CGM supplies, calculate sensors used based on cgmDays from settings
+    if (supply.type === "cgm") {
+      const settings = this.getSettings();
+      const cgmDays = settings.cgmDays || 14; // Default to 14 days if not set
+      // Assume user applies first sensor on pickup day, so we count from day 0
+      // Round down days elapsed to whole sensors used
+      const sensorsUsed = Math.floor(daysElapsed / cgmDays);
+      const adjusted = supply.quantityAtPickup - sensorsUsed;
+      return Math.max(0, adjusted);
+    }
+    
+    // For other supplies, use dailyUsage
+    if (!supply.dailyUsage || supply.dailyUsage <= 0) {
       return supply.quantityAtPickup;
     }
     
@@ -599,10 +611,22 @@ export const storage = {
   /**
    * Calculate days remaining based on adjusted quantity / dailyUsage.
    * Uses the adjusted quantity that accounts for daily usage since pickup.
+   * For CGM supplies, uses cgmDays from settings instead of dailyUsage.
    */
   getDaysRemaining(supply: Supply): number {
-    if (supply.dailyUsage <= 0) return 999;
     const adjustedQty = this.getAdjustedQuantity(supply);
+    
+    // For CGM supplies, use sensor duration from settings
+    if (supply.type === "cgm") {
+      const settings = this.getSettings();
+      const cgmDays = settings.cgmDays || 14; // Default to 14 days if not set
+      // Each sensor lasts cgmDays, so total days = sensors * cgmDays
+      // Round down for safety (user likely applies sensor soon after pickup)
+      return Math.floor(adjustedQty * cgmDays);
+    }
+    
+    // For other supplies, use dailyUsage
+    if (supply.dailyUsage <= 0) return 999;
     return Math.floor(adjustedQty / supply.dailyUsage);
   },
 

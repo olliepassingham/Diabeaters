@@ -134,6 +134,13 @@ function SupplyCard({
                     (~{Math.floor(adjustedQuantity)} units)
                   </p>
                 </div>
+              ) : supply.type === "cgm" ? (
+                <p className={`text-2xl font-bold ${
+                  status === "critical" ? "text-red-600 dark:text-red-500" : 
+                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                }`} data-testid={`text-remaining-${supply.id}`}>
+                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "sensor" : "sensors"}
+                </p>
               ) : (
                 <p className={`text-2xl font-bold ${
                   status === "critical" ? "text-red-600 dark:text-red-500" : 
@@ -162,10 +169,17 @@ function SupplyCard({
         </div>
 
         <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between text-muted-foreground">
-            <span>Daily usage</span>
-            <span>{supply.dailyUsage}/day</span>
-          </div>
+          {supply.type === "cgm" ? (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Sensor duration</span>
+              <span>{storage.getSettings().cgmDays || 14} days each</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Daily usage</span>
+              <span>{supply.dailyUsage}/day</span>
+            </div>
+          )}
           
           {lastPickupText && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -174,9 +188,15 @@ function SupplyCard({
             </div>
           )}
           
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && (
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type !== "cgm" && (
             <div className="text-xs text-muted-foreground">
               Started with {supply.quantityAtPickup} • Used ~{Math.round(daysSincePickup * supply.dailyUsage)}
+            </div>
+          )}
+          
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "cgm" && (
+            <div className="text-xs text-muted-foreground">
+              Started with {supply.quantityAtPickup} sensor{supply.quantityAtPickup !== 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -277,15 +297,15 @@ function SupplyDialog({
       name,
       type,
       currentQuantity: parsedQuantity,
-      dailyUsage: parseFloat(dailyUsage) || 0,
+      dailyUsage: type === "cgm" ? 0 : (parseFloat(dailyUsage) || 0),
       notes: notes || undefined,
-      lastPickupDate: pickupDate ? new Date(pickupDate).toISOString() : undefined,
+      lastPickupDate: pickupDate ? new Date(pickupDate + "T12:00:00").toISOString() : undefined,
       quantityAtPickup: parsedQuantity,
     });
     onOpenChange(false);
   };
 
-  const isValid = name.trim() && quantity && dailyUsage;
+  const isValid = name.trim() && quantity && (type === "cgm" || dailyUsage);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -343,30 +363,39 @@ function SupplyDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Current Quantity</Label>
+              <Label htmlFor="quantity">{type === "cgm" ? "Number of Sensors" : "Current Quantity"}</Label>
               <Input 
                 id="quantity" 
                 type="number" 
-                placeholder="e.g., 50" 
+                placeholder={type === "cgm" ? "e.g., 2" : "e.g., 50"}
                 value={quantity} 
                 onChange={e => setQuantity(e.target.value)}
                 data-testid="input-supply-quantity"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="daily-usage">Daily Usage</Label>
-              <Input 
-                id="daily-usage" 
-                type="number" 
-                step="0.1"
-                placeholder="e.g., 4" 
-                value={dailyUsage} 
-                onChange={e => setDailyUsage(e.target.value)}
-                data-testid="input-supply-daily-usage"
-              />
-            </div>
+            {type === "cgm" ? (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Depletion is calculated using your CGM Sensor Duration from Settings (Usual Habits). 
+                  Each sensor lasts the number of days you've configured there.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="daily-usage">Daily Usage</Label>
+                <Input 
+                  id="daily-usage" 
+                  type="number" 
+                  step="0.1"
+                  placeholder="e.g., 4" 
+                  value={dailyUsage} 
+                  onChange={e => setDailyUsage(e.target.value)}
+                  data-testid="input-supply-daily-usage"
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="pickup-date">Pickup Date</Label>
