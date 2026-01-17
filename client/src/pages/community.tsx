@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,8 @@ import {
   Building,
   Trash2,
   Shield,
-  UsersRound
+  UsersRound,
+  Info
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -918,20 +920,34 @@ function ReelsView() {
 
   if (reels.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Film className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="font-semibold text-lg mb-2">No reels yet</h3>
-          <p className="text-muted-foreground">
-            Check back soon for curated diabetes tips and experiences from the community.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            Full Reels functionality is coming soon. This section will feature curated diabetes tips and community experiences.
+          </AlertDescription>
+        </Alert>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Film className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="font-semibold text-lg mb-2">No reels yet</h3>
+            <p className="text-muted-foreground">
+              Check back soon for curated diabetes tips and experiences from the community.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+        <Info className="h-4 w-4 text-amber-600" />
+        <AlertDescription className="text-amber-800 dark:text-amber-200">
+          Full Reels functionality is coming soon. More features will be added in future updates.
+        </AlertDescription>
+      </Alert>
       <p className="text-sm text-muted-foreground text-center">
         Curated clips from diabetes creators. Tap to watch on their platform.
       </p>
