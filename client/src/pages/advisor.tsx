@@ -165,22 +165,24 @@ function processUserMessage(message: string, settings: UserSettings, bgUnits: st
       }
 
       if (insulinUnits > 0) {
-        return `Based on your settings, for ${carbs}g of carbs at ${mealType}:\n\n` +
-          `Suggested bolus: ${insulinUnits} units\n\n` +
-          `This calculation uses your ${mealType} ratio of ${ratio || "estimated from TDD"}.\n\n` +
-          `Remember to also consider:\n` +
-          `- Your current blood glucose level (add correction if needed)\n` +
-          `- Recent or planned physical activity\n` +
-          `- Time of day and your typical patterns\n\n` +
+        return `For ${carbs}g carbs at ${mealType}: approximately ${insulinUnits} units\n\n` +
+          `Adjust for your current blood glucose if needed.\n\n` +
+          `Planning any exercise after eating? Check the Exercise tab for guidance on timing and adjustments.\n\n` +
           `[Not medical advice. Always verify with your own calculations.]`;
       }
 
-      return `To calculate your meal bolus, I need your carb ratios.\n\n` +
-        `Please go to Settings and add your carb-to-insulin ratios for more accurate recommendations.\n\n` +
-        `In the meantime, here are some general tips for ${carbs}g of carbs:\n` +
-        `- Check your blood glucose before eating\n` +
-        `- Consider the glycemic index of your food\n` +
-        `- Monitor your levels 2 hours after eating`;
+      // Even without explicit ratio, try to estimate from TDD
+      if (settings.tdd) {
+        const estimatedRatio = Math.round(500 / settings.tdd);
+        const estimatedUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
+        return `For ${carbs}g carbs at ${mealType}: approximately ${estimatedUnits} units (estimated from TDD)\n\n` +
+          `Adjust for your current blood glucose if needed.\n\n` +
+          `Planning any exercise after eating? Check the Exercise tab for guidance.\n\n` +
+          `[Not medical advice. Always verify with your own calculations.]`;
+      }
+
+      return `To calculate your bolus, please add your carb ratios or TDD in Settings.\n\n` +
+        `[Not medical advice.]`;
     }
 
     return `I can help you plan your meal! Please tell me:\n\n` +
@@ -446,11 +448,12 @@ export default function Advisor() {
         aiResponse = data.recommendation + "\n\n[Not medical advice. Always verify with your own calculations.]";
       } else {
         // API unavailable or error - use local processing
-        aiResponse = processUserMessage(message, settings, bgUnits, "meal");
+        aiResponse = processUserMessage(message, userSettings, bgUnits, "meal");
       }
     } catch {
       // Network error or other failure - use local processing
-      aiResponse = processUserMessage(message, settings, bgUnits, "meal");
+      const freshSettings = storage.getSettings();
+      aiResponse = processUserMessage(message, freshSettings, bgUnits, "meal");
     }
 
     setMealMessages(prev => [...prev, {
@@ -503,11 +506,12 @@ export default function Advisor() {
         aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses to exercise vary.]";
       } else {
         // API unavailable or error - use local processing
-        aiResponse = processUserMessage(message, settings, bgUnits, "exercise");
+        aiResponse = processUserMessage(message, userSettings, bgUnits, "exercise");
       }
     } catch {
       // Network error or other failure - use local processing
-      aiResponse = processUserMessage(message, settings, bgUnits, "exercise");
+      const freshSettings = storage.getSettings();
+      aiResponse = processUserMessage(message, freshSettings, bgUnits, "exercise");
     }
 
     setExerciseMessages(prev => [...prev, {
