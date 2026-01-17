@@ -584,6 +584,24 @@ export const storage = {
       return Math.max(0, adjusted);
     }
     
+    // For infusion sets, calculate based on siteChangeDays from settings
+    if (supply.type === "infusion_set") {
+      const settings = this.getSettings();
+      const siteChangeDays = settings.siteChangeDays || 3; // Default to 3 days if not set
+      const setsUsed = Math.floor(daysElapsed / siteChangeDays);
+      const adjusted = supply.quantityAtPickup - setsUsed;
+      return Math.max(0, adjusted);
+    }
+    
+    // For reservoirs, calculate based on reservoirChangeDays from settings
+    if (supply.type === "reservoir") {
+      const settings = this.getSettings();
+      const reservoirChangeDays = settings.reservoirChangeDays || 3; // Default to 3 days if not set
+      const reservoirsUsed = Math.floor(daysElapsed / reservoirChangeDays);
+      const adjusted = supply.quantityAtPickup - reservoirsUsed;
+      return Math.max(0, adjusted);
+    }
+    
     // For other supplies, use dailyUsage
     if (!supply.dailyUsage || supply.dailyUsage <= 0) {
       return supply.quantityAtPickup;
@@ -623,6 +641,22 @@ export const storage = {
       // Each sensor lasts cgmDays, so total days = sensors * cgmDays
       // Round down for safety (user likely applies sensor soon after pickup)
       return Math.floor(adjustedQty * cgmDays);
+    }
+    
+    // For infusion sets, use site change days from settings
+    if (supply.type === "infusion_set") {
+      const settings = this.getSettings();
+      const siteChangeDays = settings.siteChangeDays || 3; // Default to 3 days if not set
+      // Each set lasts siteChangeDays, so total days = sets * siteChangeDays
+      return Math.floor(adjustedQty * siteChangeDays);
+    }
+    
+    // For reservoirs, use reservoir change days from settings
+    if (supply.type === "reservoir") {
+      const settings = this.getSettings();
+      const reservoirChangeDays = settings.reservoirChangeDays || 3; // Default to 3 days if not set
+      // Each reservoir lasts reservoirChangeDays, so total days = reservoirs * reservoirChangeDays
+      return Math.floor(adjustedQty * reservoirChangeDays);
     }
     
     // For other supplies, use dailyUsage

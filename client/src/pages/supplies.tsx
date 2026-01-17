@@ -141,6 +141,20 @@ function SupplyCard({
                 }`} data-testid={`text-remaining-${supply.id}`}>
                   {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "sensor" : "sensors"}
                 </p>
+              ) : supply.type === "infusion_set" ? (
+                <p className={`text-2xl font-bold ${
+                  status === "critical" ? "text-red-600 dark:text-red-500" : 
+                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                }`} data-testid={`text-remaining-${supply.id}`}>
+                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "set" : "sets"}
+                </p>
+              ) : supply.type === "reservoir" ? (
+                <p className={`text-2xl font-bold ${
+                  status === "critical" ? "text-red-600 dark:text-red-500" : 
+                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                }`} data-testid={`text-remaining-${supply.id}`}>
+                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "reservoir" : "reservoirs"}
+                </p>
               ) : (
                 <p className={`text-2xl font-bold ${
                   status === "critical" ? "text-red-600 dark:text-red-500" : 
@@ -174,6 +188,16 @@ function SupplyCard({
               <span>Sensor duration</span>
               <span>{storage.getSettings().cgmDays || 14} days each</span>
             </div>
+          ) : supply.type === "infusion_set" ? (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Site change</span>
+              <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
+            </div>
+          ) : supply.type === "reservoir" ? (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Reservoir change</span>
+              <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
+            </div>
           ) : (
             <div className="flex items-center justify-between text-muted-foreground">
               <span>Daily usage</span>
@@ -188,7 +212,8 @@ function SupplyCard({
             </div>
           )}
           
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type !== "cgm" && (
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && 
+           supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (
             <div className="text-xs text-muted-foreground">
               Started with {supply.quantityAtPickup} • Used ~{Math.round(daysSincePickup * supply.dailyUsage)}
             </div>
@@ -197,6 +222,18 @@ function SupplyCard({
           {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "cgm" && (
             <div className="text-xs text-muted-foreground">
               Started with {supply.quantityAtPickup} sensor{supply.quantityAtPickup !== 1 ? 's' : ''}
+            </div>
+          )}
+          
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "infusion_set" && (
+            <div className="text-xs text-muted-foreground">
+              Started with {supply.quantityAtPickup} set{supply.quantityAtPickup !== 1 ? 's' : ''}
+            </div>
+          )}
+          
+          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "reservoir" && (
+            <div className="text-xs text-muted-foreground">
+              Started with {supply.quantityAtPickup} reservoir{supply.quantityAtPickup !== 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -293,11 +330,12 @@ function SupplyDialog({
 
   const handleSubmit = () => {
     const parsedQuantity = parseFloat(quantity) || 0;
+    const usesDurationSettings = type === "cgm" || type === "infusion_set" || type === "reservoir";
     onSave({
       name,
       type,
       currentQuantity: parsedQuantity,
-      dailyUsage: type === "cgm" ? 0 : (parseFloat(dailyUsage) || 0),
+      dailyUsage: usesDurationSettings ? 0 : (parseFloat(dailyUsage) || 0),
       notes: notes || undefined,
       lastPickupDate: pickupDate ? new Date(pickupDate + "T12:00:00").toISOString() : undefined,
       quantityAtPickup: parsedQuantity,
@@ -305,7 +343,8 @@ function SupplyDialog({
     onOpenChange(false);
   };
 
-  const isValid = name.trim() && quantity && (type === "cgm" || dailyUsage);
+  const usesDurationSettings = type === "cgm" || type === "infusion_set" || type === "reservoir";
+  const isValid = name.trim() && quantity && (usesDurationSettings || dailyUsage);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -365,11 +404,15 @@ function SupplyDialog({
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">{type === "cgm" ? "Number of Sensors" : "Current Quantity"}</Label>
+              <Label htmlFor="quantity">
+                {type === "cgm" ? "Number of Sensors" : 
+                 type === "infusion_set" ? "Number of Infusion Sets" :
+                 type === "reservoir" ? "Number of Reservoirs" : "Current Quantity"}
+              </Label>
               <Input 
                 id="quantity" 
                 type="number" 
-                placeholder={type === "cgm" ? "e.g., 2" : "e.g., 50"}
+                placeholder={type === "cgm" || type === "infusion_set" || type === "reservoir" ? "e.g., 10" : "e.g., 50"}
                 value={quantity} 
                 onChange={e => setQuantity(e.target.value)}
                 data-testid="input-supply-quantity"
@@ -380,6 +423,20 @@ function SupplyDialog({
                 <p className="text-sm text-muted-foreground">
                   Depletion is calculated using your CGM Sensor Duration from Settings (Usual Habits). 
                   Each sensor lasts the number of days you've configured there.
+                </p>
+              </div>
+            ) : type === "infusion_set" ? (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Depletion is calculated using your Site Change frequency from Settings (Usual Habits). 
+                  Each infusion set lasts the number of days you've configured there.
+                </p>
+              </div>
+            ) : type === "reservoir" ? (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Depletion is calculated using your Reservoir Change frequency from Settings (Usual Habits). 
+                  Each reservoir lasts the number of days you've configured there.
                 </p>
               </div>
             ) : (
