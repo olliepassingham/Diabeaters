@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp } from "lucide-react";
+import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
@@ -148,6 +149,175 @@ Different types of exercise affect blood sugar in different ways. Understanding 
 5. Have your phone accessible for emergencies`;
 }
 
+function processExerciseAwareMealMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L", exerciseContext?: "before" | "after" | "during", hoursAway?: number): string {
+  const carbMatch = message.match(/(\d+)\s*(?:g|gram|cp|portion)/i);
+  const carbs = carbMatch ? parseInt(carbMatch[1]) : null;
+  
+  if (!carbs) {
+    return `Please specify how many carbs you're planning to eat.\n\n[Not medical advice.]`;
+  }
+  
+  const lowerMessage = message.toLowerCase();
+  const mealType = lowerMessage.includes("breakfast") ? "breakfast" :
+                   lowerMessage.includes("lunch") ? "lunch" :
+                   lowerMessage.includes("dinner") ? "dinner" :
+                   lowerMessage.includes("snack") ? "snack" : "meal";
+  
+  const ratioMap: Record<string, string | undefined> = {
+    breakfast: settings.breakfastRatio,
+    lunch: settings.lunchRatio,
+    dinner: settings.dinnerRatio,
+    snack: settings.snackRatio,
+    meal: settings.lunchRatio || settings.breakfastRatio,
+  };
+
+  const ratio = ratioMap[mealType];
+  let baseUnits = 0;
+
+  if (ratio) {
+    const match = ratio.match(/1:(\d+)/);
+    if (match) {
+      const carbRatio = parseInt(match[1]);
+      baseUnits = Math.round((carbs / carbRatio) * 10) / 10;
+    }
+  } else if (settings.tdd) {
+    const estimatedRatio = Math.round(500 / settings.tdd);
+    baseUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
+  }
+
+  if (baseUnits <= 0) {
+    return `To calculate your bolus, please add your carb ratios or TDD in Settings.\n\n[Not medical advice.]`;
+  }
+
+  if (!exerciseContext) {
+    return `For ${carbs}g carbs at ${mealType}: approximately ${baseUnits} units\n\n` +
+      `Adjust for your current blood glucose if needed.\n\n` +
+      `[Not medical advice. Always verify with your own calculations.]`;
+  }
+
+  const hours = hoursAway || 2;
+  
+  if (exerciseContext === "before") {
+    const reductionPercent = hours <= 1 ? 40 : hours <= 2 ? 30 : 20;
+    const adjustedUnits = Math.round(baseUnits * (1 - reductionPercent / 100) * 10) / 10;
+    
+    return `**Pre-Exercise Meal (${carbs}g carbs, ${mealType})**\n\n` +
+      `Standard dose: ${baseUnits} units\n` +
+      `Suggested reduction: ${reductionPercent}%\n` +
+      `**Adjusted dose: ~${adjustedUnits} units**\n\n` +
+      `**Why reduce?**\n` +
+      `Exercise increases insulin sensitivity. Eating ${hours} hour${hours > 1 ? 's' : ''} before exercise means the insulin will still be active when you start moving.\n\n` +
+      `**Tips:**\n` +
+      `- Start exercise with BG ${bgUnits === "mmol/L" ? "7-10" : "126-180"} ${bgUnits}\n` +
+      `- Consider slower-digesting carbs (whole grains, protein)\n` +
+      `- Check BG before starting\n\n` +
+      `[Not medical advice. Adjust based on your experience.]`;
+  }
+  
+  if (exerciseContext === "after") {
+    const reductionPercent = hours <= 1 ? 35 : hours <= 2 ? 25 : 15;
+    const adjustedUnits = Math.round(baseUnits * (1 - reductionPercent / 100) * 10) / 10;
+    
+    return `**Post-Exercise Meal (${carbs}g carbs, ${mealType})**\n\n` +
+      `Standard dose: ${baseUnits} units\n` +
+      `Suggested reduction: ${reductionPercent}%\n` +
+      `**Adjusted dose: ~${adjustedUnits} units**\n\n` +
+      `**Why reduce?**\n` +
+      `Your muscles are refuelling and insulin sensitivity stays elevated for hours after exercise. This increases hypo risk.\n\n` +
+      `**Recovery Tips:**\n` +
+      `- Include protein to help muscle recovery\n` +
+      `- Monitor for delayed lows over next 6-12 hours\n` +
+      `- Consider a bedtime snack if exercised in the evening\n\n` +
+      `[Not medical advice. Adjust based on your experience.]`;
+  }
+  
+  if (exerciseContext === "during") {
+    return `**During-Exercise Fuel (${carbs}g carbs)**\n\n` +
+      `**Usually: No insulin needed**\n\n` +
+      `Carbs eaten during exercise are typically used immediately by working muscles. For most activities under 90 minutes:\n\n` +
+      `- Skip insulin for exercise snacks/gels\n` +
+      `- Use fast-acting carbs (15-30g every 30-45 min)\n` +
+      `- Monitor BG and adjust intake\n\n` +
+      `**For longer sessions (90+ min):**\n` +
+      `- May need very small bolus (10-25% of normal)\n` +
+      `- Test with small amounts first\n\n` +
+      `[Not medical advice. Individual responses vary significantly.]`;
+  }
+
+  return `For ${carbs}g carbs: approximately ${baseUnits} units\n\n[Not medical advice.]`;
+}
+
+function processActivitySessionMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): string {
+  const durationMatch = message.match(/(\d+)\s*(?:min|minute)/i);
+  const duration = durationMatch ? parseInt(durationMatch[1]) : 45;
+  
+  const lowerMessage = message.toLowerCase();
+  const intensity = lowerMessage.includes("intense") || lowerMessage.includes("hard") ? "intense" :
+                    lowerMessage.includes("light") || lowerMessage.includes("easy") ? "light" : "moderate";
+  
+  const exerciseType = lowerMessage.includes("cardio") || lowerMessage.includes("run") || lowerMessage.includes("cycl") ? "cardio" :
+                       lowerMessage.includes("strength") || lowerMessage.includes("weight") ? "strength" :
+                       lowerMessage.includes("hiit") ? "HIIT" : "exercise";
+
+  let preExerciseCarbs = 0;
+  let duringCarbs = 0;
+  let postExerciseCarbs = 0;
+  let bolusReduction = "";
+
+  switch (intensity) {
+    case "light":
+      preExerciseCarbs = duration < 30 ? 0 : 15;
+      duringCarbs = duration > 60 ? 15 : 0;
+      postExerciseCarbs = 15;
+      bolusReduction = "15-25%";
+      break;
+    case "moderate":
+      preExerciseCarbs = duration < 20 ? 10 : 20;
+      duringCarbs = duration > 45 ? Math.round(duration / 30 * 15) : 0;
+      postExerciseCarbs = 20;
+      bolusReduction = "25-35%";
+      break;
+    case "intense":
+      preExerciseCarbs = 25;
+      duringCarbs = duration > 30 ? Math.round(duration / 30 * 20) : 0;
+      postExerciseCarbs = 30;
+      bolusReduction = "35-50%";
+      break;
+  }
+
+  const idealStart = bgUnits === "mmol/L" ? "7-10" : "126-180";
+  const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
+
+  return `**Complete Activity Session Plan**\n` +
+    `${duration} min ${intensity} ${exerciseType}\n\n` +
+    `---\n\n` +
+    `**PRE-WORKOUT (30-60 min before)**\n` +
+    `- Target BG: ${idealStart} ${bgUnits}\n` +
+    `- If BG below ${lowThreshold} ${bgUnits}: eat ${preExerciseCarbs}g carbs\n` +
+    `- Reduce bolus for pre-workout meal by ${bolusReduction}\n` +
+    `- Good options: banana, toast, oat bar\n\n` +
+    `---\n\n` +
+    `**DURING WORKOUT**\n` +
+    (duringCarbs > 0 ? 
+      `- Have ${duringCarbs}g fast carbs available\n` +
+      `- Take 15g every 30-45 min if BG drops\n`
+    : `- For ${duration} min ${intensity} exercise, you may not need extra carbs\n` +
+      `- Keep 15-20g fast glucose ready just in case\n`) +
+    `- Check BG at halfway point for longer sessions\n\n` +
+    `---\n\n` +
+    `**POST-WORKOUT (within 30-60 min)**\n` +
+    `- Have ${postExerciseCarbs}g carbs to help recovery\n` +
+    `- Include protein (15-20g) for muscle repair\n` +
+    `- Reduce bolus by ${bolusReduction} for recovery meal\n` +
+    `- Good options: chocolate milk, yogurt, sandwich\n\n` +
+    `---\n\n` +
+    `**DELAYED LOW PREVENTION**\n` +
+    `- Monitor BG for 6-24 hours after\n` +
+    `- Consider reduced basal (if pumping) overnight\n` +
+    `- Have a protein-carb snack before bed if evening exercise\n\n` +
+    `[Not medical advice. Individual responses vary. Track your patterns.]`;
+}
+
 function processUserMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L", context: "meal" | "exercise"): string {
   const lowerMessage = message.toLowerCase();
 
@@ -239,6 +409,8 @@ function processUserMessage(message: string, settings: UserSettings, bgUnits: st
       const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
       const hypoThreshold = bgUnits === "mmol/L" ? "4.0" : "70";
 
+      const recoveryCarbs = intensity === "intense" ? "25-30g" : intensity === "moderate" ? "15-25g" : "10-15g";
+      
       return `For ${duration} minutes of ${intensity} exercise:\n\n` +
         `**Before Exercise:**\n` +
         `- Ideal starting BG: ${idealLow}-${idealHigh} ${bgUnits}\n` +
@@ -248,9 +420,13 @@ function processUserMessage(message: string, settings: UserSettings, bgUnits: st
         `- Carry fast-acting glucose (15-20g)\n` +
         `- Check BG every 30-45 minutes for longer sessions\n` +
         `- If BG drops below ${hypoThreshold} ${bgUnits}, stop and treat\n\n` +
-        `**After Exercise:**\n` +
-        `- Monitor for delayed lows (up to 24 hours later)\n` +
-        `- Consider reduced basal/bolus for next meal\n` +
+        `**After Exercise - Recovery Snack:**\n` +
+        `- Within 30-60 mins: ${recoveryCarbs} carbs + protein\n` +
+        `- Good options: chocolate milk, yogurt + fruit, banana + peanut butter\n` +
+        `- Reduce bolus by ${insulinReduction} for recovery snack/meal\n\n` +
+        `**Delayed Low Prevention:**\n` +
+        `- Monitor BG for 6-24 hours after\n` +
+        `- Consider a protein-carb snack before bed\n` +
         `- Stay hydrated\n\n` +
         `[Not medical advice. Individual responses to exercise vary significantly.]`;
     }
@@ -420,6 +596,25 @@ export default function Advisor() {
   const [exerciseDuration, setExerciseDuration] = useState("");
   const [exerciseIntensity, setExerciseIntensity] = useState("moderate");
   const [showExerciseGuide, setShowExerciseGuide] = useState(false);
+  
+  const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
+  const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
+  const [exerciseWithin, setExerciseWithin] = useState("2");
+  
+  const [sessionMessages, setSessionMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content: "Welcome to Activity Session planning! This helps you plan meals and exercise together for better blood sugar management.\n\nTell me about your planned activity and I'll help you plan pre-workout fuel, the exercise itself, and recovery eating.\n\n[Not medical advice.]",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+  ]);
+  const [sessionInput, setSessionInput] = useState("");
+  const [isSessionTyping, setIsSessionTyping] = useState(false);
+  
+  const [sessionExerciseType, setSessionExerciseType] = useState("cardio");
+  const [sessionDuration, setSessionDuration] = useState("");
+  const [sessionIntensity, setSessionIntensity] = useState("moderate");
+  const [sessionTimingFromNow, setSessionTimingFromNow] = useState("60");
 
   const bgUnits = profile.bgUnits || "mmol/L";
 
@@ -569,8 +764,22 @@ export default function Advisor() {
   const handleQuickMealPlan = () => {
     if (!mealCarbs) return;
     const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
-    const message = `I'm planning to eat ${carbValue}g carbs for ${mealTime}. What should my insulin dose be?`;
-    sendMealMessage(message);
+    
+    let message = `I'm planning to eat ${carbValue}g carbs for ${mealTime}.`;
+    
+    if (planningAroundExercise) {
+      if (exerciseTiming === "before") {
+        message += ` I'll be exercising in about ${exerciseWithin} hours. How should I adjust my insulin?`;
+      } else if (exerciseTiming === "after") {
+        message += ` I just finished exercising about ${exerciseWithin} hours ago. How should I adjust my insulin?`;
+      } else {
+        message += ` I'll be eating this during exercise. How should I handle it?`;
+      }
+    } else {
+      message += ` What should my insulin dose be?`;
+    }
+    
+    sendMealMessageWithExerciseContext(message, planningAroundExercise ? exerciseTiming : undefined, planningAroundExercise ? parseInt(exerciseWithin) : undefined);
     setMealCarbs("");
   };
 
@@ -578,6 +787,66 @@ export default function Advisor() {
     if (!exerciseDuration) return;
     const message = `I'm planning to do ${exerciseType} exercise for ${exerciseDuration} minutes at ${exerciseIntensity} intensity. How should I prepare?`;
     sendExerciseMessage(message);
+  };
+  
+  const sendMealMessageWithExerciseContext = async (message: string, exerciseContext?: "before" | "after" | "during", hoursAway?: number) => {
+    const userMessage: Message = {
+      role: "user",
+      content: message,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setMealMessages(prev => [...prev, userMessage]);
+    setIsMealTyping(true);
+
+    const freshSettings = storage.getSettings();
+    const aiResponse = processExerciseAwareMealMessage(message, freshSettings, bgUnits, exerciseContext, hoursAway);
+
+    setMealMessages(prev => [...prev, {
+      role: "assistant",
+      content: aiResponse,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      action: exerciseContext ? undefined : {
+        label: "Plan Exercise",
+        onClick: () => setActiveTab("exercise"),
+      },
+    }]);
+    
+    setIsMealTyping(false);
+  };
+  
+  const handleActivitySession = () => {
+    if (!sessionDuration) return;
+    const timingMins = parseInt(sessionTimingFromNow);
+    const timingText = timingMins < 60 ? `${timingMins} minutes` : `${Math.round(timingMins / 60)} hour${timingMins >= 120 ? 's' : ''}`;
+    const message = `I'm planning ${sessionIntensity} ${sessionExerciseType} for ${sessionDuration} minutes, starting in about ${timingText}. Help me plan the whole session including what to eat before, during, and after.`;
+    sendSessionMessage(message);
+  };
+  
+  const sendSessionMessage = async (message: string) => {
+    const userMessage: Message = {
+      role: "user",
+      content: message,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    setSessionMessages(prev => [...prev, userMessage]);
+    setIsSessionTyping(true);
+
+    const freshSettings = storage.getSettings();
+    const aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
+
+    setSessionMessages(prev => [...prev, {
+      role: "assistant",
+      content: aiResponse,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }]);
+    
+    setIsSessionTyping(false);
+  };
+  
+  const handleSessionSend = () => {
+    if (!sessionInput.trim()) return;
+    sendSessionMessage(sessionInput);
+    setSessionInput("");
   };
 
   const getRatioForMeal = (meal: string): string => {
@@ -602,20 +871,20 @@ export default function Advisor() {
           title="About AI Activity Advisor"
           description="Get smart recommendations for meals and exercise"
         >
-          <InfoSection title="Plan Meal Tab">
-            <p>Enter carbs and select a meal type to get a bolus (insulin dose) suggestion based on your insulin-to-carb ratios from Settings.</p>
+          <InfoSection title="Meal Tab">
+            <p>Enter carbs and meal type for a bolus suggestion. Toggle "Planning around exercise?" to get adjusted doses for meals before, during, or after workouts.</p>
           </InfoSection>
           <InfoSection title="Exercise Tab">
-            <p>Plan your workouts by selecting exercise type, duration, and intensity. Get personalised preparation tips and blood sugar management advice.</p>
+            <p>Plan workouts by type, duration, and intensity. Get preparation tips including what to eat before, during, and after exercise.</p>
           </InfoSection>
-          <InfoSection title="Chat Features">
-            <p>Ask follow-up questions in the chat area. The AI will provide additional guidance based on your settings and the context of your conversation.</p>
+          <InfoSection title="Session Tab (NEW)">
+            <p>Plan your complete activity session: pre-workout fuel, the exercise itself, and recovery eating - all in one place with adjusted insulin recommendations.</p>
           </InfoSection>
-          <InfoSection title="Setting Up Ratios">
-            <p>For accurate meal suggestions, make sure you've set your insulin-to-carb ratios in Settings. The advisor uses these to calculate doses.</p>
+          <InfoSection title="Meal + Exercise Linking">
+            <p>When eating close to exercise, enable the exercise toggle to get adjusted insulin doses that account for increased sensitivity during and after activity.</p>
           </InfoSection>
           <InfoSection title="Safety Note">
-            <p>All suggestions are for informational purposes only and should be verified with your healthcare team. This is not medical advice.</p>
+            <p>All suggestions are for informational purposes only. Always verify with your own calculations and healthcare team. Not medical advice.</p>
           </InfoSection>
         </PageInfoDialog>
       </div>
@@ -633,12 +902,15 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
-            <Utensils className="h-4 w-4" />Plan Meal
+            <Utensils className="h-4 w-4" />Meal
           </TabsTrigger>
           <TabsTrigger value="exercise" className="gap-2" data-testid="tab-exercise">
             <Dumbbell className="h-4 w-4" />Exercise
+          </TabsTrigger>
+          <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
+            <Zap className="h-4 w-4" />Session
           </TabsTrigger>
         </TabsList>
 
@@ -690,6 +962,55 @@ export default function Advisor() {
                   </Select>
                 </div>
               </div>
+
+              <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="h-4 w-4 text-primary" />
+                  <Label htmlFor="exercise-toggle" className="text-sm font-medium cursor-pointer">
+                    Planning around exercise?
+                  </Label>
+                </div>
+                <Switch
+                  id="exercise-toggle"
+                  checked={planningAroundExercise}
+                  onCheckedChange={setPlanningAroundExercise}
+                  data-testid="switch-exercise-toggle"
+                />
+              </div>
+
+              {planningAroundExercise && (
+                <div className="grid gap-4 md:grid-cols-2 p-3 bg-muted/50 rounded-lg">
+                  <div className="space-y-2">
+                    <Label>When is exercise?</Label>
+                    <Select value={exerciseTiming} onValueChange={(v: "before" | "after" | "during") => setExerciseTiming(v)}>
+                      <SelectTrigger data-testid="select-exercise-timing">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="before">Before this meal</SelectItem>
+                        <SelectItem value="after">After this meal</SelectItem>
+                        <SelectItem value="during">During exercise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {exerciseTiming !== "during" && (
+                    <div className="space-y-2">
+                      <Label>How many hours {exerciseTiming === "before" ? "until" : "since"} exercise?</Label>
+                      <Select value={exerciseWithin} onValueChange={setExerciseWithin}>
+                        <SelectTrigger data-testid="select-exercise-hours">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">About 1 hour</SelectItem>
+                          <SelectItem value="2">About 2 hours</SelectItem>
+                          <SelectItem value="3">About 3 hours</SelectItem>
+                          <SelectItem value="4">4+ hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm font-medium mb-2">Your Current Ratios</p>
@@ -833,6 +1154,105 @@ export default function Advisor() {
             onSend={handleExerciseSend}
             isTyping={isExerciseTyping}
             placeholder="Ask about exercise, blood sugar, or preparation tips..."
+          />
+        </TabsContent>
+
+        <TabsContent value="session" className="flex-1 flex flex-col min-h-0 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Activity Session Planner
+              </CardTitle>
+              <CardDescription>Plan pre-workout fuel, exercise, and recovery eating together</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="session-type">What exercise?</Label>
+                  <Select value={sessionExerciseType} onValueChange={setSessionExerciseType}>
+                    <SelectTrigger id="session-type" data-testid="select-session-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cardio">Cardio (Running, Cycling)</SelectItem>
+                      <SelectItem value="strength">Strength Training</SelectItem>
+                      <SelectItem value="hiit">HIIT</SelectItem>
+                      <SelectItem value="sports">Team Sports</SelectItem>
+                      <SelectItem value="swimming">Swimming</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="session-duration">Duration</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      id="session-duration"
+                      type="number"
+                      placeholder="e.g., 45"
+                      value={sessionDuration}
+                      onChange={(e) => setSessionDuration(e.target.value)}
+                      data-testid="input-session-duration"
+                    />
+                    <span className="text-muted-foreground text-sm">mins</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="session-intensity">Intensity</Label>
+                  <Select value={sessionIntensity} onValueChange={setSessionIntensity}>
+                    <SelectTrigger id="session-intensity" data-testid="select-session-intensity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">Light</SelectItem>
+                      <SelectItem value="moderate">Moderate</SelectItem>
+                      <SelectItem value="intense">Intense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="session-timing">Starting in...</Label>
+                  <Select value={sessionTimingFromNow} onValueChange={setSessionTimingFromNow}>
+                    <SelectTrigger id="session-timing" data-testid="select-session-timing">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="90">1.5 hours</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-primary/5 p-3 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 text-primary mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Complete Session Plan</p>
+                    <p className="text-muted-foreground">Get recommendations for what to eat before, during, and after your workout, plus adjusted insulin doses.</p>
+                  </div>
+                </div>
+              </div>
+
+              <Button onClick={handleActivitySession} disabled={!sessionDuration} className="w-full" data-testid="button-plan-session">
+                Plan My Session
+              </Button>
+            </CardContent>
+          </Card>
+
+          <ChatSection
+            messages={sessionMessages}
+            inputValue={sessionInput}
+            setInputValue={setSessionInput}
+            onSend={handleSessionSend}
+            isTyping={isSessionTyping}
+            placeholder="Ask about your activity session..."
           />
         </TabsContent>
       </Tabs>
