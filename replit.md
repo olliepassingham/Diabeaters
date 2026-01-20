@@ -46,7 +46,7 @@ Preferred communication style: Simple, everyday language.
 ### Navigation Structure
 - **Dashboard**: Main hub with customizable widgets
 - **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts
-- **AI Advisor**: Activity recommendations and ratio adviser
+- **AI Advisor**: Meal planning with exercise integration, Exercise planning with recovery guidance, Activity Session planner for complete workout day management, and Ratio Adviser
 - **Scenarios**: Combined Sick Day and Travel Mode with tabbed interface
 - **Appointments**: Healthcare appointment tracking
 - **Community**: Posts, Events, Reels, and Messages tabs
