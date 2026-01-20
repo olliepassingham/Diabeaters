@@ -11,6 +11,7 @@ import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 type MessageAction = {
   label: string;
@@ -592,9 +593,31 @@ export default function Advisor() {
   return (
     <div className="flex flex-col h-full relative">
       <FaceLogoWatermark />
-      <div className="mb-4">
-        <h1 className="text-3xl font-semibold">AI Activity Advisor</h1>
-        <p className="text-muted-foreground mt-1">Get personalized recommendations for meals and exercise.</p>
+      <div className="mb-4 flex items-center gap-2">
+        <div>
+          <h1 className="text-3xl font-semibold">AI Activity Advisor</h1>
+          <p className="text-muted-foreground mt-1">Get personalized recommendations for meals and exercise.</p>
+        </div>
+        <PageInfoDialog
+          title="About AI Activity Advisor"
+          description="Get smart recommendations for meals and exercise"
+        >
+          <InfoSection title="Plan Meal Tab">
+            <p>Enter carbs and select a meal type to get a bolus (insulin dose) suggestion based on your insulin-to-carb ratios from Settings.</p>
+          </InfoSection>
+          <InfoSection title="Exercise Tab">
+            <p>Plan your workouts by selecting exercise type, duration, and intensity. Get personalised preparation tips and blood sugar management advice.</p>
+          </InfoSection>
+          <InfoSection title="Chat Features">
+            <p>Ask follow-up questions in the chat area. The AI will provide additional guidance based on your settings and the context of your conversation.</p>
+          </InfoSection>
+          <InfoSection title="Setting Up Ratios">
+            <p>For accurate meal suggestions, make sure you've set your insulin-to-carb ratios in Settings. The advisor uses these to calculate doses.</p>
+          </InfoSection>
+          <InfoSection title="Safety Note">
+            <p>All suggestions are for informational purposes only and should be verified with your healthcare team. This is not medical advice.</p>
+          </InfoSection>
+        </PageInfoDialog>
       </div>
 
       <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20 mb-4">

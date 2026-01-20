@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import {
   SupplySummaryWidget,
   TodayOverviewWidget,
@@ -89,6 +90,31 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
   );
 }
 
+function DashboardInfoDialog() {
+  return (
+    <PageInfoDialog
+      title="About Your Dashboard"
+      description="Your personal diabetes command centre"
+    >
+      <InfoSection title="Customise Your View">
+        <p>Click the gear icon to customise your dashboard. You can show or hide widgets and rearrange them to suit your needs.</p>
+      </InfoSection>
+      <InfoSection title="Rearranging Widgets">
+        <p>When in customisation mode, use the up and down arrows to move widgets. Toggle the switch to show or hide a widget.</p>
+      </InfoSection>
+      <InfoSection title="Status Indicator">
+        <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
+      </InfoSection>
+      <InfoSection title="Quick Navigation">
+        <p>Click the Diabeaters logo in the navigation bar to return to the dashboard from any page.</p>
+      </InfoSection>
+      <InfoSection title="Help Now Button">
+        <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
+      </InfoSection>
+    </PageInfoDialog>
+  );
+}
+
 function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
   const isUrgent = status === "action";
 
@@ -104,6 +130,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
           Help Now
         </Button>
       </Link>
+      <DashboardInfoDialog />
       <Button 
         variant="outline" 
         size="icon"

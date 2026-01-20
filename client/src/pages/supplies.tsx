@@ -14,6 +14,7 @@ import { storage, Supply, LastPrescription, UsualPrescription } from "@/lib/stor
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format } from "date-fns";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 const typeIcons = {
   needle: Syringe,
@@ -768,16 +769,38 @@ export default function Supplies() {
     <div className="space-y-6 relative">
       <FaceLogoWatermark />
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold">Supply Tracker</h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor and manage your diabetes supplies.
-            {lowStockCount > 0 && (
-              <span className="text-yellow-600 dark:text-yellow-500 ml-2">
-                ({lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low)
-              </span>
-            )}
-          </p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-3xl font-semibold">Supply Tracker</h1>
+            <p className="text-muted-foreground mt-1">
+              Monitor and manage your diabetes supplies.
+              {lowStockCount > 0 && (
+                <span className="text-yellow-600 dark:text-yellow-500 ml-2">
+                  ({lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low)
+                </span>
+              )}
+            </p>
+          </div>
+          <PageInfoDialog
+            title="About Supply Tracker"
+            description="Keep tabs on your diabetes supplies"
+          >
+            <InfoSection title="Adding Supplies">
+              <p>Click "Add Supply" to add insulin, needles, CGM sensors, or other items. Set a daily usage amount and the app will calculate when you'll run out.</p>
+            </InfoSection>
+            <InfoSection title="Depletion Forecasts">
+              <p>Each supply shows when it will run out based on your daily usage. Red means critical (under 3 days), amber means low (under 7 days).</p>
+            </InfoSection>
+            <InfoSection title="Logging Refills">
+              <p>When you pick up a prescription, click the refill button on any supply to add the quantity you received.</p>
+            </InfoSection>
+            <InfoSection title="Usual Prescription">
+              <p>Save your typical prescription quantities so you can quickly add them when you refill. Use "Save Usual" to remember your current setup.</p>
+            </InfoSection>
+            <InfoSection title="Automatic Deduction">
+              <p>Quantities are automatically reduced each day based on your daily usage settings.</p>
+            </InfoSection>
+          </PageInfoDialog>
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">

@@ -11,6 +11,7 @@ import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star } from "
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -236,9 +237,34 @@ export default function Settings() {
   return (
     <div className="space-y-6 relative">
       <FaceLogoWatermark />
-      <div>
-        <h1 className="text-3xl font-semibold">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your profile and preferences.</p>
+      <div className="flex items-center gap-2">
+        <div>
+          <h1 className="text-3xl font-semibold">Settings</h1>
+          <p className="text-muted-foreground mt-1">Manage your profile and preferences.</p>
+        </div>
+        <PageInfoDialog
+          title="About Settings"
+          description="Configure your personal diabetes management preferences"
+        >
+          <InfoSection title="Profile Section">
+            <p>Set your name, email, and choose your preferred units for blood glucose (mmol/L or mg/dL) and carbohydrates.</p>
+          </InfoSection>
+          <InfoSection title="Insulin Delivery">
+            <p>Select whether you use pens (MDI) or an insulin pump. This affects what supply types and features are shown throughout the app.</p>
+          </InfoSection>
+          <InfoSection title="Insulin Ratios">
+            <p>Enter your insulin-to-carb ratios for different meals. These are used by the AI Advisor to calculate bolus suggestions.</p>
+          </InfoSection>
+          <InfoSection title="Usage Habits">
+            <p>Set your typical daily insulin usage, injections per day, and CGM wear time. This helps calculate accurate depletion forecasts in Supply Tracker.</p>
+          </InfoSection>
+          <InfoSection title="Emergency Contacts">
+            <p>Add contacts who should be notified in an emergency. These appear in Help Now and can be called quickly when needed.</p>
+          </InfoSection>
+          <InfoSection title="Notifications">
+            <p>Enable or disable supply alerts and choose when to be warned about low stock levels.</p>
+          </InfoSection>
+        </PageInfoDialog>
       </div>
 
       <div className="grid gap-6 max-w-3xl">

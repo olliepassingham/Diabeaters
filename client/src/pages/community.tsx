@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { 
   MessageCircle, 
   Plus, 
@@ -1220,10 +1221,35 @@ export default function Community() {
       <div className="max-w-2xl mx-auto p-4">
         <div className="mb-6">
           <div className="flex items-center justify-between gap-2 mb-2">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Users className="h-6 w-6" />
-              Community
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Users className="h-6 w-6" />
+                Community
+              </h1>
+              <PageInfoDialog
+                title="About Community"
+                description="Connect with others managing diabetes"
+              >
+                <InfoSection title="Posts Tab">
+                  <p>Browse questions and discussions from other users. Filter by topic or see posts from people you follow.</p>
+                </InfoSection>
+                <InfoSection title="Asking Questions">
+                  <p>Click "Ask Question" to share your question. You can post anonymously to keep your identity private.</p>
+                </InfoSection>
+                <InfoSection title="Events Tab">
+                  <p>Discover diabetes-related events, support groups, and meet-ups happening locally or online.</p>
+                </InfoSection>
+                <InfoSection title="Reels Tab">
+                  <p>Watch helpful video content from diabetes educators and the community on topics like meal prep, exercise tips, and daily management.</p>
+                </InfoSection>
+                <InfoSection title="Messages Tab">
+                  <p>Send private messages to other community members you want to connect with.</p>
+                </InfoSection>
+                <InfoSection title="Community Guidelines">
+                  <p>Posts are personal experiences, not medical advice. Use the report button if you see inappropriate content.</p>
+                </InfoSection>
+              </PageInfoDialog>
+            </div>
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-create-post">

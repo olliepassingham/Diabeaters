@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Calendar, Plus, Clock, MapPin, Check, Trash2, Eye, Stethoscope, Heart, Footprints, TestTube, Cpu } from "lucide-react";
 import { storage, Appointment, AppointmentType } from "@/lib/storage";
 import { format, isAfter, isBefore, addDays } from "date-fns";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 const APPOINTMENT_TYPES: { value: AppointmentType; label: string; icon: typeof Calendar }[] = [
   { value: "clinic", label: "Diabetes Clinic", icon: Stethoscope },
@@ -105,12 +106,34 @@ export default function Appointments() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-8">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            Appointments
-          </h1>
-          <p className="text-muted-foreground">Track your diabetes clinic visits and health checks</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Calendar className="h-6 w-6 text-primary" />
+              Appointments
+            </h1>
+            <p className="text-muted-foreground">Track your diabetes clinic visits and health checks</p>
+          </div>
+          <PageInfoDialog
+            title="About Appointments"
+            description="Keep track of your diabetes healthcare visits"
+          >
+            <InfoSection title="Adding Appointments">
+              <p>Click "Add" to schedule diabetes clinic visits, eye checks, foot checks, blood tests, pump reviews, or other appointments.</p>
+            </InfoSection>
+            <InfoSection title="Appointment Types">
+              <p>Choose from common diabetes-related appointment types like clinic visits, eye screening, foot checks, and blood tests.</p>
+            </InfoSection>
+            <InfoSection title="Status Badges">
+              <p>Appointments show status badges: red for today, amber for this week, or showing days until the appointment.</p>
+            </InfoSection>
+            <InfoSection title="Marking Complete">
+              <p>After attending an appointment, mark it as complete to move it to your past appointments list.</p>
+            </InfoSection>
+            <InfoSection title="Notes and Location">
+              <p>Add notes to remember what to discuss, and include the location so you know where to go.</p>
+            </InfoSection>
+          </PageInfoDialog>
         </div>
         
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
