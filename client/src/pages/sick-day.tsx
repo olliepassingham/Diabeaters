@@ -154,14 +154,27 @@ function calculateSickDayRecommendations(
 
   // === RATIO AND OTHER ADJUSTMENTS ===
   
-  const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
-    if (!ratio) return `1:${Math.round(10 * multiplier)}`;
+  // Helper to parse ratio - settings stores just a number (e.g., "10" means 1 unit per 10g)
+  const parseRatioNumber = (ratio: string | undefined): number => {
+    if (!ratio) return 10; // Default 1:10
+    // If it's already in "1:X" format, extract X
     const match = ratio.match(/1:(\d+)/);
-    if (match) {
-      const originalRatio = parseInt(match[1]);
-      return `1:${Math.round(originalRatio * multiplier)}`;
-    }
-    return ratio;
+    if (match) return parseInt(match[1]);
+    // Otherwise it's just a number
+    const num = parseInt(ratio);
+    return isNaN(num) ? 10 : num;
+  };
+
+  const formatRatio = (ratioNum: number): string => `1:${Math.round(ratioNum)}`;
+
+  const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
+    const originalNum = parseRatioNumber(ratio);
+    // Lower multiplier = lower ratio number = more insulin per carb
+    return formatRatio(originalNum * multiplier);
+  };
+
+  const getOriginalRatio = (ratio: string | undefined): string => {
+    return formatRatio(parseRatioNumber(ratio));
   };
 
   let ratioMultiplier = 1;
@@ -264,10 +277,10 @@ function calculateSickDayRecommendations(
     lunchRatio: adjustRatio(settings.lunchRatio, ratioMultiplier),
     dinnerRatio: adjustRatio(settings.dinnerRatio, ratioMultiplier),
     snackRatio: adjustRatio(settings.snackRatio, ratioMultiplier),
-    originalBreakfastRatio: settings.breakfastRatio || "1:10",
-    originalLunchRatio: settings.lunchRatio || "1:10",
-    originalDinnerRatio: settings.dinnerRatio || "1:10",
-    originalSnackRatio: settings.snackRatio || "1:10",
+    originalBreakfastRatio: getOriginalRatio(settings.breakfastRatio),
+    originalLunchRatio: getOriginalRatio(settings.lunchRatio),
+    originalDinnerRatio: getOriginalRatio(settings.dinnerRatio),
+    originalSnackRatio: getOriginalRatio(settings.snackRatio),
     ratioMultiplier,
     basalAdjustment,
     hydrationNote,
