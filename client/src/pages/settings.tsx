@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, BookOpen, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
@@ -851,6 +852,30 @@ export default function Settings() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-primary" />
+              <CardTitle>Help & Documentation</CardTitle>
+            </div>
+            <CardDescription>Learn how to use all features of Diabeaters.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/documentation">
+              <Button variant="outline" className="w-full justify-between" data-testid="button-view-documentation">
+                <span className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  View Full Documentation
+                </span>
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </Link>
+            <p className="text-sm text-muted-foreground mt-3">
+              Complete guide to all features. Can be printed or saved as PDF.
+            </p>
           </CardContent>
         </Card>
       </div>
