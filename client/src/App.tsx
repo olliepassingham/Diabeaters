@@ -38,7 +38,6 @@ import Appointments from "@/pages/appointments";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
 import Shop from "@/pages/shop";
-import Documentation from "@/pages/documentation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -55,7 +54,6 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
       <Route path="/shop" component={Shop} />
-      <Route path="/documentation" component={Documentation} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -81,10 +79,6 @@ function AppContent() {
 
   if (location === "/onboarding") {
     return <Onboarding />;
-  }
-
-  if (location === "/documentation") {
-    return <Documentation />;
   }
 
   if (!hasChecked) {
