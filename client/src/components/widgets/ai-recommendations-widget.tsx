@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Brain, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Activity, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState } from "@/lib/storage";
 
@@ -11,6 +11,8 @@ interface AIInsight {
   message: string;
   reasoning?: string;
   priority: "info" | "warning" | "tip";
+  actionLink?: string;
+  actionLabel?: string;
 }
 
 function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AIInsight[] {
@@ -24,24 +26,30 @@ function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AII
       message: `${criticalSupplies[0].name} will run out in ${storage.getDaysRemaining(criticalSupplies[0])} days. Consider ordering today.`,
       reasoning: "Running out of supplies can be dangerous. Ordering with a buffer ensures you're covered for delays.",
       priority: "warning",
+      actionLink: "/supplies",
+      actionLabel: "View Supplies",
     });
   }
 
   if (scenarioState.sickDayActive) {
     insights.push({
-      title: "Sick Day Reminder",
+      title: "Sick Day Active",
       message: "Check blood glucose more frequently when unwell. Stay hydrated.",
       reasoning: "Illness can affect blood glucose levels unpredictably. More frequent monitoring helps catch issues early.",
       priority: "info",
+      actionLink: "/scenarios?tab=sick-day",
+      actionLabel: "View Sick Day",
     });
   }
 
   if (scenarioState.travelModeActive) {
     insights.push({
-      title: "Travel Tip",
+      title: "Travel Mode Active",
       message: "Remember to keep insulin in carry-on luggage and adjust for timezone changes.",
       reasoning: "Checked luggage can be lost or exposed to extreme temperatures. Timezones affect meal and dose timing.",
       priority: "tip",
+      actionLink: "/scenarios?tab=travel",
+      actionLabel: "View Travel Plan",
     });
   }
 
@@ -51,14 +59,18 @@ function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AII
       message: `${lowSupplies.length} item${lowSupplies.length > 1 ? "s are" : " is"} running low. Good time to check your pharmacy hours.`,
       reasoning: "Planning restocks before items become critical reduces stress and emergency situations.",
       priority: "tip",
+      actionLink: "/supplies",
+      actionLabel: "View Supplies",
     });
   }
 
   if (insights.length === 0) {
     insights.push({
-      title: "Looking Good",
+      title: "All Clear",
       message: "Your supplies are well-stocked and no active scenarios. Keep it up!",
       priority: "info",
+      actionLink: "/advisor",
+      actionLabel: "Plan an Activity",
     });
   }
 
@@ -80,8 +92,8 @@ export function AIRecommendationsWidget() {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">AI Insights</CardTitle>
+            <Activity className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Status Alerts</CardTitle>
           </div>
           <Badge variant="outline" className="text-xs">
             Not medical advice
@@ -110,8 +122,7 @@ export function AIRecommendationsWidget() {
               {insight.reasoning && (
                 <Button 
                   variant="ghost" 
-                  size="sm" 
-                  className="h-6 w-6 p-0"
+                  size="icon"
                   onClick={() => setExpanded(expanded === insight.title ? null : insight.title)}
                   data-testid={`button-expand-${index}`}
                 >
@@ -136,11 +147,13 @@ export function AIRecommendationsWidget() {
           <span>Always consult your healthcare team</span>
         </div>
 
-        <Link href="/advisor">
-          <Button variant="outline" size="sm" className="w-full" data-testid="button-ask-ai">
-            Ask AI Advisor
-          </Button>
-        </Link>
+        {insights[0]?.actionLink && (
+          <Link href={insights[0].actionLink}>
+            <Button variant="outline" size="sm" className="w-full" data-testid="button-status-action">
+              {insights[0].actionLabel || "View Details"}
+            </Button>
+          </Link>
+        )}
       </CardContent>
     </Card>
   );
