@@ -294,6 +294,16 @@ function calculateSickDayRecommendations(
   };
 }
 
+const SICK_DAY_STORAGE_KEY = "diabeater_sick_day_session";
+
+interface SickDaySession {
+  bgLevel: string;
+  severity: string;
+  ketoneLevel: KetoneLevel | "";
+  results: SickDayResults | null;
+  lastUpdated: string;
+}
+
 export default function SickDay() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>({});
@@ -304,6 +314,17 @@ export default function SickDay() {
   const [results, setResults] = useState<SickDayResults | null>(null);
   const [bgUnits, setBgUnits] = useState("mg/dL");
   const [isSickDayActive, setIsSickDayActive] = useState(false);
+
+  const saveSession = (newResults: SickDayResults | null) => {
+    const session: SickDaySession = {
+      bgLevel,
+      severity,
+      ketoneLevel,
+      results: newResults,
+      lastUpdated: new Date().toISOString(),
+    };
+    localStorage.setItem(SICK_DAY_STORAGE_KEY, JSON.stringify(session));
+  };
 
   useEffect(() => {
     const storedSettings = storage.getSettings();
@@ -321,8 +342,26 @@ export default function SickDay() {
     // Check if sick day mode is already active
     const scenarioState = storage.getScenarioState();
     setIsSickDayActive(scenarioState.sickDayActive || false);
-    if (scenarioState.sickDayActive && scenarioState.sickDaySeverity) {
-      setSeverity(scenarioState.sickDaySeverity);
+
+    // Load saved session only if sick day is active
+    if (scenarioState.sickDayActive) {
+      const savedSession = localStorage.getItem(SICK_DAY_STORAGE_KEY);
+      if (savedSession) {
+        try {
+          const session: SickDaySession = JSON.parse(savedSession);
+          if (session.bgLevel) setBgLevel(session.bgLevel);
+          if (session.severity) setSeverity(session.severity);
+          if (session.ketoneLevel) setKetoneLevel(session.ketoneLevel);
+          if (session.results) setResults(session.results);
+        } catch (e) {
+          console.error("Failed to load sick day session", e);
+        }
+      } else if (scenarioState.sickDaySeverity) {
+        setSeverity(scenarioState.sickDaySeverity);
+      }
+    } else {
+      // Clear any stale session data if sick day is not active
+      localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
   }, []);
 
@@ -339,6 +378,10 @@ export default function SickDay() {
   const handleDeactivateSickDay = () => {
     storage.deactivateSickDay();
     setIsSickDayActive(false);
+    localStorage.removeItem(SICK_DAY_STORAGE_KEY);
+    setResults(null);
+    setBgLevel("");
+    setKetoneLevel("");
     toast({
       title: "Sick Day Mode Deactivated",
       description: "Glad you're feeling better! Status removed from dashboard.",
@@ -390,6 +433,7 @@ export default function SickDay() {
     }
     
     setResults(recommendations);
+    saveSession(recommendations);
 
     storage.addActivityLog({
       activityType: "sick_day_calculation",
@@ -527,6 +571,54 @@ export default function SickDay() {
         </Card>
 
         {results && (
+          <>
+          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                Update Your Readings
+              </CardTitle>
+              <CardDescription>Quickly recalculate with new glucose or ketone levels</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="update-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
+                  <Input
+                    id="update-bg"
+                    type="number"
+                    placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
+                    value={bgLevel}
+                    onChange={(e) => setBgLevel(e.target.value)}
+                    data-testid="input-update-bg-level"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="update-ketones" className="text-sm">Ketone Level</Label>
+                  <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
+                    <SelectTrigger id="update-ketones" data-testid="select-update-ketone-level">
+                      <SelectValue placeholder="Select level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (negative)</SelectItem>
+                      <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
+                      <SelectItem value="small">Small (0.6-1.5)</SelectItem>
+                      <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
+                      <SelectItem value="large">Large (3.0+)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button 
+                onClick={handleCalculate} 
+                className="w-full"
+                data-testid="button-update-readings"
+              >
+                Update Recommendations
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card className="border-primary/50">
             <CardHeader>
               <CardTitle>Sick Day Recommendations</CardTitle>
@@ -752,6 +844,7 @@ export default function SickDay() {
               </div>
             </CardContent>
           </Card>
+          </>
         )}
 
       </div>

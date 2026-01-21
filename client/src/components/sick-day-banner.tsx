@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Thermometer, X, ChevronRight } from "lucide-react";
+import { Thermometer, X, ChevronRight, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { storage, ScenarioState } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
 
 export function SickDayBanner() {
+  const { toast } = useToast();
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ 
     travelModeActive: false, 
     sickDayActive: false 
@@ -42,6 +44,16 @@ export function SickDayBanner() {
     };
   }, [scenarioState.sickDayActive]);
 
+  const handleDeactivate = () => {
+    storage.deactivateSickDay();
+    localStorage.removeItem("diabeater_sick_day_session");
+    setScenarioState({ ...scenarioState, sickDayActive: false });
+    toast({
+      title: "Sick Day Mode Deactivated",
+      description: "Glad you're feeling better!",
+    });
+  };
+
   if (!scenarioState.sickDayActive || dismissed) {
     return null;
   }
@@ -78,10 +90,22 @@ export function SickDayBanner() {
             className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0"
             data-testid="button-banner-view-guidance"
           >
-            View Guidance
+            <span className="hidden sm:inline">View Guidance</span>
+            <span className="sm:hidden">View</span>
             <ChevronRight className="h-3 w-3 ml-1" />
           </Button>
         </Link>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0"
+          onClick={handleDeactivate}
+          data-testid="button-banner-deactivate"
+        >
+          <Power className="h-3 w-3 mr-1" />
+          <span className="hidden sm:inline">I'm Better</span>
+          <span className="sm:hidden">End</span>
+        </Button>
         <Button
           variant="ghost"
           size="icon"
