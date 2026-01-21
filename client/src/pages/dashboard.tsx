@@ -28,19 +28,26 @@ import {
 type HealthStatus = "stable" | "watch" | "action";
 
 function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState): HealthStatus {
-  const minDays = supplies.length > 0 
-    ? Math.min(...supplies.map(s => s.dailyUsage > 0 ? s.currentQuantity / s.dailyUsage : 999))
-    : 999;
+  // Use the same calculation as the Supplies page for consistency
+  const supplyStatuses = supplies.map(s => storage.getSupplyStatus(s));
+  const hasCritical = supplyStatuses.includes("critical");
+  const hasLow = supplyStatuses.includes("low");
   
+  // Severe sick day is always action needed
   if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
     return "action";
   }
-  if (minDays < 2) {
+  
+  // Critical supplies (≤3 days) = action needed
+  if (hasCritical) {
     return "action";
   }
-  if (minDays < 7 || scenarioState.sickDayActive) {
+  
+  // Low supplies (≤7 days) or any sick day = watch
+  if (hasLow || scenarioState.sickDayActive) {
     return "watch";
   }
+  
   return "stable";
 }
 
