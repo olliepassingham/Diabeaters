@@ -19,14 +19,40 @@ type MessageAction = {
   onClick: () => void;
 };
 
+type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+
 type Message = {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
   action?: MessageAction;
+  confidence?: ConfidenceLevel;
+  mealPeriod?: string;
 };
 
-function ChatMessage({ role, content, timestamp, action }: Message) {
+function ConfidenceBadge({ level, mealPeriod }: { level: ConfidenceLevel; mealPeriod?: string }) {
+  const config = {
+    HIGH: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", label: "High confidence" },
+    MEDIUM: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400", label: "Medium confidence" },
+    LOW: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400", label: "Low confidence" },
+  };
+  const c = config[level];
+  return (
+    <div className="flex items-center gap-2 mt-2 flex-wrap">
+      <span className={`text-xs px-2 py-0.5 rounded-full ${c.bg} ${c.text}`} data-testid="badge-confidence">
+        {c.label}
+      </span>
+      {mealPeriod && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1" data-testid="badge-meal-period">
+          <Clock className="h-3 w-3" />
+          {mealPeriod} time
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ChatMessage({ role, content, timestamp, action, confidence, mealPeriod }: Message) {
   return (
     <div className={`flex gap-3 ${role === "user" ? "flex-row-reverse" : ""}`}>
       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
@@ -45,6 +71,9 @@ function ChatMessage({ role, content, timestamp, action }: Message) {
             : "bg-muted"
         }`}>
           <p className="text-sm whitespace-pre-wrap">{content}</p>
+          {role === "assistant" && confidence && (
+            <ConfidenceBadge level={confidence} mealPeriod={mealPeriod} />
+          )}
           {action && (
             <Button 
               size="sm" 
@@ -639,10 +668,18 @@ export default function Advisor() {
     setIsMealTyping(true);
 
     let aiResponse: string;
+    let confidence: ConfidenceLevel = "MEDIUM";
+    let mealPeriod: string | undefined;
 
     try {
       const userProfile = storage.getProfile();
       const userSettings = storage.getSettings();
+      const activityLogs = storage.getActivityLogs().slice(0, 5);
+      
+      // Build conversation history for context (excluding the welcome message)
+      const conversationHistory = [...mealMessages, userMessage]
+        .filter(m => m.content !== mealMessages[0]?.content)
+        .map(m => ({ role: m.role, content: m.content }));
       
       const response = await fetch("/api/activity/advice", {
         method: "POST",
@@ -652,12 +689,17 @@ export default function Advisor() {
           activityDetails: message,
           userProfile,
           userSettings,
+          conversationHistory,
+          activityLogs,
+          currentTime: new Date().toISOString(),
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         aiResponse = data.recommendation + "\n\n[Not medical advice. Always verify with your own calculations.]";
+        confidence = data.confidence || "MEDIUM";
+        mealPeriod = data.mealPeriod;
       } else {
         // API unavailable or error - use local processing
         aiResponse = processUserMessage(message, userSettings, bgUnits, "meal");
@@ -672,6 +714,8 @@ export default function Advisor() {
       role: "assistant",
       content: aiResponse,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      confidence,
+      mealPeriod,
       action: {
         label: "Plan Exercise",
         onClick: () => setActiveTab("exercise"),
@@ -701,10 +745,17 @@ export default function Advisor() {
     setIsExerciseTyping(true);
 
     let aiResponse: string;
+    let confidence: ConfidenceLevel = "MEDIUM";
 
     try {
       const userProfile = storage.getProfile();
       const userSettings = storage.getSettings();
+      const activityLogs = storage.getActivityLogs().slice(0, 5);
+      
+      // Build conversation history for context
+      const conversationHistory = [...exerciseMessages, userMessage]
+        .filter(m => m.content !== exerciseMessages[0]?.content)
+        .map(m => ({ role: m.role, content: m.content }));
       
       const response = await fetch("/api/activity/advice", {
         method: "POST",
@@ -714,12 +765,16 @@ export default function Advisor() {
           activityDetails: message,
           userProfile,
           userSettings,
+          conversationHistory,
+          activityLogs,
+          currentTime: new Date().toISOString(),
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses to exercise vary.]";
+        confidence = data.confidence || "MEDIUM";
       } else {
         // API unavailable or error - use local processing
         aiResponse = processUserMessage(message, userSettings, bgUnits, "exercise");
@@ -734,6 +789,7 @@ export default function Advisor() {
       role: "assistant",
       content: aiResponse,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      confidence,
     }]);
     
     try {
@@ -831,13 +887,50 @@ export default function Advisor() {
     setSessionMessages(prev => [...prev, userMessage]);
     setIsSessionTyping(true);
 
-    const freshSettings = storage.getSettings();
-    const aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
+    let aiResponse: string;
+    let confidence: ConfidenceLevel = "MEDIUM";
+
+    try {
+      const userProfile = storage.getProfile();
+      const userSettings = storage.getSettings();
+      const activityLogs = storage.getActivityLogs().slice(0, 5);
+      
+      const conversationHistory = [...sessionMessages, userMessage]
+        .filter(m => m.content !== sessionMessages[0]?.content)
+        .map(m => ({ role: m.role, content: m.content }));
+      
+      const response = await fetch("/api/activity/advice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityType: "activity_session",
+          activityDetails: message,
+          userProfile,
+          userSettings,
+          conversationHistory,
+          activityLogs,
+          currentTime: new Date().toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses vary.]";
+        confidence = data.confidence || "MEDIUM";
+      } else {
+        const freshSettings = storage.getSettings();
+        aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
+      }
+    } catch {
+      const freshSettings = storage.getSettings();
+      aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
+    }
 
     setSessionMessages(prev => [...prev, {
       role: "assistant",
       content: aiResponse,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      confidence,
     }]);
     
     setIsSessionTyping(false);
@@ -877,11 +970,14 @@ export default function Advisor() {
           <InfoSection title="Exercise Tab">
             <p>Plan workouts by type, duration, and intensity. Get preparation tips including what to eat before, during, and after exercise.</p>
           </InfoSection>
-          <InfoSection title="Session Tab (NEW)">
+          <InfoSection title="Session Tab">
             <p>Plan your complete activity session: pre-workout fuel, the exercise itself, and recovery eating - all in one place with adjusted insulin recommendations.</p>
           </InfoSection>
-          <InfoSection title="Meal + Exercise Linking">
-            <p>When eating close to exercise, enable the exercise toggle to get adjusted insulin doses that account for increased sensitivity during and after activity.</p>
+          <InfoSection title="Smart Features">
+            <p><strong>Conversation Memory:</strong> The AI remembers what you've asked in this session for better follow-up answers.</p>
+            <p><strong>Time Awareness:</strong> Automatically uses your breakfast/lunch/dinner ratios based on current time.</p>
+            <p><strong>Learning:</strong> Uses your activity history to provide more personalised recommendations.</p>
+            <p><strong>Confidence Indicator:</strong> Shows how certain the AI is - green (high), amber (medium), or red (low).</p>
           </InfoSection>
           <InfoSection title="Safety Note">
             <p>All suggestions are for informational purposes only. Always verify with your own calculations and healthcare team. Not medical advice.</p>

@@ -76,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const { activityType, activityDetails, userProfile, userSettings } = req.body;
+      const { activityType, activityDetails, userProfile, userSettings, conversationHistory, activityLogs, currentTime } = req.body;
       
       if (!activityType || !activityDetails) {
         return res.status(400).send("Missing required fields");
@@ -108,6 +108,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const bgUnits = profile?.bgUnits || "mmol/L";
       const carbUnits = profile?.carbUnits || "Grams";
+
+      // Time-of-day awareness
+      const hour = currentTime ? new Date(currentTime).getHours() : new Date().getHours();
+      const mealPeriod = hour >= 5 && hour < 10 ? "breakfast" :
+                         hour >= 10 && hour < 14 ? "lunch" :
+                         hour >= 14 && hour < 17 ? "afternoon snack" :
+                         hour >= 17 && hour < 21 ? "dinner" : "evening snack";
+      const timeContext = `Current time: ${new Date(currentTime || Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} (${mealPeriod} time)`;
+
+      // Historical learning - recent activity logs
+      let historyContext = "";
+      if (activityLogs && activityLogs.length > 0) {
+        const relevantLogs = activityLogs.slice(0, 5);
+        historyContext = `\n**Recent Activity History (learn from patterns):**\n` +
+          relevantLogs.map((log: { activityType: string; activityDetails: string; recommendation: string }) => 
+            `- ${log.activityType}: "${log.activityDetails}" → ${log.recommendation.substring(0, 100)}...`
+          ).join("\n");
+      }
+
+      // Build conversation history for context
+      let conversationContext = "";
+      if (conversationHistory && conversationHistory.length > 0) {
+        const recentMessages = conversationHistory.slice(-6);
+        conversationContext = `\n**Previous messages in this conversation:**\n` +
+          recentMessages.map((msg: { role: string; content: string }) => 
+            `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? "..." : ""}`
+          ).join("\n");
+      }
       
       const prompt = `You are a personalised diabetes management assistant for a UK user. You MUST tailor your advice to their specific settings.
 
@@ -116,19 +144,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 - Carbohydrates: ALWAYS use ${carbUnits}
 - This is non-negotiable. Using wrong units could be dangerous.
 
+**${timeContext}**
+Use the appropriate meal ratio for this time of day (${mealPeriod}).
+
 **User's Personal Settings:**
 ${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"}
+${historyContext}
+${conversationContext}
 
-**User's Question/Activity:**
+**Current Question/Activity:**
 - Type: ${activityType}
 - Details: ${activityDetails}
 
 **Instructions:**
 1. ALWAYS express blood glucose values in ${bgUnits} - never use any other unit
-2. Use their specific carb ratios, TDD, and correction factor when making calculations
-3. Reference their actual numbers in your response
+2. Use the ${mealPeriod} ratio for this time of day when relevant
+3. Reference their actual numbers and any patterns from history
 4. Consider their insulin delivery method and diabetes type
 5. Give practical, personalised advice based on their unique settings
+6. If this is a follow-up question, reference the conversation context
+
+**IMPORTANT - End your response with a confidence indicator on a new line:**
+Format: [Confidence: HIGH/MEDIUM/LOW]
+- HIGH: User has complete settings configured and question is straightforward
+- MEDIUM: Some settings missing or activity involves multiple factors
+- LOW: Significant unknowns or unusual situation
 
 Keep the response concise (4-5 bullet points) and directly actionable. Always include a safety reminder.`;
 
@@ -136,12 +176,21 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.7,
-        max_tokens: 300,
+        max_tokens: 400,
       });
 
       const recommendation = completion.choices[0].message.content || "Unable to generate recommendation";
 
-      res.json({ recommendation });
+      // Extract confidence level from response
+      const confidenceMatch = recommendation.match(/\[Confidence:\s*(HIGH|MEDIUM|LOW)\]/i);
+      const confidence = confidenceMatch ? confidenceMatch[1].toUpperCase() : "MEDIUM";
+      const cleanRecommendation = recommendation.replace(/\[Confidence:\s*(HIGH|MEDIUM|LOW)\]/gi, "").trim();
+
+      res.json({ 
+        recommendation: cleanRecommendation, 
+        confidence,
+        mealPeriod 
+      });
     } catch (error) {
       console.error("Activity advice error:", error);
       res.status(500).send("Failed to generate advice");
