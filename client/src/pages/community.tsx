@@ -1453,25 +1453,25 @@ export default function Community() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="posts" data-testid="tab-posts">
-              <MessageCircle className="h-4 w-4 mr-2" />
+          <TabsList className="flex w-full">
+            <TabsTrigger value="posts" data-testid="tab-posts" className="flex-1">
+              <MessageCircle className="h-4 w-4 mr-1" />
               Posts
             </TabsTrigger>
-            <TabsTrigger value="news" data-testid="tab-news">
-              <Newspaper className="h-4 w-4 mr-2" />
+            <TabsTrigger value="news" data-testid="tab-news" className="flex-1">
+              <Newspaper className="h-4 w-4 mr-1" />
               News
             </TabsTrigger>
-            <TabsTrigger value="events" data-testid="tab-events">
-              <CalendarDays className="h-4 w-4 mr-2" />
+            <TabsTrigger value="events" data-testid="tab-events" className="flex-1">
+              <CalendarDays className="h-4 w-4 mr-1" />
               Events
             </TabsTrigger>
-            <TabsTrigger value="reels" data-testid="tab-reels">
-              <Film className="h-4 w-4 mr-2" />
+            <TabsTrigger value="reels" data-testid="tab-reels" className="flex-1">
+              <Film className="h-4 w-4 mr-1" />
               Reels
             </TabsTrigger>
-            <TabsTrigger value="messages" data-testid="tab-messages">
-              <Mail className="h-4 w-4 mr-2" />
+            <TabsTrigger value="messages" data-testid="tab-messages" className="flex-1">
+              <Mail className="h-4 w-4 mr-1" />
               Messages
             </TabsTrigger>
           </TabsList>
