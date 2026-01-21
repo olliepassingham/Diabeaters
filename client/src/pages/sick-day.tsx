@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Activity, Info, Plane, ChevronRight } from "lucide-react";
+import { AlertCircle, Activity, Info, Plane, ChevronRight, Power, Check } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings } from "@/lib/storage";
@@ -303,6 +303,7 @@ export default function SickDay() {
   const [ketoneLevel, setKetoneLevel] = useState<KetoneLevel | "">("");
   const [results, setResults] = useState<SickDayResults | null>(null);
   const [bgUnits, setBgUnits] = useState("mg/dL");
+  const [isSickDayActive, setIsSickDayActive] = useState(false);
 
   useEffect(() => {
     const storedSettings = storage.getSettings();
@@ -316,7 +317,33 @@ export default function SickDay() {
     if (profile?.bgUnits) {
       setBgUnits(profile.bgUnits);
     }
+
+    // Check if sick day mode is already active
+    const scenarioState = storage.getScenarioState();
+    setIsSickDayActive(scenarioState.sickDayActive || false);
+    if (scenarioState.sickDayActive && scenarioState.sickDaySeverity) {
+      setSeverity(scenarioState.sickDaySeverity);
+    }
   }, []);
+
+  const handleActivateSickDay = () => {
+    if (!severity) return;
+    storage.activateSickDay(severity);
+    setIsSickDayActive(true);
+    toast({
+      title: "Sick Day Mode Activated",
+      description: `Your dashboard will now show sick day status (${severity} severity).`,
+    });
+  };
+
+  const handleDeactivateSickDay = () => {
+    storage.deactivateSickDay();
+    setIsSickDayActive(false);
+    toast({
+      title: "Sick Day Mode Deactivated",
+      description: "Glad you're feeling better! Status removed from dashboard.",
+    });
+  };
 
   const handleCalculate = () => {
     if (!settings.tdd) {
@@ -682,6 +709,47 @@ export default function SickDay() {
                   </p>
                 </CardContent>
               </Card>
+
+              {/* Sick Day Mode Activation */}
+              <div className="pt-2 border-t">
+                {isSickDayActive ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+                      <Check className="h-5 w-5 text-orange-600" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Sick Day Mode Active</p>
+                        <p className="text-xs text-orange-700 dark:text-orange-300 capitalize">{severity} severity</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      onClick={handleDeactivateSickDay}
+                      data-testid="button-deactivate-sick-day"
+                    >
+                      <Power className="h-4 w-4 mr-2" />
+                      Deactivate Sick Day Mode
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Click when you're feeling better to remove the status from your dashboard
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Button 
+                      className="w-full" 
+                      onClick={handleActivateSickDay}
+                      data-testid="button-activate-sick-day"
+                    >
+                      <Power className="h-4 w-4 mr-2" />
+                      Activate Sick Day Mode
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      This will show a sick day status on your dashboard and remind you of adjusted ratios
+                    </p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
