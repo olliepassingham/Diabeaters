@@ -372,7 +372,9 @@ export const storage = {
     );
     
     if (existingIndex !== -1) {
-      const newTotalQuantity = supplies[existingIndex].currentQuantity + supply.currentQuantity;
+      const existingSupply = supplies[existingIndex];
+      const currentAdjustedQuantity = this.getAdjustedQuantity(existingSupply);
+      const newTotalQuantity = Math.max(0, currentAdjustedQuantity) + supply.currentQuantity;
       supplies[existingIndex].currentQuantity = newTotalQuantity;
       supplies[existingIndex].quantityAtPickup = newTotalQuantity;
       supplies[existingIndex].lastPickupDate = supply.lastPickupDate || new Date().toISOString();

@@ -254,18 +254,18 @@ function SupplyCard({
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => onUpdateQuantity(supply.id, Math.max(0, supply.currentQuantity - 1))}
+              onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - 1))}
               data-testid={`button-decrease-${supply.id}`}
             >
               -
             </Button>
             <span className="w-8 text-center text-sm" data-testid={`text-quantity-${supply.id}`}>
-              {supply.currentQuantity}
+              {Math.floor(adjustedQuantity)}
             </span>
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => onUpdateQuantity(supply.id, supply.currentQuantity + 1)}
+              onClick={() => onUpdateQuantity(supply.id, Math.floor(adjustedQuantity) + 1)}
               data-testid={`button-increase-${supply.id}`}
             >
               +
