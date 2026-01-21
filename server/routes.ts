@@ -4,6 +4,24 @@ import OpenAI from "openai";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
+// Simple in-memory cache for news articles
+interface NewsCache {
+  articles: NewsArticle[];
+  fetchedAt: number;
+}
+
+interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  source: string;
+  publishedAt: string;
+  urlToImage?: string;
+}
+
+let newsCache: NewsCache | null = null;
+const NEWS_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Root health check for deployment (must return 200 quickly)
@@ -127,6 +145,102 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
     } catch (error) {
       console.error("Activity advice error:", error);
       res.status(500).send("Failed to generate advice");
+    }
+  });
+
+  // Diabetes News API endpoint
+  app.get("/api/news", async (_req, res) => {
+    try {
+      const NEWS_API_KEY = process.env.NEWS_API_KEY;
+      
+      // Check if we have cached articles that are still fresh
+      if (newsCache && (Date.now() - newsCache.fetchedAt) < NEWS_CACHE_DURATION) {
+        return res.json({ articles: newsCache.articles, cached: true });
+      }
+
+      // If no API key, return curated fallback articles
+      if (!NEWS_API_KEY) {
+        const fallbackArticles: NewsArticle[] = [
+          {
+            title: "Latest Advances in Continuous Glucose Monitoring Technology",
+            description: "New CGM devices offer improved accuracy and longer wear times, making diabetes management easier for patients.",
+            url: "https://www.diabetes.org.uk/guide-to-diabetes/managing-your-diabetes/testing",
+            source: "Diabetes UK",
+            publishedAt: new Date().toISOString(),
+          },
+          {
+            title: "Understanding Insulin Resistance: What Every Diabetic Should Know",
+            description: "Research highlights the importance of lifestyle factors in managing insulin sensitivity.",
+            url: "https://www.diabetes.org.uk/guide-to-diabetes/enjoy-food",
+            source: "Diabetes UK",
+            publishedAt: new Date(Date.now() - 86400000).toISOString(),
+          },
+          {
+            title: "Exercise and Blood Sugar: Tips for Safe Physical Activity",
+            description: "Expert guidance on how to balance exercise with insulin and carbohydrate intake for optimal glucose control.",
+            url: "https://www.diabetes.org.uk/guide-to-diabetes/managing-your-diabetes/exercise",
+            source: "Diabetes UK",
+            publishedAt: new Date(Date.now() - 172800000).toISOString(),
+          },
+          {
+            title: "New Research on Type 1 Diabetes Prevention",
+            description: "Scientists are making progress in understanding the triggers of Type 1 diabetes and potential prevention strategies.",
+            url: "https://jdrf.org.uk/information-and-support/",
+            source: "JDRF UK",
+            publishedAt: new Date(Date.now() - 259200000).toISOString(),
+          },
+          {
+            title: "Mental Health and Diabetes: Breaking the Stigma",
+            description: "Support resources and coping strategies for the emotional challenges of living with diabetes.",
+            url: "https://www.diabetes.org.uk/guide-to-diabetes/living-with-diabetes/emotional-wellbeing",
+            source: "Diabetes UK",
+            publishedAt: new Date(Date.now() - 345600000).toISOString(),
+          },
+        ];
+        
+        return res.json({ 
+          articles: fallbackArticles, 
+          cached: false,
+          message: "Showing curated articles. Add NEWS_API_KEY for live news." 
+        });
+      }
+
+      // Fetch from NewsAPI
+      const response = await fetch(
+        `https://newsapi.org/v2/everything?q=diabetes+health&language=en&sortBy=publishedAt&pageSize=10&apiKey=${NEWS_API_KEY}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`NewsAPI responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const articles: NewsArticle[] = (data.articles || []).map((article: any) => ({
+        title: article.title || "Untitled",
+        description: article.description || "",
+        url: article.url || "#",
+        source: article.source?.name || "Unknown",
+        publishedAt: article.publishedAt || new Date().toISOString(),
+        urlToImage: article.urlToImage,
+      }));
+
+      // Cache the results
+      newsCache = {
+        articles,
+        fetchedAt: Date.now(),
+      };
+
+      res.json({ articles, cached: false });
+    } catch (error) {
+      console.error("News fetch error:", error);
+      
+      // Return cached data if available, even if stale
+      if (newsCache) {
+        return res.json({ articles: newsCache.articles, cached: true, stale: true });
+      }
+      
+      res.status(500).json({ error: "Failed to fetch news", articles: [] });
     }
   });
 

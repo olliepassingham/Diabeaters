@@ -44,8 +44,12 @@ import {
   Trash2,
   Shield,
   UsersRound,
-  Info
+  Info,
+  Newspaper,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { 
   storage, 
@@ -964,13 +968,128 @@ function ReelsView() {
   );
 }
 
+interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  source: string;
+  publishedAt: string;
+  urlToImage?: string;
+}
+
+function NewsView() {
+  const { data, isLoading, isError, refetch, isFetching } = useQuery<{ articles: NewsArticle[]; cached?: boolean; message?: string }>({
+    queryKey: ["/api/news"],
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const articles = data?.articles || [];
+  const isCached = data?.cached;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-spin" />
+          <h3 className="font-semibold text-lg mb-2">Loading news</h3>
+          <p className="text-muted-foreground">Fetching the latest diabetes news...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Newspaper className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="font-semibold text-lg mb-2">Could not load news</h3>
+          <p className="text-muted-foreground mb-4">There was a problem fetching news articles.</p>
+          <Button onClick={() => refetch()} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {isCached ? "Cached" : "Latest"} diabetes news from trusted sources
+        </p>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => refetch()} 
+          disabled={isFetching}
+          data-testid="button-refresh-news"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {articles.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Newspaper className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="font-semibold text-lg mb-2">No news available</h3>
+            <p className="text-muted-foreground">Check back later for diabetes news updates.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {articles.map((article, index) => (
+            <Card 
+              key={index} 
+              className="cursor-pointer hover-elevate transition-all"
+              onClick={() => window.open(article.url, "_blank", "noopener,noreferrer")}
+              data-testid={`news-article-${index}`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <Badge variant="secondary">{article.source}</Badge>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(article.publishedAt), { addSuffix: true })}
+                  </div>
+                </div>
+                
+                <h3 className="font-semibold text-lg mb-2 line-clamp-2">{article.title}</h3>
+                
+                {article.description && (
+                  <p className="text-muted-foreground text-sm line-clamp-2 mb-2">
+                    {article.description}
+                  </p>
+                )}
+                
+                <div className="flex items-center text-sm text-primary">
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  Read full article
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground text-center">
+        News articles are from external sources. Always verify with your healthcare team.
+      </p>
+    </div>
+  );
+}
+
 export default function Community() {
   const { toast } = useToast();
   
   const getInitialTab = () => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts") {
+    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts" || tab === "news") {
       return tab;
     }
     return "posts";
@@ -999,7 +1118,7 @@ export default function Community() {
     
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts") {
+    if (tab === "events" || tab === "reels" || tab === "messages" || tab === "posts" || tab === "news") {
       setActiveTab(tab);
     }
   }, []);
@@ -1233,20 +1352,20 @@ export default function Community() {
                 <InfoSection title="Posts Tab">
                   <p>Browse questions and discussions from other users. Filter by topic or see posts from people you follow.</p>
                 </InfoSection>
-                <InfoSection title="Asking Questions">
-                  <p>Click "Ask Question" to share your question. You can post anonymously to keep your identity private.</p>
+                <InfoSection title="News Tab">
+                  <p>Stay updated with the latest diabetes news from trusted sources like Diabetes UK and JDRF. Articles are updated automatically.</p>
                 </InfoSection>
                 <InfoSection title="Events Tab">
                   <p>Discover diabetes-related events, support groups, and meet-ups happening locally or online.</p>
                 </InfoSection>
                 <InfoSection title="Reels Tab">
-                  <p>Watch helpful video content from diabetes educators and the community on topics like meal prep, exercise tips, and daily management.</p>
+                  <p>Watch helpful video content from diabetes educators on topics like meal prep, exercise tips, and daily management.</p>
                 </InfoSection>
                 <InfoSection title="Messages Tab">
                   <p>Send private messages to other community members you want to connect with.</p>
                 </InfoSection>
                 <InfoSection title="Community Guidelines">
-                  <p>Posts are personal experiences, not medical advice. Use the report button if you see inappropriate content.</p>
+                  <p>Posts and news are for information only, not medical advice. Always verify with your healthcare team.</p>
                 </InfoSection>
               </PageInfoDialog>
             </div>
@@ -1334,10 +1453,14 @@ export default function Community() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="posts" data-testid="tab-posts">
               <MessageCircle className="h-4 w-4 mr-2" />
               Posts
+            </TabsTrigger>
+            <TabsTrigger value="news" data-testid="tab-news">
+              <Newspaper className="h-4 w-4 mr-2" />
+              News
             </TabsTrigger>
             <TabsTrigger value="events" data-testid="tab-events">
               <CalendarDays className="h-4 w-4 mr-2" />
@@ -1434,6 +1557,10 @@ export default function Community() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="news" className="mt-4">
+            <NewsView />
           </TabsContent>
 
           <TabsContent value="events" className="mt-4">
