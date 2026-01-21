@@ -14,6 +14,8 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
 const mmolToMgdl = (mmol: number) => Math.round(mmol * 18);
 
+type KetoneLevel = "none" | "trace" | "small" | "moderate" | "large";
+
 interface SickDayResults {
   correctionDose: number;
   correctionExplanation: string;
@@ -24,10 +26,17 @@ interface SickDayResults {
   lunchRatio: string;
   dinnerRatio: string;
   snackRatio: string;
+  originalBreakfastRatio: string;
+  originalLunchRatio: string;
+  originalDinnerRatio: string;
+  originalSnackRatio: string;
+  ratioMultiplier: number;
   basalAdjustment: string;
   hydrationNote: string;
   monitoringFrequency: string;
   ketoneWarning: string;
+  ketoneGuidance: string;
+  ketoneActionRequired: "none" | "monitor" | "urgent" | "emergency";
   stackingWarning: string;
 }
 
@@ -44,6 +53,7 @@ function calculateSickDayRecommendations(
   tdd: number,
   bgLevel: number,
   severity: string,
+  ketoneLevel: KetoneLevel,
   settings: UserSettings,
   bgUnits: string
 ): SickDayResults {
@@ -159,6 +169,8 @@ function calculateSickDayRecommendations(
   let hydrationNote = "Drink plenty of sugar-free fluids";
   let monitoringFrequency = "Check blood glucose every 4 hours";
   let ketoneWarning = "";
+  let ketoneGuidance = "";
+  let ketoneActionRequired: "none" | "monitor" | "urgent" | "emergency" = "none";
   let stackingWarning = "";
 
   switch (severity) {
@@ -173,7 +185,6 @@ function calculateSickDayRecommendations(
       basalAdjustment = "Consider 10-20% increase if blood glucose remains elevated";
       hydrationNote = "Stay well hydrated with sugar-free fluids. Consider electrolyte drinks.";
       monitoringFrequency = "Check blood glucose every 2-4 hours";
-      ketoneWarning = bgLevel > 250 ? "Check ketones now and every 2-4 hours while elevated" : "";
       stackingWarning = "Wait at least 4 hours between corrections - absorption may be delayed";
       break;
     case "severe":
@@ -181,14 +192,66 @@ function calculateSickDayRecommendations(
       basalAdjustment = "Consider 20% increase, but monitor closely for lows if unable to eat";
       hydrationNote = "Critical: Stay hydrated. If vomiting, seek medical attention immediately.";
       monitoringFrequency = "Check blood glucose and ketones every 2 hours";
-      ketoneWarning = "Check ketones immediately and every 2 hours. Seek help if ketones are moderate/large.";
       stackingWarning = "Do NOT give additional corrections for at least 4-5 hours. Insulin absorption is unpredictable during severe illness.";
       break;
   }
 
-  // Additional warnings based on BG level
-  if (bgLevel >= BG_ZONES.CRITICAL.min) {
-    ketoneWarning = "URGENT: Blood glucose is critically high. Check ketones immediately and contact your healthcare team or go to A&E if ketones are present.";
+  // === KETONE-SPECIFIC GUIDANCE ===
+  // Based on combination of ketone level and blood glucose
+  const isHighBg = bgLevel > 250; // 13.9 mmol/L
+  const isVeryHighBg = bgLevel > 300; // 16.7 mmol/L
+  const isCriticalBg = bgLevel >= 400; // 22.2 mmol/L
+
+  switch (ketoneLevel) {
+    case "none":
+      if (isHighBg) {
+        ketoneGuidance = "No ketones detected - good sign. Continue monitoring blood glucose and recheck ketones in 2-4 hours if glucose stays high.";
+        ketoneActionRequired = "monitor";
+      } else {
+        ketoneGuidance = "No ketones detected. Continue regular sick day monitoring.";
+        ketoneActionRequired = "none";
+      }
+      break;
+    case "trace":
+      ketoneGuidance = "Trace ketones can appear during illness or if you haven't eaten. Drink extra fluids (250ml water per hour) and recheck in 2 hours.";
+      ketoneActionRequired = "monitor";
+      if (isHighBg) {
+        ketoneWarning = "Trace ketones with elevated glucose - take correction dose and increase fluids.";
+      }
+      break;
+    case "small":
+      ketoneGuidance = "Small ketones indicate your body needs more insulin. Drink 250-500ml fluids per hour. Take correction dose if not already given. Recheck ketones every 2 hours.";
+      ketoneActionRequired = "monitor";
+      ketoneWarning = "Small ketones present - ensure you're getting enough insulin and fluids.";
+      if (isVeryHighBg) {
+        ketoneActionRequired = "urgent";
+        ketoneWarning = "Small ketones with high glucose - contact your diabetes team for guidance if ketones don't improve in 2 hours.";
+      }
+      break;
+    case "moderate":
+      ketoneGuidance = "Moderate ketones are a warning sign of developing DKA (diabetic ketoacidosis). You need extra insulin NOW. Drink 500ml fluids per hour. Contact your diabetes team immediately.";
+      ketoneActionRequired = "urgent";
+      ketoneWarning = "URGENT: Moderate ketones detected. This requires immediate attention. Contact your diabetes team now.";
+      if (isVeryHighBg || severity === "severe") {
+        ketoneActionRequired = "emergency";
+        ketoneWarning = "EMERGENCY: Moderate ketones with high glucose or severe illness. Go to A&E or call 999 if you cannot reach your diabetes team.";
+      }
+      break;
+    case "large":
+      ketoneGuidance = "Large ketones are a medical emergency. You are at high risk of DKA (diabetic ketoacidosis). Do NOT wait - seek emergency medical care immediately.";
+      ketoneActionRequired = "emergency";
+      ketoneWarning = "EMERGENCY: Large ketones detected. Go to A&E immediately or call 999. This is a medical emergency.";
+      break;
+  }
+
+  // Override with critical BG warning if applicable
+  if (isCriticalBg) {
+    ketoneWarning = "URGENT: Blood glucose is critically high. " + (ketoneLevel === "none" 
+      ? "Check ketones immediately and contact your healthcare team."
+      : ketoneWarning);
+    if (ketoneLevel !== "large") {
+      ketoneActionRequired = ketoneActionRequired === "emergency" ? "emergency" : "urgent";
+    }
   }
 
   return {
@@ -201,10 +264,17 @@ function calculateSickDayRecommendations(
     lunchRatio: adjustRatio(settings.lunchRatio, ratioMultiplier),
     dinnerRatio: adjustRatio(settings.dinnerRatio, ratioMultiplier),
     snackRatio: adjustRatio(settings.snackRatio, ratioMultiplier),
+    originalBreakfastRatio: settings.breakfastRatio || "1:10",
+    originalLunchRatio: settings.lunchRatio || "1:10",
+    originalDinnerRatio: settings.dinnerRatio || "1:10",
+    originalSnackRatio: settings.snackRatio || "1:10",
+    ratioMultiplier,
     basalAdjustment,
     hydrationNote,
     monitoringFrequency,
     ketoneWarning,
+    ketoneGuidance,
+    ketoneActionRequired,
     stackingWarning,
   };
 }
@@ -215,6 +285,7 @@ export default function SickDay() {
   const [tdd, setTdd] = useState("");
   const [bgLevel, setBgLevel] = useState("");
   const [severity, setSeverity] = useState<string>("");
+  const [ketoneLevel, setKetoneLevel] = useState<KetoneLevel | "">("");
   const [results, setResults] = useState<SickDayResults | null>(null);
   const [bgUnits, setBgUnits] = useState("mg/dL");
 
@@ -242,10 +313,10 @@ export default function SickDay() {
       return;
     }
     
-    if (!bgLevel || !severity) {
+    if (!bgLevel || !severity || !ketoneLevel) {
       toast({
         title: "Missing information",
-        description: "Please fill in blood glucose and severity to calculate recommendations.",
+        description: "Please fill in blood glucose, severity, and ketone level to calculate recommendations.",
         variant: "destructive",
       });
       return;
@@ -265,7 +336,7 @@ export default function SickDay() {
 
     // Convert to mg/dL for internal calculations if user uses mmol/L
     const bgInMgdl = bgUnits === "mmol/L" ? mmolToMgdl(bgNum) : bgNum;
-    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, settings, bgUnits);
+    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, ketoneLevel as KetoneLevel, settings, bgUnits);
     
     if (isNaN(recommendations.correctionDose)) {
       toast({
@@ -280,7 +351,7 @@ export default function SickDay() {
 
     storage.addActivityLog({
       activityType: "sick_day_calculation",
-      activityDetails: `TDD: ${tddNum}, BG: ${bgNum}, Severity: ${severity}`,
+      activityDetails: `TDD: ${tddNum}, BG: ${bgNum}, Severity: ${severity}, Ketones: ${ketoneLevel}`,
       recommendation: `Correction: ${recommendations.correctionDose}u, Ratios adjusted`,
     });
   };
@@ -383,6 +454,25 @@ export default function SickDay() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="ketone-level">Ketone Level</Label>
+              <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
+                <SelectTrigger id="ketone-level" data-testid="select-ketone-level">
+                  <SelectValue placeholder="Select ketone level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None / Negative</SelectItem>
+                  <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
+                  <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
+                  <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
+                  <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Use blood ketone meter or urine ketone strips to check
+              </p>
+            </div>
+
             <Button 
               onClick={handleCalculate} 
               className="w-full" 
@@ -401,14 +491,52 @@ export default function SickDay() {
               <CardDescription>Based on your current condition</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {results.ketoneWarning && (
+              {results.ketoneActionRequired === "emergency" && (
+                <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500 animate-pulse">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-base text-white">EMERGENCY - Seek Medical Help Now</p>
+                      <p className="text-sm text-red-100 mt-1">{results.ketoneWarning}</p>
+                      <p className="text-sm text-white mt-2 font-medium">{results.ketoneGuidance}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {results.ketoneActionRequired === "urgent" && (
                 <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Ketone Alert</p>
+                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent - Contact Diabetes Team</p>
                       <p className="text-xs text-red-800 dark:text-red-200 mt-1">{results.ketoneWarning}</p>
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-2">{results.ketoneGuidance}</p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {results.ketoneActionRequired === "monitor" && results.ketoneGuidance && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm text-amber-900 dark:text-amber-100">Ketone Monitoring</p>
+                      {results.ketoneWarning && (
+                        <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">{results.ketoneWarning}</p>
+                      )}
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">{results.ketoneGuidance}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {results.ketoneActionRequired === "none" && results.ketoneGuidance && (
+                <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-green-800 dark:text-green-200">{results.ketoneGuidance}</p>
                   </div>
                 </div>
               )}
@@ -457,27 +585,44 @@ export default function SickDay() {
               )}
 
               <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                    ×{results.ratioMultiplier} adjustment
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Breakfast</p>
-                    <p className="font-semibold mt-1" data-testid="text-breakfast-ratio">{results.breakfastRatio}</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="font-semibold" data-testid="text-breakfast-ratio">{results.breakfastRatio}</p>
+                      <span className="text-xs text-muted-foreground line-through">{results.originalBreakfastRatio}</span>
+                    </div>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Lunch</p>
-                    <p className="font-semibold mt-1" data-testid="text-lunch-ratio">{results.lunchRatio}</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="font-semibold" data-testid="text-lunch-ratio">{results.lunchRatio}</p>
+                      <span className="text-xs text-muted-foreground line-through">{results.originalLunchRatio}</span>
+                    </div>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Dinner</p>
-                    <p className="font-semibold mt-1" data-testid="text-dinner-ratio">{results.dinnerRatio}</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="font-semibold" data-testid="text-dinner-ratio">{results.dinnerRatio}</p>
+                      <span className="text-xs text-muted-foreground line-through">{results.originalDinnerRatio}</span>
+                    </div>
                   </div>
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Snacks</p>
-                    <p className="font-semibold mt-1" data-testid="text-snack-ratio">{results.snackRatio}</p>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="font-semibold" data-testid="text-snack-ratio">{results.snackRatio}</p>
+                      <span className="text-xs text-muted-foreground line-through">{results.originalSnackRatio}</span>
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Ratios show: 1 unit of insulin per X grams of carbohydrates (tighter than usual)
+                  Lower ratio number = more insulin per carb (to overcome illness-related insulin resistance)
                 </p>
               </div>
 
