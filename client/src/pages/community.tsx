@@ -1005,7 +1005,7 @@ function NewsView() {
           <Newspaper className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <h3 className="font-semibold text-lg mb-2">Could not load news</h3>
           <p className="text-muted-foreground mb-4">There was a problem fetching news articles.</p>
-          <Button onClick={() => refetch()} variant="outline">
+          <Button onClick={() => refetch()} variant="outline" data-testid="button-retry-news">
             <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
           </Button>
@@ -1066,7 +1066,7 @@ function NewsView() {
                   </p>
                 )}
                 
-                <div className="flex items-center text-sm text-primary">
+                <div className="flex items-center text-sm text-muted-foreground">
                   <ExternalLink className="h-3 w-3 mr-1" />
                   Read full article
                 </div>
