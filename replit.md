@@ -78,3 +78,14 @@ Preferred communication style: Simple, everyday language.
 ### Fonts
 - **Google Fonts**: Inter/DM Sans for body text, Fira Code/Geist Mono for data display
 - Loaded via CDN in index.html
+
+## Future Ideas
+
+### Family/Carer Mode
+Allow parents, partners, or carers to help manage diabetes for someone they look after:
+- **Linked Accounts**: Primary user invites carers via code/link, multiple carers supported
+- **Permission Levels**: View Only, Manage (add supplies/appointments), Full Access (change settings)
+- **Carer Dashboard**: At-a-glance status, health indicator, supply alerts
+- **For Parents**: See child's supplies, get sick day notifications, review AI recommendations, manage appointments remotely
+- **Privacy Controls**: Primary user controls access, can revoke instantly, activity log of carer actions
+- **Technical Note**: Requires moving from local storage to database with user authentication and real-time sync
