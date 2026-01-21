@@ -154,27 +154,29 @@ function calculateSickDayRecommendations(
 
   // === RATIO AND OTHER ADJUSTMENTS ===
   
-  // Helper to parse ratio - settings stores just a number (e.g., "10" means 1 unit per 10g)
-  const parseRatioNumber = (ratio: string | undefined): number => {
-    if (!ratio) return 10; // Default 1:10
-    // If it's already in "1:X" format, extract X
-    const match = ratio.match(/1:(\d+)/);
-    if (match) return parseInt(match[1]);
-    // Otherwise it's just a number
-    const num = parseInt(ratio);
-    return isNaN(num) ? 10 : num;
+  // Settings stores units per 10g carbs (e.g., "1" = 1 unit per 10g, "1.5" = 1.5 units per 10g)
+  const parseUnitsPerCP = (ratio: string | undefined): number => {
+    if (!ratio) return 1; // Default 1 unit per 10g
+    const num = parseFloat(ratio);
+    return isNaN(num) ? 1 : num;
   };
 
-  const formatRatio = (ratioNum: number): string => `1:${Math.round(ratioNum)}`;
+  // Format as "X:10g" where X is units per 10g carbs (carb portion)
+  const formatRatio = (units: number): string => {
+    // Round to 1 decimal place for display
+    const rounded = Math.round(units * 10) / 10;
+    return `${rounded}:10g`;
+  };
 
   const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
-    const originalNum = parseRatioNumber(ratio);
-    // Lower multiplier = lower ratio number = more insulin per carb
-    return formatRatio(originalNum * multiplier);
+    const originalUnits = parseUnitsPerCP(ratio);
+    // During illness, INCREASE units (more insulin needed)
+    // multiplier > 1 means more insulin (e.g., 1.2 = 20% more)
+    return formatRatio(originalUnits * multiplier);
   };
 
   const getOriginalRatio = (ratio: string | undefined): string => {
-    return formatRatio(parseRatioNumber(ratio));
+    return formatRatio(parseUnitsPerCP(ratio));
   };
 
   let ratioMultiplier = 1;
@@ -188,20 +190,20 @@ function calculateSickDayRecommendations(
 
   switch (severity) {
     case "minor":
-      ratioMultiplier = 0.9;
+      ratioMultiplier = 1.1; // 10% more insulin
       basalAdjustment = "Consider 10% increase if blood glucose runs high";
       monitoringFrequency = "Check blood glucose every 4-6 hours";
       stackingWarning = "Wait at least 3 hours between corrections to assess effectiveness";
       break;
     case "moderate":
-      ratioMultiplier = 0.8;
+      ratioMultiplier = 1.2; // 20% more insulin
       basalAdjustment = "Consider 10-20% increase if blood glucose remains elevated";
       hydrationNote = "Stay well hydrated with sugar-free fluids. Consider electrolyte drinks.";
       monitoringFrequency = "Check blood glucose every 2-4 hours";
       stackingWarning = "Wait at least 4 hours between corrections - absorption may be delayed";
       break;
     case "severe":
-      ratioMultiplier = 0.7;
+      ratioMultiplier = 1.3; // 30% more insulin
       basalAdjustment = "Consider 20% increase, but monitor closely for lows if unable to eat";
       hydrationNote = "Critical: Stay hydrated. If vomiting, seek medical attention immediately.";
       monitoringFrequency = "Check blood glucose and ketones every 2 hours";
@@ -635,7 +637,7 @@ export default function SickDay() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Lower ratio number = more insulin per carb (to overcome illness-related insulin resistance)
+                  Higher units per 10g = more insulin to overcome illness-related insulin resistance
                 </p>
               </div>
 
