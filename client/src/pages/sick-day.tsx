@@ -469,108 +469,108 @@ export default function SickDay() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Input Information</CardTitle>
-            <CardDescription>
-              Enter your details to calculate sick day adjustments
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tdd">Total Daily Dose (TDD) - Units</Label>
-              {settings.tdd ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="tdd"
-                      type="number"
-                      value={tdd}
-                      readOnly
-                      className="bg-muted cursor-default"
-                      data-testid="input-tdd"
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    From your <Link href="/settings" className="text-primary hover:underline">Insulin Settings</Link>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="p-3 rounded-md bg-muted border border-dashed">
-                    <p className="text-sm text-muted-foreground">
-                      TDD not configured. Please set your Total Daily Dose in{" "}
-                      <Link href="/settings" className="text-primary hover:underline font-medium">
-                        Settings → Insulin Settings
-                      </Link>{" "}
-                      to use the Sick Day Adviser.
+        {!results ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Input Information</CardTitle>
+              <CardDescription>
+                Enter your details to calculate sick day adjustments
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="tdd">Total Daily Dose (TDD) - Units</Label>
+                {settings.tdd ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="tdd"
+                        type="number"
+                        value={tdd}
+                        readOnly
+                        className="bg-muted cursor-default"
+                        data-testid="input-tdd"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      From your <Link href="/settings" className="text-primary hover:underline">Insulin Settings</Link>
                     </p>
-                  </div>
-                </>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Your typical total insulin dose per day (basal + bolus combined)
-              </p>
-            </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 rounded-md bg-muted border border-dashed">
+                      <p className="text-sm text-muted-foreground">
+                        TDD not configured. Please set your Total Daily Dose in{" "}
+                        <Link href="/settings" className="text-primary hover:underline font-medium">
+                          Settings → Insulin Settings
+                        </Link>{" "}
+                        to use the Sick Day Adviser.
+                      </p>
+                    </div>
+                  </>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Your typical total insulin dose per day (basal + bolus combined)
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="severity">Illness Severity</Label>
-              <Select value={severity} onValueChange={setSeverity}>
-                <SelectTrigger id="severity" data-testid="select-severity">
-                  <SelectValue placeholder="Select severity level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                  <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                  <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="severity">Illness Severity</Label>
+                <Select value={severity} onValueChange={setSeverity}>
+                  <SelectTrigger id="severity" data-testid="select-severity">
+                    <SelectValue placeholder="Select severity level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
+                    <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
+                    <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="bg-level">Current Blood Glucose ({bgUnits})</Label>
-              <Input
-                id="bg-level"
-                type="number"
-                placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                value={bgLevel}
-                onChange={(e) => setBgLevel(e.target.value)}
-                data-testid="input-bg-level"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="bg-level">Current Blood Glucose ({bgUnits})</Label>
+                <Input
+                  id="bg-level"
+                  type="number"
+                  placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
+                  value={bgLevel}
+                  onChange={(e) => setBgLevel(e.target.value)}
+                  data-testid="input-bg-level"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="ketone-level">Ketone Level</Label>
-              <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
-                <SelectTrigger id="ketone-level" data-testid="select-ketone-level">
-                  <SelectValue placeholder="Select ketone level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None / Negative</SelectItem>
-                  <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
-                  <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
-                  <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
-                  <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Use blood ketone meter or urine ketone strips to check
-              </p>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="ketone-level">Ketone Level</Label>
+                <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
+                  <SelectTrigger id="ketone-level" data-testid="select-ketone-level">
+                    <SelectValue placeholder="Select ketone level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None / Negative</SelectItem>
+                    <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
+                    <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
+                    <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
+                    <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Use blood ketone meter or urine ketone strips to check
+                </p>
+              </div>
 
-            <Button 
-              onClick={handleCalculate} 
-              className="w-full" 
-              data-testid="button-calculate"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              Calculate Recommendations
-            </Button>
-          </CardContent>
-        </Card>
-
-        {results && (
+              <Button 
+                onClick={handleCalculate} 
+                className="w-full" 
+                data-testid="button-calculate"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Calculate Recommendations
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
           <>
           <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
             <CardHeader className="pb-3">
@@ -578,9 +578,22 @@ export default function SickDay() {
                 <Activity className="h-4 w-4" />
                 Update Your Readings
               </CardTitle>
-              <CardDescription>Quickly recalculate with new glucose or ketone levels</CardDescription>
+              <CardDescription>Update your glucose, ketones, or severity and recalculate</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="update-severity" className="text-sm">Illness Severity</Label>
+                <Select value={severity} onValueChange={setSeverity}>
+                  <SelectTrigger id="update-severity" data-testid="select-update-severity">
+                    <SelectValue placeholder="Select severity level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
+                    <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
+                    <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="update-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
