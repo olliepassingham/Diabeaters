@@ -22,6 +22,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { MessagesIcon } from "@/components/messages-icon";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SickDayBanner } from "@/components/sick-day-banner";
+import { TravelBanner } from "@/components/travel-banner";
 
 // ✅ Hooks — named exports
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -110,6 +111,7 @@ function AppContent() {
         <div className="flex flex-col flex-1 overflow-hidden">
           <OfflineBanner />
           <SickDayBanner />
+          <TravelBanner />
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <button

@@ -138,7 +138,10 @@ export interface DashboardWidget {
 export interface ScenarioState {
   travelModeActive: boolean;
   travelDestination?: string;
+  travelStartDate?: string;
   travelEndDate?: string;
+  travelTimezoneShift?: number; // hours difference (positive = east, negative = west)
+  travelTimezoneDirection?: "east" | "west" | "none";
   sickDayActive: boolean;
   sickDaySeverity?: string;
 }
@@ -774,11 +777,14 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.SCENARIO_STATE, JSON.stringify(state));
   },
 
-  activateTravelMode(destination: string, endDate: string): void {
+  activateTravelMode(destination: string, startDate: string, endDate: string, timezoneShift?: number, timezoneDirection?: "east" | "west" | "none"): void {
     const state = this.getScenarioState();
     state.travelModeActive = true;
     state.travelDestination = destination;
+    state.travelStartDate = startDate;
     state.travelEndDate = endDate;
+    state.travelTimezoneShift = timezoneShift;
+    state.travelTimezoneDirection = timezoneDirection;
     this.saveScenarioState(state);
   },
 
@@ -786,7 +792,10 @@ export const storage = {
     const state = this.getScenarioState();
     state.travelModeActive = false;
     state.travelDestination = undefined;
+    state.travelStartDate = undefined;
     state.travelEndDate = undefined;
+    state.travelTimezoneShift = undefined;
+    state.travelTimezoneDirection = undefined;
     this.saveScenarioState(state);
   },
 

@@ -34,6 +34,10 @@ interface TravelPlan {
   destination: string;
   travelType: "domestic" | "international";
   timezoneChange: "none" | "minor" | "major";
+  timezoneHours: number;
+  timezoneDirection: "east" | "west" | "none";
+  startDate: string;
+  endDate: string;
   accessRisk: "easy" | "limited" | "unsure";
 }
 
@@ -422,11 +426,25 @@ const categoryLabels = {
 
 export default function Travel() {
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
+  const [isTravelModeActive, setIsTravelModeActive] = useState(false);
+  
+  const getDefaultDates = () => {
+    const today = new Date();
+    const start = today.toISOString().split("T")[0];
+    const end = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    return { start, end };
+  };
+  
+  const defaultDates = getDefaultDates();
   const [plan, setPlan] = useState<TravelPlan>({
     duration: 7,
     destination: "",
     travelType: "domestic",
     timezoneChange: "none",
+    timezoneHours: 0,
+    timezoneDirection: "none",
+    startDate: defaultDates.start,
+    endDate: defaultDates.end,
     accessRisk: "easy",
   });
   const [packingList, setPackingList] = useState<PackingItem[]>([]);
@@ -442,10 +460,51 @@ export default function Travel() {
     setSupplies(storage.getSupplies());
     setSettings(storage.getSettings());
     setProfile(storage.getProfile());
+    
+    const scenarioState = storage.getScenarioState();
+    setIsTravelModeActive(scenarioState.travelModeActive || false);
   }, []);
 
   const handleStartPlan = () => {
     setStep("inputs");
+  };
+  
+  const handleActivateTravelMode = () => {
+    const signedTimezoneShift = plan.timezoneDirection === "west" 
+      ? -plan.timezoneHours 
+      : plan.timezoneHours;
+    storage.activateTravelMode(
+      plan.destination,
+      plan.startDate,
+      plan.endDate,
+      signedTimezoneShift,
+      plan.timezoneDirection
+    );
+    setIsTravelModeActive(true);
+    toast({
+      title: "Travel Mode Activated",
+      description: `You'll see travel reminders until ${new Date(plan.endDate).toLocaleDateString()}`,
+    });
+  };
+  
+  const handleDeactivateTravelMode = () => {
+    storage.deactivateTravelMode();
+    localStorage.removeItem("diabeater_travel_session");
+    setIsTravelModeActive(false);
+    toast({
+      title: "Travel Mode Deactivated",
+      description: "Welcome back home!",
+    });
+  };
+  
+  const updateDuration = (days: number) => {
+    const start = new Date(plan.startDate);
+    const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+    setPlan(prev => ({
+      ...prev,
+      duration: days,
+      endDate: end.toISOString().split("T")[0]
+    }));
   };
 
   const handleGeneratePlan = () => {
@@ -490,11 +549,16 @@ export default function Travel() {
 
   const resetPlan = () => {
     setStep("entry");
+    const dates = getDefaultDates();
     setPlan({
       duration: 7,
       destination: "",
       travelType: "domestic",
       timezoneChange: "none",
+      timezoneHours: 0,
+      timezoneDirection: "none",
+      startDate: dates.start,
+      endDate: dates.end,
       accessRisk: "easy",
     });
     setPackingList([]);
@@ -622,7 +686,7 @@ export default function Travel() {
                     type="button"
                     variant={plan.duration === preset.days ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setPlan(prev => ({ ...prev, duration: preset.days }))}
+                    onClick={() => updateDuration(preset.days)}
                     data-testid={`button-duration-${preset.days}`}
                   >
                     {preset.label}
@@ -636,8 +700,7 @@ export default function Travel() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setPlan(prev => ({ ...prev, duration: Math.max(1, prev.duration - 1) }))}
+                    onClick={() => updateDuration(Math.max(1, plan.duration - 1))}
                     data-testid="button-duration-minus"
                   >
                     -
@@ -648,7 +711,7 @@ export default function Travel() {
                     min={1}
                     max={365}
                     value={plan.duration}
-                    onChange={(e) => setPlan(prev => ({ ...prev, duration: parseInt(e.target.value) || 1 }))}
+                    onChange={(e) => updateDuration(parseInt(e.target.value) || 1)}
                     className="w-20 text-center"
                     data-testid="input-duration"
                   />
@@ -656,14 +719,56 @@ export default function Travel() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setPlan(prev => ({ ...prev, duration: Math.min(365, prev.duration + 1) }))}
+                    onClick={() => updateDuration(Math.min(365, plan.duration + 1))}
                     data-testid="button-duration-plus"
                   >
                     +
                   </Button>
                   <span className="text-sm text-muted-foreground ml-1">days</span>
                 </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-date">Start Date</Label>
+                <Input
+                  id="start-date"
+                  type="date"
+                  value={plan.startDate}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    const startDate = new Date(newStart);
+                    const endDate = new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000);
+                    setPlan(prev => ({ 
+                      ...prev, 
+                      startDate: newStart,
+                      endDate: endDate.toISOString().split("T")[0]
+                    }));
+                  }}
+                  data-testid="input-start-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-date">End Date</Label>
+                <Input
+                  id="end-date"
+                  type="date"
+                  value={plan.endDate}
+                  min={plan.startDate}
+                  onChange={(e) => {
+                    const newEnd = e.target.value;
+                    const startDate = new Date(plan.startDate);
+                    const endDate = new Date(newEnd);
+                    const diffDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+                    setPlan(prev => ({ 
+                      ...prev, 
+                      endDate: newEnd,
+                      duration: diffDays
+                    }));
+                  }}
+                  data-testid="input-end-date"
+                />
               </div>
             </div>
 
@@ -698,7 +803,14 @@ export default function Travel() {
               <Label>Timezone Change</Label>
               <Select 
                 value={plan.timezoneChange} 
-                onValueChange={(value: "none" | "minor" | "major") => setPlan(prev => ({ ...prev, timezoneChange: value }))}
+                onValueChange={(value: "none" | "minor" | "major") => {
+                  setPlan(prev => ({ 
+                    ...prev, 
+                    timezoneChange: value,
+                    timezoneDirection: value === "none" ? "none" : prev.timezoneDirection === "none" ? "east" : prev.timezoneDirection,
+                    timezoneHours: value === "none" ? 0 : value === "minor" ? 2 : 6
+                  }));
+                }}
               >
                 <SelectTrigger data-testid="select-timezone">
                   <SelectValue />
@@ -710,6 +822,45 @@ export default function Travel() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {plan.timezoneChange !== "none" && (
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Hours Difference</Label>
+                  <Select 
+                    value={plan.timezoneHours.toString()} 
+                    onValueChange={(value) => setPlan(prev => ({ ...prev, timezoneHours: parseInt(value) }))}
+                  >
+                    <SelectTrigger data-testid="select-timezone-hours">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => (
+                        <SelectItem key={h} value={h.toString()}>{h} hour{h > 1 ? "s" : ""}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Direction</Label>
+                  <Select 
+                    value={plan.timezoneDirection} 
+                    onValueChange={(value: "east" | "west") => setPlan(prev => ({ ...prev, timezoneDirection: value }))}
+                  >
+                    <SelectTrigger data-testid="select-timezone-direction">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="east">Travelling East (ahead)</SelectItem>
+                      <SelectItem value="west">Travelling West (behind)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="col-span-2 text-xs text-muted-foreground">
+                  Destination is {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} your home time
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Pharmacy Access at Destination</Label>
@@ -938,6 +1089,117 @@ export default function Travel() {
         </CardContent>
       </Card>
 
+
+      {plan.timezoneChange !== "none" && (
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              Timezone Adjustment Guidance
+            </CardTitle>
+            <CardDescription>
+              Daily reminders for adjusting to {plan.timezoneHours}-hour time difference
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">
+                {plan.timezoneDirection === "east" ? "Travelling East" : "Travelling West"} — Key Strategy
+              </h4>
+              {plan.timezoneDirection === "east" ? (
+                <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
+                  <p>When travelling east, your day gets shorter. This affects insulin timing:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>You may need less long-acting insulin on travel day (shorter day)</li>
+                    <li>Shift meal times and boluses earlier gradually over 2-3 days</li>
+                    <li>Monitor more frequently in the first 48 hours</li>
+                    <li>Expect some temporary insulin resistance from jet lag</li>
+                  </ul>
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
+                  <p>When travelling west, your day gets longer. This affects insulin timing:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li>You may need extra short-acting insulin for the extended day</li>
+                    <li>Keep basal insulin on home time initially, then shift gradually</li>
+                    <li>Add an extra meal if your day extends significantly</li>
+                    <li>Monitor more frequently during the adjustment period</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <h5 className="font-medium text-sm mb-1">Day 1-2 (Departure)</h5>
+                <p className="text-xs text-muted-foreground">
+                  Check glucose every 2-3 hours. Keep snacks accessible. Consider keeping pump/basal on home timezone for first day.
+                </p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <h5 className="font-medium text-sm mb-1">Day 3-4 (Adjusting)</h5>
+                <p className="text-xs text-muted-foreground">
+                  Begin shifting meal times to local schedule. Adjust basal timing by 2-3 hours per day. Continue extra monitoring.
+                </p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <h5 className="font-medium text-sm mb-1">Day 5+ (Settled)</h5>
+                <p className="text-xs text-muted-foreground">
+                  Should be on local schedule. Resume normal monitoring pattern. Watch for delayed effects of jet lag.
+                </p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <h5 className="font-medium text-sm mb-1">Return Journey</h5>
+                <p className="text-xs text-muted-foreground">
+                  Same process in reverse. Expect adjustment to take 1 day per hour of timezone difference.
+                </p>
+              </div>
+            </div>
+            
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                These are general guidelines only. Discuss your specific adjustment plan with your diabetes team before travelling, especially for major timezone changes.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className={isTravelModeActive ? "border-green-500/50 bg-green-50/30 dark:bg-green-950/20" : "border-primary/50"}>
+        <CardContent className="p-4">
+          {isTravelModeActive ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">You'll see reminders until your trip ends</p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
+                End Travel Mode
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Plane className="h-5 w-5 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium">Activate Travel Mode</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enable travel mode to see reminders and timezone guidance across the app until {new Date(plan.endDate).toLocaleDateString()}.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleActivateTravelMode} className="w-full" data-testid="button-activate-travel">
+                <Plane className="h-4 w-4 mr-2" />
+                Activate Travel Mode
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="flex flex-wrap justify-center gap-4">
         <Button variant="outline" onClick={resetPlan} data-testid="button-create-new-plan">
