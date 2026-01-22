@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Settings, AlertCircle, ArrowRight, Bot } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -137,6 +137,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
           Help Now
         </Button>
       </Link>
+      <DashboardInfoDialog />
       <Link href="/ai-coach">
         <Button 
           variant="outline"
@@ -144,10 +145,9 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
           className="rounded-full"
           data-testid="button-ai-coach"
         >
-          <Bot className="h-4 w-4" />
+          <MessageCircle className="h-4 w-4" />
         </Button>
       </Link>
-      <DashboardInfoDialog />
       <Button 
         variant="outline" 
         size="icon"
