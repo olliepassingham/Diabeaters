@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Settings, AlertCircle, ArrowRight } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight, Bot } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
-import { AICoachButton } from "@/components/ai-coach-button";
 import {
   SupplySummaryWidget,
   TodayOverviewWidget,
@@ -136,6 +135,16 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         >
           <Phone className="h-4 w-4 mr-2" />
           Help Now
+        </Button>
+      </Link>
+      <Link href="/ai-coach">
+        <Button 
+          variant="outline"
+          size="icon"
+          className="rounded-full"
+          data-testid="button-ai-coach"
+        >
+          <Bot className="h-4 w-4" />
         </Button>
       </Link>
       <DashboardInfoDialog />
@@ -348,8 +357,6 @@ export default function Dashboard() {
           </Button>
         </div>
       )}
-
-      <AICoachButton />
     </div>
   );
 }
