@@ -163,7 +163,7 @@ export function QuickActionsWidget() {
                     className="w-full h-auto flex-col py-4 gap-2 hover-elevate"
                     data-testid={`action-${actionConfig.id}`}
                   >
-                    {Icon && <Icon className={`h-7 w-7 ${details.color}`} />}
+                    {Icon && <Icon className={`h-10 w-10 ${details.color}`} />}
                     <span className="text-sm font-medium">{details.label}</span>
                   </Button>
                 </Link>
