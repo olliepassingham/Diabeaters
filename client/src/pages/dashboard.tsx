@@ -118,6 +118,9 @@ function DashboardInfoDialog() {
       <InfoSection title="Help Now Button">
         <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
       </InfoSection>
+      <InfoSection title="AI Coach">
+        <p>The speech bubble icon opens your AI Coach - a conversational assistant that can answer questions about diabetes management. It remembers your previous conversations and uses your profile to give personalised guidance. Remember, it's not medical advice!</p>
+      </InfoSection>
     </PageInfoDialog>
   );
 }
