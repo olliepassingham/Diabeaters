@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, Send, Trash2, User, AlertTriangle, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { storage, AICoachMessage } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -14,58 +15,56 @@ export default function AICoach() {
   const { toast } = useToast();
   const [messages, setMessages] = useState<AICoachMessage[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMessages(storage.getAICoachHistory());
   }, []);
 
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput || isLoading) return;
-
-    const userMessage = storage.addAICoachMessage("user", trimmedInput);
-    setMessages(prev => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/ai-coach/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmedInput,
-          history: storage.getAICoachHistory().slice(-20),
-          userProfile: storage.getProfile(),
-          userSettings: storage.getSettings(),
-        }),
+  const chatMutation = useMutation({
+    mutationFn: async (messageText: string) => {
+      const response = await apiRequest("POST", "/api/ai-coach/chat", {
+        message: messageText,
+        history: storage.getAICoachHistory().slice(-20),
+        userProfile: storage.getProfile(),
+        userSettings: storage.getSettings(),
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to get response");
-      }
-
-      const data = await response.json();
+      return response.json();
+    },
+    onSuccess: (data) => {
       const assistantMessage = storage.addAICoachMessage("assistant", data.response);
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    },
+    onError: () => {
       toast({
         title: "Error",
         description: "Failed to get a response. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+    },
+    onSettled: () => {
       inputRef.current?.focus();
-    }
+    },
+  });
+
+  const handleSend = () => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput || chatMutation.isPending) return;
+
+    const userMessage = storage.addAICoachMessage("user", trimmedInput);
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    
+    chatMutation.mutate(trimmedInput);
   };
 
   const handleClearHistory = () => {
@@ -140,7 +139,7 @@ export default function AICoach() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+          <div className="flex-1 overflow-y-auto p-4">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <Bot className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -202,7 +201,7 @@ export default function AICoach() {
                     )}
                   </div>
                 ))}
-                {isLoading && (
+                {chatMutation.isPending && (
                   <div className="flex gap-3 justify-start">
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                       <Bot className="h-4 w-4 text-primary" />
@@ -216,9 +215,10 @@ export default function AICoach() {
                     </div>
                   </div>
                 )}
+                <div ref={messagesEndRef} />
               </div>
             )}
-          </ScrollArea>
+          </div>
           
           <div className="p-4 border-t">
             <div className="flex gap-2">
@@ -228,12 +228,12 @@ export default function AICoach() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={isLoading}
+                disabled={chatMutation.isPending}
                 data-testid="input-coach-message"
               />
               <Button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || chatMutation.isPending}
                 data-testid="button-send-message"
               >
                 <Send className="h-4 w-4" />

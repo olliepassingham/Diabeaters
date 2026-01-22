@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag } from "lucide-react";
+import { Home, Package, Bot, MessageCircle, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { FaceLogo } from "@/components/face-logo";
 import {
@@ -29,6 +29,11 @@ const items = [
     title: "Activity Advisor",
     url: "/advisor",
     icon: Bot,
+  },
+  {
+    title: "AI Coach",
+    url: "/ai-coach",
+    icon: MessageCircle,
   },
   {
     title: "Scenarios",

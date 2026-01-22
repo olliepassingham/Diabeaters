@@ -8,13 +8,16 @@ export function AICoachButton() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Link href="/ai-coach">
-          <Button
-            size="icon"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-50"
-            data-testid="button-ai-coach-floating"
-          >
-            <Bot className="h-6 w-6" />
-          </Button>
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button
+              size="lg"
+              className="rounded-full shadow-lg"
+              data-testid="button-ai-coach-floating"
+            >
+              <Bot className="h-5 w-5 mr-2" />
+              AI Coach
+            </Button>
+          </div>
         </Link>
       </TooltipTrigger>
       <TooltipContent side="left">
