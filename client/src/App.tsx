@@ -33,6 +33,7 @@ import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import Scenarios from "@/pages/scenarios";
 import Advisor from "@/pages/advisor";
+import AICoach from "@/pages/ai-coach";
 import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
 import Community from "@/pages/community";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/supplies" component={Supplies} />
       <Route path="/scenarios" component={Scenarios} />
       <Route path="/advisor" component={Advisor} />
+      <Route path="/ai-coach" component={AICoach} />
       <Route path="/community" component={Community} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/emergency-card" component={EmergencyCard} />

@@ -22,6 +22,7 @@ const STORAGE_KEYS = {
   LAST_NOTIFICATION_CHECK: "diabeater_last_notification_check",
   APPOINTMENTS: "diabeater_appointments",
   EVENTS: "diabeater_events",
+  AI_COACH_HISTORY: "diabeater_ai_coach_history",
 } as const;
 
 export interface UserProfile {
@@ -286,6 +287,13 @@ export interface QuickActionConfig {
   id: QuickActionId;
   enabled: boolean;
   order: number;
+}
+
+export interface AICoachMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string;
 }
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
@@ -1482,5 +1490,30 @@ export const storage = {
     if (filtered.length === events.length) return false;
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(filtered));
     return true;
+  },
+
+  // AI Coach conversation history
+  getAICoachHistory(): AICoachMessage[] {
+    const data = localStorage.getItem(STORAGE_KEYS.AI_COACH_HISTORY);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addAICoachMessage(role: "user" | "assistant", content: string): AICoachMessage {
+    const history = this.getAICoachHistory();
+    const message: AICoachMessage = {
+      id: generateId(),
+      role,
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    history.push(message);
+    // Keep last 100 messages to avoid localStorage limits
+    const trimmed = history.slice(-100);
+    localStorage.setItem(STORAGE_KEYS.AI_COACH_HISTORY, JSON.stringify(trimmed));
+    return message;
+  },
+
+  clearAICoachHistory(): void {
+    localStorage.removeItem(STORAGE_KEYS.AI_COACH_HISTORY);
   },
 };

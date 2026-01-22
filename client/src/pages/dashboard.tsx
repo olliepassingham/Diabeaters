@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { AICoachButton } from "@/components/ai-coach-button";
 import {
   SupplySummaryWidget,
   TodayOverviewWidget,
@@ -347,6 +348,8 @@ export default function Dashboard() {
           </Button>
         </div>
       )}
+
+      <AICoachButton />
     </div>
   );
 }

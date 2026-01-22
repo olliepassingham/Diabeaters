@@ -293,6 +293,84 @@ Keep the response concise (4-5 bullet points) and directly actionable. Always in
     }
   });
 
+  // AI Coach Chat Route
+  app.post("/api/ai-coach/chat", async (req, res) => {
+    if (!openai) {
+      return res.status(503).send("OpenAI API key not configured");
+    }
+
+    try {
+      const { message, history, userProfile, userSettings } = req.body;
+
+      if (!message) {
+        return res.status(400).send("Message is required");
+      }
+
+      const profile = userProfile || {};
+      const settings = userSettings || {};
+
+      const userContext: string[] = [];
+      if (profile.name) userContext.push(`User's name: ${profile.name}`);
+      if (profile.diabetesType) userContext.push(`Diabetes Type: ${profile.diabetesType}`);
+      if (profile.insulinDeliveryMethod) userContext.push(`Insulin Delivery: ${profile.insulinDeliveryMethod}`);
+      if (profile.bgUnits) userContext.push(`Blood Glucose Units: ${profile.bgUnits}`);
+      if (settings.tdd) userContext.push(`Total Daily Dose: ${settings.tdd} units`);
+      if (settings.breakfastRatio) userContext.push(`Breakfast Ratio: ${settings.breakfastRatio}`);
+      if (settings.lunchRatio) userContext.push(`Lunch Ratio: ${settings.lunchRatio}`);
+      if (settings.dinnerRatio) userContext.push(`Dinner Ratio: ${settings.dinnerRatio}`);
+
+      const systemPrompt = `You are a friendly and knowledgeable AI Coach for people with diabetes, specifically designed to help with Type 1 diabetes management. Your role is to:
+
+1. Answer questions about diabetes management, blood glucose patterns, insulin, nutrition, and exercise
+2. Provide supportive, practical advice while always emphasizing safety
+3. Remember context from previous conversations to personalize your responses
+4. Use simple, everyday language that's easy to understand
+5. Be encouraging and empathetic
+
+CRITICAL SAFETY RULES:
+- NEVER provide specific medical dosing recommendations
+- ALWAYS remind users to consult their healthcare team for medical decisions
+- If someone describes a medical emergency, tell them to seek immediate medical help
+- Be cautious and conservative with any suggestions
+
+User Context:
+${userContext.length > 0 ? userContext.join("\n") : "No profile information available"}
+
+Keep responses concise but helpful. Use bullet points for lists. Include practical tips when relevant.`;
+
+      const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+        { role: "system", content: systemPrompt },
+      ];
+
+      // Add conversation history for context (last 10 messages)
+      if (history && Array.isArray(history)) {
+        const recentHistory = history.slice(-10);
+        for (const msg of recentHistory) {
+          if (msg.role === "user" || msg.role === "assistant") {
+            messages.push({ role: msg.role, content: msg.content });
+          }
+        }
+      }
+
+      // Add current message
+      messages.push({ role: "user", content: message });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages,
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const response = completion.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response. Please try again.";
+
+      res.json({ response });
+    } catch (error) {
+      console.error("AI Coach error:", error);
+      res.status(500).send("Failed to process your message");
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
