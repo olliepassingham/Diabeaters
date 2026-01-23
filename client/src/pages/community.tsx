@@ -1452,6 +1452,13 @@ export default function Community() {
           </p>
         </div>
 
+        <Alert className="mb-4 border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            <strong>Prototype Preview:</strong> This is a demonstration of the Community feature. In this preview, you can only see your own posts. A full multi-user community will be available in a future release.
+          </AlertDescription>
+        </Alert>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
           <TabsList className="flex w-full">
             <TabsTrigger value="posts" data-testid="tab-posts" className="flex-1">
