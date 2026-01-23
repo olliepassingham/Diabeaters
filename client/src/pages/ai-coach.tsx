@@ -102,7 +102,7 @@ export default function AICoach() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs bg-amber-50 border-amber-500/50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <AlertTriangle className="h-3 w-3 mr-1" />
-            Prototype - Not medical advice
+            Prototype - Full AI features coming in future release
           </Badge>
           {messages.length > 0 && (
             <AlertDialog>

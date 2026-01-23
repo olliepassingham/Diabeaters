@@ -990,7 +990,7 @@ export default function Advisor() {
           <div className="flex gap-2">
             <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 dark:text-amber-200">
-              <strong>Prototype Preview:</strong> This AI feature requires a backend connection. When deployed as a mobile app, ensure the backend is published and accessible for AI features to work.
+              <strong>Prototype Preview:</strong> This AI feature requires a backend connection. Full AI functionality will be available in a future release.
             </p>
           </div>
           <div className="flex gap-2">
