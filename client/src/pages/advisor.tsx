@@ -985,11 +985,17 @@ export default function Advisor() {
         </PageInfoDialog>
       </div>
 
-      <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20 mb-4">
-        <CardContent className="p-3">
+      <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20 mb-4">
+        <CardContent className="p-3 space-y-2">
           <div className="flex gap-2">
-            <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-yellow-800 dark:text-yellow-200">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              <strong>Prototype Preview:</strong> This AI feature requires a backend connection. When deployed as a mobile app, ensure the backend is published and accessible for AI features to work.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 dark:text-amber-200">
               <strong>Not Medical Advice:</strong> All suggestions are educational only. 
               Always verify with your own calculations and consult your healthcare provider.
             </p>

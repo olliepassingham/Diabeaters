@@ -100,9 +100,9 @@ export default function AICoach() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs bg-amber-50 border-amber-500/50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             <AlertTriangle className="h-3 w-3 mr-1" />
-            Not medical advice
+            Prototype - Not medical advice
           </Badge>
           {messages.length > 0 && (
             <AlertDialog>
