@@ -490,27 +490,42 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="px-3 pb-3">
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-4 text-sm text-muted-foreground">
           <div>
-            <p className="font-medium text-foreground">500 Rule (Carb Ratio)</p>
+            <p className="font-medium text-foreground">Starting Point: The 500 Rule</p>
             <p>500 ÷ TDD = grams of carbs covered by 1 unit</p>
             {settings.tdd && (
-              <p className="text-primary">Your estimate: 500 ÷ {settings.tdd} = 1:{Math.round(500 / settings.tdd)}</p>
+              <p className="text-primary">Your starting estimate: 500 ÷ {settings.tdd} = 1:{Math.round(500 / settings.tdd)}</p>
             )}
           </div>
+          
           <div>
-            <p className="font-medium text-foreground">{ruleName} (Correction Factor)</p>
+            <p className="font-medium text-foreground">Fine-Tuning by Trial</p>
+            <p>The 500 rule gives you a starting point, but everyone is different. Here's how to adjust:</p>
+            <ol className="list-decimal list-inside space-y-1 mt-2 text-xs">
+              <li>Start with your calculated ratio (e.g., 1:10)</li>
+              <li>Eat a measured meal with known carbs when blood sugar is stable</li>
+              <li>Check blood sugar 2-3 hours after eating</li>
+              <li>If still high: try a stronger ratio (e.g., 1:8)</li>
+              <li>If going low: try a weaker ratio (e.g., 1:12)</li>
+              <li>Repeat until you find what works for each meal</li>
+            </ol>
+          </div>
+
+          <div>
+            <p className="font-medium text-foreground">Correction Factor: {ruleName}</p>
             <p>{correctionRule} ÷ TDD = {bgUnits} drop per 1 unit</p>
             {settings.tdd && (
               <p className="text-primary">Your estimate: {correctionRule} ÷ {settings.tdd} = {Math.round(correctionRule / settings.tdd * 10) / 10} {bgUnits}</p>
             )}
           </div>
+
           <div className="text-xs bg-muted p-2 rounded">
-            <p><strong>Example:</strong> If TDD is 40 units:</p>
-            <p>• Carb ratio: 500 ÷ 40 = 1:12.5 (round to 1:12)</p>
-            <p>• Correction: {correctionRule} ÷ 40 = {exampleResult} {bgUnits} per unit</p>
+            <p><strong>Why ratios differ by meal:</strong></p>
+            <p>Many people need stronger ratios at breakfast (e.g., 1:8) due to morning hormone changes, and weaker ratios at lunch/dinner (e.g., 1:12). Trial each meal separately.</p>
           </div>
-          <p className="text-xs text-muted-foreground italic">Note: These are starting estimates. Work with your healthcare team to fine-tune.</p>
+          
+          <p className="text-xs text-muted-foreground italic">Note: Always work with your healthcare team when adjusting ratios. Keep a log of your trials to spot patterns.</p>
         </div>
       </CollapsibleContent>
     </Collapsible>
