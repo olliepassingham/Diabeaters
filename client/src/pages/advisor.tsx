@@ -1051,6 +1051,7 @@ export default function Advisor() {
                       placeholder={carbUnit === "cp" ? "e.g., 6" : "e.g., 60"}
                       value={mealCarbs}
                       onChange={(e) => setMealCarbs(e.target.value)}
+                      className="flex-1"
                       data-testid="input-meal-carbs"
                     />
                     <Select value={carbUnit} onValueChange={(v: "grams" | "cp") => setCarbUnit(v)}>
