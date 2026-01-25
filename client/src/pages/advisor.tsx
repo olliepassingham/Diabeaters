@@ -1043,27 +1043,15 @@ export default function Advisor() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="meal-carbs">How many carbs?</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="meal-carbs"
-                      type="number"
-                      placeholder={carbUnit === "cp" ? "e.g., 6" : "e.g., 60"}
-                      value={mealCarbs}
-                      onChange={(e) => setMealCarbs(e.target.value)}
-                      className="flex-1"
-                      data-testid="input-meal-carbs"
-                    />
-                    <Select value={carbUnit} onValueChange={(v: "grams" | "cp") => setCarbUnit(v)}>
-                      <SelectTrigger className="w-28" data-testid="select-carb-unit">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="grams">grams</SelectItem>
-                        <SelectItem value="cp">CP (10g)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <Label htmlFor="meal-carbs">How many carbs? ({carbUnit === "cp" ? "CP" : "grams"})</Label>
+                  <Input
+                    id="meal-carbs"
+                    type="number"
+                    placeholder={carbUnit === "cp" ? "e.g., 6" : "e.g., 60"}
+                    value={mealCarbs}
+                    onChange={(e) => setMealCarbs(e.target.value)}
+                    data-testid="input-meal-carbs"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="meal-time">Which meal?</Label>
