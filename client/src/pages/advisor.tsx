@@ -1240,8 +1240,8 @@ export default function Advisor() {
               </CollapsibleTrigger>
               <CollapsibleContent className="px-3 pb-3">
                 <ScrollArea className="h-72">
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <pre className="whitespace-pre-wrap font-sans text-sm bg-transparent p-0">
+                  <div className="max-w-none">
+                    <pre className="whitespace-pre-wrap font-sans text-sm bg-transparent p-0 text-foreground">
                       {generateExerciseTypeGuide(bgUnits)}
                     </pre>
                   </div>
