@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock } from "lucide-react";
+import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock, Droplet, Pizza, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -660,6 +660,31 @@ export default function Advisor() {
   const [sessionIntensity, setSessionIntensity] = useState("moderate");
   const [sessionTimingFromNow, setSessionTimingFromNow] = useState("60");
 
+  // Split Bolus Calculator state
+  const [splitCarbs, setSplitCarbs] = useState("");
+  const [splitFatLevel, setSplitFatLevel] = useState<"low" | "medium" | "high">("high");
+  const [splitMealTime, setSplitMealTime] = useState<"breakfast" | "lunch" | "dinner" | "snack">("dinner");
+  const [showSplitCalculator, setShowSplitCalculator] = useState(false);
+  const [splitResult, setSplitResult] = useState<{
+    totalUnits: number;
+    firstDose: number;
+    secondDose: number;
+    secondDoseDelay: number;
+    splitRatio: string;
+    ratioUsed: string;
+  } | null>(null);
+
+  // Hypo Treatment Calculator state
+  const [currentBg, setCurrentBg] = useState("");
+  const [targetBg, setTargetBg] = useState("");
+  const [userWeight, setUserWeight] = useState("");
+  const [hypoResult, setHypoResult] = useState<{
+    carbsNeeded: number;
+    glucoseTablets: number;
+    juiceMl: number;
+    jellyBabies: number;
+  } | null>(null);
+
   const bgUnits = profile.bgUnits || "mmol/L";
 
   useEffect(() => {
@@ -672,6 +697,122 @@ export default function Advisor() {
       }
     }
   }, []);
+
+  // Split Bolus Calculator function
+  const calculateSplitBolus = () => {
+    if (!splitCarbs) return;
+    
+    const carbValue = parseInt(splitCarbs);
+    if (isNaN(carbValue) || carbValue <= 0) return;
+    
+    // Get ratio based on selected meal time
+    const ratioMap: Record<string, string | undefined> = {
+      breakfast: settings.breakfastRatio,
+      lunch: settings.lunchRatio,
+      dinner: settings.dinnerRatio,
+      snack: settings.snackRatio || settings.lunchRatio, // Fallback snack to lunch
+    };
+    const selectedRatio = ratioMap[splitMealTime];
+    
+    let totalUnits = 0;
+    let ratioUsed = "";
+    
+    if (selectedRatio) {
+      const match = selectedRatio.match(/1:(\d+)/);
+      if (match) {
+        const carbRatio = parseInt(match[1]);
+        totalUnits = Math.round((carbValue / carbRatio) * 10) / 10;
+        ratioUsed = `Using your ${splitMealTime} ratio (${selectedRatio})`;
+      }
+    } else if (settings.tdd) {
+      const estimatedRatio = Math.round(500 / settings.tdd);
+      totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
+      ratioUsed = `Estimated from TDD (1:${estimatedRatio})`;
+    }
+    
+    if (totalUnits <= 0) {
+      setSplitResult(null);
+      return;
+    }
+    
+    // Split ratios and timing based on fat content
+    let firstPercent: number;
+    let secondDoseDelay: number;
+    let splitRatio: string;
+    
+    switch (splitFatLevel) {
+      case "low":
+        firstPercent = 70;
+        secondDoseDelay = 1.5;
+        splitRatio = "70/30";
+        break;
+      case "medium":
+        firstPercent = 60;
+        secondDoseDelay = 2;
+        splitRatio = "60/40";
+        break;
+      case "high":
+        firstPercent = 50;
+        secondDoseDelay = 3;
+        splitRatio = "50/50";
+        break;
+    }
+    
+    const firstDose = Math.round(totalUnits * (firstPercent / 100) * 10) / 10;
+    const secondDose = Math.round((totalUnits - firstDose) * 10) / 10;
+    
+    setSplitResult({
+      totalUnits,
+      firstDose,
+      secondDose,
+      secondDoseDelay,
+      splitRatio,
+      ratioUsed,
+    });
+  };
+
+  // Hypo Treatment Calculator function
+  const calculateHypoTreatment = () => {
+    if (!currentBg || !targetBg) return;
+    
+    const current = parseFloat(currentBg);
+    const target = parseFloat(targetBg);
+    const parsedWeight = userWeight ? parseFloat(userWeight) : 70;
+    const weight = (isNaN(parsedWeight) || parsedWeight <= 0) ? 70 : parsedWeight; // Default 70kg, guard against invalid
+    
+    if (isNaN(current) || isNaN(target)) return;
+    
+    // Convert to mmol/L if using mg/dL for calculation
+    const currentMmol = bgUnits === "mg/dL" ? current / 18 : current;
+    const targetMmol = bgUnits === "mg/dL" ? target / 18 : target;
+    
+    const bgDifference = targetMmol - currentMmol;
+    
+    if (bgDifference <= 0) {
+      setHypoResult(null);
+      return;
+    }
+    
+    // Rule of thumb: 1g glucose raises BG by ~0.2-0.3 mmol/L for a 70kg adult
+    // Lighter people need less, heavier people need more
+    const sensitivityFactor = 70 / weight; // Adjust for weight
+    const baseRise = 0.25; // mmol/L per gram of glucose
+    const effectiveRise = baseRise * sensitivityFactor;
+    
+    const carbsNeeded = Math.ceil(bgDifference / effectiveRise);
+    
+    // Common hypo treatment equivalents (UK focused)
+    const glucoseTablets = Math.ceil(carbsNeeded / 4); // ~4g per tablet
+    const juiceMl = Math.round(carbsNeeded * 10); // ~10ml juice per 1g carb
+    const jellyBabies = Math.ceil(carbsNeeded / 5); // ~5g per jelly baby
+    
+    setHypoResult({
+      carbsNeeded: Math.max(carbsNeeded, 10), // Minimum 10g
+      glucoseTablets: Math.max(glucoseTablets, 3), // Minimum 3 tablets
+      juiceMl: Math.max(juiceMl, 100), // Minimum 100ml
+      jellyBabies: Math.max(jellyBabies, 2), // Minimum 2
+    });
+  };
 
   const sendMealMessage = async (message: string) => {
     const userMessage: Message = {
@@ -1019,7 +1160,7 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
             <Utensils className="h-4 w-4" />Meal
           </TabsTrigger>
@@ -1028,6 +1169,9 @@ export default function Advisor() {
           </TabsTrigger>
           <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
             <Zap className="h-4 w-4" />Session
+          </TabsTrigger>
+          <TabsTrigger value="tools" className="gap-2" data-testid="tab-tools">
+            <Wrench className="h-4 w-4" />Tools
           </TabsTrigger>
         </TabsList>
 
@@ -1153,6 +1297,115 @@ export default function Advisor() {
 
           <Card className="border-0 bg-transparent shadow-none">
             <RatioCalculationGuide settings={settings} bgUnits={bgUnits} />
+          </Card>
+
+          <Card>
+            <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-4 h-auto" data-testid="button-split-calculator-toggle">
+                  <div className="flex items-center gap-2">
+                    <Pizza className="h-5 w-5 text-primary" />
+                    <div className="text-left">
+                      <span className="font-medium">Split Bolus Calculator</span>
+                      <p className="text-xs text-muted-foreground font-normal">For high-fat meals like pizza, fish & chips</p>
+                    </div>
+                  </div>
+                  {showSplitCalculator ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      High-fat meals slow down carb absorption. Taking all insulin upfront can cause an initial hypo, 
+                      then a late spike. Split your bolus to match the slower digestion.
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="split-carbs">Total carbs (g)</Label>
+                      <Input
+                        id="split-carbs"
+                        type="number"
+                        placeholder="e.g., 80"
+                        value={splitCarbs}
+                        onChange={(e) => setSplitCarbs(e.target.value)}
+                        data-testid="input-split-carbs"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="split-meal">Which meal?</Label>
+                      <Select value={splitMealTime} onValueChange={(v: "breakfast" | "lunch" | "dinner" | "snack") => setSplitMealTime(v)}>
+                        <SelectTrigger id="split-meal" data-testid="select-split-meal">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="breakfast">Breakfast</SelectItem>
+                          <SelectItem value="lunch">Lunch</SelectItem>
+                          <SelectItem value="dinner">Dinner</SelectItem>
+                          <SelectItem value="snack">Snack</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="split-fat">Fat content</Label>
+                      <Select value={splitFatLevel} onValueChange={(v: "low" | "medium" | "high") => setSplitFatLevel(v)}>
+                        <SelectTrigger id="split-fat" data-testid="select-split-fat">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low fat (pasta, rice)</SelectItem>
+                          <SelectItem value="medium">Medium fat (burgers, curries)</SelectItem>
+                          <SelectItem value="high">High fat (pizza, fish & chips)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button onClick={calculateSplitBolus} disabled={!splitCarbs} className="w-full" data-testid="button-calculate-split">
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Calculate Split Doses
+                  </Button>
+
+                  {splitResult && (
+                    <div className="p-4 bg-primary/5 rounded-lg space-y-3">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Pizza className="h-4 w-4 text-primary" />
+                        Your Split Bolus Plan ({splitResult.splitRatio})
+                      </h4>
+                      
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">FIRST DOSE - NOW</p>
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{splitResult.firstDose} units</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">Take when you start eating</p>
+                        </div>
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">SECOND DOSE - LATER</p>
+                          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{splitResult.secondDose} units</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">Take in {splitResult.secondDoseDelay} hours</p>
+                        </div>
+                      </div>
+
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p><strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs</p>
+                        <p className="text-xs">{splitResult.ratioUsed}</p>
+                        <p><strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to {splitResult.secondDoseDelay + 1} hours.</p>
+                      </div>
+
+                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
+                        <strong>Tip:</strong> Set a timer for your second dose! Check BG before taking it.
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground">
+                    [Not medical advice. Everyone's response to fat varies. Start conservatively and adjust based on your experience.]
+                  </p>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           <ChatSection
@@ -1360,6 +1613,135 @@ export default function Advisor() {
             isTyping={isSessionTyping}
             placeholder="Ask about your activity session..."
           />
+        </TabsContent>
+
+        <TabsContent value="tools" className="flex-1 flex flex-col min-h-0 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Droplet className="h-5 w-5 text-red-500" />
+                Hypo Treatment Calculator
+              </CardTitle>
+              <CardDescription>Calculate exactly how much fast-acting glucose you need</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  Instead of always eating 15g carbs, this calculator helps you treat hypos more precisely 
+                  based on your current reading and target - helping avoid over-treating and rebounding high.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="current-bg">Current BG ({bgUnits})</Label>
+                  <Input
+                    id="current-bg"
+                    type="number"
+                    step="0.1"
+                    placeholder={bgUnits === "mmol/L" ? "e.g., 3.2" : "e.g., 58"}
+                    value={currentBg}
+                    onChange={(e) => setCurrentBg(e.target.value)}
+                    data-testid="input-current-bg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="target-bg">Target BG ({bgUnits})</Label>
+                  <Input
+                    id="target-bg"
+                    type="number"
+                    step="0.1"
+                    placeholder={bgUnits === "mmol/L" ? "e.g., 5.5" : "e.g., 100"}
+                    value={targetBg}
+                    onChange={(e) => setTargetBg(e.target.value)}
+                    data-testid="input-target-bg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="user-weight">Your weight (kg, optional)</Label>
+                  <Input
+                    id="user-weight"
+                    type="number"
+                    placeholder="e.g., 70"
+                    value={userWeight}
+                    onChange={(e) => setUserWeight(e.target.value)}
+                    data-testid="input-user-weight"
+                  />
+                </div>
+              </div>
+
+              <Button onClick={calculateHypoTreatment} disabled={!currentBg || !targetBg} className="w-full" data-testid="button-calculate-hypo">
+                <Calculator className="h-4 w-4 mr-2" />
+                Calculate Treatment
+              </Button>
+
+              {hypoResult && (
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 space-y-4">
+                  <h4 className="font-medium flex items-center gap-2 text-red-800 dark:text-red-200">
+                    <Droplet className="h-4 w-4" />
+                    You need approximately:
+                  </h4>
+                  
+                  <div className="text-center p-4 bg-white dark:bg-red-900/30 rounded-lg">
+                    <p className="text-4xl font-bold text-red-600 dark:text-red-400">{hypoResult.carbsNeeded}g</p>
+                    <p className="text-sm text-red-700 dark:text-red-300">fast-acting carbs</p>
+                  </div>
+
+                  <div className="grid gap-2 text-sm">
+                    <p className="font-medium text-red-800 dark:text-red-200">That's about:</p>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <div className="p-2 bg-white dark:bg-red-900/30 rounded text-center">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.glucoseTablets}</p>
+                        <p className="text-xs text-red-600 dark:text-red-400">glucose tablets</p>
+                      </div>
+                      <div className="p-2 bg-white dark:bg-red-900/30 rounded text-center">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.juiceMl}ml</p>
+                        <p className="text-xs text-red-600 dark:text-red-400">fruit juice</p>
+                      </div>
+                      <div className="p-2 bg-white dark:bg-red-900/30 rounded text-center">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.jellyBabies}</p>
+                        <p className="text-xs text-red-600 dark:text-red-400">jelly babies</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-xs text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+                    <strong>Remember:</strong> Wait 15 minutes, then recheck. If still low, treat again.
+                  </div>
+                </div>
+              )}
+
+              {parseFloat(currentBg) > 0 && parseFloat(targetBg) > 0 && parseFloat(currentBg) >= parseFloat(targetBg) && (
+                <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    Your current BG is already at or above your target - no treatment needed!
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                [Not medical advice. Individual responses vary. If in doubt, use the standard 15g rule. 
+                For severe hypos or if you're unable to swallow, use glucagon and call for help.]
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="p-4 bg-muted/30">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="space-y-2 text-sm">
+                <p className="font-medium">Quick Reference - Standard Hypo Treatment</p>
+                <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                  <li><strong>Mild hypo (3.5-3.9 {bgUnits === "mmol/L" ? "mmol/L" : "mg/dL"}):</strong> 10-15g fast carbs</li>
+                  <li><strong>Moderate hypo (2.8-3.4 {bgUnits === "mmol/L" ? "mmol/L" : "mg/dL"}):</strong> 15-20g fast carbs</li>
+                  <li><strong>Severe hypo (&lt;2.8 {bgUnits === "mmol/L" ? "mmol/L" : "mg/dL"}):</strong> 20-25g fast carbs, may need help</li>
+                </ul>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Always follow up with a slower-acting snack if your next meal is more than 1-2 hours away.
+                </p>
+              </div>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
