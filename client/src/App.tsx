@@ -27,6 +27,9 @@ import { TravelBanner } from "@/components/travel-banner";
 // ✅ Hooks — named exports
 import { ThemeProvider } from "@/hooks/use-theme";
 
+// Error boundary for production
+import { ErrorBoundary } from "@/components/error-boundary";
+
 // Pages — your pages appear to be default exports (based on your existing imports)
 // If any are named, change imports accordingly.
 import Dashboard from "@/pages/dashboard";
@@ -165,14 +168,16 @@ export default function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ThemeProvider>
-          <AppContent />
-          <Toaster />
-        </ThemeProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <ThemeProvider>
+            <AppContent />
+            <Toaster />
+          </ThemeProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
