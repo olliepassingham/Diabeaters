@@ -136,13 +136,19 @@ export default function Onboarding() {
                   onValueChange={(value) => updateData("bgUnits", value)}
                   className="space-y-2"
                 >
-                  <div className="flex items-center space-x-2">
+                  <div 
+                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("bgUnits", "mmol/L")}
+                  >
                     <RadioGroupItem value="mmol/L" id="mmol" data-testid="radio-mmol" />
-                    <Label htmlFor="mmol" className="font-normal">mmol/L (millimoles per litre)</Label>
+                    <Label htmlFor="mmol" className="font-normal cursor-pointer flex-1">mmol/L (millimoles per litre)</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div 
+                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("bgUnits", "mg/dL")}
+                  >
                     <RadioGroupItem value="mg/dL" id="mgdl" data-testid="radio-mgdl" />
-                    <Label htmlFor="mgdl" className="font-normal">mg/dL (milligrams per decilitre)</Label>
+                    <Label htmlFor="mgdl" className="font-normal cursor-pointer flex-1">mg/dL (milligrams per decilitre)</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -153,17 +159,26 @@ export default function Onboarding() {
                   onValueChange={(value) => updateData("carbUnits", value)}
                   className="space-y-2"
                 >
-                  <div className="flex items-center space-x-2">
+                  <div 
+                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("carbUnits", "grams")}
+                  >
                     <RadioGroupItem value="grams" id="grams" data-testid="radio-grams" />
-                    <Label htmlFor="grams" className="font-normal">Grams</Label>
+                    <Label htmlFor="grams" className="font-normal cursor-pointer flex-1">Grams</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div 
+                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("carbUnits", "portions-10g")}
+                  >
                     <RadioGroupItem value="portions-10g" id="portions-10g" data-testid="radio-portions-10g" />
-                    <Label htmlFor="portions-10g" className="font-normal">Carb Portion (10g)</Label>
+                    <Label htmlFor="portions-10g" className="font-normal cursor-pointer flex-1">Carb Portion (10g)</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div 
+                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("carbUnits", "portions-15g")}
+                  >
                     <RadioGroupItem value="portions-15g" id="portions-15g" data-testid="radio-portions-15g" />
-                    <Label htmlFor="portions-15g" className="font-normal">Carb Portion (15g)</Label>
+                    <Label htmlFor="portions-15g" className="font-normal cursor-pointer flex-1">Carb Portion (15g)</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -184,9 +199,12 @@ export default function Onboarding() {
                 onValueChange={(value) => updateData("diabetesType", value)}
                 className="space-y-3"
               >
-                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
+                <div 
+                  className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                  onClick={() => updateData("diabetesType", "type1")}
+                >
                   <RadioGroupItem value="type1" id="type1" className="mt-1" data-testid="radio-type1" />
-                  <div>
+                  <div className="flex-1">
                     <Label htmlFor="type1" className="font-medium cursor-pointer">Type 1 Diabetes</Label>
                     <p className="text-sm text-muted-foreground mt-1">Autoimmune condition requiring insulin therapy</p>
                   </div>
@@ -237,16 +255,28 @@ export default function Onboarding() {
                   }}
                   className="space-y-3"
                 >
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
+                  <div 
+                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => {
+                      updateData("insulinDeliveryMethod", "injections");
+                      updateData("usingInsulin", true);
+                    }}
+                  >
                     <RadioGroupItem value="injections" id="injections" className="mt-1" data-testid="radio-injections" />
-                    <div>
+                    <div className="flex-1">
                       <Label htmlFor="injections" className="font-medium cursor-pointer">Injections (MDI)</Label>
                       <p className="text-sm text-muted-foreground mt-1">Multiple daily injections with pens or syringes</p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
+                  <div 
+                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => {
+                      updateData("insulinDeliveryMethod", "pump");
+                      updateData("usingInsulin", true);
+                    }}
+                  >
                     <RadioGroupItem value="pump" id="pump" className="mt-1" data-testid="radio-pump" />
-                    <div>
+                    <div className="flex-1">
                       <Label htmlFor="pump" className="font-medium cursor-pointer">Insulin Pump</Label>
                       <p className="text-sm text-muted-foreground mt-1">Continuous subcutaneous insulin infusion</p>
                     </div>
@@ -258,16 +288,22 @@ export default function Onboarding() {
                   onValueChange={(value) => updateData("usingInsulin", value === "yes")}
                   className="space-y-3"
                 >
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
+                  <div 
+                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("usingInsulin", true)}
+                  >
                     <RadioGroupItem value="yes" id="using-yes" className="mt-1" data-testid="radio-using-insulin-yes" />
-                    <div>
+                    <div className="flex-1">
                       <Label htmlFor="using-yes" className="font-medium cursor-pointer">Yes, I use insulin</Label>
                       <p className="text-sm text-muted-foreground mt-1">I currently take insulin as part of my treatment</p>
                     </div>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer">
+                  <div 
+                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                    onClick={() => updateData("usingInsulin", false)}
+                  >
                     <RadioGroupItem value="no" id="using-no" className="mt-1" data-testid="radio-using-insulin-no" />
-                    <div>
+                    <div className="flex-1">
                       <Label htmlFor="using-no" className="font-medium cursor-pointer">No, I don't use insulin</Label>
                       <p className="text-sm text-muted-foreground mt-1">I manage with diet, exercise, or other medications</p>
                     </div>
@@ -300,14 +336,17 @@ export default function Onboarding() {
                   <li>This app is a companion tool, not a replacement for professional medical care</li>
                 </ul>
               </div>
-              <div className="flex items-start space-x-3 p-4 border rounded-lg">
+              <div 
+                className="flex items-start space-x-3 p-4 border rounded-lg hover-elevate cursor-pointer"
+                onClick={() => updateData("hasAcceptedDisclaimer", !data.hasAcceptedDisclaimer)}
+              >
                 <Checkbox
                   id="disclaimer"
                   checked={data.hasAcceptedDisclaimer}
                   onCheckedChange={(checked) => updateData("hasAcceptedDisclaimer", checked === true)}
                   data-testid="checkbox-disclaimer"
                 />
-                <div>
+                <div className="flex-1">
                   <Label htmlFor="disclaimer" className="font-medium cursor-pointer">
                     I understand and accept
                   </Label>
