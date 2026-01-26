@@ -349,34 +349,35 @@ function SupplyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{supply ? "Edit Supply" : "Add New Supply"}</DialogTitle>
           <DialogDescription>
             {supply ? "Update the details of your supply item." : "Add a new item to track in your inventory."}
           </DialogDescription>
         </DialogHeader>
-        {!supply && showLastPrescriptionOption && lastPrescription && (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Use last prescription?</p>
-                  <p className="text-xs text-muted-foreground truncate">{lastPrescription.name}</p>
+        <div className="flex-1 overflow-y-auto pr-2">
+          {!supply && showLastPrescriptionOption && lastPrescription && (
+            <Card className="bg-primary/5 border-primary/20 mb-4">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Use last prescription?</p>
+                    <p className="text-xs text-muted-foreground truncate">{lastPrescription.name}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setShowLastPrescriptionOption(false)} data-testid="button-add-different">
+                      New
+                    </Button>
+                    <Button size="sm" onClick={useLastPrescription} data-testid="button-use-last">
+                      Use
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setShowLastPrescriptionOption(false)} data-testid="button-add-different">
-                    New
-                  </Button>
-                  <Button size="sm" onClick={useLastPrescription} data-testid="button-use-last">
-                    Use
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        <div className="space-y-4">
+              </CardContent>
+            </Card>
+          )}
+          <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input 
@@ -477,6 +478,7 @@ function SupplyDialog({
               onChange={e => setNotes(e.target.value)}
               data-testid="input-supply-notes"
             />
+          </div>
           </div>
         </div>
         <DialogFooter>
