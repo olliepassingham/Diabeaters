@@ -452,9 +452,97 @@ export default function Travel() {
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
   const { toast } = useToast();
 
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+
+  // Calculate long-acting insulin adjustment schedule for MDI users
+  const calculateBasalAdjustmentSchedule = () => {
+    if (isPumpUser || plan.timezoneChange === "none" || !basalInjectionTime) return [];
+    
+    const [hours, minutes] = basalInjectionTime.split(":").map(Number);
+    const homeTimeMinutes = hours * 60 + minutes;
+    const tzDiff = plan.timezoneHours;
+    const direction = plan.timezoneDirection;
+    
+    // Shift by 2-3 hours per day maximum
+    const maxShiftPerDay = 2;
+    const daysToAdjust = Math.ceil(tzDiff / maxShiftPerDay);
+    
+    const schedule: Array<{
+      day: number;
+      label: string;
+      homeTime: string;
+      localTime: string;
+      note: string;
+    }> = [];
+    
+    const formatTime = (totalMinutes: number) => {
+      let mins = totalMinutes % (24 * 60);
+      if (mins < 0) mins += 24 * 60;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+    };
+    
+    // Day 0: Travel day - take at usual home time
+    schedule.push({
+      day: 0,
+      label: "Travel Day",
+      homeTime: basalInjectionTime,
+      localTime: formatTime(homeTimeMinutes + (direction === "east" ? tzDiff * 60 : -tzDiff * 60)),
+      note: "Take at your usual time (shown in both home and local time)"
+    });
+    
+    // Gradual adjustment days
+    for (let i = 1; i <= daysToAdjust; i++) {
+      const shiftSoFar = Math.min(i * maxShiftPerDay, tzDiff);
+      const shiftMinutes = shiftSoFar * 60;
+      
+      let adjustedHomeMinutes: number;
+      let adjustedLocalMinutes: number;
+      
+      if (direction === "east") {
+        // Travelling east: shift injection earlier (local time catching up to target)
+        adjustedHomeMinutes = homeTimeMinutes - shiftMinutes;
+        adjustedLocalMinutes = homeTimeMinutes + (tzDiff * 60) - shiftMinutes;
+      } else {
+        // Travelling west: shift injection later
+        adjustedHomeMinutes = homeTimeMinutes + shiftMinutes;
+        adjustedLocalMinutes = homeTimeMinutes - (tzDiff * 60) + shiftMinutes;
+      }
+      
+      const isFullyAdjusted = shiftSoFar >= tzDiff;
+      
+      schedule.push({
+        day: i,
+        label: `Day ${i}`,
+        homeTime: formatTime(adjustedHomeMinutes),
+        localTime: formatTime(adjustedLocalMinutes),
+        note: isFullyAdjusted 
+          ? "Fully adjusted to local time" 
+          : `Shifted ${shiftSoFar}h of ${tzDiff}h total`
+      });
+    }
+    
+    // Final day showing target local time
+    if (daysToAdjust > 0) {
+      schedule.push({
+        day: daysToAdjust + 1,
+        label: "Onwards",
+        homeTime: direction === "east" 
+          ? formatTime(homeTimeMinutes - tzDiff * 60)
+          : formatTime(homeTimeMinutes + tzDiff * 60),
+        localTime: basalInjectionTime,
+        note: "Continue taking at your usual local time"
+      });
+    }
+    
+    return schedule;
+  };
+
+  const basalSchedule = calculateBasalAdjustmentSchedule();
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -1155,6 +1243,100 @@ export default function Travel() {
                 </p>
               </div>
             </div>
+
+            {!isPumpUser && (
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100">
+                    Long-Acting Insulin Adjustment Calculator
+                  </h4>
+                </div>
+                <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
+                  Enter your usual long-acting (basal) insulin injection time to see a gradual adjustment schedule for your trip.
+                </p>
+                
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Label htmlFor="basal-time" className="text-blue-900 dark:text-blue-100 whitespace-nowrap">
+                      I usually take my long-acting insulin at:
+                    </Label>
+                    <Input
+                      id="basal-time"
+                      type="time"
+                      value={basalInjectionTime}
+                      onChange={(e) => setBasalInjectionTime(e.target.value)}
+                      className="w-32 bg-white dark:bg-blue-900/50"
+                      data-testid="input-basal-time"
+                    />
+                    <span className="text-sm text-blue-700 dark:text-blue-300">(home time)</span>
+                  </div>
+
+                  {basalSchedule.length > 0 && (
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Your Adjustment Schedule ({plan.timezoneHours}h {plan.timezoneDirection})
+                      </h5>
+                      <div className="bg-white dark:bg-blue-900/30 rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100">
+                              <th className="px-3 py-2 text-left font-medium">Day</th>
+                              <th className="px-3 py-2 text-left font-medium">Home Time</th>
+                              <th className="px-3 py-2 text-left font-medium">Local Time</th>
+                              <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {basalSchedule.map((row, idx) => (
+                              <tr 
+                                key={idx} 
+                                className={idx % 2 === 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
+                              >
+                                <td className="px-3 py-2 text-blue-800 dark:text-blue-200 font-medium">
+                                  {row.label}
+                                </td>
+                                <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
+                                  {row.homeTime}
+                                </td>
+                                <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
+                                  {row.localTime}
+                                </td>
+                                <td className="px-3 py-2 text-blue-600 dark:text-blue-400 text-xs hidden sm:table-cell">
+                                  {row.note}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="sm:hidden space-y-1 mt-2">
+                        {basalSchedule.map((row, idx) => (
+                          <p key={idx} className="text-xs text-blue-600 dark:text-blue-400">
+                            <strong>{row.label}:</strong> {row.note}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                        <p><strong>Important notes:</strong></p>
+                        <ul className="list-disc list-inside space-y-0.5 ml-1">
+                          <li>Tresiba is more flexible and may not need gradual adjustment</li>
+                          <li>For trips under 3 days, you may keep your home injection time</li>
+                          <li>Monitor blood glucose more frequently during adjustment</li>
+                          <li>Discuss your specific plan with your diabetes team before travelling</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <Alert>
               <AlertTriangle className="h-4 w-4" />
