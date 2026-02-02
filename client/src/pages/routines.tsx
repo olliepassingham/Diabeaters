@@ -163,8 +163,7 @@ export function RoutinesContent() {
     : recentlyUsed;
 
   return (
-    <div className="h-full p-4 md:p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900">
@@ -547,7 +546,6 @@ export function RoutinesContent() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

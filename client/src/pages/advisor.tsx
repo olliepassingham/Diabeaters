@@ -560,14 +560,14 @@ function ChatSection({
   }, [messages]);
 
   return (
-    <Card className="flex flex-col min-h-[300px]">
+    <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Bot className="h-4 w-4 text-primary" />
           Ask the AI Advisor
         </CardTitle>
       </CardHeader>
-      <ScrollArea className="flex-1 px-4 max-h-[400px]" ref={scrollRef}>
+      <ScrollArea className="px-4 h-[300px]" ref={scrollRef}>
         <div className="space-y-4 pb-4">
           {messages.map((message, index) => (
             <ChatMessage key={index} {...message} />
@@ -1044,7 +1044,7 @@ export default function Advisor() {
   };
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col min-h-full relative overflow-auto">
       <FaceLogoWatermark />
       <div className="mb-4 flex items-center gap-2">
         <div>
@@ -1094,7 +1094,7 @@ export default function Advisor() {
         </CardContent>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
             <Utensils className="h-4 w-4" />Meal
@@ -1110,7 +1110,7 @@ export default function Advisor() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meal" className="flex-1 flex flex-col min-h-0 gap-4">
+        <TabsContent value="meal" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1353,7 +1353,7 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="exercise" className="flex-1 flex flex-col min-h-0 gap-4">
+        <TabsContent value="exercise" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1480,11 +1480,11 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="routines" className="flex-1 flex flex-col min-h-[500px] overflow-auto">
+        <TabsContent value="routines" className="mt-4">
           <RoutinesContent />
         </TabsContent>
 
-        <TabsContent value="tools" className="flex-1 flex flex-col min-h-0 gap-4">
+        <TabsContent value="tools" className="space-y-4 mt-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
