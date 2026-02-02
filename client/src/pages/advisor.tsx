@@ -1480,7 +1480,7 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="routines" className="flex-1 overflow-auto">
+        <TabsContent value="routines" className="flex-1 flex flex-col min-h-0 overflow-auto">
           <RoutinesContent />
         </TabsContent>
 
