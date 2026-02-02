@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Package, Dumbbell, Thermometer, Plane, Users, Calculator, AlertCircle, Settings, Bot, Pencil, Calendar, CalendarDays, AlertTriangle, ShieldAlert, Moon } from "lucide-react";
+import { Package, Dumbbell, Thermometer, Plane, Users, Calculator, AlertCircle, Settings, Bot, Pencil, Calendar, CalendarDays, AlertTriangle, ShieldAlert, Moon, Repeat } from "lucide-react";
 import { Link } from "wouter";
 import { storage, QuickActionConfig, ALL_QUICK_ACTIONS, QuickActionId } from "@/lib/storage";
 
@@ -23,6 +23,7 @@ const ICON_MAP: Record<string, typeof Package> = {
   AlertTriangle,
   ShieldAlert,
   Moon,
+  Repeat,
 };
 
 export function QuickActionsWidget() {

@@ -44,6 +44,7 @@ import Appointments from "@/pages/appointments";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
 import Shop from "@/pages/shop";
+import Routines from "@/pages/routines";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/community" component={Community} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/emergency-card" component={EmergencyCard} />
+      <Route path="/routines" component={Routines} />
       <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
       <Route path="/shop" component={Shop} />

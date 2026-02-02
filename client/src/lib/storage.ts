@@ -23,6 +23,7 @@ const STORAGE_KEYS = {
   APPOINTMENTS: "diabeater_appointments",
   EVENTS: "diabeater_events",
   AI_COACH_HISTORY: "diabeater_ai_coach_history",
+  ROUTINES: "diabeater_routines",
 } as const;
 
 export interface UserProfile {
@@ -278,6 +279,7 @@ export type QuickActionId =
   | "sick-day" 
   | "travel" 
   | "ratios" 
+  | "routines"
   | "community"
   | "settings"
   | "appointments"
@@ -297,10 +299,33 @@ export interface AICoachMessage {
   timestamp: string;
 }
 
+export type RoutineMealType = "breakfast" | "lunch" | "dinner" | "snack" | "other";
+export type RoutineOutcome = "great" | "good" | "okay" | "not_ideal";
+
+export interface Routine {
+  id: string;
+  name: string;
+  mealType: RoutineMealType;
+  mealDescription: string;
+  carbEstimate?: number;
+  insulinDose?: number;
+  insulinTiming: "before" | "with" | "after";
+  timingMinutes?: number;
+  context?: string;
+  outcome: RoutineOutcome;
+  outcomeNotes?: string;
+  tags: string[];
+  timesUsed: number;
+  lastUsed?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
   { id: "bedtime", label: "Bedtime", href: "/scenarios?tab=bedtime", iconName: "Moon", color: "text-indigo-600" },
+  { id: "routines", label: "Routines", href: "/routines", iconName: "Repeat", color: "text-emerald-600" },
   { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
   { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
   { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
@@ -1517,5 +1542,82 @@ export const storage = {
 
   clearAICoachHistory(): void {
     localStorage.removeItem(STORAGE_KEYS.AI_COACH_HISTORY);
+  },
+
+  // Routines - personal success patterns
+  getRoutines(): Routine[] {
+    const data = localStorage.getItem(STORAGE_KEYS.ROUTINES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getRoutine(id: string): Routine | null {
+    const routines = this.getRoutines();
+    return routines.find(r => r.id === id) || null;
+  },
+
+  addRoutine(routine: Omit<Routine, "id" | "timesUsed" | "createdAt" | "updatedAt">): Routine {
+    const routines = this.getRoutines();
+    const newRoutine: Routine = {
+      ...routine,
+      id: generateId(),
+      timesUsed: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    routines.push(newRoutine);
+    localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+    return newRoutine;
+  },
+
+  updateRoutine(id: string, updates: Partial<Omit<Routine, "id" | "createdAt">>): Routine | null {
+    const routines = this.getRoutines();
+    const index = routines.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    routines[index] = {
+      ...routines[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+    return routines[index];
+  },
+
+  deleteRoutine(id: string): boolean {
+    const routines = this.getRoutines();
+    const filtered = routines.filter(r => r.id !== id);
+    if (filtered.length === routines.length) return false;
+    localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(filtered));
+    return true;
+  },
+
+  useRoutine(id: string): Routine | null {
+    const routines = this.getRoutines();
+    const index = routines.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    routines[index] = {
+      ...routines[index],
+      timesUsed: routines[index].timesUsed + 1,
+      lastUsed: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.ROUTINES, JSON.stringify(routines));
+    return routines[index];
+  },
+
+  getRoutinesByMealType(mealType: RoutineMealType): Routine[] {
+    return this.getRoutines().filter(r => r.mealType === mealType);
+  },
+
+  getMostUsedRoutines(limit: number = 5): Routine[] {
+    return this.getRoutines()
+      .sort((a, b) => b.timesUsed - a.timesUsed)
+      .slice(0, limit);
+  },
+
+  getRecentRoutines(limit: number = 5): Routine[] {
+    return this.getRoutines()
+      .filter(r => r.lastUsed)
+      .sort((a, b) => new Date(b.lastUsed!).getTime() - new Date(a.lastUsed!).getTime())
+      .slice(0, limit);
   },
 };
