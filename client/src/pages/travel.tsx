@@ -655,17 +655,20 @@ export default function Travel() {
 
   if (step === "entry") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 relative">
-        <FaceLogoWatermark />
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Plane className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Travel Mode</h1>
-            <p className="text-muted-foreground">Prepare for your trip with confidence</p>
-          </div>
-        </div>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900">
+                <Plane className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <CardTitle className="text-xl">Travel Mode</CardTitle>
+                <CardDescription>Prepare for your trip with confidence</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -739,17 +742,20 @@ export default function Travel() {
 
   if (step === "inputs") {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 relative">
-        <FaceLogoWatermark />
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Trip Details</h1>
-            <p className="text-muted-foreground">Tell us about your upcoming travel</p>
-          </div>
-        </div>
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <CardTitle className="text-xl">Trip Details</CardTitle>
+                <CardDescription>Tell us about your upcoming travel</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -999,22 +1005,25 @@ export default function Travel() {
   const checkedCount = packingList.filter(i => i.checked).length;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 relative">
-      <FaceLogoWatermark />
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-new-plan">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">Your Travel Plan</h1>
-          <p className="text-muted-foreground">
-            {plan.duration} days to {plan.destination}
-          </p>
-        </div>
-        <Badge variant="outline">
-          {plan.travelType === "international" ? "International" : "Domestic"}
-        </Badge>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
+        <CardHeader>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-new-plan">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <CardTitle className="text-xl">Your Travel Plan</CardTitle>
+              <CardDescription>
+                {plan.duration} days to {plan.destination}
+              </CardDescription>
+            </div>
+            <Badge variant="outline">
+              {plan.travelType === "international" ? "International" : "Domestic"}
+            </Badge>
+          </div>
+        </CardHeader>
+      </Card>
 
       <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
         <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />

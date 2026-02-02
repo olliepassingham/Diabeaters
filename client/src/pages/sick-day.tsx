@@ -443,16 +443,22 @@ export default function SickDay() {
   };
 
   return (
-    <div className="space-y-6 relative">
-      <FaceLogoWatermark />
-      <div>
-        <h1 className="text-3xl font-semibold">Sick Day Adviser</h1>
-        <p className="text-muted-foreground mt-1">
-          Calculate insulin adjustments when you're feeling unwell.
-        </p>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-100 dark:border-orange-900">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900">
+              <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <CardTitle className="text-xl">Sick Day Adviser</CardTitle>
+              <CardDescription>Calculate insulin adjustments when you're feeling unwell</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
 
-      <div className="grid gap-6 max-w-4xl">
+      <div className="grid gap-6">
         <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
           <CardContent className="p-4">
             <div className="flex gap-3">
