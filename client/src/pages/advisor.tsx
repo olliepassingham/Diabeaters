@@ -1107,7 +1107,7 @@ export default function Advisor() {
             <Repeat className="h-4 w-4" />Routines
           </TabsTrigger>
           <TabsTrigger value="tools" className="gap-2" data-testid="tab-tools">
-            <Wrench className="h-4 w-4" />Tools
+            <Droplet className="h-4 w-4" />Hypo Help
           </TabsTrigger>
         </TabsList>
 
