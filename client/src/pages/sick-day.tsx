@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -485,7 +486,10 @@ export default function SickDay() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="tdd">Total Daily Dose (TDD) - Units</Label>
+                <Label htmlFor="tdd" className="flex items-center">
+                  Total Daily Dose (TDD) - Units
+                  <InfoTooltip {...DIABETES_TERMS.tdd} />
+                </Label>
                 {settings.tdd ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -548,7 +552,10 @@ export default function SickDay() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ketone-level">Ketone Level</Label>
+                <Label htmlFor="ketone-level" className="flex items-center">
+                  Ketone Level
+                  <InfoTooltip {...DIABETES_TERMS.ketones} />
+                </Label>
                 <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
                   <SelectTrigger id="ketone-level" data-testid="select-ketone-level">
                     <SelectValue placeholder="Select ketone level" />
@@ -613,7 +620,10 @@ export default function SickDay() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="update-ketones" className="text-sm">Ketone Level</Label>
+                  <Label htmlFor="update-ketones" className="text-sm flex items-center">
+                    Ketone Level
+                    <InfoTooltip {...DIABETES_TERMS.ketones} />
+                  </Label>
                   <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
                     <SelectTrigger id="update-ketones" data-testid="select-update-ketone-level">
                       <SelectValue placeholder="Select level" />

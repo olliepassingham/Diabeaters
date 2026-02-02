@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Wrench, Repeat } from "lucide-react";
+import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
@@ -633,7 +634,7 @@ export default function Advisor() {
   const [mealMessages, setMealMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm here to help you plan your meals. Tell me how many carbs you're planning to eat (e.g., \"60g carbs for lunch\") and I'll calculate a suggested bolus based on your ratios.\n\n[Not medical advice. Always verify with your own calculations.]",
+      content: "Hi! I'm here to help you plan your meals. Tell me how many carbs you're planning to eat (e.g., \"60g carbs for lunch\") and I'll calculate a suggested mealtime dose based on your ratios.\n\n[Not medical advice. Always verify with your own calculations.]",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -1056,7 +1057,7 @@ export default function Advisor() {
           description="Get smart recommendations for meals and exercise"
         >
           <InfoSection title="Meal Tab">
-            <p>Enter carbs and meal type for a bolus suggestion. Toggle "Planning around exercise?" to get adjusted doses for meals before, during, or after workouts.</p>
+            <p>Enter carbs and meal type for a dose suggestion. Toggle "Planning around exercise?" to get adjusted doses for meals before, during, or after workouts.</p>
           </InfoSection>
           <InfoSection title="Exercise Tab">
             <p>Plan workouts by type, duration, and intensity. Get preparation tips including what to eat before, during, and after exercise.</p>
@@ -1117,12 +1118,18 @@ export default function Advisor() {
                 <Utensils className="h-5 w-5 text-primary" />
                 Quick Meal Planner
               </CardTitle>
-              <CardDescription>Enter your carbs and get a bolus suggestion</CardDescription>
+              <CardDescription className="flex items-center gap-1">
+                Enter your carbs and get a mealtime dose suggestion
+                <InfoTooltip {...DIABETES_TERMS.bolus} />
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="meal-carbs">How many carbs? ({carbUnit === "cp" ? "CP" : "grams"})</Label>
+                  <Label htmlFor="meal-carbs" className="flex items-center">
+                    How many carbs? ({carbUnit === "cp" ? "CP" : "grams"})
+                    <InfoTooltip {...DIABETES_TERMS.carbRatio} />
+                  </Label>
                   <Input
                     id="meal-carbs"
                     type="number"
@@ -1225,7 +1232,7 @@ export default function Advisor() {
               </div>
 
               <Button onClick={handleQuickMealPlan} disabled={!mealCarbs} className="w-full" data-testid="button-get-meal-advice">
-                Get Bolus Suggestion
+                Get Dose Suggestion
               </Button>
             </CardContent>
           </Card>
@@ -1241,7 +1248,7 @@ export default function Advisor() {
                   <div className="flex items-center gap-2">
                     <Pizza className="h-5 w-5 text-primary" />
                     <div className="text-left">
-                      <span className="font-medium">Split Bolus Calculator</span>
+                      <span className="font-medium">Split Dose Calculator</span>
                       <p className="text-xs text-muted-foreground font-normal">For high-fat meals like pizza, fish & chips</p>
                     </div>
                   </div>
@@ -1253,7 +1260,7 @@ export default function Advisor() {
                   <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
                       High-fat meals slow down carb absorption. Taking all insulin upfront can cause an initial hypo, 
-                      then a late spike. Split your bolus to match the slower digestion.
+                      then a late spike. Split your dose to match the slower digestion.
                     </p>
                   </div>
 
@@ -1307,7 +1314,7 @@ export default function Advisor() {
                     <div className="p-4 bg-primary/5 rounded-lg space-y-3">
                       <h4 className="font-medium flex items-center gap-2">
                         <Pizza className="h-4 w-4 text-primary" />
-                        Your Split Bolus Plan ({splitResult.splitRatio})
+                        Your Split Dose Plan ({splitResult.splitRatio})
                       </h4>
                       
                       <div className="grid gap-3 md:grid-cols-2">
@@ -1349,7 +1356,7 @@ export default function Advisor() {
             setInputValue={setMealInput}
             onSend={handleMealSend}
             isTyping={isMealTyping}
-            placeholder="Ask about meals, carbs, or bolus calculations..."
+            placeholder="Ask about meals, carbs, or dose calculations..."
           />
         </TabsContent>
 

@@ -12,6 +12,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -362,7 +363,10 @@ export default function Settings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="tdd">Total Daily Dose (TDD)</Label>
+                <Label htmlFor="tdd" className="flex items-center">
+                  Total Daily Dose (TDD)
+                  <InfoTooltip {...DIABETES_TERMS.tdd} />
+                </Label>
                 <Input
                   id="tdd"
                   type="number"
@@ -374,7 +378,10 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">Units per day</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="correction-factor">Correction Factor</Label>
+                <Label htmlFor="correction-factor" className="flex items-center">
+                  Correction Factor
+                  <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
+                </Label>
                 <Input
                   id="correction-factor"
                   type="number"
@@ -384,10 +391,13 @@ export default function Settings() {
                   onChange={(e) => setCorrectionFactor(e.target.value)}
                   data-testid="input-correction-factor"
                 />
-                <p className="text-xs text-muted-foreground">1 unit drops BG by X {bgUnits}</p>
+                <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
               </div>
               <div className="space-y-2">
-                <Label>Target Range ({bgUnits})</Label>
+                <Label className="flex items-center">
+                  Target Range ({bgUnits})
+                  <InfoTooltip {...DIABETES_TERMS.targetRange} />
+                </Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
@@ -409,7 +419,10 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Carb Ratios (units per 10g carbs)</Label>
+              <Label className="text-sm font-medium flex items-center">
+                Carb Ratios (units per 10g carbs)
+                <InfoTooltip {...DIABETES_TERMS.carbRatio} />
+              </Label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles } from "lucide-react";
 import { storage, UserSettings } from "@/lib/storage";
+import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
@@ -242,7 +243,8 @@ export default function Bedtime() {
             <div className="space-y-2">
               <Label htmlFor="hours-insulin" className="flex items-center gap-2">
                 <Syringe className="h-4 w-4" />
-                Hours since last bolus
+                Hours since last mealtime dose
+                <InfoTooltip {...DIABETES_TERMS.bolus} />
               </Label>
               <Select value={hoursSinceInsulin} onValueChange={setHoursSinceInsulin}>
                 <SelectTrigger id="hours-insulin" data-testid="select-hours-insulin">
