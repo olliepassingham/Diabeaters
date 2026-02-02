@@ -175,7 +175,7 @@ export default function Routines() {
               <p className="text-muted-foreground text-sm">Meals and moments that worked well</p>
             </div>
           </div>
-          <PageInfoDialog title="About Routines">
+          <PageInfoDialog title="About Routines" description="Save and recall your successful meals and moments">
             <InfoSection title="What are Routines?">
               <p>Routines are your personal collection of meals and moments that went well. Save the details of what worked so you can confidently repeat success.</p>
             </InfoSection>
@@ -241,7 +241,7 @@ export default function Routines() {
                       </SelectTrigger>
                       <SelectContent>
                         {MEAL_TYPES.map(mt => (
-                          <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>
+                          <SelectItem key={mt.value} value={mt.value} data-testid={`option-meal-${mt.value}`}>{mt.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -254,7 +254,7 @@ export default function Routines() {
                       </SelectTrigger>
                       <SelectContent>
                         {OUTCOMES.map(o => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          <SelectItem key={o.value} value={o.value} data-testid={`option-outcome-${o.value}`}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -309,7 +309,7 @@ export default function Routines() {
                       </SelectTrigger>
                       <SelectContent>
                         {TIMING_OPTIONS.map(t => (
-                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          <SelectItem key={t.value} value={t.value} data-testid={`option-timing-${t.value}`}>{t.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -371,7 +371,7 @@ export default function Routines() {
               </div>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
+                  <Button variant="outline" data-testid="button-cancel-routine">Cancel</Button>
                 </DialogClose>
                 <Button onClick={handleSave} disabled={!name || !mealDescription} data-testid="button-save-routine">
                   {editingRoutine ? "Save Changes" : "Save Routine"}
@@ -386,9 +386,9 @@ export default function Routines() {
                 <SelectValue placeholder="Filter by meal" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All meals</SelectItem>
+                <SelectItem value="all" data-testid="option-filter-all">All meals</SelectItem>
                 {MEAL_TYPES.map(mt => (
-                  <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>
+                  <SelectItem key={mt.value} value={mt.value} data-testid={`option-filter-${mt.value}`}>{mt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
