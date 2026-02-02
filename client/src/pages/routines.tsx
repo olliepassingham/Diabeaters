@@ -212,14 +212,14 @@ export function RoutinesContent() {
                 Save a Routine
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
+            <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>{editingRoutine ? "Edit Routine" : "Save a New Routine"}</DialogTitle>
                 <DialogDescription>
                   Record a meal or moment that went well so you can repeat it
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-4 overflow-y-auto flex-1 pr-2">
                 <div className="space-y-2">
                   <Label htmlFor="routine-name">Give it a name</Label>
                   <Input
@@ -368,7 +368,7 @@ export function RoutinesContent() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-shrink-0 border-t pt-4 mt-2">
                 <DialogClose asChild>
                   <Button variant="outline" data-testid="button-cancel-routine">Cancel</Button>
                 </DialogClose>
