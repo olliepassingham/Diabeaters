@@ -163,7 +163,7 @@ export function RoutinesContent() {
     : recentlyUsed;
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-6">
+    <div className="h-full p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
