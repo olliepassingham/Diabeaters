@@ -274,6 +274,7 @@ export interface CommunityReel {
 export type QuickActionId = 
   | "supplies" 
   | "activity" 
+  | "bedtime"
   | "sick-day" 
   | "travel" 
   | "ratios" 
@@ -299,6 +300,7 @@ export interface AICoachMessage {
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
+  { id: "bedtime", label: "Bedtime", href: "/scenarios?tab=bedtime", iconName: "Moon", color: "text-indigo-600" },
   { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
   { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
   { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
@@ -312,10 +314,10 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
 export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "supplies", enabled: true, order: 0 },
   { id: "activity", enabled: true, order: 1 },
-  { id: "sick-day", enabled: true, order: 2 },
-  { id: "travel", enabled: true, order: 3 },
-  { id: "appointments", enabled: true, order: 4 },
-  { id: "community", enabled: true, order: 5 },
+  { id: "bedtime", enabled: true, order: 2 },
+  { id: "sick-day", enabled: true, order: 3 },
+  { id: "travel", enabled: true, order: 4 },
+  { id: "appointments", enabled: true, order: 5 },
 ];
 
 // Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Appointments, Community, Messages, Ratios, Settings (at bottom)
