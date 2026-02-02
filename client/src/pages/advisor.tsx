@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock, Droplet, Pizza, Wrench, Repeat } from "lucide-react";
+import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Wrench, Repeat } from "lucide-react";
 import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
@@ -611,7 +611,7 @@ function ChatSection({
 function getInitialTab(): string {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab === "meal" || tab === "exercise" || tab === "session" || tab === "routines" || tab === "tools") {
+  if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools") {
     return tab;
   }
   return "meal";
@@ -625,7 +625,7 @@ export default function Advisor() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    if (tab === "meal" || tab === "exercise" || tab === "session" || tab === "routines" || tab === "tools") {
+    if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools") {
       setActiveTab(tab);
     }
   }, []);
@@ -640,7 +640,7 @@ export default function Advisor() {
   const [exerciseMessages, setExerciseMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm here to help you prepare for exercise. Tell me what you're planning (e.g., \"45 minutes of moderate running\") and I'll give you recommendations for before, during, and after.\n\n[Not medical advice. Individual responses to exercise vary.]",
+      content: "Hi! I'm here to help you plan your workout. Use the form above to set up your exercise, then I'll give you a complete plan covering what to eat before, during, and after your workout, plus insulin adjustments.\n\n[Not medical advice. Individual responses to exercise vary.]",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -663,19 +663,6 @@ export default function Advisor() {
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
   const [exerciseWithin, setExerciseWithin] = useState("2");
   
-  const [sessionMessages, setSessionMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Welcome to Activity Session planning! This helps you plan meals and exercise together for better blood sugar management.\n\nTell me about your planned activity and I'll help you plan pre-workout fuel, the exercise itself, and recovery eating.\n\n[Not medical advice.]",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
-  const [sessionInput, setSessionInput] = useState("");
-  const [isSessionTyping, setIsSessionTyping] = useState(false);
-  
-  const [sessionExerciseType, setSessionExerciseType] = useState("cardio");
-  const [sessionDuration, setSessionDuration] = useState("");
-  const [sessionIntensity, setSessionIntensity] = useState("moderate");
   const [sessionTimingFromNow, setSessionTimingFromNow] = useState("60");
 
   // Split Bolus Calculator state
@@ -950,13 +937,13 @@ export default function Advisor() {
         aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses to exercise vary.]";
         confidence = data.confidence || "MEDIUM";
       } else {
-        // API unavailable or error - use local processing
-        aiResponse = processUserMessage(message, userSettings, bgUnits, "exercise");
+        // API unavailable or error - use local processing with session-style output
+        aiResponse = processActivitySessionMessage(message, userSettings, bgUnits);
       }
     } catch {
-      // Network error or other failure - use local processing
+      // Network error or other failure - use local processing with session-style output
       const freshSettings = storage.getSettings();
-      aiResponse = processUserMessage(message, freshSettings, bgUnits, "exercise");
+      aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
     }
 
     setExerciseMessages(prev => [...prev, {
@@ -1015,7 +1002,9 @@ export default function Advisor() {
 
   const handleQuickExercisePlan = () => {
     if (!exerciseDuration) return;
-    const message = `I'm planning to do ${exerciseType} exercise for ${exerciseDuration} minutes at ${exerciseIntensity} intensity. How should I prepare?`;
+    const timingMins = parseInt(sessionTimingFromNow);
+    const timingText = timingMins < 60 ? `${timingMins} minutes` : `${Math.round(timingMins / 60)} hour${timingMins >= 120 ? 's' : ''}`;
+    const message = `I'm planning ${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes, starting in about ${timingText}. Help me plan the whole workout including what to eat before, during, and after.`;
     sendExerciseMessage(message);
   };
   
@@ -1044,78 +1033,6 @@ export default function Advisor() {
     setIsMealTyping(false);
   };
   
-  const handleActivitySession = () => {
-    if (!sessionDuration) return;
-    const timingMins = parseInt(sessionTimingFromNow);
-    const timingText = timingMins < 60 ? `${timingMins} minutes` : `${Math.round(timingMins / 60)} hour${timingMins >= 120 ? 's' : ''}`;
-    const message = `I'm planning ${sessionIntensity} ${sessionExerciseType} for ${sessionDuration} minutes, starting in about ${timingText}. Help me plan the whole session including what to eat before, during, and after.`;
-    sendSessionMessage(message);
-  };
-  
-  const sendSessionMessage = async (message: string) => {
-    const userMessage: Message = {
-      role: "user",
-      content: message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setSessionMessages(prev => [...prev, userMessage]);
-    setIsSessionTyping(true);
-
-    let aiResponse: string;
-    let confidence: ConfidenceLevel = "MEDIUM";
-
-    try {
-      const userProfile = storage.getProfile();
-      const userSettings = storage.getSettings();
-      const activityLogs = storage.getActivityLogs().slice(0, 5);
-      
-      const conversationHistory = [...sessionMessages, userMessage]
-        .filter(m => m.content !== sessionMessages[0]?.content)
-        .map(m => ({ role: m.role, content: m.content }));
-      
-      const response = await fetch("/api/activity/advice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activityType: "activity_session",
-          activityDetails: message,
-          userProfile,
-          userSettings,
-          conversationHistory,
-          activityLogs,
-          currentTime: new Date().toISOString(),
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses vary.]";
-        confidence = data.confidence || "MEDIUM";
-      } else {
-        const freshSettings = storage.getSettings();
-        aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
-      }
-    } catch {
-      const freshSettings = storage.getSettings();
-      aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
-    }
-
-    setSessionMessages(prev => [...prev, {
-      role: "assistant",
-      content: aiResponse,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      confidence,
-    }]);
-    
-    setIsSessionTyping(false);
-  };
-  
-  const handleSessionSend = () => {
-    if (!sessionInput.trim()) return;
-    sendSessionMessage(sessionInput);
-    setSessionInput("");
-  };
-
   const getRatioForMeal = (meal: string): string => {
     const ratioMap: Record<string, string | undefined> = {
       breakfast: settings.breakfastRatio,
@@ -1178,15 +1095,12 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-4 max-w-xl">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
             <Utensils className="h-4 w-4" />Meal
           </TabsTrigger>
           <TabsTrigger value="exercise" className="gap-2" data-testid="tab-exercise">
             <Dumbbell className="h-4 w-4" />Exercise
-          </TabsTrigger>
-          <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
-            <Zap className="h-4 w-4" />Session
           </TabsTrigger>
           <TabsTrigger value="routines" className="gap-2" data-testid="tab-routines">
             <Repeat className="h-4 w-4" />Routines
@@ -1446,10 +1360,10 @@ export default function Advisor() {
                 <Dumbbell className="h-5 w-5 text-primary" />
                 Exercise Planner
               </CardTitle>
-              <CardDescription>Plan your workout and get preparation tips</CardDescription>
+              <CardDescription>Plan your workout with before, during, and after recommendations</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="exercise-type">Type of Exercise</Label>
                   <Select value={exerciseType} onValueChange={setExerciseType}>
@@ -1463,6 +1377,7 @@ export default function Advisor() {
                       <SelectItem value="yoga">Yoga / Stretching</SelectItem>
                       <SelectItem value="walking">Walking</SelectItem>
                       <SelectItem value="sports">Team Sports</SelectItem>
+                      <SelectItem value="swimming">Swimming</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1480,6 +1395,9 @@ export default function Advisor() {
                     <span className="text-muted-foreground text-sm">mins</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="exercise-intensity">Intensity</Label>
                   <Select value={exerciseIntensity} onValueChange={setExerciseIntensity}>
@@ -1493,10 +1411,35 @@ export default function Advisor() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exercise-timing">Starting in...</Label>
+                  <Select value={sessionTimingFromNow} onValueChange={setSessionTimingFromNow}>
+                    <SelectTrigger id="exercise-timing" data-testid="select-exercise-timing">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="90">1.5 hours</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="bg-primary/5 p-3 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 text-primary mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Complete Workout Plan</p>
+                    <p className="text-muted-foreground">Get recommendations for what to eat before, during, and after your workout, plus adjusted insulin guidance.</p>
+                  </div>
+                </div>
               </div>
 
               <Button onClick={handleQuickExercisePlan} disabled={!exerciseDuration} className="w-full" data-testid="button-get-exercise-advice">
-                Get Exercise Recommendations
+                Plan My Workout
               </Button>
             </CardContent>
           </Card>
@@ -1534,105 +1477,6 @@ export default function Advisor() {
             onSend={handleExerciseSend}
             isTyping={isExerciseTyping}
             placeholder="Ask about exercise, blood sugar, or preparation tips..."
-          />
-        </TabsContent>
-
-        <TabsContent value="session" className="flex-1 flex flex-col min-h-0 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                Activity Session Planner
-              </CardTitle>
-              <CardDescription>Plan pre-workout fuel, exercise, and recovery eating together</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="session-type">What exercise?</Label>
-                  <Select value={sessionExerciseType} onValueChange={setSessionExerciseType}>
-                    <SelectTrigger id="session-type" data-testid="select-session-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cardio">Cardio (Running, Cycling)</SelectItem>
-                      <SelectItem value="strength">Strength Training</SelectItem>
-                      <SelectItem value="hiit">HIIT</SelectItem>
-                      <SelectItem value="sports">Team Sports</SelectItem>
-                      <SelectItem value="swimming">Swimming</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session-duration">Duration</Label>
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      id="session-duration"
-                      type="number"
-                      placeholder="e.g., 45"
-                      value={sessionDuration}
-                      onChange={(e) => setSessionDuration(e.target.value)}
-                      data-testid="input-session-duration"
-                    />
-                    <span className="text-muted-foreground text-sm">mins</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="session-intensity">Intensity</Label>
-                  <Select value={sessionIntensity} onValueChange={setSessionIntensity}>
-                    <SelectTrigger id="session-intensity" data-testid="select-session-intensity">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="moderate">Moderate</SelectItem>
-                      <SelectItem value="intense">Intense</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="session-timing">Starting in...</Label>
-                  <Select value={sessionTimingFromNow} onValueChange={setSessionTimingFromNow}>
-                    <SelectTrigger id="session-timing" data-testid="select-session-timing">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="90">1.5 hours</SelectItem>
-                      <SelectItem value="120">2 hours</SelectItem>
-                      <SelectItem value="180">3 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="bg-primary/5 p-3 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Clock className="h-4 w-4 text-primary mt-0.5" />
-                  <div className="text-sm">
-                    <p className="font-medium">Complete Session Plan</p>
-                    <p className="text-muted-foreground">Get recommendations for what to eat before, during, and after your workout, plus adjusted insulin doses.</p>
-                  </div>
-                </div>
-              </div>
-
-              <Button onClick={handleActivitySession} disabled={!sessionDuration} className="w-full" data-testid="button-plan-session">
-                Plan My Session
-              </Button>
-            </CardContent>
-          </Card>
-
-          <ChatSection
-            messages={sessionMessages}
-            inputValue={sessionInput}
-            setInputValue={setSessionInput}
-            onSend={handleSessionSend}
-            isTyping={isSessionTyping}
-            placeholder="Ask about your activity session..."
           />
         </TabsContent>
 
