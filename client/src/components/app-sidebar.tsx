@@ -1,4 +1,4 @@
-import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag, Repeat } from "lucide-react";
+import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { FaceLogo } from "@/components/face-logo";
 import {
@@ -35,12 +35,7 @@ const items = [
     url: "/scenarios",
     icon: AlertTriangle,
   },
-  {
-    title: "Routines",
-    url: "/routines",
-    icon: Repeat,
-  },
-  {
+    {
     title: "Appointments",
     url: "/appointments",
     icon: Calendar,

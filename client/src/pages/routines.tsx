@@ -55,7 +55,7 @@ function getOutcomeLabel(outcome: RoutineOutcome) {
   return found ? found.label.split(" - ")[0] : "Okay";
 }
 
-export default function Routines() {
+export function RoutinesContent() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -550,4 +550,8 @@ export default function Routines() {
       </div>
     </div>
   );
+}
+
+export default function Routines() {
+  return <RoutinesContent />;
 }

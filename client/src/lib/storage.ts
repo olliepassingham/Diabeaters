@@ -325,7 +325,7 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
   { id: "bedtime", label: "Bedtime", href: "/scenarios?tab=bedtime", iconName: "Moon", color: "text-indigo-600" },
-  { id: "routines", label: "Routines", href: "/routines", iconName: "Repeat", color: "text-emerald-600" },
+  { id: "routines", label: "Routines", href: "/advisor?tab=routines", iconName: "Repeat", color: "text-emerald-600" },
   { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
   { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
   { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },

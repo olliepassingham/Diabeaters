@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock, Droplet, Pizza, Wrench } from "lucide-react";
+import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Zap, Clock, Droplet, Pizza, Wrench, Repeat } from "lucide-react";
+import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -607,10 +608,27 @@ function ChatSection({
   );
 }
 
+function getInitialTab(): string {
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get("tab");
+  if (tab === "meal" || tab === "exercise" || tab === "session" || tab === "routines" || tab === "tools") {
+    return tab;
+  }
+  return "meal";
+}
+
 export default function Advisor() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
-  const [activeTab, setActiveTab] = useState("meal");
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "meal" || tab === "exercise" || tab === "session" || tab === "routines" || tab === "tools") {
+      setActiveTab(tab);
+    }
+  }, []);
   
   const [mealMessages, setMealMessages] = useState<Message[]>([
     {
@@ -1160,7 +1178,7 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
             <Utensils className="h-4 w-4" />Meal
           </TabsTrigger>
@@ -1169,6 +1187,9 @@ export default function Advisor() {
           </TabsTrigger>
           <TabsTrigger value="session" className="gap-2" data-testid="tab-session">
             <Zap className="h-4 w-4" />Session
+          </TabsTrigger>
+          <TabsTrigger value="routines" className="gap-2" data-testid="tab-routines">
+            <Repeat className="h-4 w-4" />Routines
           </TabsTrigger>
           <TabsTrigger value="tools" className="gap-2" data-testid="tab-tools">
             <Wrench className="h-4 w-4" />Tools
@@ -1613,6 +1634,10 @@ export default function Advisor() {
             isTyping={isSessionTyping}
             placeholder="Ask about your activity session..."
           />
+        </TabsContent>
+
+        <TabsContent value="routines" className="flex-1 overflow-auto">
+          <RoutinesContent />
         </TabsContent>
 
         <TabsContent value="tools" className="flex-1 flex flex-col min-h-0 gap-4">

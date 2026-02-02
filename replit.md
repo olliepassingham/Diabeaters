@@ -46,10 +46,9 @@ Preferred communication style: Simple, everyday language.
 ### Navigation Structure
 - **Dashboard**: Main hub with customizable widgets and floating AI Coach button
 - **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts
-- **Activity Advisor**: Meal planning with exercise integration, Exercise planning with recovery guidance, Activity Session planner for complete workout day management, and Ratio Adviser. Features conversation memory, time-of-day awareness (auto-uses correct meal ratios), historical learning from activity logs, and confidence indicators on recommendations.
+- **Activity Advisor**: Meal planning with exercise integration, Exercise planning with recovery guidance, Activity Session planner for complete workout day management, Ratio Adviser, and Routines tab. Features conversation memory, time-of-day awareness (auto-uses correct meal ratios), historical learning from activity logs, and confidence indicators on recommendations.
 - **AI Coach**: Conversational AI assistant with persistent memory (last 100 messages stored in localStorage). Provides personalized diabetes guidance using user profile/settings context. Safety-first with "Not medical advice" labeling.
 - **Scenarios**: Bedtime Readiness Check (first tab - calm evening check for stable sleep), Sick Day Mode, and Travel Mode with tabbed interface
-- **Routines**: Personal success library for saving meals/moments that went well. Pattern recall focused (not recommendations), helps users repeat success with confidence
 - **Appointments**: Healthcare appointment tracking
 - **Community**: Posts, News (diabetes articles from trusted sources), Events, Reels, and Messages tabs
 - **Settings**: User profile and app configuration
