@@ -23,7 +23,10 @@ import {
   Hospital,
   Pill,
   Info,
-  Globe
+  Globe,
+  Thermometer,
+  Sun,
+  Snowflake
 } from "lucide-react";
 import { storage, Supply, UserSettings, UserProfile } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -1186,6 +1189,78 @@ export default function Travel() {
         </CardContent>
       </Card>
 
+      {/* Weather Considerations Card */}
+      <Card className="border-orange-200 dark:border-orange-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            Weather & Temperature Considerations
+          </CardTitle>
+          <CardDescription>
+            How climate differences can affect your diabetes management
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Hot Weather */}
+            <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Sun className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <h4 className="font-medium text-red-900 dark:text-red-100">Hot Weather</h4>
+              </div>
+              <ul className="text-sm text-red-800 dark:text-red-200 space-y-2 list-disc list-inside">
+                <li><strong>Faster insulin absorption</strong> — heat increases blood flow, so insulin works quicker. You may need less insulin or experience unexpected hypos</li>
+                <li><strong>Dehydration raises BG</strong> — drink more water than usual. Dehydration can make blood glucose harder to control</li>
+                <li><strong>Protect your insulin</strong> — never leave insulin in direct sun or hot cars. Use a cooling case or insulated bag</li>
+                <li><strong>CGM accuracy</strong> — extreme heat can affect sensor readings. Check with finger pricks if readings seem off</li>
+                <li><strong>Infusion sites</strong> — sweat can loosen adhesives. Consider extra tape or skin prep wipes</li>
+              </ul>
+              <div className="mt-3 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs text-red-700 dark:text-red-300">
+                <strong>Tip:</strong> Consider reducing mealtime doses by 10-20% on very hot days, and monitor more frequently
+              </div>
+            </div>
+
+            {/* Cold Weather */}
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Snowflake className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                <h4 className="font-medium text-blue-900 dark:text-blue-100">Cold Weather</h4>
+              </div>
+              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-disc list-inside">
+                <li><strong>Slower insulin absorption</strong> — cold reduces blood flow, so insulin may work slower. You might see higher readings initially</li>
+                <li><strong>Shivering burns glucose</strong> — like exercise, shivering uses energy. Be prepared for unexpected lows</li>
+                <li><strong>Keep insulin warm</strong> — frozen insulin is damaged and won't work. Keep it close to your body in extreme cold</li>
+                <li><strong>CGM sensor issues</strong> — extreme cold can cause inaccurate readings or sensor errors. Keep sensor site warm under clothing</li>
+                <li><strong>Test strip accuracy</strong> — very cold test strips may give inaccurate results. Keep meter and strips at body temperature</li>
+              </ul>
+              <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-xs text-blue-700 dark:text-blue-300">
+                <strong>Tip:</strong> Winter sports can cause dramatic hypos. Reduce basal/bolus and keep fast-acting glucose easily accessible
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <h4 className="font-medium text-amber-900 dark:text-amber-100">General Climate Adaptation Tips</h4>
+            </div>
+            <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1 list-disc list-inside">
+              <li>First few days in a new climate — monitor blood glucose more often than usual</li>
+              <li>Keep a glucose diary noting weather and activity to spot patterns</li>
+              <li>Adjust ratios gradually — don't make big changes all at once</li>
+              <li>Have extra hypo treatment easily accessible, especially during outdoor activities</li>
+              <li>Acclimatisation takes 3-5 days — expect some variability initially</li>
+            </ul>
+          </div>
+
+          <Alert className="border-muted">
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Everyone responds differently to climate changes. These are general guidelines — monitor your own responses and adjust accordingly. Discuss significant travel with your diabetes team beforehand if possible.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
 
       {plan.timezoneChange !== "none" && (
         <Card className="border-purple-200 dark:border-purple-800">
