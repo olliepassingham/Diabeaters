@@ -42,6 +42,8 @@ interface TravelPlan {
   startDate: string;
   endDate: string;
   accessRisk: "easy" | "limited" | "unsure";
+  weatherChange: "warmer" | "colder" | "similar" | "unknown";
+  weatherSeverity: "slight" | "moderate" | "extreme";
 }
 
 interface PackingItem {
@@ -449,6 +451,8 @@ export default function Travel() {
     startDate: defaultDates.start,
     endDate: defaultDates.end,
     accessRisk: "easy",
+    weatherChange: "unknown",
+    weatherSeverity: "moderate",
   });
   const [packingList, setPackingList] = useState<PackingItem[]>([]);
   const [riskWarnings, setRiskWarnings] = useState<RiskWarning[]>([]);
@@ -651,6 +655,8 @@ export default function Travel() {
       startDate: dates.start,
       endDate: dates.end,
       accessRisk: "easy",
+      weatherChange: "unknown",
+      weatherSeverity: "moderate",
     });
     setPackingList([]);
     setRiskWarnings([]);
@@ -976,6 +982,51 @@ export default function Travel() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Thermometer className="h-4 w-4" />
+                Weather at Destination
+              </Label>
+              <Select 
+                value={plan.weatherChange} 
+                onValueChange={(value: "warmer" | "colder" | "similar" | "unknown") => setPlan(prev => ({ ...prev, weatherChange: value }))}
+              >
+                <SelectTrigger data-testid="select-weather-change">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unknown">I'm not sure</SelectItem>
+                  <SelectItem value="similar">Similar to home</SelectItem>
+                  <SelectItem value="warmer">Warmer than home</SelectItem>
+                  <SelectItem value="colder">Colder than home</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(plan.weatherChange === "warmer" || plan.weatherChange === "colder") && (
+              <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                <Label>How much {plan.weatherChange === "warmer" ? "warmer" : "colder"}?</Label>
+                <Select 
+                  value={plan.weatherSeverity} 
+                  onValueChange={(value: "slight" | "moderate" | "extreme") => setPlan(prev => ({ ...prev, weatherSeverity: value }))}
+                >
+                  <SelectTrigger data-testid="select-weather-severity">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="slight">Slightly (5-10°C difference)</SelectItem>
+                    <SelectItem value="moderate">Moderately (10-20°C difference)</SelectItem>
+                    <SelectItem value="extreme">Significantly (20°C+ difference)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {plan.weatherChange === "warmer" 
+                    ? "Heat can speed up insulin absorption and increase hypo risk" 
+                    : "Cold can slow insulin absorption and affect CGM/meter accuracy"}
+                </p>
+              </div>
+            )}
+
             <Alert>
               <Info className="h-4 w-4" />
               <AlertDescription className="text-sm">
@@ -1189,78 +1240,218 @@ export default function Travel() {
         </CardContent>
       </Card>
 
-      {/* Weather Considerations Card */}
-      <Card className="border-orange-200 dark:border-orange-800">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            Weather & Temperature Considerations
-          </CardTitle>
-          <CardDescription>
-            How climate differences can affect your diabetes management
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Hot Weather */}
-            <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-              <div className="flex items-center gap-2 mb-3">
+      {/* Weather Considerations Card - Dynamic based on user selection */}
+      {plan.weatherChange !== "similar" && (
+        <Card className={plan.weatherChange === "warmer" 
+          ? "border-red-200 dark:border-red-800" 
+          : plan.weatherChange === "colder" 
+            ? "border-blue-200 dark:border-blue-800" 
+            : "border-orange-200 dark:border-orange-800"
+        }>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {plan.weatherChange === "warmer" ? (
                 <Sun className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <h4 className="font-medium text-red-900 dark:text-red-100">Hot Weather</h4>
-              </div>
-              <ul className="text-sm text-red-800 dark:text-red-200 space-y-2 list-disc list-inside">
-                <li><strong>Faster insulin absorption</strong> — heat increases blood flow, so insulin works quicker. You may need less insulin or experience unexpected hypos</li>
-                <li><strong>Dehydration raises BG</strong> — drink more water than usual. Dehydration can make blood glucose harder to control</li>
-                <li><strong>Protect your insulin</strong> — never leave insulin in direct sun or hot cars. Use a cooling case or insulated bag</li>
-                <li><strong>CGM accuracy</strong> — extreme heat can affect sensor readings. Check with finger pricks if readings seem off</li>
-                <li><strong>Infusion sites</strong> — sweat can loosen adhesives. Consider extra tape or skin prep wipes</li>
-              </ul>
-              <div className="mt-3 p-2 bg-red-100 dark:bg-red-900/30 rounded text-xs text-red-700 dark:text-red-300">
-                <strong>Tip:</strong> Consider reducing mealtime doses by 10-20% on very hot days, and monitor more frequently
-              </div>
-            </div>
-
-            {/* Cold Weather */}
-            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center gap-2 mb-3">
+              ) : plan.weatherChange === "colder" ? (
                 <Snowflake className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                <h4 className="font-medium text-blue-900 dark:text-blue-100">Cold Weather</h4>
-              </div>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-disc list-inside">
-                <li><strong>Slower insulin absorption</strong> — cold reduces blood flow, so insulin may work slower. You might see higher readings initially</li>
-                <li><strong>Shivering burns glucose</strong> — like exercise, shivering uses energy. Be prepared for unexpected lows</li>
-                <li><strong>Keep insulin warm</strong> — frozen insulin is damaged and won't work. Keep it close to your body in extreme cold</li>
-                <li><strong>CGM sensor issues</strong> — extreme cold can cause inaccurate readings or sensor errors. Keep sensor site warm under clothing</li>
-                <li><strong>Test strip accuracy</strong> — very cold test strips may give inaccurate results. Keep meter and strips at body temperature</li>
-              </ul>
-              <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-900/30 rounded text-xs text-blue-700 dark:text-blue-300">
-                <strong>Tip:</strong> Winter sports can cause dramatic hypos. Reduce basal/bolus and keep fast-acting glucose easily accessible
-              </div>
-            </div>
-          </div>
+              ) : (
+                <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              )}
+              {plan.weatherChange === "warmer" 
+                ? "Hot Weather Adjustments" 
+                : plan.weatherChange === "colder" 
+                  ? "Cold Weather Adjustments" 
+                  : "Weather Considerations"}
+            </CardTitle>
+            <CardDescription>
+              {plan.weatherChange === "warmer" 
+                ? "Personalized recommendations for your warmer destination" 
+                : plan.weatherChange === "colder" 
+                  ? "Personalized recommendations for your colder destination" 
+                  : "How climate differences may affect your diabetes management"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {plan.weatherChange === "warmer" && (
+              <>
+                {/* Personalized Hot Weather Recommendations */}
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                  <h4 className="font-medium text-red-900 dark:text-red-100 mb-3 flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Your Insulin Adjustment Suggestion
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-100">Mealtime Doses</p>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        Reduce by {plan.weatherSeverity === "slight" ? "5-10%" : plan.weatherSeverity === "moderate" ? "10-15%" : "15-25%"}
+                      </p>
+                      {settings.tdd && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Based on your TDD of {settings.tdd}u, this is roughly {Math.round((settings.tdd * 0.6) * (plan.weatherSeverity === "slight" ? 0.075 : plan.weatherSeverity === "moderate" ? 0.125 : 0.2) * 10) / 10}u less mealtime insulin per day
+                        </p>
+                      )}
+                    </div>
+                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
+                      <p className="text-sm font-medium text-red-900 dark:text-red-100">Background/Basal Insulin</p>
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                        {plan.weatherSeverity === "slight" 
+                          ? "Usually no change needed" 
+                          : plan.weatherSeverity === "moderate" 
+                            ? "Consider reducing by 5-10%" 
+                            : "Consider reducing by 10-15%"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <h4 className="font-medium text-amber-900 dark:text-amber-100">General Climate Adaptation Tips</h4>
-            </div>
-            <ul className="text-sm text-amber-800 dark:text-amber-200 space-y-1 list-disc list-inside">
-              <li>First few days in a new climate — monitor blood glucose more often than usual</li>
-              <li>Keep a glucose diary noting weather and activity to spot patterns</li>
-              <li>Adjust ratios gradually — don't make big changes all at once</li>
-              <li>Have extra hypo treatment easily accessible, especially during outdoor activities</li>
-              <li>Acclimatisation takes 3-5 days — expect some variability initially</li>
-            </ul>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h5 className="font-medium text-sm mb-2">Why This Happens</h5>
+                    <p className="text-sm text-muted-foreground">
+                      Heat increases blood flow to the skin, causing insulin to absorb faster than normal. 
+                      This means the same dose works more quickly and effectively — increasing hypo risk.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h5 className="font-medium text-sm mb-2">Key Actions</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Check blood glucose more often (every 2-3 hours)</li>
+                      <li>Carry extra hypo treatment — glucose tabs melt in heat</li>
+                      <li>Stay hydrated (dehydration raises BG)</li>
+                      <li>Keep insulin in a cooling case or bag</li>
+                    </ul>
+                  </div>
+                </div>
 
-          <Alert className="border-muted">
-            <Info className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              Everyone responds differently to climate changes. These are general guidelines — monitor your own responses and adjust accordingly. Discuss significant travel with your diabetes team beforehand if possible.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+                {isPumpUser && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      <strong>Pump users:</strong> Infusion sets may lose adhesion in humidity and sweat. 
+                      Pack extra sets and consider skin prep wipes or additional tape.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {plan.weatherChange === "colder" && (
+              <>
+                {/* Personalized Cold Weather Recommendations */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Your Insulin Adjustment Suggestion
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Mealtime Doses</p>
+                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {plan.weatherSeverity === "slight" 
+                          ? "May need 5-10% more" 
+                          : plan.weatherSeverity === "moderate" 
+                            ? "May need 10-15% more" 
+                            : "May need 15-20% more"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Start with your normal dose and adjust based on readings — cold affects everyone differently
+                      </p>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Background/Basal Insulin</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        {plan.weatherSeverity === "slight" 
+                          ? "Usually no change needed" 
+                          : plan.weatherSeverity === "moderate" 
+                            ? "Monitor — may run slightly higher" 
+                            : "May need 5-10% increase after 2-3 days"}
+                      </p>
+                    </div>
+                    {plan.weatherSeverity !== "slight" && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                        <p className="text-sm font-medium text-amber-900 dark:text-amber-100">⚠️ Activity Warning</p>
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          Shivering and winter activities (skiing, skating) burn glucose rapidly like exercise. 
+                          Despite needing more insulin for meals, you may experience <strong>unexpected hypos</strong> during physical activity in the cold.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h5 className="font-medium text-sm mb-2">Why This Happens</h5>
+                    <p className="text-sm text-muted-foreground">
+                      Cold reduces blood flow to the skin, slowing insulin absorption. 
+                      This means your usual dose may work more slowly or less effectively initially.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h5 className="font-medium text-sm mb-2">Key Actions</h5>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Keep insulin close to your body (it can freeze!)</li>
+                      <li>Warm test strips before using</li>
+                      <li>CGM may read lower than actual in extreme cold</li>
+                      <li>Carry hypo treatment in an inside pocket</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {isPumpUser && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      <strong>Pump users:</strong> Keep your pump close to your body to prevent insulin from getting too cold. 
+                      Insulin left in a cold bag or exposed tubing may not work properly.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {plan.weatherChange === "unknown" && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  You haven't specified the weather at your destination. Here's a quick overview of how temperature differences can affect your insulin needs:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sun className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <h5 className="font-medium text-red-900 dark:text-red-100">If It's Hotter</h5>
+                    </div>
+                    <ul className="text-xs text-red-800 dark:text-red-200 space-y-1 list-disc list-inside">
+                      <li>Insulin absorbs faster → reduce doses 10-20%</li>
+                      <li>Higher hypo risk</li>
+                      <li>Keep insulin cool</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Snowflake className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h5 className="font-medium text-blue-900 dark:text-blue-100">If It's Colder</h5>
+                    </div>
+                    <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                      <li>Insulin absorbs slower → may need 10-20% more</li>
+                      <li>Activity in cold = hypo risk</li>
+                      <li>Keep insulin warm (don't let it freeze)</li>
+                    </ul>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <Alert className="border-muted">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                <strong>Not medical advice.</strong> These are starting points based on general patterns. 
+                Everyone responds differently — monitor frequently, start with smaller adjustments, and increase if needed.
+                Discuss significant travel with your diabetes team beforehand if possible.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      )}
 
       {plan.timezoneChange !== "none" && (
         <Card className="border-purple-200 dark:border-purple-800">
