@@ -1,19 +1,22 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Activity, ArrowRight, Clock } from "lucide-react";
+import { Activity, ArrowRight, Clock, Repeat } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ActivityLog } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 
 export function ActivityAdviserWidget() {
   const [recentActivity, setRecentActivity] = useState<ActivityLog | null>(null);
+  const [routineCount, setRoutineCount] = useState(0);
 
   useEffect(() => {
     const logs = storage.getActivityLogs();
     if (logs.length > 0) {
       setRecentActivity(logs[0]);
     }
+    const routines = storage.getRoutines();
+    setRoutineCount(routines.length);
   }, []);
 
   return (
@@ -41,13 +44,35 @@ export function ActivityAdviserWidget() {
             Plan your next activity to get personalised advice
           </p>
         )}
+
+        {routineCount > 0 && (
+          <Link href="/advisor?tab=routines">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover-elevate cursor-pointer" data-testid="card-routines-shortcut">
+              <Repeat className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm text-emerald-800 dark:text-emerald-200">
+                {routineCount} saved routine{routineCount !== 1 ? "s" : ""}
+              </span>
+              <ArrowRight className="h-3 w-3 ml-auto text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </Link>
+        )}
         
-        <Link href="/advisor">
-          <Button variant="secondary" size="sm" className="w-full" data-testid="button-plan-activity">
-            Plan Activity
-            <ArrowRight className="h-4 w-4 ml-1" />
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/advisor" className="flex-1">
+            <Button variant="secondary" size="sm" className="w-full" data-testid="button-plan-activity">
+              Plan Activity
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </Link>
+          {routineCount === 0 && (
+            <Link href="/advisor?tab=routines" className="flex-1">
+              <Button variant="outline" size="sm" className="w-full" data-testid="button-view-routines">
+                <Repeat className="h-4 w-4 mr-1" />
+                Routines
+              </Button>
+            </Link>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

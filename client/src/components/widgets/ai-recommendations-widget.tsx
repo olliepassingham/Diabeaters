@@ -64,6 +64,18 @@ function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AII
     });
   }
 
+  const hour = new Date().getHours();
+  if (hour >= 19 || hour < 6) {
+    insights.push({
+      title: "Bedtime Check",
+      message: "It's evening — a good time to check your glucose before bed for a steady night.",
+      reasoning: "Checking blood glucose before sleep helps you spot if you need a snack to prevent overnight lows, or if you're running high and may need a correction.",
+      priority: "tip",
+      actionLink: "/scenarios?tab=bedtime",
+      actionLabel: "Bedtime Check",
+    });
+  }
+
   if (insights.length === 0) {
     insights.push({
       title: "All Clear",

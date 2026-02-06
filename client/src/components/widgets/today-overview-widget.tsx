@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
+import { Calendar, CheckCircle, AlertCircle, ArrowRight, Moon } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ScenarioState, Supply } from "@/lib/storage";
 
@@ -17,6 +17,8 @@ export function TodayOverviewWidget() {
 
   const criticalSupplies = supplies.filter(s => storage.getSupplyStatus(s) === "critical");
   const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
+  const hour = new Date().getHours();
+  const isEvening = hour >= 19 || hour < 6;
 
   const getStatusMessage = () => {
     if (criticalSupplies.length > 0) {
@@ -42,7 +44,7 @@ export function TodayOverviewWidget() {
             <CardTitle className="text-base">Today</CardTitle>
           </div>
           <Badge variant={status.type === "warning" ? "destructive" : status.type === "info" ? "secondary" : "outline"}>
-            {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+            {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
           </Badge>
         </div>
       </CardHeader>
@@ -60,7 +62,7 @@ export function TodayOverviewWidget() {
           <div className="space-y-2">
             {scenarioState.travelModeActive && (
               <div className="p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg text-sm text-blue-800 dark:text-blue-200">
-                Travel mode until {scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate).toLocaleDateString() : "unspecified"}
+                Travel mode until {scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate).toLocaleDateString("en-GB") : "unspecified"}
               </div>
             )}
             {scenarioState.sickDayActive && (
@@ -82,6 +84,16 @@ export function TodayOverviewWidget() {
               </div>
             ))}
           </div>
+        )}
+
+        {isEvening && (
+          <Link href="/scenarios?tab=bedtime">
+            <div className="flex items-center gap-2 p-2 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg text-sm text-indigo-800 dark:text-indigo-200 hover-elevate cursor-pointer" data-testid="card-evening-bedtime">
+              <Moon className="h-4 w-4" />
+              <span>Time for your bedtime check</span>
+              <ArrowRight className="h-3 w-3 ml-auto" />
+            </div>
+          </Link>
         )}
 
         <Link href="/advisor">

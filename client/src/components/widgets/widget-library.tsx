@@ -57,8 +57,8 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
   },
   "scenario-status": {
     type: "scenario-status",
-    name: "Active Scenarios",
-    description: "Travel and sick day modes",
+    name: "Scenarios",
+    description: "Bedtime check, travel and sick day modes",
     icon: LayoutGrid,
   },
   "community": {
@@ -76,7 +76,7 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
   "activity-adviser": {
     type: "activity-adviser",
     name: "Activity Adviser",
-    description: "Plan activities with AI guidance",
+    description: "Plan activities, meals and routines with AI guidance",
     icon: Activity,
   },
   "ratio-adviser": {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Thermometer, X, ArrowRight, CheckCircle } from "lucide-react";
+import { Plane, Thermometer, Moon, X, ArrowRight, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ScenarioState } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -38,26 +38,50 @@ export function ScenarioStatusWidget() {
   };
 
   const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
+  const hour = new Date().getHours();
+  const isEvening = hour >= 19 || hour < 6;
 
   if (!hasActiveScenario) {
     return (
       <Card data-testid="widget-scenario-status">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Active Scenarios</CardTitle>
+          <CardTitle className="text-base">Scenarios</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CheckCircle className="h-4 w-4 text-green-500" />
-            <span data-testid="text-no-scenarios">No active scenarios</span>
+            <span data-testid="text-no-scenarios">No active modes</span>
           </div>
-          <div className="flex gap-2 mt-3">
-            <Link href="/scenarios" className="flex-1">
+
+          {isEvening && (
+            <Link href="/scenarios?tab=bedtime">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg hover-elevate cursor-pointer" data-testid="card-bedtime-prompt">
+                <div className="flex items-center gap-2">
+                  <Moon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Bedtime Check</p>
+                    <p className="text-xs text-muted-foreground">Check you're ready for a steady night</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 ml-auto text-indigo-600 dark:text-indigo-400" />
+                </div>
+              </div>
+            </Link>
+          )}
+
+          <div className="flex gap-2">
+            <Link href="/scenarios?tab=bedtime" className="flex-1">
+              <Button variant="outline" size="sm" className="w-full" data-testid="button-start-bedtime">
+                <Moon className="h-4 w-4 mr-1" />
+                Bedtime
+              </Button>
+            </Link>
+            <Link href="/scenarios?tab=travel" className="flex-1">
               <Button variant="outline" size="sm" className="w-full" data-testid="button-start-travel">
                 <Plane className="h-4 w-4 mr-1" />
                 Travel
               </Button>
             </Link>
-            <Link href="/scenarios" className="flex-1">
+            <Link href="/scenarios?tab=sick-day" className="flex-1">
               <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
                 <Thermometer className="h-4 w-4 mr-1" />
                 Sick Day
@@ -93,7 +117,7 @@ export function ScenarioStatusWidget() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Link href="/scenarios">
+              <Link href="/scenarios?tab=travel">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-travel">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -123,7 +147,7 @@ export function ScenarioStatusWidget() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Link href="/scenarios">
+              <Link href="/scenarios?tab=sick-day">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-sick-day">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -139,6 +163,21 @@ export function ScenarioStatusWidget() {
               </Button>
             </div>
           </div>
+        )}
+
+        {isEvening && (
+          <Link href="/scenarios?tab=bedtime">
+            <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg hover-elevate cursor-pointer" data-testid="card-bedtime-prompt">
+              <div className="flex items-center gap-2">
+                <Moon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <div>
+                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">Bedtime Check</p>
+                  <p className="text-xs text-muted-foreground">Check you're ready for a steady night</p>
+                </div>
+                <ArrowRight className="h-4 w-4 ml-auto text-indigo-600 dark:text-indigo-400" />
+              </div>
+            </div>
+          </Link>
         )}
       </CardContent>
     </Card>
