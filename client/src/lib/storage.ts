@@ -24,6 +24,7 @@ const STORAGE_KEYS = {
   EVENTS: "diabeater_events",
   AI_COACH_HISTORY: "diabeater_ai_coach_history",
   ROUTINES: "diabeater_routines",
+  PRESCRIPTION_CYCLE: "diabeater_prescription_cycle",
 } as const;
 
 export interface UserProfile {
@@ -96,6 +97,13 @@ export interface PickupRecord {
   supplyName: string;
   quantity: number;
   pickupDate: string;
+}
+
+export interface PrescriptionCycle {
+  intervalDays: number;
+  leadTimeDays: number;
+  lastOrderDate?: string;
+  lastCollectionDate?: string;
 }
 
 export interface EmergencyContact {
@@ -546,6 +554,15 @@ export const storage = {
       localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
     }
     return record;
+  },
+
+  getPrescriptionCycle(): PrescriptionCycle | null {
+    const data = localStorage.getItem(STORAGE_KEYS.PRESCRIPTION_CYCLE);
+    return data ? JSON.parse(data) : null;
+  },
+
+  savePrescriptionCycle(cycle: PrescriptionCycle): void {
+    localStorage.setItem(STORAGE_KEYS.PRESCRIPTION_CYCLE, JSON.stringify(cycle));
   },
 
   getEmergencyContacts(): EmergencyContact[] {

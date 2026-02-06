@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, PrescriptionCycle, ScenarioState } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 const typeIcons = {
@@ -33,6 +33,585 @@ const typeLabels = {
   reservoir: "Reservoirs/Cartridges",
   other: "Other",
 };
+
+function DepletionTimeline({ supplies }: { supplies: Supply[] }) {
+  if (supplies.length === 0) return null;
+
+  const supplyData = supplies.map(s => {
+    const daysRemaining = storage.getDaysRemaining(s);
+    const status = storage.getSupplyStatus(s);
+    const runOutDate = storage.getRunOutDate(s);
+    return { supply: s, daysRemaining: Math.min(daysRemaining, 90), actualDays: daysRemaining, status, runOutDate };
+  }).sort((a, b) => a.actualDays - b.actualDays);
+
+  const maxDays = Math.max(...supplyData.map(d => d.daysRemaining), 30);
+
+  return (
+    <Card data-testid="card-depletion-timeline">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <TrendingDown className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">Depletion Timeline</CardTitle>
+        </div>
+        <CardDescription>When each supply is predicted to run out</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm bg-red-500" />
+            <span>Critical (0-3 days)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm bg-yellow-500" />
+            <span>Low (4-7 days)</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-sm bg-emerald-500" />
+            <span>OK (8+ days)</span>
+          </div>
+        </div>
+
+        {supplyData.map(({ supply, daysRemaining, actualDays, status, runOutDate }) => {
+          const barWidth = maxDays > 0 ? Math.max((daysRemaining / maxDays) * 100, 2) : 2;
+          const barColor = status === "critical" ? "bg-red-500" : status === "low" ? "bg-yellow-500" : "bg-emerald-500";
+          const Icon = typeIcons[supply.type] || Package;
+
+          return (
+            <div key={supply.id} className="space-y-1" data-testid={`timeline-row-${supply.id}`}>
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate">{supply.name}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-xs font-medium ${
+                    status === "critical" ? "text-red-600 dark:text-red-400" : 
+                    status === "low" ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"
+                  }`}>
+                    {actualDays >= 999 ? "N/A" : `${actualDays}d`}
+                  </span>
+                  {runOutDate && actualDays < 999 && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      {format(runOutDate, "d MMM")}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full rounded-full transition-all ${barColor}`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
+          <span>Today</span>
+          <span>{maxDays >= 90 ? "90+ days" : `${maxDays} days`}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PrescriptionCyclePanel({ 
+  cycle, 
+  onSave, 
+  supplies 
+}: { 
+  cycle: PrescriptionCycle | null; 
+  onSave: (cycle: PrescriptionCycle) => void;
+  supplies: Supply[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [intervalDays, setIntervalDays] = useState(cycle?.intervalDays?.toString() || "28");
+  const [leadTimeDays, setLeadTimeDays] = useState(cycle?.leadTimeDays?.toString() || "5");
+  const [lastOrderDate, setLastOrderDate] = useState(
+    cycle?.lastOrderDate ? format(new Date(cycle.lastOrderDate), "yyyy-MM-dd") : ""
+  );
+  const [lastCollectionDate, setLastCollectionDate] = useState(
+    cycle?.lastCollectionDate ? format(new Date(cycle.lastCollectionDate), "yyyy-MM-dd") : ""
+  );
+
+  useEffect(() => {
+    if (cycle) {
+      setIntervalDays(cycle.intervalDays.toString());
+      setLeadTimeDays(cycle.leadTimeDays.toString());
+      setLastOrderDate(cycle.lastOrderDate ? format(new Date(cycle.lastOrderDate), "yyyy-MM-dd") : "");
+      setLastCollectionDate(cycle.lastCollectionDate ? format(new Date(cycle.lastCollectionDate), "yyyy-MM-dd") : "");
+    }
+  }, [cycle]);
+
+  const handleSave = () => {
+    const interval = Math.max(1, parseInt(intervalDays) || 28);
+    const lead = Math.max(0, Math.min(parseInt(leadTimeDays) || 5, interval - 1));
+    onSave({
+      intervalDays: interval,
+      leadTimeDays: lead,
+      lastOrderDate: lastOrderDate ? new Date(lastOrderDate + "T12:00:00").toISOString() : undefined,
+      lastCollectionDate: lastCollectionDate ? new Date(lastCollectionDate + "T12:00:00").toISOString() : undefined,
+    });
+    setEditing(false);
+  };
+
+  const getNextOrderDate = (): Date | null => {
+    if (!cycle) return null;
+    const interval = cycle.intervalDays || 28;
+    const lead = Math.min(cycle.leadTimeDays || 5, interval - 1);
+    if (cycle.lastOrderDate) {
+      return addDays(new Date(cycle.lastOrderDate), interval - lead);
+    }
+    if (cycle.lastCollectionDate) {
+      return addDays(new Date(cycle.lastCollectionDate), interval - lead);
+    }
+    return null;
+  };
+
+  const getNextCollectionDate = (): Date | null => {
+    if (!cycle) return null;
+    const interval = cycle.intervalDays || 28;
+    if (cycle.lastCollectionDate) {
+      return addDays(new Date(cycle.lastCollectionDate), interval);
+    }
+    if (cycle.lastOrderDate) {
+      const lead = Math.min(cycle.leadTimeDays || 5, interval - 1);
+      return addDays(new Date(cycle.lastOrderDate), lead);
+    }
+    return null;
+  };
+
+  const getDaysUntilOrder = (): number | null => {
+    const nextOrder = getNextOrderDate();
+    if (!nextOrder) return null;
+    return differenceInDays(nextOrder, new Date());
+  };
+
+  const getDaysUntilCollection = (): number | null => {
+    const nextCollection = getNextCollectionDate();
+    if (!nextCollection) return null;
+    return differenceInDays(nextCollection, new Date());
+  };
+
+  const getSuppliesRunningOutBeforeCollection = (): Supply[] => {
+    const nextCollection = getNextCollectionDate();
+    if (!nextCollection) return [];
+    const daysUntil = differenceInDays(nextCollection, new Date());
+    if (daysUntil <= 0) return [];
+    return supplies.filter(s => {
+      const daysRemaining = storage.getDaysRemaining(s);
+      return daysRemaining < daysUntil && daysRemaining < 999;
+    });
+  };
+
+  const daysUntilOrder = getDaysUntilOrder();
+  const daysUntilCollection = getDaysUntilCollection();
+  const atRiskSupplies = getSuppliesRunningOutBeforeCollection();
+  const needsSetup = !cycle;
+  const orderOverdue = daysUntilOrder !== null && daysUntilOrder < 0;
+  const orderSoon = daysUntilOrder !== null && daysUntilOrder >= 0 && daysUntilOrder <= 3;
+
+  return (
+    <Card data-testid="card-prescription-cycle">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Prescription Cycle</CardTitle>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)} data-testid="button-edit-prescription-cycle">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+        <CardDescription>Track when to reorder your prescription</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {editing || needsSetup ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="interval-days">How often do you get a prescription? (days)</Label>
+              <Input 
+                id="interval-days" 
+                type="number" 
+                placeholder="e.g., 28" 
+                value={intervalDays} 
+                onChange={e => setIntervalDays(e.target.value)}
+                data-testid="input-interval-days"
+              />
+              <p className="text-xs text-muted-foreground">
+                Common intervals: 28 days (monthly), 56 days (2 months), 84 days (3 months)
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lead-time">How many days before do you need to reorder?</Label>
+              <Input 
+                id="lead-time" 
+                type="number" 
+                placeholder="e.g., 5" 
+                value={leadTimeDays} 
+                onChange={e => setLeadTimeDays(e.target.value)}
+                data-testid="input-lead-time"
+              />
+              <p className="text-xs text-muted-foreground">
+                Time it takes your GP surgery or pharmacy to process your repeat prescription
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="last-order-date">When did you last order? (optional)</Label>
+              <Input 
+                id="last-order-date" 
+                type="date" 
+                value={lastOrderDate} 
+                onChange={e => setLastOrderDate(e.target.value)}
+                data-testid="input-last-order-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="last-collection-date">When did you last collect? (optional)</Label>
+              <Input 
+                id="last-collection-date" 
+                type="date" 
+                value={lastCollectionDate} 
+                onChange={e => setLastCollectionDate(e.target.value)}
+                data-testid="input-last-collection-date"
+              />
+            </div>
+            <Button onClick={handleSave} size="sm" data-testid="button-save-prescription-cycle">
+              Save Prescription Cycle
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground mb-1">Prescription every</p>
+                <p className="text-lg font-bold" data-testid="text-prescription-interval">
+                  {cycle?.intervalDays || 28} days
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/30">
+                <p className="text-xs text-muted-foreground mb-1">Reorder lead time</p>
+                <p className="text-lg font-bold" data-testid="text-lead-time">
+                  {cycle?.leadTimeDays || 5} days
+                </p>
+              </div>
+            </div>
+
+            {(daysUntilOrder !== null || daysUntilCollection !== null) && (
+              <div className="space-y-2">
+                {daysUntilOrder !== null && (
+                  <div className={`p-3 rounded-lg ${
+                    orderOverdue ? "bg-red-50 dark:bg-red-950/30" : 
+                    orderSoon ? "bg-yellow-50 dark:bg-yellow-950/30" : "bg-muted/30"
+                  }`} data-testid="card-next-order">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">
+                          {orderOverdue ? "Reorder overdue" : "Reorder by"}
+                        </p>
+                        <p className={`text-sm font-medium ${
+                          orderOverdue ? "text-red-700 dark:text-red-400" : 
+                          orderSoon ? "text-yellow-700 dark:text-yellow-400" : ""
+                        }`}>
+                          {format(getNextOrderDate()!, "d MMMM yyyy")}
+                        </p>
+                      </div>
+                      <Badge variant={orderOverdue ? "destructive" : orderSoon ? "secondary" : "outline"}>
+                        {orderOverdue ? `${Math.abs(daysUntilOrder)} days overdue` : 
+                         daysUntilOrder === 0 ? "Today" :
+                         `${daysUntilOrder} day${daysUntilOrder !== 1 ? "s" : ""}`}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+
+                {daysUntilCollection !== null && (
+                  <div className="p-3 rounded-lg bg-muted/30" data-testid="card-next-collection">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Next collection due</p>
+                        <p className="text-sm font-medium">
+                          {format(getNextCollectionDate()!, "d MMMM yyyy")}
+                        </p>
+                      </div>
+                      <Badge variant="outline">
+                        {daysUntilCollection! <= 0 ? "Now" : 
+                         `${daysUntilCollection} day${daysUntilCollection !== 1 ? "s" : ""}`}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {atRiskSupplies.length > 0 && (
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30" data-testid="card-at-risk-supplies">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                      {atRiskSupplies.length === 1 ? "1 supply" : `${atRiskSupplies.length} supplies`} may run out before your next collection
+                    </p>
+                    <div className="mt-1 space-y-0.5">
+                      {atRiskSupplies.map(s => (
+                        <p key={s.id} className="text-xs text-red-700 dark:text-red-400">
+                          {s.name} — {storage.getDaysRemaining(s)} days left
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; scenarioState: ScenarioState }) {
+  if (!scenarioState.travelModeActive) return null;
+
+  const settings = storage.getSettings();
+  const profile = storage.getProfile();
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+
+  const travelStart = scenarioState.travelStartDate ? new Date(scenarioState.travelStartDate) : new Date();
+  const travelEnd = scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate) : addDays(new Date(), 7);
+  const tripDuration = Math.max(1, differenceInDays(travelEnd, travelStart));
+
+  const getSupplyNeedsForTrip = () => {
+    const needs: Array<{ supply: Supply; currentDaysLeft: number; daysNeededForTrip: number; shortfall: number; extraNeeded: number }> = [];
+    
+    for (const supply of supplies) {
+      const currentDaysLeft = storage.getDaysRemaining(supply);
+      if (currentDaysLeft >= 999) continue;
+      
+      let dailyRate: number;
+      if (supply.type === "cgm") {
+        const cgmDays = settings.cgmDays || 14;
+        dailyRate = 1 / cgmDays;
+      } else if (supply.type === "infusion_set") {
+        const siteChangeDays = settings.siteChangeDays || 3;
+        dailyRate = 1 / siteChangeDays;
+      } else if (supply.type === "reservoir") {
+        const reservoirChangeDays = settings.reservoirChangeDays || 3;
+        dailyRate = 1 / reservoirChangeDays;
+      } else {
+        dailyRate = supply.dailyUsage;
+      }
+      
+      if (dailyRate <= 0) continue;
+      
+      const travelBuffer = 2;
+      const totalNeededForTrip = Math.ceil(dailyRate * tripDuration * travelBuffer);
+      const currentStock = Math.floor(storage.getAdjustedQuantity(supply));
+      const shortfall = totalNeededForTrip - currentStock;
+
+      needs.push({
+        supply,
+        currentDaysLeft,
+        daysNeededForTrip: tripDuration,
+        shortfall: Math.max(0, shortfall),
+        extraNeeded: Math.max(0, shortfall),
+      });
+    }
+    
+    return needs;
+  };
+
+  const needs = getSupplyNeedsForTrip();
+  const suppliesAtRisk = needs.filter(n => n.currentDaysLeft < tripDuration);
+  const suppliesShort = needs.filter(n => n.shortfall > 0);
+
+  return (
+    <Card className="border-blue-500/30" data-testid="card-travel-impact">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Plane className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <CardTitle className="text-base">Travel Supply Impact</CardTitle>
+          </div>
+          <Badge variant="secondary">
+            {scenarioState.travelDestination || "Travel"} — {tripDuration} days
+          </Badge>
+        </div>
+        <CardDescription>
+          How your trip affects supply levels (includes 2x NHS travel buffer)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {suppliesShort.length > 0 && (
+          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30" data-testid="card-travel-shortfall">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                  You may not have enough for the trip
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
+                  With the recommended 2x travel buffer, you may need more of these:
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {needs.map(({ supply, currentDaysLeft, shortfall, extraNeeded }) => {
+            const Icon = typeIcons[supply.type] || Package;
+            const isShort = shortfall > 0;
+            const willRunOutDuringTrip = currentDaysLeft < tripDuration;
+
+            return (
+              <div 
+                key={supply.id} 
+                className={`flex items-center justify-between gap-2 p-2 rounded-lg ${
+                  isShort ? "bg-red-50 dark:bg-red-950/20" : 
+                  willRunOutDuringTrip ? "bg-yellow-50 dark:bg-yellow-950/20" : "bg-muted/20"
+                }`}
+                data-testid={`travel-supply-${supply.id}`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm truncate">{supply.name}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {isShort ? (
+                    <Badge variant="destructive" className="text-xs">
+                      Need {extraNeeded} more
+                    </Badge>
+                  ) : willRunOutDuringTrip ? (
+                    <Badge variant="secondary" className="text-xs">
+                      Tight — {currentDaysLeft}d left
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      OK
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <Link href="/scenarios?tab=travel">
+          <Button variant="outline" size="sm" className="w-full" data-testid="button-view-travel-packing">
+            View Full Packing List
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; scenarioState: ScenarioState }) {
+  if (!scenarioState.sickDayActive) return null;
+
+  const severity = scenarioState.sickDaySeverity || "moderate";
+  const usageMultiplier = severity === "severe" ? 1.5 : severity === "moderate" ? 1.25 : 1.1;
+
+  const getAffectedSupplies = () => {
+    return supplies
+      .filter(s => s.type === "insulin" || s.type === "needle" || s.type === "other")
+      .map(s => {
+        const normalDaysLeft = storage.getDaysRemaining(s);
+        if (normalDaysLeft >= 999) return null;
+        const adjustedDaysLeft = Math.floor(normalDaysLeft / usageMultiplier);
+        const daysLost = normalDaysLeft - adjustedDaysLeft;
+        return { supply: s, normalDaysLeft, adjustedDaysLeft, daysLost };
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+  };
+
+  const affected = getAffectedSupplies();
+  const testStripEstimate = severity === "severe" ? "every 2-3 hours" : severity === "moderate" ? "every 3-4 hours" : "every 4 hours";
+
+  return (
+    <Card className="border-orange-500/30" data-testid="card-sick-day-impact">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <CardTitle className="text-base">Sick Day Impact</CardTitle>
+          </div>
+          <Badge variant="secondary">
+            {severity} severity
+          </Badge>
+        </div>
+        <CardDescription>
+          How being unwell may affect your supply usage
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/30">
+          <p className="text-sm text-orange-800 dark:text-orange-200">
+            When you're unwell, your body may need more insulin due to stress hormones and illness. 
+            Supplies could deplete up to {Math.round((usageMultiplier - 1) * 100)}% faster than normal.
+          </p>
+          <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+            Not medical advice — always follow your sick day rules from your diabetes team.
+          </p>
+        </div>
+
+        {affected.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Adjusted forecasts</p>
+            {affected.map(({ supply, normalDaysLeft, adjustedDaysLeft, daysLost }) => {
+              const Icon = typeIcons[supply.type] || Package;
+              const isAtRisk = adjustedDaysLeft <= 3;
+
+              return (
+                <div 
+                  key={supply.id} 
+                  className={`flex items-center justify-between gap-2 p-2 rounded-lg ${
+                    isAtRisk ? "bg-red-50 dark:bg-red-950/20" : "bg-muted/20"
+                  }`}
+                  data-testid={`sick-supply-${supply.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate">{supply.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    <span className="text-muted-foreground line-through">{normalDaysLeft}d</span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <span className={`font-medium ${isAtRisk ? "text-red-600 dark:text-red-400" : ""}`}>
+                      ~{adjustedDaysLeft}d
+                    </span>
+                    {daysLost > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400">
+                        (-{daysLost}d)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="p-3 rounded-lg bg-muted/30">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium">Blood glucose testing: </span>
+            NHS guidance suggests checking {testStripEstimate} when unwell. Make sure you have enough test strips.
+          </p>
+        </div>
+
+        <Link href="/scenarios?tab=sickday">
+          <Button variant="outline" size="sm" className="w-full" data-testid="button-view-sick-day">
+            View Sick Day Guidance
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
 
 function SupplyCard({ 
   supply, 
@@ -623,11 +1202,15 @@ export default function Supplies() {
   const [pickupDialogOpen, setPickupDialogOpen] = useState(false);
   const [pickupSupply, setPickupSupply] = useState<Supply | null>(null);
   const [previousSupplies, setPreviousSupplies] = useState<Supply[] | null>(null);
+  const [prescriptionCycle, setPrescriptionCycle] = useState<PrescriptionCycle | null>(null);
+  const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
     setLastPrescription(storage.getLastPrescription());
     setUsualPrescription(storage.getUsualPrescription());
+    setPrescriptionCycle(storage.getPrescriptionCycle());
+    setScenarioState(storage.getScenarioState());
   }, []);
 
   const refreshSupplies = () => {
@@ -676,6 +1259,12 @@ export default function Supplies() {
       title: "Usual prescription saved", 
       description: `Saved ${supplies.length} item${supplies.length > 1 ? "s" : ""} as your usual prescription.` 
     });
+  };
+
+  const handleSavePrescriptionCycle = (cycle: PrescriptionCycle) => {
+    storage.savePrescriptionCycle(cycle);
+    setPrescriptionCycle(cycle);
+    toast({ title: "Prescription cycle saved", description: "Your prescription schedule has been updated." });
   };
 
   const handleAddNew = () => {
@@ -802,6 +1391,15 @@ export default function Supplies() {
             <InfoSection title="Automatic Deduction">
               <p>Quantities are automatically reduced each day based on your daily usage settings.</p>
             </InfoSection>
+            <InfoSection title="Depletion Timeline">
+              <p>A visual overview showing when each supply will run out, with colour-coded bars (red = critical, amber = low, green = OK).</p>
+            </InfoSection>
+            <InfoSection title="Prescription Cycle">
+              <p>Set up your repeat prescription schedule to get reminders when it's time to reorder. The app will also warn you if any supply might run out before your next collection.</p>
+            </InfoSection>
+            <InfoSection title="Travel & Sick Day Impact">
+              <p>When Travel Mode or Sick Day Mode is active, you'll see how your supply levels are affected — including extra supplies needed for travel and adjusted depletion forecasts when unwell.</p>
+            </InfoSection>
           </PageInfoDialog>
         </div>
         <div className="flex flex-col gap-2">
@@ -842,6 +1440,20 @@ export default function Supplies() {
             </Link>
           </div>
         </div>
+      </div>
+
+      {supplies.length > 0 && (
+        <DepletionTimeline supplies={supplies} />
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <PrescriptionCyclePanel 
+          cycle={prescriptionCycle} 
+          onSave={handleSavePrescriptionCycle} 
+          supplies={supplies}
+        />
+        <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
+        <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
       </div>
 
       <Tabs defaultValue="all" className="w-full">
