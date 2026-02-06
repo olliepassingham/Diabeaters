@@ -34,7 +34,7 @@ const typeLabels = {
   other: "Other",
 };
 
-function DepletionTimeline({ supplies }: { supplies: Supply[] }) {
+function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; onSupplyClick?: (id: string) => void }) {
   if (supplies.length === 0) return null;
 
   const supplyData = supplies.map(s => {
@@ -53,7 +53,7 @@ function DepletionTimeline({ supplies }: { supplies: Supply[] }) {
           <TrendingDown className="h-5 w-5 text-primary" />
           <CardTitle className="text-base">Depletion Timeline</CardTitle>
         </div>
-        <CardDescription>When each supply is predicted to run out</CardDescription>
+        <CardDescription>When each supply is predicted to run out. Tap any supply to jump to its details.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-2 flex-wrap">
@@ -77,7 +77,13 @@ function DepletionTimeline({ supplies }: { supplies: Supply[] }) {
           const Icon = typeIcons[supply.type] || Package;
 
           return (
-            <div key={supply.id} className="space-y-1" data-testid={`timeline-row-${supply.id}`}>
+            <button
+              key={supply.id}
+              type="button"
+              className="w-full text-left space-y-1 rounded-md p-1.5 -mx-1.5 cursor-pointer hover-elevate transition-colors"
+              onClick={() => onSupplyClick?.(supply.id)}
+              data-testid={`timeline-row-${supply.id}`}
+            >
               <div className="flex items-center justify-between gap-2 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -103,7 +109,7 @@ function DepletionTimeline({ supplies }: { supplies: Supply[] }) {
                   style={{ width: `${barWidth}%` }}
                 />
               </div>
-            </div>
+            </button>
           );
         })}
 
@@ -1204,6 +1210,8 @@ export default function Supplies() {
   const [previousSupplies, setPreviousSupplies] = useState<Supply[] | null>(null);
   const [prescriptionCycle, setPrescriptionCycle] = useState<PrescriptionCycle | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [activeTab, setActiveTab] = useState("all");
+  const [highlightedSupplyId, setHighlightedSupplyId] = useState<string | null>(null);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -1356,6 +1364,18 @@ export default function Supplies() {
 
   const lowStockCount = supplies.filter(s => storage.getSupplyStatus(s) !== "ok").length;
 
+  const handleTimelineClick = (supplyId: string) => {
+    setActiveTab("all");
+    setHighlightedSupplyId(supplyId);
+    setTimeout(() => {
+      const el = document.getElementById(`supply-card-${supplyId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
+    setTimeout(() => setHighlightedSupplyId(null), 2000);
+  };
+
   return (
     <div className="space-y-6 relative">
       <FaceLogoWatermark />
@@ -1443,7 +1463,7 @@ export default function Supplies() {
       </div>
 
       {supplies.length > 0 && (
-        <DepletionTimeline supplies={supplies} />
+        <DepletionTimeline supplies={supplies} onSupplyClick={handleTimelineClick} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1456,7 +1476,7 @@ export default function Supplies() {
         <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="all" data-testid="tab-all">
             All ({supplies.length})
@@ -1496,14 +1516,23 @@ export default function Supplies() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filterByType(tabValue).map((supply) => (
-                  <SupplyCard
+                  <div
                     key={supply.id}
-                    supply={supply}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    onLogPickup={handleLogPickup}
-                  />
+                    id={`supply-card-${supply.id}`}
+                    className={`rounded-lg transition-all duration-500 ${
+                      highlightedSupplyId === supply.id
+                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        : ""
+                    }`}
+                  >
+                    <SupplyCard
+                      supply={supply}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onLogPickup={handleLogPickup}
+                    />
+                  </div>
                 ))}
               </div>
             )}
