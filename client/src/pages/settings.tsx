@@ -579,7 +579,9 @@ export default function Settings() {
   const [, setLocation] = useLocation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
-  const [activeTab, setActiveTab] = useState("profile");
+  const validTabs = ["profile", "insulin", "usage", "notifications", "contacts", "data"];
+  const urlTab = new URLSearchParams(window.location.search).get("tab");
+  const [activeTab, setActiveTab] = useState(urlTab && validTabs.includes(urlTab) ? urlTab : "profile");
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
