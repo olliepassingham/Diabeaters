@@ -58,7 +58,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
           </div>
         )}
         
-        <Link href="/advisor?tab=tools">
+        <Link href="/settings?tab=insulin">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-edit-ratios">
             {hasRatios ? "Edit Ratios" : "Set Up Ratios"}
             <ArrowRight className="h-4 w-4 ml-1" />
