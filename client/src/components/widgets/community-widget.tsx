@@ -21,13 +21,19 @@ export function CommunityWidget({ compact = false }: { compact?: boolean }) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Community</CardTitle>
+            <CardTitle className={compact ? "text-base" : "text-lg"}>Community</CardTitle>
           </div>
           <Link href="/community">
-            <Button variant="ghost" size="sm" data-testid="button-view-community">
-              View All
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
+            {compact ? (
+              <Button variant="ghost" size="icon" data-testid="button-view-community">
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" data-testid="button-view-community">
+                View All
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
           </Link>
         </div>
         {!compact && <CardDescription>Connect with others who understand</CardDescription>}

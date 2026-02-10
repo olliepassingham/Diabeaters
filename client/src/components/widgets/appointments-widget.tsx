@@ -33,13 +33,19 @@ export function AppointmentsWidget({ compact = false }: { compact?: boolean }) {
       <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />
-          Appointments
+          {compact ? "Appts" : "Appointments"}
         </CardTitle>
         <Link href="/appointments">
-          <Button variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-appointments">
-            View All
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          {compact ? (
+            <Button variant="ghost" size="icon" data-testid="button-view-all-appointments">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-appointments">
+              View All
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          )}
         </Link>
       </CardHeader>
       <CardContent>
