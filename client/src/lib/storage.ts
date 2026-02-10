@@ -73,6 +73,8 @@ export interface Supply {
   quantityAtPickup?: number;
   typicalRefillQuantity?: number;
   notes?: string;
+  isOnOrder?: boolean;
+  orderedDate?: string;
 }
 
 export type SupplyType = Supply["type"];
@@ -642,6 +644,146 @@ export const storage = {
 
   savePrescriptionCycle(cycle: PrescriptionCycle): void {
     localStorage.setItem(STORAGE_KEYS.PRESCRIPTION_CYCLE, JSON.stringify(cycle));
+  },
+
+  markSupplyOrdered(id: string): Supply | null {
+    return this.updateSupply(id, { isOnOrder: true, orderedDate: new Date().toISOString() });
+  },
+
+  clearSupplyOrder(id: string): Supply | null {
+    return this.updateSupply(id, { isOnOrder: false, orderedDate: undefined });
+  },
+
+  getSmartPrescriptionAdvice(supplies: Supply[]): {
+    collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[];
+    skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[];
+    travelExtras: { supply: Supply; extraNeeded: number; reason: string }[];
+    orderedSupplies: { supply: Supply; daysSinceOrder: number; estimatedCollectBy: number }[];
+  } {
+    const cycle = this.getPrescriptionCycle();
+    const scenarioState = this.getScenarioState();
+    const settings = this.getSettings();
+    const leadTime = cycle?.leadTimeDays || 5;
+
+    const collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[] = [];
+    const skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[] = [];
+    const travelExtras: { supply: Supply; extraNeeded: number; reason: string }[] = [];
+    const orderedSupplies: { supply: Supply; daysSinceOrder: number; estimatedCollectBy: number }[] = [];
+
+    for (const supply of supplies) {
+      const daysRemaining = this.getDaysRemaining(supply);
+      const adjustedQty = this.getAdjustedQuantity(supply);
+
+      if (supply.isOnOrder && supply.orderedDate) {
+        const orderDate = new Date(supply.orderedDate);
+        const today = new Date();
+        orderDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const daysSinceOrder = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysUntilCollect = leadTime - daysSinceOrder;
+
+        orderedSupplies.push({
+          supply,
+          daysSinceOrder,
+          estimatedCollectBy: Math.max(0, daysUntilCollect),
+        });
+
+        const isOverdue = daysUntilCollect < 0;
+        const overdueDays = Math.abs(daysUntilCollect);
+
+        if (adjustedQty <= 0 || daysRemaining <= 0) {
+          collectSoon.push({
+            supply,
+            daysUntilCollect,
+            reason: isOverdue
+              ? `You're out of ${supply.name} — prescription should be ready (ordered ${overdueDays} day${overdueDays !== 1 ? "s" : ""} ago), collect now`
+              : `You're out of ${supply.name} — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}`,
+          });
+        } else if (daysRemaining <= 3) {
+          collectSoon.push({
+            supply,
+            daysUntilCollect,
+            reason: isOverdue
+              ? `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — prescription should be ready, collect now`
+              : `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}`,
+          });
+        } else if (isOverdue) {
+          collectSoon.push({
+            supply,
+            daysUntilCollect,
+            reason: `${supply.name} prescription should be ready to collect (ordered ${daysSinceOrder} day${daysSinceOrder !== 1 ? "s" : ""} ago)`,
+          });
+        }
+      } else if (!supply.isOnOrder && daysRemaining <= 0) {
+        collectSoon.push({
+          supply,
+          daysUntilCollect: -1,
+          reason: `You're out of ${supply.name} — order now`,
+        });
+      } else if (!supply.isOnOrder && daysRemaining > 0 && daysRemaining <= leadTime) {
+        collectSoon.push({
+          supply,
+          daysUntilCollect: -1,
+          reason: `${supply.name} will run out in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} — time to order`,
+        });
+      }
+
+      const intervalDays = cycle?.intervalDays || 28;
+      if (daysRemaining > intervalDays * 1.5 && daysRemaining < 999) {
+        skipSuggestions.push({
+          supply,
+          daysRemaining,
+          reason: `You have ${daysRemaining} days of ${supply.name} — consider skipping this on your next prescription`,
+        });
+      }
+    }
+
+    if (scenarioState.travelModeActive && scenarioState.travelStartDate && scenarioState.travelEndDate) {
+      const travelStart = new Date(scenarioState.travelStartDate);
+      const travelEnd = new Date(scenarioState.travelEndDate);
+      travelStart.setHours(0, 0, 0, 0);
+      travelEnd.setHours(0, 0, 0, 0);
+      const tripDuration = Math.max(1, Math.floor((travelEnd.getTime() - travelStart.getTime()) / (1000 * 60 * 60 * 24)));
+
+      for (const supply of supplies) {
+        const daysRemaining = this.getDaysRemaining(supply);
+        if (daysRemaining >= 999) continue;
+
+        let dailyRate: number;
+        if (supply.type === "cgm") {
+          dailyRate = 1 / (settings.cgmDays || 14);
+        } else if (supply.type === "infusion_set") {
+          dailyRate = 1 / (settings.siteChangeDays || 3);
+        } else if (supply.type === "reservoir") {
+          dailyRate = 1 / (settings.reservoirChangeDays || 3);
+        } else {
+          dailyRate = supply.dailyUsage;
+        }
+        if (dailyRate <= 0) continue;
+
+        const travelBuffer = 2;
+        const totalNeeded = Math.ceil(dailyRate * tripDuration * travelBuffer);
+        const currentStock = Math.floor(this.getAdjustedQuantity(supply));
+        const shortfall = totalNeeded - currentStock;
+
+        if (shortfall > 0) {
+          const inSkipList = skipSuggestions.findIndex(s => s.supply.id === supply.id);
+          if (inSkipList !== -1) {
+            skipSuggestions.splice(inSkipList, 1);
+          }
+          travelExtras.push({
+            supply,
+            extraNeeded: shortfall,
+            reason: `Your ${scenarioState.travelDestination || "trip"} (${tripDuration} days) needs extra ${supply.name} — order ${shortfall} more with your prescription`,
+          });
+        }
+      }
+    }
+
+    collectSoon.sort((a, b) => a.daysUntilCollect - b.daysUntilCollect);
+    skipSuggestions.sort((a, b) => b.daysRemaining - a.daysRemaining);
+
+    return { collectSoon, skipSuggestions, travelExtras, orderedSupplies };
   },
 
   getEmergencyContacts(): EmergencyContact[] {

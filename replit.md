@@ -36,7 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Users**: Authentication with username/password
 - **UserProfiles**: Personal info, diabetes type, insulin delivery method, onboarding status
 - **UserSettings**: TDD, carb ratios, correction factors, target blood glucose ranges
-- **Supplies**: Inventory tracking with type, quantity, daily usage
+- **Supplies**: Inventory tracking with type, quantity, daily usage, order tracking (isOnOrder, orderedDate)
 - **ActivityLogs**: Historical record of activities and recommendations
 
 ### Client-Side Storage
@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Navigation Structure
 - **Dashboard**: Main hub with customizable widgets and floating AI Coach button
-- **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts, depletion timeline visualisation, prescription cycle tracking with reorder reminders, travel supply impact analysis, and sick day adjusted forecasts
+- **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts, depletion timeline visualisation, smart prescription cycle tracking with supply-aware notifications (collection reminders based on order dates, skip suggestions for well-stocked items, travel-aware extra supply alerts), order tracking per supply, configurable pack sizes, travel supply impact analysis, and sick day adjusted forecasts
 - **Activity Advisor**: Meal planning with exercise integration, Exercise planning with recovery guidance, Activity Session planner for complete workout day management, Ratio Adviser, and Routines tab. Features conversation memory, time-of-day awareness (auto-uses correct meal ratios), historical learning from activity logs, and confidence indicators on recommendations.
 - **AI Coach**: Conversational AI assistant with persistent memory (last 100 messages stored in localStorage). Provides personalized diabetes guidance using user profile/settings context. Safety-first with "Not medical advice" labeling.
 - **Scenarios**: Bedtime Readiness Check (first tab - calm evening check for stable sleep), Sick Day Mode, and Travel Mode with tabbed interface

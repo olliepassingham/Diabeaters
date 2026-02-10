@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -200,26 +200,17 @@ function PrescriptionCyclePanel({
     return differenceInDays(nextCollection, new Date());
   };
 
-  const getSuppliesRunningOutBeforeCollection = (): Supply[] => {
-    const nextCollection = getNextCollectionDate();
-    if (!nextCollection) return [];
-    const daysUntil = differenceInDays(nextCollection, new Date());
-    if (daysUntil <= 0) return [];
-    return supplies.filter(s => {
-      const daysRemaining = storage.getDaysRemaining(s);
-      return daysRemaining < daysUntil && daysRemaining < 999;
-    });
-  };
-
   const daysUntilOrder = getDaysUntilOrder();
   const daysUntilCollection = getDaysUntilCollection();
-  const atRiskSupplies = getSuppliesRunningOutBeforeCollection();
   const needsSetup = !cycle;
   const orderOverdue = daysUntilOrder !== null && daysUntilOrder < 0;
   const orderSoon = daysUntilOrder !== null && daysUntilOrder >= 0 && daysUntilOrder <= 3;
 
+  const advice = storage.getSmartPrescriptionAdvice(supplies);
+  const hasAdvice = advice.collectSoon.length > 0 || advice.skipSuggestions.length > 0 || advice.travelExtras.length > 0;
+
   return (
-    <Card data-testid="card-prescription-cycle">
+    <Card data-testid="card-prescription-cycle" className={advice.collectSoon.length > 0 ? "border-amber-500/40" : ""}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -230,7 +221,7 @@ function PrescriptionCyclePanel({
             <Settings className="h-4 w-4" />
           </Button>
         </div>
-        <CardDescription>Track when to reorder your prescription</CardDescription>
+        <CardDescription>Smart prescription tracking based on your actual supply levels</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {editing || needsSetup ? (
@@ -250,7 +241,7 @@ function PrescriptionCyclePanel({
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lead-time">How many days before do you need to reorder?</Label>
+              <Label htmlFor="lead-time">How many days does it take to process your prescription?</Label>
               <Input 
                 id="lead-time" 
                 type="number" 
@@ -297,7 +288,7 @@ function PrescriptionCyclePanel({
                 </p>
               </div>
               <div className="p-3 rounded-lg bg-muted/30">
-                <p className="text-xs text-muted-foreground mb-1">Reorder lead time</p>
+                <p className="text-xs text-muted-foreground mb-1">Processing time</p>
                 <p className="text-lg font-bold" data-testid="text-lead-time">
                   {cycle?.leadTimeDays || 5} days
                 </p>
@@ -351,22 +342,105 @@ function PrescriptionCyclePanel({
               </div>
             )}
 
-            {atRiskSupplies.length > 0 && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30" data-testid="card-at-risk-supplies">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-red-800 dark:text-red-300">
-                      {atRiskSupplies.length === 1 ? "1 supply" : `${atRiskSupplies.length} supplies`} may run out before your next collection
-                    </p>
-                    <div className="mt-1 space-y-0.5">
-                      {atRiskSupplies.map(s => (
-                        <p key={s.id} className="text-xs text-red-700 dark:text-red-400">
-                          {s.name} — {storage.getDaysRemaining(s)} days left
-                        </p>
-                      ))}
+            {advice.orderedSupplies.length > 0 && (
+              <div className="space-y-2" data-testid="section-ordered-supplies">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">On Order</p>
+                {advice.orderedSupplies.map(({ supply, daysSinceOrder, estimatedCollectBy }) => {
+                  const Icon = typeIcons[supply.type] || Package;
+                  const isReady = estimatedCollectBy === 0;
+                  return (
+                    <div key={supply.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg ${isReady ? "bg-emerald-50 dark:bg-emerald-950/20" : "bg-blue-50 dark:bg-blue-950/20"}`} data-testid={`ordered-item-${supply.id}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Icon className={`h-3.5 w-3.5 shrink-0 ${isReady ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"}`} />
+                        <div className="min-w-0">
+                          <span className="text-sm truncate block">{supply.name}</span>
+                          <span className="text-xs text-muted-foreground">Ordered {daysSinceOrder === 0 ? "today" : `${daysSinceOrder}d ago`}</span>
+                        </div>
+                      </div>
+                      <Badge variant={isReady ? "default" : "secondary"} className="shrink-0 text-xs">
+                        {isReady ? "Ready to collect" : `~${estimatedCollectBy}d until ready`}
+                      </Badge>
                     </div>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {advice.collectSoon.length > 0 && (
+              <div className="space-y-2" data-testid="section-collect-soon">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Action Needed</p>
+                {advice.collectSoon.map(({ supply, daysUntilCollect, reason }) => {
+                  const Icon = typeIcons[supply.type] || Package;
+                  const isUrgent = daysUntilCollect <= 0;
+                  return (
+                    <div key={supply.id} className={`p-2.5 rounded-lg ${isUrgent ? "bg-red-50 dark:bg-red-950/20" : "bg-amber-50 dark:bg-amber-950/20"}`} data-testid={`collect-item-${supply.id}`}>
+                      <div className="flex items-start gap-2">
+                        {isUrgent ? (
+                          <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                        ) : (
+                          <Icon className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                        )}
+                        <p className={`text-sm ${isUrgent ? "text-red-800 dark:text-red-300" : "text-amber-800 dark:text-amber-300"}`}>
+                          {reason}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {advice.travelExtras.length > 0 && (
+              <div className="space-y-2" data-testid="section-travel-extras">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <Plane className="h-3 w-3 inline mr-1" />
+                  Extra for Travel
+                </p>
+                {advice.travelExtras.map(({ supply, extraNeeded, reason }) => {
+                  const Icon = typeIcons[supply.type] || Package;
+                  return (
+                    <div key={supply.id} className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/20" data-testid={`travel-extra-${supply.id}`}>
+                      <div className="flex items-start gap-2">
+                        <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                        <div>
+                          <p className="text-sm text-blue-800 dark:text-blue-300">{reason}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {advice.skipSuggestions.length > 0 && (
+              <div className="space-y-2" data-testid="section-skip-suggestions">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <Lightbulb className="h-3 w-3 inline mr-1" />
+                  Next Prescription Suggestions
+                </p>
+                {advice.skipSuggestions.map(({ supply, daysRemaining, reason }) => {
+                  const Icon = typeIcons[supply.type] || Package;
+                  return (
+                    <div key={supply.id} className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20" data-testid={`skip-item-${supply.id}`}>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                        <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                          {reason}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!hasAdvice && supplies.length > 0 && (
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20" data-testid="card-all-good">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                    All supplies looking good. No action needed right now.
+                  </p>
                 </div>
               </div>
             )}
@@ -624,13 +698,17 @@ function SupplyCard({
   onEdit, 
   onDelete, 
   onUpdateQuantity,
-  onLogPickup 
+  onLogPickup,
+  onMarkOrdered,
+  onClearOrder,
 }: { 
   supply: Supply; 
   onEdit: (supply: Supply) => void;
   onDelete: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onLogPickup: (supply: Supply) => void;
+  onMarkOrdered: (id: string) => void;
+  onClearOrder: (id: string) => void;
 }) {
   const adjustedQuantity = storage.getAdjustedQuantity(supply);
   const daysRemaining = storage.getDaysRemaining(supply);
@@ -835,6 +913,33 @@ function SupplyCard({
           )}
         </div>
 
+        {supply.isOnOrder && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 mt-3" data-testid={`order-status-${supply.id}`}>
+            <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
+                On order
+                {supply.orderedDate && (() => {
+                  const orderDate = new Date(supply.orderedDate);
+                  const today = new Date();
+                  orderDate.setHours(0, 0, 0, 0);
+                  today.setHours(0, 0, 0, 0);
+                  const days = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
+                  return days === 0 ? " — ordered today" : ` — ordered ${days} day${days !== 1 ? "s" : ""} ago`;
+                })()}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onClearOrder(supply.id)}
+              data-testid={`button-clear-order-${supply.id}`}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
         <div className="pt-3 mt-3 border-t space-y-2">
           <div className="flex gap-2">
             <Button 
@@ -847,6 +952,17 @@ function SupplyCard({
               <RotateCcw className="h-3 w-3 mr-1" />
               Refill
             </Button>
+            {!supply.isOnOrder && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onMarkOrdered(supply.id)}
+                data-testid={`button-mark-ordered-${supply.id}`}
+              >
+                <ShoppingCart className="h-3 w-3 mr-1" />
+                Ordered
+              </Button>
+            )}
           </div>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
@@ -1358,7 +1474,9 @@ export default function Supplies() {
       const updates: Partial<Supply> = { 
         currentQuantity: quantity,
         quantityAtPickup: quantity,
-        lastPickupDate: new Date().toISOString()
+        lastPickupDate: new Date().toISOString(),
+        isOnOrder: false,
+        orderedDate: undefined,
       };
       
       if (saveAsTypical) {
@@ -1373,6 +1491,22 @@ export default function Supplies() {
       });
       refreshSupplies();
     }
+  };
+
+  const handleMarkOrdered = (id: string) => {
+    storage.markSupplyOrdered(id);
+    const supply = supplies.find(s => s.id === id);
+    toast({
+      title: "Marked as ordered",
+      description: supply ? `${supply.name} marked as on order. We'll remind you when to collect.` : "Supply marked as on order.",
+    });
+    refreshSupplies();
+  };
+
+  const handleClearOrder = (id: string) => {
+    storage.clearSupplyOrder(id);
+    toast({ title: "Order cleared" });
+    refreshSupplies();
   };
 
   const filterByType = (type: string) => {
@@ -1549,6 +1683,8 @@ export default function Supplies() {
                       onDelete={handleDelete}
                       onUpdateQuantity={handleUpdateQuantity}
                       onLogPickup={handleLogPickup}
+                      onMarkOrdered={handleMarkOrdered}
+                      onClearOrder={handleClearOrder}
                     />
                   </div>
                 ))}
