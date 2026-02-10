@@ -418,18 +418,18 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "appointments", enabled: true, order: 5 },
 ];
 
-// Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Appointments, Community, Messages, Ratios, Settings (at bottom)
-// Other widgets start disabled but can be added via customization
+// Default widget layout for new users: Today Overview, Quick Actions, Supply + Scenarios, Appointments + AI, Community + Ratios, Settings + Help Now
+// Activity Adviser, Travel Mode, Sick Day, Messages start disabled but can be added via customization
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "quick-actions": "full",
   "supply-summary": "half",
-  "ai-recommendations": "full",
+  "ai-recommendations": "half",
   "appointments": "half",
   "community": "half",
   "ratio-adviser": "half",
   "settings-completion": "half",
   "today-overview": "full",
-  "scenario-status": "full",
+  "scenario-status": "half",
   "activity-adviser": "half",
   "travel-mode": "half",
   "sick-day": "half",
@@ -438,19 +438,20 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0, size: "full" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "half" },
-  { id: "appointments", type: "appointments", enabled: true, order: 2, size: "half" },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 3, size: "full" },
-  { id: "community", type: "community", enabled: true, order: 4, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5, size: "half" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6, size: "half" },
-  { id: "today-overview", type: "today-overview", enabled: false, order: 8, size: "full" },
-  { id: "scenario-status", type: "scenario-status", enabled: false, order: 9, size: "full" },
+  { id: "today-overview", type: "today-overview", enabled: true, order: 0, size: "full" },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 1, size: "full" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 2, size: "half" },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 3, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 5, size: "half" },
+  { id: "community", type: "community", enabled: true, order: 6, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 7, size: "half" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
+  { id: "help-now-info", type: "help-now-info", enabled: true, order: 9, size: "half" },
   { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 10, size: "half" },
   { id: "travel-mode", type: "travel-mode", enabled: false, order: 11, size: "half" },
   { id: "sick-day", type: "sick-day", enabled: false, order: 12, size: "half" },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 13, size: "half" },
+  { id: "messages", type: "messages", enabled: false, order: 13, size: "half" },
 ];
 
 function generateId(): string {
