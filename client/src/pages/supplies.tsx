@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
@@ -1332,6 +1332,246 @@ function RefillDialog({
   );
 }
 
+function EditUsualPrescriptionDialog({ 
+  open, 
+  onOpenChange, 
+  usualPrescription, 
+  currentSupplies,
+  onSave 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  usualPrescription: UsualPrescription | null;
+  currentSupplies: Supply[];
+  onSave: (items: UsualPrescriptionItem[]) => void;
+}) {
+  const [items, setItems] = useState<UsualPrescriptionItem[]>([]);
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<Supply["type"]>("needle");
+  const [newQuantity, setNewQuantity] = useState("");
+  const [newDailyUsage, setNewDailyUsage] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setItems(usualPrescription?.items ? [...usualPrescription.items.map(i => ({ ...i }))] : []);
+      setAddingNew(false);
+      resetNewForm();
+    }
+  }, [open, usualPrescription]);
+
+  const resetNewForm = () => {
+    setNewName("");
+    setNewType("needle");
+    setNewQuantity("");
+    setNewDailyUsage("");
+  };
+
+  const handleUpdateQuantity = (index: number, quantity: number) => {
+    const updated = [...items];
+    updated[index] = { ...updated[index], quantity: Math.max(0, quantity) };
+    setItems(updated);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const handleAddItem = () => {
+    if (!newName.trim() || !newQuantity) return;
+    const item: UsualPrescriptionItem = {
+      name: newName.trim(),
+      type: newType,
+      quantity: parseFloat(newQuantity) || 0,
+      dailyUsage: parseFloat(newDailyUsage) || 0,
+    };
+    setItems([...items, item]);
+    setAddingNew(false);
+    resetNewForm();
+  };
+
+  const handleSave = () => {
+    onSave(items);
+    onOpenChange(false);
+  };
+
+  const hasChanges = JSON.stringify(items) !== JSON.stringify(usualPrescription?.items || []);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] flex flex-col sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Usual Prescription</DialogTitle>
+          <DialogDescription>
+            Edit the items and quantities you normally receive on your repeat prescription.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {items.length === 0 && !addingNew && (
+            <div className="text-center py-6 text-muted-foreground">
+              <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No items saved yet.</p>
+              <p className="text-xs">Add items to build your usual prescription.</p>
+            </div>
+          )}
+          {items.map((item, index) => {
+            const Icon = typeIcons[item.type as keyof typeof typeIcons] || Package;
+            return (
+              <div key={`${item.name}-${index}`} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30" data-testid={`usual-item-${index}`}>
+                <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">{typeLabels[item.type as keyof typeof typeLabels] || item.type}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleUpdateQuantity(index, item.quantity - 1)}
+                    disabled={item.quantity <= 0}
+                    data-testid={`button-usual-decrease-${index}`}
+                  >
+                    <TrendingDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <Input
+                    type="number"
+                    value={item.quantity}
+                    onChange={e => handleUpdateQuantity(index, parseFloat(e.target.value) || 0)}
+                    className="w-16 text-center text-sm"
+                    data-testid={`input-usual-quantity-${index}`}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleUpdateQuantity(index, item.quantity + 1)}
+                    data-testid={`button-usual-increase-${index}`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveItem(index)}
+                  data-testid={`button-usual-remove-${index}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            );
+          })}
+
+          {currentSupplies.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const fromSupplies: UsualPrescriptionItem[] = currentSupplies.map(s => ({
+                  name: s.name,
+                  type: s.type,
+                  quantity: s.currentQuantity,
+                  dailyUsage: s.dailyUsage,
+                }));
+                setItems(fromSupplies);
+              }}
+              className="w-full"
+              data-testid="button-usual-from-current"
+            >
+              <ClipboardList className="h-3.5 w-3.5 mr-1" />
+              Use Current Supplies
+            </Button>
+          )}
+
+          {addingNew ? (
+            <div className="space-y-3 p-3 rounded-lg border border-dashed">
+              <div className="space-y-2">
+                <Label htmlFor="usual-new-name">Name</Label>
+                <Input
+                  id="usual-new-name"
+                  placeholder="e.g., NovoRapid FlexPen"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  data-testid="input-usual-new-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="usual-new-type">Type</Label>
+                <Select value={newType} onValueChange={v => setNewType(v as Supply["type"])}>
+                  <SelectTrigger id="usual-new-type" data-testid="select-usual-new-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="needle">Needles/Lancets</SelectItem>
+                    <SelectItem value="insulin">Insulin</SelectItem>
+                    <SelectItem value="cgm">CGM/Monitors</SelectItem>
+                    <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
+                    <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="usual-new-qty">Quantity</Label>
+                  <Input
+                    id="usual-new-qty"
+                    type="number"
+                    placeholder="e.g., 100"
+                    value={newQuantity}
+                    onChange={e => setNewQuantity(e.target.value)}
+                    data-testid="input-usual-new-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="usual-new-daily">Daily Usage</Label>
+                  <Input
+                    id="usual-new-daily"
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 4"
+                    value={newDailyUsage}
+                    onChange={e => setNewDailyUsage(e.target.value)}
+                    data-testid="input-usual-new-daily-usage"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleAddItem} disabled={!newName.trim() || !newQuantity} data-testid="button-usual-confirm-add">
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Add Item
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAddingNew(false); resetNewForm(); }} data-testid="button-usual-cancel-add">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddingNew(true)}
+              className="w-full"
+              data-testid="button-usual-add-new"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Add Item
+            </Button>
+          )}
+        </div>
+        <DialogFooter className="flex-row gap-2 pt-3 border-t">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} data-testid="button-usual-cancel">
+            Cancel
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={!hasChanges} data-testid="button-usual-save">
+            <Save className="h-3.5 w-3.5 mr-1" />
+            Save Usual Prescription
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Supplies() {
   const { toast } = useToast();
   const [supplies, setSupplies] = useState<Supply[]>([]);
@@ -1346,6 +1586,7 @@ export default function Supplies() {
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [activeTab, setActiveTab] = useState("all");
   const [highlightedSupplyId, setHighlightedSupplyId] = useState<string | null>(null);
+  const [usualDialogOpen, setUsualDialogOpen] = useState(false);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -1400,6 +1641,17 @@ export default function Supplies() {
     toast({ 
       title: "Usual prescription saved", 
       description: `Saved ${supplies.length} item${supplies.length > 1 ? "s" : ""} as your usual prescription.` 
+    });
+  };
+
+  const handleSaveUsualPrescription = (items: UsualPrescriptionItem[]) => {
+    storage.saveUsualPrescription(items);
+    setUsualPrescription(storage.getUsualPrescription());
+    toast({
+      title: "Usual prescription updated",
+      description: items.length > 0 
+        ? `Saved ${items.length} item${items.length > 1 ? "s" : ""} as your usual prescription.`
+        : "Usual prescription cleared.",
     });
   };
 
@@ -1558,7 +1810,7 @@ export default function Supplies() {
               <p>When you pick up a prescription, click the refill button on any supply to add the quantity you received.</p>
             </InfoSection>
             <InfoSection title="Usual Prescription">
-              <p>Save your typical prescription quantities so you can quickly add them when you refill. Use "Save Usual" to remember your current setup.</p>
+              <p>Save the items and quantities you normally receive on your repeat prescription. Use "Edit Usual" to view, add, remove, or change quantities. Then use "Add Usual" to quickly add those items when you pick up.</p>
             </InfoSection>
             <InfoSection title="Automatic Deduction">
               <p>Quantities are automatically reduced each day based on your daily usage settings.</p>
@@ -1580,12 +1832,10 @@ export default function Supplies() {
               <Plus className="h-4 w-4 mr-1" />
               Add Supply
             </Button>
-            {supplies.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleSaveAsUsualPrescription} data-testid="button-save-usual-prescription">
-                <Save className="h-4 w-4 mr-1" />
-                Save Usual
-              </Button>
-            )}
+            <Button variant="outline" size="sm" onClick={() => setUsualDialogOpen(true)} data-testid="button-edit-usual-prescription">
+              <Pencil className="h-4 w-4 mr-1" />
+              {usualPrescription && usualPrescription.items.length > 0 ? "Edit Usual" : "Set Usual"}
+            </Button>
             <Button 
               variant="outline" 
               size="sm" 
@@ -1707,6 +1957,14 @@ export default function Supplies() {
         open={pickupDialogOpen}
         onOpenChange={setPickupDialogOpen}
         onConfirm={handleConfirmRefill}
+      />
+
+      <EditUsualPrescriptionDialog
+        open={usualDialogOpen}
+        onOpenChange={setUsualDialogOpen}
+        usualPrescription={usualPrescription}
+        currentSupplies={supplies}
+        onSave={handleSaveUsualPrescription}
       />
     </div>
   );
