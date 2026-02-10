@@ -19,9 +19,11 @@ import {
   Plane,
   Thermometer,
   Phone,
-  GripVertical
+  GripVertical,
+  Columns2,
+  Square
 } from "lucide-react";
-import { DashboardWidget, WidgetType } from "@/lib/storage";
+import { DashboardWidget, WidgetType, WidgetSize } from "@/lib/storage";
 
 interface WidgetInfo {
   type: WidgetType;
@@ -121,10 +123,11 @@ interface WidgetLibraryProps {
   widgets: DashboardWidget[];
   onToggleWidget: (widgetId: string, enabled: boolean) => void;
   onMoveWidget: (widgetId: string, direction: "up" | "down") => void;
+  onResizeWidget: (widgetId: string, size: WidgetSize) => void;
   onClose: () => void;
 }
 
-export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onClose }: WidgetLibraryProps) {
+export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onResizeWidget, onClose }: WidgetLibraryProps) {
   const sortedWidgets = [...widgets].sort((a, b) => a.order - b.order);
 
   return (
@@ -132,8 +135,8 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onClose }
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-lg">Customize Dashboard</CardTitle>
-            <CardDescription>Choose which widgets to show and arrange their order</CardDescription>
+            <CardTitle className="text-lg">Customise Dashboard</CardTitle>
+            <CardDescription>Show, hide, reorder and resize your widgets</CardDescription>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} data-testid="button-close-library">
             <X className="h-4 w-4" />
@@ -182,10 +185,22 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onClose }
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-medium text-sm">{info.name}</p>
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                     {index + 1}
+                  </Badge>
+                  <Badge 
+                    variant="secondary" 
+                    className="text-[10px] px-1.5 py-0 cursor-pointer"
+                    onClick={() => onResizeWidget(widget.id, widget.size === "full" ? "half" : "full")}
+                    data-testid={`badge-size-${widget.type}`}
+                  >
+                    {widget.size === "full" ? (
+                      <><Square className="h-2.5 w-2.5 mr-0.5" /> Full</>
+                    ) : (
+                      <><Columns2 className="h-2.5 w-2.5 mr-0.5" /> Half</>
+                    )}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground truncate">{info.description}</p>

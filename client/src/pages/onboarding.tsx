@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { AlertTriangle, ArrowRight, ArrowLeft, Check, SkipForward } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
+import { storage } from "@/lib/storage";
 
-type Step = "personal" | "units" | "diabetes" | "delivery" | "disclaimer" | "complete";
+type Step = "personal" | "units" | "diabetes" | "delivery" | "insulin" | "usage" | "disclaimer" | "complete";
 
 interface OnboardingData {
   name: string;
@@ -23,12 +23,24 @@ interface OnboardingData {
   insulinDeliveryMethod: string;
   usingInsulin: boolean;
   hasAcceptedDisclaimer: boolean;
+  tdd: string;
+  breakfastRatio: string;
+  lunchRatio: string;
+  dinnerRatio: string;
+  correctionFactor: string;
+  shortActingUnitsPerDay: string;
+  longActingUnitsPerDay: string;
+  injectionsPerDay: string;
+  cgmDays: string;
 }
 
-const STEPS: Step[] = ["personal", "units", "diabetes", "delivery", "disclaimer", "complete"];
+const STEPS: Step[] = ["personal", "units", "diabetes", "delivery", "insulin", "usage", "disclaimer", "complete"];
 
-export default function Onboarding() {
-  const [, setLocation] = useLocation();
+interface OnboardingProps {
+  onComplete?: () => void;
+}
+
+export default function Onboarding({ onComplete }: OnboardingProps) {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<Step>("personal");
   const [data, setData] = useState<OnboardingData>({
@@ -40,20 +52,56 @@ export default function Onboarding() {
     insulinDeliveryMethod: "",
     usingInsulin: false,
     hasAcceptedDisclaimer: false,
+    tdd: "",
+    breakfastRatio: "",
+    lunchRatio: "",
+    dinnerRatio: "",
+    correctionFactor: "",
+    shortActingUnitsPerDay: "",
+    longActingUnitsPerDay: "",
+    injectionsPerDay: "",
+    cgmDays: "",
   });
 
   const currentStepIndex = STEPS.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / STEPS.length) * 100;
 
   const handleSaveProfile = () => {
-    localStorage.setItem("diabeater_onboarding_completed", "true");
-    localStorage.setItem("diabeater_profile", JSON.stringify(data));
+    storage.saveProfile({
+      name: data.name,
+      email: data.email,
+      bgUnits: data.bgUnits,
+      carbUnits: data.carbUnits,
+      diabetesType: data.diabetesType,
+      insulinDeliveryMethod: data.insulinDeliveryMethod === "injections" ? "pen" : data.insulinDeliveryMethod,
+      usingInsulin: data.usingInsulin,
+      hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
+      dateOfBirth: "",
+    });
+
+    const settings: Record<string, number | string | undefined> = {};
+    if (data.tdd) settings.tdd = parseFloat(data.tdd);
+    if (data.breakfastRatio) settings.breakfastRatio = data.breakfastRatio;
+    if (data.lunchRatio) settings.lunchRatio = data.lunchRatio;
+    if (data.dinnerRatio) settings.dinnerRatio = data.dinnerRatio;
+    if (data.correctionFactor) settings.correctionFactor = parseFloat(data.correctionFactor);
+    if (data.shortActingUnitsPerDay) settings.shortActingUnitsPerDay = parseInt(data.shortActingUnitsPerDay);
+    if (data.longActingUnitsPerDay) settings.longActingUnitsPerDay = parseInt(data.longActingUnitsPerDay);
+    if (data.injectionsPerDay) settings.injectionsPerDay = parseInt(data.injectionsPerDay);
+    if (data.cgmDays) settings.cgmDays = parseInt(data.cgmDays);
+
+    if (Object.keys(settings).length > 0) {
+      storage.saveSettings(settings);
+    }
+
     toast({
       title: "Welcome to Diabeaters!",
       description: "Your profile has been set up successfully.",
     });
-    setLocation("/");
-    window.location.reload();
+
+    if (onComplete) {
+      onComplete();
+    }
   };
 
   const handleNext = () => {
@@ -86,6 +134,8 @@ export default function Onboarding() {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const isSkippableStep = currentStep === "insulin" || currentStep === "usage";
+
   const renderStep = () => {
     switch (currentStep) {
       case "personal":
@@ -98,24 +148,11 @@ export default function Onboarding() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={data.name}
-                  onChange={(e) => updateData("name", e.target.value)}
-                  placeholder="Your name"
-                  data-testid="input-onboarding-name"
-                />
+                <Input id="name" value={data.name} onChange={(e) => updateData("name", e.target.value)} placeholder="Your name" data-testid="input-onboarding-name" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={data.email}
-                  onChange={(e) => updateData("email", e.target.value)}
-                  placeholder="your@email.com"
-                  data-testid="input-onboarding-email"
-                />
+                <Input id="email" type="email" value={data.email} onChange={(e) => updateData("email", e.target.value)} placeholder="your@email.com" data-testid="input-onboarding-email" />
               </div>
             </CardContent>
           </Card>
@@ -131,22 +168,12 @@ export default function Onboarding() {
             <CardContent className="space-y-6">
               <div className="space-y-3">
                 <Label>Blood Glucose Units</Label>
-                <RadioGroup
-                  value={data.bgUnits}
-                  onValueChange={(value) => updateData("bgUnits", value)}
-                  className="space-y-2"
-                >
-                  <div 
-                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("bgUnits", "mmol/L")}
-                  >
+                <RadioGroup value={data.bgUnits} onValueChange={(value) => updateData("bgUnits", value)} className="space-y-2">
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("bgUnits", "mmol/L")}>
                     <RadioGroupItem value="mmol/L" id="mmol" data-testid="radio-mmol" />
                     <Label htmlFor="mmol" className="font-normal cursor-pointer flex-1">mmol/L (millimoles per litre)</Label>
                   </div>
-                  <div 
-                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("bgUnits", "mg/dL")}
-                  >
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("bgUnits", "mg/dL")}>
                     <RadioGroupItem value="mg/dL" id="mgdl" data-testid="radio-mgdl" />
                     <Label htmlFor="mgdl" className="font-normal cursor-pointer flex-1">mg/dL (milligrams per decilitre)</Label>
                   </div>
@@ -154,29 +181,16 @@ export default function Onboarding() {
               </div>
               <div className="space-y-3">
                 <Label>Carbohydrate Units</Label>
-                <RadioGroup
-                  value={data.carbUnits}
-                  onValueChange={(value) => updateData("carbUnits", value)}
-                  className="space-y-2"
-                >
-                  <div 
-                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("carbUnits", "grams")}
-                  >
+                <RadioGroup value={data.carbUnits} onValueChange={(value) => updateData("carbUnits", value)} className="space-y-2">
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("carbUnits", "grams")}>
                     <RadioGroupItem value="grams" id="grams" data-testid="radio-grams" />
                     <Label htmlFor="grams" className="font-normal cursor-pointer flex-1">Grams</Label>
                   </div>
-                  <div 
-                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("carbUnits", "portions-10g")}
-                  >
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("carbUnits", "portions-10g")}>
                     <RadioGroupItem value="portions-10g" id="portions-10g" data-testid="radio-portions-10g" />
                     <Label htmlFor="portions-10g" className="font-normal cursor-pointer flex-1">Carb Portion (10g)</Label>
                   </div>
-                  <div 
-                    className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("carbUnits", "portions-15g")}
-                  >
+                  <div className="flex items-center space-x-2 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("carbUnits", "portions-15g")}>
                     <RadioGroupItem value="portions-15g" id="portions-15g" data-testid="radio-portions-15g" />
                     <Label htmlFor="portions-15g" className="font-normal cursor-pointer flex-1">Carb Portion (15g)</Label>
                   </div>
@@ -191,18 +205,11 @@ export default function Onboarding() {
           <Card>
             <CardHeader>
               <CardTitle>Diabetes Type</CardTitle>
-              <CardDescription>Select your diabetes type for personalized guidance</CardDescription>
+              <CardDescription>Select your diabetes type for personalised guidance</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <RadioGroup
-                value={data.diabetesType}
-                onValueChange={(value) => updateData("diabetesType", value)}
-                className="space-y-3"
-              >
-                <div 
-                  className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
-                  onClick={() => updateData("diabetesType", "type1")}
-                >
+              <RadioGroup value={data.diabetesType} onValueChange={(value) => updateData("diabetesType", value)} className="space-y-3">
+                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => updateData("diabetesType", "type1")}>
                   <RadioGroupItem value="type1" id="type1" className="mt-1" data-testid="radio-type1" />
                   <div className="flex-1">
                     <Label htmlFor="type1" className="font-medium cursor-pointer">Type 1 Diabetes</Label>
@@ -239,77 +246,121 @@ export default function Onboarding() {
           <Card>
             <CardHeader>
               <CardTitle>Insulin Delivery</CardTitle>
-              <CardDescription>
-                {data.diabetesType === "type1"
-                  ? "How do you administer insulin?"
-                  : "Are you currently using insulin?"}
-              </CardDescription>
+              <CardDescription>How do you administer insulin?</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {data.diabetesType === "type1" ? (
-                <RadioGroup
-                  value={data.insulinDeliveryMethod}
-                  onValueChange={(value) => {
-                    updateData("insulinDeliveryMethod", value);
-                    updateData("usingInsulin", true);
-                  }}
-                  className="space-y-3"
-                >
-                  <div 
-                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => {
-                      updateData("insulinDeliveryMethod", "injections");
-                      updateData("usingInsulin", true);
-                    }}
-                  >
-                    <RadioGroupItem value="injections" id="injections" className="mt-1" data-testid="radio-injections" />
-                    <div className="flex-1">
-                      <Label htmlFor="injections" className="font-medium cursor-pointer">Injections (MDI)</Label>
-                      <p className="text-sm text-muted-foreground mt-1">Multiple daily injections with pens or syringes</p>
+              <RadioGroup
+                value={data.insulinDeliveryMethod}
+                onValueChange={(value) => { updateData("insulinDeliveryMethod", value); updateData("usingInsulin", true); }}
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => { updateData("insulinDeliveryMethod", "injections"); updateData("usingInsulin", true); }}>
+                  <RadioGroupItem value="injections" id="injections" className="mt-1" data-testid="radio-injections" />
+                  <div className="flex-1">
+                    <Label htmlFor="injections" className="font-medium cursor-pointer">Injections (MDI)</Label>
+                    <p className="text-sm text-muted-foreground mt-1">Multiple daily injections with pens or syringes</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => { updateData("insulinDeliveryMethod", "pump"); updateData("usingInsulin", true); }}>
+                  <RadioGroupItem value="pump" id="pump" className="mt-1" data-testid="radio-pump" />
+                  <div className="flex-1">
+                    <Label htmlFor="pump" className="font-medium cursor-pointer">Insulin Pump</Label>
+                    <p className="text-sm text-muted-foreground mt-1">Continuous subcutaneous insulin infusion</p>
+                  </div>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        );
+
+      case "insulin":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Insulin Settings</CardTitle>
+              <CardDescription>These help calculate doses - you can skip and add later in Settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="onboard-tdd">Total Daily Dose (units)</Label>
+                  <Input id="onboard-tdd" type="number" placeholder="e.g., 40" value={data.tdd} onChange={(e) => updateData("tdd", e.target.value)} data-testid="input-onboarding-tdd" />
+                  <p className="text-xs text-muted-foreground">All insulin you take in a day</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="onboard-correction">Correction Factor</Label>
+                  <Input id="onboard-correction" type="number" step="0.1" placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={data.correctionFactor} onChange={(e) => updateData("correctionFactor", e.target.value)} data-testid="input-onboarding-correction" />
+                  <p className="text-xs text-muted-foreground">How much 1 unit drops BG</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Carb Ratios (units per 10g carbs)</Label>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Breakfast</Label>
+                    <Input type="number" step="0.1" placeholder="e.g., 1.0" value={data.breakfastRatio} onChange={(e) => updateData("breakfastRatio", e.target.value)} data-testid="input-onboarding-breakfast-ratio" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Lunch</Label>
+                    <Input type="number" step="0.1" placeholder="e.g., 0.8" value={data.lunchRatio} onChange={(e) => updateData("lunchRatio", e.target.value)} data-testid="input-onboarding-lunch-ratio" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Dinner</Label>
+                    <Input type="number" step="0.1" placeholder="e.g., 1.0" value={data.dinnerRatio} onChange={(e) => updateData("dinnerRatio", e.target.value)} data-testid="input-onboarding-dinner-ratio" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground italic">Don't worry if you're unsure - you can always update these in Settings later.</p>
+            </CardContent>
+          </Card>
+        );
+
+      case "usage":
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Supply Usage</CardTitle>
+              <CardDescription>Helps predict when supplies will run out - you can skip and add later</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.insulinDeliveryMethod === "pump" ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <Label>Total Daily Dose</Label>
+                    <div className="h-9 px-3 rounded-md border bg-muted/50 flex items-center">
+                      <span className={data.tdd ? "" : "text-muted-foreground"}>
+                        {data.tdd ? `${data.tdd} units/day` : "Set in the previous step"}
+                      </span>
                     </div>
                   </div>
-                  <div 
-                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => {
-                      updateData("insulinDeliveryMethod", "pump");
-                      updateData("usingInsulin", true);
-                    }}
-                  >
-                    <RadioGroupItem value="pump" id="pump" className="mt-1" data-testid="radio-pump" />
-                    <div className="flex-1">
-                      <Label htmlFor="pump" className="font-medium cursor-pointer">Insulin Pump</Label>
-                      <p className="text-sm text-muted-foreground mt-1">Continuous subcutaneous insulin infusion</p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="onboard-cgm">CGM Sensor Duration (days)</Label>
+                    <Input id="onboard-cgm" type="number" placeholder="e.g., 10 or 14" value={data.cgmDays} onChange={(e) => updateData("cgmDays", e.target.value)} data-testid="input-onboarding-cgm" />
                   </div>
-                </RadioGroup>
+                </div>
               ) : (
-                <RadioGroup
-                  value={data.usingInsulin ? "yes" : "no"}
-                  onValueChange={(value) => updateData("usingInsulin", value === "yes")}
-                  className="space-y-3"
-                >
-                  <div 
-                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("usingInsulin", true)}
-                  >
-                    <RadioGroupItem value="yes" id="using-yes" className="mt-1" data-testid="radio-using-insulin-yes" />
-                    <div className="flex-1">
-                      <Label htmlFor="using-yes" className="font-medium cursor-pointer">Yes, I use insulin</Label>
-                      <p className="text-sm text-muted-foreground mt-1">I currently take insulin as part of my treatment</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="onboard-short">Short-Acting Units/Day</Label>
+                    <Input id="onboard-short" type="number" placeholder="e.g., 25" value={data.shortActingUnitsPerDay} onChange={(e) => updateData("shortActingUnitsPerDay", e.target.value)} data-testid="input-onboarding-short-acting" />
+                    <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
                   </div>
-                  <div 
-                    className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
-                    onClick={() => updateData("usingInsulin", false)}
-                  >
-                    <RadioGroupItem value="no" id="using-no" className="mt-1" data-testid="radio-using-insulin-no" />
-                    <div className="flex-1">
-                      <Label htmlFor="using-no" className="font-medium cursor-pointer">No, I don't use insulin</Label>
-                      <p className="text-sm text-muted-foreground mt-1">I manage with diet, exercise, or other medications</p>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="onboard-long">Long-Acting Units/Day</Label>
+                    <Input id="onboard-long" type="number" placeholder="e.g., 20" value={data.longActingUnitsPerDay} onChange={(e) => updateData("longActingUnitsPerDay", e.target.value)} data-testid="input-onboarding-long-acting" />
+                    <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
                   </div>
-                </RadioGroup>
+                  <div className="space-y-2">
+                    <Label htmlFor="onboard-injections">Injections/Day</Label>
+                    <Input id="onboard-injections" type="number" placeholder="e.g., 4" value={data.injectionsPerDay} onChange={(e) => updateData("injectionsPerDay", e.target.value)} data-testid="input-onboarding-injections" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="onboard-cgm">CGM Duration (days)</Label>
+                    <Input id="onboard-cgm" type="number" placeholder="e.g., 10 or 14" value={data.cgmDays} onChange={(e) => updateData("cgmDays", e.target.value)} data-testid="input-onboarding-cgm" />
+                  </div>
+                </div>
               )}
+              <p className="text-xs text-muted-foreground italic">This information helps your Supply Tracker predict depletion dates. You can update it anytime in Settings.</p>
             </CardContent>
           </Card>
         );
@@ -336,23 +387,11 @@ export default function Onboarding() {
                   <li>This app is a companion tool, not a replacement for professional medical care</li>
                 </ul>
               </div>
-              <div 
-                className="flex items-start space-x-3 p-4 border rounded-lg hover-elevate cursor-pointer"
-                onClick={() => updateData("hasAcceptedDisclaimer", !data.hasAcceptedDisclaimer)}
-              >
-                <Checkbox
-                  id="disclaimer"
-                  checked={data.hasAcceptedDisclaimer}
-                  onCheckedChange={(checked) => updateData("hasAcceptedDisclaimer", checked === true)}
-                  data-testid="checkbox-disclaimer"
-                />
+              <div className="flex items-start space-x-3 p-4 border rounded-lg hover-elevate cursor-pointer" onClick={() => updateData("hasAcceptedDisclaimer", !data.hasAcceptedDisclaimer)}>
+                <Checkbox id="disclaimer" checked={data.hasAcceptedDisclaimer} onCheckedChange={(checked) => updateData("hasAcceptedDisclaimer", checked === true)} data-testid="checkbox-disclaimer" />
                 <div className="flex-1">
-                  <Label htmlFor="disclaimer" className="font-medium cursor-pointer">
-                    I understand and accept
-                  </Label>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    I acknowledge that Diabeaters is not a substitute for professional medical advice
-                  </p>
+                  <Label htmlFor="disclaimer" className="font-medium cursor-pointer">I understand and accept</Label>
+                  <p className="text-sm text-muted-foreground mt-1">I acknowledge that Diabeaters is not a substitute for professional medical advice</p>
                 </div>
               </div>
             </CardContent>
@@ -383,6 +422,12 @@ export default function Onboarding() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Insulin Delivery:</span>
                     <span className="font-medium capitalize">{data.insulinDeliveryMethod}</span>
+                  </div>
+                )}
+                {data.tdd && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Daily Dose:</span>
+                    <span className="font-medium">{data.tdd} units</span>
                   </div>
                 )}
               </div>
@@ -418,22 +463,19 @@ export default function Onboarding() {
             </Button>
           )}
           <div className="flex-1" />
+          {isSkippableStep && (
+            <Button variant="ghost" onClick={handleNext} data-testid="button-onboarding-skip">
+              <SkipForward className="h-4 w-4 mr-2" />
+              Skip
+            </Button>
+          )}
           {currentStep === "complete" ? (
-            <Button
-              onClick={handleComplete}
-              className="min-w-32"
-              data-testid="button-onboarding-complete"
-            >
+            <Button onClick={handleComplete} className="min-w-32" data-testid="button-onboarding-complete">
               Get Started
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           ) : currentStep === "disclaimer" ? (
-            <Button
-              onClick={() => setCurrentStep("complete")}
-              disabled={!data.hasAcceptedDisclaimer}
-              className="min-w-32"
-              data-testid="button-onboarding-next"
-            >
+            <Button onClick={() => setCurrentStep("complete")} disabled={!data.hasAcceptedDisclaimer} className="min-w-32" data-testid="button-onboarding-next">
               Continue
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

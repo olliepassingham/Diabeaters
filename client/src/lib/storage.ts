@@ -138,11 +138,14 @@ export type WidgetType =
   | "help-now-info"
   | "appointments";
 
+export type WidgetSize = "full" | "half";
+
 export interface DashboardWidget {
   id: string;
   type: WidgetType;
   enabled: boolean;
   order: number;
+  size: WidgetSize;
 }
 
 export interface ScenarioState {
@@ -355,21 +358,37 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
 
 // Default widget order after setup: Quick Actions, Supply Summary, AI Insights, Appointments, Community, Messages, Ratios, Settings (at bottom)
 // Other widgets start disabled but can be added via customization
+export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
+  "quick-actions": "full",
+  "supply-summary": "half",
+  "ai-recommendations": "full",
+  "appointments": "half",
+  "community": "half",
+  "ratio-adviser": "half",
+  "settings-completion": "half",
+  "today-overview": "full",
+  "scenario-status": "full",
+  "activity-adviser": "half",
+  "travel-mode": "half",
+  "sick-day": "half",
+  "help-now-info": "half",
+  "messages": "half",
+};
+
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0 },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1 },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 2 },
-  { id: "appointments", type: "appointments", enabled: true, order: 3 },
-  { id: "community", type: "community", enabled: true, order: 4 },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5 },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6 },
-  // Disabled by default - can be added via customization
-  { id: "today-overview", type: "today-overview", enabled: false, order: 8 },
-  { id: "scenario-status", type: "scenario-status", enabled: false, order: 9 },
-  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 10 },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 11 },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 12 },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 13 },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0, size: "full" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 2, size: "half" },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 3, size: "full" },
+  { id: "community", type: "community", enabled: true, order: 4, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 5, size: "half" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 6, size: "half" },
+  { id: "today-overview", type: "today-overview", enabled: false, order: 8, size: "full" },
+  { id: "scenario-status", type: "scenario-status", enabled: false, order: 9, size: "full" },
+  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 10, size: "half" },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 11, size: "half" },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 12, size: "half" },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 13, size: "half" },
 ];
 
 function generateId(): string {
@@ -795,6 +814,12 @@ export const storage = {
       if (!savedIds.has(defaultWidget.id)) {
         const maxOrder = Math.max(...savedWidgets.map(w => w.order), -1);
         savedWidgets.push({ ...defaultWidget, order: maxOrder + 1 });
+        updated = true;
+      }
+    }
+    for (const widget of savedWidgets) {
+      if (!widget.size) {
+        widget.size = DEFAULT_WIDGET_SIZES[widget.type] || "half";
         updated = true;
       }
     }
@@ -1636,5 +1661,41 @@ export const storage = {
       .filter(r => r.lastUsed)
       .sort((a, b) => new Date(b.lastUsed!).getTime() - new Date(a.lastUsed!).getTime())
       .slice(0, limit);
+  },
+
+  exportAllData(): string {
+    const data: Record<string, unknown> = {};
+    for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+      const value = localStorage.getItem(storageKey);
+      if (value) {
+        try {
+          data[key] = JSON.parse(value);
+        } catch {
+          data[key] = value;
+        }
+      }
+    }
+    data._exportedAt = new Date().toISOString();
+    data._version = "1.0";
+    return JSON.stringify(data, null, 2);
+  },
+
+  importAllData(jsonString: string): { success: boolean; error?: string } {
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || typeof data !== "object") {
+        return { success: false, error: "Invalid data format" };
+      }
+
+      for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+        if (data[key] !== undefined) {
+          const value = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
+          localStorage.setItem(storageKey, value);
+        }
+      }
+      return { success: true };
+    } catch {
+      return { success: false, error: "Could not read the file. Please check it's a valid Diabeaters backup." };
+    }
   },
 };

@@ -5,7 +5,7 @@ import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle } from "lucide-
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { storage, Supply, ScenarioState, UserProfile, DashboardWidget } from "@/lib/storage";
+import { storage, Supply, ScenarioState, UserProfile, DashboardWidget, WidgetSize } from "@/lib/storage";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import {
   SupplySummaryWidget,
@@ -286,6 +286,14 @@ export default function Dashboard() {
     setWidgets(updated);
   };
 
+  const handleResizeWidget = (widgetId: string, size: WidgetSize) => {
+    const updated = widgets.map(w => 
+      w.id === widgetId ? { ...w, size } : w
+    );
+    storage.saveDashboardWidgets(updated);
+    setWidgets(updated);
+  };
+
   const handleMoveWidget = (widgetId: string, direction: "up" | "down") => {
     const sorted = [...widgets].sort((a, b) => a.order - b.order);
     const index = sorted.findIndex(w => w.id === widgetId);
@@ -323,7 +331,7 @@ export default function Dashboard() {
     : enabledWidgets.filter(w => w.type !== "settings-completion");
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto pb-8">
+    <div className="space-y-4 max-w-4xl mx-auto pb-8">
       <HeaderCard profile={profile} status={healthStatus} />
       
       <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
@@ -338,14 +346,19 @@ export default function Dashboard() {
           widgets={widgets}
           onToggleWidget={handleToggleWidget}
           onMoveWidget={handleMoveWidget}
+          onResizeWidget={handleResizeWidget}
           onClose={handleCloseEditor}
         />
       )}
       
       {!isEditing && (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {widgetsToRender.map((widget) => (
-            <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
+            <div 
+              key={widget.id} 
+              className={`${widget.size === "full" ? "md:col-span-2" : ""} [&>*]:h-full`}
+              data-testid={`widget-container-${widget.type}`}
+            >
               <WidgetRenderer type={widget.type} />
             </div>
           ))}

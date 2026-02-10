@@ -12,6 +12,7 @@ import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { AIStatusInline } from "@/components/ai-status-banner";
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
@@ -1047,6 +1048,7 @@ export default function Advisor() {
   return (
     <div className="flex flex-col min-h-full relative overflow-auto">
       <FaceLogoWatermark />
+      <AIStatusInline />
       <div className="mb-4 flex items-center gap-2">
         <div>
           <h1 className="text-3xl font-semibold">AI Activity Advisor</h1>

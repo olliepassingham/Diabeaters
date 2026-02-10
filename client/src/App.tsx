@@ -50,7 +50,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/onboarding" component={Onboarding} />
       <Route path="/supplies" component={Supplies} />
       <Route path="/scenarios" component={Scenarios} />
       <Route path="/advisor" component={Advisor} />
@@ -85,7 +84,10 @@ function AppContent() {
   }, [hasChecked, onboardingCompleted, location, setLocation]);
 
   if (location === "/onboarding") {
-    return <Onboarding />;
+    return <Onboarding onComplete={() => {
+      setOnboardingCompleted(true);
+      setLocation("/");
+    }} />;
   }
 
   if (!hasChecked) {

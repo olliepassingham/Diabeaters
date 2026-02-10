@@ -69,6 +69,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/ai-status", (_req, res) => {
+    res.json({ available: !!openai });
+  });
+
   // Activity Adviser Route
   app.post("/api/activity/advice", async (req, res) => {
     if (!openai) {

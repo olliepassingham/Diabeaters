@@ -9,6 +9,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { storage, AICoachMessage } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { AIStatusBanner } from "@/components/ai-status-banner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function AICoach() {
@@ -86,6 +87,7 @@ export default function AICoach() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 relative min-h-[calc(100vh-200px)]">
       <FaceLogoWatermark />
+      <AIStatusBanner />
       
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
