@@ -69,10 +69,10 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
           )}
 
           <div className={`flex gap-2 ${compact ? "flex-col" : ""}`}>
-            <Link href="/scenarios?tab=bedtime" className="flex-1">
-              <Button variant="outline" size="sm" className="w-full" data-testid="button-start-bedtime">
-                <Moon className="h-4 w-4 mr-1" />
-                Bedtime
+            <Link href="/scenarios?tab=sick-day" className="flex-1">
+              <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
+                <Thermometer className="h-4 w-4 mr-1" />
+                Sick Day
               </Button>
             </Link>
             <Link href="/scenarios?tab=travel" className="flex-1">
@@ -82,10 +82,10 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
               </Button>
             </Link>
             {!compact && (
-              <Link href="/scenarios?tab=sick-day" className="flex-1">
-                <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
-                  <Thermometer className="h-4 w-4 mr-1" />
-                  Sick Day
+              <Link href="/scenarios?tab=bedtime" className="flex-1">
+                <Button variant="outline" size="sm" className="w-full" data-testid="button-start-bedtime">
+                  <Moon className="h-4 w-4 mr-1" />
+                  Bedtime
                 </Button>
               </Link>
             )}
