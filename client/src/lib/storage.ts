@@ -410,22 +410,20 @@ export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string
 ];
 
 export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
-  { id: "supplies", enabled: true, order: 0 },
-  { id: "activity", enabled: true, order: 1 },
-  { id: "bedtime", enabled: true, order: 2 },
-  { id: "sick-day", enabled: true, order: 3 },
-  { id: "travel", enabled: true, order: 4 },
-  { id: "appointments", enabled: true, order: 5 },
+  { id: "activity", enabled: true, order: 0 },
+  { id: "bedtime", enabled: true, order: 1 },
+  { id: "routines", enabled: true, order: 2 },
+  { id: "settings", enabled: true, order: 3 },
 ];
 
-// Default widget layout for new users: Today Overview, Quick Actions, Supply + Scenarios, Appointments + AI, Community + Ratios, Settings + Help Now
-// Activity Adviser, Travel Mode, Sick Day, Messages start disabled but can be added via customization
+// Default widget layout for new users: Quick Actions + Ratios (side by side), Supply Summary (full), Appointments + Scenarios (side by side), Community (full)
+// Other widgets start disabled but can be added via customization
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
-  "quick-actions": "full",
-  "supply-summary": "half",
+  "quick-actions": "half",
+  "supply-summary": "full",
   "ai-recommendations": "half",
   "appointments": "half",
-  "community": "half",
+  "community": "full",
   "ratio-adviser": "half",
   "settings-completion": "half",
   "today-overview": "full",
@@ -438,16 +436,16 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "today-overview", type: "today-overview", enabled: true, order: 0, size: "full" },
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 1, size: "full" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 2, size: "half" },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 3, size: "half" },
-  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: true, order: 5, size: "half" },
-  { id: "community", type: "community", enabled: true, order: 6, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 7, size: "half" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
-  { id: "help-now-info", type: "help-now-info", enabled: true, order: 9, size: "half" },
+  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 1, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 2, size: "full" },
+  { id: "appointments", type: "appointments", enabled: true, order: 3, size: "half" },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4, size: "half" },
+  { id: "community", type: "community", enabled: true, order: 5, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: false, order: 6, size: "half" },
+  { id: "today-overview", type: "today-overview", enabled: false, order: 7, size: "full" },
+  { id: "ai-recommendations", type: "ai-recommendations", enabled: false, order: 8, size: "half" },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 9, size: "half" },
   { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 10, size: "half" },
   { id: "travel-mode", type: "travel-mode", enabled: false, order: 11, size: "half" },
   { id: "sick-day", type: "sick-day", enabled: false, order: 12, size: "half" },
