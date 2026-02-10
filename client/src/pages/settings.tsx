@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
@@ -201,6 +201,12 @@ function UsageTab({
   siteChangeDays, setSiteChangeDays,
   reservoirChangeDays, setReservoirChangeDays,
   reservoirCapacity, setReservoirCapacity,
+  unitsPerInsulinPen, setUnitsPerInsulinPen,
+  needlesPerBox, setNeedlesPerBox,
+  sensorsPerBox, setSensorsPerBox,
+  infusionSetsPerBox, setInfusionSetsPerBox,
+  reservoirsPerBox, setReservoirsPerBox,
+  insulinCartridgeUnits, setInsulinCartridgeUnits,
   onSave
 }: {
   isPumpUser: boolean; tdd: string;
@@ -211,6 +217,12 @@ function UsageTab({
   siteChangeDays: string; setSiteChangeDays: (v: string) => void;
   reservoirChangeDays: string; setReservoirChangeDays: (v: string) => void;
   reservoirCapacity: string; setReservoirCapacity: (v: string) => void;
+  unitsPerInsulinPen: string; setUnitsPerInsulinPen: (v: string) => void;
+  needlesPerBox: string; setNeedlesPerBox: (v: string) => void;
+  sensorsPerBox: string; setSensorsPerBox: (v: string) => void;
+  infusionSetsPerBox: string; setInfusionSetsPerBox: (v: string) => void;
+  reservoirsPerBox: string; setReservoirsPerBox: (v: string) => void;
+  insulinCartridgeUnits: string; setInsulinCartridgeUnits: (v: string) => void;
   onSave: () => void;
 }) {
   return (
@@ -278,12 +290,12 @@ function UsageTab({
             <div className="space-y-2">
               <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
               <Input id="short-acting-units" type="number" placeholder="e.g., 25" value={shortActingUnitsPerDay} onChange={(e) => setShortActingUnitsPerDay(e.target.value)} data-testid="input-short-acting-units" />
-              <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+              <p className="text-xs text-muted-foreground">{unitsPerInsulinPen || "300"} units = 1 pen</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
               <Input id="long-acting-units" type="number" placeholder="e.g., 20" value={longActingUnitsPerDay} onChange={(e) => setLongActingUnitsPerDay(e.target.value)} data-testid="input-long-acting-units" />
-              <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+              <p className="text-xs text-muted-foreground">{unitsPerInsulinPen || "300"} units = 1 pen</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="injections-per-day">Injections/Day</Label>
@@ -295,6 +307,61 @@ function UsageTab({
             </div>
           </div>
         )}
+
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Package className="h-4 w-4 text-primary" />
+            <Label className="text-sm font-medium">Supply Pack Sizes</Label>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Set how many units come in each pack or box you pick up. This controls the +/- buttons in Supply Tracker so one tap adds a whole pen or box.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            {isPumpUser ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="insulin-cartridge-units">Units per Insulin Cartridge</Label>
+                  <Input id="insulin-cartridge-units" type="number" min="1" placeholder="e.g., 300" value={insulinCartridgeUnits} onChange={(e) => setInsulinCartridgeUnits(e.target.value)} data-testid="input-insulin-cartridge-units" />
+                  <p className="text-xs text-muted-foreground">Units in one cartridge/vial</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="infusion-sets-per-box">Infusion Sets per Box</Label>
+                  <Input id="infusion-sets-per-box" type="number" min="1" placeholder="e.g., 10" value={infusionSetsPerBox} onChange={(e) => setInfusionSetsPerBox(e.target.value)} data-testid="input-infusion-sets-per-box" />
+                  <p className="text-xs text-muted-foreground">Sets in one box</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reservoirs-per-box">Reservoirs per Box</Label>
+                  <Input id="reservoirs-per-box" type="number" min="1" placeholder="e.g., 10" value={reservoirsPerBox} onChange={(e) => setReservoirsPerBox(e.target.value)} data-testid="input-reservoirs-per-box" />
+                  <p className="text-xs text-muted-foreground">Reservoirs in one box</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sensors-per-box">CGM Sensors per Box</Label>
+                  <Input id="sensors-per-box" type="number" min="1" placeholder="e.g., 1" value={sensorsPerBox} onChange={(e) => setSensorsPerBox(e.target.value)} data-testid="input-sensors-per-box" />
+                  <p className="text-xs text-muted-foreground">Sensors in one box</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="units-per-pen">Units per Insulin Pen</Label>
+                  <Input id="units-per-pen" type="number" min="1" placeholder="e.g., 300" value={unitsPerInsulinPen} onChange={(e) => setUnitsPerInsulinPen(e.target.value)} data-testid="input-units-per-pen" />
+                  <p className="text-xs text-muted-foreground">Units in one disposable pen</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="needles-per-box">Needles per Box</Label>
+                  <Input id="needles-per-box" type="number" min="1" placeholder="e.g., 100" value={needlesPerBox} onChange={(e) => setNeedlesPerBox(e.target.value)} data-testid="input-needles-per-box" />
+                  <p className="text-xs text-muted-foreground">Needles/lancets in one box</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sensors-per-box">CGM Sensors per Box</Label>
+                  <Input id="sensors-per-box" type="number" min="1" placeholder="e.g., 1" value={sensorsPerBox} onChange={(e) => setSensorsPerBox(e.target.value)} data-testid="input-sensors-per-box" />
+                  <p className="text-xs text-muted-foreground">Sensors in one box</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex justify-end">
           <Button onClick={onSave} data-testid="button-save-usage">
             <Save className="h-4 w-4 mr-2" />
@@ -605,6 +672,12 @@ export default function Settings() {
   const [siteChangeDays, setSiteChangeDays] = useState("");
   const [reservoirChangeDays, setReservoirChangeDays] = useState("");
   const [reservoirCapacity, setReservoirCapacity] = useState("");
+  const [unitsPerInsulinPen, setUnitsPerInsulinPen] = useState("");
+  const [needlesPerBox, setNeedlesPerBox] = useState("");
+  const [sensorsPerBox, setSensorsPerBox] = useState("");
+  const [infusionSetsPerBox, setInfusionSetsPerBox] = useState("");
+  const [reservoirsPerBox, setReservoirsPerBox] = useState("");
+  const [insulinCartridgeUnits, setInsulinCartridgeUnits] = useState("");
   
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -664,6 +737,12 @@ export default function Settings() {
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
       setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
       setReservoirCapacity(storedSettings.reservoirCapacity?.toString() || "300");
+      setUnitsPerInsulinPen(storedSettings.unitsPerInsulinPen?.toString() || "");
+      setNeedlesPerBox(storedSettings.needlesPerBox?.toString() || "");
+      setSensorsPerBox(storedSettings.sensorsPerBox?.toString() || "");
+      setInfusionSetsPerBox(storedSettings.infusionSetsPerBox?.toString() || "");
+      setReservoirsPerBox(storedSettings.reservoirsPerBox?.toString() || "");
+      setInsulinCartridgeUnits(storedSettings.insulinCartridgeUnits?.toString() || "");
     } else {
       setSiteChangeDays("3");
       setReservoirChangeDays("3");
@@ -722,6 +801,12 @@ export default function Settings() {
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
       reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
       reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity) : undefined,
+      unitsPerInsulinPen: unitsPerInsulinPen ? Math.max(1, parseInt(unitsPerInsulinPen)) : undefined,
+      needlesPerBox: needlesPerBox ? Math.max(1, parseInt(needlesPerBox)) : undefined,
+      sensorsPerBox: sensorsPerBox ? Math.max(1, parseInt(sensorsPerBox)) : undefined,
+      infusionSetsPerBox: infusionSetsPerBox ? Math.max(1, parseInt(infusionSetsPerBox)) : undefined,
+      reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
+      insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
@@ -881,6 +966,12 @@ export default function Settings() {
                 siteChangeDays={siteChangeDays} setSiteChangeDays={setSiteChangeDays}
                 reservoirChangeDays={reservoirChangeDays} setReservoirChangeDays={setReservoirChangeDays}
                 reservoirCapacity={reservoirCapacity} setReservoirCapacity={setReservoirCapacity}
+                unitsPerInsulinPen={unitsPerInsulinPen} setUnitsPerInsulinPen={setUnitsPerInsulinPen}
+                needlesPerBox={needlesPerBox} setNeedlesPerBox={setNeedlesPerBox}
+                sensorsPerBox={sensorsPerBox} setSensorsPerBox={setSensorsPerBox}
+                infusionSetsPerBox={infusionSetsPerBox} setInfusionSetsPerBox={setInfusionSetsPerBox}
+                reservoirsPerBox={reservoirsPerBox} setReservoirsPerBox={setReservoirsPerBox}
+                insulinCartridgeUnits={insulinCartridgeUnits} setInsulinCartridgeUnits={setInsulinCartridgeUnits}
                 onSave={handleSaveUsage}
               />
             </TabsContent>

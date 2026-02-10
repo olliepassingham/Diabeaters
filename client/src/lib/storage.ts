@@ -55,6 +55,12 @@ export interface UserSettings {
   siteChangeDays?: number;
   reservoirChangeDays?: number;
   reservoirCapacity?: number;
+  unitsPerInsulinPen?: number;
+  needlesPerBox?: number;
+  sensorsPerBox?: number;
+  infusionSetsPerBox?: number;
+  reservoirsPerBox?: number;
+  insulinCartridgeUnits?: number;
 }
 
 export interface Supply {
@@ -67,6 +73,60 @@ export interface Supply {
   quantityAtPickup?: number;
   typicalRefillQuantity?: number;
   notes?: string;
+}
+
+export type SupplyType = Supply["type"];
+
+export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, { increment: number; label: string; settingsKey: keyof UserSettings }> = {
+  insulin: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  needle: { increment: 100, label: "box", settingsKey: "needlesPerBox" },
+  cgm: { increment: 1, label: "sensor", settingsKey: "sensorsPerBox" },
+  infusion_set: { increment: 10, label: "box", settingsKey: "infusionSetsPerBox" },
+  reservoir: { increment: 10, label: "box", settingsKey: "reservoirsPerBox" },
+  other: { increment: 1, label: "unit", settingsKey: "needlesPerBox" },
+};
+
+export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): { amount: number; label: string } {
+  const s = settings || storage.getSettings();
+  const packInfo = SUPPLY_PACK_DEFAULTS[type];
+  const customValue = s[packInfo.settingsKey] as number | undefined;
+
+  if (type === "other") {
+    return { amount: 1, label: "unit" };
+  }
+
+  if (type === "insulin") {
+    const isPump = storage.getProfile()?.insulinDeliveryMethod === "pump";
+    const amount = Math.max(1, customValue || (isPump ? s.insulinCartridgeUnits : undefined) || packInfo.increment);
+    const itemLabel = isPump ? "cartridge" : "pen";
+    return { amount, label: amount === 1 ? "unit" : itemLabel };
+  }
+
+  const amount = Math.max(1, customValue || packInfo.increment);
+  if (type === "needle") {
+    return { amount, label: amount === 1 ? "needle" : "box" };
+  }
+  if (type === "cgm") {
+    return { amount, label: "sensor" };
+  }
+  if (type === "infusion_set") {
+    return { amount, label: amount === 1 ? "set" : "box" };
+  }
+  if (type === "reservoir") {
+    return { amount, label: amount === 1 ? "reservoir" : "box" };
+  }
+
+  return { amount: 1, label: "unit" };
+}
+
+export function getUnitsPerPen(settings?: UserSettings): number {
+  const s = settings || storage.getSettings();
+  return Math.max(1, s.unitsPerInsulinPen || s.insulinCartridgeUnits || 300);
+}
+
+export function getInsulinContainerLabel(): string {
+  const profile = storage.getProfile();
+  return profile?.insulinDeliveryMethod === "pump" ? "cartridge" : "pen";
 }
 
 export interface LastPrescription {

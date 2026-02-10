@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription, PrescriptionCycle, ScenarioState } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
@@ -710,15 +710,26 @@ function SupplyCard({
               <p className="text-xs text-muted-foreground mb-1">Estimated Remaining</p>
               {supply.type === "insulin" ? (
                 <div data-testid={`text-remaining-${supply.id}`}>
-                  <p className={`text-2xl font-bold ${
-                    status === "critical" ? "text-red-600 dark:text-red-500" : 
-                    status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                  }`}>
-                    {Math.floor(adjustedQuantity / 100)} {Math.floor(adjustedQuantity / 100) === 1 ? "pen" : "pens"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    (~{Math.floor(adjustedQuantity)} units)
-                  </p>
+                  {(() => {
+                    const uPerContainer = getUnitsPerPen();
+                    const containerLabel = getInsulinContainerLabel();
+                    const containerCount = Math.floor(adjustedQuantity / uPerContainer);
+                    const remainderUnits = Math.floor(adjustedQuantity % uPerContainer);
+                    const plural = containerCount === 1 ? containerLabel : `${containerLabel}s`;
+                    return (
+                      <>
+                        <p className={`text-2xl font-bold ${
+                          status === "critical" ? "text-red-600 dark:text-red-500" : 
+                          status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
+                        }`}>
+                          {containerCount} {plural}{remainderUnits > 0 ? ` + ${remainderUnits}u` : ""}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          (~{Math.floor(adjustedQuantity)} units total)
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               ) : supply.type === "cgm" ? (
                 <p className={`text-2xl font-bold ${
@@ -824,38 +835,45 @@ function SupplyCard({
           )}
         </div>
 
-        <div className="pt-3 mt-3 border-t flex gap-2">
-          <Button 
-            variant="default" 
-            size="sm" 
-            className="flex-1"
-            onClick={() => onLogPickup(supply)}
-            data-testid={`button-refill-${supply.id}`}
-          >
-            <RotateCcw className="h-3 w-3 mr-1" />
-            Refill
-          </Button>
-          <div className="flex items-center gap-1">
+        <div className="pt-3 mt-3 border-t space-y-2">
+          <div className="flex gap-2">
             <Button 
-              variant="outline" 
+              variant="default" 
               size="sm" 
-              onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - 1))}
-              data-testid={`button-decrease-${supply.id}`}
+              className="flex-1"
+              onClick={() => onLogPickup(supply)}
+              data-testid={`button-refill-${supply.id}`}
             >
-              -
-            </Button>
-            <span className="w-8 text-center text-sm" data-testid={`text-quantity-${supply.id}`}>
-              {Math.floor(adjustedQuantity)}
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => onUpdateQuantity(supply.id, Math.floor(adjustedQuantity) + 1)}
-              data-testid={`button-increase-${supply.id}`}
-            >
-              +
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Refill
             </Button>
           </div>
+          {(() => {
+            const inc = getSupplyIncrement(supply.type);
+            return (
+              <div className="flex items-center justify-between gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - inc.amount))}
+                  data-testid={`button-decrease-${supply.id}`}
+                >
+                  -{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
+                </Button>
+                <span className="text-center text-sm font-medium" data-testid={`text-quantity-${supply.id}`}>
+                  {Math.floor(adjustedQuantity)} {supply.type === "insulin" ? "units" : ""}
+                </span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => onUpdateQuantity(supply.id, Math.floor(adjustedQuantity) + inc.amount)}
+                  data-testid={`button-increase-${supply.id}`}
+                >
+                  +{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
+                </Button>
+              </div>
+            );
+          })()}
         </div>
       </CardContent>
     </Card>
