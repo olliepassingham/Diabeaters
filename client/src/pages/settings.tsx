@@ -818,29 +818,29 @@ export default function Settings() {
 
       <div className="max-w-3xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="settings-tabs">
-          <TabsList className="w-full grid grid-cols-6" data-testid="settings-tab-list">
-            <TabsTrigger value="profile" data-testid="tab-profile">
-              <User className="h-4 w-4 mr-1 hidden sm:inline" />
+          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-6" data-testid="settings-tab-list">
+            <TabsTrigger value="profile" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-profile">
+              <User className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Profile</span>
             </TabsTrigger>
-            <TabsTrigger value="insulin" data-testid="tab-insulin">
-              <Syringe className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger value="insulin" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-insulin">
+              <Syringe className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Ratios</span>
             </TabsTrigger>
-            <TabsTrigger value="usage" data-testid="tab-usage">
-              <Activity className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger value="usage" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-usage">
+              <Activity className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Usage</span>
             </TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="tab-notifications">
-              <Bell className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger value="notifications" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-notifications">
+              <Bell className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Alerts</span>
             </TabsTrigger>
-            <TabsTrigger value="contacts" data-testid="tab-contacts">
-              <Phone className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger value="contacts" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-contacts">
+              <Phone className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Contacts</span>
             </TabsTrigger>
-            <TabsTrigger value="data" data-testid="tab-data">
-              <Download className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger value="data" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-data">
+              <Download className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Data</span>
             </TabsTrigger>
           </TabsList>
