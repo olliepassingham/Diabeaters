@@ -1379,10 +1379,13 @@ function EditUsualPrescriptionDialog({
 
   const handleAddItem = () => {
     if (!newName.trim() || !newQuantity) return;
+    const newInc = getSupplyIncrement(newType);
+    const rawQty = parseFloat(newQuantity) || 0;
+    const actualUnits = newInc.amount > 1 ? Math.round(rawQty * newInc.amount) : rawQty;
     const item: UsualPrescriptionItem = {
       name: newName.trim(),
       type: newType,
-      quantity: parseFloat(newQuantity) || 0,
+      quantity: actualUnits,
       dailyUsage: parseFloat(newDailyUsage) || 0,
     };
     setItems([...items, item]);
@@ -1416,37 +1419,49 @@ function EditUsualPrescriptionDialog({
           )}
           {items.map((item, index) => {
             const Icon = typeIcons[item.type as keyof typeof typeIcons] || Package;
+            const inc = getSupplyIncrement(item.type as Supply["type"]);
+            const packCount = inc.amount > 1 ? Math.round(item.quantity / inc.amount * 10) / 10 : item.quantity;
+            const packLabel = inc.amount > 1 ? inc.label : "";
             return (
               <div key={`${item.name}-${index}`} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30" data-testid={`usual-item-${index}`}>
                 <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{typeLabels[item.type as keyof typeof typeLabels] || item.type}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {typeLabels[item.type as keyof typeof typeLabels] || item.type}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleUpdateQuantity(index, item.quantity - 1)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUpdateQuantity(index, Math.max(0, item.quantity - inc.amount))}
                     disabled={item.quantity <= 0}
                     data-testid={`button-usual-decrease-${index}`}
                   >
-                    <TrendingDown className="h-3.5 w-3.5" />
+                    -{inc.amount > 1 ? ` 1 ${packLabel}` : "1"}
                   </Button>
-                  <Input
-                    type="number"
-                    value={item.quantity}
-                    onChange={e => handleUpdateQuantity(index, parseFloat(e.target.value) || 0)}
-                    className="w-16 text-center text-sm"
-                    data-testid={`input-usual-quantity-${index}`}
-                  />
+                  <div className="text-center">
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={e => handleUpdateQuantity(index, parseFloat(e.target.value) || 0)}
+                      className="w-16 text-center text-sm"
+                      data-testid={`input-usual-quantity-${index}`}
+                    />
+                    {inc.amount > 1 && (
+                      <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                        {packCount} {packLabel}{packCount !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleUpdateQuantity(index, item.quantity + 1)}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleUpdateQuantity(index, item.quantity + inc.amount)}
                     data-testid={`button-usual-increase-${index}`}
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    +{inc.amount > 1 ? ` 1 ${packLabel}` : "1"}
                   </Button>
                 </div>
                 <Button
@@ -1510,31 +1525,44 @@ function EditUsualPrescriptionDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="usual-new-qty">Quantity</Label>
-                  <Input
-                    id="usual-new-qty"
-                    type="number"
-                    placeholder="e.g., 100"
-                    value={newQuantity}
-                    onChange={e => setNewQuantity(e.target.value)}
-                    data-testid="input-usual-new-quantity"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="usual-new-daily">Daily Usage</Label>
-                  <Input
-                    id="usual-new-daily"
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 4"
-                    value={newDailyUsage}
-                    onChange={e => setNewDailyUsage(e.target.value)}
-                    data-testid="input-usual-new-daily-usage"
-                  />
-                </div>
-              </div>
+              {(() => {
+                const addInc = getSupplyIncrement(newType);
+                const usesPacks = addInc.amount > 1;
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="usual-new-qty">
+                        {usesPacks ? `How many ${addInc.label}s?` : "Quantity"}
+                      </Label>
+                      <Input
+                        id="usual-new-qty"
+                        type="number"
+                        placeholder={usesPacks ? `e.g., 5` : "e.g., 100"}
+                        value={newQuantity}
+                        onChange={e => setNewQuantity(e.target.value)}
+                        data-testid="input-usual-new-quantity"
+                      />
+                      {usesPacks && newQuantity && (
+                        <p className="text-xs text-muted-foreground">
+                          = {Math.round((parseFloat(newQuantity) || 0) * addInc.amount)} units
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="usual-new-daily">Daily Usage</Label>
+                      <Input
+                        id="usual-new-daily"
+                        type="number"
+                        step="0.1"
+                        placeholder="e.g., 4"
+                        value={newDailyUsage}
+                        onChange={e => setNewDailyUsage(e.target.value)}
+                        data-testid="input-usual-new-daily-usage"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="flex gap-2">
                 <Button size="sm" onClick={handleAddItem} disabled={!newName.trim() || !newQuantity} data-testid="button-usual-confirm-add">
                   <Plus className="h-3.5 w-3.5 mr-1" />
