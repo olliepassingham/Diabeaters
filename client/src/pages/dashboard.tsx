@@ -200,36 +200,37 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
   );
 }
 
-function WidgetRenderer({ type }: { type: string }) {
+function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSize }) {
+  const compact = size === "half";
   switch (type) {
     case "supply-summary":
-      return <SupplySummaryWidget />;
+      return <SupplySummaryWidget compact={compact} />;
     case "today-overview":
-      return <TodayOverviewWidget />;
+      return <TodayOverviewWidget compact={compact} />;
     case "ai-recommendations":
-      return <AIRecommendationsWidget />;
+      return <AIRecommendationsWidget compact={compact} />;
     case "quick-actions":
-      return <QuickActionsWidget />;
+      return <QuickActionsWidget compact={compact} />;
     case "scenario-status":
-      return <ScenarioStatusWidget />;
+      return <ScenarioStatusWidget compact={compact} />;
     case "settings-completion":
-      return <SettingsCompletionWidget />;
+      return <SettingsCompletionWidget compact={compact} />;
     case "community":
-      return <CommunityWidget />;
+      return <CommunityWidget compact={compact} />;
     case "messages":
-      return <MessagesWidget />;
+      return <MessagesWidget compact={compact} />;
     case "activity-adviser":
-      return <ActivityAdviserWidget />;
+      return <ActivityAdviserWidget compact={compact} />;
     case "ratio-adviser":
-      return <RatioAdviserWidget />;
+      return <RatioAdviserWidget compact={compact} />;
     case "travel-mode":
-      return <TravelModeWidget />;
+      return <TravelModeWidget compact={compact} />;
     case "sick-day":
-      return <SickDayWidget />;
+      return <SickDayWidget compact={compact} />;
     case "help-now-info":
-      return <HelpNowInfoWidget />;
+      return <HelpNowInfoWidget compact={compact} />;
     case "appointments":
-      return <AppointmentsWidget />;
+      return <AppointmentsWidget compact={compact} />;
     default:
       return null;
   }
@@ -359,7 +360,7 @@ export default function Dashboard() {
               className={`${widget.size === "full" ? "col-span-2" : ""} [&>*]:h-full`}
               data-testid={`widget-container-${widget.type}`}
             >
-              <WidgetRenderer type={widget.type} />
+              <WidgetRenderer type={widget.type} size={widget.size} />
             </div>
           ))}
         </div>
