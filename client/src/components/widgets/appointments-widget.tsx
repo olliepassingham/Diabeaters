@@ -29,7 +29,7 @@ export function AppointmentsWidget({ compact = false }: { compact?: boolean }) {
   };
 
   return (
-    <Card data-testid="widget-appointments">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-appointments">
       <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
           <Calendar className="h-4 w-4 text-primary" />

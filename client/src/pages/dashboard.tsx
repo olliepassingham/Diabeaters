@@ -357,7 +357,7 @@ export default function Dashboard() {
           {widgetsToRender.map((widget) => (
             <div 
               key={widget.id} 
-              className={`${widget.size === "full" ? "col-span-2" : ""} [&>*]:h-full`}
+              className={`${widget.size === "full" ? "col-span-2" : "h-[280px]"} [&>*]:h-full`}
               data-testid={`widget-container-${widget.type}`}
             >
               <WidgetRenderer type={widget.type} size={widget.size} />

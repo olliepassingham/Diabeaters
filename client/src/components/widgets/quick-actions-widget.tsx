@@ -75,7 +75,7 @@ export function QuickActionsWidget({ compact = false }: { compact?: boolean }) {
   const enabledCount = editActions.filter(a => a.enabled).length;
 
   return (
-    <Card data-testid="widget-quick-actions">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-quick-actions">
       <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base">Quick Actions</CardTitle>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -16,7 +16,7 @@ export function CommunityWidget({ compact = false }: { compact?: boolean }) {
   }, []);
 
   return (
-    <Card data-testid="widget-community">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-community">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

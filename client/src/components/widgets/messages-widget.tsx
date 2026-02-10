@@ -17,7 +17,7 @@ export function MessagesWidget({ compact = false }: { compact?: boolean }) {
   }, []);
 
   return (
-    <Card data-testid="widget-messages">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-messages">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

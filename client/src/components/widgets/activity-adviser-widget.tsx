@@ -20,7 +20,7 @@ export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }
   }, []);
 
   return (
-    <Card data-testid="widget-activity-adviser">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-activity-adviser">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-primary" />

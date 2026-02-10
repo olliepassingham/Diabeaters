@@ -26,7 +26,7 @@ export function SupplySummaryWidget({ compact = false }: { compact?: boolean }) 
   const hasAlerts = criticalSupplies.length > 0 || lowSupplies.length > 0;
 
   return (
-    <Card className={hasAlerts ? "border-yellow-500/50" : ""} data-testid="widget-supply-summary">
+    <Card className={`${hasAlerts ? "border-yellow-500/50" : ""} ${compact ? "flex flex-col overflow-hidden" : ""}`} data-testid="widget-supply-summary">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

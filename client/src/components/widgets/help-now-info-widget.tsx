@@ -15,7 +15,7 @@ export function HelpNowInfoWidget({ compact = false }: { compact?: boolean }) {
   const primaryContact = contacts.find(c => c.isPrimary);
 
   return (
-    <Card data-testid="widget-help-now-info">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-help-now-info">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <Phone className="h-5 w-5 text-primary" />

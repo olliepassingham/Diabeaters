@@ -39,7 +39,7 @@ export function SettingsCompletionWidget({ compact = false }: { compact?: boolea
 
   if (isComplete) {
     return (
-      <Card className="border-green-500/30 bg-green-50/50 dark:bg-green-950/20">
+      <Card className={`border-green-500/30 bg-green-50/50 dark:bg-green-950/20 ${compact ? "flex flex-col overflow-hidden" : ""}`}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export function SettingsCompletionWidget({ compact = false }: { compact?: boolea
   }
 
   return (
-    <Card className="border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20">
+    <Card className={`border-amber-500/30 bg-amber-50/50 dark:bg-amber-950/20 ${compact ? "flex flex-col overflow-hidden" : ""}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -100,7 +100,7 @@ export function AIRecommendationsWidget({ compact = false }: { compact?: boolean
   }, []);
 
   return (
-    <Card data-testid="widget-ai-recommendations">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-ai-recommendations">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

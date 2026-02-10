@@ -15,7 +15,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
   const hasRatios = settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio;
 
   return (
-    <Card data-testid="widget-ratio-adviser">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-ratio-adviser">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <Syringe className="h-5 w-5 text-primary" />
