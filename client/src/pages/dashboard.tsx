@@ -352,11 +352,11 @@ export default function Dashboard() {
       )}
       
       {!isEditing && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {widgetsToRender.map((widget) => (
             <div 
               key={widget.id} 
-              className={`${widget.size === "full" ? "md:col-span-2" : ""} [&>*]:h-full`}
+              className={`${widget.size === "full" ? "col-span-2" : ""} [&>*]:h-full`}
               data-testid={`widget-container-${widget.type}`}
             >
               <WidgetRenderer type={widget.type} />
