@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import { storage, ScenarioState } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 
-export function ScenarioStatusWidget() {
+export function ScenarioStatusWidget({ compact = false }: { compact?: boolean }) {
   const { toast } = useToast();
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
 
@@ -53,7 +53,7 @@ export function ScenarioStatusWidget() {
             <span data-testid="text-no-scenarios">No active modes</span>
           </div>
 
-          {isEvening && (
+          {isEvening && !compact && (
             <Link href="/scenarios?tab=bedtime">
               <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg hover-elevate cursor-pointer" data-testid="card-bedtime-prompt">
                 <div className="flex items-center gap-2">
@@ -68,7 +68,7 @@ export function ScenarioStatusWidget() {
             </Link>
           )}
 
-          <div className="flex gap-2">
+          <div className={`flex gap-2 ${compact ? "flex-col" : ""}`}>
             <Link href="/scenarios?tab=bedtime" className="flex-1">
               <Button variant="outline" size="sm" className="w-full" data-testid="button-start-bedtime">
                 <Moon className="h-4 w-4 mr-1" />
@@ -81,12 +81,14 @@ export function ScenarioStatusWidget() {
                 Travel
               </Button>
             </Link>
-            <Link href="/scenarios?tab=sick-day" className="flex-1">
-              <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
-                <Thermometer className="h-4 w-4 mr-1" />
-                Sick Day
-              </Button>
-            </Link>
+            {!compact && (
+              <Link href="/scenarios?tab=sick-day" className="flex-1">
+                <Button variant="outline" size="sm" className="w-full" data-testid="button-start-sick-day">
+                  <Thermometer className="h-4 w-4 mr-1" />
+                  Sick Day
+                </Button>
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -6,7 +6,7 @@ import { Mail, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Conversation } from "@/lib/storage";
 
-export function MessagesWidget() {
+export function MessagesWidget({ compact = false }: { compact?: boolean }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [totalUnread, setTotalUnread] = useState(0);
 
@@ -38,7 +38,7 @@ export function MessagesWidget() {
           </p>
         ) : (
           <div className="space-y-2">
-            {conversations.map((conv) => (
+            {(compact ? conversations.slice(0, 2) : conversations).map((conv) => (
               <div 
                 key={conv.id} 
                 className="p-2 rounded-lg bg-muted/30 flex items-center justify-between"

@@ -26,7 +26,7 @@ const ICON_MAP: Record<string, typeof Package> = {
   Repeat,
 };
 
-export function QuickActionsWidget() {
+export function QuickActionsWidget({ compact = false }: { compact?: boolean }) {
   const [actions, setActions] = useState<QuickActionConfig[]>([]);
   const [editActions, setEditActions] = useState<QuickActionConfig[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -152,8 +152,8 @@ export function QuickActionsWidget() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {enabledActions.map((actionConfig) => {
+          <div className={`grid ${compact ? "grid-cols-2 gap-1" : "grid-cols-3 gap-2"}`}>
+            {(compact ? enabledActions.slice(0, 4) : enabledActions).map((actionConfig) => {
               const details = getActionDetails(actionConfig.id);
               if (!details) return null;
               const Icon = ICON_MAP[details.iconName];
@@ -162,11 +162,11 @@ export function QuickActionsWidget() {
                 <Link key={actionConfig.id} href={details.href}>
                   <Button
                     variant="ghost"
-                    className="w-full h-auto flex-col py-4 gap-2 hover-elevate"
+                    className={`w-full h-auto flex-col ${compact ? "py-2 gap-1" : "py-4 gap-2"} hover-elevate`}
                     data-testid={`action-${actionConfig.id}`}
                   >
-                    {Icon && <Icon className={`h-10 w-10 ${details.color}`} />}
-                    <span className="text-sm font-medium">{details.label}</span>
+                    {Icon && <Icon className={`${compact ? "h-6 w-6" : "h-10 w-10"} ${details.color}`} />}
+                    <span className={`${compact ? "text-xs" : "text-sm"} font-medium`}>{details.label}</span>
                   </Button>
                 </Link>
               );

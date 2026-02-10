@@ -5,7 +5,7 @@ import { Syringe, ArrowRight, AlertCircle } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings } from "@/lib/storage";
 
-export function RatioAdviserWidget() {
+export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
   const [settings, setSettings] = useState<UserSettings>({});
 
   useEffect(() => {

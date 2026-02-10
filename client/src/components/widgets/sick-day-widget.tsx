@@ -6,7 +6,7 @@ import { Thermometer, ArrowRight, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ScenarioState } from "@/lib/storage";
 
-export function SickDayWidget() {
+export function SickDayWidget({ compact = false }: { compact?: boolean }) {
   const [scenario, setScenario] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
 
   useEffect(() => {

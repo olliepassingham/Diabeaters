@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import { storage, Appointment } from "@/lib/storage";
 import { format } from "date-fns";
 
-export function AppointmentsWidget() {
+export function AppointmentsWidget({ compact = false }: { compact?: boolean }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function AppointmentsWidget() {
           </div>
         ) : (
           <div className="space-y-3">
-            {appointments.map((appointment) => (
+            {(compact ? appointments.slice(0, 2) : appointments).map((appointment) => (
               <div 
                 key={appointment.id} 
                 className="flex items-start gap-3 p-2 rounded-lg bg-muted/30"

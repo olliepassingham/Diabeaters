@@ -6,7 +6,7 @@ import { Package, AlertTriangle, ShoppingCart, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Supply } from "@/lib/storage";
 
-export function SupplySummaryWidget() {
+export function SupplySummaryWidget({ compact = false }: { compact?: boolean }) {
   const [supplies, setSupplies] = useState<Supply[]>([]);
 
   useEffect(() => {
@@ -65,18 +65,20 @@ export function SupplySummaryWidget() {
           </div>
         )}
 
-        <div className="flex gap-2 pt-1">
+        <div className={`flex gap-2 pt-1`}>
           <Link href="/supplies" className="flex-1">
             <Button variant="outline" size="sm" className="w-full" data-testid="button-view-supplies">
-              View Supplies
+              {compact ? "Supplies" : "View Supplies"}
               <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </Link>
-          <Link href="/supplies">
-            <Button size="sm" variant="ghost" data-testid="button-add-order">
-              <ShoppingCart className="h-4 w-4" />
-            </Button>
-          </Link>
+          {!compact && (
+            <Link href="/supplies">
+              <Button size="sm" variant="ghost" data-testid="button-add-order">
+                <ShoppingCart className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>

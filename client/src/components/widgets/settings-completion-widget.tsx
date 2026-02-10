@@ -13,7 +13,7 @@ interface SettingsItem {
   complete: boolean;
 }
 
-export function SettingsCompletionWidget() {
+export function SettingsCompletionWidget({ compact = false }: { compact?: boolean }) {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
@@ -88,31 +88,35 @@ export function SettingsCompletionWidget() {
           <Progress value={completionPercentage} className="h-2" />
         </div>
 
-        <div className="space-y-2">
-          {settingsItems.map((item) => (
-            <div 
-              key={item.key} 
-              className="flex items-center gap-2 text-sm"
-            >
-              {item.complete ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              ) : (
-                <div className="h-4 w-4 rounded-full border-2 border-amber-400" />
-              )}
-              <span className={item.complete ? "text-muted-foreground" : "font-medium"}>
-                {item.label}
-              </span>
-            </div>
-          ))}
-        </div>
+        {!compact && (
+          <div className="space-y-2">
+            {settingsItems.map((item) => (
+              <div 
+                key={item.key} 
+                className="flex items-center gap-2 text-sm"
+              >
+                {item.complete ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                ) : (
+                  <div className="h-4 w-4 rounded-full border-2 border-amber-400" />
+                )}
+                <span className={item.complete ? "text-muted-foreground" : "font-medium"}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div className="pt-2">
-          <p className="text-sm text-muted-foreground mb-3">
-            Complete your settings to unlock accurate recommendations and supply tracking.
-          </p>
+        <div className={compact ? "" : "pt-2"}>
+          {!compact && (
+            <p className="text-sm text-muted-foreground mb-3">
+              Complete your settings to unlock accurate recommendations and supply tracking.
+            </p>
+          )}
           <Link href="/settings">
             <Button size="sm" className="w-full" data-testid="button-complete-settings">
-              Complete Settings
+              {compact ? "Complete" : "Complete Settings"}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </Link>

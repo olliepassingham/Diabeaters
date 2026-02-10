@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import { storage, ScenarioState } from "@/lib/storage";
 import { format } from "date-fns";
 
-export function TravelModeWidget() {
+export function TravelModeWidget({ compact = false }: { compact?: boolean }) {
   const [scenario, setScenario] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
 
   useEffect(() => {

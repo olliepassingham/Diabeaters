@@ -6,7 +6,7 @@ import { Calendar, CheckCircle, AlertCircle, ArrowRight, Moon } from "lucide-rea
 import { Link } from "wouter";
 import { storage, ScenarioState, Supply } from "@/lib/storage";
 
-export function TodayOverviewWidget() {
+export function TodayOverviewWidget({ compact = false }: { compact?: boolean }) {
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [supplies, setSupplies] = useState<Supply[]>([]);
 
@@ -73,7 +73,7 @@ export function TodayOverviewWidget() {
           </div>
         )}
 
-        {criticalSupplies.length > 0 && (
+        {criticalSupplies.length > 0 && !compact && (
           <div className="space-y-1">
             {criticalSupplies.slice(0, 2).map(supply => (
               <div key={supply.id} className="flex items-center justify-between text-sm">
@@ -86,7 +86,7 @@ export function TodayOverviewWidget() {
           </div>
         )}
 
-        {isEvening && (
+        {isEvening && !compact && (
           <Link href="/scenarios?tab=bedtime">
             <div className="flex items-center gap-2 p-2 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg text-sm text-indigo-800 dark:text-indigo-200 hover-elevate cursor-pointer" data-testid="card-evening-bedtime">
               <Moon className="h-4 w-4" />
@@ -98,7 +98,7 @@ export function TodayOverviewWidget() {
 
         <Link href="/advisor">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-view-today">
-            Plan Today
+            {compact ? "Plan" : "Plan Today"}
             <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </Link>

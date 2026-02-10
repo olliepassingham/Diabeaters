@@ -89,7 +89,7 @@ function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AII
   return insights.slice(0, 2);
 }
 
-export function AIRecommendationsWidget() {
+export function AIRecommendationsWidget({ compact = false }: { compact?: boolean }) {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -113,10 +113,10 @@ export function AIRecommendationsWidget() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {insights.map((insight, index) => (
+        {(compact ? insights.slice(0, 1) : insights).map((insight, index) => (
           <div 
             key={index} 
-            className={`p-3 rounded-lg ${
+            className={`${compact ? "p-2" : "p-3"} rounded-lg ${
               insight.priority === "warning" 
                 ? "bg-yellow-50 dark:bg-yellow-950/30" 
                 : insight.priority === "tip"
@@ -127,11 +127,11 @@ export function AIRecommendationsWidget() {
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
                 <p className="font-medium text-sm">{insight.title}</p>
-                <p className="text-sm text-muted-foreground mt-1" data-testid={`text-insight-${index}`}>
-                  {insight.message}
+                <p className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground mt-1`} data-testid={`text-insight-${index}`}>
+                  {compact ? insight.message.slice(0, 60) + (insight.message.length > 60 ? "..." : "") : insight.message}
                 </p>
               </div>
-              {insight.reasoning && (
+              {insight.reasoning && !compact && (
                 <Button 
                   variant="ghost" 
                   size="icon"
@@ -146,7 +146,7 @@ export function AIRecommendationsWidget() {
                 </Button>
               )}
             </div>
-            {expanded === insight.title && insight.reasoning && (
+            {expanded === insight.title && insight.reasoning && !compact && (
               <p className="text-xs text-muted-foreground mt-2 pt-2 border-t">
                 {insight.reasoning}
               </p>

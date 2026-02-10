@@ -7,7 +7,7 @@ import { Link } from "wouter";
 import { storage, CommunityPost } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 
-export function CommunityWidget() {
+export function CommunityWidget({ compact = false }: { compact?: boolean }) {
   const [recentPosts, setRecentPosts] = useState<CommunityPost[]>([]);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function CommunityWidget() {
             </Button>
           </Link>
         </div>
-        <CardDescription>Connect with others who understand</CardDescription>
+        {!compact && <CardDescription>Connect with others who understand</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-3">
         {recentPosts.length === 0 ? (
@@ -44,7 +44,7 @@ export function CommunityWidget() {
           </div>
         ) : (
           <>
-            {recentPosts.map((post) => (
+            {(compact ? recentPosts.slice(0, 2) : recentPosts).map((post) => (
               <Link key={post.id} href="/community">
                 <div 
                   className="p-3 rounded-lg bg-muted/30 hover-elevate cursor-pointer transition-all"

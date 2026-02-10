@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { storage, ActivityLog } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 
-export function ActivityAdviserWidget() {
+export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }) {
   const [recentActivity, setRecentActivity] = useState<ActivityLog | null>(null);
   const [routineCount, setRoutineCount] = useState(0);
 
@@ -45,7 +45,7 @@ export function ActivityAdviserWidget() {
           </p>
         )}
 
-        {routineCount > 0 && (
+        {routineCount > 0 && !compact && (
           <Link href="/advisor?tab=routines">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover-elevate cursor-pointer" data-testid="card-routines-shortcut">
               <Repeat className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -57,22 +57,12 @@ export function ActivityAdviserWidget() {
           </Link>
         )}
         
-        <div className="flex gap-2">
-          <Link href="/advisor" className="flex-1">
-            <Button variant="secondary" size="sm" className="w-full" data-testid="button-plan-activity">
-              Plan Activity
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          </Link>
-          {routineCount === 0 && (
-            <Link href="/advisor?tab=routines" className="flex-1">
-              <Button variant="outline" size="sm" className="w-full" data-testid="button-view-routines">
-                <Repeat className="h-4 w-4 mr-1" />
-                Routines
-              </Button>
-            </Link>
-          )}
-        </div>
+        <Link href="/advisor" className="w-full">
+          <Button variant="secondary" size="sm" className="w-full" data-testid="button-plan-activity">
+            {compact ? "Plan" : "Plan Activity"}
+            <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
+        </Link>
       </CardContent>
     </Card>
   );

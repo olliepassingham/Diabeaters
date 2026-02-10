@@ -5,7 +5,7 @@ import { Phone, ArrowRight, User } from "lucide-react";
 import { Link } from "wouter";
 import { storage, EmergencyContact } from "@/lib/storage";
 
-export function HelpNowInfoWidget() {
+export function HelpNowInfoWidget({ compact = false }: { compact?: boolean }) {
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
 
   useEffect(() => {
