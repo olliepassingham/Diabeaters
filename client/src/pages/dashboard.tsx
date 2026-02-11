@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { storage, Supply, ScenarioState, UserProfile, DashboardWidget, WidgetSize } from "@/lib/storage";
+import { storage, Supply, ScenarioState, UserProfile, DashboardWidget, WidgetSize, HypoTreatment, CarerLink } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import {
   SupplySummaryWidget,
@@ -127,39 +132,153 @@ function DashboardInfoDialog() {
 
 function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
   const isUrgent = status === "action";
+  const { toast } = useToast();
+  const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
+  const [hypoGlucose, setHypoGlucose] = useState("");
+  const [hypoTreatment, setHypoTreatment] = useState("");
+  const [hypoNotes, setHypoNotes] = useState("");
+  const [carers, setCarers] = useState<CarerLink[]>([]);
+
+  useEffect(() => {
+    setCarers(storage.getCarerLinks());
+  }, []);
+
+  const handleLogHypo = () => {
+    const hasCarers = carers.length > 0;
+    storage.addHypoTreatment({
+      timestamp: new Date().toISOString(),
+      glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
+      treatment: hypoTreatment || undefined,
+      notes: hypoNotes || undefined,
+      carerNotified: hasCarers,
+    });
+    setHypoDialogOpen(false);
+    setHypoGlucose("");
+    setHypoTreatment("");
+    setHypoNotes("");
+    toast({
+      title: hasCarers ? "Hypo logged & carers notified" : "Hypo treatment logged",
+      description: hasCarers
+        ? `${carers.length} linked carer${carers.length > 1 ? "s" : ""} ${carers.length > 1 ? "have" : "has"} been notified.`
+        : "Your hypo treatment has been recorded.",
+    });
+  };
 
   return (
-    <div className="flex items-center justify-between gap-3" data-testid="card-hero">
-      <Link href="/help-now" className="flex-1">
-        <Button 
-          variant="destructive" 
-          className={`w-full rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
-          data-testid="button-help-now"
+    <>
+      <div className="flex items-center justify-between gap-3" data-testid="card-hero">
+        <Link href="/help-now">
+          <Button 
+            variant="destructive" 
+            size="sm"
+            className={`rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
+            data-testid="button-help-now"
+          >
+            <Phone className="h-4 w-4 mr-1" />
+            Help Now
+          </Button>
+        </Link>
+        <Button
+          size="sm"
+          className="rounded-full bg-green-600 dark:bg-green-700 text-white gap-1"
+          onClick={() => setHypoDialogOpen(true)}
+          data-testid="button-dashboard-treated-hypo"
         >
-          <Phone className="h-4 w-4 mr-2" />
-          Help Now
+          <CheckCircle2 className="h-4 w-4" />
+          Treated a Hypo
         </Button>
-      </Link>
-      <DashboardInfoDialog />
-      <Link href="/ai-coach">
-        <Button 
-          variant="outline"
-          size="icon"
-          className="rounded-full"
-          data-testid="button-ai-coach"
-        >
-          <MessageCircle className="h-4 w-4" />
-        </Button>
-      </Link>
-      <Button 
-        variant="outline" 
-        size="icon"
-        onClick={onCustomize}
-        data-testid="button-customize"
-      >
-        <Settings className="h-4 w-4" />
-      </Button>
-    </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <DashboardInfoDialog />
+          <Link href="/ai-coach">
+            <Button 
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              data-testid="button-ai-coach"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+          </Link>
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={onCustomize}
+            data-testid="button-customize"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <Dialog open={hypoDialogOpen} onOpenChange={setHypoDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Log Hypo Treatment
+            </DialogTitle>
+            <DialogDescription>
+              Record details about your hypo. {carers.length > 0 ? `Your ${carers.length} linked carer${carers.length > 1 ? "s" : ""} will be notified.` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="dash-hypo-glucose">Blood Glucose (mmol/L) - optional</Label>
+              <Input
+                id="dash-hypo-glucose"
+                type="number"
+                step="0.1"
+                placeholder="e.g., 3.2"
+                value={hypoGlucose}
+                onChange={(e) => setHypoGlucose(e.target.value)}
+                data-testid="input-dashboard-hypo-glucose"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>What did you take?</Label>
+              <Select value={hypoTreatment} onValueChange={setHypoTreatment}>
+                <SelectTrigger data-testid="select-dashboard-hypo-treatment">
+                  <SelectValue placeholder="Select treatment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Glucose tablets">Glucose tablets</SelectItem>
+                  <SelectItem value="Juice">Juice</SelectItem>
+                  <SelectItem value="Sweets">Sweets</SelectItem>
+                  <SelectItem value="Sugary drink">Sugary drink</SelectItem>
+                  <SelectItem value="Gel">Glucose gel</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dash-hypo-notes">Notes (optional)</Label>
+              <Input
+                id="dash-hypo-notes"
+                placeholder="e.g., Felt shaky before lunch"
+                value={hypoNotes}
+                onChange={(e) => setHypoNotes(e.target.value)}
+                data-testid="input-dashboard-hypo-notes"
+              />
+            </div>
+            {carers.length > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-md">
+                <Bell className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  {carers.map(c => c.name).join(", ")} will be notified
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleLogHypo} className="bg-green-600 dark:bg-green-700 gap-2" data-testid="button-dashboard-confirm-hypo">
+              <CheckCircle2 className="h-4 w-4" />
+              Log & Notify
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
