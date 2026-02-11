@@ -167,11 +167,11 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   return (
     <>
       <div className="flex items-center justify-between gap-3" data-testid="card-hero">
-        <Link href="/help-now">
+        <Link href="/help-now" className="flex-1">
           <Button 
             variant="destructive" 
             size="sm"
-            className={`rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
+            className={`w-full rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
             data-testid="button-help-now"
           >
             <Phone className="h-4 w-4 mr-1" />
@@ -180,14 +180,14 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         </Link>
         <Button
           size="sm"
-          className="rounded-full bg-green-600 dark:bg-green-700 text-white gap-1"
+          className="rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0"
           onClick={() => setHypoDialogOpen(true)}
           data-testid="button-dashboard-treated-hypo"
         >
           <CheckCircle2 className="h-4 w-4" />
           Treated a Hypo
         </Button>
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 shrink-0">
           <DashboardInfoDialog />
           <Link href="/ai-coach">
             <Button 
