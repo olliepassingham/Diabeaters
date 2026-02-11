@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { 
   MessageCircle, 
@@ -92,19 +91,15 @@ function UserAvatar({ name, isAnonymous, size = "sm" }: { name?: string; isAnony
   const sizeClass = size === "md" ? "h-9 w-9 text-sm" : "h-7 w-7 text-xs";
   if (isAnonymous || !name) {
     return (
-      <Avatar className={sizeClass}>
-        <AvatarFallback className="bg-muted text-muted-foreground">
-          <User className={size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"} />
-        </AvatarFallback>
-      </Avatar>
+      <div className={`${sizeClass} rounded-full bg-muted flex items-center justify-center shrink-0`}>
+        <User className={size === "md" ? "h-4 w-4 text-muted-foreground" : "h-3.5 w-3.5 text-muted-foreground"} />
+      </div>
     );
   }
   return (
-    <Avatar className={sizeClass}>
-      <AvatarFallback className={getAvatarColor(name)}>
-        {getInitials(name)}
-      </AvatarFallback>
-    </Avatar>
+    <div className={`${sizeClass} rounded-full flex items-center justify-center shrink-0 font-medium ${getAvatarColor(name)}`}>
+      {getInitials(name)}
+    </div>
   );
 }
 
