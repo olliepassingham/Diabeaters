@@ -1929,7 +1929,7 @@ export default function Supplies() {
         </TabsList>
 
         {["all", "needle", "insulin", "cgm", "infusion_set", "reservoir"].map((tabValue) => (
-          <TabsContent key={tabValue} value={tabValue} className="mt-6">
+          <TabsContent key={tabValue} value={tabValue} className="mt-6 animate-fade-in-up">
             {filterByType(tabValue).length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">

@@ -1483,7 +1483,7 @@ export default function Community() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="posts" className="mt-4">
+          <TabsContent value="posts" className="mt-4 animate-fade-in-up">
             <div className="mb-4">
               <ScrollArea className="w-full whitespace-nowrap">
                 <div className="flex gap-2 pb-2">
@@ -1566,19 +1566,19 @@ export default function Community() {
             )}
           </TabsContent>
 
-          <TabsContent value="news" className="mt-4">
+          <TabsContent value="news" className="mt-4 animate-fade-in-up">
             <NewsView />
           </TabsContent>
 
-          <TabsContent value="events" className="mt-4">
+          <TabsContent value="events" className="mt-4 animate-fade-in-up">
             <EventsView />
           </TabsContent>
 
-          <TabsContent value="reels" className="mt-4">
+          <TabsContent value="reels" className="mt-4 animate-fade-in-up">
             <ReelsView />
           </TabsContent>
 
-          <TabsContent value="messages" className="mt-4">
+          <TabsContent value="messages" className="mt-4 animate-fade-in-up">
             <MessagesView 
               currentUserName={profile?.name}
               initialRecipient={messageRecipient}

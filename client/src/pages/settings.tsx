@@ -933,7 +933,7 @@ export default function Settings() {
           </TabsList>
 
           <div className="mt-4">
-            <TabsContent value="profile">
+            <TabsContent value="profile" className="animate-fade-in-up">
               <ProfileTab
                 name={name} setName={setName} email={email} setEmail={setEmail}
                 bgUnits={bgUnits} setBgUnits={setBgUnits} carbUnits={carbUnits} setCarbUnits={setCarbUnits}
@@ -942,7 +942,7 @@ export default function Settings() {
               />
             </TabsContent>
 
-            <TabsContent value="insulin">
+            <TabsContent value="insulin" className="animate-fade-in-up">
               <InsulinTab
                 bgUnits={bgUnits} tdd={tdd} setTdd={setTdd}
                 correctionFactor={correctionFactor} setCorrectionFactor={setCorrectionFactor}
@@ -956,7 +956,7 @@ export default function Settings() {
               />
             </TabsContent>
 
-            <TabsContent value="usage">
+            <TabsContent value="usage" className="animate-fade-in-up">
               <UsageTab
                 isPumpUser={isPumpUser} tdd={tdd}
                 shortActingUnitsPerDay={shortActingUnitsPerDay} setShortActingUnitsPerDay={setShortActingUnitsPerDay}
@@ -976,7 +976,7 @@ export default function Settings() {
               />
             </TabsContent>
 
-            <TabsContent value="notifications">
+            <TabsContent value="notifications" className="animate-fade-in-up">
               <NotificationsTab
                 notifSettings={notifSettings}
                 onToggle={handleNotifToggle}
@@ -985,7 +985,7 @@ export default function Settings() {
               />
             </TabsContent>
 
-            <TabsContent value="contacts">
+            <TabsContent value="contacts" className="animate-fade-in-up">
               <EmergencyContactsTab
                 contacts={contacts} showContactForm={showContactForm} setShowContactForm={setShowContactForm}
                 newContactName={newContactName} setNewContactName={setNewContactName}
@@ -995,7 +995,7 @@ export default function Settings() {
               />
             </TabsContent>
 
-            <TabsContent value="data">
+            <TabsContent value="data" className="animate-fade-in-up">
               <DataTab />
             </TabsContent>
           </div>

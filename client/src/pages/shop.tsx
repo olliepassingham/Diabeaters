@@ -274,7 +274,7 @@ export default function Shop() {
         </TabsList>
 
         {categories.map((category) => (
-          <TabsContent key={category.id} value={category.id} className="mt-6">
+          <TabsContent key={category.id} value={category.id} className="mt-6 animate-fade-in-up">
             {filteredProducts.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">

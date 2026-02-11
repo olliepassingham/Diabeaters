@@ -70,15 +70,15 @@ export default function Scenarios() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="bedtime" className="mt-6">
+        <TabsContent value="bedtime" className="mt-6 animate-fade-in-up">
           <BedtimeContent />
         </TabsContent>
 
-        <TabsContent value="sick-day" className="mt-6">
+        <TabsContent value="sick-day" className="mt-6 animate-fade-in-up">
           <SickDayContent />
         </TabsContent>
 
-        <TabsContent value="travel" className="mt-6">
+        <TabsContent value="travel" className="mt-6 animate-fade-in-up">
           <TravelContent />
         </TabsContent>
       </Tabs>

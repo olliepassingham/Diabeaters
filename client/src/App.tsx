@@ -119,7 +119,7 @@ function AppContent() {
           <OfflineBanner />
           <SickDayBanner />
           <TravelBanner />
-          <header className="flex items-center justify-between p-4 border-b">
+          <header className="flex items-center justify-between p-4 border-b transition-colors duration-200">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <button
               onClick={() => {
@@ -127,10 +127,10 @@ function AppContent() {
                   setLocation("/");
                 }
               }}
-              className={`flex items-center gap-3 transition-opacity ${
+              className={`flex items-center gap-3 transition-all duration-200 ${
                 location === "/"
                   ? "cursor-default"
-                  : "cursor-pointer hover:opacity-80 active:opacity-60"
+                  : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
               }`}
               data-testid="button-home-brand"
             >
@@ -144,7 +144,9 @@ function AppContent() {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
-            <Router />
+            <div key={location} className="animate-fade-in-up">
+              <Router />
+            </div>
           </main>
           <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground">
             <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>

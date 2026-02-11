@@ -333,27 +333,34 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-8">
-      <HeaderCard profile={profile} status={healthStatus} />
+      <div className="animate-fade-in-down">
+        <HeaderCard profile={profile} status={healthStatus} />
+      </div>
       
-      <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
+      <div className="animate-fade-in" style={{ animationDelay: '50ms' }}>
+        <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
+      </div>
 
-      {/* Show setup prompt at top when settings incomplete */}
       {!isEditing && !isSettingsComplete && (
-        <SetupPromptCard completion={settingsCompletion} />
+        <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <SetupPromptCard completion={settingsCompletion} />
+        </div>
       )}
 
       {isEditing && (
-        <WidgetLibrary
-          widgets={widgets}
-          onToggleWidget={handleToggleWidget}
-          onMoveWidget={handleMoveWidget}
-          onResizeWidget={handleResizeWidget}
-          onClose={handleCloseEditor}
-        />
+        <div className="animate-fade-in-scale">
+          <WidgetLibrary
+            widgets={widgets}
+            onToggleWidget={handleToggleWidget}
+            onMoveWidget={handleMoveWidget}
+            onResizeWidget={handleResizeWidget}
+            onClose={handleCloseEditor}
+          />
+        </div>
       )}
       
       {!isEditing && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-stagger">
           {widgetsToRender.map((widget) => (
             <div 
               key={widget.id} 
@@ -367,7 +374,7 @@ export default function Dashboard() {
       )}
 
       {!isEditing && widgetsToRender.length === 0 && isSettingsComplete && (
-        <div className="text-center py-12">
+        <div className="text-center py-12 animate-fade-in">
           <p className="text-muted-foreground mb-4">No widgets enabled. Click "Customize Dashboard" to add some.</p>
           <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-add-widgets">
             Add Widgets

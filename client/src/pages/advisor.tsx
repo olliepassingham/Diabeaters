@@ -1113,7 +1113,7 @@ export default function Advisor() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meal" className="space-y-4 mt-4">
+        <TabsContent value="meal" className="space-y-4 mt-4 animate-fade-in-up">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1362,7 +1362,7 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="exercise" className="space-y-4 mt-4">
+        <TabsContent value="exercise" className="space-y-4 mt-4 animate-fade-in-up">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1489,11 +1489,11 @@ export default function Advisor() {
           />
         </TabsContent>
 
-        <TabsContent value="routines" className="mt-4">
+        <TabsContent value="routines" className="mt-4 animate-fade-in-up">
           <RoutinesContent />
         </TabsContent>
 
-        <TabsContent value="tools" className="space-y-4 mt-4">
+        <TabsContent value="tools" className="space-y-4 mt-4 animate-fade-in-up">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
