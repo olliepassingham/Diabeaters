@@ -1,0 +1,15 @@
+Something went wrong
+Cannot read properties of null (reading 'useRef')
+
+TypeError: Cannot read properties of null (reading 'useRef')
+    at Object.useRef (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-QCHXOAYK.js?v=515d5443:1074:29)
+    at TooltipProvider (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=604e4630:163:35)
+    at renderWithHooks (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:11548:26)
+    at mountIndeterminateComponent (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:14926:21)
+    at beginWork (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:15914:22)
+    at beginWork$1 (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:19753:22)
+    at performUnitOfWork (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:19198:20)
+    at workLoopSync (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:19137:13)
+    at renderRootSync (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:19116:15)
+    at recoverFromConcurrentError (https://968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev:5000/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-RPCDYKBN.js?v=359beba1:18736:28)
+Reload page

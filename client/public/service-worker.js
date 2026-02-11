@@ -1,12 +1,21 @@
-const CACHE_NAME = 'diabeaters-v7';
-const STATIC_CACHE = 'diabeaters-static-v7';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v7';
+const CACHE_NAME = 'diabeaters-v8';
+const STATIC_CACHE = 'diabeaters-static-v8';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v8';
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
 ];
+
+function isViteDevResource(url) {
+  return url.pathname.includes('.vite/') ||
+    url.pathname.includes('/@vite/') ||
+    url.pathname.includes('/@react-refresh') ||
+    url.pathname.includes('/@fs/') ||
+    url.pathname.includes('/node_modules/') ||
+    url.pathname.startsWith('/src/');
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -32,11 +41,15 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  
+
   if (url.origin !== location.origin) {
     return;
   }
-  
+
+  if (isViteDevResource(url)) {
+    return;
+  }
+
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request)
@@ -55,10 +68,8 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  
-  if (event.request.destination === 'image' || 
-      event.request.destination === 'script' ||
-      event.request.destination === 'style') {
+
+  if (event.request.destination === 'image') {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) {
@@ -84,18 +95,19 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        if (response.ok && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(DYNAMIC_CACHE).then((cache) => {
-            cache.put(event.request, clone);
-          });
-        }
-        return response;
-      }).catch(() => {
+    fetch(event.request).then((response) => {
+      if (response.ok && event.request.method === 'GET') {
+        const clone = response.clone();
+        caches.open(DYNAMIC_CACHE).then((cache) => {
+          cache.put(event.request, clone);
+        });
+      }
+      return response;
+    }).catch(() => {
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
         if (event.request.destination === 'document') {
           return caches.match('/');
         }
@@ -107,9 +119,9 @@ self.addEventListener('fetch', (event) => {
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  
+
   const data = event.data.json();
-  
+
   const options = {
     body: data.message,
     icon: '/icon-192.png',
@@ -123,7 +135,7 @@ self.addEventListener('push', (event) => {
       { action: 'dismiss', title: 'Dismiss' },
     ],
   };
-  
+
   event.waitUntil(
     self.registration.showNotification(data.title, options)
   );
@@ -131,11 +143,11 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  
+
   if (event.action === 'dismiss') return;
-  
+
   const url = event.notification.data?.url || '/';
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {

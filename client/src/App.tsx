@@ -159,9 +159,10 @@ export default function App() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
-        .register("/service-worker.js")
+        .register("/service-worker.js", { updateViaCache: 'none' })
         .then((registration) => {
           console.log("SW registered:", registration.scope);
+          registration.update();
         })
         .catch((error) => {
           console.log("SW registration failed:", error);
