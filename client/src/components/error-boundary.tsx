@@ -32,6 +32,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-gray-600 mb-4">
               {this.state.error?.message || "An unexpected error occurred"}
             </p>
+            <pre className="text-left text-xs text-gray-500 mb-4 max-h-48 overflow-auto bg-gray-100 p-2 rounded" data-testid="error-stack">
+              {this.state.error?.stack || "No stack trace available"}
+            </pre>
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
