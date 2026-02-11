@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { 
   MessageCircle, 
@@ -65,6 +66,47 @@ import {
   DiabetesEvent
 } from "@/lib/storage";
 import { format, formatDistanceToNow } from "date-fns";
+
+function getInitials(name?: string): string {
+  if (!name) return "?";
+  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+  "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+];
+
+function getAvatarColor(name?: string): string {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function UserAvatar({ name, isAnonymous, size = "sm" }: { name?: string; isAnonymous: boolean; size?: "sm" | "md" }) {
+  const sizeClass = size === "md" ? "h-9 w-9 text-sm" : "h-7 w-7 text-xs";
+  if (isAnonymous || !name) {
+    return (
+      <Avatar className={sizeClass}>
+        <AvatarFallback className="bg-muted text-muted-foreground">
+          <User className={size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"} />
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
+  return (
+    <Avatar className={sizeClass}>
+      <AvatarFallback className={getAvatarColor(name)}>
+        {getInitials(name)}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 const TOPIC_ICONS: Record<CommunityTopicId, typeof Plane> = {
   "holidays-travel": Plane,
@@ -164,45 +206,47 @@ function PostCard({
   onMessage: (name: string) => void;
   currentUserName?: string;
 }) {
+  const authorDisplay = post.isAnonymous ? "Anonymous" : (post.authorName || "Someone");
   return (
     <Card 
-      className="cursor-pointer hover-elevate transition-all" 
+      className="cursor-pointer hover-elevate" 
       onClick={onClick}
       data-testid={`card-post-${post.id}`}
     >
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <TopicBadge topic={post.topic} />
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-          </div>
-        </div>
-        
-        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{post.title}</h3>
-        
-        {post.content && (
-          <p className="text-muted-foreground text-sm line-clamp-2 mb-3">
-            {post.content}
-          </p>
-        )}
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <User className="h-4 w-4" />
-              <span>{post.isAnonymous ? "Anonymous" : (post.authorName || "Someone")}</span>
+        <div className="flex gap-3">
+          <UserAvatar name={post.authorName} isAnonymous={post.isAnonymous} size="md" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-medium truncate">{authorDisplay}</span>
+                <UserActions 
+                  userName={post.authorName} 
+                  isAnonymous={post.isAnonymous}
+                  onMessage={onMessage}
+                  currentUserName={currentUserName}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">
+                {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+              </span>
             </div>
-            <UserActions 
-              userName={post.authorName} 
-              isAnonymous={post.isAnonymous}
-              onMessage={onMessage}
-              currentUserName={currentUserName}
-            />
-          </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MessageCircle className="h-4 w-4" />
-            <span>{post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}</span>
+            
+            <h3 className="font-semibold mb-1 line-clamp-2">{post.title}</h3>
+            
+            {post.content && (
+              <p className="text-muted-foreground text-sm line-clamp-2 mb-2">
+                {post.content}
+              </p>
+            )}
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <TopicBadge topic={post.topic} />
+              <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+                <MessageCircle className="h-3.5 w-3.5" />
+                <span>{post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}</span>
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -221,36 +265,36 @@ function ReplyCard({
   onMessage: (name: string) => void;
   currentUserName?: string;
 }) {
+  const authorDisplay = reply.isAnonymous ? "Anonymous" : (reply.authorName || "Someone");
   return (
-    <div className="p-4 bg-muted/30 rounded-lg" data-testid={`reply-${reply.id}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-sm">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <span className={reply.isAnonymous ? "text-muted-foreground" : ""}>
-            {reply.isAnonymous ? "Anonymous" : (reply.authorName || "Someone")}
-          </span>
-          <UserActions 
-            userName={reply.authorName} 
-            isAnonymous={reply.isAnonymous}
-            onMessage={onMessage}
-            currentUserName={currentUserName}
-          />
-          <span className="text-muted-foreground">·</span>
-          <span className="text-muted-foreground text-xs">
-            {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
-          </span>
+    <div className="flex gap-3 p-4 bg-muted/30 rounded-lg" data-testid={`reply-${reply.id}`}>
+      <UserAvatar name={reply.authorName} isAnonymous={reply.isAnonymous} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <span className="font-medium">{authorDisplay}</span>
+            <UserActions 
+              userName={reply.authorName} 
+              isAnonymous={reply.isAnonymous}
+              onMessage={onMessage}
+              currentUserName={currentUserName}
+            />
+            <span className="text-muted-foreground text-xs">
+              {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
+            </span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="text-muted-foreground shrink-0"
+            onClick={onReport}
+            data-testid={`button-report-reply-${reply.id}`}
+          >
+            <Flag className="h-3 w-3" />
+          </Button>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-8 text-muted-foreground"
-          onClick={onReport}
-          data-testid={`button-report-reply-${reply.id}`}
-        >
-          <Flag className="h-3 w-3" />
-        </Button>
+        <p className="text-sm">{reply.content}</p>
       </div>
-      <p className="text-sm">{reply.content}</p>
     </div>
   );
 }
@@ -266,28 +310,33 @@ function ConversationItem({
 }) {
   return (
     <div 
-      className={`p-3 rounded-lg cursor-pointer hover-elevate transition-all ${isActive ? "bg-primary/10" : "bg-muted/30"}`}
+      className={`flex gap-3 p-3 rounded-lg cursor-pointer hover-elevate ${isActive ? "bg-primary/10" : "bg-muted/30"}`}
       onClick={onClick}
       data-testid={`conversation-${conversation.id}`}
     >
-      <div className="flex items-center justify-between mb-1">
-        <span className="font-medium">{conversation.participantName}</span>
-        {conversation.unreadCount > 0 && (
-          <Badge variant="default" className="h-5 min-w-5 justify-center">
-            {conversation.unreadCount}
-          </Badge>
+      <UserAvatar name={conversation.participantName} isAnonymous={false} size="md" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <span className="font-medium truncate">{conversation.participantName}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            {conversation.lastMessageAt && (
+              <span className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
+              </span>
+            )}
+            {conversation.unreadCount > 0 && (
+              <Badge variant="default" className="h-5 min-w-5 justify-center">
+                {conversation.unreadCount}
+              </Badge>
+            )}
+          </div>
+        </div>
+        {conversation.lastMessage && (
+          <p className="text-sm text-muted-foreground line-clamp-1">
+            {conversation.lastMessage}
+          </p>
         )}
       </div>
-      {conversation.lastMessage && (
-        <p className="text-sm text-muted-foreground line-clamp-1">
-          {conversation.lastMessage}
-        </p>
-      )}
-      {conversation.lastMessageAt && (
-        <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
-        </p>
-      )}
     </div>
   );
 }
@@ -346,9 +395,11 @@ function MessagesView({
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+            <Mail className="h-8 w-8 text-muted-foreground" />
+          </div>
           <h3 className="font-semibold text-lg mb-2">Set up your profile</h3>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             To send and receive messages, please complete your profile in Settings with your name.
           </p>
         </CardContent>
@@ -370,8 +421,8 @@ function MessagesView({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="h-5 w-5" />
+            <CardTitle className="text-lg flex items-center gap-3">
+              <UserAvatar name={selectedConversation.participantName} isAnonymous={false} size="md" />
               {selectedConversation.participantName}
             </CardTitle>
           </CardHeader>
@@ -434,22 +485,26 @@ function MessagesView({
       {conversations.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Mail className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+              <Mail className="h-8 w-8 text-muted-foreground" />
+            </div>
             <h3 className="font-semibold text-lg mb-2">No messages yet</h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               When you message someone from the community, your conversations will appear here.
             </p>
           </CardContent>
         </Card>
       ) : (
-        conversations.map((conv) => (
-          <ConversationItem
-            key={conv.id}
-            conversation={conv}
-            onClick={() => setSelectedConversation(conv)}
-            isActive={false}
-          />
-        ))
+        <div className="animate-stagger">
+          {conversations.map((conv) => (
+            <ConversationItem
+              key={conv.id}
+              conversation={conv}
+              onClick={() => setSelectedConversation(conv)}
+              isActive={false}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -865,9 +920,11 @@ function EventsView() {
       {events.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <CalendarDays className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+              <CalendarDays className="h-8 w-8 text-muted-foreground" />
+            </div>
             <h3 className="font-semibold text-lg mb-2">No upcoming events</h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-muted-foreground text-sm mb-4">
               Be the first to share a local meetup or support group.
             </p>
             <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-first-event">
@@ -934,9 +991,11 @@ function ReelsView() {
         </Alert>
         <Card>
           <CardContent className="p-8 text-center">
-            <Film className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+              <Film className="h-8 w-8 text-muted-foreground" />
+            </div>
             <h3 className="font-semibold text-lg mb-2">No reels yet</h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Check back soon for curated diabetes tips and experiences from the community.
             </p>
           </CardContent>
@@ -1035,17 +1094,19 @@ function NewsView() {
       {articles.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
-            <Newspaper className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+              <Newspaper className="h-8 w-8 text-muted-foreground" />
+            </div>
             <h3 className="font-semibold text-lg mb-2">No news available</h3>
-            <p className="text-muted-foreground">Check back later for diabetes news updates.</p>
+            <p className="text-muted-foreground text-sm">Check back later for diabetes news updates.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 animate-stagger">
           {articles.map((article, index) => (
             <Card 
               key={index} 
-              className="cursor-pointer hover-elevate transition-all"
+              className="cursor-pointer hover-elevate"
               onClick={() => window.open(article.url, "_blank", "noopener,noreferrer")}
               data-testid={`news-article-${index}`}
             >
@@ -1233,13 +1294,13 @@ export default function Community() {
             Back to Community
           </Button>
 
-          <Card className="mb-4">
+          <Card className="mb-4 animate-scale-in">
             <CardHeader>
               <div className="flex items-center justify-between gap-2 mb-2">
                 <TopicBadge topic={selectedPost.topic} />
                 <Button 
                   variant="ghost" 
-                  size="sm"
+                  size="icon"
                   onClick={() => handleReportPost(selectedPost.id)}
                   data-testid="button-report-post"
                 >
@@ -1247,17 +1308,20 @@ export default function Community() {
                 </Button>
               </div>
               <CardTitle className="text-xl">{selectedPost.title}</CardTitle>
-              <CardDescription className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span>{selectedPost.isAnonymous ? "Anonymous" : (selectedPost.authorName || "Someone")}</span>
-                <UserActions 
-                  userName={selectedPost.authorName} 
-                  isAnonymous={selectedPost.isAnonymous}
-                  onMessage={handleOpenMessage}
-                  currentUserName={profile?.name}
-                />
-                <span>·</span>
-                {formatDistanceToNow(new Date(selectedPost.createdAt), { addSuffix: true })}
+              <CardDescription>
+                <div className="flex items-center gap-2 mt-1">
+                  <UserAvatar name={selectedPost.authorName} isAnonymous={selectedPost.isAnonymous} />
+                  <span className="font-medium">{selectedPost.isAnonymous ? "Anonymous" : (selectedPost.authorName || "Someone")}</span>
+                  <UserActions 
+                    userName={selectedPost.authorName} 
+                    isAnonymous={selectedPost.isAnonymous}
+                    onMessage={handleOpenMessage}
+                    currentUserName={profile?.name}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(selectedPost.createdAt), { addSuffix: true })}
+                  </span>
+                </div>
               </CardDescription>
             </CardHeader>
             {selectedPost.content && (
@@ -1274,11 +1338,16 @@ export default function Community() {
             </h3>
 
             {replies.length === 0 ? (
-              <p className="text-muted-foreground text-center py-6">
-                No replies yet. Be the first to share your experience!
-              </p>
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                  <MessageCircle className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  No replies yet. Be the first to share your experience!
+                </p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 animate-stagger">
                 {replies.map((reply) => (
                   <ReplyCard 
                     key={reply.id} 
@@ -1530,17 +1599,21 @@ export default function Community() {
                 <CardContent className="p-8 text-center">
                   {selectedTopic === "following" ? (
                     <>
-                      <Heart className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                        <Heart className="h-8 w-8 text-muted-foreground" />
+                      </div>
                       <h3 className="font-semibold text-lg mb-2">No posts from followed users</h3>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-muted-foreground text-sm mb-4">
                         Follow community members to see their posts here.
                       </p>
                     </>
                   ) : (
                     <>
-                      <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                        <MessageCircle className="h-8 w-8 text-muted-foreground" />
+                      </div>
                       <h3 className="font-semibold text-lg mb-2">No posts yet</h3>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-muted-foreground text-sm mb-4">
                         Be the first to start a conversation!
                       </p>
                       <Button onClick={() => setCreateDialogOpen(true)}>
@@ -1552,7 +1625,7 @@ export default function Community() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 animate-stagger">
                 {posts.map((post) => (
                   <PostCard 
                     key={post.id} 

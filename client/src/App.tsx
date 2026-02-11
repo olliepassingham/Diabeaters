@@ -144,7 +144,9 @@ function AppContent() {
             </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
-            <Router />
+            <div key={location} className="animate-page-enter">
+              <Router />
+            </div>
           </main>
           <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground">
             <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>
