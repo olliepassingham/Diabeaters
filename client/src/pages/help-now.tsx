@@ -4,12 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, Phone, Plus, User, Trash2, Heart, Settings, X, ChevronDown, ChevronUp, CheckCircle2, Clock, Users, Bell } from "lucide-react";
+import { AlertCircle, Phone, Plus, User, Trash2, Heart, Settings, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, EmergencyContact, UserProfile, HypoTreatment, CarerLink } from "@/lib/storage";
-import { formatDistanceToNow } from "date-fns";
+import { storage, EmergencyContact, UserProfile } from "@/lib/storage";
 
 export default function HelpNow() {
   const { toast } = useToast();
@@ -21,19 +19,10 @@ export default function HelpNow() {
   const [newContactPhone, setNewContactPhone] = useState("");
   const [newContactRelationship, setNewContactRelationship] = useState("");
   const [expandedSection, setExpandedSection] = useState<string | null>("awake");
-  const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
-  const [hypoGlucose, setHypoGlucose] = useState("");
-  const [hypoTreatment, setHypoTreatment] = useState("");
-  const [hypoNotes, setHypoNotes] = useState("");
-  const [recentHypos, setRecentHypos] = useState<HypoTreatment[]>([]);
-  const [carers, setCarers] = useState<CarerLink[]>([]);
-  const [hypoConfirmed, setHypoConfirmed] = useState(false);
 
   useEffect(() => {
     setContacts(storage.getEmergencyContacts());
     setProfile(storage.getProfile());
-    setRecentHypos(storage.getHypoTreatments());
-    setCarers(storage.getCarerLinks());
   }, []);
 
   const refreshContacts = () => {
@@ -85,30 +74,6 @@ export default function HelpNow() {
 
   const callEmergencyServices = () => {
     handleCall("999");
-  };
-
-  const handleLogHypo = () => {
-    const hasCarers = carers.length > 0;
-    storage.addHypoTreatment({
-      timestamp: new Date().toISOString(),
-      glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
-      treatment: hypoTreatment || undefined,
-      notes: hypoNotes || undefined,
-      carerNotified: hasCarers,
-    });
-    setRecentHypos(storage.getHypoTreatments());
-    setHypoDialogOpen(false);
-    setHypoConfirmed(true);
-    setHypoGlucose("");
-    setHypoTreatment("");
-    setHypoNotes("");
-    toast({
-      title: hasCarers ? "Hypo logged & carers notified" : "Hypo treatment logged",
-      description: hasCarers
-        ? `${carers.length} linked carer${carers.length > 1 ? "s" : ""} ${carers.length > 1 ? "have" : "has"} been notified that you've treated a hypo.`
-        : "Your hypo treatment has been recorded. Link carers in Family & Carers to notify them automatically.",
-    });
-    setTimeout(() => setHypoConfirmed(false), 5000);
   };
 
   const toggleSection = (section: string) => {
@@ -345,166 +310,10 @@ export default function HelpNow() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-500 bg-green-50/50 dark:bg-green-950/20" data-testid="card-hypo-treatment">
-          <CardContent className="p-4">
-            <h3 className="font-bold text-lg mb-2 flex items-center gap-2 text-green-700 dark:text-green-400">
-              <CheckCircle2 className="h-5 w-5" />
-              I've Treated a Hypo
-            </h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Tap the button below to log your hypo treatment{carers.length > 0 ? " and notify your linked carers" : ""}.
-            </p>
-
-            {hypoConfirmed ? (
-              <div className="flex items-center gap-3 p-3 bg-green-100 dark:bg-green-900/30 rounded-md animate-fade-in-scale">
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 shrink-0" />
-                <div>
-                  <p className="font-medium text-green-800 dark:text-green-200">Hypo treatment logged</p>
-                  {carers.length > 0 && (
-                    <p className="text-sm text-green-700 dark:text-green-300 flex items-center gap-1">
-                      <Bell className="h-3 w-3" />
-                      {carers.length} carer{carers.length > 1 ? "s" : ""} notified
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Button
-                  className="w-full text-lg bg-green-600 dark:bg-green-700 gap-2"
-                  size="lg"
-                  onClick={() => setHypoDialogOpen(true)}
-                  data-testid="button-treated-hypo"
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  I've Treated My Hypo
-                  {carers.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 bg-white/20 text-white">
-                      <Users className="h-3 w-3 mr-1" />
-                      Notify {carers.length}
-                    </Badge>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full text-sm"
-                  onClick={() => {
-                    const hasCarers = carers.length > 0;
-                    storage.addHypoTreatment({
-                      timestamp: new Date().toISOString(),
-                      carerNotified: hasCarers,
-                    });
-                    setRecentHypos(storage.getHypoTreatments());
-                    setHypoConfirmed(true);
-                    toast({
-                      title: hasCarers ? "Quick log sent" : "Hypo logged",
-                      description: hasCarers ? "Carers have been notified." : "Treatment recorded.",
-                    });
-                    setTimeout(() => setHypoConfirmed(false), 5000);
-                  }}
-                  data-testid="button-quick-hypo"
-                >
-                  Quick log (no details)
-                </Button>
-              </div>
-            )}
-
-            {recentHypos.length > 0 && (
-              <div className="mt-4 pt-3 border-t">
-                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Recent treatments
-                </p>
-                <div className="space-y-1">
-                  {recentHypos.slice(0, 3).map((h) => (
-                    <div key={h.id} className="flex items-center justify-between text-xs py-1" data-testid={`recent-hypo-${h.id}`}>
-                      <span className="text-muted-foreground">{formatDistanceToNow(new Date(h.timestamp), { addSuffix: true })}</span>
-                      <div className="flex items-center gap-2">
-                        {h.glucoseLevel && <span>{h.glucoseLevel} mmol/L</span>}
-                        {h.treatment && <Badge variant="secondary" className="text-xs">{h.treatment}</Badge>}
-                        {h.carerNotified && <Bell className="h-3 w-3 text-green-500" />}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <p className="text-xs text-center text-muted-foreground pb-4">
           This information is for emergency guidance only and is not medical advice.
         </p>
       </div>
-
-      <Dialog open={hypoDialogOpen} onOpenChange={setHypoDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Log Hypo Treatment
-            </DialogTitle>
-            <DialogDescription>
-              Record details about your hypo. {carers.length > 0 ? `Your ${carers.length} linked carer${carers.length > 1 ? "s" : ""} will be notified.` : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="hypo-glucose">Blood Glucose (mmol/L) - optional</Label>
-              <Input
-                id="hypo-glucose"
-                type="number"
-                step="0.1"
-                placeholder="e.g., 3.2"
-                value={hypoGlucose}
-                onChange={(e) => setHypoGlucose(e.target.value)}
-                data-testid="input-hypo-glucose"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>What did you take?</Label>
-              <Select value={hypoTreatment} onValueChange={setHypoTreatment}>
-                <SelectTrigger data-testid="select-hypo-treatment">
-                  <SelectValue placeholder="Select treatment" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Glucose tablets">Glucose tablets</SelectItem>
-                  <SelectItem value="Juice">Juice</SelectItem>
-                  <SelectItem value="Sweets">Sweets</SelectItem>
-                  <SelectItem value="Sugary drink">Sugary drink</SelectItem>
-                  <SelectItem value="Gel">Glucose gel</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="hypo-notes">Notes (optional)</Label>
-              <Input
-                id="hypo-notes"
-                placeholder="e.g., Felt shaky before lunch"
-                value={hypoNotes}
-                onChange={(e) => setHypoNotes(e.target.value)}
-                data-testid="input-hypo-notes"
-              />
-            </div>
-            {carers.length > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-md">
-                <Bell className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-                <p className="text-sm text-green-800 dark:text-green-200">
-                  {carers.map(c => c.name).join(", ")} will be notified
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleLogHypo} className="bg-green-600 dark:bg-green-700 gap-2" data-testid="button-confirm-hypo">
-              <CheckCircle2 className="h-4 w-4" />
-              Log & Notify
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
