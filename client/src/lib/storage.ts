@@ -25,6 +25,12 @@ const STORAGE_KEYS = {
   AI_COACH_HISTORY: "diabeater_ai_coach_history",
   ROUTINES: "diabeater_routines",
   PRESCRIPTION_CYCLE: "diabeater_prescription_cycle",
+  CARER_LINKS: "diabeater_carer_links",
+  CARER_PRIVACY: "diabeater_carer_privacy",
+  CARER_ACTIVITY_LOG: "diabeater_carer_activity_log",
+  HYPO_TREATMENTS: "diabeater_hypo_treatments",
+  CARER_MODE: "diabeater_carer_mode",
+  CARER_INVITE_CODE: "diabeater_carer_invite_code",
 } as const;
 
 export interface UserProfile {
@@ -78,6 +84,46 @@ export interface Supply {
 }
 
 export type SupplyType = Supply["type"];
+
+export type CarerPermission = "view" | "manage" | "full";
+
+export interface CarerLink {
+  id: string;
+  name: string;
+  relationship: string;
+  email: string;
+  permission: CarerPermission;
+  linkedAt: string;
+  lastActive?: string;
+  avatar?: string;
+}
+
+export interface CarerPrivacySettings {
+  shareSupplies: boolean;
+  shareAppointments: boolean;
+  shareScenarios: boolean;
+  shareHypoAlerts: boolean;
+  shareActivityAdvisor: boolean;
+}
+
+export interface CarerActivityLogEntry {
+  id: string;
+  carerName: string;
+  action: string;
+  detail: string;
+  timestamp: string;
+}
+
+export interface HypoTreatment {
+  id: string;
+  timestamp: string;
+  glucoseLevel?: number;
+  treatment?: string;
+  notes?: string;
+  carerNotified: boolean;
+  followUpGlucose?: number;
+  followUpTime?: string;
+}
 
 export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, { increment: number; label: string; settingsKey: keyof UserSettings }> = {
   insulin: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
@@ -1879,6 +1925,100 @@ export const storage = {
     data._exportedAt = new Date().toISOString();
     data._version = "1.0";
     return JSON.stringify(data, null, 2);
+  },
+
+  getCarerLinks(): CarerLink[] {
+    const data = localStorage.getItem(STORAGE_KEYS.CARER_LINKS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveCarerLinks(links: CarerLink[]) {
+    localStorage.setItem(STORAGE_KEYS.CARER_LINKS, JSON.stringify(links));
+  },
+
+  addCarerLink(link: Omit<CarerLink, "id" | "linkedAt">) {
+    const links = this.getCarerLinks();
+    links.push({ ...link, id: crypto.randomUUID(), linkedAt: new Date().toISOString() });
+    this.saveCarerLinks(links);
+  },
+
+  removeCarerLink(id: string) {
+    this.saveCarerLinks(this.getCarerLinks().filter(l => l.id !== id));
+  },
+
+  updateCarerPermission(id: string, permission: CarerPermission) {
+    const links = this.getCarerLinks();
+    const link = links.find(l => l.id === id);
+    if (link) { link.permission = permission; this.saveCarerLinks(links); }
+  },
+
+  getCarerPrivacy(): CarerPrivacySettings {
+    const data = localStorage.getItem(STORAGE_KEYS.CARER_PRIVACY);
+    return data ? JSON.parse(data) : {
+      shareSupplies: true,
+      shareAppointments: true,
+      shareScenarios: true,
+      shareHypoAlerts: true,
+      shareActivityAdvisor: false,
+    };
+  },
+
+  saveCarerPrivacy(settings: CarerPrivacySettings) {
+    localStorage.setItem(STORAGE_KEYS.CARER_PRIVACY, JSON.stringify(settings));
+  },
+
+  getCarerActivityLog(): CarerActivityLogEntry[] {
+    const data = localStorage.getItem(STORAGE_KEYS.CARER_ACTIVITY_LOG);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addCarerActivity(entry: Omit<CarerActivityLogEntry, "id" | "timestamp">) {
+    const log = this.getCarerActivityLog();
+    log.unshift({ ...entry, id: crypto.randomUUID(), timestamp: new Date().toISOString() });
+    if (log.length > 50) log.splice(50);
+    localStorage.setItem(STORAGE_KEYS.CARER_ACTIVITY_LOG, JSON.stringify(log));
+  },
+
+  getHypoTreatments(): HypoTreatment[] {
+    const data = localStorage.getItem(STORAGE_KEYS.HYPO_TREATMENTS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addHypoTreatment(treatment: Omit<HypoTreatment, "id">) {
+    const treatments = this.getHypoTreatments();
+    treatments.unshift({ ...treatment, id: crypto.randomUUID() });
+    if (treatments.length > 100) treatments.splice(100);
+    localStorage.setItem(STORAGE_KEYS.HYPO_TREATMENTS, JSON.stringify(treatments));
+    if (treatment.carerNotified) {
+      this.addCarerActivity({
+        carerName: "System",
+        action: "Hypo Alert",
+        detail: "Hypo treatment logged and carers notified",
+      });
+    }
+  },
+
+  getCarerMode(): boolean {
+    return localStorage.getItem(STORAGE_KEYS.CARER_MODE) === "true";
+  },
+
+  setCarerMode(enabled: boolean) {
+    localStorage.setItem(STORAGE_KEYS.CARER_MODE, enabled ? "true" : "false");
+  },
+
+  getInviteCode(): string {
+    let code = localStorage.getItem(STORAGE_KEYS.CARER_INVITE_CODE);
+    if (!code) {
+      code = `DB-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      localStorage.setItem(STORAGE_KEYS.CARER_INVITE_CODE, code);
+    }
+    return code;
+  },
+
+  regenerateInviteCode(): string {
+    const code = `DB-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    localStorage.setItem(STORAGE_KEYS.CARER_INVITE_CODE, code);
+    return code;
   },
 
   importAllData(jsonString: string): { success: boolean; error?: string } {

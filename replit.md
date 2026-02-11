@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **Scenarios**: Bedtime Readiness Check (first tab - calm evening check for stable sleep), Sick Day Mode, and Travel Mode with tabbed interface
 - **Appointments**: Healthcare appointment tracking
 - **Community**: Posts, News (diabetes articles from trusted sources), Events, Reels, and Messages tabs
+- **Family & Carers** (Prototype): Link parents/partners/carers to account with invite codes, permission levels (View Only, Manage, Full Access), privacy controls, activity log, and Carer View dashboard showing user's status at a glance. Includes "I've Treated a Hypo" button on Help Now page for quick carer notification.
 - **Settings**: User profile and app configuration
 
 ### Build System

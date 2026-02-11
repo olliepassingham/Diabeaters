@@ -44,6 +44,8 @@ import Appointments from "@/pages/appointments";
 import EmergencyCard from "@/pages/emergency-card";
 import Onboarding from "@/pages/onboarding";
 import Shop from "@/pages/shop";
+import FamilyCarers from "@/pages/family-carers";
+import CarerView from "@/pages/carer-view";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -60,6 +62,8 @@ function Router() {
             <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
       <Route path="/shop" component={Shop} />
+      <Route path="/family-carers" component={FamilyCarers} />
+      <Route path="/carer-view" component={CarerView} />
       <Route component={NotFound} />
     </Switch>
   );
