@@ -66,42 +66,6 @@ import {
 } from "@/lib/storage";
 import { format, formatDistanceToNow } from "date-fns";
 
-function getInitials(name?: string): string {
-  if (!name) return "?";
-  return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-}
-
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-  "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
-];
-
-function getAvatarColor(name?: string): string {
-  if (!name) return AVATAR_COLORS[0];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function UserAvatar({ name, isAnonymous, size = "sm" }: { name?: string; isAnonymous: boolean; size?: "sm" | "md" }) {
-  const sizeClass = size === "md" ? "h-9 w-9 text-sm" : "h-7 w-7 text-xs";
-  if (isAnonymous || !name) {
-    return (
-      <div className={`${sizeClass} rounded-full bg-muted flex items-center justify-center shrink-0`}>
-        <User className={size === "md" ? "h-4 w-4 text-muted-foreground" : "h-3.5 w-3.5 text-muted-foreground"} />
-      </div>
-    );
-  }
-  return (
-    <div className={`${sizeClass} rounded-full flex items-center justify-center shrink-0 font-medium ${getAvatarColor(name)}`}>
-      {getInitials(name)}
-    </div>
-  );
-}
 
 const TOPIC_ICONS: Record<CommunityTopicId, typeof Plane> = {
   "holidays-travel": Plane,
@@ -209,39 +173,35 @@ function PostCard({
       data-testid={`card-post-${post.id}`}
     >
       <CardContent className="p-4">
-        <div className="flex gap-3">
-          <UserAvatar name={post.authorName} isAnonymous={post.isAnonymous} size="md" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-medium truncate">{authorDisplay}</span>
-                <UserActions 
-                  userName={post.authorName} 
-                  isAnonymous={post.isAnonymous}
-                  onMessage={onMessage}
-                  currentUserName={currentUserName}
-                />
-              </div>
-              <span className="text-xs text-muted-foreground shrink-0">
-                {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-              </span>
-            </div>
-            
-            <h3 className="font-semibold mb-1 line-clamp-2">{post.title}</h3>
-            
-            {post.content && (
-              <p className="text-muted-foreground text-sm line-clamp-2 mb-2">
-                {post.content}
-              </p>
-            )}
-            
-            <div className="flex items-center gap-2 flex-wrap">
-              <TopicBadge topic={post.topic} />
-              <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-                <MessageCircle className="h-3.5 w-3.5" />
-                <span>{post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}</span>
-              </div>
-            </div>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <User className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium truncate">{authorDisplay}</span>
+            <UserActions 
+              userName={post.authorName} 
+              isAnonymous={post.isAnonymous}
+              onMessage={onMessage}
+              currentUserName={currentUserName}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+          </span>
+        </div>
+        
+        <h3 className="font-semibold mb-1 line-clamp-2">{post.title}</h3>
+        
+        {post.content && (
+          <p className="text-muted-foreground text-sm line-clamp-2 mb-2">
+            {post.content}
+          </p>
+        )}
+        
+        <div className="flex items-center gap-2 flex-wrap">
+          <TopicBadge topic={post.topic} />
+          <div className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span>{post.replyCount} {post.replyCount === 1 ? "reply" : "replies"}</span>
           </div>
         </div>
       </CardContent>
@@ -262,8 +222,7 @@ function ReplyCard({
 }) {
   const authorDisplay = reply.isAnonymous ? "Anonymous" : (reply.authorName || "Someone");
   return (
-    <div className="flex gap-3 p-4 bg-muted/30 rounded-lg" data-testid={`reply-${reply.id}`}>
-      <UserAvatar name={reply.authorName} isAnonymous={reply.isAnonymous} />
+    <div className="p-4 bg-muted/30 rounded-lg" data-testid={`reply-${reply.id}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
           <div className="flex items-center gap-2 text-sm flex-wrap">
@@ -309,10 +268,12 @@ function ConversationItem({
       onClick={onClick}
       data-testid={`conversation-${conversation.id}`}
     >
-      <UserAvatar name={conversation.participantName} isAnonymous={false} size="md" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className="font-medium truncate">{conversation.participantName}</span>
+          <span className="font-medium truncate">
+            <User className="h-4 w-4 text-muted-foreground inline mr-1" />
+            {conversation.participantName}
+          </span>
           <div className="flex items-center gap-2 shrink-0">
             {conversation.lastMessageAt && (
               <span className="text-xs text-muted-foreground">
@@ -416,8 +377,8 @@ function MessagesView({
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-3">
-              <UserAvatar name={selectedConversation.participantName} isAnonymous={false} size="md" />
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-5 w-5" />
               {selectedConversation.participantName}
             </CardTitle>
           </CardHeader>
@@ -1303,20 +1264,17 @@ export default function Community() {
                 </Button>
               </div>
               <CardTitle className="text-xl">{selectedPost.title}</CardTitle>
-              <CardDescription>
-                <div className="flex items-center gap-2 mt-1">
-                  <UserAvatar name={selectedPost.authorName} isAnonymous={selectedPost.isAnonymous} />
-                  <span className="font-medium">{selectedPost.isAnonymous ? "Anonymous" : (selectedPost.authorName || "Someone")}</span>
-                  <UserActions 
-                    userName={selectedPost.authorName} 
-                    isAnonymous={selectedPost.isAnonymous}
-                    onMessage={handleOpenMessage}
-                    currentUserName={profile?.name}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(selectedPost.createdAt), { addSuffix: true })}
-                  </span>
-                </div>
+              <CardDescription className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>{selectedPost.isAnonymous ? "Anonymous" : (selectedPost.authorName || "Someone")}</span>
+                <UserActions 
+                  userName={selectedPost.authorName} 
+                  isAnonymous={selectedPost.isAnonymous}
+                  onMessage={handleOpenMessage}
+                  currentUserName={profile?.name}
+                />
+                <span>·</span>
+                {formatDistanceToNow(new Date(selectedPost.createdAt), { addSuffix: true })}
               </CardDescription>
             </CardHeader>
             {selectedPost.content && (
