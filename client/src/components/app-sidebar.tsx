@@ -1,5 +1,6 @@
 import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, ShoppingBag, Heart } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { Badge } from "@/components/ui/badge";
 import { FaceLogo } from "@/components/face-logo";
 import {
   Sidebar,
@@ -35,7 +36,7 @@ const items = [
     url: "/scenarios",
     icon: AlertTriangle,
   },
-    {
+  {
     title: "Appointments",
     url: "/appointments",
     icon: Calendar,
@@ -44,23 +45,26 @@ const items = [
     title: "Community",
     url: "/community",
     icon: Users,
+    beta: true,
   },
   {
     title: "Family & Carers",
     url: "/family-carers",
     icon: Heart,
+    beta: true,
   },
   {
     title: "Shop",
     url: "/shop",
     icon: ShoppingBag,
+    beta: true,
   },
   {
     title: "Settings",
     url: "/settings",
     icon: Settings,
   },
-];
+] as const;
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -87,7 +91,12 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                     <Link href={item.url}>
                       <item.icon />
-                      <span>{item.title}</span>
+                      <span className="flex-1">{item.title}</span>
+                      {"beta" in item && item.beta && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal no-default-hover-elevate no-default-active-elevate" data-testid={`badge-beta-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                          Beta
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
