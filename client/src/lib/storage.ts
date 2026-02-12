@@ -268,6 +268,7 @@ export interface ScenarioState {
   travelTimezoneDirection?: "east" | "west" | "none";
   sickDayActive: boolean;
   sickDaySeverity?: string;
+  sickDayActivatedAt?: string;
 }
 
 export const COMMUNITY_TOPICS = [
@@ -1255,6 +1256,7 @@ export const storage = {
     const state = this.getScenarioState();
     state.sickDayActive = true;
     state.sickDaySeverity = severity;
+    state.sickDayActivatedAt = state.sickDayActivatedAt || new Date().toISOString();
     this.saveScenarioState(state);
   },
 
@@ -1262,6 +1264,7 @@ export const storage = {
     const state = this.getScenarioState();
     state.sickDayActive = false;
     state.sickDaySeverity = undefined;
+    state.sickDayActivatedAt = undefined;
     this.saveScenarioState(state);
   },
 
