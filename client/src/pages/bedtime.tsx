@@ -5,11 +5,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles } from "lucide-react";
-import { storage, UserSettings } from "@/lib/storage";
+import { Badge } from "@/components/ui/badge";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import { storage, UserSettings, ScenarioState } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
+
+interface CorrectionSuggestion {
+  fullDose: number;
+  suggestedDose: number;
+  currentBg: number;
+  targetBg: number;
+  correctionFactor: number;
+  bgUnits: string;
+  hasIOB: boolean;
+  iobWarning: string;
+  exerciseWarning: string;
+  alcoholWarning: string;
+  sickDayWarning: string;
+}
 
 interface ReadinessResult {
   level: ReadinessLevel;
@@ -17,6 +33,7 @@ interface ReadinessResult {
   message: string;
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string }[];
+  correction: CorrectionSuggestion | null;
 }
 
 export default function Bedtime() {
@@ -28,10 +45,18 @@ export default function Bedtime() {
   const [hadAlcohol, setHadAlcohol] = useState(false);
   const [result, setResult] = useState<ReadinessResult | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
+  const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [profileBgUnits, setProfileBgUnits] = useState<string | null>(null);
 
   useEffect(() => {
     const settings = storage.getSettings();
     setUserSettings(settings);
+    const profile = storage.getProfile();
+    if (profile?.bgUnits) {
+      setBgUnits(profile.bgUnits as "mmol/L" | "mg/dL");
+      setProfileBgUnits(profile.bgUnits);
+    }
+    setScenarioState(storage.getScenarioState());
   }, []);
 
   const getTargetRange = () => {
@@ -39,6 +64,75 @@ export default function Bedtime() {
       return { low: userSettings.targetBgLow, high: userSettings.targetBgHigh };
     }
     return bgUnits === "mmol/L" ? { low: 5.0, high: 8.0 } : { low: 90, high: 144 };
+  };
+
+  const calculateCorrectionDose = (bgMmol: number, targetHighMmol: number, insulinHours: number): CorrectionSuggestion | null => {
+    if (bgMmol <= targetHighMmol) return null;
+
+    const correctionFactor = userSettings?.correctionFactor;
+    if (!correctionFactor || correctionFactor <= 0) return null;
+
+    if (profileBgUnits && profileBgUnits !== bgUnits) return null;
+
+    const bgInUserUnits = bgUnits === "mg/dL" ? Math.round(bgMmol * 18) : Math.round(bgMmol * 10) / 10;
+    const targetInUserUnits = bgUnits === "mg/dL" ? Math.round(targetHighMmol * 18) : Math.round(targetHighMmol * 10) / 10;
+    const cfInUserUnits = correctionFactor;
+
+    const diff = bgInUserUnits - targetInUserUnits;
+    if (diff <= 0) return null;
+
+    const fullDose = Math.round((diff / cfInUserUnits) * 10) / 10;
+
+    const hasIOB = insulinHours < 4;
+    let iobReduction = 0;
+    if (insulinHours < 1) iobReduction = 0.6;
+    else if (insulinHours < 2) iobReduction = 0.4;
+    else if (insulinHours < 3) iobReduction = 0.2;
+    else if (insulinHours < 4) iobReduction = 0.1;
+
+    const bedtimeReduction = 0.5;
+    const effectiveDose = fullDose * bedtimeReduction * (1 - iobReduction);
+    const suggestedDose = Math.round(effectiveDose * 2) / 2;
+
+    if (suggestedDose <= 0) return null;
+
+    let iobWarning = "";
+    if (insulinHours < 1) {
+      iobWarning = "You have significant active insulin from less than 1 hour ago. This may bring you down on its own.";
+    } else if (insulinHours < 2) {
+      iobWarning = "You still have active insulin from your recent dose. It may bring you down further.";
+    } else if (insulinHours < 4) {
+      iobWarning = "Some insulin is still active from earlier. A smaller correction accounts for this.";
+    }
+
+    let exerciseWarning = "";
+    if (exercisedToday) {
+      exerciseWarning = "Exercise increases your sensitivity to insulin, especially overnight. Be extra cautious with any correction.";
+    }
+
+    let alcoholWarning = "";
+    if (hadAlcohol) {
+      alcoholWarning = "Alcohol can cause delayed lows. Correcting at bedtime after drinking carries extra risk.";
+    }
+
+    let sickDayWarning = "";
+    if (scenarioState.sickDayActive) {
+      sickDayWarning = "You're in sick day mode. Illness can make blood glucose harder to predict. Consider a smaller correction or consult your diabetes team.";
+    }
+
+    return {
+      fullDose,
+      suggestedDose,
+      currentBg: bgInUserUnits,
+      targetBg: targetInUserUnits,
+      correctionFactor: cfInUserUnits,
+      bgUnits,
+      hasIOB,
+      iobWarning,
+      exerciseWarning,
+      alcoholWarning,
+      sickDayWarning,
+    };
   };
 
   const calculateReadiness = () => {
@@ -66,7 +160,7 @@ export default function Bedtime() {
       factors.push({ label: "Blood glucose", status: "caution", note: "On the lower side of target" });
       cautionCount++;
     } else if (bgMmol > targetHighMmol + 3) {
-      factors.push({ label: "Blood glucose", status: "caution", note: "Higher than ideal - may come down overnight" });
+      factors.push({ label: "Blood glucose", status: "caution", note: "Higher than ideal - a bedtime correction may help" });
       cautionCount++;
     } else if (bgMmol > targetHighMmol) {
       factors.push({ label: "Blood glucose", status: "caution", note: "Slightly above target" });
@@ -103,6 +197,29 @@ export default function Bedtime() {
       concernCount++;
     }
 
+    if (scenarioState.sickDayActive) {
+      const severity = scenarioState.sickDaySeverity || "moderate";
+      factors.push({
+        label: "Sick day",
+        status: severity === "severe" ? "concern" : "caution",
+        note: "Being unwell affects overnight glucose - check more often",
+      });
+      if (severity === "severe") concernCount++;
+      else cautionCount++;
+    }
+
+    if (scenarioState.travelModeActive) {
+      const hasTimezoneShift = scenarioState.travelTimezoneShift && Math.abs(scenarioState.travelTimezoneShift) >= 2;
+      factors.push({
+        label: "Travel mode",
+        status: "caution",
+        note: hasTimezoneShift
+          ? "Timezone changes can affect overnight glucose patterns"
+          : "Travel and routine changes can affect overnight levels",
+      });
+      cautionCount++;
+    }
+
     let level: ReadinessLevel;
     let title: string;
     let message: string;
@@ -133,7 +250,24 @@ export default function Bedtime() {
       tips.push("Your glucose is in a comfortable range for sleep");
     }
 
-    setResult({ level, title, message, tips, factors });
+    if (scenarioState.sickDayActive) {
+      tips.push("When unwell, set an alarm to check ketones and glucose overnight");
+      if (scenarioState.sickDaySeverity === "severe") {
+        tips.push("With severe illness, consider checking every 2-3 hours overnight");
+      }
+    }
+
+    if (scenarioState.travelModeActive) {
+      const hasTimezoneShift = scenarioState.travelTimezoneShift && Math.abs(scenarioState.travelTimezoneShift) >= 2;
+      if (hasTimezoneShift) {
+        tips.push("Your body clock may still be adjusting - overnight patterns could differ from normal");
+      }
+      tips.push("Keep your hypo kit easily accessible in an unfamiliar room");
+    }
+
+    const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHours);
+
+    setResult({ level, title, message, tips, factors, correction });
   };
 
   const getLevelColors = (level: ReadinessLevel) => {
@@ -177,6 +311,27 @@ export default function Bedtime() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
+        <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
+          {scenarioState.sickDayActive && (
+            <Link href="/scenarios?tab=sick-day">
+              <Badge variant="secondary" className="cursor-pointer" data-testid="badge-sick-day-active">
+                <Thermometer className="h-3 w-3 mr-1" />
+                Sick Day Active ({scenarioState.sickDaySeverity || "moderate"})
+              </Badge>
+            </Link>
+          )}
+          {scenarioState.travelModeActive && (
+            <Link href="/scenarios?tab=travel">
+              <Badge variant="secondary" className="cursor-pointer" data-testid="badge-travel-active">
+                <Plane className="h-3 w-3 mr-1" />
+                Travel Mode Active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}
+              </Badge>
+            </Link>
+          )}
+        </div>
+      )}
+
       <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-indigo-100 dark:border-indigo-900">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -335,6 +490,84 @@ export default function Bedtime() {
                 ))}
               </div>
             </div>
+
+            {result.correction && (
+              <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20" data-testid="card-correction-suggestion">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-medium text-sm">Bedtime Correction Suggestion</h4>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-background/60 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Current:</span>
+                      <span className="font-mono font-medium" data-testid="text-correction-current-bg">
+                        {result.correction.currentBg} {result.correction.bgUnits}
+                      </span>
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-muted-foreground">Target:</span>
+                      <span className="font-mono font-medium" data-testid="text-correction-target-bg">
+                        {result.correction.targetBg} {result.correction.bgUnits}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      ({result.correction.currentBg} - {result.correction.targetBg}) / {result.correction.correctionFactor} = {result.correction.fullDose}u full correction
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-purple-100/50 dark:bg-purple-900/30">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Suggested bedtime dose</p>
+                        <p className="text-2xl font-bold font-mono text-purple-700 dark:text-purple-300" data-testid="text-correction-suggested-dose">
+                          {result.correction.suggestedDose}u
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        ~{Math.round((result.correction.suggestedDose / result.correction.fullDose) * 100)}% of full dose
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Reduced from {result.correction.fullDose}u because bedtime corrections carry overnight hypo risk. Many diabetes teams recommend a cautious approach at night.
+                    </p>
+                  </div>
+
+                  {(result.correction.hasIOB || result.correction.exerciseWarning || result.correction.alcoholWarning || result.correction.sickDayWarning) && (
+                    <div className="space-y-2">
+                      {result.correction.iobWarning && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
+                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-200" data-testid="text-correction-iob-warning">{result.correction.iobWarning}</p>
+                        </div>
+                      )}
+                      {result.correction.exerciseWarning && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
+                          <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 dark:text-amber-200" data-testid="text-correction-exercise-warning">{result.correction.exerciseWarning}</p>
+                        </div>
+                      )}
+                      {result.correction.alcoholWarning && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                          <Wine className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-red-800 dark:text-red-200" data-testid="text-correction-alcohol-warning">{result.correction.alcoholWarning}</p>
+                        </div>
+                      )}
+                      {result.correction.sickDayWarning && (
+                        <div className="flex items-start gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-950/30">
+                          <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                          <p className="text-xs text-orange-800 dark:text-orange-200" data-testid="text-correction-sick-warning">{result.correction.sickDayWarning}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs italic text-muted-foreground" data-testid="text-correction-disclaimer">
+                    [Not medical advice. This is a calculation based on your settings, not a prescription. Always follow your diabetes team's guidance on bedtime corrections.]
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {result.tips.length > 0 && (
               <div className="space-y-2" data-testid="container-bedtime-tips">
