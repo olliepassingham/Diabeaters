@@ -16,23 +16,31 @@ import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
-const typeIcons = {
+const typeIcons: Record<string, any> = {
   needle: Syringe,
   insulin: Package,
+  insulin_short: Package,
+  insulin_long: Package,
   cgm: Activity,
   infusion_set: Plug,
   reservoir: Cylinder,
   other: Package,
 };
 
-const typeLabels = {
+const typeLabels: Record<string, string> = {
   needle: "Needles/Lancets",
   insulin: "Insulin",
+  insulin_short: "Short-Acting Insulin",
+  insulin_long: "Long-Acting Insulin",
   cgm: "CGM/Monitors",
   infusion_set: "Infusion Sets",
   reservoir: "Reservoirs/Cartridges",
   other: "Other",
 };
+
+function isInsulinType(type: string): boolean {
+  return type === "insulin" || type === "insulin_short" || type === "insulin_long";
+}
 
 function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; onSupplyClick?: (id: string) => void }) {
   if (supplies.length === 0) return null;
@@ -597,7 +605,7 @@ function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; s
 
   const getAffectedSupplies = () => {
     return supplies
-      .filter(s => s.type === "insulin" || s.type === "needle" || s.type === "other")
+      .filter(s => isInsulinType(s.type) || s.type === "needle" || s.type === "other")
       .map(s => {
         const normalDaysLeft = storage.getDaysRemaining(s);
         if (normalDaysLeft >= 999) return null;
@@ -786,7 +794,7 @@ function SupplyCard({
           <div className="flex items-baseline justify-between gap-2">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Estimated Remaining</p>
-              {supply.type === "insulin" ? (
+              {isInsulinType(supply.type) ? (
                 <div data-testid={`text-remaining-${supply.id}`}>
                   {(() => {
                     const uPerContainer = getUnitsPerPen();
@@ -879,7 +887,7 @@ function SupplyCard({
                 <span>Daily usage</span>
                 <span>
                   {effectiveUsage > 0 ? effectiveUsage : supply.dailyUsage}/day
-                  {supply.type === "insulin" && " units"}
+                  {isInsulinType(supply.type) && " units"}
                   {supply.type === "needle" && " needles"}
                 </span>
               </div>
@@ -899,7 +907,7 @@ function SupplyCard({
             const usedAmount = Math.round(daysSincePickup * effectiveUsage);
             return (
               <div className="text-xs text-muted-foreground">
-                Started with {supply.quantityAtPickup}{supply.type === "insulin" ? "u" : ""} • Used ~{usedAmount}{supply.type === "insulin" ? "u" : ""}
+                Started with {supply.quantityAtPickup}{isInsulinType(supply.type) ? "u" : ""} • Used ~{usedAmount}{isInsulinType(supply.type) ? "u" : ""}
               </div>
             );
           })()}
@@ -987,7 +995,7 @@ function SupplyCard({
                   -{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
                 </Button>
                 <span className="text-center text-sm font-medium" data-testid={`text-quantity-${supply.id}`}>
-                  {Math.floor(adjustedQuantity)} {supply.type === "insulin" ? "units" : ""}
+                  {Math.floor(adjustedQuantity)} {isInsulinType(supply.type) ? "units" : ""}
                 </span>
                 <Button 
                   variant="outline" 
@@ -1133,7 +1141,8 @@ function SupplyDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="needle">Needles/Lancets</SelectItem>
-                <SelectItem value="insulin">Insulin</SelectItem>
+                <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
+                <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
                 <SelectItem value="cgm">CGM/Monitors</SelectItem>
                 <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
                 <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
@@ -1183,14 +1192,14 @@ function SupplyDialog({
               return (
                 <div className="space-y-2">
                   <Label htmlFor="daily-usage">
-                    {type === "insulin" ? "Daily Insulin Usage (units/day)" : 
+                    {isInsulinType(type) ? "Daily Insulin Usage (units/day)" : 
                      type === "needle" ? "Needles Used Per Day" : "Daily Usage"}
                   </Label>
                   <Input 
                     id="daily-usage" 
                     type="number" 
                     step="0.1"
-                    placeholder={type === "insulin" ? "e.g., 40" : type === "needle" ? "e.g., 4" : "e.g., 4"} 
+                    placeholder={isInsulinType(type) ? "e.g., 40" : type === "needle" ? "e.g., 4" : "e.g., 4"} 
                     value={dailyUsage} 
                     onChange={e => setDailyUsage(e.target.value)}
                     data-testid="input-supply-daily-usage"
@@ -1198,6 +1207,16 @@ function SupplyDialog({
                   {suggested && dailyUsage === suggested.value.toString() && (
                     <p className="text-xs text-primary">
                       Auto-filled {suggested.source}
+                    </p>
+                  )}
+                  {type === "insulin_short" && (
+                    <p className="text-xs text-muted-foreground">
+                      Short-acting (rapid) insulin units you use per day, e.g. NovoRapid, Humalog, Fiasp.
+                    </p>
+                  )}
+                  {type === "insulin_long" && (
+                    <p className="text-xs text-muted-foreground">
+                      Long-acting (basal) insulin units you use per day, e.g. Lantus, Levemir, Tresiba.
                     </p>
                   )}
                   {type === "insulin" && (
@@ -1556,7 +1575,8 @@ function EditUsualPrescriptionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="needle">Needles/Lancets</SelectItem>
-                    <SelectItem value="insulin">Insulin</SelectItem>
+                    <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
+                    <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
                     <SelectItem value="cgm">CGM/Monitors</SelectItem>
                     <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
                     <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
@@ -1830,6 +1850,7 @@ export default function Supplies() {
 
   const filterByType = (type: string) => {
     if (type === "all") return supplies;
+    if (type === "insulin") return supplies.filter(s => isInsulinType(s.type));
     return supplies.filter(s => s.type === type);
   };
 

@@ -72,7 +72,7 @@ export interface UserSettings {
 export interface Supply {
   id: string;
   name: string;
-  type: "needle" | "insulin" | "cgm" | "infusion_set" | "reservoir" | "other";
+  type: "needle" | "insulin" | "insulin_short" | "insulin_long" | "cgm" | "infusion_set" | "reservoir" | "other";
   currentQuantity: number;
   dailyUsage: number;
   lastPickupDate?: string;
@@ -127,6 +127,8 @@ export interface HypoTreatment {
 
 export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, { increment: number; label: string; settingsKey: keyof UserSettings }> = {
   insulin: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  insulin_short: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  insulin_long: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
   needle: { increment: 100, label: "box", settingsKey: "needlesPerBox" },
   cgm: { increment: 1, label: "sensor", settingsKey: "sensorsPerBox" },
   infusion_set: { increment: 10, label: "box", settingsKey: "infusionSetsPerBox" },
@@ -143,7 +145,7 @@ export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): {
     return { amount: 1, label: "unit" };
   }
 
-  if (type === "insulin") {
+  if (type === "insulin" || type === "insulin_short" || type === "insulin_long") {
     const isPump = storage.getProfile()?.insulinDeliveryMethod === "pump";
     const amount = Math.max(1, customValue || (isPump ? s.insulinCartridgeUnits : undefined) || packInfo.increment);
     const itemLabel = isPump ? "cartridge" : "pen";
@@ -889,6 +891,28 @@ export const storage = {
       return supply.dailyUsage || 0;
     }
 
+    if (supply.type === "insulin_short") {
+      const shortActing = s.shortActingUnitsPerDay || 0;
+      if (shortActing > 0) {
+        return shortActing;
+      }
+      if (supply.dailyUsage && supply.dailyUsage > 0) {
+        return supply.dailyUsage;
+      }
+      return 0;
+    }
+
+    if (supply.type === "insulin_long") {
+      const longActing = s.longActingUnitsPerDay || 0;
+      if (longActing > 0) {
+        return longActing;
+      }
+      if (supply.dailyUsage && supply.dailyUsage > 0) {
+        return supply.dailyUsage;
+      }
+      return 0;
+    }
+
     if (supply.type === "insulin") {
       const shortActing = s.shortActingUnitsPerDay || 0;
       const longActing = s.longActingUnitsPerDay || 0;
@@ -919,6 +943,28 @@ export const storage = {
     if (type === "needle") {
       if (s.injectionsPerDay && s.injectionsPerDay > 0) {
         return { value: s.injectionsPerDay, source: "from your Settings (injections/day)" };
+      }
+      return null;
+    }
+
+    if (type === "insulin_short") {
+      if (isPump) {
+        if (s.tdd && s.tdd > 0) {
+          return { value: s.tdd, source: "from your Settings (TDD)" };
+        }
+        return null;
+      }
+      const shortActing = s.shortActingUnitsPerDay || 0;
+      if (shortActing > 0) {
+        return { value: shortActing, source: "from your Settings (short-acting units/day)" };
+      }
+      return null;
+    }
+
+    if (type === "insulin_long") {
+      const longActing = s.longActingUnitsPerDay || 0;
+      if (longActing > 0) {
+        return { value: longActing, source: "from your Settings (long-acting units/day)" };
       }
       return null;
     }

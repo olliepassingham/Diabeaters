@@ -66,7 +66,7 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
   const bufferMultiplier = plan.travelType === "international" ? 2 : 1.5;
   const accessBuffer = plan.accessRisk === "limited" ? 1.5 : plan.accessRisk === "unsure" ? 1.3 : 1;
   
-  const insulinSupplies = supplies.filter(s => s.type === "insulin");
+  const insulinSupplies = supplies.filter(s => s.type === "insulin" || s.type === "insulin_short" || s.type === "insulin_long");
   const needleSupplies = supplies.filter(s => s.type === "needle");
   const cgmSupplies = supplies.filter(s => s.type === "cgm");
 
