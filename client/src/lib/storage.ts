@@ -242,7 +242,8 @@ export type WidgetType =
   | "travel-mode"
   | "sick-day"
   | "help-now-info"
-  | "appointments";
+  | "appointments"
+  | "tip-of-day";
 
 export type WidgetSize = "full" | "half";
 
@@ -475,6 +476,7 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "sick-day": "half",
   "help-now-info": "half",
   "messages": "half",
+  "tip-of-day": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -490,6 +492,7 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "travel-mode", type: "travel-mode", enabled: false, order: 9, size: "half" },
   { id: "sick-day", type: "sick-day", enabled: false, order: 10, size: "half" },
   { id: "messages", type: "messages", enabled: false, order: 11, size: "half" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 12, size: "half" },
 ];
 
 function generateId(): string {

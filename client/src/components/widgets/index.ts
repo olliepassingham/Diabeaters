@@ -10,4 +10,5 @@ export { TravelModeWidget } from "./travel-mode-widget";
 export { SickDayWidget } from "./sick-day-widget";
 export { HelpNowInfoWidget } from "./help-now-info-widget";
 export { AppointmentsWidget } from "./appointments-widget";
+export { TipOfDayWidget } from "./tip-of-day-widget";
 export { WidgetLibrary, WIDGET_INFO } from "./widget-library";

@@ -16,6 +16,7 @@ import {
   Plane,
   Thermometer,
   Phone,
+  Lightbulb,
   GripVertical,
   Columns2,
   RectangleHorizontal,
@@ -144,6 +145,13 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     name: "Emergency Info",
     description: "Quick access to emergency contacts",
     icon: Phone,
+    category: "health",
+  },
+  "tip-of-day": {
+    type: "tip-of-day",
+    name: "Tip of the Day",
+    description: "Daily diabetes management tips and advice",
+    icon: Lightbulb,
     category: "health",
   },
 };

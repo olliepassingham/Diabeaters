@@ -25,6 +25,7 @@ import {
   TravelModeWidget,
   SickDayWidget,
   HelpNowInfoWidget,
+  TipOfDayWidget,
   AppointmentsWidget,
   WidgetLibrary,
 } from "@/components/widgets";
@@ -406,6 +407,8 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
       return <AppointmentsWidget compact={compact} />;
     case "supply-depletion":
       return <SupplyDepletionWidget compact={compact} />;
+    case "tip-of-day":
+      return <TipOfDayWidget compact={compact} />;
     default:
       return null;
   }
