@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings, ScenarioState } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -41,6 +41,7 @@ export default function Bedtime() {
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
   const [hoursSinceFood, setHoursSinceFood] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
+  const [hoursUntilSleep, setHoursUntilSleep] = useState("");
   const [exercisedToday, setExercisedToday] = useState(false);
   const [hadAlcohol, setHadAlcohol] = useState(false);
   const [result, setResult] = useState<ReadinessResult | null>(null);
@@ -141,6 +142,7 @@ export default function Bedtime() {
     const bg = parseFloat(currentBg);
     const foodHours = hoursSinceFood ? parseFloat(hoursSinceFood) : 999;
     const insulinHours = hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : 999;
+    const sleepHours = hoursUntilSleep ? parseFloat(hoursUntilSleep) : null;
     
     if (isNaN(bg)) return;
 
@@ -197,6 +199,20 @@ export default function Bedtime() {
       concernCount++;
     }
 
+    if (sleepHours !== null) {
+      if (sleepHours <= 0.25) {
+        factors.push({ label: "Time to sleep", status: "good", note: "Heading to bed now" });
+      } else if (sleepHours <= 1) {
+        factors.push({ label: "Time to sleep", status: "good", note: "Soon - good time to do this check" });
+      } else if (sleepHours <= 2) {
+        factors.push({ label: "Time to sleep", status: "caution", note: "Glucose may change before bed - recheck closer to sleep" });
+        cautionCount++;
+      } else {
+        factors.push({ label: "Time to sleep", status: "caution", note: "Still a while yet - consider rechecking nearer bedtime" });
+        cautionCount++;
+      }
+    }
+
     if (scenarioState.sickDayActive) {
       const severity = scenarioState.sickDaySeverity || "moderate";
       factors.push({
@@ -234,6 +250,7 @@ export default function Bedtime() {
       if (bgMmol < targetLowMmol) tips.push("Have a small snack before bed");
       if (hadAlcohol) tips.push("Alcohol can cause delayed lows for up to 24 hours");
       if (exercisedToday) tips.push("Exercise can cause lows for up to 24 hours after");
+      if (sleepHours !== null && sleepHours > 1) tips.push("Re-run this check closer to when you actually go to bed");
     } else if (cautionCount >= 2 || concernCount >= 1) {
       level = "monitor";
       title = "Worth Keeping an Eye On";
@@ -241,6 +258,7 @@ export default function Bedtime() {
       if (foodHours < 2) tips.push("Your glucose may rise as food digests");
       if (insulinHours < 2) tips.push("Check again before you actually fall asleep");
       if (exercisedToday) tips.push("Keep a snack nearby just in case");
+      if (sleepHours !== null && sleepHours > 1.5) tips.push("You've got time - recheck before you head to bed");
       tips.push("If you wake in the night, do a quick check");
     } else {
       level = "steady";
@@ -415,6 +433,26 @@ export default function Bedtime() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="hours-sleep" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                How long until you plan to sleep?
+              </Label>
+              <Select value={hoursUntilSleep} onValueChange={setHoursUntilSleep}>
+                <SelectTrigger id="hours-sleep" data-testid="select-hours-sleep">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0.25">Going to bed now</SelectItem>
+                  <SelectItem value="0.5">About 30 minutes</SelectItem>
+                  <SelectItem value="1">About 1 hour</SelectItem>
+                  <SelectItem value="1.5">About 1.5 hours</SelectItem>
+                  <SelectItem value="2">About 2 hours</SelectItem>
+                  <SelectItem value="3">3+ hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="exercised" className="flex items-center gap-2 cursor-pointer">
@@ -559,6 +597,15 @@ export default function Bedtime() {
                           <p className="text-xs text-orange-800 dark:text-orange-200" data-testid="text-correction-sick-warning">{result.correction.sickDayWarning}</p>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {hoursUntilSleep && parseFloat(hoursUntilSleep) > 1.5 && (
+                    <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                      <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                      <p className="text-xs text-blue-800 dark:text-blue-200" data-testid="text-correction-timing-note">
+                        You're not sleeping just yet. If you correct now, recheck before bed as your levels may change.
+                      </p>
                     </div>
                   )}
 
