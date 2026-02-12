@@ -110,7 +110,7 @@ export function TipOfDayWidget({ compact = false }: { compact?: boolean }) {
         </div>
       </CardHeader>
       <CardContent>
-        <p className={`text-sm leading-relaxed ${compact ? "line-clamp-4" : ""}`} data-testid="text-tip-content">
+        <p className="text-sm leading-relaxed" data-testid="text-tip-content">
           {tip.text}
         </p>
         <p className="text-xs text-muted-foreground mt-2" data-testid="text-tip-category">

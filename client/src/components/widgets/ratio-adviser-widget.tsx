@@ -17,7 +17,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-ratio-adviser">
       <CardHeader className="pb-2">
-        <Link href="/advisor">
+        <Link href="/settings">
           <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
             <Syringe className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">Your Ratios</CardTitle>
