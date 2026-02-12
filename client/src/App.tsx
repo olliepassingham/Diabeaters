@@ -125,7 +125,7 @@ function AppContent() {
           <OfflineBanner />
           <SickDayBanner />
           <TravelBanner />
-          <header className="flex items-center justify-between p-4 border-b transition-colors duration-200">
+          <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-[9999]">
             <SidebarTrigger className="hidden md:flex" data-testid="button-sidebar-toggle" />
             <button
               onClick={() => {

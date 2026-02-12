@@ -733,7 +733,7 @@ function SupplyCard({
   const lastPickupText = getLastPickupText();
 
   return (
-    <Card className={status === "critical" ? "border-red-500/50" : status === "low" ? "border-yellow-500/50" : ""}>
+    <Card className={status === "critical" ? "border-red-500/50 glow-critical" : status === "low" ? "border-yellow-500/50 glow-warning" : ""}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">

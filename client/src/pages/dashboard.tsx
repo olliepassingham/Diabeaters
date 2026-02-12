@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -66,9 +67,11 @@ function StatusIndicator({ status }: { status: HealthStatus }) {
 
   const { bg, text, textColor } = config[status];
 
+  const glowClass = status === "action" ? "glow-pulse-critical" : status === "watch" ? "glow-pulse-warning" : "glow-success";
+
   return (
     <div className="flex items-center gap-2">
-      <div className={`w-3 h-3 rounded-full ${bg} animate-pulse`} />
+      <div className={`w-3 h-3 rounded-full ${bg} ${glowClass}`} />
       <span className={`text-sm font-medium ${textColor}`} data-testid="text-status">
         {text}
       </span>
@@ -87,7 +90,7 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
   const firstName = profile?.name?.split(" ")[0] || "";
 
   return (
-    <Card className="bg-card/80 backdrop-blur" data-testid="card-header">
+    <Card className="glass-card" data-testid="card-header">
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -172,7 +175,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
           <Button 
             variant="destructive" 
             size="sm"
-            className={`w-full rounded-full ${isUrgent ? "animate-pulse shadow-lg shadow-red-500/30" : ""}`}
+            className={`w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
             data-testid="button-help-now"
           >
             <Phone className="h-4 w-4 mr-1" />
@@ -283,9 +286,70 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   );
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4 max-w-4xl mx-auto pb-8 animate-fade-in">
+      <Card className="glass-card">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-48 skeleton-shimmer" />
+              <Skeleton className="h-4 w-36 skeleton-shimmer" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-3 w-3 rounded-full skeleton-shimmer" />
+              <Skeleton className="h-4 w-14 skeleton-shimmer" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-8 flex-1 rounded-full skeleton-shimmer" />
+        <Skeleton className="h-8 w-32 rounded-full skeleton-shimmer" />
+        <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
+        <Skeleton className="h-9 w-9 rounded-md skeleton-shimmer" />
+      </div>
+      <div className="space-y-3">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded skeleton-shimmer" />
+              <Skeleton className="h-5 w-32 skeleton-shimmer" />
+            </div>
+            <Skeleton className="h-20 w-full rounded-md skeleton-shimmer" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <Skeleton className="h-5 w-40 skeleton-shimmer" />
+            <div className="grid grid-cols-2 gap-3">
+              <Skeleton className="h-16 rounded-md skeleton-shimmer" />
+              <Skeleton className="h-16 rounded-md skeleton-shimmer" />
+            </div>
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Card>
+            <CardContent className="p-4 space-y-2">
+              <Skeleton className="h-5 w-28 skeleton-shimmer" />
+              <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 space-y-2">
+              <Skeleton className="h-5 w-28 skeleton-shimmer" />
+              <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
-    <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/30" data-testid="card-setup-prompt">
+    <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/30 glow-warning" data-testid="card-setup-prompt">
       <CardContent className="p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -310,7 +374,7 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
         </p>
         
         <Link href="/settings">
-          <Button className="w-full" data-testid="button-complete-setup">
+          <Button className="w-full gradient-primary border-primary-border" data-testid="button-complete-setup">
             Complete Settings
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
@@ -367,6 +431,7 @@ export default function Dashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isSettingsComplete, setIsSettingsComplete] = useState(false);
   const [settingsCompletion, setSettingsCompletion] = useState({ percentage: 0, completed: 0, total: 5 });
+  const [isLoading, setIsLoading] = useState(true);
 
   // Refresh data on mount and when refreshKey changes
   useEffect(() => {
@@ -380,8 +445,8 @@ export default function Dashboard() {
     };
     
     refreshData();
+    const timer = setTimeout(() => setIsLoading(false), 400);
     
-    // Also refresh when window gains focus (e.g., returning from settings page)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshData();
@@ -394,6 +459,7 @@ export default function Dashboard() {
     window.addEventListener('focus', handleFocus);
     
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
@@ -452,6 +518,10 @@ export default function Dashboard() {
   const widgetsToRender = isSettingsComplete 
     ? enabledWidgets 
     : enabledWidgets.filter(w => w.type !== "settings-completion");
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-4 max-w-4xl mx-auto pb-8">

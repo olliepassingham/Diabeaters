@@ -96,7 +96,7 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
   }
 
   return (
-    <Card className={`border-primary/50 ${compact ? "flex flex-col overflow-hidden" : ""}`} data-testid="widget-scenario-status">
+    <Card className={`border-primary/50 glow-warning ${compact ? "flex flex-col overflow-hidden" : ""}`} data-testid="widget-scenario-status">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">Active Scenarios</CardTitle>
