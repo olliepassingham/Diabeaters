@@ -17,10 +17,12 @@ export function HelpNowInfoWidget({ compact = false }: { compact?: boolean }) {
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-help-now-info">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Phone className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base">Emergency Info</CardTitle>
-        </div>
+        <Link href="/help-now">
+          <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+            <Phone className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Emergency Info</CardTitle>
+          </div>
+        </Link>
       </CardHeader>
       <CardContent className="space-y-3">
         {primaryContact ? (

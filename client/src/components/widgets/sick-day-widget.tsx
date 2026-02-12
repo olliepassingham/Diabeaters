@@ -25,10 +25,12 @@ export function SickDayWidget({ compact = false }: { compact?: boolean }) {
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-sick-day">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Thermometer className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Sick Day Mode</CardTitle>
-          </div>
+          <Link href="/sick-day">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <Thermometer className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Sick Day Mode</CardTitle>
+            </div>
+          </Link>
           {scenario.sickDayActive && (
             <Badge variant={getSeverityColor(scenario.sickDaySeverity) as any}>
               {scenario.sickDaySeverity || "Active"}

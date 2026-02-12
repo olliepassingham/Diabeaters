@@ -45,7 +45,11 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
     return (
       <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-scenario-status">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Scenarios</CardTitle>
+          <Link href="/scenarios">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <CardTitle className="text-base">Scenarios</CardTitle>
+            </div>
+          </Link>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -99,7 +103,11 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
     <Card className={`border-primary/50 glow-warning ${compact ? "flex flex-col overflow-hidden" : ""}`} data-testid="widget-scenario-status">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">Active Scenarios</CardTitle>
+          <Link href="/scenarios">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <CardTitle className="text-base">Active Scenarios</CardTitle>
+            </div>
+          </Link>
           <Badge variant="secondary">
             {[scenarioState.travelModeActive && "Travel", scenarioState.sickDayActive && "Sick Day"].filter(Boolean).join(" + ")}
           </Badge>

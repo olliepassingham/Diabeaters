@@ -18,10 +18,12 @@ export function TravelModeWidget({ compact = false }: { compact?: boolean }) {
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-travel-mode">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Plane className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Travel Mode</CardTitle>
-          </div>
+          <Link href="/travel">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <Plane className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Travel Mode</CardTitle>
+            </div>
+          </Link>
           {scenario.travelModeActive && (
             <Badge variant="default">Active</Badge>
           )}

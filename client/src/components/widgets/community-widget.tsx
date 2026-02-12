@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Users, MessageCircle, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, CommunityPost } from "@/lib/storage";
@@ -19,21 +18,11 @@ export function CommunityWidget({ compact = false }: { compact?: boolean }) {
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-community">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            <CardTitle className={compact ? "text-base" : "text-lg"}>Community</CardTitle>
-          </div>
           <Link href="/community">
-            {compact ? (
-              <Button variant="ghost" size="icon" data-testid="button-view-community">
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button variant="ghost" size="sm" data-testid="button-view-community">
-                View All
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle className={compact ? "text-base" : "text-lg"}>Community</CardTitle>
+            </div>
           </Link>
         </div>
         {!compact && <CardDescription>Connect with others who understand</CardDescription>}

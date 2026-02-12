@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Plus, Clock, MapPin, ChevronRight } from "lucide-react";
+import { Calendar, Plus, Clock, MapPin } from "lucide-react";
 import { Link } from "wouter";
 import { storage, Appointment } from "@/lib/storage";
 import { format } from "date-fns";
@@ -31,21 +31,13 @@ export function AppointmentsWidget({ compact = false }: { compact?: boolean }) {
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-appointments">
       <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-primary" />
-          {compact ? "Appts" : "Appointments"}
-        </CardTitle>
         <Link href="/appointments">
-          {compact ? (
-            <Button variant="ghost" size="icon" data-testid="button-view-all-appointments">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-appointments">
-              View All
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+            <Calendar className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base">
+              {compact ? "Appts" : "Appointments"}
+            </CardTitle>
+          </div>
         </Link>
       </CardHeader>
       <CardContent>

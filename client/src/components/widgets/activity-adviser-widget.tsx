@@ -22,10 +22,12 @@ export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-activity-adviser">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base">Activity Adviser</CardTitle>
-        </div>
+        <Link href="/advisor">
+          <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+            <Activity className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Activity Adviser</CardTitle>
+          </div>
+        </Link>
       </CardHeader>
       <CardContent className="space-y-3">
         {recentActivity ? (

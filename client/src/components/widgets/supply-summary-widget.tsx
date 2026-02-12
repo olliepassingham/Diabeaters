@@ -29,10 +29,12 @@ export function SupplySummaryWidget({ compact = false }: { compact?: boolean }) 
     <Card className={`${hasAlerts ? "border-yellow-500/50" : ""} ${compact ? "flex flex-col overflow-hidden" : ""}`} data-testid="widget-supply-summary">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Supply Summary</CardTitle>
-          </div>
+          <Link href="/supplies">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <Package className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Supply Summary</CardTitle>
+            </div>
+          </Link>
           {criticalSupplies.length > 0 && (
             <Badge variant="destructive" data-testid="badge-critical-count">
               {criticalSupplies.length} critical

@@ -20,10 +20,12 @@ export function MessagesWidget({ compact = false }: { compact?: boolean }) {
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-messages">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Mail className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Messages</CardTitle>
-          </div>
+          <Link href="/community">
+            <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
+              <Mail className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Messages</CardTitle>
+            </div>
+          </Link>
           {totalUnread > 0 && (
             <Badge variant="default" data-testid="badge-unread-count">
               {totalUnread} new
