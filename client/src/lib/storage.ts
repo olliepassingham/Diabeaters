@@ -480,19 +480,19 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 0, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "full" },
-  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 2, size: "full" },
-  { id: "appointments", type: "appointments", enabled: true, order: 3, size: "half" },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4, size: "half" },
-  { id: "community", type: "community", enabled: true, order: 5, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: false, order: 6, size: "half" },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 7, size: "half" },
-  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 8, size: "half" },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 9, size: "half" },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 10, size: "half" },
-  { id: "messages", type: "messages", enabled: false, order: 11, size: "half" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 12, size: "half" },
+  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 1, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 2, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 3, size: "full" },
+  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 5, size: "half" },
+  { id: "community", type: "community", enabled: true, order: 6, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: false, order: 7, size: "half" },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 8, size: "half" },
+  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 9, size: "half" },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 10, size: "half" },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 11, size: "half" },
+  { id: "messages", type: "messages", enabled: false, order: 12, size: "half" },
 ];
 
 function generateId(): string {
