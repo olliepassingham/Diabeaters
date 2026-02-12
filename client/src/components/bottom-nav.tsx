@@ -20,7 +20,7 @@ const primaryTabs = [
 
 const moreItems = [
   { title: "Appointments", url: "/appointments", icon: Calendar },
-  { title: "AI Coach", url: "/ai-coach", icon: MessageCircle },
+  { title: "AI Coach", url: "/ai-coach", icon: MessageCircle, beta: true },
   { title: "Community", url: "/community", icon: Users, beta: true },
   { title: "Family & Carers", url: "/family-carers", icon: Heart, beta: true },
   { title: "Shop", url: "/shop", icon: ShoppingBag, beta: true },

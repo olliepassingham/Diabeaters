@@ -95,7 +95,7 @@ export default function AICoach() {
             <Bot className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">AI Coach</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2">AI Coach <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge></h1>
             <p className="text-muted-foreground text-sm">
               Your personal diabetes companion
             </p>
