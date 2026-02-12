@@ -799,7 +799,7 @@ function SupplyCard({
                           status === "critical" ? "text-red-600 dark:text-red-500" : 
                           status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                         }`}>
-                          {containerCount} unopened {plural}
+                          {containerCount} {plural}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           ~{Math.floor(adjustedQuantity)} units remaining
@@ -976,15 +976,17 @@ function SupplyCard({
           </div>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
+            const dailyDec = storage.getEffectiveDailyUsage(supply);
+            const decAmount = dailyDec > 0 ? dailyDec : 1;
             return (
               <div className="flex items-center justify-between gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - inc.amount))}
+                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - decAmount))}
                   data-testid={`button-decrease-${supply.id}`}
                 >
-                  -{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
+                  -{decAmount}{supply.type === "insulin" ? "u" : ""}
                 </Button>
                 <span className="text-center text-sm font-medium" data-testid={`text-quantity-${supply.id}`}>
                   {Math.floor(adjustedQuantity)} {supply.type === "insulin" ? "units" : ""}
