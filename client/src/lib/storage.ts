@@ -876,8 +876,81 @@ export const storage = {
   },
 
   /**
+   * Get the effective daily usage rate for a supply, pulling from Settings when available.
+   * For insulin: uses supply.dailyUsage (which should be set from settings shortActing/longActing/TDD)
+   * For needles: uses settings.injectionsPerDay if available, falls back to supply.dailyUsage
+   * For CGM/infusion/reservoir: handled separately via settings intervals
+   * For other: uses supply.dailyUsage
+   */
+  getEffectiveDailyUsage(supply: Supply, settings?: UserSettings): number {
+    const s = settings || this.getSettings();
+
+    if (supply.type === "needle") {
+      if (s.injectionsPerDay && s.injectionsPerDay > 0) {
+        return s.injectionsPerDay;
+      }
+      return supply.dailyUsage || 0;
+    }
+
+    if (supply.type === "insulin") {
+      const shortActing = s.shortActingUnitsPerDay || 0;
+      const longActing = s.longActingUnitsPerDay || 0;
+      if (shortActing + longActing > 0) {
+        return shortActing + longActing;
+      }
+      if (s.tdd && s.tdd > 0) {
+        return s.tdd;
+      }
+      if (supply.dailyUsage && supply.dailyUsage > 0) {
+        return supply.dailyUsage;
+      }
+      return 0;
+    }
+
+    return supply.dailyUsage || 0;
+  },
+
+  /**
+   * Get a suggested daily usage value for a supply type based on Settings.
+   * Used to pre-populate the SupplyDialog when adding new supplies.
+   */
+  getSuggestedDailyUsage(type: Supply["type"]): { value: number; source: string } | null {
+    const s = this.getSettings();
+    const profile = this.getProfile();
+    const isPump = profile?.insulinDeliveryMethod === "pump";
+
+    if (type === "needle") {
+      if (s.injectionsPerDay && s.injectionsPerDay > 0) {
+        return { value: s.injectionsPerDay, source: "from your Settings (injections/day)" };
+      }
+      return null;
+    }
+
+    if (type === "insulin") {
+      if (isPump) {
+        if (s.tdd && s.tdd > 0) {
+          return { value: s.tdd, source: "from your Settings (TDD)" };
+        }
+        return null;
+      }
+      const shortActing = s.shortActingUnitsPerDay || 0;
+      const longActing = s.longActingUnitsPerDay || 0;
+      if (shortActing + longActing > 0) {
+        return { value: shortActing + longActing, source: "from your Settings (short + long acting units/day)" };
+      }
+      if (s.tdd && s.tdd > 0) {
+        return { value: s.tdd, source: "from your Settings (TDD)" };
+      }
+      return null;
+    }
+
+    return null;
+  },
+
+  /**
    * Calculate the adjusted remaining quantity based on days elapsed since pickup.
    * If pickup date and quantity are set, automatically deducts daily usage for each day passed.
+   * Uses Settings data for insulin and needle daily usage rates.
    */
   getAdjustedQuantity(supply: Supply): number {
     if (!supply.lastPickupDate || supply.quantityAtPickup == null) {
@@ -893,42 +966,36 @@ export const storage = {
     if (daysElapsed <= 0) {
       return supply.quantityAtPickup;
     }
+
+    const settings = this.getSettings();
     
-    // For CGM supplies, calculate sensors used based on cgmDays from settings
     if (supply.type === "cgm") {
-      const settings = this.getSettings();
-      const cgmDays = settings.cgmDays || 14; // Default to 14 days if not set
-      // Assume user applies first sensor on pickup day, so we count from day 0
-      // Round down days elapsed to whole sensors used
+      const cgmDays = settings.cgmDays || 14;
       const sensorsUsed = Math.floor(daysElapsed / cgmDays);
       const adjusted = supply.quantityAtPickup - sensorsUsed;
       return Math.max(0, adjusted);
     }
     
-    // For infusion sets, calculate based on siteChangeDays from settings
     if (supply.type === "infusion_set") {
-      const settings = this.getSettings();
-      const siteChangeDays = settings.siteChangeDays || 3; // Default to 3 days if not set
+      const siteChangeDays = settings.siteChangeDays || 3;
       const setsUsed = Math.floor(daysElapsed / siteChangeDays);
       const adjusted = supply.quantityAtPickup - setsUsed;
       return Math.max(0, adjusted);
     }
     
-    // For reservoirs, calculate based on reservoirChangeDays from settings
     if (supply.type === "reservoir") {
-      const settings = this.getSettings();
-      const reservoirChangeDays = settings.reservoirChangeDays || 3; // Default to 3 days if not set
+      const reservoirChangeDays = settings.reservoirChangeDays || 3;
       const reservoirsUsed = Math.floor(daysElapsed / reservoirChangeDays);
       const adjusted = supply.quantityAtPickup - reservoirsUsed;
       return Math.max(0, adjusted);
     }
     
-    // For other supplies, use dailyUsage
-    if (!supply.dailyUsage || supply.dailyUsage <= 0) {
+    const effectiveDailyUsage = this.getEffectiveDailyUsage(supply, settings);
+    if (effectiveDailyUsage <= 0) {
       return supply.quantityAtPickup;
     }
     
-    const usedAmount = daysElapsed * supply.dailyUsage;
+    const usedAmount = daysElapsed * effectiveDailyUsage;
     const adjusted = supply.quantityAtPickup - usedAmount;
     return Math.max(0, adjusted);
   },
@@ -948,41 +1015,32 @@ export const storage = {
   },
 
   /**
-   * Calculate days remaining based on adjusted quantity / dailyUsage.
-   * Uses the adjusted quantity that accounts for daily usage since pickup.
-   * For CGM supplies, uses cgmDays from settings instead of dailyUsage.
+   * Calculate days remaining based on adjusted quantity and effective daily usage.
+   * Uses Settings data for insulin/needle depletion rates.
+   * For CGM/infusion/reservoir, uses settings intervals.
    */
   getDaysRemaining(supply: Supply): number {
     const adjustedQty = this.getAdjustedQuantity(supply);
+    const settings = this.getSettings();
     
-    // For CGM supplies, use sensor duration from settings
     if (supply.type === "cgm") {
-      const settings = this.getSettings();
-      const cgmDays = settings.cgmDays || 14; // Default to 14 days if not set
-      // Each sensor lasts cgmDays, so total days = sensors * cgmDays
-      // Round down for safety (user likely applies sensor soon after pickup)
+      const cgmDays = settings.cgmDays || 14;
       return Math.floor(adjustedQty * cgmDays);
     }
     
-    // For infusion sets, use site change days from settings
     if (supply.type === "infusion_set") {
-      const settings = this.getSettings();
-      const siteChangeDays = settings.siteChangeDays || 3; // Default to 3 days if not set
-      // Each set lasts siteChangeDays, so total days = sets * siteChangeDays
+      const siteChangeDays = settings.siteChangeDays || 3;
       return Math.floor(adjustedQty * siteChangeDays);
     }
     
-    // For reservoirs, use reservoir change days from settings
     if (supply.type === "reservoir") {
-      const settings = this.getSettings();
-      const reservoirChangeDays = settings.reservoirChangeDays || 3; // Default to 3 days if not set
-      // Each reservoir lasts reservoirChangeDays, so total days = reservoirs * reservoirChangeDays
+      const reservoirChangeDays = settings.reservoirChangeDays || 3;
       return Math.floor(adjustedQty * reservoirChangeDays);
     }
     
-    // For other supplies, use dailyUsage
-    if (supply.dailyUsage <= 0) return 999;
-    return Math.floor(adjustedQty / supply.dailyUsage);
+    const effectiveDailyUsage = this.getEffectiveDailyUsage(supply, settings);
+    if (effectiveDailyUsage <= 0) return 999;
+    return Math.floor(adjustedQty / effectiveDailyUsage);
   },
 
   /**

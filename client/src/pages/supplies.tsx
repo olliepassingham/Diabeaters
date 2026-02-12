@@ -792,7 +792,6 @@ function SupplyCard({
                     const uPerContainer = getUnitsPerPen();
                     const containerLabel = getInsulinContainerLabel();
                     const containerCount = Math.floor(adjustedQuantity / uPerContainer);
-                    const remainderUnits = Math.floor(adjustedQuantity % uPerContainer);
                     const plural = containerCount === 1 ? containerLabel : `${containerLabel}s`;
                     return (
                       <>
@@ -800,10 +799,10 @@ function SupplyCard({
                           status === "critical" ? "text-red-600 dark:text-red-500" : 
                           status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                         }`}>
-                          {containerCount} {plural}{remainderUnits > 0 ? ` + ${remainderUnits}u` : ""}
+                          {containerCount} unopened {plural}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          (~{Math.floor(adjustedQuantity)} units total)
+                          ~{Math.floor(adjustedQuantity)} units remaining
                         </p>
                       </>
                     );
@@ -835,7 +834,7 @@ function SupplyCard({
                   status === "critical" ? "text-red-600 dark:text-red-500" : 
                   status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
                 }`} data-testid={`text-remaining-${supply.id}`}>
-                  ~{Math.floor(adjustedQuantity)}
+                  ~{Math.floor(adjustedQuantity)}{supply.type === "needle" ? " needles" : ""}
                 </p>
               )}
             </div>
@@ -873,12 +872,19 @@ function SupplyCard({
               <span>Reservoir change</span>
               <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
             </div>
-          ) : (
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Daily usage</span>
-              <span>{supply.dailyUsage}/day</span>
-            </div>
-          )}
+          ) : (() => {
+            const effectiveUsage = storage.getEffectiveDailyUsage(supply);
+            return (
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Daily usage</span>
+                <span>
+                  {effectiveUsage > 0 ? effectiveUsage : supply.dailyUsage}/day
+                  {supply.type === "insulin" && " units"}
+                  {supply.type === "needle" && " needles"}
+                </span>
+              </div>
+            );
+          })()}
           
           {lastPickupText && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -888,11 +894,15 @@ function SupplyCard({
           )}
           
           {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && 
-           supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (
-            <div className="text-xs text-muted-foreground">
-              Started with {supply.quantityAtPickup} • Used ~{Math.round(daysSincePickup * supply.dailyUsage)}
-            </div>
-          )}
+           supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (() => {
+            const effectiveUsage = storage.getEffectiveDailyUsage(supply);
+            const usedAmount = Math.round(daysSincePickup * effectiveUsage);
+            return (
+              <div className="text-xs text-muted-foreground">
+                Started with {supply.quantityAtPickup}{supply.type === "insulin" ? "u" : ""} • Used ~{usedAmount}{supply.type === "insulin" ? "u" : ""}
+              </div>
+            );
+          })()}
           
           {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "cgm" && (
             <div className="text-xs text-muted-foreground">
@@ -1030,10 +1040,11 @@ function SupplyDialog({
       setName("");
       setType("needle");
       setQuantity("");
-      setDailyUsage("");
       setNotes("");
       setPickupDate(format(new Date(), "yyyy-MM-dd"));
       setShowLastPrescriptionOption(lastPrescription !== null);
+      const suggested = storage.getSuggestedDailyUsage("needle");
+      setDailyUsage(suggested ? suggested.value.toString() : "");
     }
   }, [supply, open, lastPrescription]);
 
@@ -1109,7 +1120,14 @@ function SupplyDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as Supply["type"])}>
+            <Select value={type} onValueChange={(v) => {
+              const newType = v as Supply["type"];
+              setType(newType);
+              if (!supply) {
+                const suggested = storage.getSuggestedDailyUsage(newType);
+                setDailyUsage(suggested ? suggested.value.toString() : "");
+              }
+            }}>
               <SelectTrigger id="type" data-testid="select-supply-type">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -1160,20 +1178,41 @@ function SupplyDialog({
                   Each reservoir lasts the number of days you've configured there.
                 </p>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <Label htmlFor="daily-usage">Daily Usage</Label>
-                <Input 
-                  id="daily-usage" 
-                  type="number" 
-                  step="0.1"
-                  placeholder="e.g., 4" 
-                  value={dailyUsage} 
-                  onChange={e => setDailyUsage(e.target.value)}
-                  data-testid="input-supply-daily-usage"
-                />
-              </div>
-            )}
+            ) : (() => {
+              const suggested = storage.getSuggestedDailyUsage(type);
+              return (
+                <div className="space-y-2">
+                  <Label htmlFor="daily-usage">
+                    {type === "insulin" ? "Daily Insulin Usage (units/day)" : 
+                     type === "needle" ? "Needles Used Per Day" : "Daily Usage"}
+                  </Label>
+                  <Input 
+                    id="daily-usage" 
+                    type="number" 
+                    step="0.1"
+                    placeholder={type === "insulin" ? "e.g., 40" : type === "needle" ? "e.g., 4" : "e.g., 4"} 
+                    value={dailyUsage} 
+                    onChange={e => setDailyUsage(e.target.value)}
+                    data-testid="input-supply-daily-usage"
+                  />
+                  {suggested && dailyUsage === suggested.value.toString() && (
+                    <p className="text-xs text-primary">
+                      Auto-filled {suggested.source}
+                    </p>
+                  )}
+                  {type === "insulin" && (
+                    <p className="text-xs text-muted-foreground">
+                      Total insulin units you use per day. This determines how quickly your pens deplete.
+                    </p>
+                  )}
+                  {type === "needle" && (
+                    <p className="text-xs text-muted-foreground">
+                      Number of needles you use per day (typically matches your injections per day).
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <div className="space-y-2">
             <Label htmlFor="pickup-date">Pickup Date</Label>
