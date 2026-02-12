@@ -34,7 +34,7 @@ export function BottomNav() {
   const isMoreActive = moreItems.some(item => location === item.url);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t safe-area-bottom md:hidden" data-testid="nav-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t safe-area-bottom" data-testid="nav-bottom">
       <div className="flex items-stretch justify-around px-1">
         {primaryTabs.map((tab) => {
           const isActive = location === tab.url;

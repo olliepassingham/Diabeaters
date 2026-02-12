@@ -149,12 +149,12 @@ function AppContent() {
               <ProfileMenu />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+          <main className="flex-1 overflow-auto p-4 md:p-6 pb-20">
             <div key={location} className="animate-fade-in-up">
               <Router />
             </div>
           </main>
-          <footer className="hidden md:block border-t py-3 px-6 text-center text-xs text-muted-foreground">
+          <footer className="hidden border-t py-3 px-6 text-center text-xs text-muted-foreground">
             <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>
           </footer>
         </div>
