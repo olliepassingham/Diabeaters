@@ -725,12 +725,13 @@ export default function Travel() {
     endDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
 
-    const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const daysElapsed = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const daysRemaining = Math.max(0, totalDays - daysElapsed);
-    const progressPercent = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+    const totalDays = Math.max(1, plan.duration || Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
     const hasStarted = today >= startDate;
     const hasEnded = today > endDate;
+    const daysElapsed = hasStarted ? Math.min(totalDays, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+    const daysUntilStart = !hasStarted ? Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+    const progressPercent = hasStarted ? Math.min(100, Math.round((daysElapsed / totalDays) * 100)) : 0;
 
     const checkedCount = packingList.filter(i => i.checked).length;
     const groupedItems = packingList.reduce((acc, item) => {
@@ -779,7 +780,7 @@ export default function Travel() {
                 {new Date(plan.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — {new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               </span>
               <span className="font-medium" data-testid="text-trip-progress">
-                {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${Math.abs(daysElapsed)} days`}
+                {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? "s" : ""}`}
               </span>
             </div>
             <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
@@ -790,7 +791,7 @@ export default function Travel() {
           </CardContent>
         </Card>
 
-        {todayScheduleEntry && !isPumpUser && (
+        {todayScheduleEntry && !isPumpUser && hasStarted && !hasEnded && (
           <Card className="border-purple-200 dark:border-purple-800">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -857,7 +858,7 @@ export default function Travel() {
           </Card>
         )}
 
-        {isPumpUser && plan.timezoneChange !== "none" && (
+        {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
           <Card className="border-purple-200 dark:border-purple-800">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-lg">
