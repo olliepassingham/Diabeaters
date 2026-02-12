@@ -48,8 +48,8 @@ export function BottomNav() {
                 }`}
                 data-testid={`bottomnav-${tab.title.toLowerCase()}`}
               >
-                <tab.icon className={`h-5 w-5 ${isActive ? "stroke-[2.5]" : ""}`} />
-                <span className="text-[10px] font-medium">{tab.title}</span>
+                <tab.icon className={`h-6 w-6 ${isActive ? "stroke-[2.5]" : ""}`} />
+                <span className="text-[11px] font-medium">{tab.title}</span>
               </button>
             </Link>
           );
@@ -65,8 +65,8 @@ export function BottomNav() {
               }`}
               data-testid="bottomnav-more"
             >
-              <MoreHorizontal className={`h-5 w-5 ${isMoreActive ? "stroke-[2.5]" : ""}`} />
-              <span className="text-[10px] font-medium">More</span>
+              <MoreHorizontal className={`h-6 w-6 ${isMoreActive ? "stroke-[2.5]" : ""}`} />
+              <span className="text-[11px] font-medium">More</span>
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl pb-8">
