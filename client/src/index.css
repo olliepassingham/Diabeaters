@@ -20,11 +20,11 @@
 
   --border: 38 20% 82%;
 
-  --card: 37 40% 92%;
+  --card: 38 35% 97%;
 
   --card-foreground: 27.27deg 14.29% 15.1%;
 
-  --card-border: 38 25% 86%;
+  --card-border: 38 20% 91%;
 
   --sidebar: 40 30% 92%;
 
@@ -141,12 +141,12 @@
   /* Subtle warm border */
   --border: 32 18% 24%;
 
-  /* Cocoa card surfaces - distinct from background */
-  --card: 30 20% 18%;
+  /* Cocoa card surfaces - slightly lighter for readability */
+  --card: 30 18% 21%;
 
-  --card-foreground: 38 40% 86%;
+  --card-foreground: 38 40% 88%;
 
-  --card-border: 32 20% 26%;
+  --card-border: 32 18% 28%;
 
   /* Dark mocha sidebar */
   --sidebar: 28 22% 16%;
@@ -337,13 +337,13 @@
 }
 
 .glass-card {
-  background: hsl(var(--card) / 0.75);
+  background: hsl(var(--card) / 0.92);
   backdrop-filter: blur(12px) saturate(1.1);
   -webkit-backdrop-filter: blur(12px) saturate(1.1);
 }
 
 .dark .glass-card {
-  background: hsl(var(--card) / 0.65);
+  background: hsl(var(--card) / 0.85);
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
 }

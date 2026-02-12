@@ -90,19 +90,17 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
   const firstName = profile?.name?.split(" ")[0] || "";
 
   return (
-    <Card className="glass-card" data-testid="card-header">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold" data-testid="text-greeting">
-              {greeting()}{firstName ? `, ${firstName}` : ""}
-            </h1>
-            <p className="text-muted-foreground text-sm">Here's your diabetes today</p>
-          </div>
-          <StatusIndicator status={status} />
+    <div className="p-4" data-testid="card-header">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold" data-testid="text-greeting">
+            {greeting()}{firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="text-muted-foreground text-sm">Here's your diabetes today</p>
         </div>
-      </CardContent>
-    </Card>
+        <StatusIndicator status={status} />
+      </div>
+    </div>
   );
 }
 
