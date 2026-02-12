@@ -116,7 +116,7 @@ function DashboardInfoDialog() {
         <p>Click the gear icon to customise your dashboard. You can show or hide widgets and rearrange them to suit your needs.</p>
       </InfoSection>
       <InfoSection title="Rearranging Widgets">
-        <p>When in customisation mode, use the up and down arrows to move widgets. Toggle the switch to show or hide a widget.</p>
+        <p>When in customisation mode, drag the grip handle to reorder widgets. Use the category tabs to filter, and toggle the switch to show or hide a widget.</p>
       </InfoSection>
       <InfoSection title="Status Indicator">
         <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
@@ -503,6 +503,11 @@ export default function Dashboard() {
     setWidgets(sorted);
   };
 
+  const handleReorderWidgets = (reordered: DashboardWidget[]) => {
+    storage.saveDashboardWidgets(reordered);
+    setWidgets(reordered);
+  };
+
   const handleCloseEditor = () => {
     setIsEditing(false);
     setRefreshKey(prev => prev + 1);
@@ -546,6 +551,7 @@ export default function Dashboard() {
             onToggleWidget={handleToggleWidget}
             onMoveWidget={handleMoveWidget}
             onResizeWidget={handleResizeWidget}
+            onReorderWidgets={handleReorderWidgets}
             onClose={handleCloseEditor}
           />
         </div>
@@ -570,7 +576,7 @@ export default function Dashboard() {
                 if (next && next.size === "half") {
                   rows.push(
                     <Card key={`pair-${widget.id}-${next.id}`} className="overflow-hidden">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                      <div className="grid grid-cols-2 divide-x divide-border">
                         <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none" data-testid={`widget-container-${widget.type}`}>
                           <WidgetRenderer type={widget.type} size={widget.size} />
                         </div>
