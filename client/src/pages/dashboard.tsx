@@ -482,16 +482,47 @@ export default function Dashboard() {
       )}
       
       {!isEditing && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 animate-stagger">
-          {widgetsToRender.map((widget) => (
-            <div 
-              key={widget.id} 
-              className={`${widget.size === "full" ? "col-span-2" : "h-[280px] min-h-[280px] max-h-[280px]"} [&>*]:h-full`}
-              data-testid={`widget-container-${widget.type}`}
-            >
-              <WidgetRenderer type={widget.type} size={widget.size} />
-            </div>
-          ))}
+        <div className="flex flex-col gap-3 sm:gap-4 animate-stagger">
+          {(() => {
+            const rows: React.ReactNode[] = [];
+            let i = 0;
+            while (i < widgetsToRender.length) {
+              const widget = widgetsToRender[i];
+              if (widget.size === "full") {
+                rows.push(
+                  <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
+                    <WidgetRenderer type={widget.type} size={widget.size} />
+                  </div>
+                );
+                i++;
+              } else {
+                const next = widgetsToRender[i + 1];
+                if (next && next.size === "half") {
+                  rows.push(
+                    <Card key={`pair-${widget.id}-${next.id}`} className="overflow-hidden">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none" data-testid={`widget-container-${widget.type}`}>
+                          <WidgetRenderer type={widget.type} size={widget.size} />
+                        </div>
+                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none" data-testid={`widget-container-${next.type}`}>
+                          <WidgetRenderer type={next.type} size={next.size} />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                  i += 2;
+                } else {
+                  rows.push(
+                    <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
+                      <WidgetRenderer type={widget.type} size={widget.size} />
+                    </div>
+                  );
+                  i++;
+                }
+              }
+            }
+            return rows;
+          })()}
         </div>
       )}
 
