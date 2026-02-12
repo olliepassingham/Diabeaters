@@ -117,6 +117,12 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Track clinic visits and check-ups",
     icon: Calendar,
   },
+  "supply-depletion": {
+    type: "supply-depletion",
+    name: "Depletion Forecast",
+    description: "Visual timeline of when supplies run out",
+    icon: Package,
+  },
 };
 
 interface WidgetLibraryProps {

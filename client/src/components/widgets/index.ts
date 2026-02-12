@@ -1,4 +1,5 @@
 export { SupplySummaryWidget } from "./supply-summary-widget";
+export { SupplyDepletionWidget } from "./supply-depletion-widget";
 export { TodayOverviewWidget } from "./today-overview-widget";
 export { AIRecommendationsWidget } from "./ai-recommendations-widget";
 export { QuickActionsWidget } from "./quick-actions-widget";

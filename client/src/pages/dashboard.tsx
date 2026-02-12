@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import {
   SupplySummaryWidget,
+  SupplyDepletionWidget,
   TodayOverviewWidget,
   AIRecommendationsWidget,
   QuickActionsWidget,
@@ -350,6 +351,8 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
       return <HelpNowInfoWidget compact={compact} />;
     case "appointments":
       return <AppointmentsWidget compact={compact} />;
+    case "supply-depletion":
+      return <SupplyDepletionWidget compact={compact} />;
     default:
       return null;
   }

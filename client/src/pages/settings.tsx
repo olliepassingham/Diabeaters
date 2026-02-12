@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check } from "lucide-react";
+import { useTheme, COLOUR_THEMES, ColourThemeId } from "@/hooks/use-theme";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
@@ -560,6 +561,89 @@ function EmergencyContactsTab({
   );
 }
 
+function AppearanceTab() {
+  const { theme, colourTheme, toggleTheme, setColourTheme } = useTheme();
+  const { toast } = useToast();
+
+  const handleColourChange = (id: ColourThemeId) => {
+    setColourTheme(id);
+    toast({ title: "Theme updated", description: `Switched to ${COLOUR_THEMES.find(t => t.id === id)?.name} theme.` });
+  };
+
+  return (
+    <Card data-testid="settings-appearance">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Palette className="h-5 w-5" />
+          Appearance
+        </CardTitle>
+        <CardDescription>Personalise the look and feel of your app</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <Label className="text-base font-medium">Mode</Label>
+          <div className="flex gap-3">
+            <Button
+              variant={theme === "light" ? "default" : "outline"}
+              onClick={() => { if (theme !== "light") toggleTheme(); }}
+              className="flex-1"
+              data-testid="button-theme-light"
+            >
+              <Sun className="h-4 w-4 mr-2" />
+              Light
+            </Button>
+            <Button
+              variant={theme === "dark" ? "default" : "outline"}
+              onClick={() => { if (theme !== "dark") toggleTheme(); }}
+              className="flex-1"
+              data-testid="button-theme-dark"
+            >
+              <Moon className="h-4 w-4 mr-2" />
+              Dark
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Label className="text-base font-medium">Colour Theme</Label>
+          <p className="text-sm text-muted-foreground">Choose a colour palette that suits you</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {COLOUR_THEMES.map((ct) => {
+              const isSelected = colourTheme === ct.id;
+              const previewColor = theme === "dark" ? ct.preview.dark : ct.preview.light;
+              return (
+                <button
+                  key={ct.id}
+                  onClick={() => handleColourChange(ct.id)}
+                  className={`relative p-3 rounded-lg border-2 transition-all text-left ${
+                    isSelected
+                      ? "border-primary ring-2 ring-primary/20"
+                      : "border-border hover-elevate"
+                  }`}
+                  data-testid={`button-colour-theme-${ct.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full shrink-0 border border-border"
+                      style={{ backgroundColor: previewColor }}
+                    />
+                    <span className="text-sm font-medium">{ct.name}</span>
+                  </div>
+                  {isSelected && (
+                    <div className="absolute top-1.5 right-1.5">
+                      <Check className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DataTab() {
   const { toast } = useToast();
 
@@ -646,7 +730,7 @@ export default function Settings() {
   const [, setLocation] = useLocation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
-  const validTabs = ["profile", "insulin", "usage", "notifications", "contacts", "data"];
+  const validTabs = ["profile", "insulin", "usage", "notifications", "contacts", "data", "appearance"];
   const urlTab = new URLSearchParams(window.location.search).get("tab");
   const [activeTab, setActiveTab] = useState(urlTab && validTabs.includes(urlTab) ? urlTab : "profile");
   
@@ -905,7 +989,7 @@ export default function Settings() {
 
       <div className="max-w-3xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="settings-tabs">
-          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-6" data-testid="settings-tab-list">
+          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-7" data-testid="settings-tab-list">
             <TabsTrigger value="profile" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-profile">
               <User className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Profile</span>
@@ -929,6 +1013,10 @@ export default function Settings() {
             <TabsTrigger value="data" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-data">
               <Download className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Data</span>
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-appearance">
+              <Palette className="h-4 w-4 mr-1.5 shrink-0" />
+              <span>Theme</span>
             </TabsTrigger>
           </TabsList>
 
@@ -997,6 +1085,10 @@ export default function Settings() {
 
             <TabsContent value="data" className="animate-fade-in-up">
               <DataTab />
+            </TabsContent>
+
+            <TabsContent value="appearance" className="animate-fade-in-up">
+              <AppearanceTab />
             </TabsContent>
           </div>
         </Tabs>

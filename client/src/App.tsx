@@ -14,8 +14,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 // ✅ SidebarProvider / SidebarTrigger are named exports from ui/sidebar.tsx
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
-// ✅ App-level components — assumed named exports (adjust to default if your file uses `export default`)
 import { AppSidebar } from "@/components/app-sidebar";
+import { BottomNav } from "@/components/bottom-nav";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
@@ -118,13 +118,15 @@ function AppContent() {
   return (
     <SidebarProvider style={style}>
       <div className="flex h-screen w-full">
-        <AppSidebar />
+        <div className="hidden md:block">
+          <AppSidebar />
+        </div>
         <div className="flex flex-col flex-1 overflow-hidden">
           <OfflineBanner />
           <SickDayBanner />
           <TravelBanner />
           <header className="flex items-center justify-between p-4 border-b transition-colors duration-200">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <SidebarTrigger className="hidden md:flex" data-testid="button-sidebar-toggle" />
             <button
               onClick={() => {
                 if (location !== "/") {
@@ -147,16 +149,17 @@ function AppContent() {
               <ProfileMenu />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6">
+          <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
             <div key={location} className="animate-fade-in-up">
               <Router />
             </div>
           </main>
-          <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground">
+          <footer className="hidden md:block border-t py-3 px-6 text-center text-xs text-muted-foreground">
             <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>
           </footer>
         </div>
       </div>
+      <BottomNav />
     </SidebarProvider>
   );
 }
