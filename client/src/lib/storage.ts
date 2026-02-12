@@ -487,7 +487,7 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
   { id: "scenario-status", type: "scenario-status", enabled: true, order: 5, size: "half" },
   { id: "community", type: "community", enabled: true, order: 6, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: false, order: 7, size: "half" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
   { id: "help-now-info", type: "help-now-info", enabled: false, order: 8, size: "half" },
   { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 9, size: "half" },
   { id: "travel-mode", type: "travel-mode", enabled: false, order: 10, size: "half" },

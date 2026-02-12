@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Settings, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
+import { CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings, UserProfile, EmergencyContact } from "@/lib/storage";
 
@@ -38,32 +38,7 @@ export function SettingsCompletionWidget({ compact = false }: { compact?: boolea
   const isComplete = completedCount === totalCount;
 
   if (isComplete) {
-    return (
-      <Card className={`border-green-500/30 bg-green-50/50 dark:bg-green-950/20 ${compact ? "flex flex-col overflow-hidden" : ""}`}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <CardTitle className="text-base">Settings Complete</CardTitle>
-            </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-              All set
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Your settings are configured. All features are ready to use.
-          </p>
-          <Link href="/settings">
-            <Button variant="ghost" size="sm" className="mt-2 -ml-2" data-testid="link-settings-complete">
-              <Settings className="h-4 w-4 mr-2" />
-              Review Settings
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (
