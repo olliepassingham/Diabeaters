@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,95 +6,17 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Send, Utensils, Dumbbell, AlertCircle, Bot, User, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Wrench, Repeat } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { AIStatusInline } from "@/components/ai-status-banner";
+
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
-type MessageAction = {
-  label: string;
-  onClick: () => void;
-};
-
-type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
-
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  action?: MessageAction;
-  confidence?: ConfidenceLevel;
-  mealPeriod?: string;
-};
-
-function ConfidenceBadge({ level, mealPeriod }: { level: ConfidenceLevel; mealPeriod?: string }) {
-  const config = {
-    HIGH: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", label: "High confidence" },
-    MEDIUM: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400", label: "Medium confidence" },
-    LOW: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400", label: "Low confidence" },
-  };
-  const c = config[level];
-  return (
-    <div className="flex items-center gap-2 mt-2 flex-wrap">
-      <span className={`text-xs px-2 py-0.5 rounded-full ${c.bg} ${c.text}`} data-testid="badge-confidence">
-        {c.label}
-      </span>
-      {mealPeriod && (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1" data-testid="badge-meal-period">
-          <Clock className="h-3 w-3" />
-          {mealPeriod} time
-        </span>
-      )}
-    </div>
-  );
-}
-
-function ChatMessage({ role, content, timestamp, action, confidence, mealPeriod }: Message) {
-  return (
-    <div className={`flex gap-3 ${role === "user" ? "flex-row-reverse" : ""}`}>
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-        role === "assistant" ? "bg-primary/10" : "bg-muted"
-      }`}>
-        {role === "assistant" ? (
-          <Bot className="h-4 w-4 text-primary" />
-        ) : (
-          <User className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
-      <div className={`max-w-[80%] ${role === "user" ? "text-right" : ""}`}>
-        <div className={`p-3 rounded-lg ${
-          role === "user" 
-            ? "bg-primary text-primary-foreground" 
-            : "bg-muted"
-        }`}>
-          <p className="text-sm whitespace-pre-wrap">{content}</p>
-          {role === "assistant" && confidence && (
-            <ConfidenceBadge level={confidence} mealPeriod={mealPeriod} />
-          )}
-          {action && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="mt-2"
-              onClick={action.onClick}
-              data-testid="button-message-action"
-            >
-              <Dumbbell className="h-3 w-3 mr-1" />
-              {action.label}
-            </Button>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">{timestamp}</p>
-      </div>
-    </div>
-  );
-}
 
 function generateExerciseTypeGuide(bgUnits: string = "mmol/L"): string {
   const lowThreshold = bgUnits === "mmol/L" ? "5.0" : "90";
@@ -350,129 +272,6 @@ function processActivitySessionMessage(message: string, settings: UserSettings, 
     `[Not medical advice. Individual responses vary. Track your patterns.]`;
 }
 
-function processUserMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L", context: "meal" | "exercise"): string {
-  const lowerMessage = message.toLowerCase();
-
-  if (context === "meal") {
-    const carbMatch = message.match(/(\d+)\s*(?:g|gram|cp|portion)/i);
-    const carbs = carbMatch ? parseInt(carbMatch[1]) : null;
-    
-    if (carbs) {
-      const mealType = lowerMessage.includes("breakfast") ? "breakfast" :
-                       lowerMessage.includes("lunch") ? "lunch" :
-                       lowerMessage.includes("dinner") ? "dinner" :
-                       lowerMessage.includes("snack") ? "snack" : "meal";
-      
-      const ratioMap: Record<string, string | undefined> = {
-        breakfast: settings.breakfastRatio,
-        lunch: settings.lunchRatio,
-        dinner: settings.dinnerRatio,
-        snack: settings.snackRatio,
-        meal: settings.lunchRatio || settings.breakfastRatio,
-      };
-
-      const ratio = ratioMap[mealType];
-      let insulinUnits = 0;
-
-      if (ratio) {
-        const match = ratio.match(/1:(\d+)/);
-        if (match) {
-          const carbRatio = parseInt(match[1]);
-          insulinUnits = Math.round((carbs / carbRatio) * 10) / 10;
-        }
-      } else if (settings.tdd) {
-        const estimatedRatio = Math.round(500 / settings.tdd);
-        insulinUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
-      }
-
-      if (insulinUnits > 0) {
-        return `For ${carbs}g carbs at ${mealType}: approximately ${insulinUnits} units\n\n` +
-          `Adjust for your current blood glucose if needed.\n\n` +
-          `[Not medical advice. Always verify with your own calculations.]`;
-      }
-
-      // Even without explicit ratio, try to estimate from TDD
-      if (settings.tdd) {
-        const estimatedRatio = Math.round(500 / settings.tdd);
-        const estimatedUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
-        return `For ${carbs}g carbs at ${mealType}: approximately ${estimatedUnits} units (estimated from TDD)\n\n` +
-          `Adjust for your current blood glucose if needed.\n\n` +
-          `[Not medical advice. Always verify with your own calculations.]`;
-      }
-
-      return `To calculate your bolus, please add your carb ratios or TDD in Settings.\n\n` +
-        `[Not medical advice.]`;
-    }
-
-    return `I can help you plan your meal! Please tell me:\n\n` +
-      `- How many carbs you're planning to eat (e.g., "60g carbs")\n` +
-      `- What meal it is (breakfast, lunch, dinner, or snack)\n\n` +
-      `I'll calculate a suggested bolus based on your ratios.\n\n` +
-      `[Not medical advice. Always verify with your own calculations.]`;
-  }
-
-  if (context === "exercise") {
-    const durationMatch = message.match(/(\d+)\s*(?:min|minute|hr|hour)/i);
-    const duration = durationMatch ? parseInt(durationMatch[1]) : null;
-    const intensity = lowerMessage.includes("intense") || lowerMessage.includes("hard") ? "intense" :
-                      lowerMessage.includes("light") || lowerMessage.includes("easy") ? "light" : "moderate";
-
-    if (duration) {
-      let carbsNeeded = 0;
-      let insulinReduction = "";
-
-      switch (intensity) {
-        case "light":
-          carbsNeeded = Math.round(duration / 30 * 10);
-          insulinReduction = "10-20%";
-          break;
-        case "moderate":
-          carbsNeeded = Math.round(duration / 30 * 15);
-          insulinReduction = "20-30%";
-          break;
-        case "intense":
-          carbsNeeded = Math.round(duration / 30 * 25);
-          insulinReduction = "30-50%";
-          break;
-      }
-
-      const idealLow = bgUnits === "mmol/L" ? "6.7" : "120";
-      const idealHigh = bgUnits === "mmol/L" ? "10.0" : "180";
-      const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
-      const hypoThreshold = bgUnits === "mmol/L" ? "4.0" : "70";
-
-      const recoveryCarbs = intensity === "intense" ? "25-30g" : intensity === "moderate" ? "15-25g" : "10-15g";
-      
-      return `For ${duration} minutes of ${intensity} exercise:\n\n` +
-        `**Before Exercise:**\n` +
-        `- Ideal starting BG: ${idealLow}-${idealHigh} ${bgUnits}\n` +
-        `- If below ${lowThreshold} ${bgUnits}: eat ${carbsNeeded}g of fast-acting carbs\n` +
-        `- Consider reducing bolus by ${insulinReduction} for meal within 2 hours before\n\n` +
-        `**During Exercise:**\n` +
-        `- Carry fast-acting glucose (15-20g)\n` +
-        `- Check BG every 30-45 minutes for longer sessions\n` +
-        `- If BG drops below ${hypoThreshold} ${bgUnits}, stop and treat\n\n` +
-        `**After Exercise - Recovery Snack:**\n` +
-        `- Within 30-60 mins: ${recoveryCarbs} carbs + protein\n` +
-        `- Good options: chocolate milk, yogurt + fruit, banana + peanut butter\n` +
-        `- Reduce bolus by ${insulinReduction} for recovery snack/meal\n\n` +
-        `**Delayed Low Prevention:**\n` +
-        `- Monitor BG for 6-24 hours after\n` +
-        `- Consider a protein-carb snack before bed\n` +
-        `- Stay hydrated\n\n` +
-        `[Not medical advice. Individual responses to exercise vary significantly.]`;
-    }
-
-    return `I can help you plan for exercise! Please tell me:\n\n` +
-      `- How long you'll exercise (e.g., "45 minutes")\n` +
-      `- What type of exercise (cardio, weights, HIIT, etc.)\n` +
-      `- How intense it will be (light, moderate, intense)\n\n` +
-      `I'll provide recommendations for before, during, and after.\n\n` +
-      `[Not medical advice. Individual responses to exercise vary.]`;
-  }
-
-  return `How can I help you today?`;
-}
 
 function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; bgUnits: string }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -535,80 +334,6 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
   );
 }
 
-function ChatSection({ 
-  messages, 
-  inputValue, 
-  setInputValue, 
-  onSend, 
-  isTyping,
-  placeholder 
-}: { 
-  messages: Message[]; 
-  inputValue: string; 
-  setInputValue: (v: string) => void; 
-  onSend: () => void; 
-  isTyping: boolean;
-  placeholder: string;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    if (scrollRef.current) {
-      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
-    }
-  }, [messages]);
-
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Bot className="h-4 w-4 text-primary" />
-          Ask the AI Advisor
-        </CardTitle>
-      </CardHeader>
-      <ScrollArea className="px-4 h-[300px]" ref={scrollRef}>
-        <div className="space-y-4 pb-4">
-          {messages.map((message, index) => (
-            <ChatMessage key={index} {...message} />
-          ))}
-          {isTyping && (
-            <div className="flex gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                  <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      <div className="border-t p-4">
-        <div className="flex gap-2">
-          <Input
-            placeholder={placeholder}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && onSend()}
-            disabled={isTyping}
-            data-testid="input-chat"
-          />
-          <Button onClick={onSend} disabled={isTyping || !inputValue.trim()} data-testid="button-send">
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 function getInitialTab(): string {
   const params = new URLSearchParams(window.location.search);
@@ -632,25 +357,8 @@ export default function Advisor() {
     }
   }, []);
   
-  const [mealMessages, setMealMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Hi! I'm here to help you plan your meals. Tell me how many carbs you're planning to eat (e.g., \"60g carbs for lunch\") and I'll calculate a suggested mealtime dose based on your ratios.\n\n[Not medical advice. Always verify with your own calculations.]",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
-  const [exerciseMessages, setExerciseMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Hi! I'm here to help you plan your workout. Use the form above to set up your exercise, then I'll give you a complete plan covering what to eat before, during, and after your workout, plus insulin adjustments.\n\n[Not medical advice. Individual responses to exercise vary.]",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
-  
-  const [mealInput, setMealInput] = useState("");
-  const [exerciseInput, setExerciseInput] = useState("");
-  const [isMealTyping, setIsMealTyping] = useState(false);
-  const [isExerciseTyping, setIsExerciseTyping] = useState(false);
+  const [mealResult, setMealResult] = useState<string | null>(null);
+  const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
@@ -821,218 +529,42 @@ export default function Advisor() {
     });
   };
 
-  const sendMealMessage = async (message: string) => {
-    const userMessage: Message = {
-      role: "user",
-      content: message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMealMessages(prev => [...prev, userMessage]);
-    setIsMealTyping(true);
-
-    let aiResponse: string;
-    let confidence: ConfidenceLevel = "MEDIUM";
-    let mealPeriod: string | undefined;
-
-    try {
-      const userProfile = storage.getProfile();
-      const userSettings = storage.getSettings();
-      const activityLogs = storage.getActivityLogs().slice(0, 5);
-      
-      // Build conversation history for context (excluding the welcome message)
-      const conversationHistory = [...mealMessages, userMessage]
-        .filter(m => m.content !== mealMessages[0]?.content)
-        .map(m => ({ role: m.role, content: m.content }));
-      
-      const response = await fetch("/api/activity/advice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activityType: "meal",
-          activityDetails: message,
-          userProfile,
-          userSettings,
-          conversationHistory,
-          activityLogs,
-          currentTime: new Date().toISOString(),
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        aiResponse = data.recommendation + "\n\n[Not medical advice. Always verify with your own calculations.]";
-        confidence = data.confidence || "MEDIUM";
-        mealPeriod = data.mealPeriod;
-      } else {
-        // API unavailable or error - use local processing
-        aiResponse = processUserMessage(message, userSettings, bgUnits, "meal");
-      }
-    } catch {
-      // Network error or other failure - use local processing
-      const freshSettings = storage.getSettings();
-      aiResponse = processUserMessage(message, freshSettings, bgUnits, "meal");
-    }
-
-    setMealMessages(prev => [...prev, {
-      role: "assistant",
-      content: aiResponse,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      confidence,
-      mealPeriod,
-      action: {
-        label: "Plan Exercise",
-        onClick: () => setActiveTab("exercise"),
-      },
-    }]);
+  const handleQuickMealPlan = () => {
+    if (!mealCarbs) return;
+    const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
+    const freshSettings = storage.getSettings();
+    
+    const message = `${carbValue}g carbs for ${mealTime}`;
+    const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
+    const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
+    
+    const result = processExerciseAwareMealMessage(message, freshSettings, bgUnits, exerciseContext, hoursAway);
+    setMealResult(result);
     
     try {
       storage.addActivityLog({
         activityType: "meal_planning",
-        activityDetails: message,
-        recommendation: aiResponse.substring(0, 200),
+        activityDetails: `${carbValue}g carbs for ${mealTime}`,
+        recommendation: result.substring(0, 200),
       });
-    } catch {
-      // Ignore logging errors
-    }
-
-    setIsMealTyping(false);
+    } catch {}
   };
 
-  const sendExerciseMessage = async (message: string) => {
-    const userMessage: Message = {
-      role: "user",
-      content: message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setExerciseMessages(prev => [...prev, userMessage]);
-    setIsExerciseTyping(true);
-
-    let aiResponse: string;
-    let confidence: ConfidenceLevel = "MEDIUM";
-
-    try {
-      const userProfile = storage.getProfile();
-      const userSettings = storage.getSettings();
-      const activityLogs = storage.getActivityLogs().slice(0, 5);
-      
-      // Build conversation history for context
-      const conversationHistory = [...exerciseMessages, userMessage]
-        .filter(m => m.content !== exerciseMessages[0]?.content)
-        .map(m => ({ role: m.role, content: m.content }));
-      
-      const response = await fetch("/api/activity/advice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activityType: "exercise",
-          activityDetails: message,
-          userProfile,
-          userSettings,
-          conversationHistory,
-          activityLogs,
-          currentTime: new Date().toISOString(),
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        aiResponse = data.recommendation + "\n\n[Not medical advice. Individual responses to exercise vary.]";
-        confidence = data.confidence || "MEDIUM";
-      } else {
-        // API unavailable or error - use local processing with session-style output
-        aiResponse = processActivitySessionMessage(message, userSettings, bgUnits);
-      }
-    } catch {
-      // Network error or other failure - use local processing with session-style output
-      const freshSettings = storage.getSettings();
-      aiResponse = processActivitySessionMessage(message, freshSettings, bgUnits);
-    }
-
-    setExerciseMessages(prev => [...prev, {
-      role: "assistant",
-      content: aiResponse,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      confidence,
-    }]);
+  const handleQuickExercisePlan = () => {
+    if (!exerciseDuration) return;
+    const freshSettings = storage.getSettings();
+    const message = `${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes`;
+    
+    const result = processActivitySessionMessage(message, freshSettings, bgUnits);
+    setExerciseResult(result);
     
     try {
       storage.addActivityLog({
         activityType: "exercise_planning",
         activityDetails: message,
-        recommendation: aiResponse.substring(0, 200),
+        recommendation: result.substring(0, 200),
       });
-    } catch {
-      // Ignore logging errors
-    }
-
-    setIsExerciseTyping(false);
-  };
-
-  const handleMealSend = () => {
-    if (!mealInput.trim()) return;
-    sendMealMessage(mealInput);
-    setMealInput("");
-  };
-
-  const handleExerciseSend = () => {
-    if (!exerciseInput.trim()) return;
-    sendExerciseMessage(exerciseInput);
-    setExerciseInput("");
-  };
-
-  const handleQuickMealPlan = () => {
-    if (!mealCarbs) return;
-    const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
-    
-    let message = `I'm planning to eat ${carbValue}g carbs for ${mealTime}.`;
-    
-    if (planningAroundExercise) {
-      if (exerciseTiming === "before") {
-        message += ` I'll be exercising in about ${exerciseWithin} hours. How should I adjust my insulin?`;
-      } else if (exerciseTiming === "after") {
-        message += ` I just finished exercising about ${exerciseWithin} hours ago. How should I adjust my insulin?`;
-      } else {
-        message += ` I'll be eating this during exercise. How should I handle it?`;
-      }
-    } else {
-      message += ` What should my insulin dose be?`;
-    }
-    
-    sendMealMessageWithExerciseContext(message, planningAroundExercise ? exerciseTiming : undefined, planningAroundExercise ? parseInt(exerciseWithin) : undefined);
-    setMealCarbs("");
-  };
-
-  const handleQuickExercisePlan = () => {
-    if (!exerciseDuration) return;
-    const timingMins = parseInt(sessionTimingFromNow);
-    const timingText = timingMins < 60 ? `${timingMins} minutes` : `${Math.round(timingMins / 60)} hour${timingMins >= 120 ? 's' : ''}`;
-    const message = `I'm planning ${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes, starting in about ${timingText}. Help me plan the whole workout including what to eat before, during, and after.`;
-    sendExerciseMessage(message);
-  };
-  
-  const sendMealMessageWithExerciseContext = async (message: string, exerciseContext?: "before" | "after" | "during", hoursAway?: number) => {
-    const userMessage: Message = {
-      role: "user",
-      content: message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMealMessages(prev => [...prev, userMessage]);
-    setIsMealTyping(true);
-
-    const freshSettings = storage.getSettings();
-    const aiResponse = processExerciseAwareMealMessage(message, freshSettings, bgUnits, exerciseContext, hoursAway);
-
-    setMealMessages(prev => [...prev, {
-      role: "assistant",
-      content: aiResponse,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      action: exerciseContext ? undefined : {
-        label: "Plan Exercise",
-        onClick: () => setActiveTab("exercise"),
-      },
-    }]);
-    
-    setIsMealTyping(false);
+    } catch {}
   };
   
   const getRatioForMeal = (meal: string): string => {
@@ -1048,30 +580,26 @@ export default function Advisor() {
   return (
     <div className="flex flex-col min-h-full relative overflow-auto">
       <FaceLogoWatermark />
-      <AIStatusInline />
       <div className="mb-4 flex items-center gap-2">
         <div>
-          <h1 className="text-3xl font-semibold">AI Activity Advisor</h1>
-          <p className="text-muted-foreground mt-1">Get personalized recommendations for meals and exercise.</p>
+          <h1 className="text-3xl font-semibold">Activity Advisor</h1>
+          <p className="text-muted-foreground mt-1">Get calculated recommendations for meals and exercise based on your settings.</p>
         </div>
         <PageInfoDialog
-          title="About AI Activity Advisor"
-          description="Get smart recommendations for meals and exercise"
+          title="About Activity Advisor"
+          description="Get calculated recommendations for meals and exercise"
         >
           <InfoSection title="Meal Tab">
-            <p>Enter carbs and meal type for a dose suggestion. Toggle "Planning around exercise?" to get adjusted doses for meals before, during, or after workouts.</p>
+            <p>Enter carbs and meal type for a dose suggestion based on your ratios. Toggle "Planning around exercise?" to get adjusted doses for meals before, during, or after workouts.</p>
           </InfoSection>
           <InfoSection title="Exercise Tab">
             <p>Plan workouts by type, duration, and intensity. Get preparation tips including what to eat before, during, and after exercise.</p>
           </InfoSection>
-          <InfoSection title="Session Tab">
-            <p>Plan your complete activity session: pre-workout fuel, the exercise itself, and recovery eating - all in one place with adjusted insulin recommendations.</p>
+          <InfoSection title="Routines Tab">
+            <p>Save your regular activities and meals as routines for quick access.</p>
           </InfoSection>
-          <InfoSection title="Smart Features">
-            <p><strong>Conversation Memory:</strong> The AI remembers what you've asked in this session for better follow-up answers.</p>
-            <p><strong>Time Awareness:</strong> Automatically uses your breakfast/lunch/dinner ratios based on current time.</p>
-            <p><strong>Learning:</strong> Uses your activity history to provide more personalised recommendations.</p>
-            <p><strong>Confidence Indicator:</strong> Shows how certain the AI is - green (high), amber (medium), or red (low).</p>
+          <InfoSection title="How It Works">
+            <p>All calculations use the ratios and settings you've entered (carb ratios, TDD, correction factor). The more accurate your settings, the better the recommendations.</p>
           </InfoSection>
           <InfoSection title="Safety Note">
             <p>All suggestions are for informational purposes only. Always verify with your own calculations and healthcare team. Not medical advice.</p>
@@ -1080,17 +608,11 @@ export default function Advisor() {
       </div>
 
       <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20 mb-4">
-        <CardContent className="p-3 space-y-2">
-          <div className="flex gap-2">
-            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800 dark:text-amber-200">
-              <strong>Prototype Preview:</strong> This AI feature requires a backend connection. Full AI functionality will be available in a future release.
-            </p>
-          </div>
+        <CardContent className="p-3">
           <div className="flex gap-2">
             <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800 dark:text-amber-200">
-              <strong>Not Medical Advice:</strong> All suggestions are educational only. 
+              <strong>Not Medical Advice:</strong> All suggestions are calculated from your settings and are educational only. 
               Always verify with your own calculations and consult your healthcare provider.
             </p>
           </div>
@@ -1239,6 +761,26 @@ export default function Advisor() {
             </CardContent>
           </Card>
 
+          {mealResult && (
+            <Card data-testid="card-meal-result">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Utensils className="h-4 w-4 text-primary" />
+                    Your Dose Suggestion
+                  </h4>
+                  <Button variant="ghost" size="icon" onClick={() => setMealResult(null)} data-testid="button-clear-meal-result">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="bg-primary/5 rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap font-sans text-sm" data-testid="text-meal-result">{mealResult}</pre>
+                </div>
+                <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-0 bg-transparent shadow-none">
             <RatioCalculationGuide settings={settings} bgUnits={bgUnits} />
           </Card>
@@ -1352,14 +894,13 @@ export default function Advisor() {
             </Collapsible>
           </Card>
 
-          <ChatSection
-            messages={mealMessages}
-            inputValue={mealInput}
-            setInputValue={setMealInput}
-            onSend={handleMealSend}
-            isTyping={isMealTyping}
-            placeholder="Ask about meals, carbs, or dose calculations..."
-          />
+          <Card className="border-dashed border-2 bg-muted/20">
+            <CardContent className="p-6 text-center space-y-2">
+              <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+              <p className="font-medium text-muted-foreground">Ask the AI Advisor</p>
+              <p className="text-sm text-muted-foreground/70">Conversational meal planning with personalised AI recommendations is coming in a future update.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="exercise" className="space-y-4 mt-4 animate-fade-in-up">
@@ -1453,6 +994,26 @@ export default function Advisor() {
             </CardContent>
           </Card>
 
+          {exerciseResult && (
+            <Card data-testid="card-exercise-result">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Dumbbell className="h-4 w-4 text-primary" />
+                    Your Workout Plan
+                  </h4>
+                  <Button variant="ghost" size="icon" onClick={() => setExerciseResult(null)} data-testid="button-clear-exercise-result">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="bg-primary/5 rounded-lg p-4">
+                  <pre className="whitespace-pre-wrap font-sans text-sm" data-testid="text-exercise-result">{exerciseResult}</pre>
+                </div>
+                <p className="text-xs text-muted-foreground">[Not medical advice. Individual responses to exercise vary.]</p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border-0 bg-transparent shadow-none">
             <Collapsible open={showExerciseGuide} onOpenChange={setShowExerciseGuide}>
               <CollapsibleTrigger asChild>
@@ -1479,14 +1040,13 @@ export default function Advisor() {
             </Collapsible>
           </Card>
 
-          <ChatSection
-            messages={exerciseMessages}
-            inputValue={exerciseInput}
-            setInputValue={setExerciseInput}
-            onSend={handleExerciseSend}
-            isTyping={isExerciseTyping}
-            placeholder="Ask about exercise, blood sugar, or preparation tips..."
-          />
+          <Card className="border-dashed border-2 bg-muted/20">
+            <CardContent className="p-6 text-center space-y-2">
+              <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+              <p className="font-medium text-muted-foreground">Ask the AI Advisor</p>
+              <p className="text-sm text-muted-foreground/70">Conversational exercise planning with personalised AI recommendations is coming in a future update.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="routines" className="mt-4 animate-fade-in-up">
