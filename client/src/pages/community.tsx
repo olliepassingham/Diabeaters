@@ -133,8 +133,7 @@ function UserActions({
     <div className="flex items-center gap-1">
       <Button 
         variant="ghost" 
-        size="sm" 
-        className="h-7 px-2"
+        size="icon" 
         onClick={handleMessage}
         data-testid={`button-dm-${userName}`}
       >
@@ -242,8 +241,8 @@ function ReplyCard({
         </div>
         <Button 
           variant="ghost" 
-          size="sm" 
-          className="h-8 text-muted-foreground"
+          size="icon" 
+          className="text-muted-foreground"
           onClick={onReport}
           data-testid={`button-report-reply-${reply.id}`}
         >
@@ -584,7 +583,6 @@ function EventCard({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7" 
                   onClick={() => onDelete(event.id)}
                   data-testid={`button-delete-event-${event.id}`}
                 >
