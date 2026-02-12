@@ -7,20 +7,20 @@ import { AlertTriangle, Globe, Phone, Syringe, Heart, Download, Share2, Info } f
 import { storage, UserProfile, EmergencyContact } from "@/lib/storage";
 
 const LANGUAGES = [
-  { code: "en", name: "English", flag: "🇬🇧" },
-  { code: "es", name: "Spanish", flag: "🇪🇸" },
-  { code: "fr", name: "French", flag: "🇫🇷" },
-  { code: "de", name: "German", flag: "🇩🇪" },
-  { code: "it", name: "Italian", flag: "🇮🇹" },
-  { code: "pt", name: "Portuguese", flag: "🇵🇹" },
-  { code: "nl", name: "Dutch", flag: "🇳🇱" },
-  { code: "pl", name: "Polish", flag: "🇵🇱" },
-  { code: "el", name: "Greek", flag: "🇬🇷" },
-  { code: "tr", name: "Turkish", flag: "🇹🇷" },
-  { code: "ar", name: "Arabic", flag: "🇸🇦" },
-  { code: "zh", name: "Chinese", flag: "🇨🇳" },
-  { code: "ja", name: "Japanese", flag: "🇯🇵" },
-  { code: "th", name: "Thai", flag: "🇹🇭" },
+  { code: "en", name: "English", flag: "GB" },
+  { code: "es", name: "Spanish", flag: "ES" },
+  { code: "fr", name: "French", flag: "FR" },
+  { code: "de", name: "German", flag: "DE" },
+  { code: "it", name: "Italian", flag: "IT" },
+  { code: "pt", name: "Portuguese", flag: "PT" },
+  { code: "nl", name: "Dutch", flag: "NL" },
+  { code: "pl", name: "Polish", flag: "PL" },
+  { code: "el", name: "Greek", flag: "GR" },
+  { code: "tr", name: "Turkish", flag: "TR" },
+  { code: "ar", name: "Arabic", flag: "AR" },
+  { code: "zh", name: "Chinese", flag: "CN" },
+  { code: "ja", name: "Japanese", flag: "JP" },
+  { code: "th", name: "Thai", flag: "TH" },
 ];
 
 const TRANSLATIONS: Record<string, {
@@ -239,7 +239,7 @@ export default function EmergencyCard() {
             <SelectValue>
               {selectedLangInfo && (
                 <span className="flex items-center gap-2">
-                  <span>{selectedLangInfo.flag}</span>
+                  <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{selectedLangInfo.flag}</span>
                   <span>{selectedLangInfo.name}</span>
                 </span>
               )}
@@ -249,7 +249,7 @@ export default function EmergencyCard() {
             {LANGUAGES.map((lang) => (
               <SelectItem key={lang.code} value={lang.code} data-testid={`option-lang-${lang.code}`}>
                 <span className="flex items-center gap-2">
-                  <span>{lang.flag}</span>
+                  <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{lang.flag}</span>
                   <span>{lang.name}</span>
                 </span>
               </SelectItem>
@@ -267,7 +267,7 @@ export default function EmergencyCard() {
           </CardTitle>
           {selectedLangInfo && (
             <p className="text-center text-red-100 text-sm">
-              {selectedLangInfo.flag} {selectedLangInfo.name}
+              {selectedLangInfo.name}
             </p>
           )}
         </CardHeader>

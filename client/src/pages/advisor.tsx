@@ -1228,7 +1228,7 @@ export default function Advisor() {
                 </div>
                 {(!settings.breakfastRatio && !settings.lunchRatio && !settings.dinnerRatio) && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    <Link href="/settings" className="text-primary hover:underline">Set your ratios in Settings</Link> for accurate calculations.
+                    <Link href="/settings" className="text-primary hover:underline" data-testid="link-settings-ratios">Set your ratios in Settings</Link> for accurate calculations.
                   </p>
                 )}
               </div>

@@ -769,7 +769,7 @@ function SupplyCard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={() => onDelete(supply.id)} data-testid="button-confirm-delete">
                     Delete
                   </AlertDialogAction>
@@ -1201,7 +1201,7 @@ function SupplyDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-supply">Cancel</Button>
           <Button onClick={handleSubmit} disabled={!isValid} data-testid="button-save-supply">
             {supply ? "Save Changes" : "Add Supply"}
           </Button>
@@ -1318,7 +1318,7 @@ function RefillDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-refill">Cancel</Button>
           <Button 
             onClick={handleConfirm} 
             disabled={parsedQty <= 0} 
@@ -1937,7 +1937,7 @@ export default function Supplies() {
                   <p className="text-muted-foreground text-center">
                     No supplies in this category yet.
                   </p>
-                  <Button variant="outline" className="mt-4" onClick={handleAddNew}>
+                  <Button variant="outline" className="mt-4" onClick={handleAddNew} data-testid="button-add-supply-empty">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Supply
                   </Button>

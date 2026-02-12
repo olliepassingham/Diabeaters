@@ -504,7 +504,7 @@ export default function SickDay() {
                       <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      From your <Link href="/settings" className="text-primary hover:underline">Insulin Settings</Link>
+                      From your <Link href="/settings" className="text-primary hover:underline" data-testid="link-insulin-settings">Insulin Settings</Link>
                     </p>
                   </>
                 ) : (
@@ -512,7 +512,7 @@ export default function SickDay() {
                     <div className="p-3 rounded-md bg-muted border border-dashed">
                       <p className="text-sm text-muted-foreground">
                         TDD not configured. Please set your Total Daily Dose in{" "}
-                        <Link href="/settings" className="text-primary hover:underline font-medium">
+                        <Link href="/settings" className="text-primary hover:underline font-medium" data-testid="link-settings-insulin">
                           Settings → Insulin Settings
                         </Link>{" "}
                         to use the Sick Day Adviser.

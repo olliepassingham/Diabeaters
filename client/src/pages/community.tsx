@@ -567,7 +567,7 @@ function EventCard({
               <h4 className="font-medium">{event.title}</h4>
               <Badge 
                 variant={isOfficial ? "default" : "secondary"} 
-                className={`text-xs ${isOfficial ? "bg-blue-600 hover:bg-blue-600" : ""}`}
+                className={`text-xs ${isOfficial ? "bg-blue-600 dark:bg-blue-700" : ""}`}
               >
                 {isOfficial ? (
                   <><Shield className="h-3 w-3 mr-1" /> Official</>

@@ -104,7 +104,7 @@ export default function HelpNow() {
         <div className="grid grid-cols-2 gap-3">
           <Button
             size="lg"
-            className="h-20 text-lg bg-red-600 hover:bg-red-700 flex flex-col items-center justify-center gap-1"
+            className="text-lg bg-red-600 dark:bg-red-700 flex flex-col items-center justify-center gap-1 py-6"
             onClick={callEmergencyServices}
             data-testid="button-call-999"
           >
@@ -115,7 +115,7 @@ export default function HelpNow() {
           <Button
             size="lg"
             variant={primaryContact ? "default" : "outline"}
-            className={`h-20 text-lg flex flex-col items-center justify-center gap-1 ${primaryContact ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+            className={`text-lg flex flex-col items-center justify-center gap-1 py-6 ${primaryContact ? "bg-blue-600 dark:bg-blue-700" : ""}`}
             onClick={callPrimaryContact}
             data-testid="button-call-contact"
           >
@@ -226,7 +226,8 @@ export default function HelpNow() {
                   CALL 999 IMMEDIATELY
                 </p>
                 <Button
-                  className="w-full bg-red-600 hover:bg-red-700 h-12"
+                  size="lg"
+                  className="w-full bg-red-600 dark:bg-red-700"
                   onClick={callEmergencyServices}
                   data-testid="button-call-999-unconscious"
                 >

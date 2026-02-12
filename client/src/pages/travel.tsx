@@ -1162,6 +1162,7 @@ export default function Travel() {
                           className="mt-0.5"
                           onClick={(e) => e.stopPropagation()}
                           onCheckedChange={() => toggleItem(globalIndex)}
+                          data-testid={`checkbox-packing-item-${globalIndex}`}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center justify-between gap-2">
