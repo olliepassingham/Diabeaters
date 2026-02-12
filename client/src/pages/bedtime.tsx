@@ -47,7 +47,6 @@ export default function Bedtime() {
   const [result, setResult] = useState<ReadinessResult | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
-  const [profileBgUnits, setProfileBgUnits] = useState<string | null>(null);
 
   useEffect(() => {
     const settings = storage.getSettings();
@@ -55,7 +54,6 @@ export default function Bedtime() {
     const profile = storage.getProfile();
     if (profile?.bgUnits) {
       setBgUnits(profile.bgUnits as "mmol/L" | "mg/dL");
-      setProfileBgUnits(profile.bgUnits);
     }
     setScenarioState(storage.getScenarioState());
   }, []);
@@ -72,8 +70,6 @@ export default function Bedtime() {
 
     const correctionFactor = userSettings?.correctionFactor;
     if (!correctionFactor || correctionFactor <= 0) return null;
-
-    if (profileBgUnits && profileBgUnits !== bgUnits) return null;
 
     const bgInUserUnits = bgUnits === "mg/dL" ? Math.round(bgMmol * 18) : Math.round(bgMmol * 10) / 10;
     const targetInUserUnits = bgUnits === "mg/dL" ? Math.round(targetHighMmol * 18) : Math.round(targetHighMmol * 10) / 10;
@@ -382,15 +378,7 @@ export default function Bedtime() {
                   className="flex-1"
                   data-testid="input-bedtime-bg"
                 />
-                <Select value={bgUnits} onValueChange={(v: "mmol/L" | "mg/dL") => setBgUnits(v)}>
-                  <SelectTrigger className="w-24" data-testid="select-bedtime-bg-units">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mmol/L">mmol/L</SelectItem>
-                    <SelectItem value="mg/dL">mg/dL</SelectItem>
-                  </SelectContent>
-                </Select>
+                <span className="flex items-center text-sm text-muted-foreground px-2">{bgUnits}</span>
               </div>
             </div>
 
