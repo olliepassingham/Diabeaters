@@ -129,10 +129,15 @@ function processExerciseAwareMealMessage(message: string, settings: UserSettings
   let baseUnits = 0;
 
   if (ratio) {
-    const match = ratio.match(/1:(\d+)/);
-    if (match) {
-      const carbRatio = parseInt(match[1]);
+    const ratioMatch = ratio.match(/1:(\d+)/);
+    if (ratioMatch) {
+      const carbRatio = parseInt(ratioMatch[1]);
       baseUnits = Math.round((carbs / carbRatio) * 10) / 10;
+    } else {
+      const unitsPerTenG = parseFloat(ratio);
+      if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
+        baseUnits = Math.round((carbs / 10) * unitsPerTenG * 10) / 10;
+      }
     }
   } else if (settings.tdd) {
     const estimatedRatio = Math.round(500 / settings.tdd);
@@ -433,11 +438,17 @@ export default function Advisor() {
     let ratioUsed = "";
     
     if (selectedRatio) {
-      const match = selectedRatio.match(/1:(\d+)/);
-      if (match) {
-        const carbRatio = parseInt(match[1]);
+      const ratioMatch = selectedRatio.match(/1:(\d+)/);
+      if (ratioMatch) {
+        const carbRatio = parseInt(ratioMatch[1]);
         totalUnits = Math.round((carbValue / carbRatio) * 10) / 10;
-        ratioUsed = `Using your ${splitMealTime} ratio (${selectedRatio})`;
+        ratioUsed = `Using your ${splitMealTime} ratio (1:${carbRatio})`;
+      } else {
+        const unitsPerTenG = parseFloat(selectedRatio);
+        if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
+          totalUnits = Math.round((carbValue / 10) * unitsPerTenG * 10) / 10;
+          ratioUsed = `Using your ${splitMealTime} ratio (${unitsPerTenG} units/10g)`;
+        }
       }
     } else if (settings.tdd) {
       const estimatedRatio = Math.round(500 / settings.tdd);
@@ -574,7 +585,10 @@ export default function Advisor() {
       dinner: settings.dinnerRatio,
       snack: settings.snackRatio,
     };
-    return ratioMap[meal] || "Not set";
+    const val = ratioMap[meal];
+    if (!val) return "Not set";
+    if (val.includes(":")) return val;
+    return `${val} u/10g`;
   };
 
   return (
