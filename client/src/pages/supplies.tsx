@@ -976,17 +976,15 @@ function SupplyCard({
           </div>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
-            const dailyDec = storage.getEffectiveDailyUsage(supply);
-            const decAmount = dailyDec > 0 ? dailyDec : 1;
             return (
               <div className="flex items-center justify-between gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - decAmount))}
+                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - inc.amount))}
                   data-testid={`button-decrease-${supply.id}`}
                 >
-                  -{decAmount}{supply.type === "insulin" ? "u" : ""}
+                  -{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
                 </Button>
                 <span className="text-center text-sm font-medium" data-testid={`text-quantity-${supply.id}`}>
                   {Math.floor(adjustedQuantity)} {supply.type === "insulin" ? "units" : ""}
