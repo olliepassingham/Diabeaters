@@ -457,6 +457,8 @@ const EMERGENCY_PHRASES: Record<string, { lang: string; iAmDiabetic: string; nee
 export default function Travel() {
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
+  const [isSickDayAlsoActive, setIsSickDayAlsoActive] = useState(false);
+  const [sickDaySeverity, setSickDaySeverity] = useState<string | undefined>();
   
   const getDefaultDates = () => {
     const today = new Date();
@@ -588,6 +590,8 @@ export default function Travel() {
     
     const scenarioState = storage.getScenarioState();
     setIsTravelModeActive(scenarioState.travelModeActive || false);
+    setIsSickDayAlsoActive(scenarioState.sickDayActive || false);
+    setSickDaySeverity(scenarioState.sickDaySeverity);
 
     if (scenarioState.travelModeActive) {
       const savedPlan = storage.getTravelPlan();
@@ -790,6 +794,32 @@ export default function Travel() {
             </div>
           </CardContent>
         </Card>
+
+        {isSickDayAlsoActive && (
+          <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20" data-testid="card-sick-day-also-active">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-1.5 rounded-full bg-orange-100 dark:bg-orange-900 shrink-0">
+                  <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Sick Day Mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Link href="/scenarios?tab=sick-day">
+                      <Button variant="outline" size="sm" data-testid="button-view-sick-day-from-travel">
+                        <Thermometer className="h-3 w-3 mr-1" />
+                        View Sick Day Dashboard
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {todayScheduleEntry && !isPumpUser && hasStarted && !hasEnded && (
           <Card className="border-purple-200 dark:border-purple-800">

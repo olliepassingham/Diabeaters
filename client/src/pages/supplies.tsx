@@ -701,6 +701,164 @@ function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; s
   );
 }
 
+function CombinedScenarioImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; scenarioState: ScenarioState }) {
+  if (!scenarioState.travelModeActive || !scenarioState.sickDayActive) return null;
+
+  const severity = scenarioState.sickDaySeverity || "moderate";
+
+  const sickDayMultipliers: Record<string, number> = {
+    insulin_short: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1,
+    insulin_long: 1.0,
+    insulin: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1,
+    needle: severity === "severe" ? 1.5 : severity === "moderate" ? 1.3 : 1.1,
+    cgm: 1.0,
+    infusion_set: severity === "severe" ? 1.3 : 1.0,
+    reservoir: severity === "severe" ? 1.2 : 1.0,
+  };
+
+  const travelStart = scenarioState.travelStartDate ? new Date(scenarioState.travelStartDate) : new Date();
+  const travelEnd = scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate) : addDays(new Date(), 7);
+  const tripDuration = Math.max(1, differenceInDays(travelEnd, travelStart));
+  const travelBuffer = 2;
+
+  const settings = storage.getSettings();
+
+  const getCombinedImpact = () => {
+    return supplies
+      .filter(s => s.dailyUsage > 0 && s.currentQuantity > 0)
+      .map(s => {
+        let dailyRate: number;
+        if (s.type === "cgm") {
+          dailyRate = 1 / (settings.cgmDays || 14);
+        } else if (s.type === "infusion_set") {
+          dailyRate = 1 / (settings.siteChangeDays || 3);
+        } else if (s.type === "reservoir") {
+          dailyRate = 1 / (settings.reservoirChangeDays || 3);
+        } else {
+          dailyRate = s.dailyUsage;
+        }
+        if (dailyRate <= 0) return null;
+
+        const normalDaysLeft = Math.min(365, Math.floor(s.currentQuantity / dailyRate));
+
+        const effectiveMultiplier = sickDayMultipliers[s.type] || 1.0;
+        const combinedDailyRate = dailyRate * effectiveMultiplier;
+        const combinedDaysLeft = Math.min(365, Math.floor(s.currentQuantity / combinedDailyRate));
+
+        const totalNeededForTrip = Math.ceil(combinedDailyRate * tripDuration * travelBuffer);
+        const shortfall = Math.max(0, totalNeededForTrip - s.currentQuantity);
+
+        return {
+          supply: s,
+          normalDaysLeft,
+          combinedDaysLeft,
+          daysLost: normalDaysLeft - combinedDaysLeft,
+          shortfall,
+          effectiveMultiplier,
+          willRunOutDuringTrip: combinedDaysLeft < tripDuration,
+        };
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+  };
+
+  const combined = getCombinedImpact();
+  const atRisk = combined.filter(c => c.willRunOutDuringTrip || c.shortfall > 0);
+
+  return (
+    <Card className="border-red-500/30 lg:col-span-2" data-testid="card-combined-scenario-impact">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <CardTitle className="text-base">Combined Scenario Impact</CardTitle>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            <Badge variant="secondary" className="text-xs">
+              <Plane className="h-3 w-3 mr-1" />
+              {scenarioState.travelDestination || "Travel"} — {tripDuration}d
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              <Thermometer className="h-3 w-3 mr-1" />
+              {severity} sick day
+            </Badge>
+          </div>
+        </div>
+        <CardDescription>
+          Travelling while unwell — your supplies face higher demand from both scenarios
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
+          <p className="text-sm text-red-800 dark:text-red-200">
+            Being unwell while travelling creates a compounding effect on your supplies. Illness increases insulin and testing needs, while travel requires extra buffer stock. Plan for both.
+          </p>
+          <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+            Not medical advice — contact your diabetes team before travelling while unwell.
+          </p>
+        </div>
+
+        {atRisk.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wider">Supplies at risk</p>
+            {atRisk.map(({ supply, normalDaysLeft, combinedDaysLeft, shortfall }) => {
+              const Icon = typeIcons[supply.type] || Package;
+              return (
+                <div 
+                  key={supply.id} 
+                  className="flex items-center justify-between gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/20"
+                  data-testid={`combined-supply-${supply.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate">{supply.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    <span className="text-muted-foreground line-through">{normalDaysLeft}d</span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium text-red-600 dark:text-red-400">~{combinedDaysLeft}d</span>
+                    {shortfall > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        Need {shortfall} more
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {combined.filter(c => !c.willRunOutDuringTrip && c.shortfall === 0).length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Supplies OK for trip</p>
+            {combined.filter(c => !c.willRunOutDuringTrip && c.shortfall === 0).map(({ supply, normalDaysLeft, combinedDaysLeft }) => {
+              const Icon = typeIcons[supply.type] || Package;
+              return (
+                <div 
+                  key={supply.id} 
+                  className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/20"
+                  data-testid={`combined-supply-ok-${supply.id}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm truncate">{supply.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    <span className="text-muted-foreground">{normalDaysLeft}d</span>
+                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium">~{combinedDaysLeft}d</span>
+                    <Badge variant="outline" className="text-xs">OK</Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SupplyCard({ 
   supply, 
   onEdit, 
@@ -1964,6 +2122,7 @@ export default function Supplies() {
         />
         <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
         <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
+        <CombinedScenarioImpactPanel supplies={supplies} scenarioState={scenarioState} />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

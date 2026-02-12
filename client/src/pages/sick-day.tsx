@@ -319,6 +319,8 @@ export default function SickDay() {
   const [isSickDayActive, setIsSickDayActive] = useState(false);
   const [sickDayActivatedAt, setSickDayActivatedAt] = useState<string | undefined>();
   const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [isTravelAlsoActive, setIsTravelAlsoActive] = useState(false);
+  const [travelDestination, setTravelDestination] = useState<string | undefined>();
 
   const saveSession = (newResults: SickDayResults | null) => {
     const session: SickDaySession = {
@@ -348,6 +350,8 @@ export default function SickDay() {
     const scenarioState = storage.getScenarioState();
     setIsSickDayActive(scenarioState.sickDayActive || false);
     setSickDayActivatedAt(scenarioState.sickDayActivatedAt);
+    setIsTravelAlsoActive(scenarioState.travelModeActive || false);
+    setTravelDestination(scenarioState.travelDestination);
 
     if (scenarioState.sickDayActive) {
       const savedSession = localStorage.getItem(SICK_DAY_STORAGE_KEY);
@@ -582,6 +586,32 @@ export default function SickDay() {
             )}
           </CardContent>
         </Card>
+
+        {isTravelAlsoActive && (
+          <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-travel-also-active">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900 shrink-0">
+                  <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Travel Mode is also active{travelDestination ? ` — ${travelDestination}` : ""}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Being unwell while travelling increases your supply needs. Your supply forecasts on the Supplies page now show the combined impact of both scenarios.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Link href="/scenarios?tab=travel">
+                      <Button variant="outline" size="sm" data-testid="button-view-travel-from-sick">
+                        <Plane className="h-3 w-3 mr-1" />
+                        View Travel Dashboard
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="pb-3">

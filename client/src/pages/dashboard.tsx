@@ -33,23 +33,25 @@ import {
 type HealthStatus = "stable" | "watch" | "action";
 
 function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState): HealthStatus {
-  // Use the same calculation as the Supplies page for consistency
   const supplyStatuses = supplies.map(s => storage.getSupplyStatus(s));
   const hasCritical = supplyStatuses.includes("critical");
   const hasLow = supplyStatuses.includes("low");
   
-  // Severe sick day is always action needed
+  const bothActive = scenarioState.sickDayActive && scenarioState.travelModeActive;
+  
+  if (bothActive) {
+    return "action";
+  }
+  
   if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
     return "action";
   }
   
-  // Critical supplies (≤3 days) = action needed
   if (hasCritical) {
     return "action";
   }
   
-  // Low supplies (≤7 days) or any sick day = watch
-  if (hasLow || scenarioState.sickDayActive) {
+  if (hasLow || scenarioState.sickDayActive || scenarioState.travelModeActive) {
     return "watch";
   }
   
