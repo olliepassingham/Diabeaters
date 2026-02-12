@@ -233,9 +233,6 @@ export interface ActivityLog {
 export type WidgetType = 
   | "supply-summary" 
   | "supply-depletion"
-  | "today-overview" 
-  | "ai-recommendations" 
-  | "quick-actions" 
   | "scenario-status" 
   | "settings-completion" 
   | "community"
@@ -466,15 +463,12 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
 // Default widget layout for new users: Quick Actions + Ratios (side by side), Supply Summary (full), Appointments + Scenarios (side by side), Community (full)
 // Other widgets start disabled but can be added via customization
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
-  "quick-actions": "half",
   "supply-summary": "full",
   "supply-depletion": "full",
-  "ai-recommendations": "half",
   "appointments": "half",
   "community": "full",
   "ratio-adviser": "half",
   "settings-completion": "half",
-  "today-overview": "full",
   "scenario-status": "half",
   "activity-adviser": "half",
   "travel-mode": "half",
@@ -484,21 +478,18 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "quick-actions", type: "quick-actions", enabled: true, order: 0, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 1, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 2, size: "full" },
-  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 3, size: "full" },
-  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 5, size: "half" },
-  { id: "community", type: "community", enabled: true, order: 6, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: false, order: 7, size: "half" },
-  { id: "today-overview", type: "today-overview", enabled: false, order: 8, size: "full" },
-  { id: "ai-recommendations", type: "ai-recommendations", enabled: false, order: 9, size: "half" },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 10, size: "half" },
-  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 11, size: "half" },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 12, size: "half" },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 13, size: "half" },
-  { id: "messages", type: "messages", enabled: false, order: 14, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 0, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "full" },
+  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 2, size: "full" },
+  { id: "appointments", type: "appointments", enabled: true, order: 3, size: "half" },
+  { id: "scenario-status", type: "scenario-status", enabled: true, order: 4, size: "half" },
+  { id: "community", type: "community", enabled: true, order: 5, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: false, order: 6, size: "half" },
+  { id: "help-now-info", type: "help-now-info", enabled: false, order: 7, size: "half" },
+  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 8, size: "half" },
+  { id: "travel-mode", type: "travel-mode", enabled: false, order: 9, size: "half" },
+  { id: "sick-day", type: "sick-day", enabled: false, order: 10, size: "half" },
+  { id: "messages", type: "messages", enabled: false, order: 11, size: "half" },
 ];
 
 function generateId(): string {
@@ -1115,9 +1106,12 @@ export const storage = {
       localStorage.setItem(STORAGE_KEYS.DASHBOARD_WIDGETS, JSON.stringify(defaultCopy));
       return defaultCopy;
     }
-    const savedWidgets: DashboardWidget[] = JSON.parse(data);
+    let savedWidgets: DashboardWidget[] = JSON.parse(data);
+    const validTypes = new Set(Object.keys(DEFAULT_WIDGET_SIZES));
+    const beforeCount = savedWidgets.length;
+    savedWidgets = savedWidgets.filter(w => validTypes.has(w.type));
+    let updated = savedWidgets.length !== beforeCount;
     const savedIds = new Set(savedWidgets.map(w => w.id));
-    let updated = false;
     for (const defaultWidget of DEFAULT_WIDGETS) {
       if (!savedIds.has(defaultWidget.id)) {
         const maxOrder = Math.max(...savedWidgets.map(w => w.order), -1);

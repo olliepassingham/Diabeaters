@@ -6,8 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Package, 
   Calendar, 
-  Brain, 
-  Zap, 
   LayoutGrid, 
   X, 
   Settings, 
@@ -64,13 +62,6 @@ const CATEGORY_LABELS: Record<WidgetCategory, { label: string; icon: typeof Hear
 };
 
 export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
-  "today-overview": {
-    type: "today-overview",
-    name: "Today at a Glance",
-    description: "Today's status and micro-stats",
-    icon: Calendar,
-    category: "health",
-  },
   "supply-summary": {
     type: "supply-summary",
     name: "Supplies",
@@ -84,20 +75,6 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Visual timeline of when supplies run out",
     icon: TrendingDown,
     category: "supplies",
-  },
-  "quick-actions": {
-    type: "quick-actions",
-    name: "Quick Actions",
-    description: "Fast access to all features",
-    icon: Zap,
-    category: "setup",
-  },
-  "ai-recommendations": {
-    type: "ai-recommendations",
-    name: "AI Insights",
-    description: "Supportive guidance and tips",
-    icon: Brain,
-    category: "health",
   },
   "scenario-status": {
     type: "scenario-status",

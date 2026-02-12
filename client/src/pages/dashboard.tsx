@@ -16,9 +16,6 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import {
   SupplySummaryWidget,
   SupplyDepletionWidget,
-  TodayOverviewWidget,
-  AIRecommendationsWidget,
-  QuickActionsWidget,
   ScenarioStatusWidget,
   SettingsCompletionWidget,
   CommunityWidget,
@@ -387,12 +384,6 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
   switch (type) {
     case "supply-summary":
       return <SupplySummaryWidget compact={compact} />;
-    case "today-overview":
-      return <TodayOverviewWidget compact={compact} />;
-    case "ai-recommendations":
-      return <AIRecommendationsWidget compact={compact} />;
-    case "quick-actions":
-      return <QuickActionsWidget compact={compact} />;
     case "scenario-status":
       return <ScenarioStatusWidget compact={compact} />;
     case "settings-completion":
