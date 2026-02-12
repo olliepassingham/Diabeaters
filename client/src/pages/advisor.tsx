@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { Switch } from "@/components/ui/switch";
@@ -239,7 +239,40 @@ Different types of exercise affect blood sugar in different ways. Understanding 
 }
 
 
-function processActivitySessionMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): string {
+interface ExercisePlanResult {
+  duration: number;
+  intensity: string;
+  exerciseType: string;
+  summary: string;
+  pre: {
+    targetBg: string;
+    lowThreshold: string;
+    carbsIfLow: number;
+    bolusReduction: string;
+    snackIdeas: string[];
+    timing: string;
+  };
+  during: {
+    carbsNeeded: number;
+    needsCarbs: boolean;
+    carbFrequency: string;
+    checkBg: boolean;
+    tips: string[];
+  };
+  post: {
+    carbs: number;
+    protein: string;
+    bolusReduction: string;
+    snackIdeas: string[];
+    timing: string;
+  };
+  recovery: {
+    monitorHours: string;
+    tips: string[];
+  };
+}
+
+function calculateExercisePlan(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): ExercisePlanResult {
   const durationMatch = message.match(/(\d+)\s*(?:min|minute)/i);
   const duration = durationMatch ? parseInt(durationMatch[1]) : 45;
   
@@ -249,7 +282,11 @@ function processActivitySessionMessage(message: string, settings: UserSettings, 
   
   const exerciseType = lowerMessage.includes("cardio") || lowerMessage.includes("run") || lowerMessage.includes("cycl") ? "cardio" :
                        lowerMessage.includes("strength") || lowerMessage.includes("weight") ? "strength" :
-                       lowerMessage.includes("hiit") ? "HIIT" : "exercise";
+                       lowerMessage.includes("hiit") ? "HIIT" :
+                       lowerMessage.includes("yoga") || lowerMessage.includes("stretch") ? "yoga" :
+                       lowerMessage.includes("walk") ? "walking" :
+                       lowerMessage.includes("swim") ? "swimming" :
+                       lowerMessage.includes("sport") ? "sports" : "exercise";
 
   let preExerciseCarbs = 0;
   let duringCarbs = 0;
@@ -280,34 +317,50 @@ function processActivitySessionMessage(message: string, settings: UserSettings, 
   const idealStart = bgUnits === "mmol/L" ? "7-10" : "126-180";
   const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
 
-  return `**Complete Activity Session Plan**\n` +
-    `${duration} min ${intensity} ${exerciseType}\n\n` +
-    `---\n\n` +
-    `**PRE-WORKOUT (30-60 min before)**\n` +
-    `- Target BG: ${idealStart} ${bgUnits}\n` +
-    `- If BG below ${lowThreshold} ${bgUnits}: eat ${preExerciseCarbs}g carbs\n` +
-    `- Reduce bolus for pre-workout meal by ${bolusReduction}\n` +
-    `- Good options: banana, toast, oat bar\n\n` +
-    `---\n\n` +
-    `**DURING WORKOUT**\n` +
-    (duringCarbs > 0 ? 
-      `- Have ${duringCarbs}g fast carbs available\n` +
-      `- Take 15g every 30-45 min if BG drops\n`
-    : `- For ${duration} min ${intensity} exercise, you may not need extra carbs\n` +
-      `- Keep 15-20g fast glucose ready just in case\n`) +
-    `- Check BG at halfway point for longer sessions\n\n` +
-    `---\n\n` +
-    `**POST-WORKOUT (within 30-60 min)**\n` +
-    `- Have ${postExerciseCarbs}g carbs to help recovery\n` +
-    `- Include protein (15-20g) for muscle repair\n` +
-    `- Reduce bolus by ${bolusReduction} for recovery meal\n` +
-    `- Good options: chocolate milk, yogurt, sandwich\n\n` +
-    `---\n\n` +
-    `**DELAYED LOW PREVENTION**\n` +
-    `- Monitor BG for 6-24 hours after\n` +
-    `- Consider reduced basal (if pumping) overnight\n` +
-    `- Have a protein-carb snack before bed if evening exercise\n\n` +
-    `[Not medical advice. Individual responses vary. Track your patterns.]`;
+  const exerciseLabels: Record<string, string> = {
+    cardio: "Cardio", strength: "Strength", HIIT: "HIIT", yoga: "Yoga",
+    walking: "Walking", swimming: "Swimming", sports: "Sports", exercise: "Exercise"
+  };
+
+  return {
+    duration,
+    intensity,
+    exerciseType: exerciseLabels[exerciseType] || exerciseType,
+    summary: `${duration} min ${intensity} ${exerciseLabels[exerciseType] || exerciseType}`,
+    pre: {
+      targetBg: idealStart,
+      lowThreshold,
+      carbsIfLow: preExerciseCarbs,
+      bolusReduction,
+      snackIdeas: ["Banana", "Toast with peanut butter", "Oat bar"],
+      timing: "30-60 min before",
+    },
+    during: {
+      carbsNeeded: duringCarbs,
+      needsCarbs: duringCarbs > 0,
+      carbFrequency: "every 30-45 min",
+      checkBg: duration > 45,
+      tips: duringCarbs > 0
+        ? [`Have ${duringCarbs}g fast-acting carbs ready`, "Take 15g if BG starts dropping", "Check BG halfway through"]
+        : ["You may not need extra carbs for this session", "Keep 15-20g fast glucose nearby just in case"],
+    },
+    post: {
+      carbs: postExerciseCarbs,
+      protein: "15-20g",
+      bolusReduction,
+      snackIdeas: ["Chocolate milk", "Greek yoghurt", "Sandwich"],
+      timing: "Within 30-60 min after",
+    },
+    recovery: {
+      monitorHours: "6-24",
+      tips: [
+        "Monitor BG closely for delayed lows",
+        "Consider reducing basal rate overnight (if on a pump)",
+        "Have a protein-carb snack before bed if you exercised in the evening",
+        "Stay hydrated — dehydration affects BG readings",
+      ],
+    },
+  };
 }
 
 
@@ -396,7 +449,8 @@ export default function Advisor() {
   }, []);
   
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
-  const [exerciseResult, setExerciseResult] = useState<string | null>(null);
+  const [exerciseResult, setExerciseResult] = useState<ExercisePlanResult | null>(null);
+  const [exerciseResultTab, setExerciseResultTab] = useState("before");
   
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
@@ -598,14 +652,15 @@ export default function Advisor() {
     const freshSettings = storage.getSettings();
     const message = `${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes`;
     
-    const result = processActivitySessionMessage(message, freshSettings, bgUnits);
+    const result = calculateExercisePlan(message, freshSettings, bgUnits);
     setExerciseResult(result);
+    setExerciseResultTab("before");
     
     try {
       storage.addActivityLog({
         activityType: "exercise_planning",
         activityDetails: message,
-        recommendation: result.substring(0, 200),
+        recommendation: result.summary,
       });
     } catch {}
   };
@@ -1098,20 +1153,177 @@ export default function Advisor() {
 
           {exerciseResult && (
             <Card data-testid="card-exercise-result">
-              <CardContent className="p-4 space-y-3">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Dumbbell className="h-4 w-4 text-primary" />
-                    Your Workout Plan
-                  </h4>
+                  <div>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Dumbbell className="h-5 w-5 text-primary" />
+                      Your Workout Plan
+                    </CardTitle>
+                    <CardDescription className="mt-1">{exerciseResult.summary}</CardDescription>
+                  </div>
                   <Button variant="ghost" size="icon" onClick={() => setExerciseResult(null)} data-testid="button-clear-exercise-result">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="bg-primary/5 rounded-lg p-4">
-                  <pre className="whitespace-pre-wrap font-sans text-sm" data-testid="text-exercise-result">{exerciseResult}</pre>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-2 bg-primary/5 rounded-lg">
+                    <p className="text-2xl font-bold text-primary">{exerciseResult.duration}</p>
+                    <p className="text-xs text-muted-foreground">minutes</p>
+                  </div>
+                  <div className="p-2 bg-primary/5 rounded-lg">
+                    <p className="text-2xl font-bold text-primary capitalize">{exerciseResult.intensity}</p>
+                    <p className="text-xs text-muted-foreground">intensity</p>
+                  </div>
+                  <div className="p-2 bg-primary/5 rounded-lg">
+                    <p className="text-2xl font-bold text-primary">{exerciseResult.pre.bolusReduction}</p>
+                    <p className="text-xs text-muted-foreground">reduce bolus</p>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">[Not medical advice. Individual responses to exercise vary.]</p>
+
+                <Tabs value={exerciseResultTab} onValueChange={setExerciseResultTab}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="before" data-testid="tab-exercise-before" className="text-xs gap-1">
+                      <Play className="h-3 w-3" />
+                      Before
+                    </TabsTrigger>
+                    <TabsTrigger value="during" data-testid="tab-exercise-during" className="text-xs gap-1">
+                      <Zap className="h-3 w-3" />
+                      During
+                    </TabsTrigger>
+                    <TabsTrigger value="after" data-testid="tab-exercise-after" className="text-xs gap-1">
+                      <Heart className="h-3 w-3" />
+                      After
+                    </TabsTrigger>
+                    <TabsTrigger value="recovery" data-testid="tab-exercise-recovery" className="text-xs gap-1">
+                      <Moon className="h-3 w-3" />
+                      Later
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="before" className="mt-3 space-y-3 animate-fade-in-up">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800 space-y-3">
+                      <p className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">{exerciseResult.pre.timing}</p>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-2">
+                          <ArrowRight className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            <strong>Target BG:</strong> {exerciseResult.pre.targetBg} {bgUnits} before you start
+                          </p>
+                        </div>
+                        
+                        {exerciseResult.pre.carbsIfLow > 0 && (
+                          <div className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                              <strong>If BG is below {exerciseResult.pre.lowThreshold}:</strong> eat {exerciseResult.pre.carbsIfLow}g carbs first
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex items-start gap-2">
+                          <ArrowRight className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            <strong>Reduce meal bolus</strong> by {exerciseResult.pre.bolusReduction} if eating before
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                          <Apple className="h-3 w-3" />
+                          Good snack options: {exerciseResult.pre.snackIdeas.join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="during" className="mt-3 space-y-3 animate-fade-in-up">
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800 space-y-3">
+                      <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">During your workout</p>
+                      
+                      {exerciseResult.during.needsCarbs && (
+                        <div className="p-3 bg-white dark:bg-amber-900/30 rounded-lg text-center">
+                          <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">{exerciseResult.during.carbsNeeded}g</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">fast-acting carbs to have ready</p>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        {exerciseResult.during.tips.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-amber-800 dark:text-amber-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {exerciseResult.during.checkBg && (
+                        <div className="pt-2 border-t border-amber-200 dark:border-amber-700">
+                          <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Check BG at the halfway mark
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="after" className="mt-3 space-y-3 animate-fade-in-up">
+                    <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 space-y-3">
+                      <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase">{exerciseResult.post.timing}</p>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-white dark:bg-green-900/30 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{exerciseResult.post.carbs}g</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">carbs for recovery</p>
+                        </div>
+                        <div className="p-3 bg-white dark:bg-green-900/30 rounded-lg text-center">
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{exerciseResult.post.protein}</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">protein for muscles</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <ArrowRight className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-green-800 dark:text-green-200">
+                          <strong>Reduce recovery meal bolus</strong> by {exerciseResult.post.bolusReduction}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-green-200 dark:border-green-700">
+                        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <Apple className="h-3 w-3" />
+                          Good options: {exerciseResult.post.snackIdeas.join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="recovery" className="mt-3 space-y-3 animate-fade-in-up">
+                    <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800 space-y-3">
+                      <p className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Next {exerciseResult.recovery.monitorHours} hours</p>
+
+                      <div className="space-y-2">
+                        {exerciseResult.recovery.tips.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-purple-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-purple-800 dark:text-purple-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded text-xs text-purple-700 dark:text-purple-300">
+                        <strong>Why delayed lows happen:</strong> Your muscles keep absorbing glucose for hours after exercise to replenish their stores.
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <p className="text-xs text-muted-foreground">[Not medical advice. Individual responses to exercise vary. Track your patterns.]</p>
               </CardContent>
             </Card>
           )}
