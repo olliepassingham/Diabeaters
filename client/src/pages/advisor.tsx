@@ -18,6 +18,141 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 
+function roundToHalf(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
+function getRoundingAdvice(exactDose: number, roundedDose: number, bgUnits: string): string {
+  const diff = exactDose - roundedDose;
+  if (Math.abs(diff) < 0.05) return "";
+  
+  const roundedDown = Math.floor(exactDose * 2) / 2;
+  const roundedUp = Math.ceil(exactDose * 2) / 2;
+  
+  if (roundedDown === roundedUp) return "";
+  
+  const lowLabel = bgUnits === "mmol/L" ? "below 5" : "below 90";
+  const highLabel = bgUnits === "mmol/L" ? "above 10" : "above 180";
+  const midLabel = bgUnits === "mmol/L" ? "5-10" : "90-180";
+  
+  return `Exact: ${exactDose.toFixed(1)}u. ` +
+    `Round down to ${roundedDown}u if BG is ${lowLabel} ${bgUnits} or trending down. ` +
+    `Round up to ${roundedUp}u if BG is ${highLabel} ${bgUnits} or trending up. ` +
+    `Use ${roundedDose}u if BG is steady at ${midLabel} ${bgUnits}.`;
+}
+
+type MealDoseResult = {
+  carbs: number;
+  mealType: string;
+  dose: number;
+  exactDose: number;
+  roundingAdvice: string;
+  exerciseContext?: "before" | "after" | "during";
+  exerciseReduction?: number;
+  standardDose?: number;
+  tips?: string[];
+  error?: string;
+};
+
+function calculateMealDose(
+  carbs: number,
+  mealType: string,
+  settings: UserSettings,
+  bgUnits: string,
+  exerciseContext?: "before" | "after" | "during",
+  hoursAway?: number
+): MealDoseResult {
+  const ratioMap: Record<string, string | undefined> = {
+    breakfast: settings.breakfastRatio,
+    lunch: settings.lunchRatio,
+    dinner: settings.dinnerRatio,
+    snack: settings.snackRatio,
+    meal: settings.lunchRatio || settings.breakfastRatio,
+  };
+
+  const ratio = ratioMap[mealType];
+  let exactBaseUnits = 0;
+
+  if (ratio) {
+    const ratioMatch = ratio.match(/1:(\d+)/);
+    if (ratioMatch) {
+      exactBaseUnits = carbs / parseInt(ratioMatch[1]);
+    } else {
+      const unitsPerTenG = parseFloat(ratio);
+      if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
+        exactBaseUnits = (carbs / 10) * unitsPerTenG;
+      }
+    }
+  } else if (settings.tdd) {
+    const estimatedRatio = Math.round(500 / settings.tdd);
+    exactBaseUnits = carbs / estimatedRatio;
+  }
+
+  if (exactBaseUnits <= 0) {
+    return { carbs, mealType, dose: 0, exactDose: 0, roundingAdvice: "", error: "no_ratios" };
+  }
+
+  if (!exerciseContext) {
+    const rounded = roundToHalf(exactBaseUnits);
+    return {
+      carbs, mealType,
+      dose: rounded,
+      exactDose: Math.round(exactBaseUnits * 10) / 10,
+      roundingAdvice: getRoundingAdvice(exactBaseUnits, rounded, bgUnits),
+    };
+  }
+
+  const hours = hoursAway || 2;
+  
+  if (exerciseContext === "during") {
+    return {
+      carbs, mealType,
+      dose: 0,
+      exactDose: 0,
+      roundingAdvice: "",
+      exerciseContext,
+      standardDose: roundToHalf(exactBaseUnits),
+      tips: [
+        "Carbs during exercise are usually used immediately by working muscles",
+        "For sessions under 90 min: skip insulin for exercise snacks/gels",
+        "For 90+ min sessions: may need 10-25% of normal dose",
+        "Use fast-acting carbs (15-30g every 30-45 min)",
+      ],
+    };
+  }
+
+  const reductionPercent = exerciseContext === "before"
+    ? (hours <= 1 ? 40 : hours <= 2 ? 30 : 20)
+    : (hours <= 1 ? 35 : hours <= 2 ? 25 : 15);
+  
+  const adjustedExact = exactBaseUnits * (1 - reductionPercent / 100);
+  const rounded = roundToHalf(adjustedExact);
+  const stdDose = roundToHalf(exactBaseUnits);
+
+  const tips = exerciseContext === "before"
+    ? [
+        `Start exercise with BG ${bgUnits === "mmol/L" ? "7-10" : "126-180"} ${bgUnits}`,
+        "Consider slower-digesting carbs (whole grains, protein)",
+        "Check BG before starting exercise",
+      ]
+    : [
+        "Include protein to help muscle recovery",
+        "Monitor for delayed lows over next 6-12 hours",
+        "Consider a bedtime snack if exercised in the evening",
+      ];
+
+  return {
+    carbs, mealType,
+    dose: rounded,
+    exactDose: Math.round(adjustedExact * 10) / 10,
+    roundingAdvice: getRoundingAdvice(adjustedExact, rounded, bgUnits),
+    exerciseContext,
+    exerciseReduction: reductionPercent,
+    standardDose: stdDose,
+    tips,
+  };
+}
+
 function generateExerciseTypeGuide(bgUnits: string = "mmol/L"): string {
   const lowThreshold = bgUnits === "mmol/L" ? "5.0" : "90";
   const idealLow = bgUnits === "mmol/L" ? "7.0" : "126";
@@ -103,108 +238,6 @@ Different types of exercise affect blood sugar in different ways. Understanding 
 5. Have your phone accessible for emergencies`;
 }
 
-function processExerciseAwareMealMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L", exerciseContext?: "before" | "after" | "during", hoursAway?: number): string {
-  const carbMatch = message.match(/(\d+)\s*(?:g|gram|cp|portion)/i);
-  const carbs = carbMatch ? parseInt(carbMatch[1]) : null;
-  
-  if (!carbs) {
-    return `Please specify how many carbs you're planning to eat.\n\n[Not medical advice.]`;
-  }
-  
-  const lowerMessage = message.toLowerCase();
-  const mealType = lowerMessage.includes("breakfast") ? "breakfast" :
-                   lowerMessage.includes("lunch") ? "lunch" :
-                   lowerMessage.includes("dinner") ? "dinner" :
-                   lowerMessage.includes("snack") ? "snack" : "meal";
-  
-  const ratioMap: Record<string, string | undefined> = {
-    breakfast: settings.breakfastRatio,
-    lunch: settings.lunchRatio,
-    dinner: settings.dinnerRatio,
-    snack: settings.snackRatio,
-    meal: settings.lunchRatio || settings.breakfastRatio,
-  };
-
-  const ratio = ratioMap[mealType];
-  let baseUnits = 0;
-
-  if (ratio) {
-    const ratioMatch = ratio.match(/1:(\d+)/);
-    if (ratioMatch) {
-      const carbRatio = parseInt(ratioMatch[1]);
-      baseUnits = Math.round((carbs / carbRatio) * 10) / 10;
-    } else {
-      const unitsPerTenG = parseFloat(ratio);
-      if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
-        baseUnits = Math.round((carbs / 10) * unitsPerTenG * 10) / 10;
-      }
-    }
-  } else if (settings.tdd) {
-    const estimatedRatio = Math.round(500 / settings.tdd);
-    baseUnits = Math.round((carbs / estimatedRatio) * 10) / 10;
-  }
-
-  if (baseUnits <= 0) {
-    return `To calculate your bolus, please add your carb ratios or TDD in Settings.\n\n[Not medical advice.]`;
-  }
-
-  if (!exerciseContext) {
-    return `For ${carbs}g carbs at ${mealType}: approximately ${baseUnits} units\n\n` +
-      `Adjust for your current blood glucose if needed.\n\n` +
-      `[Not medical advice. Always verify with your own calculations.]`;
-  }
-
-  const hours = hoursAway || 2;
-  
-  if (exerciseContext === "before") {
-    const reductionPercent = hours <= 1 ? 40 : hours <= 2 ? 30 : 20;
-    const adjustedUnits = Math.round(baseUnits * (1 - reductionPercent / 100) * 10) / 10;
-    
-    return `**Pre-Exercise Meal (${carbs}g carbs, ${mealType})**\n\n` +
-      `Standard dose: ${baseUnits} units\n` +
-      `Suggested reduction: ${reductionPercent}%\n` +
-      `**Adjusted dose: ~${adjustedUnits} units**\n\n` +
-      `**Why reduce?**\n` +
-      `Exercise increases insulin sensitivity. Eating ${hours} hour${hours > 1 ? 's' : ''} before exercise means the insulin will still be active when you start moving.\n\n` +
-      `**Tips:**\n` +
-      `- Start exercise with BG ${bgUnits === "mmol/L" ? "7-10" : "126-180"} ${bgUnits}\n` +
-      `- Consider slower-digesting carbs (whole grains, protein)\n` +
-      `- Check BG before starting\n\n` +
-      `[Not medical advice. Adjust based on your experience.]`;
-  }
-  
-  if (exerciseContext === "after") {
-    const reductionPercent = hours <= 1 ? 35 : hours <= 2 ? 25 : 15;
-    const adjustedUnits = Math.round(baseUnits * (1 - reductionPercent / 100) * 10) / 10;
-    
-    return `**Post-Exercise Meal (${carbs}g carbs, ${mealType})**\n\n` +
-      `Standard dose: ${baseUnits} units\n` +
-      `Suggested reduction: ${reductionPercent}%\n` +
-      `**Adjusted dose: ~${adjustedUnits} units**\n\n` +
-      `**Why reduce?**\n` +
-      `Your muscles are refuelling and insulin sensitivity stays elevated for hours after exercise. This increases hypo risk.\n\n` +
-      `**Recovery Tips:**\n` +
-      `- Include protein to help muscle recovery\n` +
-      `- Monitor for delayed lows over next 6-12 hours\n` +
-      `- Consider a bedtime snack if exercised in the evening\n\n` +
-      `[Not medical advice. Adjust based on your experience.]`;
-  }
-  
-  if (exerciseContext === "during") {
-    return `**During-Exercise Fuel (${carbs}g carbs)**\n\n` +
-      `**Usually: No insulin needed**\n\n` +
-      `Carbs eaten during exercise are typically used immediately by working muscles. For most activities under 90 minutes:\n\n` +
-      `- Skip insulin for exercise snacks/gels\n` +
-      `- Use fast-acting carbs (15-30g every 30-45 min)\n` +
-      `- Monitor BG and adjust intake\n\n` +
-      `**For longer sessions (90+ min):**\n` +
-      `- May need very small bolus (10-25% of normal)\n` +
-      `- Test with small amounts first\n\n` +
-      `[Not medical advice. Individual responses vary significantly.]`;
-  }
-
-  return `For ${carbs}g carbs: approximately ${baseUnits} units\n\n[Not medical advice.]`;
-}
 
 function processActivitySessionMessage(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): string {
   const durationMatch = message.match(/(\d+)\s*(?:min|minute)/i);
@@ -362,7 +395,7 @@ export default function Advisor() {
     }
   }, []);
   
-  const [mealResult, setMealResult] = useState<string | null>(null);
+  const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
   const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   
   const [mealCarbs, setMealCarbs] = useState("");
@@ -484,11 +517,12 @@ export default function Advisor() {
         break;
     }
     
-    const firstDose = Math.round(totalUnits * (firstPercent / 100) * 10) / 10;
-    const secondDose = Math.round((totalUnits - firstDose) * 10) / 10;
+    const totalRounded = roundToHalf(totalUnits);
+    const firstDose = roundToHalf(totalRounded * (firstPercent / 100));
+    const secondDose = roundToHalf(totalRounded - firstDose);
     
     setSplitResult({
-      totalUnits,
+      totalUnits: totalRounded,
       firstDose,
       secondDose,
       secondDoseDelay,
@@ -544,19 +578,17 @@ export default function Advisor() {
     if (!mealCarbs) return;
     const carbValue = carbUnit === "cp" ? parseInt(mealCarbs) * 10 : parseInt(mealCarbs);
     const freshSettings = storage.getSettings();
-    
-    const message = `${carbValue}g carbs for ${mealTime}`;
     const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
     const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
     
-    const result = processExerciseAwareMealMessage(message, freshSettings, bgUnits, exerciseContext, hoursAway);
+    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway);
     setMealResult(result);
     
     try {
       storage.addActivityLog({
         activityType: "meal_planning",
         activityDetails: `${carbValue}g carbs for ${mealTime}`,
-        recommendation: result.substring(0, 200),
+        recommendation: `${result.dose} units`,
       });
     } catch {}
   };
@@ -781,15 +813,70 @@ export default function Advisor() {
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="font-medium flex items-center gap-2">
                     <Utensils className="h-4 w-4 text-primary" />
-                    Your Dose Suggestion
+                    {mealResult.exerciseContext === "during" ? "During-Exercise Fuel" :
+                     mealResult.exerciseContext === "before" ? "Pre-Exercise Dose" :
+                     mealResult.exerciseContext === "after" ? "Post-Exercise Dose" :
+                     "Your Dose Suggestion"}
                   </h4>
                   <Button variant="ghost" size="icon" onClick={() => setMealResult(null)} data-testid="button-clear-meal-result">
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="bg-primary/5 rounded-lg p-4">
-                  <pre className="whitespace-pre-wrap font-sans text-sm" data-testid="text-meal-result">{mealResult}</pre>
-                </div>
+
+                {mealResult.error === "no_ratios" ? (
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">Add your carb ratios or TDD in <Link href="/settings" className="text-primary hover:underline">Settings</Link> to get dose suggestions.</p>
+                  </div>
+                ) : mealResult.exerciseContext === "during" ? (
+                  <div className="space-y-3">
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">DURING EXERCISE</p>
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">Usually no insulin</p>
+                      <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">{mealResult.carbs}g carbs - standard dose would be {mealResult.standardDose}u</p>
+                    </div>
+                    {mealResult.tips && (
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {mealResult.exerciseContext && mealResult.standardDose !== undefined && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="p-3 bg-muted/50 rounded-lg text-center">
+                          <p className="text-xs text-muted-foreground font-medium">STANDARD DOSE</p>
+                          <p className="text-xl font-bold line-through text-muted-foreground">{mealResult.standardDose} units</p>
+                          <p className="text-xs text-muted-foreground">{mealResult.carbs}g carbs at {mealResult.mealType}</p>
+                        </div>
+                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 text-center">
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            {mealResult.exerciseContext === "before" ? "PRE-EXERCISE" : "POST-EXERCISE"} (-{mealResult.exerciseReduction}%)
+                          </p>
+                          <p className="text-3xl font-bold text-green-700 dark:text-green-300" data-testid="text-meal-dose">{mealResult.dose} units</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">suggested dose</p>
+                        </div>
+                      </div>
+                    )}
+                    {!mealResult.exerciseContext && (
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">SUGGESTED DOSE</p>
+                        <p className="text-4xl font-bold text-green-700 dark:text-green-300" data-testid="text-meal-dose">{mealResult.dose} units</p>
+                        <p className="text-sm text-green-600 dark:text-green-400">for {mealResult.carbs}g carbs at {mealResult.mealType}</p>
+                      </div>
+                    )}
+                    {mealResult.roundingAdvice && (
+                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
+                        <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
+                      </div>
+                    )}
+                    {mealResult.tips && (
+                      <ul className="text-sm text-muted-foreground space-y-1">
+                        {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
               </CardContent>
             </Card>
@@ -894,8 +981,9 @@ export default function Advisor() {
                         <p><strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to {splitResult.secondDoseDelay + 1} hours.</p>
                       </div>
 
-                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
-                        <strong>Tip:</strong> Set a timer for your second dose! Check BG before taking it.
+                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
+                        <p><strong>Rounding guide:</strong> If BG is trending high or above target, round doses up to the nearest 0.5. If trending low or below target, round down.</p>
+                        <p><strong>Tip:</strong> Set a timer for your second dose! Check BG before taking it.</p>
                       </div>
                     </div>
                   )}
