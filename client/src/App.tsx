@@ -154,7 +154,7 @@ function AppContent() {
               <Router />
             </div>
           </main>
-          <footer className="hidden border-t py-3 px-6 text-center text-xs text-muted-foreground">
+          <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground mb-12">
             <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>
           </footer>
         </div>
