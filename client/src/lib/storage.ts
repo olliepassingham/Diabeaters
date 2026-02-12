@@ -31,6 +31,8 @@ const STORAGE_KEYS = {
   HYPO_TREATMENTS: "diabeater_hypo_treatments",
   CARER_MODE: "diabeater_carer_mode",
   CARER_INVITE_CODE: "diabeater_carer_invite_code",
+  TRAVEL_PLAN: "diabeater_travel_plan",
+  TRAVEL_PACKING_LIST: "diabeater_travel_packing_list",
 } as const;
 
 export interface UserProfile {
@@ -1227,6 +1229,26 @@ export const storage = {
     state.travelTimezoneShift = undefined;
     state.travelTimezoneDirection = undefined;
     this.saveScenarioState(state);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PLAN);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
+  },
+
+  saveTravelPlan(plan: any): void {
+    localStorage.setItem(STORAGE_KEYS.TRAVEL_PLAN, JSON.stringify(plan));
+  },
+
+  getTravelPlan(): any | null {
+    const data = localStorage.getItem(STORAGE_KEYS.TRAVEL_PLAN);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveTravelPackingList(list: any[]): void {
+    localStorage.setItem(STORAGE_KEYS.TRAVEL_PACKING_LIST, JSON.stringify(list));
+  },
+
+  getTravelPackingList(): any[] {
+    const data = localStorage.getItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
+    return data ? JSON.parse(data) : [];
   },
 
   activateSickDay(severity: string): void {

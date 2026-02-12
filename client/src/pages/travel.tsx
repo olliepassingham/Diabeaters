@@ -26,8 +26,14 @@ import {
   Globe,
   Thermometer,
   Sun,
-  Snowflake
+  Snowflake,
+  Calendar,
+  Heart,
+  Languages,
+  Phone,
+  Navigation
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { storage, Supply, UserSettings, UserProfile } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -429,6 +435,25 @@ const categoryLabels = {
   backup: { label: "Backup & Documentation", icon: ShieldAlert, color: "text-gray-600 dark:text-gray-400" },
 };
 
+const EMERGENCY_PHRASES: Record<string, { lang: string; iAmDiabetic: string; needSugar: string; needHelp: string; emergencyNumber: string }> = {
+  "English": { lang: "en", iAmDiabetic: "I am diabetic", needSugar: "I need sugar", needHelp: "I need medical help", emergencyNumber: "999 / 112" },
+  "Spanish": { lang: "es", iAmDiabetic: "Soy diabético/a", needSugar: "Necesito azúcar", needHelp: "Necesito ayuda médica", emergencyNumber: "112" },
+  "French": { lang: "fr", iAmDiabetic: "Je suis diabétique", needSugar: "J'ai besoin de sucre", needHelp: "J'ai besoin d'aide médicale", emergencyNumber: "15 / 112" },
+  "German": { lang: "de", iAmDiabetic: "Ich bin Diabetiker/in", needSugar: "Ich brauche Zucker", needHelp: "Ich brauche medizinische Hilfe", emergencyNumber: "112" },
+  "Italian": { lang: "it", iAmDiabetic: "Sono diabetico/a", needSugar: "Ho bisogno di zucchero", needHelp: "Ho bisogno di aiuto medico", emergencyNumber: "118 / 112" },
+  "Portuguese": { lang: "pt", iAmDiabetic: "Sou diabético/a", needSugar: "Preciso de açúcar", needHelp: "Preciso de ajuda médica", emergencyNumber: "112" },
+  "Dutch": { lang: "nl", iAmDiabetic: "Ik heb diabetes", needSugar: "Ik heb suiker nodig", needHelp: "Ik heb medische hulp nodig", emergencyNumber: "112" },
+  "Greek": { lang: "el", iAmDiabetic: "Έχω διαβήτη", needSugar: "Χρειάζομαι ζάχαρη", needHelp: "Χρειάζομαι ιατρική βοήθεια", emergencyNumber: "166 / 112" },
+  "Turkish": { lang: "tr", iAmDiabetic: "Şeker hastasıyım", needSugar: "Şekere ihtiyacım var", needHelp: "Tıbbi yardıma ihtiyacım var", emergencyNumber: "112" },
+  "Arabic": { lang: "ar", iAmDiabetic: "أنا مصاب بالسكري", needSugar: "أحتاج سكر", needHelp: "أحتاج مساعدة طبية", emergencyNumber: "varies" },
+  "Chinese": { lang: "zh", iAmDiabetic: "我有糖尿病", needSugar: "我需要糖", needHelp: "我需要医疗帮助", emergencyNumber: "120" },
+  "Japanese": { lang: "ja", iAmDiabetic: "糖尿病です", needSugar: "砂糖が必要です", needHelp: "医療支援が必要です", emergencyNumber: "119" },
+  "Thai": { lang: "th", iAmDiabetic: "ฉันเป็นเบาหวาน", needSugar: "ฉันต้องการน้ำตาล", needHelp: "ฉันต้องการความช่วยเหลือทางการแพทย์", emergencyNumber: "1669" },
+  "Polish": { lang: "pl", iAmDiabetic: "Mam cukrzycę", needSugar: "Potrzebuję cukru", needHelp: "Potrzebuję pomocy medycznej", emergencyNumber: "112" },
+  "Hindi": { lang: "hi", iAmDiabetic: "मुझे मधुमेह है", needSugar: "मुझे चीनी चाहिए", needHelp: "मुझे चिकित्सा सहायता चाहिए", emergencyNumber: "102 / 112" },
+  "Croatian": { lang: "hr", iAmDiabetic: "Imam dijabetes", needSugar: "Trebam šećer", needHelp: "Trebam medicinsku pomoć", emergencyNumber: "112" },
+};
+
 export default function Travel() {
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
@@ -551,13 +576,31 @@ export default function Travel() {
 
   const basalSchedule = calculateBasalAdjustmentSchedule();
 
+  const [selectedLanguage, setSelectedLanguage] = useState("English");
+
   useEffect(() => {
-    setSupplies(storage.getSupplies());
-    setSettings(storage.getSettings());
-    setProfile(storage.getProfile());
+    const s = storage.getSupplies();
+    const st = storage.getSettings();
+    const p = storage.getProfile();
+    setSupplies(s);
+    setSettings(st);
+    setProfile(p);
     
     const scenarioState = storage.getScenarioState();
     setIsTravelModeActive(scenarioState.travelModeActive || false);
+
+    if (scenarioState.travelModeActive) {
+      const savedPlan = storage.getTravelPlan();
+      const savedList = storage.getTravelPackingList();
+      if (savedPlan) {
+        setPlan(savedPlan);
+      }
+      if (savedList && savedList.length > 0) {
+        setPackingList(savedList);
+        const warnings = calculateRiskWarnings(savedPlan || plan, p?.insulinDeliveryMethod === "pump");
+        setRiskWarnings(warnings);
+      }
+    }
   }, []);
 
   const handleStartPlan = () => {
@@ -575,6 +618,8 @@ export default function Travel() {
       signedTimezoneShift,
       plan.timezoneDirection
     );
+    storage.saveTravelPlan(plan);
+    storage.saveTravelPackingList(packingList);
     setIsTravelModeActive(true);
     toast({
       title: "Travel Mode Activated",
@@ -586,9 +631,19 @@ export default function Travel() {
     storage.deactivateTravelMode();
     localStorage.removeItem("diabeater_travel_session");
     setIsTravelModeActive(false);
+    setStep("entry");
     toast({
       title: "Travel Mode Deactivated",
       description: "Welcome back home!",
+    });
+  };
+
+  const updatePackingItem = (index: number) => {
+    setPackingList(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], checked: !updated[index].checked };
+      storage.saveTravelPackingList(updated);
+      return updated;
     });
   };
   
@@ -661,6 +716,362 @@ export default function Travel() {
     setPackingList([]);
     setRiskWarnings([]);
   };
+
+  if (step === "entry" && isTravelModeActive && packingList.length > 0) {
+    const startDate = new Date(plan.startDate);
+    const endDate = new Date(plan.endDate);
+    const today = new Date();
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const totalDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const daysElapsed = Math.max(0, Math.ceil((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const daysRemaining = Math.max(0, totalDays - daysElapsed);
+    const progressPercent = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+    const hasStarted = today >= startDate;
+    const hasEnded = today > endDate;
+
+    const checkedCount = packingList.filter(i => i.checked).length;
+    const groupedItems = packingList.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {} as Record<string, PackingItem[]>);
+
+    const todayScheduleEntry = (() => {
+      if (plan.timezoneChange === "none" || !basalSchedule.length) return null;
+      const dayInTrip = daysElapsed;
+      const entry = basalSchedule.find(s => s.day === dayInTrip);
+      if (entry) return entry;
+      const lastEntry = basalSchedule[basalSchedule.length - 1];
+      if (dayInTrip >= (lastEntry?.day || 0)) return lastEntry;
+      return null;
+    })();
+
+    const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
+
+    return (
+      <div className="max-w-3xl mx-auto space-y-6">
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
+          <CardHeader>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="p-2 rounded-full bg-green-100 dark:bg-green-900">
+                <Plane className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-xl" data-testid="text-travel-dashboard-title">
+                  {hasEnded ? "Trip Complete" : hasStarted ? "Travelling" : "Trip Starting Soon"}
+                </CardTitle>
+                <CardDescription>
+                  {plan.destination} — {plan.duration} days ({plan.travelType})
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Active
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                {new Date(plan.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — {new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              </span>
+              <span className="font-medium" data-testid="text-trip-progress">
+                {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${Math.abs(daysElapsed)} days`}
+              </span>
+            </div>
+            <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
+            <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+              <span>{daysElapsed} days elapsed</span>
+              <span>{daysRemaining} days remaining</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {todayScheduleEntry && !isPumpUser && (
+          <Card className="border-purple-200 dark:border-purple-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                Today's Insulin Timing
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Long-acting injection today</p>
+                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid="text-today-injection-time">
+                      {todayScheduleEntry.localTime} <span className="text-sm font-normal">local time</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ({todayScheduleEntry.homeTime} home time)
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-purple-700 dark:text-purple-300">
+                      {todayScheduleEntry.label}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">{todayScheduleEntry.note}</p>
+                  </div>
+                </div>
+                {plan.timezoneChange === "major" && (
+                  <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
+                    Shifting by up to 2 hours per day until adjusted to local time ({plan.timezoneHours}h {plan.timezoneDirection}).
+                    Monitor blood glucose extra closely during adjustment.
+                  </p>
+                )}
+              </div>
+              {basalSchedule.length > 1 && (
+                <details className="mt-3">
+                  <summary className="text-sm text-purple-600 dark:text-purple-400 cursor-pointer hover:opacity-70">
+                    View full adjustment schedule
+                  </summary>
+                  <div className="mt-2 bg-muted/50 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100">
+                          <th className="px-3 py-2 text-left font-medium">Day</th>
+                          <th className="px-3 py-2 text-left font-medium">Home</th>
+                          <th className="px-3 py-2 text-left font-medium">Local</th>
+                          <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {basalSchedule.map((row, idx) => (
+                          <tr key={idx} className={row.day === daysElapsed ? "bg-purple-100/50 dark:bg-purple-900/30 font-medium" : idx % 2 === 0 ? "bg-muted/30" : ""}>
+                            <td className="px-3 py-1.5 text-sm">{row.label}</td>
+                            <td className="px-3 py-1.5 text-sm font-mono">{row.homeTime}</td>
+                            <td className="px-3 py-1.5 text-sm font-mono">{row.localTime}</td>
+                            <td className="px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">{row.note}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isPumpUser && plan.timezoneChange !== "none" && (
+          <Card className="border-purple-200 dark:border-purple-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                Timezone Reminder
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-2">
+                <p className="text-sm">
+                  You're {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {daysElapsed < 2 
+                    ? "Consider keeping your pump on home time for the first day, then update the clock."
+                    : "Your pump clock should now be set to local time. Check basal rates are appropriate."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Packing Checklist
+              </CardTitle>
+              <Badge variant={checkedCount === packingList.length ? "default" : "secondary"} data-testid="badge-packing-progress">
+                {checkedCount}/{packingList.length} packed
+              </Badge>
+            </div>
+            <CardDescription>
+              Tap items to mark them as packed
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map(category => {
+              const items = groupedItems[category];
+              if (!items || items.length === 0) return null;
+              const { label, icon: Icon, color } = categoryLabels[category];
+              
+              return (
+                <div key={category} className="space-y-2">
+                  <h3 className={`font-semibold flex items-center gap-2 text-sm ${color}`}>
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </h3>
+                  <div className="space-y-1.5">
+                    {items.map((item) => {
+                      const globalIndex = packingList.findIndex(i => i === item);
+                      return (
+                        <div 
+                          key={globalIndex}
+                          onClick={() => updatePackingItem(globalIndex)}
+                          className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors hover-elevate ${
+                            item.checked 
+                              ? "bg-green-50 dark:bg-green-950/30" 
+                              : "bg-muted/50"
+                          }`}
+                          data-testid={`active-packing-item-${globalIndex}`}
+                        >
+                          <Checkbox 
+                            checked={item.checked} 
+                            onClick={(e) => e.stopPropagation()}
+                            onCheckedChange={() => updatePackingItem(globalIndex)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-sm ${item.checked ? "line-through text-muted-foreground" : ""}`}>
+                              {item.name}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="shrink-0 text-xs">
+                            {item.estimatedAmount} {item.unit}
+                          </Badge>
+                          {item.checked && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200 dark:border-red-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Heart className="h-5 w-5 text-red-600 dark:text-red-400" />
+              Emergency Quick Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Link href="/emergency-card">
+              <Button variant="outline" className="w-full" data-testid="button-active-emergency-card">
+                <Globe className="h-4 w-4 mr-2 text-red-600" />
+                View Full Emergency Card
+                <ChevronRight className="h-4 w-4 ml-auto" />
+              </Button>
+            </Link>
+
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Languages className="h-4 w-4" />
+                  Key Phrases
+                </h4>
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger className="w-40" data-testid="select-phrase-language">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(EMERGENCY_PHRASES).map(lang => (
+                      <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedPhrases && (
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">"I am diabetic"</p>
+                    <p className="text-lg font-medium" data-testid="text-phrase-diabetic">{selectedPhrases.iAmDiabetic}</p>
+                  </div>
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">"I need sugar"</p>
+                    <p className="text-lg font-medium" data-testid="text-phrase-sugar">{selectedPhrases.needSugar}</p>
+                  </div>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">"I need medical help"</p>
+                    <p className="text-lg font-medium" data-testid="text-phrase-help">{selectedPhrases.needHelp}</p>
+                  </div>
+                  <div className="p-3 bg-muted/50 rounded-lg flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Emergency Number ({selectedLanguage})</p>
+                      <p className="text-lg font-bold font-mono" data-testid="text-emergency-number">{selectedPhrases.emergencyNumber}</p>
+                    </div>
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Link href="/help">
+              <Button variant="outline" className="w-full mt-2" data-testid="button-help-now-link">
+                <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                Help Now Page
+                <ChevronRight className="h-4 w-4 ml-auto" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {riskWarnings.length > 0 && (
+          <Card className="border-orange-500/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShieldAlert className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                Trip Reminders
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {riskWarnings.map((warning, index) => (
+                <div 
+                  key={index} 
+                  className={`p-3 rounded-lg ${
+                    warning.severity === "high" 
+                      ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+                      : warning.severity === "medium"
+                      ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
+                      : "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"
+                  }`}
+                >
+                  <h4 className="font-medium text-sm">{warning.title}</h4>
+                  <p className="text-sm text-muted-foreground mt-1">{warning.description}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    {hasEnded ? "Your trip has ended" : `Until ${new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
+                End Travel Mode
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-center">
+          <Link href="/">
+            <Button variant="ghost" data-testid="link-back-dashboard-active">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "entry") {
     return (
