@@ -50,6 +50,7 @@ interface WidgetInfo {
   description: string;
   icon: typeof Package;
   category: WidgetCategory;
+  beta?: boolean;
 }
 
 type WidgetCategory = "health" | "supplies" | "planning" | "social" | "setup";
@@ -125,6 +126,7 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Connect with others who understand",
     icon: Users,
     category: "social",
+    beta: true,
   },
   "messages": {
     type: "messages",
@@ -132,6 +134,7 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Your direct message inbox",
     icon: Mail,
     category: "social",
+    beta: true,
   },
   "settings-completion": {
     type: "settings-completion",
@@ -216,7 +219,12 @@ function SortableWidgetItem({
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm">{info.name}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="font-medium text-sm">{info.name}</p>
+          {info.beta && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground truncate">{info.description}</p>
       </div>
 

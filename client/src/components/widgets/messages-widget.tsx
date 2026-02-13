@@ -24,6 +24,7 @@ export function MessagesWidget({ compact = false }: { compact?: boolean }) {
             <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
               <Mail className="h-5 w-5 text-primary" />
               <CardTitle className="text-base">Messages</CardTitle>
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge>
             </div>
           </Link>
           {totalUnread > 0 && (

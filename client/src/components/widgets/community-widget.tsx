@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Users, MessageCircle, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, CommunityPost } from "@/lib/storage";
@@ -22,6 +23,7 @@ export function CommunityWidget({ compact = false }: { compact?: boolean }) {
             <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
               <Users className="h-5 w-5 text-primary" />
               <CardTitle className={compact ? "text-base" : "text-lg"}>Community</CardTitle>
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge>
             </div>
           </Link>
         </div>
