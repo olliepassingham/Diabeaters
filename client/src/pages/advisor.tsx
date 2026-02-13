@@ -511,6 +511,7 @@ export default function Advisor() {
   const [currentBg, setCurrentBg] = useState("");
   const [targetBg, setTargetBg] = useState("");
   const [userWeight, setUserWeight] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
   const [hypoResult, setHypoResult] = useState<{
     carbsNeeded: number;
     glucoseTablets: number;
@@ -618,7 +619,8 @@ export default function Advisor() {
     const current = parseFloat(currentBg);
     const target = parseFloat(targetBg);
     const parsedWeight = userWeight ? parseFloat(userWeight) : 70;
-    const weight = (isNaN(parsedWeight) || parsedWeight <= 0) ? 70 : parsedWeight; // Default 70kg, guard against invalid
+    const rawWeight = (isNaN(parsedWeight) || parsedWeight <= 0) ? 70 : parsedWeight;
+    const weight = weightUnit === "lbs" ? rawWeight * 0.4536 : rawWeight;
     
     if (isNaN(current) || isNaN(target)) return;
     
@@ -1490,15 +1492,40 @@ export default function Advisor() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="user-weight">Your weight (kg, optional)</Label>
-                  <Input
-                    id="user-weight"
-                    type="number"
-                    placeholder="e.g., 70"
-                    value={userWeight}
-                    onChange={(e) => setUserWeight(e.target.value)}
-                    data-testid="input-user-weight"
-                  />
+                  <Label htmlFor="user-weight">Your weight (optional)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="user-weight"
+                      type="number"
+                      placeholder={weightUnit === "kg" ? "e.g., 70" : "e.g., 154"}
+                      value={userWeight}
+                      onChange={(e) => setUserWeight(e.target.value)}
+                      className="flex-1"
+                      data-testid="input-user-weight"
+                    />
+                    <div className="flex">
+                      <Button
+                        type="button"
+                        variant={weightUnit === "kg" ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-r-none"
+                        onClick={() => setWeightUnit("kg")}
+                        data-testid="button-weight-kg"
+                      >
+                        kg
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={weightUnit === "lbs" ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-l-none"
+                        onClick={() => setWeightUnit("lbs")}
+                        data-testid="button-weight-lbs"
+                      >
+                        lbs
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
