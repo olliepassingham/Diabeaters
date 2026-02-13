@@ -109,10 +109,6 @@ export function SupplyDepletionWidget({ compact = false }: { compact?: boolean }
           );
         })}
 
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
-          <span>Today</span>
-          <span>{maxDays >= 90 ? "90+ days" : `${maxDays} days`}</span>
-        </div>
       </CardContent>
     </Card>
   );
