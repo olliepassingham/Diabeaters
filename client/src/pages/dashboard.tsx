@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell, Download, X } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell, Download, X, History, ChevronDown, ChevronUp } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -227,11 +227,20 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   const [hypoGlucose, setHypoGlucose] = useState("");
   const [hypoTreatment, setHypoTreatment] = useState("");
   const [hypoNotes, setHypoNotes] = useState("");
+  const [showHypoHistory, setShowHypoHistory] = useState(false);
+  const [hypoHistory, setHypoHistory] = useState<HypoTreatment[]>([]);
   const [carers, setCarers] = useState<CarerLink[]>([]);
 
   useEffect(() => {
     setCarers(storage.getCarerLinks());
   }, []);
+
+  useEffect(() => {
+    if (hypoDialogOpen) {
+      setHypoHistory(storage.getHypoTreatments());
+      setShowHypoHistory(false);
+    }
+  }, [hypoDialogOpen]);
 
   const handleLogHypo = () => {
     storage.addHypoTreatment({
@@ -245,6 +254,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
     setHypoGlucose("");
     setHypoTreatment("");
     setHypoNotes("");
+    setHypoHistory(storage.getHypoTreatments());
     toast({
       title: "Hypo treatment logged",
       description: "Your hypo treatment has been recorded.",
@@ -354,6 +364,47 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
                 Carer notifications coming soon. For now, your hypo is saved locally for your own records.
               </p>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full gap-2 text-muted-foreground"
+              onClick={() => setShowHypoHistory(!showHypoHistory)}
+              data-testid="button-toggle-hypo-history"
+            >
+              <History className="h-4 w-4" />
+              Previous Treatments ({hypoHistory.length})
+              {showHypoHistory ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+            </Button>
+            {showHypoHistory && (
+              <div className="max-h-48 overflow-y-auto space-y-2" data-testid="list-hypo-history">
+                {hypoHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-3">No treatments logged yet.</p>
+                ) : (
+                  hypoHistory.map((entry) => {
+                    const date = new Date(entry.timestamp);
+                    const timeStr = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+                    const dateStr = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                    return (
+                      <div key={entry.id} className="flex items-start gap-3 p-2 rounded-md bg-muted/30 text-sm" data-testid={`item-hypo-${entry.id}`}>
+                        <div className="text-muted-foreground text-xs whitespace-nowrap pt-0.5">
+                          <div>{dateStr}</div>
+                          <div>{timeStr}</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {entry.treatment && <Badge variant="secondary" className="text-xs">{entry.treatment}</Badge>}
+                            {entry.glucoseLevel !== undefined && (
+                              <span className="text-xs text-muted-foreground">{entry.glucoseLevel} mmol/L</span>
+                            )}
+                          </div>
+                          {entry.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{entry.notes}</p>}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
