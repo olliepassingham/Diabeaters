@@ -121,8 +121,7 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
           );
         })}
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
-          <span>Today</span>
+        <div className="flex items-center justify-end text-xs text-muted-foreground pt-1 border-t">
           <span>{maxDays >= 90 ? "90+ days" : `${maxDays} days`}</span>
         </div>
       </CardContent>
