@@ -417,7 +417,7 @@ function BackupReminderCard({ onDismiss }: { onDismiss: () => void }) {
           Your data is stored on this device only. A backup file keeps your settings and supplies safe if anything happens to your device.
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/settings">
+          <Link href="/settings?tab=data">
             <Button size="sm" className="gradient-primary border-primary-border" data-testid="button-backup-now">
               <Download className="h-4 w-4 mr-1" />
               Back Up Now
