@@ -1149,14 +1149,12 @@ export const storage = {
    */
   isSettingsComplete(): boolean {
     const settings = this.getSettings();
-    const contacts = this.getEmergencyContacts();
     
     const checks = [
       !!settings.tdd,
       !!(settings.breakfastRatio || settings.lunchRatio),
       !!settings.correctionFactor,
       !!(settings.targetBgLow && settings.targetBgHigh),
-      contacts.length > 0,
     ];
     
     return checks.every(c => c);
@@ -1167,14 +1165,12 @@ export const storage = {
    */
   getSettingsCompletion(): { percentage: number; completed: number; total: number } {
     const settings = this.getSettings();
-    const contacts = this.getEmergencyContacts();
     
     const checks = [
       !!settings.tdd,
       !!(settings.breakfastRatio || settings.lunchRatio),
       !!settings.correctionFactor,
       !!(settings.targetBgLow && settings.targetBgHigh),
-      contacts.length > 0,
     ];
     
     const completed = checks.filter(c => c).length;

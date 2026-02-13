@@ -277,15 +277,20 @@ export default function HelpNow() {
             </div>
             
             {contacts.length === 0 ? (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setDialogOpen(true)}
-                data-testid="button-add-first-contact"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Emergency Contact
-              </Button>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Add a contact so someone who knows you can be reached quickly in an emergency.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setDialogOpen(true)}
+                  data-testid="button-add-first-contact"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Emergency Contact
+                </Button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {contacts.slice(0, 2).map((contact) => (

@@ -29,8 +29,9 @@ export function SettingsCompletionWidget({ compact = false }: { compact?: boolea
     { key: "carbRatio", label: "Carb Ratios", complete: !!(settings.breakfastRatio || settings.lunchRatio) },
     { key: "correctionFactor", label: "Correction Factor", complete: !!settings.correctionFactor },
     { key: "targetRange", label: "Target BG Range", complete: !!(settings.targetBgLow && settings.targetBgHigh) },
-    { key: "emergencyContact", label: "Emergency Contact", complete: contacts.length > 0 },
   ];
+
+  const hasEmergencyContact = contacts.length > 0;
 
   const completedCount = settingsItems.filter(item => item.complete).length;
   const totalCount = settingsItems.length;
@@ -82,6 +83,16 @@ export function SettingsCompletionWidget({ compact = false }: { compact?: boolea
                 </span>
               </div>
             ))}
+            <div className="flex items-center gap-2 text-sm">
+              {hasEmergencyContact ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : (
+                <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+              )}
+              <span className="text-muted-foreground">
+                Emergency Contact <span className="text-xs">(optional)</span>
+              </span>
+            </div>
           </div>
         )}
 
