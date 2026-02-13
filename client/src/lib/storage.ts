@@ -156,10 +156,8 @@ export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): {
   }
 
   if (type === "insulin" || type === "insulin_short" || type === "insulin_long") {
-    const isPump = storage.getProfile()?.insulinDeliveryMethod === "pump";
-    const amount = Math.max(1, customValue || (isPump ? s.insulinCartridgeUnits : undefined) || packInfo.increment);
-    const itemLabel = isPump ? "cartridge" : "pen";
-    return { amount, label: amount === 1 ? "unit" : itemLabel };
+    const amount = Math.max(1, customValue || packInfo.increment);
+    return { amount, label: amount === 1 ? "unit" : "pen" };
   }
 
   const amount = Math.max(1, customValue || packInfo.increment);
@@ -184,9 +182,9 @@ export function getUnitsPerPen(settings?: UserSettings): number {
   return Math.max(1, s.unitsPerInsulinPen || s.insulinCartridgeUnits || 300);
 }
 
-export function getInsulinContainerLabel(): string {
-  const profile = storage.getProfile();
-  return profile?.insulinDeliveryMethod === "pump" ? "cartridge" : "pen";
+export function getInsulinContainerLabel(type?: SupplyType): string {
+  if (type === "insulin_vial") return "vial";
+  return "pen";
 }
 
 export interface LastPrescription {

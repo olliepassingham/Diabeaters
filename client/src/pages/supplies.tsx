@@ -953,7 +953,7 @@ function SupplyCard({
                 <div data-testid={`text-remaining-${supply.id}`}>
                   {(() => {
                     const uPerContainer = getUnitsPerPen();
-                    const containerLabel = getInsulinContainerLabel();
+                    const containerLabel = getInsulinContainerLabel(supply.type);
                     const containerCount = Math.floor(adjustedQuantity / uPerContainer);
                     const plural = containerCount === 1 ? containerLabel : `${containerLabel}s`;
                     return (
