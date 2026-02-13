@@ -217,7 +217,7 @@ export default function Shop() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Shop</h1>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">Shop <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge></h1>
           <p className="text-muted-foreground">
             Essential diabetes supplies delivered to your door
           </p>

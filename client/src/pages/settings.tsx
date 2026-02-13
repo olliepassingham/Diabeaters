@@ -17,12 +17,11 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 function ProfileTab({ 
-  name, setName, email, setEmail, bgUnits, setBgUnits, 
+  name, setName, bgUnits, setBgUnits, 
   carbUnits, setCarbUnits, deliveryMethod, setDeliveryMethod, 
   onSave 
 }: {
   name: string; setName: (v: string) => void;
-  email: string; setEmail: (v: string) => void;
   bgUnits: string; setBgUnits: (v: string) => void;
   carbUnits: string; setCarbUnits: (v: string) => void;
   deliveryMethod: "pen" | "pump"; setDeliveryMethod: (v: "pen" | "pump") => void;
@@ -42,10 +41,6 @@ function ProfileTab({
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-name" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-email" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -735,7 +730,6 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState(urlTab && validTabs.includes(urlTab) ? urlTab : "profile");
   
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [carbUnits, setCarbUnits] = useState("grams");
   const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
@@ -796,7 +790,6 @@ export default function Settings() {
     if (storedProfile) {
       setProfile(storedProfile);
       setName(storedProfile.name || "");
-      setEmail(storedProfile.email || "");
       setBgUnits(storedProfile.bgUnits || "mmol/L");
       setCarbUnits(storedProfile.carbUnits || "grams");
       setDeliveryMethod((storedProfile.insulinDeliveryMethod as "pen" | "pump") || "pen");
@@ -854,7 +847,7 @@ export default function Settings() {
 
   const handleSaveProfile = () => {
     if (profile) {
-      const updatedProfile = { ...profile, name, email, bgUnits, carbUnits, insulinDeliveryMethod: deliveryMethod };
+      const updatedProfile = { ...profile, name, bgUnits, carbUnits, insulinDeliveryMethod: deliveryMethod };
       storage.saveProfile(updatedProfile);
       setProfile(updatedProfile);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
@@ -970,7 +963,7 @@ export default function Settings() {
           description="Configure your personal diabetes management preferences"
         >
           <InfoSection title="Profile">
-            <p>Set your name, email, and choose your preferred units for blood glucose (mmol/L or mg/dL) and carbohydrates.</p>
+            <p>Set your name and choose your preferred units for blood glucose (mmol/L or mg/dL) and carbohydrates.</p>
           </InfoSection>
           <InfoSection title="Insulin & Ratios">
             <p>Enter your insulin-to-carb ratios, correction factor, and target range. These are used by the Activity Advisor for bolus suggestions.</p>
@@ -1023,7 +1016,7 @@ export default function Settings() {
           <div className="mt-4">
             <TabsContent value="profile" className="animate-fade-in-up">
               <ProfileTab
-                name={name} setName={setName} email={email} setEmail={setEmail}
+                name={name} setName={setName}
                 bgUnits={bgUnits} setBgUnits={setBgUnits} carbUnits={carbUnits} setCarbUnits={setCarbUnits}
                 deliveryMethod={deliveryMethod} setDeliveryMethod={setDeliveryMethod}
                 onSave={handleSaveProfile}

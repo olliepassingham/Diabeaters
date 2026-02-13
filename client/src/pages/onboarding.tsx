@@ -16,7 +16,6 @@ type Step = "personal" | "units" | "diabetes" | "delivery" | "insulin" | "usage"
 
 interface OnboardingData {
   name: string;
-  email: string;
   bgUnits: string;
   carbUnits: string;
   diabetesType: string;
@@ -45,7 +44,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [currentStep, setCurrentStep] = useState<Step>("personal");
   const [data, setData] = useState<OnboardingData>({
     name: "",
-    email: "",
     bgUnits: "mmol/L",
     carbUnits: "grams",
     diabetesType: "",
@@ -69,7 +67,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleSaveProfile = () => {
     storage.saveProfile({
       name: data.name,
-      email: data.email,
+      email: "",
       bgUnits: data.bgUnits,
       carbUnits: data.carbUnits,
       diabetesType: data.diabetesType,
@@ -147,12 +145,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">What should we call you?</Label>
                 <Input id="name" value={data.name} onChange={(e) => updateData("name", e.target.value)} placeholder="Your name" data-testid="input-onboarding-name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={data.email} onChange={(e) => updateData("email", e.target.value)} placeholder="your@email.com" data-testid="input-onboarding-email" />
               </div>
             </CardContent>
           </Card>

@@ -274,7 +274,7 @@ export function ProfileMenu() {
             <section>
               <h3 className="font-semibold mb-2">1. Information We Collect</h3>
               <p className="text-muted-foreground">
-                Diabeaters collects health-related information you provide, including diabetes type, insulin settings, and supply inventory. This data is stored locally on your device and optionally synced to secure servers.
+                Diabeaters collects health-related information you provide, including your name, diabetes type, insulin settings, and supply inventory. All data is stored locally on your device and is never uploaded to our servers.
               </p>
             </section>
             
@@ -288,7 +288,7 @@ export function ProfileMenu() {
             <section>
               <h3 className="font-semibold mb-2">3. Data Storage</h3>
               <p className="text-muted-foreground">
-                Data is primarily stored locally on your device. If you use cloud features, data is encrypted in transit and at rest using industry-standard protocols.
+                All your data is stored locally on your device. Nothing is sent to or stored on our servers. This means your health information stays private and under your control at all times.
               </p>
             </section>
             

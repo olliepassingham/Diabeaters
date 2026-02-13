@@ -157,6 +157,7 @@ export default function FamilyCarers() {
             <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="heading-family-carers">
               <Users className="h-6 w-6 text-primary" />
               Family & Carers
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal no-default-hover-elevate no-default-active-elevate">Beta</Badge>
             </h1>
             <p className="text-muted-foreground">Link family members or carers to your account</p>
           </div>
