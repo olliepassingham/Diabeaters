@@ -60,18 +60,70 @@ function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState): Heal
 
 function StatusIndicator({ status }: { status: HealthStatus }) {
   const config = {
-    stable: { bg: "bg-green-500", text: "Stable", textColor: "text-green-700 dark:text-green-400" },
-    watch: { bg: "bg-amber-500", text: "Watch", textColor: "text-amber-700 dark:text-amber-400" },
-    action: { bg: "bg-red-500", text: "Action needed", textColor: "text-red-700 dark:text-red-400" },
+    stable: {
+      text: "Stable",
+      textColor: "text-green-700 dark:text-green-400",
+      stroke: "#22c55e",
+      fill: "hsl(142 71% 45% / 0.12)",
+      arc: 1,
+    },
+    watch: {
+      text: "Watch",
+      textColor: "text-amber-700 dark:text-amber-400",
+      stroke: "#f59e0b",
+      fill: "hsl(38 92% 50% / 0.12)",
+      arc: 0.6,
+    },
+    action: {
+      text: "Action needed",
+      textColor: "text-red-700 dark:text-red-400",
+      stroke: "#ef4444",
+      fill: "hsl(0 72% 52% / 0.12)",
+      arc: 0.3,
+    },
   };
 
-  const { bg, text, textColor } = config[status];
-
-  const glowClass = status === "action" ? "glow-pulse-critical" : status === "watch" ? "glow-pulse-warning" : "glow-success";
+  const { text, textColor, stroke, fill, arc } = config[status];
+  const size = 36;
+  const strokeWidth = 3.5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - arc);
+  const pulseClass = status === "action" ? "animate-pulse" : "";
 
   return (
-    <div className="flex items-center gap-2">
-      <div className={`w-3 h-3 rounded-full ${bg} ${glowClass}`} />
+    <div className="flex items-center gap-2.5" data-testid="status-indicator">
+      <div className={`relative ${pulseClass}`}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill={fill}
+            stroke="hsl(var(--border))"
+            strokeWidth={1}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ transition: "stroke-dashoffset 0.6s ease" }}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={4}
+            fill={stroke}
+          />
+        </svg>
+      </div>
       <span className={`text-sm font-medium ${textColor}`} data-testid="text-status">
         {text}
       </span>
