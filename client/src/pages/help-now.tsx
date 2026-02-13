@@ -201,6 +201,35 @@ export default function HelpNow() {
           )}
         </Card>
 
+        {profile?.insulinDeliveryMethod === "pump" && (
+          <Card className="border-2 border-indigo-300 dark:border-indigo-700" data-testid="card-pump-emergency">
+            <CardContent className="p-4">
+              <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                <AlertCircle className="h-5 w-5" />
+                Pump Users - Important
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 p-2 bg-indigo-50 dark:bg-indigo-900/50 rounded text-sm">
+                  <span className="text-indigo-600 font-bold flex-shrink-0">1</span>
+                  <span>If blood sugar is LOW: <strong>do NOT disconnect the pump</strong>. Treat the hypo with fast sugar first.</span>
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-indigo-50 dark:bg-indigo-900/50 rounded text-sm">
+                  <span className="text-indigo-600 font-bold flex-shrink-0">2</span>
+                  <span>If blood sugar is VERY HIGH with ketones: check the pump site for kinks or blockages. Consider whether the pump is delivering insulin properly.</span>
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-indigo-50 dark:bg-indigo-900/50 rounded text-sm">
+                  <span className="text-indigo-600 font-bold flex-shrink-0">3</span>
+                  <span>If you suspect DKA (very high BG + ketones + feeling very unwell): give a correction dose by <strong>pen injection</strong>, not through the pump, in case the pump is not delivering.</span>
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-red-50 dark:bg-red-900/50 rounded text-sm">
+                  <span className="text-red-600 font-bold flex-shrink-0">!</span>
+                  <span><strong>Never remove someone else's pump</strong> unless you are trained to do so. Call 999 if unsure.</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card 
           className={`border-2 transition-colors ${expandedSection === "unconscious" ? "border-red-500" : "border-muted"}`}
         >
@@ -253,6 +282,12 @@ export default function HelpNow() {
                   <span className="text-green-600 text-lg flex-shrink-0">✓</span>
                   <span>Stay with them until help arrives</span>
                 </div>
+                {profile?.insulinDeliveryMethod === "pump" && (
+                  <div className="flex items-center gap-3 p-2 bg-indigo-50 dark:bg-indigo-900/50 rounded text-sm mt-2" data-testid="pump-tip-unconscious">
+                    <AlertCircle className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+                    <span>They have an insulin pump. <strong>Do not remove it.</strong> Tell the paramedics they use a pump.</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           )}

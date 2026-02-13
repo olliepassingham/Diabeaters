@@ -270,6 +270,12 @@ interface ExercisePlanResult {
     monitorHours: string;
     tips: string[];
   };
+  pumpTips: {
+    pre: string[];
+    during: string[];
+    post: string[];
+    recovery: string[];
+  };
 }
 
 function calculateExercisePlan(message: string, settings: UserSettings, bgUnits: string = "mmol/L"): ExercisePlanResult {
@@ -355,11 +361,31 @@ function calculateExercisePlan(message: string, settings: UserSettings, bgUnits:
       monitorHours: "6-24",
       tips: [
         "Monitor BG closely for delayed lows",
-        "Consider reducing basal rate overnight (if on a pump)",
+        "Consider a small bedtime snack to prevent overnight lows",
         "Have a protein-carb snack before bed if you exercised in the evening",
         "Stay hydrated — dehydration affects BG readings",
       ],
     },
+    pumpTips: intensity === "light"
+      ? {
+          pre: ["Consider a 20-30% temporary basal reduction starting 60 min before"],
+          during: ["Your pump's current basal may be sufficient for light activity"],
+          post: ["Resume normal basal rate after light exercise"],
+          recovery: ["No overnight basal change typically needed for light exercise"],
+        }
+      : intensity === "moderate"
+      ? {
+          pre: ["Set a temporary basal rate at 50-70% (30-50% reduction) starting 60-90 min before exercise"],
+          during: ["If BG drops below target, reduce or suspend temp basal"],
+          post: ["Keep temp basal running at 70-80% for 1-2 hours after exercise"],
+          recovery: ["Consider running basal at 80-90% overnight if exercised in the evening"],
+        }
+      : {
+          pre: ["Set a temporary basal rate at 30-50% (50-70% reduction) starting 60-90 min before exercise"],
+          during: ["Be ready to suspend pump briefly if BG drops rapidly", "Some people disconnect for water sports - discuss with your team first"],
+          post: ["Keep temp basal at 60-70% for 2-3 hours post-exercise"],
+          recovery: ["Run basal at 70-80% overnight - intense exercise increases hypo risk for up to 24 hours"],
+        },
   };
 }
 
@@ -1040,6 +1066,16 @@ export default function Advisor() {
                         <p><strong>Rounding guide:</strong> If BG is trending high or above target, round doses up to the nearest 0.5. If trending low or below target, round down.</p>
                         <p><strong>Tip:</strong> Set a timer for your second dose! Check BG before taking it.</p>
                       </div>
+
+                      {profile.insulinDeliveryMethod === "pump" && (
+                        <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
+                          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
+                          <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                            Your pump may have an extended/square wave bolus feature that handles this automatically. 
+                            Check your pump's manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1239,6 +1275,17 @@ export default function Advisor() {
                         </p>
                       </div>
                     </div>
+                    {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
+                      <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-before">
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump Users</p>
+                        {exerciseResult.pumpTips.pre.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-indigo-800 dark:text-indigo-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="during" className="mt-3 space-y-3 animate-fade-in-up">
@@ -1270,6 +1317,17 @@ export default function Advisor() {
                         </div>
                       )}
                     </div>
+                    {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.during.length > 0 && (
+                      <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-during">
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump Users</p>
+                        {exerciseResult.pumpTips.during.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-indigo-800 dark:text-indigo-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="after" className="mt-3 space-y-3 animate-fade-in-up">
@@ -1301,6 +1359,17 @@ export default function Advisor() {
                         </p>
                       </div>
                     </div>
+                    {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
+                      <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-after">
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump Users</p>
+                        {exerciseResult.pumpTips.post.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-indigo-800 dark:text-indigo-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="recovery" className="mt-3 space-y-3 animate-fade-in-up">
@@ -1320,6 +1389,17 @@ export default function Advisor() {
                         <strong>Why delayed lows happen:</strong> Your muscles keep absorbing glucose for hours after exercise to replenish their stores.
                       </div>
                     </div>
+                    {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.recovery.length > 0 && (
+                      <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-recovery">
+                        <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump Users</p>
+                        {exerciseResult.pumpTips.recovery.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-sm text-indigo-800 dark:text-indigo-200">{tip}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
 

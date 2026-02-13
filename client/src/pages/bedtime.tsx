@@ -47,6 +47,7 @@ export default function Bedtime() {
   const [result, setResult] = useState<ReadinessResult | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     const settings = storage.getSettings();
@@ -55,8 +56,11 @@ export default function Bedtime() {
     if (profile?.bgUnits) {
       setBgUnits(profile.bgUnits as "mmol/L" | "mg/dL");
     }
+    setProfile(storage.getProfile());
     setScenarioState(storage.getScenarioState());
   }, []);
+
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   const getTargetRange = () => {
     if (userSettings?.targetBgLow && userSettings?.targetBgHigh) {
@@ -245,7 +249,9 @@ export default function Bedtime() {
       tips.push("Keep fast-acting glucose by your bed");
       if (bgMmol < targetLowMmol) tips.push("Have a small snack before bed");
       if (hadAlcohol) tips.push("Alcohol can cause delayed lows for up to 24 hours");
+      if (hadAlcohol && isPumpUser) tips.push("Check your pump's IOB display before deciding on a correction");
       if (exercisedToday) tips.push("Exercise can cause lows for up to 24 hours after");
+      if (exercisedToday && isPumpUser) tips.push("Consider setting a temporary basal rate at 80-90% overnight after exercise");
       if (sleepHours !== null && sleepHours > 1) tips.push("Re-run this check closer to when you actually go to bed");
     } else if (cautionCount >= 2 || concernCount >= 1) {
       level = "monitor";
@@ -262,6 +268,7 @@ export default function Bedtime() {
       message = "Your glucose looks stable, no recent food or insulin actively working. You're set for a restful night.";
       tips.push("Sweet dreams - you've set yourself up well");
       tips.push("Your glucose is in a comfortable range for sleep");
+      if (isPumpUser) tips.push("Your pump's basal rate should keep you steady overnight");
     }
 
     if (scenarioState.sickDayActive) {
@@ -557,6 +564,11 @@ export default function Bedtime() {
                     <p className="text-xs text-muted-foreground mt-1">
                       Reduced from {result.correction.fullDose}u because bedtime corrections carry overnight hypo risk. Many diabetes teams recommend a cautious approach at night.
                     </p>
+                    {isPumpUser && (
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1" data-testid="text-pump-correction-tip">
+                        Your pump tracks active insulin (IOB). Check your pump's IOB before correcting — it may already account for recent boluses.
+                      </p>
+                    )}
                   </div>
 
                   {(result.correction.hasIOB || result.correction.exerciseWarning || result.correction.alcoholWarning || result.correction.sickDayWarning) && (
@@ -600,6 +612,26 @@ export default function Bedtime() {
                   <p className="text-xs italic text-muted-foreground" data-testid="text-correction-disclaimer">
                     [Not medical advice. This is a calculation based on your settings, not a prescription. Always follow your diabetes team's guidance on bedtime corrections.]
                   </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {isPumpUser && result && (result.level === "monitor" || result.level === "alert") && (
+              <Card className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20" data-testid="card-pump-overnight">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="font-medium text-sm">Pump Overnight Tips</h4>
+                  </div>
+                  <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
+                    {exercisedToday && (
+                      <p>Consider a temporary basal rate at 80-90% for 4-6 hours overnight to reduce post-exercise hypo risk.</p>
+                    )}
+                    {hadAlcohol && (
+                      <p>Alcohol can cause delayed lows. Consider reducing basal by 10-20% overnight and setting an alarm.</p>
+                    )}
+                    <p>If your BG is trending down, a small temporary basal reduction (80-90%) may help prevent an overnight low.</p>
+                  </div>
                 </CardContent>
               </Card>
             )}

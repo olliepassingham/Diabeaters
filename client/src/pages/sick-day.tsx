@@ -321,6 +321,7 @@ export default function SickDay() {
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [isTravelAlsoActive, setIsTravelAlsoActive] = useState(false);
   const [travelDestination, setTravelDestination] = useState<string | undefined>();
+  const [isPumpUser, setIsPumpUser] = useState(false);
 
   const saveSession = (newResults: SickDayResults | null) => {
     const session: SickDaySession = {
@@ -344,6 +345,7 @@ export default function SickDay() {
     if (profile?.bgUnits) {
       setBgUnits(profile.bgUnits);
     }
+    setIsPumpUser(profile?.insulinDeliveryMethod === "pump");
 
     setSupplies(storage.getSupplies());
 
@@ -628,7 +630,11 @@ export default function SickDay() {
                 <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium">Never stop taking insulin</p>
-                  <p className="text-xs text-muted-foreground">Even if you're not eating, your body needs insulin. Your long-acting (basal) insulin must continue.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isPumpUser 
+                      ? "Even if you're not eating, your body needs insulin. Keep your pump running and do not disconnect. If your pump fails, switch to backup injections immediately."
+                      : "Even if you're not eating, your body needs insulin. Your long-acting (basal) insulin must continue."}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
@@ -654,6 +660,18 @@ export default function SickDay() {
                   <p className="text-xs text-muted-foreground">{results.hydrationNote}</p>
                 </div>
               </div>
+              {isPumpUser && (
+                <div className="flex items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg">
+                  <Syringe className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Check your pump site</p>
+                    <p className="text-xs text-muted-foreground">
+                      Illness can affect infusion site absorption. If blood glucose stays high despite corrections, 
+                      change your infusion set and site. A blocked or kinked cannula could be making things worse.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -743,6 +761,7 @@ export default function SickDay() {
               { text: "Chest pain or severe abdominal pain", severity: "critical" },
               { text: "Fruity smell on breath (sign of ketoacidosis)", severity: "high" },
               { text: "Illness lasting more than 48 hours with no improvement", severity: "medium" },
+              ...(isPumpUser ? [{ text: "Pump site failure or suspected blocked cannula with rising blood glucose and ketones", severity: "high" as const }] : []),
             ].map((item, idx) => (
               <div 
                 key={idx} 
@@ -1327,11 +1346,30 @@ export default function SickDay() {
                   <div className="flex items-start gap-2">
                     <Info className="h-4 w-4 text-primary mt-0.5" />
                     <div>
-                      <p className="font-medium text-sm">Basal Insulin</p>
+                      <p className="font-medium text-sm">{isPumpUser ? "Basal Rate Adjustment" : "Basal (Long-Acting) Insulin"}</p>
                       <p className="text-xs text-muted-foreground">{results.basalAdjustment}</p>
+                      {isPumpUser && (
+                        <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
+                          Adjust your temporary basal rate on your pump rather than changing your programmed profile.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {isPumpUser && (
+                  <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800 space-y-2" data-testid="pump-tip-sick-day">
+                    <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase">Pump Users</p>
+                    <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
+                      <p>Change your infusion set and site if blood glucose remains high after 2 corrections.</p>
+                      <p>Use your pump's correction bolus calculator, but verify it accounts for active insulin (IOB).</p>
+                      {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
+                        <p className="font-medium">With moderate/large ketones: consider switching to pen injections. Pump site absorption may be compromised. Contact your diabetes team.</p>
+                      )}
+                      <p>If you suspect pump failure, switch to backup pen injections and contact your pump supplier.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="font-medium text-sm text-blue-900 dark:text-blue-100">Hydration</p>
