@@ -33,6 +33,8 @@ const STORAGE_KEYS = {
   CARER_INVITE_CODE: "diabeater_carer_invite_code",
   TRAVEL_PLAN: "diabeater_travel_plan",
   TRAVEL_PACKING_LIST: "diabeater_travel_packing_list",
+  BACKUP_REMINDER_DISMISSED: "diabeater_backup_reminder_dismissed",
+  LAST_BACKUP_DATE: "diabeater_last_backup_date",
 } as const;
 
 export interface UserProfile {
@@ -2053,6 +2055,9 @@ export const storage = {
     }
     data._exportedAt = new Date().toISOString();
     data._version = "1.0";
+    localStorage.setItem(STORAGE_KEYS.LAST_BACKUP_DATE, new Date().toISOString());
+    localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED);
+    localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED + "_at");
     return JSON.stringify(data, null, 2);
   },
 
@@ -2148,6 +2153,36 @@ export const storage = {
     const code = `DB-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     localStorage.setItem(STORAGE_KEYS.CARER_INVITE_CODE, code);
     return code;
+  },
+
+  shouldShowBackupReminder(): boolean {
+    const settingsComplete = this.isSettingsComplete();
+    const hasSupplies = this.getSupplies().length > 0;
+    if (!settingsComplete || !hasSupplies) return false;
+    const dismissed = localStorage.getItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED);
+    if (dismissed === "permanent") return false;
+    if (dismissed === "later") {
+      const dismissedAt = localStorage.getItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED + "_at");
+      if (dismissedAt) {
+        const daysSinceDismiss = (Date.now() - new Date(dismissedAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceDismiss < 7) return false;
+      }
+    }
+    const lastBackup = localStorage.getItem(STORAGE_KEYS.LAST_BACKUP_DATE);
+    if (!lastBackup) return true;
+    const daysSinceBackup = (Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceBackup >= 7;
+  },
+
+  dismissBackupReminder(type: "later" | "permanent"): void {
+    localStorage.setItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED, type);
+    if (type === "later") {
+      localStorage.setItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED + "_at", new Date().toISOString());
+    }
+  },
+
+  getLastBackupDate(): string | null {
+    return localStorage.getItem(STORAGE_KEYS.LAST_BACKUP_DATE);
   },
 
   importAllData(jsonString: string): { success: boolean; error?: string } {

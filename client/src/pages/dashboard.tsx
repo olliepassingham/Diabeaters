@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell } from "lucide-react";
+import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell, Download, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -382,6 +382,59 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
   );
 }
 
+function BackupReminderCard({ onDismiss }: { onDismiss: () => void }) {
+  const lastBackup = storage.getLastBackupDate();
+  const lastBackupText = lastBackup 
+    ? `Last backup: ${new Date(lastBackup).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    : "You haven't backed up yet";
+
+  const handleRemindLater = () => {
+    storage.dismissBackupReminder("later");
+    onDismiss();
+  };
+
+  const handleDontRemind = () => {
+    storage.dismissBackupReminder("permanent");
+    onDismiss();
+  };
+
+  return (
+    <Card className="border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/30" data-testid="card-backup-reminder">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Download className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <div>
+              <h3 className="font-semibold" data-testid="text-backup-title">Back Up Your Data</h3>
+              <p className="text-sm text-muted-foreground">{lastBackupText}</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleRemindLater} data-testid="button-dismiss-backup">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Your data is stored on this device only. A backup file keeps your settings and supplies safe if anything happens to your device.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/settings">
+            <Button size="sm" className="gradient-primary border-primary-border" data-testid="button-backup-now">
+              <Download className="h-4 w-4 mr-1" />
+              Back Up Now
+            </Button>
+          </Link>
+          <Button size="sm" variant="ghost" onClick={handleRemindLater} data-testid="button-remind-later">
+            Remind me later
+          </Button>
+          <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={handleDontRemind} data-testid="button-dont-remind">
+            Don't remind me
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSize }) {
   const compact = size === "half";
   switch (type) {
@@ -426,6 +479,7 @@ export default function Dashboard() {
   const [isSettingsComplete, setIsSettingsComplete] = useState(false);
   const [settingsCompletion, setSettingsCompletion] = useState({ percentage: 0, completed: 0, total: 5 });
   const [isLoading, setIsLoading] = useState(true);
+  const [showBackupReminder, setShowBackupReminder] = useState(false);
 
   // Refresh data on mount and when refreshKey changes
   useEffect(() => {
@@ -436,6 +490,7 @@ export default function Dashboard() {
       setWidgets(storage.getDashboardWidgets());
       setIsSettingsComplete(storage.isSettingsComplete());
       setSettingsCompletion(storage.getSettingsCompletion());
+      setShowBackupReminder(storage.shouldShowBackupReminder());
     };
     
     refreshData();
@@ -535,6 +590,12 @@ export default function Dashboard() {
       {!isEditing && !isSettingsComplete && (
         <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <SetupPromptCard completion={settingsCompletion} />
+        </div>
+      )}
+
+      {!isEditing && showBackupReminder && (
+        <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <BackupReminderCard onDismiss={() => setShowBackupReminder(false)} />
         </div>
       )}
 
