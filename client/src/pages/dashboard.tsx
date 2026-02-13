@@ -234,23 +234,20 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   }, []);
 
   const handleLogHypo = () => {
-    const hasCarers = carers.length > 0;
     storage.addHypoTreatment({
       timestamp: new Date().toISOString(),
       glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
       treatment: hypoTreatment || undefined,
       notes: hypoNotes || undefined,
-      carerNotified: hasCarers,
+      carerNotified: false,
     });
     setHypoDialogOpen(false);
     setHypoGlucose("");
     setHypoTreatment("");
     setHypoNotes("");
     toast({
-      title: hasCarers ? "Hypo logged & carers notified" : "Hypo treatment logged",
-      description: hasCarers
-        ? `${carers.length} linked carer${carers.length > 1 ? "s" : ""} ${carers.length > 1 ? "have" : "has"} been notified.`
-        : "Your hypo treatment has been recorded.",
+      title: "Hypo treatment logged",
+      description: "Your hypo treatment has been recorded.",
     });
   };
 
@@ -309,7 +306,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Beta</Badge>
             </DialogTitle>
             <DialogDescription>
-              Record details about your hypo. {carers.length > 0 ? `Your ${carers.length} linked carer${carers.length > 1 ? "s" : ""} will be notified.` : ""}
+              Record details about your hypo treatment.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -351,20 +348,18 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
                 data-testid="input-dashboard-hypo-notes"
               />
             </div>
-            {carers.length > 0 && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-md">
-                <Bell className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-                <p className="text-sm text-green-800 dark:text-green-200">
-                  {carers.map(c => c.name).join(", ")} will be notified
-                </p>
-              </div>
-            )}
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+              <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                Carer notifications coming soon. For now, your hypo is saved locally for your own records.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleLogHypo} className="bg-green-600 dark:bg-green-700 gap-2" data-testid="button-dashboard-confirm-hypo">
               <CheckCircle2 className="h-4 w-4" />
-              Log & Notify
+              Log Treatment
             </Button>
           </DialogFooter>
         </DialogContent>
