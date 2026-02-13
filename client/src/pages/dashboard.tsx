@@ -276,6 +276,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         >
           <CheckCircle2 className="h-4 w-4" />
           Treated a Hypo
+          <Badge variant="outline" className="ml-0.5 text-[10px] px-1 py-0 h-4 bg-white/20 border-white/40 text-white">Beta</Badge>
         </Button>
         <div className="flex items-center gap-2 shrink-0">
           <DashboardInfoDialog />
