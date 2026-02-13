@@ -32,6 +32,7 @@ const typeLabels: Record<string, string> = {
   insulin: "Insulin",
   insulin_short: "Short-Acting Insulin",
   insulin_long: "Long-Acting Insulin",
+  insulin_vial: "Insulin Vials (Pump)",
   cgm: "CGM/Monitors",
   infusion_set: "Infusion Sets",
   reservoir: "Reservoirs/Cartridges",
@@ -39,7 +40,7 @@ const typeLabels: Record<string, string> = {
 };
 
 function isInsulinType(type: string): boolean {
-  return type === "insulin" || type === "insulin_short" || type === "insulin_long";
+  return type === "insulin" || type === "insulin_short" || type === "insulin_long" || type === "insulin_vial";
 }
 
 function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; onSupplyClick?: (id: string) => void }) {
@@ -1297,6 +1298,7 @@ function SupplyDialog({
                 <SelectItem value="needle">Needles/Lancets</SelectItem>
                 <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
                 <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
+                <SelectItem value="insulin_vial">Insulin Vials (Pump)</SelectItem>
                 <SelectItem value="cgm">CGM/Monitors</SelectItem>
                 <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
                 <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
@@ -1371,6 +1373,11 @@ function SupplyDialog({
                   {type === "insulin_long" && (
                     <p className="text-xs text-muted-foreground">
                       Long-acting (basal) insulin units you use per day, e.g. Lantus, Levemir, Tresiba.
+                    </p>
+                  )}
+                  {type === "insulin_vial" && (
+                    <p className="text-xs text-muted-foreground">
+                      Insulin vials for pump use (typically 10ml / 1000 units), e.g. NovoRapid, Humalog, Fiasp.
                     </p>
                   )}
                   {type === "insulin" && (
@@ -1731,6 +1738,7 @@ function EditUsualPrescriptionDialog({
                     <SelectItem value="needle">Needles/Lancets</SelectItem>
                     <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
                     <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
+                    <SelectItem value="insulin_vial">Insulin Vials (Pump)</SelectItem>
                     <SelectItem value="cgm">CGM/Monitors</SelectItem>
                     <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
                     <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>

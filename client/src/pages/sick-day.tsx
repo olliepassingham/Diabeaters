@@ -474,6 +474,7 @@ export default function SickDay() {
     const sickDayMultipliers: Record<string, { multiplier: number; reason: string }> = {
       insulin_short: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher correction doses needed" },
       insulin_long: { multiplier: 1.0, reason: "Keep basal dose consistent" },
+      insulin_vial: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher doses during illness" },
       insulin: { multiplier: severity === "severe" ? 1.3 : severity === "moderate" ? 1.2 : 1.1, reason: "Higher doses during illness" },
       needle: { multiplier: severity === "severe" ? 1.5 : severity === "moderate" ? 1.3 : 1.1, reason: "More frequent injections for corrections" },
       cgm: { multiplier: 1.0, reason: "No change - continuous monitoring" },
