@@ -149,7 +149,7 @@ function AppContent() {
               <ProfileMenu />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6 pb-20">
+          <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
             <div key={location} className="animate-fade-in-up">
               <Router />
             </div>

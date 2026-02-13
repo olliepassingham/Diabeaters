@@ -41,15 +41,15 @@ export function BottomNav() {
           return (
             <Link key={tab.url} href={tab.url}>
               <button
-                className={`flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-w-[64px] transition-colors ${
+                className={`flex flex-col items-center justify-center gap-1 py-3 px-4 min-w-[72px] transition-colors ${
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground"
                 }`}
                 data-testid={`bottomnav-${tab.title.toLowerCase()}`}
               >
-                <tab.icon className={`h-6 w-6 ${isActive ? "stroke-[2.5]" : ""}`} />
-                <span className="text-[11px] font-medium">{tab.title}</span>
+                <tab.icon className={`h-7 w-7 ${isActive ? "stroke-[2.5]" : ""}`} />
+                <span className="text-xs font-medium">{tab.title}</span>
               </button>
             </Link>
           );
@@ -58,15 +58,15 @@ export function BottomNav() {
         <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
           <SheetTrigger asChild>
             <button
-              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-3 min-w-[64px] transition-colors ${
+              className={`flex flex-col items-center justify-center gap-1 py-3 px-4 min-w-[72px] transition-colors ${
                 isMoreActive
                   ? "text-primary"
                   : "text-muted-foreground"
               }`}
               data-testid="bottomnav-more"
             >
-              <MoreHorizontal className={`h-6 w-6 ${isMoreActive ? "stroke-[2.5]" : ""}`} />
-              <span className="text-[11px] font-medium">More</span>
+              <MoreHorizontal className={`h-7 w-7 ${isMoreActive ? "stroke-[2.5]" : ""}`} />
+              <span className="text-xs font-medium">More</span>
             </button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl pb-8">
