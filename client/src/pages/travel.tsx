@@ -31,10 +31,13 @@ import {
   Heart,
   Languages,
   Phone,
-  Navigation
+  Navigation,
+  Luggage,
+  Trash2,
+  Plus
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { storage, Supply, UserSettings, UserProfile } from "@/lib/storage";
+import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
@@ -489,6 +492,13 @@ export default function Travel() {
   const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
   const { toast } = useToast();
 
+  const [holidayPrep, setHolidayPrep] = useState<HolidayPrep | null>(null);
+  const [showPrepForm, setShowPrepForm] = useState(false);
+  const [prepDestination, setPrepDestination] = useState("");
+  const [prepDeparture, setPrepDeparture] = useState("");
+  const [prepReturn, setPrepReturn] = useState("");
+  const [prepNotes, setPrepNotes] = useState("");
+
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   // Calculate long-acting insulin adjustment schedule for MDI users
@@ -605,12 +615,111 @@ export default function Travel() {
         setRiskWarnings(warnings);
       }
     }
+
+    const savedPrep = storage.getHolidayPrep();
+    if (savedPrep) {
+      setHolidayPrep(savedPrep);
+    }
   }, []);
 
   const handleStartPlan = () => {
     setStep("inputs");
   };
   
+  const defaultChecklist = [
+    { id: "gp_letter", label: "Get GP letter confirming diabetes diagnosis and medication list", checked: false },
+    { id: "prescription", label: "Check prescription is up to date and collect early if needed", checked: false },
+    { id: "carry_on", label: "Pack all insulin and supplies in hand luggage (never in hold)", checked: false },
+    { id: "sharps_bin", label: "Pack a travel sharps container for used needles", checked: false },
+    { id: "cool_bag", label: "Get an insulin cool bag or Frio wallet for hot climates", checked: false },
+    { id: "spare_meter", label: "Pack a spare blood glucose meter and batteries", checked: false },
+    { id: "hypo_kit", label: "Pack hypo treatment (glucose tablets, juice boxes, glucagon)", checked: false },
+    { id: "id_bracelet", label: "Wear medical ID bracelet or necklace", checked: false },
+    { id: "insurance", label: "Arrange travel insurance that covers Type 1 diabetes", checked: false },
+    { id: "timezone", label: "Discuss insulin timing adjustments with diabetes team if crossing time zones", checked: false },
+    { id: "emergency_card", label: "Set up Emergency Card with translations for your destination", checked: false },
+    { id: "snacks", label: "Pack carb snacks for journey delays", checked: false },
+  ];
+
+  const handleSaveHolidayPrep = () => {
+    if (!prepDestination.trim() || !prepDeparture || !prepReturn) {
+      toast({ title: "Missing details", description: "Please fill in destination and dates", variant: "destructive" });
+      return;
+    }
+    if (new Date(prepReturn) <= new Date(prepDeparture)) {
+      toast({ title: "Invalid dates", description: "Return date must be after departure", variant: "destructive" });
+      return;
+    }
+    const prep: HolidayPrep = {
+      id: crypto.randomUUID(),
+      destination: prepDestination.trim(),
+      departureDate: prepDeparture,
+      returnDate: prepReturn,
+      notes: prepNotes.trim() || undefined,
+      checklist: defaultChecklist,
+      createdAt: new Date().toISOString(),
+    };
+    storage.saveHolidayPrep(prep);
+    setHolidayPrep(prep);
+    setShowPrepForm(false);
+    toast({ title: "Holiday prep saved", description: `Trip to ${prep.destination} is being tracked` });
+  };
+
+  const handleDeleteHolidayPrep = () => {
+    storage.deleteHolidayPrep();
+    setHolidayPrep(null);
+    setPrepDestination("");
+    setPrepDeparture("");
+    setPrepReturn("");
+    setPrepNotes("");
+    toast({ title: "Holiday prep cleared", description: "Trip planning data removed" });
+  };
+
+  const handleTogglePrepChecklist = (itemId: string) => {
+    if (!holidayPrep) return;
+    const updated = {
+      ...holidayPrep,
+      checklist: holidayPrep.checklist.map(item =>
+        item.id === itemId ? { ...item, checked: !item.checked } : item
+      ),
+    };
+    storage.saveHolidayPrep(updated);
+    setHolidayPrep(updated);
+  };
+
+  const handleActivateFromPrep = () => {
+    if (!holidayPrep) return;
+    const dep = new Date(holidayPrep.departureDate);
+    const ret = new Date(holidayPrep.returnDate);
+    const duration = Math.max(1, Math.ceil((ret.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24)));
+    setPlan(prev => ({
+      ...prev,
+      destination: holidayPrep.destination,
+      duration,
+      startDate: holidayPrep.departureDate,
+      endDate: holidayPrep.returnDate,
+    }));
+    setStep("inputs");
+  };
+
+  const getPrepDaysUntilDeparture = (): number | null => {
+    if (!holidayPrep) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dep = new Date(holidayPrep.departureDate);
+    dep.setHours(0, 0, 0, 0);
+    return Math.ceil((dep.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getPrepTripDays = (): number => {
+    if (!holidayPrep) return 0;
+    const dep = new Date(holidayPrep.departureDate);
+    const ret = new Date(holidayPrep.returnDate);
+    dep.setHours(0, 0, 0, 0);
+    ret.setHours(0, 0, 0, 0);
+    return Math.max(1, Math.ceil((ret.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24)));
+  };
+
   const handleActivateTravelMode = () => {
     const signedTimezoneShift = plan.timezoneDirection === "west" 
       ? -plan.timezoneHours 
@@ -1155,6 +1264,273 @@ export default function Travel() {
               Start Travel Plan
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Luggage className="h-5 w-5" />
+              Holiday Prep
+            </CardTitle>
+            <CardDescription>
+              Plan ahead before your trip - track your preparation, check supply coverage, and tick off your checklist.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!holidayPrep && !showPrepForm && (
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setShowPrepForm(true)}
+                data-testid="button-start-holiday-prep"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Plan a Holiday
+              </Button>
+            )}
+
+            {showPrepForm && !holidayPrep && (
+              <div className="space-y-4" data-testid="holiday-prep-form">
+                <div className="space-y-2">
+                  <Label>Where are you going?</Label>
+                  <Input 
+                    placeholder="e.g. Spain, Lake District, Florida"
+                    value={prepDestination}
+                    onChange={(e) => setPrepDestination(e.target.value)}
+                    data-testid="input-prep-destination"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Departure</Label>
+                    <Input 
+                      type="date"
+                      value={prepDeparture}
+                      onChange={(e) => setPrepDeparture(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                      data-testid="input-prep-departure"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Return</Label>
+                    <Input 
+                      type="date"
+                      value={prepReturn}
+                      onChange={(e) => setPrepReturn(e.target.value)}
+                      min={prepDeparture || new Date().toISOString().split("T")[0]}
+                      data-testid="input-prep-return"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes (optional)</Label>
+                  <Input 
+                    placeholder="e.g. All-inclusive, hiking trip, visiting family"
+                    value={prepNotes}
+                    onChange={(e) => setPrepNotes(e.target.value)}
+                    data-testid="input-prep-notes"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={handleSaveHolidayPrep} data-testid="button-save-holiday-prep">
+                    Save Trip
+                  </Button>
+                  <Button variant="ghost" onClick={() => setShowPrepForm(false)} data-testid="button-cancel-holiday-prep">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {holidayPrep && (() => {
+              const daysUntil = getPrepDaysUntilDeparture();
+              const tripDays = getPrepTripDays();
+              const coverage = storage.getHolidaySupplyCoverage();
+              const checkedCount = holidayPrep.checklist.filter(c => c.checked).length;
+              const totalChecklist = holidayPrep.checklist.length;
+              const prescriptionCycle = storage.getPrescriptionCycle();
+              const hasSupplyShortfall = coverage.some(c => c.shortfall > 0);
+              const isDepartureNear = daysUntil !== null && daysUntil <= 3 && daysUntil >= 0;
+              const hasDeparted = daysUntil !== null && daysUntil < 0;
+
+              return (
+                <div className="space-y-4" data-testid="holiday-prep-active">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-base">{holidayPrep.destination}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(holidayPrep.departureDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} 
+                        {" — "}
+                        {new Date(holidayPrep.returnDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {" "}({tripDays} days)
+                      </p>
+                      {holidayPrep.notes && (
+                        <p className="text-xs text-muted-foreground mt-1">{holidayPrep.notes}</p>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={handleDeleteHolidayPrep} data-testid="button-delete-holiday-prep">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {daysUntil !== null && daysUntil >= 0 && (
+                    <div className={`p-3 rounded-lg text-center ${
+                      daysUntil <= 3
+                        ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
+                        : daysUntil <= 7
+                        ? "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"
+                        : "bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800"
+                    }`} data-testid="text-prep-countdown">
+                      <p className="text-2xl font-bold">{daysUntil}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {daysUntil === 0 ? "Departing today" : daysUntil === 1 ? "day until departure" : "days until departure"}
+                      </p>
+                    </div>
+                  )}
+
+                  {hasDeparted && !isTravelModeActive && (
+                    <Alert className="border-orange-300 dark:border-orange-700">
+                      <Plane className="h-4 w-4" />
+                      <AlertTitle>Already departed?</AlertTitle>
+                      <AlertDescription>
+                        Your departure date has passed. If you're travelling, activate Travel Mode for real-time guidance.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {coverage.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium flex items-center gap-1.5">
+                        <Package className="h-4 w-4" />
+                        Supply Coverage ({tripDays}+2 buffer days)
+                      </h4>
+                      <div className="space-y-2">
+                        {coverage.map(({ supply, daysRemaining, tripDays: needed, shortfall, coveragePercent }) => (
+                          <div key={supply.id} className="space-y-1" data-testid={`prep-supply-${supply.id}`}>
+                            <div className="flex flex-wrap items-center justify-between gap-1 text-sm">
+                              <span>{supply.name}</span>
+                              <span className={`text-xs font-medium ${
+                                shortfall > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+                              }`}>
+                                {daysRemaining >= 999 
+                                  ? "N/A" 
+                                  : shortfall > 0 
+                                  ? `${shortfall} days short` 
+                                  : "Covered"}
+                              </span>
+                            </div>
+                            {daysRemaining < 999 && (
+                              <Progress 
+                                value={coveragePercent} 
+                                className={`h-2 ${shortfall > 0 ? "[&>div]:bg-red-500" : "[&>div]:bg-green-500"}`}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {hasSupplyShortfall && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                          Some supplies won't last the trip. Consider ordering a top-up or speaking to your pharmacy.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {prescriptionCycle && daysUntil !== null && daysUntil > 0 && (() => {
+                    const interval = prescriptionCycle.intervalDays || 28;
+                    const insulinSupplies = supplies.filter(s => 
+                      s.type === "insulin_short" || s.type === "insulin_long" || s.type === "insulin_vial" || s.type === "insulin"
+                    );
+                    const relevantPickups = insulinSupplies.flatMap(s => storage.getPickupHistory(s.id));
+                    const sortedPickups = [...relevantPickups].sort((a, b) => new Date(b.pickupDate).getTime() - new Date(a.pickupDate).getTime());
+                    const lastPickup = sortedPickups[0];
+                    if (!lastPickup) return null;
+                    const lastDate = new Date(lastPickup.pickupDate);
+                    lastDate.setHours(0, 0, 0, 0);
+                    const nextDue = new Date(lastDate);
+                    nextDue.setDate(nextDue.getDate() + interval);
+                    const departure = new Date(holidayPrep.departureDate);
+                    departure.setHours(0, 0, 0, 0);
+                    const daysBeforeDeparture = Math.ceil((departure.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysBeforeDeparture >= -7 && daysBeforeDeparture <= 14) {
+                      return (
+                        <Alert className="border-blue-300 dark:border-blue-700" data-testid="alert-prescription-timing">
+                          <Calendar className="h-4 w-4" />
+                          <AlertTitle>Prescription Timing</AlertTitle>
+                          <AlertDescription>
+                            {daysBeforeDeparture <= 0
+                              ? `Your next prescription is due around ${nextDue.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — that's ${Math.abs(daysBeforeDeparture)} days before departure. Ask your pharmacy about collecting early.`
+                              : `Your next prescription is due around ${nextDue.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — while you're away. Ask your pharmacy about collecting early before you go.`
+                            }
+                          </AlertDescription>
+                        </Alert>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium flex items-center justify-between gap-1.5">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Preparation Checklist
+                      </span>
+                      <span className="text-xs text-muted-foreground">{checkedCount}/{totalChecklist}</span>
+                    </h4>
+                    <Progress value={(checkedCount / totalChecklist) * 100} className="h-2" />
+                    <div className="space-y-1 mt-2">
+                      {holidayPrep.checklist.map((item) => (
+                        <label
+                          key={item.id}
+                          className="flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate"
+                          data-testid={`prep-check-${item.id}`}
+                        >
+                          <Checkbox 
+                            checked={item.checked}
+                            onCheckedChange={() => handleTogglePrepChecklist(item.id)}
+                          />
+                          <span className={`text-sm leading-tight ${item.checked ? "line-through text-muted-foreground" : ""}`}>
+                            {item.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {isDepartureNear && !isTravelModeActive && (
+                    <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20" data-testid="card-departure-prompt">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Plane className="h-5 w-5 text-green-600" />
+                            <p className="font-medium text-green-800 dark:text-green-200">
+                              {daysUntil === 0 ? "Time to go!" : "Nearly time to go!"}
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Activate Travel Mode to get real-time guidance, timezone adjustments, and emergency support while you're away.
+                          </p>
+                          <Button onClick={handleActivateFromPrep} className="w-full" data-testid="button-activate-from-prep">
+                            Start Travel Plan
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {!isDepartureNear && !hasDeparted && !isTravelModeActive && (
+                    <Button variant="outline" onClick={handleActivateFromPrep} className="w-full" data-testid="button-start-plan-from-prep">
+                      <Plane className="h-4 w-4 mr-2" />
+                      Start Travel Plan for This Trip
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 

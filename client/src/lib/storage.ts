@@ -35,6 +35,7 @@ const STORAGE_KEYS = {
   TRAVEL_PACKING_LIST: "diabeater_travel_packing_list",
   BACKUP_REMINDER_DISMISSED: "diabeater_backup_reminder_dismissed",
   LAST_BACKUP_DATE: "diabeater_last_backup_date",
+  HOLIDAY_PREP: "diabeater_holiday_prep",
 } as const;
 
 export interface UserProfile {
@@ -88,6 +89,16 @@ export interface Supply {
 }
 
 export type SupplyType = Supply["type"];
+
+export interface HolidayPrep {
+  id: string;
+  destination: string;
+  departureDate: string;
+  returnDate: string;
+  notes?: string;
+  checklist: { id: string; label: string; checked: boolean }[];
+  createdAt: string;
+}
 
 export type CarerPermission = "view" | "manage" | "full";
 
@@ -2210,6 +2221,40 @@ export const storage = {
 
   getLastBackupDate(): string | null {
     return localStorage.getItem(STORAGE_KEYS.LAST_BACKUP_DATE);
+  },
+
+  getHolidayPrep(): HolidayPrep | null {
+    const data = localStorage.getItem(STORAGE_KEYS.HOLIDAY_PREP);
+    return data ? JSON.parse(data) : null;
+  },
+
+  saveHolidayPrep(prep: HolidayPrep): void {
+    localStorage.setItem(STORAGE_KEYS.HOLIDAY_PREP, JSON.stringify(prep));
+  },
+
+  deleteHolidayPrep(): void {
+    localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+  },
+
+  getHolidaySupplyCoverage(): { supply: Supply; daysRemaining: number; tripDays: number; shortfall: number; coveragePercent: number }[] {
+    const prep = this.getHolidayPrep();
+    if (!prep) return [];
+    const supplies = this.getSupplies();
+    const departureDate = new Date(prep.departureDate);
+    const returnDate = new Date(prep.returnDate);
+    departureDate.setHours(0, 0, 0, 0);
+    returnDate.setHours(0, 0, 0, 0);
+    const tripDays = Math.max(1, Math.ceil((returnDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const bufferDays = 2;
+    const totalNeededDays = tripDays + bufferDays;
+
+    return supplies.map(supply => {
+      const daysRemaining = this.getDaysRemaining(supply);
+      if (daysRemaining >= 999) return { supply, daysRemaining: 999, tripDays: totalNeededDays, shortfall: 0, coveragePercent: 100 };
+      const coveragePercent = Math.min(100, Math.round((daysRemaining / totalNeededDays) * 100));
+      const shortfall = Math.max(0, totalNeededDays - daysRemaining);
+      return { supply, daysRemaining, tripDays: totalNeededDays, shortfall, coveragePercent };
+    });
   },
 
   importAllData(jsonString: string): { success: boolean; error?: string } {
