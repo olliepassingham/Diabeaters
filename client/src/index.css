@@ -222,12 +222,7 @@
   }
 
   body {
-    @apply font-sans antialiased text-foreground;
-    background: linear-gradient(160deg, hsl(38 50% 89%), hsl(34 42% 84%) 40%, hsl(30 38% 82%)) fixed;
-  }
-
-  .dark body {
-    background: linear-gradient(160deg, hsl(34 26% 14%), hsl(30 22% 11%) 40%, hsl(28 20% 9%)) fixed;
+    @apply font-sans antialiased bg-background text-foreground;
   }
 }
 
