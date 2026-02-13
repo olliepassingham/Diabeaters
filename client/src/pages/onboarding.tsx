@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, ArrowLeft, Check, SkipForward } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
 import { storage } from "@/lib/storage";
+import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 type Step = "personal" | "units" | "diabetes" | "delivery" | "insulin" | "usage" | "disclaimer" | "complete";
 
@@ -251,7 +252,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 <div className="flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer" onClick={() => { updateData("insulinDeliveryMethod", "injections"); updateData("usingInsulin", true); }}>
                   <RadioGroupItem value="injections" id="injections" className="mt-1" data-testid="radio-injections" />
                   <div className="flex-1">
-                    <Label htmlFor="injections" className="font-medium cursor-pointer">Injections (MDI)</Label>
+                    <Label htmlFor="injections" className="font-medium cursor-pointer">Injections (Multiple Daily Injections)</Label>
                     <p className="text-sm text-muted-foreground mt-1">Multiple daily injections with pens or syringes</p>
                   </div>
                 </div>
@@ -259,7 +260,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   <RadioGroupItem value="pump" id="pump" className="mt-1" data-testid="radio-pump" />
                   <div className="flex-1">
                     <Label htmlFor="pump" className="font-medium cursor-pointer">Insulin Pump</Label>
-                    <p className="text-sm text-muted-foreground mt-1">Continuous subcutaneous insulin infusion</p>
+                    <p className="text-sm text-muted-foreground mt-1">A device that delivers insulin continuously throughout the day</p>
                   </div>
                 </div>
               </RadioGroup>
@@ -277,18 +278,27 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="onboard-tdd">Total Daily Dose (units)</Label>
+                  <Label htmlFor="onboard-tdd" className="flex items-center">
+                    Total Daily Dose (units)
+                    <InfoTooltip {...DIABETES_TERMS.tdd} />
+                  </Label>
                   <Input id="onboard-tdd" type="number" placeholder="e.g., 40" value={data.tdd} onChange={(e) => updateData("tdd", e.target.value)} data-testid="input-onboarding-tdd" />
                   <p className="text-xs text-muted-foreground">All insulin you take in a day</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="onboard-correction">Correction Factor</Label>
+                  <Label htmlFor="onboard-correction" className="flex items-center">
+                    Correction Factor
+                    <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
+                  </Label>
                   <Input id="onboard-correction" type="number" step="0.1" placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={data.correctionFactor} onChange={(e) => updateData("correctionFactor", e.target.value)} data-testid="input-onboarding-correction" />
-                  <p className="text-xs text-muted-foreground">How much 1 unit drops BG</p>
+                  <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Carb Ratios (units per 10g carbs)</Label>
+                <Label className="text-sm font-medium flex items-center">
+                  Carb Ratios (units per 10g carbs)
+                  <InfoTooltip {...DIABETES_TERMS.carbRatio} />
+                </Label>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Breakfast</Label>
@@ -320,7 +330,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               {data.insulinDeliveryMethod === "pump" ? (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 col-span-2">
-                    <Label>Total Daily Dose</Label>
+                    <Label className="flex items-center">
+                      Total Daily Dose
+                      <InfoTooltip {...DIABETES_TERMS.tdd} />
+                    </Label>
                     <div className="h-9 px-3 rounded-md border bg-muted/50 flex items-center">
                       <span className={data.tdd ? "" : "text-muted-foreground"}>
                         {data.tdd ? `${data.tdd} units/day` : "Set in the previous step"}
@@ -328,33 +341,51 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="onboard-cgm">CGM Sensor Duration (days)</Label>
+                    <Label htmlFor="onboard-cgm" className="flex items-center">
+                      Sensor Duration (days)
+                      <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
+                    </Label>
                     <Input id="onboard-cgm" type="number" placeholder="e.g., 10 or 14" value={data.cgmDays} onChange={(e) => updateData("cgmDays", e.target.value)} data-testid="input-onboarding-cgm" />
+                    <p className="text-xs text-muted-foreground">How many days each glucose sensor lasts</p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="onboard-short">Short-Acting Units/Day</Label>
+                    <Label htmlFor="onboard-short" className="flex items-center">
+                      Short-Acting Units/Day
+                      <InfoTooltip {...DIABETES_TERMS.shortActing} />
+                    </Label>
                     <Input id="onboard-short" type="number" placeholder="e.g., 25" value={data.shortActingUnitsPerDay} onChange={(e) => updateData("shortActingUnitsPerDay", e.target.value)} data-testid="input-onboarding-short-acting" />
-                    <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+                    <p className="text-xs text-muted-foreground">Mealtime insulin - 100 units = 1 pen</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="onboard-long">Long-Acting Units/Day</Label>
+                    <Label htmlFor="onboard-long" className="flex items-center">
+                      Long-Acting Units/Day
+                      <InfoTooltip {...DIABETES_TERMS.longActing} />
+                    </Label>
                     <Input id="onboard-long" type="number" placeholder="e.g., 20" value={data.longActingUnitsPerDay} onChange={(e) => updateData("longActingUnitsPerDay", e.target.value)} data-testid="input-onboarding-long-acting" />
-                    <p className="text-xs text-muted-foreground">100 units = 1 pen</p>
+                    <p className="text-xs text-muted-foreground">Background insulin - 100 units = 1 pen</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="onboard-injections">Injections/Day</Label>
+                    <Label htmlFor="onboard-injections" className="flex items-center">
+                      Injections Per Day
+                      <InfoTooltip {...DIABETES_TERMS.injectionsPerDay} />
+                    </Label>
                     <Input id="onboard-injections" type="number" placeholder="e.g., 4" value={data.injectionsPerDay} onChange={(e) => updateData("injectionsPerDay", e.target.value)} data-testid="input-onboarding-injections" />
+                    <p className="text-xs text-muted-foreground">Total injections including all types</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="onboard-cgm">CGM Duration (days)</Label>
+                    <Label htmlFor="onboard-cgm" className="flex items-center">
+                      Sensor Duration (days)
+                      <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
+                    </Label>
                     <Input id="onboard-cgm" type="number" placeholder="e.g., 10 or 14" value={data.cgmDays} onChange={(e) => updateData("cgmDays", e.target.value)} data-testid="input-onboarding-cgm" />
+                    <p className="text-xs text-muted-foreground">How many days each glucose sensor lasts</p>
                   </div>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground italic">This information helps your Supply Tracker predict depletion dates. You can update it anytime in Settings.</p>
+              <p className="text-xs text-muted-foreground italic">This information helps your Supply Tracker predict when you'll need more supplies. You can update it anytime in Settings.</p>
             </CardContent>
           </Card>
         );

@@ -15,6 +15,7 @@ export function InfoTooltip({ term, explanation, example }: InfoTooltipProps) {
           type="button" 
           className="inline-flex items-center justify-center w-4 h-4 ml-1 text-muted-foreground hover:text-foreground transition-colors"
           aria-label={`Learn more about ${term}`}
+          data-testid={`button-info-${term.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
         >
           <HelpCircle className="h-3.5 w-3.5" />
         </button>
@@ -34,9 +35,9 @@ export function InfoTooltip({ term, explanation, example }: InfoTooltipProps) {
 
 export const DIABETES_TERMS = {
   tdd: {
-    term: "Total Daily Dose (TDD)",
+    term: "Total Daily Dose",
     explanation: "The total amount of insulin you use in a typical day, including both mealtime and background insulin. This helps calculate other settings.",
-    example: "If you take 20 units of background insulin and about 25 units for meals, your TDD is roughly 45 units.",
+    example: "If you take 20 units of background insulin and about 25 units for meals, your total daily dose is roughly 45 units.",
   },
   correctionFactor: {
     term: "Correction Factor",
@@ -74,13 +75,33 @@ export const DIABETES_TERMS = {
     example: "Check for ketones when you're unwell or your blood sugar is very high (above 14 mmol/L).",
   },
   cgm: {
-    term: "CGM (Continuous Glucose Monitor)",
-    explanation: "A small sensor worn on your body that checks your blood sugar every few minutes and shows the readings on a device or phone.",
-    example: "A CGM sensor typically lasts 7-14 days before needing to be replaced.",
+    term: "Continuous Glucose Monitor",
+    explanation: "A small sensor worn on your body that checks your blood sugar every few minutes and shows the readings on a device or phone. Often called a CGM for short.",
+    example: "A sensor typically lasts 7-14 days before needing to be replaced.",
   },
   iob: {
-    term: "Insulin on Board (IOB)",
-    explanation: "The insulin still active in your body from previous doses. Fast-acting insulin typically works for 3-5 hours.",
+    term: "Insulin on Board",
+    explanation: "The insulin still active in your body from previous doses. Fast-acting insulin typically works for 3-5 hours. Sometimes abbreviated as IOB.",
     example: "If you took 4 units 2 hours ago, you might still have about 2 units of insulin on board.",
+  },
+  shortActing: {
+    term: "Short-Acting (Fast-Acting) Insulin",
+    explanation: "The insulin you take at mealtimes to cover the food you eat. It starts working within 15 minutes and lasts a few hours. Sometimes called rapid-acting or bolus insulin.",
+    example: "You might take 4 units of short-acting insulin before lunch to cover your meal.",
+  },
+  longActing: {
+    term: "Long-Acting (Background) Insulin",
+    explanation: "The insulin that works slowly over 12-24 hours to keep your blood sugar steady between meals and overnight. Sometimes called basal or background insulin.",
+    example: "You might take 18 units of long-acting insulin at bedtime to keep your levels stable overnight.",
+  },
+  injectionsPerDay: {
+    term: "Injections Per Day",
+    explanation: "The total number of insulin injections you give yourself in a typical day, including both mealtime and background injections. This helps track your needle supply.",
+    example: "If you inject background insulin once and mealtime insulin 3 times, that's 4 injections per day.",
+  },
+  cgmDuration: {
+    term: "Sensor Duration",
+    explanation: "How many days each glucose sensor lasts before you need to replace it with a new one. This varies by brand and model.",
+    example: "FreeStyle Libre sensors last 14 days, Dexcom G7 sensors last 10 days.",
   },
 } as const;
