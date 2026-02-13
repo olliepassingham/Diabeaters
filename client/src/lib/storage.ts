@@ -72,6 +72,7 @@ export interface UserSettings {
   infusionSetsPerBox?: number;
   reservoirsPerBox?: number;
   insulinCartridgeUnits?: number;
+  basalInjectionTime?: string;
 }
 
 export interface Supply {

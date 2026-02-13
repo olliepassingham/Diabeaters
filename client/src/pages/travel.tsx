@@ -597,6 +597,9 @@ export default function Travel() {
     setSupplies(s);
     setSettings(st);
     setProfile(p);
+    if (st.basalInjectionTime) {
+      setBasalInjectionTime(st.basalInjectionTime);
+    }
     
     const scenarioState = storage.getScenarioState();
     setIsTravelModeActive(scenarioState.travelModeActive || false);
@@ -2359,7 +2362,11 @@ export default function Travel() {
                       id="basal-time"
                       type="time"
                       value={basalInjectionTime}
-                      onChange={(e) => setBasalInjectionTime(e.target.value)}
+                      onChange={(e) => {
+                        setBasalInjectionTime(e.target.value);
+                        const current = storage.getSettings();
+                        storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
+                      }}
                       className="w-32 bg-white dark:bg-blue-900/50"
                       data-testid="input-basal-time"
                     />
