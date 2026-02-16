@@ -46,6 +46,7 @@ import Onboarding from "@/pages/onboarding";
 import Shop from "@/pages/shop";
 import FamilyCarers from "@/pages/family-carers";
 import CarerView from "@/pages/carer-view";
+import Ratios from "@/pages/ratios";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/shop" component={Shop} />
       <Route path="/family-carers" component={FamilyCarers} />
       <Route path="/carer-view" component={CarerView} />
+      <Route path="/ratios" component={Ratios} />
       <Route component={NotFound} />
     </Switch>
   );

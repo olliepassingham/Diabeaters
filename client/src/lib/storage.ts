@@ -36,6 +36,7 @@ const STORAGE_KEYS = {
   BACKUP_REMINDER_DISMISSED: "diabeater_backup_reminder_dismissed",
   LAST_BACKUP_DATE: "diabeater_last_backup_date",
   HOLIDAY_PREP: "diabeater_holiday_prep",
+  RATIO_HISTORY: "diabeater_ratio_history",
 } as const;
 
 export interface UserProfile {
@@ -287,6 +288,17 @@ export interface ScenarioState {
   sickDayActive: boolean;
   sickDaySeverity?: string;
   sickDayActivatedAt?: string;
+}
+
+export interface RatioHistoryEntry {
+  id: string;
+  date: string;
+  breakfastRatio?: string;
+  lunchRatio?: string;
+  dinnerRatio?: string;
+  snackRatio?: string;
+  correctionFactor?: number;
+  note?: string;
 }
 
 export const COMMUNITY_TOPICS = [
@@ -2256,6 +2268,37 @@ export const storage = {
       const shortfall = Math.max(0, totalNeededDays - daysRemaining);
       return { supply, daysRemaining, tripDays: totalNeededDays, shortfall, coveragePercent };
     });
+  },
+
+  getRatioHistory(): RatioHistoryEntry[] {
+    const data = localStorage.getItem(STORAGE_KEYS.RATIO_HISTORY);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addRatioHistoryEntry(entry: RatioHistoryEntry): void {
+    const history = this.getRatioHistory();
+    history.unshift(entry);
+    localStorage.setItem(STORAGE_KEYS.RATIO_HISTORY, JSON.stringify(history));
+  },
+
+  deleteRatioHistoryEntry(id: string): void {
+    const history = this.getRatioHistory().filter(e => e.id !== id);
+    localStorage.setItem(STORAGE_KEYS.RATIO_HISTORY, JSON.stringify(history));
+  },
+
+  snapshotCurrentRatios(note?: string): void {
+    const settings = this.getSettings();
+    const entry: RatioHistoryEntry = {
+      id: Date.now().toString(),
+      date: new Date().toISOString(),
+      breakfastRatio: settings.breakfastRatio,
+      lunchRatio: settings.lunchRatio,
+      dinnerRatio: settings.dinnerRatio,
+      snackRatio: settings.snackRatio,
+      correctionFactor: settings.correctionFactor,
+      note,
+    };
+    this.addRatioHistoryEntry(entry);
   },
 
   importAllData(jsonString: string): { success: boolean; error?: string } {
