@@ -768,7 +768,7 @@ export default function Advisor() {
             <Search className="h-4 w-4" /><span>Ratios</span>
           </TabsTrigger>
           <TabsTrigger value="tools" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-tools">
-            <Wrench className="h-4 w-4" /><span>Tools</span>
+            <Droplet className="h-4 w-4" /><span>Hypo Help</span>
           </TabsTrigger>
         </TabsList>
 
