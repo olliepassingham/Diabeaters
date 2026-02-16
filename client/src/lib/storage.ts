@@ -88,6 +88,7 @@ export interface Supply {
   notes?: string;
   isOnOrder?: boolean;
   orderedDate?: string;
+  activeItemStartDate?: string;
 }
 
 export type SupplyType = Supply["type"];
@@ -1075,24 +1076,38 @@ export const storage = {
 
     const settings = this.getSettings();
     
-    if (supply.type === "cgm") {
-      const cgmDays = settings.cgmDays || 14;
-      const sensorsUsed = Math.floor(daysElapsed / cgmDays);
-      const adjusted = supply.quantityAtPickup - sensorsUsed;
-      return Math.max(0, adjusted);
-    }
-    
-    if (supply.type === "infusion_set") {
-      const siteChangeDays = settings.siteChangeDays || 3;
-      const setsUsed = Math.floor(daysElapsed / siteChangeDays);
-      const adjusted = supply.quantityAtPickup - setsUsed;
-      return Math.max(0, adjusted);
-    }
-    
-    if (supply.type === "reservoir") {
-      const reservoirChangeDays = settings.reservoirChangeDays || 3;
-      const reservoirsUsed = Math.floor(daysElapsed / reservoirChangeDays);
-      const adjusted = supply.quantityAtPickup - reservoirsUsed;
+    if (supply.type === "cgm" || supply.type === "infusion_set" || supply.type === "reservoir") {
+      const itemDuration = supply.type === "cgm" 
+        ? (settings.cgmDays || 14)
+        : supply.type === "infusion_set" 
+          ? (settings.siteChangeDays || 3) 
+          : (settings.reservoirChangeDays || 3);
+      
+      if (supply.activeItemStartDate) {
+        const activeStart = new Date(supply.activeItemStartDate);
+        activeStart.setHours(0, 0, 0, 0);
+        const daysSinceActive = Math.max(0, Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24)));
+        const activeItemFinished = daysSinceActive >= itemDuration;
+        
+        if (activeItemFinished) {
+          const daysAfterActiveExpired = daysSinceActive - itemDuration;
+          const totalStockItemsUsedOrInUse = 1 + Math.floor(daysAfterActiveExpired / itemDuration);
+          if (totalStockItemsUsedOrInUse > supply.quantityAtPickup) {
+            return 0;
+          }
+          const daysIntoCurrentItem = daysAfterActiveExpired % itemDuration;
+          if (daysIntoCurrentItem === 0 && totalStockItemsUsedOrInUse === supply.quantityAtPickup) {
+            return 0;
+          }
+          const unusedStock = supply.quantityAtPickup - totalStockItemsUsedOrInUse;
+          return Math.max(0, unusedStock);
+        } else {
+          return supply.quantityAtPickup;
+        }
+      }
+      
+      const itemsUsed = Math.floor(daysElapsed / itemDuration);
+      const adjusted = supply.quantityAtPickup - itemsUsed;
       return Math.max(0, adjusted);
     }
     
@@ -1129,19 +1144,43 @@ export const storage = {
     const adjustedQty = this.getAdjustedQuantity(supply);
     const settings = this.getSettings();
     
-    if (supply.type === "cgm") {
-      const cgmDays = settings.cgmDays || 14;
-      return Math.floor(adjustedQty * cgmDays);
-    }
-    
-    if (supply.type === "infusion_set") {
-      const siteChangeDays = settings.siteChangeDays || 3;
-      return Math.floor(adjustedQty * siteChangeDays);
-    }
-    
-    if (supply.type === "reservoir") {
-      const reservoirChangeDays = settings.reservoirChangeDays || 3;
-      return Math.floor(adjustedQty * reservoirChangeDays);
+    if (supply.type === "cgm" || supply.type === "infusion_set" || supply.type === "reservoir") {
+      const itemDuration = supply.type === "cgm" 
+        ? (settings.cgmDays || 14)
+        : supply.type === "infusion_set" 
+          ? (settings.siteChangeDays || 3) 
+          : (settings.reservoirChangeDays || 3);
+      
+      const stockDays = Math.floor(adjustedQty * itemDuration);
+      
+      if (supply.activeItemStartDate) {
+        const activeStart = new Date(supply.activeItemStartDate);
+        const today = new Date();
+        activeStart.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+        const daysSinceActive = Math.max(0, Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24)));
+        
+        if (daysSinceActive < itemDuration) {
+          const activeRemainingDays = itemDuration - daysSinceActive;
+          return activeRemainingDays + stockDays;
+        } else {
+          if (adjustedQty <= 0) {
+            const daysAfterActiveExpired = daysSinceActive - itemDuration;
+            const totalStockItemsNeeded = 1 + Math.floor(daysAfterActiveExpired / itemDuration);
+            if (totalStockItemsNeeded > (supply.quantityAtPickup || 0)) {
+              return 0;
+            }
+            const daysIntoCurrentStockItem = daysAfterActiveExpired % itemDuration;
+            return itemDuration - daysIntoCurrentStockItem;
+          }
+          const daysAfterActiveExpired = daysSinceActive - itemDuration;
+          const daysIntoCurrentStockItem = daysAfterActiveExpired % itemDuration;
+          const currentItemRemainingDays = itemDuration - daysIntoCurrentStockItem;
+          return currentItemRemainingDays + stockDays;
+        }
+      }
+      
+      return stockDays;
     }
     
     const effectiveDailyUsage = this.getEffectiveDailyUsage(supply, settings);

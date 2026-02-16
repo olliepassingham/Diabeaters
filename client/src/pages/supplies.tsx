@@ -1021,19 +1021,76 @@ function SupplyCard({
 
         <div className="space-y-2 text-sm">
           {supply.type === "cgm" ? (
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Sensor duration</span>
-              <span>{storage.getSettings().cgmDays || 14} days each</span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Sensor duration</span>
+                <span>{storage.getSettings().cgmDays || 14} days each</span>
+              </div>
+              {supply.activeItemStartDate && (() => {
+                const settings = storage.getSettings();
+                const itemDuration = settings.cgmDays || 14;
+                const activeStart = new Date(supply.activeItemStartDate);
+                const today = new Date();
+                activeStart.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
+                const isExpired = daysLeft === 0;
+                return (
+                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                    <span>Active sensor</span>
+                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  </div>
+                );
+              })()}
             </div>
           ) : supply.type === "infusion_set" ? (
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Site change</span>
-              <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Site change</span>
+                <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
+              </div>
+              {supply.activeItemStartDate && (() => {
+                const settings = storage.getSettings();
+                const itemDuration = settings.siteChangeDays || 3;
+                const activeStart = new Date(supply.activeItemStartDate);
+                const today = new Date();
+                activeStart.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
+                const isExpired = daysLeft === 0;
+                return (
+                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                    <span>Active set</span>
+                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  </div>
+                );
+              })()}
             </div>
           ) : supply.type === "reservoir" ? (
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span>Reservoir change</span>
-              <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-muted-foreground">
+                <span>Reservoir change</span>
+                <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
+              </div>
+              {supply.activeItemStartDate && (() => {
+                const settings = storage.getSettings();
+                const itemDuration = settings.reservoirChangeDays || 3;
+                const activeStart = new Date(supply.activeItemStartDate);
+                const today = new Date();
+                activeStart.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
+                const isExpired = daysLeft === 0;
+                return (
+                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                    <span>Active reservoir</span>
+                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  </div>
+                );
+              })()}
             </div>
           ) : (() => {
             const effectiveUsage = storage.getEffectiveDailyUsage(supply);
@@ -1188,6 +1245,7 @@ function SupplyDialog({
   const [dailyUsage, setDailyUsage] = useState("");
   const [notes, setNotes] = useState("");
   const [pickupDate, setPickupDate] = useState("");
+  const [activeItemDate, setActiveItemDate] = useState("");
   const [showLastPrescriptionOption, setShowLastPrescriptionOption] = useState(false);
 
   useEffect(() => {
@@ -1198,6 +1256,7 @@ function SupplyDialog({
       setDailyUsage(supply.dailyUsage.toString());
       setNotes(supply.notes || "");
       setPickupDate(supply.lastPickupDate ? format(new Date(supply.lastPickupDate), "yyyy-MM-dd") : "");
+      setActiveItemDate(supply.activeItemStartDate ? format(new Date(supply.activeItemStartDate), "yyyy-MM-dd") : "");
       setShowLastPrescriptionOption(false);
     } else {
       setName("");
@@ -1205,6 +1264,7 @@ function SupplyDialog({
       setQuantity("");
       setNotes("");
       setPickupDate(format(new Date(), "yyyy-MM-dd"));
+      setActiveItemDate("");
       setShowLastPrescriptionOption(lastPrescription !== null);
       const suggested = storage.getSuggestedDailyUsage("needle");
       setDailyUsage(suggested ? suggested.value.toString() : "");
@@ -1233,6 +1293,7 @@ function SupplyDialog({
       notes: notes || undefined,
       lastPickupDate: pickupDate ? new Date(pickupDate + "T12:00:00").toISOString() : undefined,
       quantityAtPickup: parsedQuantity,
+      activeItemStartDate: usesDurationSettings && activeItemDate ? new Date(activeItemDate + "T12:00:00").toISOString() : undefined,
     });
     onOpenChange(false);
   };
@@ -1323,25 +1384,71 @@ function SupplyDialog({
               />
             </div>
             {type === "cgm" ? (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Depletion is calculated using your CGM Sensor Duration from Settings (Usual Habits). 
-                  Each sensor lasts the number of days you've configured there.
-                </p>
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Depletion is calculated using your CGM Sensor Duration from Settings (Usual Habits). 
+                    Each sensor lasts the number of days you've configured there.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="active-item-date">Current sensor applied on (optional)</Label>
+                  <Input
+                    id="active-item-date"
+                    type="date"
+                    value={activeItemDate}
+                    onChange={e => setActiveItemDate(e.target.value)}
+                    data-testid="input-active-item-date"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    When did you apply your current sensor? This lets the app know the stock quantity is your unused sensors,
+                    separate from the one you're wearing.
+                  </p>
+                </div>
               </div>
             ) : type === "infusion_set" ? (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Depletion is calculated using your Site Change frequency from Settings (Usual Habits). 
-                  Each infusion set lasts the number of days you've configured there.
-                </p>
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Depletion is calculated using your Site Change frequency from Settings (Usual Habits). 
+                    Each infusion set lasts the number of days you've configured there.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="active-item-date">Current set applied on (optional)</Label>
+                  <Input
+                    id="active-item-date"
+                    type="date"
+                    value={activeItemDate}
+                    onChange={e => setActiveItemDate(e.target.value)}
+                    data-testid="input-active-item-date"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    When did you last change your infusion set? This separates your active set from unused stock.
+                  </p>
+                </div>
               </div>
             ) : type === "reservoir" ? (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Depletion is calculated using your Reservoir Change frequency from Settings (Usual Habits). 
-                  Each reservoir lasts the number of days you've configured there.
-                </p>
+              <div className="space-y-3">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Depletion is calculated using your Reservoir Change frequency from Settings (Usual Habits). 
+                    Each reservoir lasts the number of days you've configured there.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="active-item-date">Current reservoir changed on (optional)</Label>
+                  <Input
+                    id="active-item-date"
+                    type="date"
+                    value={activeItemDate}
+                    onChange={e => setActiveItemDate(e.target.value)}
+                    data-testid="input-active-item-date"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    When did you last change your reservoir? This separates your active reservoir from unused stock.
+                  </p>
+                </div>
               </div>
             ) : (() => {
               const suggested = storage.getSuggestedDailyUsage(type);
