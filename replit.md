@@ -43,6 +43,16 @@ Preferred communication style: Simple, everyday language.
 - Local storage fallback for offline capability and onboarding state
 - Keys prefixed with `diabeater_` for profile, settings, supplies, emergency contacts
 
+### Onboarding Flow
+- **Welcome**: Emotional hook with FaceLogo, app tagline ("Stay one step ahead"), name input, privacy/time reassurance
+- **Struggle Picker**: 4 paths — Supplies ("I keep running out"), Meals ("I struggle with meal dosing"), Exercise ("Exercise throws my levels off"), Overview ("I want everything in one place")
+- **Essentials**: Insulin delivery method (injections/pump) and BG units (mmol/L or mg/dL) — minimal required data
+- **Path-Specific Data**: Only collects data relevant to chosen struggle (e.g., supply users get daily usage, meal users get carb ratios). All fields optional/skippable.
+- **Disclaimer**: Safety disclaimer with checkbox acceptance
+- **First Win**: Personalised screen showing value for chosen path with CTA routing to the relevant page (supplies→/supplies, meals→/advisor?tab=meal, exercise→/advisor?tab=exercise, overview→/)
+- **Post-Onboarding**: Dashboard shows SetupPromptCard for incomplete profiles, encouraging users to add more details later
+- **localStorage keys**: `diabeater_onboarding_completed` (flow gate), `diabeater_onboarding_struggle` (chosen path), `diabeater_profile_incomplete` (prompt flag)
+
 ### Navigation Structure
 - **Dashboard**: Main hub with customizable widgets and floating AI Coach button
 - **Supply Tracker**: Monitor insulin, needles, CGM sensors with depletion forecasts, depletion timeline visualisation, smart prescription cycle tracking with supply-aware notifications (collection reminders based on order dates, skip suggestions for well-stocked items, travel-aware extra supply alerts), order tracking per supply, configurable pack sizes, travel supply impact analysis, and sick day adjusted forecasts

@@ -92,7 +92,14 @@ function AppContent() {
   if (location === "/onboarding") {
     return <Onboarding onComplete={() => {
       setOnboardingCompleted(true);
-      setLocation("/");
+      const struggle = localStorage.getItem("diabeater_onboarding_struggle");
+      const routes: Record<string, string> = {
+        supplies: "/supplies",
+        meals: "/advisor?tab=meal",
+        exercise: "/advisor?tab=exercise",
+        overview: "/",
+      };
+      setLocation(struggle && routes[struggle] ? routes[struggle] : "/");
     }} />;
   }
 
