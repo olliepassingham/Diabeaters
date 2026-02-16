@@ -10,7 +10,8 @@ import { Progress } from "@/components/ui/progress";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { storage, UserSettings, Supply, SickDayJournalEntry } from "@/lib/storage";
+import { storage, UserSettings, Supply, SickDayJournalEntry, RatioFormat } from "@/lib/storage";
+import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
@@ -158,29 +159,18 @@ function calculateSickDayRecommendations(
 
   // === RATIO AND OTHER ADJUSTMENTS ===
   
-  // Settings stores units per 10g carbs (e.g., "1" = 1 unit per 10g, "1.5" = 1.5 units per 10g)
-  const parseUnitsPerCP = (ratio: string | undefined): number => {
-    if (!ratio) return 1; // Default 1 unit per 10g
-    const num = parseFloat(ratio);
-    return isNaN(num) ? 1 : num;
-  };
-
-  // Format as "X:10g" where X is units per 10g carbs (carb portion)
-  const formatRatio = (units: number): string => {
-    // Round to 1 decimal place for display
-    const rounded = Math.round(units * 10) / 10;
-    return `${rounded}:10g`;
-  };
+  const ratioFmt: RatioFormat = storage.getProfile()?.ratioFormat || "per10g";
 
   const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
-    const originalUnits = parseUnitsPerCP(ratio);
-    // During illness, INCREASE units (more insulin needed)
-    // multiplier > 1 means more insulin (e.g., 1.2 = 20% more)
-    return formatRatio(originalUnits * multiplier);
+    const gpu = parseRatioToGramsPerUnit(ratio);
+    if (!gpu) return formatRatioForDisplay(10, ratioFmt);
+    const adjustedGpu = gpu / multiplier;
+    return formatRatioForDisplay(adjustedGpu, ratioFmt);
   };
 
   const getOriginalRatio = (ratio: string | undefined): string => {
-    return formatRatio(parseUnitsPerCP(ratio));
+    const gpu = parseRatioToGramsPerUnit(ratio);
+    return formatRatioForDisplay(gpu || 10, ratioFmt);
   };
 
   let ratioMultiplier = 1;

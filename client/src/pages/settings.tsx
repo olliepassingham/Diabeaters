@@ -15,6 +15,9 @@ import { requestNotificationPermission } from "@/hooks/use-offline";
 import { useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioForStorage, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
+import type { RatioFormat } from "@/lib/storage";
 
 function ProfileTab({ 
   name, setName, bgUnits, setBgUnits, 
@@ -95,6 +98,7 @@ function InsulinTab({
   targetBgLow, setTargetBgLow, targetBgHigh, setTargetBgHigh,
   breakfastRatio, setBreakfastRatio, lunchRatio, setLunchRatio,
   dinnerRatio, setDinnerRatio, snackRatio, setSnackRatio,
+  ratioFormat, onRatioFormatChange,
   onSave
 }: {
   bgUnits: string;
@@ -106,6 +110,7 @@ function InsulinTab({
   lunchRatio: string; setLunchRatio: (v: string) => void;
   dinnerRatio: string; setDinnerRatio: (v: string) => void;
   snackRatio: string; setSnackRatio: (v: string) => void;
+  ratioFormat: RatioFormat; onRatioFormatChange: (format: RatioFormat) => void;
   onSave: () => void;
 }) {
   return (
@@ -148,31 +153,45 @@ function InsulinTab({
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="flex items-center gap-4 flex-wrap">
+            <Label className="text-sm font-medium">Ratio format:</Label>
+            <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <RadioGroupItem value="per10g" id="ratio-format-per10g" data-testid="radio-ratio-format-per10g" />
+                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">Units per 10g</Label>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <RadioGroupItem value="1toXg" id="ratio-format-1toXg" data-testid="radio-ratio-format-1toXg" />
+                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">1 unit per Xg</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           <Label className="text-sm font-medium flex items-center">
-            Carb Ratios (units per 10g carbs)
+            Carb Ratios ({formatRatioInputLabel(ratioFormat)})
             <InfoTooltip {...DIABETES_TERMS.carbRatio} />
           </Label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
-              <Input id="breakfast-ratio" type="number" step="0.1" placeholder="e.g., 1.0" value={breakfastRatio} onChange={(e) => setBreakfastRatio(e.target.value)} data-testid="input-breakfast-ratio" />
-              <p className="text-xs text-muted-foreground">units/10g</p>
+              <Input id="breakfast-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={breakfastRatio} onChange={(e) => setBreakfastRatio(e.target.value)} data-testid="input-breakfast-ratio" />
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="lunch-ratio" className="text-xs text-muted-foreground">Lunch</Label>
-              <Input id="lunch-ratio" type="number" step="0.1" placeholder="e.g., 0.8" value={lunchRatio} onChange={(e) => setLunchRatio(e.target.value)} data-testid="input-lunch-ratio" />
-              <p className="text-xs text-muted-foreground">units/10g</p>
+              <Input id="lunch-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={lunchRatio} onChange={(e) => setLunchRatio(e.target.value)} data-testid="input-lunch-ratio" />
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dinner-ratio" className="text-xs text-muted-foreground">Dinner</Label>
-              <Input id="dinner-ratio" type="number" step="0.1" placeholder="e.g., 1.0" value={dinnerRatio} onChange={(e) => setDinnerRatio(e.target.value)} data-testid="input-dinner-ratio" />
-              <p className="text-xs text-muted-foreground">units/10g</p>
+              <Input id="dinner-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={dinnerRatio} onChange={(e) => setDinnerRatio(e.target.value)} data-testid="input-dinner-ratio" />
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="snack-ratio" className="text-xs text-muted-foreground">Snack</Label>
-              <Input id="snack-ratio" type="number" step="0.1" placeholder="e.g., 0.7" value={snackRatio} onChange={(e) => setSnackRatio(e.target.value)} data-testid="input-snack-ratio" />
-              <p className="text-xs text-muted-foreground">units/10g</p>
+              <Input id="snack-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={snackRatio} onChange={(e) => setSnackRatio(e.target.value)} data-testid="input-snack-ratio" />
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
             </div>
           </div>
         </div>
@@ -742,6 +761,7 @@ export default function Settings() {
   const [correctionFactor, setCorrectionFactor] = useState("");
   const [targetBgLow, setTargetBgLow] = useState("");
   const [targetBgHigh, setTargetBgHigh] = useState("");
+  const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
   
   const [shortActingUnitsPerDay, setShortActingUnitsPerDay] = useState("");
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
@@ -796,14 +816,21 @@ export default function Settings() {
     } else {
       setProfile(defaultProfile);
     }
+
+    const format: RatioFormat = storedProfile?.ratioFormat || "per10g";
+    setRatioFormat(format);
     
     if (storedSettings) {
       setSettings(storedSettings);
       setTdd(storedSettings.tdd?.toString() || "");
-      setBreakfastRatio(storedSettings.breakfastRatio || "");
-      setLunchRatio(storedSettings.lunchRatio || "");
-      setDinnerRatio(storedSettings.dinnerRatio || "");
-      setSnackRatio(storedSettings.snackRatio || "");
+      const bGpu = parseRatioToGramsPerUnit(storedSettings.breakfastRatio);
+      setBreakfastRatio(bGpu ? gramsPerUnitToInputValue(bGpu, format) : "");
+      const lGpu = parseRatioToGramsPerUnit(storedSettings.lunchRatio);
+      setLunchRatio(lGpu ? gramsPerUnitToInputValue(lGpu, format) : "");
+      const dGpu = parseRatioToGramsPerUnit(storedSettings.dinnerRatio);
+      setDinnerRatio(dGpu ? gramsPerUnitToInputValue(dGpu, format) : "");
+      const sGpu = parseRatioToGramsPerUnit(storedSettings.snackRatio);
+      setSnackRatio(sGpu ? gramsPerUnitToInputValue(sGpu, format) : "");
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
       setTargetBgLow(storedSettings.targetBgLow?.toString() || "");
       setTargetBgHigh(storedSettings.targetBgHigh?.toString() || "");
@@ -854,17 +881,43 @@ export default function Settings() {
     }
   };
 
+  const handleRatioFormatChange = (newFormat: RatioFormat) => {
+    const oldFormat = ratioFormat;
+    const convertValue = (val: string) => {
+      if (!val) return "";
+      const gpu = parseInputToGramsPerUnit(val, oldFormat);
+      return gpu ? gramsPerUnitToInputValue(gpu, newFormat) : val;
+    };
+    setBreakfastRatio(convertValue(breakfastRatio));
+    setLunchRatio(convertValue(lunchRatio));
+    setDinnerRatio(convertValue(dinnerRatio));
+    setSnackRatio(convertValue(snackRatio));
+    setRatioFormat(newFormat);
+  };
+
   const handleSaveInsulin = () => {
+    const bGpu = parseInputToGramsPerUnit(breakfastRatio, ratioFormat);
+    const lGpu = parseInputToGramsPerUnit(lunchRatio, ratioFormat);
+    const dGpu = parseInputToGramsPerUnit(dinnerRatio, ratioFormat);
+    const sGpu = parseInputToGramsPerUnit(snackRatio, ratioFormat);
     const newSettings: UserSettings = {
       ...settings,
       tdd: tdd ? parseFloat(tdd) : undefined,
-      breakfastRatio, lunchRatio, dinnerRatio, snackRatio,
+      breakfastRatio: bGpu ? formatRatioForStorage(bGpu) : undefined,
+      lunchRatio: lGpu ? formatRatioForStorage(lGpu) : undefined,
+      dinnerRatio: dGpu ? formatRatioForStorage(dGpu) : undefined,
+      snackRatio: sGpu ? formatRatioForStorage(sGpu) : undefined,
       correctionFactor: correctionFactor ? parseFloat(correctionFactor) : undefined,
       targetBgLow: targetBgLow ? parseFloat(targetBgLow) : undefined,
       targetBgHigh: targetBgHigh ? parseFloat(targetBgHigh) : undefined,
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
+    if (profile) {
+      const updatedProfile = { ...profile, ratioFormat };
+      storage.saveProfile(updatedProfile);
+      setProfile(updatedProfile);
+    }
     toast({ title: "Insulin settings saved", description: "Your insulin settings have been updated." });
   };
 
@@ -1033,6 +1086,7 @@ export default function Settings() {
                 lunchRatio={lunchRatio} setLunchRatio={setLunchRatio}
                 dinnerRatio={dinnerRatio} setDinnerRatio={setDinnerRatio}
                 snackRatio={snackRatio} setSnackRatio={setSnackRatio}
+                ratioFormat={ratioFormat} onRatioFormatChange={handleRatioFormatChange}
                 onSave={handleSaveInsulin}
               />
             </TabsContent>

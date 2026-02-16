@@ -11,7 +11,8 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
-import { storage, UserSettings, UserProfile, ScenarioState } from "@/lib/storage";
+import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat } from "@/lib/storage";
+import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -77,15 +78,7 @@ function calculateMealDose(
   let exactBaseUnits = 0;
 
   if (ratio) {
-    const ratioMatch = ratio.match(/1:(\d+)/);
-    if (ratioMatch) {
-      exactBaseUnits = carbs / parseInt(ratioMatch[1]);
-    } else {
-      const unitsPerTenG = parseFloat(ratio);
-      if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
-        exactBaseUnits = (carbs / 10) * unitsPerTenG;
-      }
-    }
+    exactBaseUnits = calculateDoseFromCarbs(carbs, ratio);
   } else if (settings.tdd) {
     const estimatedRatio = Math.round(500 / settings.tdd);
     exactBaseUnits = carbs / estimatedRatio;
@@ -393,7 +386,7 @@ function calculateExercisePlan(message: string, settings: UserSettings, bgUnits:
 }
 
 
-function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; bgUnits: string }) {
+function RatioCalculationGuide({ settings, bgUnits, ratioFormat }: { settings: UserSettings; bgUnits: string; ratioFormat: RatioFormat }) {
   const [isOpen, setIsOpen] = useState(false);
   
   const correctionRule = bgUnits === "mmol/L" ? 100 : 1800;
@@ -417,7 +410,7 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
             <p className="font-medium text-foreground">Starting Point: The 500 Rule</p>
             <p>500 ÷ TDD = grams of carbs covered by 1 unit</p>
             {settings.tdd && (
-              <p className="text-primary">Your starting estimate: 500 ÷ {settings.tdd} = 1:{Math.round(500 / settings.tdd)}</p>
+              <p className="text-primary">Your starting estimate: 500 ÷ {settings.tdd} = {formatRatioForDisplay(Math.round(500 / settings.tdd), ratioFormat)}</p>
             )}
           </div>
           
@@ -425,11 +418,11 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
             <p className="font-medium text-foreground">Fine-Tuning by Trial</p>
             <p>The 500 rule gives you a starting point, but everyone is different. Here's how to adjust:</p>
             <ol className="list-decimal list-inside space-y-1 mt-2 text-xs">
-              <li>Start with your calculated ratio (e.g., 1:10)</li>
+              <li>Start with your calculated ratio (e.g., {formatRatioForDisplay(10, ratioFormat)})</li>
               <li>Eat a measured meal with known carbs when blood sugar is stable</li>
               <li>Check blood sugar 2-3 hours after eating</li>
-              <li>If still high: try a stronger ratio (e.g., 1:8)</li>
-              <li>If going low: try a weaker ratio (e.g., 1:12)</li>
+              <li>If still high: try a stronger ratio (e.g., {formatRatioForDisplay(8, ratioFormat)})</li>
+              <li>If going low: try a weaker ratio (e.g., {formatRatioForDisplay(12, ratioFormat)})</li>
               <li>Repeat until you find what works for each meal</li>
             </ol>
           </div>
@@ -444,7 +437,7 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
 
           <div className="text-xs bg-muted p-2 rounded">
             <p><strong>Why ratios differ by meal:</strong></p>
-            <p>Many people need stronger ratios at breakfast (e.g., 1:8) due to morning hormone changes, and weaker ratios at lunch/dinner (e.g., 1:12). Trial each meal separately.</p>
+            <p>Many people need stronger ratios at breakfast (e.g., {formatRatioForDisplay(8, ratioFormat)}) due to morning hormone changes, and weaker ratios at lunch/dinner (e.g., {formatRatioForDisplay(12, ratioFormat)}). Trial each meal separately.</p>
           </div>
           
           <p className="text-xs text-muted-foreground italic">Note: Always work with your healthcare team when adjusting ratios. Keep a log of your trials to spot patterns.</p>
@@ -563,24 +556,18 @@ export default function Advisor() {
     
     let totalUnits = 0;
     let ratioUsed = "";
+    const ratioFmt: RatioFormat = profile.ratioFormat || "per10g";
     
     if (selectedRatio) {
-      const ratioMatch = selectedRatio.match(/1:(\d+)/);
-      if (ratioMatch) {
-        const carbRatio = parseInt(ratioMatch[1]);
-        totalUnits = Math.round((carbValue / carbRatio) * 10) / 10;
-        ratioUsed = `Using your ${splitMealTime} ratio (1:${carbRatio})`;
-      } else {
-        const unitsPerTenG = parseFloat(selectedRatio);
-        if (!isNaN(unitsPerTenG) && unitsPerTenG > 0) {
-          totalUnits = Math.round((carbValue / 10) * unitsPerTenG * 10) / 10;
-          ratioUsed = `Using your ${splitMealTime} ratio (${unitsPerTenG} units/10g)`;
-        }
+      const gpu = parseRatioToGramsPerUnit(selectedRatio);
+      if (gpu && gpu > 0) {
+        totalUnits = Math.round((carbValue / gpu) * 10) / 10;
+        ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt)})`;
       }
     } else if (settings.tdd) {
       const estimatedRatio = Math.round(500 / settings.tdd);
       totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
-      ratioUsed = `Estimated from TDD (1:${estimatedRatio})`;
+      ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt)})`;
     }
     
     if (totalUnits <= 0) {
@@ -1044,7 +1031,7 @@ export default function Advisor() {
           )}
 
           <Card className="border-0 bg-transparent shadow-none">
-            <RatioCalculationGuide settings={settings} bgUnits={bgUnits} />
+            <RatioCalculationGuide settings={settings} bgUnits={bgUnits} ratioFormat={profile.ratioFormat || "per10g"} />
           </Card>
 
           <Card>

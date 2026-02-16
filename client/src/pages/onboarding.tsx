@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ArrowRight, ArrowLeft, Check, Package, Utensils, Dumbbell, LayoutDashboard, Heart, Shield, Sparkles, Clock, TrendingDown } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
 import { storage } from "@/lib/storage";
+import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
@@ -129,9 +130,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
     const settings: Record<string, number | string | undefined> = {};
     if (data.tdd) settings.tdd = parseFloat(data.tdd);
-    if (data.breakfastRatio) settings.breakfastRatio = data.breakfastRatio;
-    if (data.lunchRatio) settings.lunchRatio = data.lunchRatio;
-    if (data.dinnerRatio) settings.dinnerRatio = data.dinnerRatio;
+    if (data.breakfastRatio) {
+      const gpu = parseInputToGramsPerUnit(data.breakfastRatio, "per10g");
+      settings.breakfastRatio = gpu ? formatRatioForStorage(gpu) : data.breakfastRatio;
+    }
+    if (data.lunchRatio) {
+      const gpu = parseInputToGramsPerUnit(data.lunchRatio, "per10g");
+      settings.lunchRatio = gpu ? formatRatioForStorage(gpu) : data.lunchRatio;
+    }
+    if (data.dinnerRatio) {
+      const gpu = parseInputToGramsPerUnit(data.dinnerRatio, "per10g");
+      settings.dinnerRatio = gpu ? formatRatioForStorage(gpu) : data.dinnerRatio;
+    }
     if (data.correctionFactor) settings.correctionFactor = parseFloat(data.correctionFactor);
     if (data.shortActingUnitsPerDay) settings.shortActingUnitsPerDay = parseInt(data.shortActingUnitsPerDay);
     if (data.longActingUnitsPerDay) settings.longActingUnitsPerDay = parseInt(data.longActingUnitsPerDay);

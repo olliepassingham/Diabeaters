@@ -42,6 +42,8 @@ const STORAGE_KEYS = {
   SCENARIO_HISTORY: "diabeater_scenario_history",
 } as const;
 
+export type RatioFormat = "per10g" | "1toXg";
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -52,6 +54,7 @@ export interface UserProfile {
   insulinDeliveryMethod: string;
   usingInsulin: boolean;
   hasAcceptedDisclaimer: boolean;
+  ratioFormat?: RatioFormat;
 }
 
 export interface UserSettings {
