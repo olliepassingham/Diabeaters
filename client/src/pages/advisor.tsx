@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, Wrench, Search } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
@@ -467,6 +467,7 @@ export default function Advisor() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [cameFromRatios, setCameFromRatios] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -476,6 +477,9 @@ export default function Advisor() {
     }
     if (tab === "ratio-adviser") {
       setActiveTab("ratios");
+    }
+    if (params.get("from") === "ratios") {
+      setCameFromRatios(true);
     }
   }, []);
   
@@ -773,6 +777,14 @@ export default function Advisor() {
         </TabsList>
 
         <TabsContent value="meal" className="space-y-4 mt-4 animate-fade-in-up">
+          {cameFromRatios && (
+            <Link href="/ratios">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-back-to-ratios-meal">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Ratios
+              </Button>
+            </Link>
+          )}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -1613,6 +1625,14 @@ export default function Advisor() {
         </TabsContent>
 
         <TabsContent value="ratios" className="space-y-4 mt-4 animate-fade-in-up">
+          {cameFromRatios && (
+            <Link href="/ratios">
+              <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-back-to-ratios">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Ratios
+              </Button>
+            </Link>
+          )}
           <RatioAdviserTool settings={settings} bgUnit={bgUnits} />
         </TabsContent>
       </Tabs>

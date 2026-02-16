@@ -532,14 +532,14 @@ export default function Ratios() {
       <Card data-testid="card-quick-actions">
         <CardContent className="p-4 space-y-3">
           <h3 className="font-medium">Quick Actions</h3>
-          <Link href="/advisor?tab=ratios">
+          <Link href="/advisor?tab=ratios&from=ratios">
             <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-go-ratio-adviser">
               <Search className="h-4 w-4" />
               Use Ratio Adviser
               <ArrowRight className="h-4 w-4 ml-auto" />
             </Button>
           </Link>
-          <Link href="/advisor?tab=meal">
+          <Link href="/advisor?tab=meal&from=ratios">
             <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-go-meal-planner">
               <UtensilsCrossed className="h-4 w-4" />
               Calculate a meal dose
