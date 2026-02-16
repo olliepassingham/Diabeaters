@@ -59,6 +59,7 @@ const STRUGGLE_OPTIONS = [
 
 interface OnboardingData {
   name: string;
+  diabetesType: string;
   struggle: Struggle;
   insulinDeliveryMethod: string;
   bgUnits: string;
@@ -84,6 +85,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [data, setData] = useState<OnboardingData>({
     name: "",
+    diabetesType: "type1",
     struggle: null,
     insulinDeliveryMethod: "",
     bgUnits: "mmol/L",
@@ -118,7 +120,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       email: "",
       bgUnits: data.bgUnits,
       carbUnits: data.carbUnits,
-      diabetesType: "type1",
+      diabetesType: data.diabetesType || "type1",
       insulinDeliveryMethod: data.insulinDeliveryMethod === "injections" ? "pen" : data.insulinDeliveryMethod,
       usingInsulin: true,
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
@@ -284,7 +286,7 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
       </div>
 
       <Card>
-        <CardContent className="pt-6 pb-6 space-y-4">
+        <CardContent className="pt-6 pb-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="welcome-name" className="text-base">What should we call you?</Label>
             <Input
@@ -295,6 +297,45 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
               className="text-center text-lg"
               data-testid="input-onboarding-name"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-base">What type of diabetes do you have?</Label>
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={() => updateData("diabetesType", "type1")}
+                className={`flex items-center justify-between p-3 rounded-md border text-left transition-colors ${
+                  data.diabetesType === "type1"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-border hover-elevate"
+                }`}
+                data-testid="button-diabetes-type1"
+              >
+                <span className="font-medium text-sm">Type 1</span>
+                {data.diabetesType === "type1" && (
+                  <Check className="h-4 w-4 text-primary" />
+                )}
+              </button>
+              <button
+                type="button"
+                disabled
+                className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
+                data-testid="button-diabetes-type2"
+              >
+                <span className="font-medium text-sm text-muted-foreground">Type 2</span>
+                <span className="text-xs text-muted-foreground">Coming soon</span>
+              </button>
+              <button
+                type="button"
+                disabled
+                className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
+                data-testid="button-diabetes-gestational"
+              >
+                <span className="font-medium text-sm text-muted-foreground">Gestational</span>
+                <span className="text-xs text-muted-foreground">Coming soon</span>
+              </button>
+            </div>
           </div>
         </CardContent>
       </Card>
