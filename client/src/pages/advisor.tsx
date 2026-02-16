@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, Wrench } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
+import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -465,12 +466,16 @@ export default function Advisor() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [autoOpenRatioAdviser, setAutoOpenRatioAdviser] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
     if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools") {
       setActiveTab(tab);
+    }
+    if (params.get("tool") === "ratio-adviser") {
+      setAutoOpenRatioAdviser(true);
     }
   }, []);
   
@@ -760,7 +765,7 @@ export default function Advisor() {
             <Repeat className="h-4 w-4" />Routines
           </TabsTrigger>
           <TabsTrigger value="tools" className="gap-2" data-testid="tab-tools">
-            <Droplet className="h-4 w-4" />Hypo Help
+            <Wrench className="h-4 w-4" />Tools
           </TabsTrigger>
         </TabsList>
 
@@ -1601,6 +1606,8 @@ export default function Advisor() {
               </div>
             </div>
           </Card>
+
+          <RatioAdviserTool settings={settings} bgUnit={bgUnits} defaultOpen={autoOpenRatioAdviser} />
         </TabsContent>
       </Tabs>
     </div>

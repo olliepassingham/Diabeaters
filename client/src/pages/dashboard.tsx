@@ -27,6 +27,7 @@ import {
   HelpNowInfoWidget,
   TipOfDayWidget,
   AppointmentsWidget,
+  RoutinesWidget,
   WidgetLibrary,
 } from "@/components/widgets";
 
@@ -599,6 +600,8 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
       return <SupplyDepletionWidget compact={compact} />;
     case "tip-of-day":
       return <TipOfDayWidget compact={compact} />;
+    case "routines":
+      return <RoutinesWidget compact={compact} />;
     default:
       return null;
   }

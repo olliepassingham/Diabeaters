@@ -23,7 +23,8 @@ import {
   TrendingDown,
   Heart,
   Shield,
-  MessageSquare
+  MessageSquare,
+  Repeat
 } from "lucide-react";
 import { DashboardWidget, WidgetType, WidgetSize } from "@/lib/storage";
 import {
@@ -156,6 +157,13 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     description: "Daily diabetes management tips and advice",
     icon: Lightbulb,
     category: "health",
+  },
+  "routines": {
+    type: "routines",
+    name: "Routines",
+    description: "Quick access to your saved meal and activity routines",
+    icon: Repeat,
+    category: "planning",
   },
 };
 
