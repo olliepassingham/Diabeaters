@@ -759,8 +759,8 @@ export default function Advisor() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-5 max-w-2xl">
-          <TabsTrigger value="meal" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-meal">
-            <Utensils className="h-4 w-4" /><span>Meal</span>
+          <TabsTrigger value="meal" className="text-xs sm:text-sm" data-testid="tab-meal">
+            Meal
           </TabsTrigger>
           <TabsTrigger value="exercise" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-exercise">
             <Dumbbell className="h-4 w-4" /><span>Exercise</span>
@@ -768,8 +768,8 @@ export default function Advisor() {
           <TabsTrigger value="routines" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-routines">
             <Repeat className="h-4 w-4" /><span>Routines</span>
           </TabsTrigger>
-          <TabsTrigger value="ratios" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-ratios">
-            <Search className="h-4 w-4" /><span>Ratios</span>
+          <TabsTrigger value="ratios" className="text-xs sm:text-sm" data-testid="tab-ratios">
+            Ratios
           </TabsTrigger>
           <TabsTrigger value="tools" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-tools">
             <Droplet className="h-4 w-4" /><span>Hypo Help</span>
