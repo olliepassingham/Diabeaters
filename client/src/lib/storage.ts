@@ -919,6 +919,10 @@ export const storage = {
    * For other: uses supply.dailyUsage
    */
   getEffectiveDailyUsage(supply: Supply, settings?: UserSettings): number {
+    if (supply.dailyUsage === 0) {
+      return 0;
+    }
+
     const s = settings || this.getSettings();
 
     if (supply.type === "needle") {
