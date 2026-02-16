@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Moon, Thermometer, Plane } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Moon, Thermometer, Plane, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Bedtime from "./bedtime";
 import SickDay from "./sick-day";
 import Travel from "./travel";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { storage, ScenarioHistoryEntry } from "@/lib/storage";
 
 export default function Scenarios() {
   const getInitialTab = () => {
@@ -16,6 +19,8 @@ export default function Scenarios() {
   };
   
   const [activeTab, setActiveTab] = useState(getInitialTab);
+  const [scenarioHistory, setScenarioHistory] = useState<ScenarioHistoryEntry[]>([]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -23,6 +28,7 @@ export default function Scenarios() {
     if (tab === "bedtime" || tab === "travel" || tab === "sick-day") {
       setActiveTab(tab);
     }
+    setScenarioHistory(storage.getScenarioHistory().slice(0, 10));
   }, []);
 
   return (
@@ -82,6 +88,61 @@ export default function Scenarios() {
           <TravelContent />
         </TabsContent>
       </Tabs>
+
+      <Card data-testid="card-past-scenarios">
+        <CardHeader className="cursor-pointer" onClick={() => setHistoryExpanded(!historyExpanded)} data-testid="button-toggle-history">
+          <CardTitle className="flex items-center justify-between gap-2 text-base">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Past Scenarios
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" tabIndex={-1}>
+              {historyExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {historyExpanded && (
+          <CardContent data-testid="section-scenario-history">
+            {scenarioHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="text-no-history">No past scenarios recorded yet</p>
+            ) : (
+              <div className="space-y-3">
+                {scenarioHistory.map((entry) => {
+                  const formatDate = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                  return (
+                    <div key={entry.id} className="flex items-start gap-3 text-sm" data-testid={`history-entry-${entry.id}`}>
+                      <div className="mt-0.5">
+                        {entry.type === "sick_day" ? (
+                          <Thermometer className="h-4 w-4 text-orange-500" />
+                        ) : (
+                          <Plane className="h-4 w-4 text-purple-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{entry.type === "sick_day" ? "Sick Day" : "Travel"}</span>
+                          <span className="text-muted-foreground">
+                            {formatDate(entry.startDate)}
+                            {entry.endDate ? ` — ${formatDate(entry.endDate)}` : ""}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                          {entry.destination && <span>{entry.destination}</span>}
+                          {entry.severity && <span>Severity: {entry.severity}</span>}
+                          {entry.journalEntryCount != null && entry.journalEntryCount > 0 && (
+                            <span>{entry.journalEntryCount} journal {entry.journalEntryCount === 1 ? "entry" : "entries"}</span>
+                          )}
+                        </div>
+                        {entry.notes && <p className="text-muted-foreground truncate">{entry.notes}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
     </div>
   );
 }

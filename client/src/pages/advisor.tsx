@@ -6,12 +6,14 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
-import { storage, UserSettings, UserProfile } from "@/lib/storage";
+import { storage, UserSettings, UserProfile, ScenarioState } from "@/lib/storage";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
 
 import { Link } from "wouter";
@@ -468,6 +470,7 @@ export default function Advisor() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [cameFromRatios, setCameFromRatios] = useState(false);
+  const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -532,6 +535,7 @@ export default function Advisor() {
 
   useEffect(() => {
     setSettings(storage.getSettings());
+    setScenarioState(storage.getScenarioState());
     const storedProfile = storage.getProfile();
     if (storedProfile) {
       setProfile(storedProfile);
@@ -756,6 +760,38 @@ export default function Advisor() {
           </div>
         </CardContent>
       </Card>
+
+      {scenarioState.sickDayActive && (
+        <Alert className="mb-4 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" data-testid="banner-sick-day-active">
+          <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-sm text-amber-800 dark:text-amber-200">
+              Sick Day Mode is active. Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
+            </span>
+            <Link href="/scenarios?tab=sick-day">
+              <Badge variant="outline" className="cursor-pointer text-amber-700 dark:text-amber-300 border-amber-400" data-testid="link-sick-day-scenarios">
+                Sick Day Settings
+              </Badge>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {scenarioState.travelModeActive && (
+        <Alert className="mb-4 border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20" data-testid="banner-travel-mode-active">
+          <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-sm text-blue-800 dark:text-blue-200">
+              Travel Mode is active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ''}. Be mindful of timezone and routine changes affecting your levels.
+            </span>
+            <Link href="/scenarios?tab=travel">
+              <Badge variant="outline" className="cursor-pointer text-blue-700 dark:text-blue-300 border-blue-400" data-testid="link-travel-scenarios">
+                Travel Settings
+              </Badge>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <TabsList className="grid w-full grid-cols-5 max-w-2xl">
@@ -985,6 +1021,28 @@ export default function Advisor() {
             </Card>
           )}
 
+          {scenarioState.sickDayActive && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
+              <div className="flex items-start gap-2">
+                <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Sick Day Note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick Day tool has adjusted ratios for you.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
+              <div className="flex items-start gap-2">
+                <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
+                </p>
+              </div>
+            </div>
+          )}
+
           <Card className="border-0 bg-transparent shadow-none">
             <RatioCalculationGuide settings={settings} bgUnits={bgUnits} />
           </Card>
@@ -1119,6 +1177,25 @@ export default function Advisor() {
         </TabsContent>
 
         <TabsContent value="exercise" className="space-y-4 mt-4 animate-fade-in-up">
+          {scenarioState.sickDayActive && (
+            <div className="p-3 rounded-lg border" data-testid="exercise-warning-sick-day">
+              {scenarioState.sickDaySeverity === "severe" ? (
+                <div className="flex items-start gap-2 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 p-3 rounded-lg">
+                  <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    <strong>Exercise is generally not recommended during severe illness.</strong> Focus on rest and monitoring.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 p-3 rounded-lg">
+                  <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>Exercise During Illness:</strong> Take extra care when exercising while unwell. Your body is under stress and blood glucose can be unpredictable. Consider lighter activities and monitor closely.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">

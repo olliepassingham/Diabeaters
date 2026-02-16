@@ -1537,6 +1537,25 @@ export default function Travel() {
           </CardContent>
         </Card>
 
+        <Card data-testid="card-pretravel-appointment">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calendar className="h-5 w-5 text-muted-foreground" />
+              Pre-travel appointment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Consider booking a GP appointment before your trip. You may need a letter confirming your diabetes and insulin supplies for airport security, and a prescription for extra supplies.
+            </p>
+            <Link href="/appointments">
+              <Button variant="outline" size="sm" data-testid="link-pretravel-appointments">
+                View Appointments
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -6,10 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "wouter";
-import { storage, UserSettings, ScenarioState } from "@/lib/storage";
+import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
@@ -48,6 +50,10 @@ export default function Bedtime() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [profile, setProfile] = useState<any>(null);
+  const [saved, setSaved] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     const settings = storage.getSettings();
@@ -58,6 +64,7 @@ export default function Bedtime() {
     }
     setProfile(storage.getProfile());
     setScenarioState(storage.getScenarioState());
+    setBedtimeLogs(storage.getBedtimeLogs());
   }, []);
 
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
@@ -289,6 +296,7 @@ export default function Bedtime() {
     const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHours);
 
     setResult({ level, title, message, tips, factors, correction });
+    setSaved(false);
   };
 
   const getLevelColors = (level: ReadinessLevel) => {
@@ -329,6 +337,70 @@ export default function Bedtime() {
   };
 
   const canCalculate = currentBg && !isNaN(parseFloat(currentBg));
+
+  const handleSaveCheck = () => {
+    if (!result || saved) return;
+    const log: BedtimeLog = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      currentBg: parseFloat(currentBg),
+      bgUnits,
+      readinessLevel: result.level,
+      hoursSinceFood: hoursSinceFood ? parseFloat(hoursSinceFood) : null,
+      hoursSinceInsulin: hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : null,
+      exercisedToday,
+      hadAlcohol,
+      sickDayActive: scenarioState.sickDayActive,
+      travelModeActive: scenarioState.travelModeActive,
+      correctionGiven: result.correction ? result.correction.suggestedDose : null,
+      notes: "",
+    };
+    storage.saveBedtimeLog(log);
+    setBedtimeLogs(storage.getBedtimeLogs());
+    setSaved(true);
+    toast({ title: "Bedtime check saved", description: "Your check has been logged." });
+  };
+
+  const getRecentLogs = () => {
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    return bedtimeLogs
+      .filter((log) => new Date(log.date) >= fourteenDaysAgo)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
+
+  const getPatternInsight = () => {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentWeek = bedtimeLogs.filter((log) => new Date(log.date) >= sevenDaysAgo);
+    if (recentWeek.length < 3) return null;
+    const counts = { steady: 0, monitor: 0, alert: 0 };
+    recentWeek.forEach((log) => { counts[log.readinessLevel]++; });
+    const parts: string[] = [];
+    if (counts.steady > 0) parts.push(`${counts.steady} steady night${counts.steady !== 1 ? "s" : ""}`);
+    if (counts.monitor > 0) parts.push(`${counts.monitor} monitor night${counts.monitor !== 1 ? "s" : ""}`);
+    if (counts.alert > 0) parts.push(`${counts.alert} alert night${counts.alert !== 1 ? "s" : ""}`);
+    return `You've had ${parts.join(" and ")} in the last week`;
+  };
+
+  const getLevelBadge = (level: ReadinessLevel) => {
+    switch (level) {
+      case "steady":
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">{level}</Badge>;
+      case "monitor":
+        return <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{level}</Badge>;
+      case "alert":
+        return <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{level}</Badge>;
+    }
+  };
+
+  const formatLogDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  const recentLogs = getRecentLogs();
+  const patternInsight = getPatternInsight();
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -652,6 +724,17 @@ export default function Bedtime() {
                 </ul>
               </div>
             )}
+
+            <Button
+              onClick={handleSaveCheck}
+              disabled={saved}
+              variant="outline"
+              className="w-full"
+              data-testid="button-save-bedtime-check"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              {saved ? "Saved" : "Save this check"}
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -675,6 +758,77 @@ export default function Bedtime() {
           </div>
         </CardContent>
       </Card>
+
+      <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+        <Card data-testid="card-bedtime-history">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full flex items-center justify-between gap-2 p-4"
+              data-testid="button-toggle-bedtime-history"
+            >
+              <div className="flex items-center gap-2">
+                <Moon className="h-4 w-4" />
+                <span className="font-medium">Recent Bedtime Checks</span>
+                {recentLogs.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{recentLogs.length}</Badge>
+                )}
+              </div>
+              {historyOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-3">
+              {patternInsight && (
+                <div className="flex items-start gap-2 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg" data-testid="text-pattern-insight">
+                  <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 mt-0.5 shrink-0" />
+                  <p className="text-sm text-indigo-700 dark:text-indigo-300">{patternInsight}</p>
+                </div>
+              )}
+
+              {recentLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-bedtime-logs">
+                  No bedtime checks saved yet. Run a check and save it to start tracking patterns.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {recentLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg"
+                      data-testid={`card-bedtime-log-${log.id}`}
+                    >
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-sm text-muted-foreground" data-testid={`text-log-date-${log.id}`}>
+                          {formatLogDate(log.date)}
+                        </span>
+                        <span className="text-sm font-medium" data-testid={`text-log-bg-${log.id}`}>
+                          {log.currentBg} {log.bgUnits}
+                        </span>
+                        {getLevelBadge(log.readinessLevel)}
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {log.exercisedToday && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-exercise-${log.id}`}>
+                            <Activity className="h-3 w-3 mr-1" />
+                            Exercise
+                          </Badge>
+                        )}
+                        {log.hadAlcohol && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-alcohol-${log.id}`}>
+                            <Wine className="h-3 w-3 mr-1" />
+                            Alcohol
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }

@@ -37,6 +37,9 @@ const STORAGE_KEYS = {
   LAST_BACKUP_DATE: "diabeater_last_backup_date",
   HOLIDAY_PREP: "diabeater_holiday_prep",
   RATIO_HISTORY: "diabeater_ratio_history",
+  BEDTIME_LOGS: "diabeater_bedtime_logs",
+  SICK_DAY_JOURNAL: "diabeater_sick_day_journal",
+  SCENARIO_HISTORY: "diabeater_scenario_history",
 } as const;
 
 export interface UserProfile {
@@ -290,6 +293,46 @@ export interface ScenarioState {
   sickDayActive: boolean;
   sickDaySeverity?: string;
   sickDayActivatedAt?: string;
+}
+
+export interface BedtimeLog {
+  id: string;
+  date: string;
+  currentBg: number;
+  bgUnits: string;
+  readinessLevel: "steady" | "monitor" | "alert";
+  hoursSinceFood: number | null;
+  hoursSinceInsulin: number | null;
+  exercisedToday: boolean;
+  hadAlcohol: boolean;
+  sickDayActive: boolean;
+  travelModeActive: boolean;
+  correctionGiven: number | null;
+  notes: string;
+}
+
+export interface SickDayJournalEntry {
+  id: string;
+  timestamp: string;
+  bg: number;
+  bgUnits: string;
+  ketoneLevel: string;
+  correctionDose: number | null;
+  fluidsml: number | null;
+  symptoms: string;
+  notes: string;
+  severity: string;
+}
+
+export interface ScenarioHistoryEntry {
+  id: string;
+  type: "sick_day" | "travel";
+  startDate: string;
+  endDate: string | null;
+  destination?: string;
+  severity?: string;
+  notes: string;
+  journalEntryCount?: number;
 }
 
 export interface RatioHistoryEntry {
@@ -1322,6 +1365,16 @@ export const storage = {
 
   deactivateTravelMode(): void {
     const state = this.getScenarioState();
+    if (state.travelModeActive && state.travelStartDate) {
+      this.addScenarioHistory({
+        id: crypto.randomUUID(),
+        type: "travel",
+        startDate: state.travelStartDate,
+        endDate: new Date().toISOString(),
+        destination: state.travelDestination,
+        notes: "",
+      });
+    }
     state.travelModeActive = false;
     state.travelDestination = undefined;
     state.travelStartDate = undefined;
@@ -1361,10 +1414,63 @@ export const storage = {
 
   deactivateSickDay(): void {
     const state = this.getScenarioState();
+    if (state.sickDayActive && state.sickDayActivatedAt) {
+      const journal = this.getSickDayJournal();
+      this.addScenarioHistory({
+        id: crypto.randomUUID(),
+        type: "sick_day",
+        startDate: state.sickDayActivatedAt,
+        endDate: new Date().toISOString(),
+        severity: state.sickDaySeverity,
+        notes: "",
+        journalEntryCount: journal.length,
+      });
+      localStorage.removeItem(STORAGE_KEYS.SICK_DAY_JOURNAL);
+    }
     state.sickDayActive = false;
     state.sickDaySeverity = undefined;
     state.sickDayActivatedAt = undefined;
     this.saveScenarioState(state);
+  },
+
+  getBedtimeLogs(): BedtimeLog[] {
+    const data = localStorage.getItem(STORAGE_KEYS.BEDTIME_LOGS);
+    return data ? JSON.parse(data) : [];
+  },
+
+  saveBedtimeLog(log: BedtimeLog): void {
+    const logs = this.getBedtimeLogs();
+    logs.unshift(log);
+    const trimmed = logs.slice(0, 90);
+    localStorage.setItem(STORAGE_KEYS.BEDTIME_LOGS, JSON.stringify(trimmed));
+  },
+
+  getSickDayJournal(): SickDayJournalEntry[] {
+    const data = localStorage.getItem(STORAGE_KEYS.SICK_DAY_JOURNAL);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addSickDayJournalEntry(entry: SickDayJournalEntry): void {
+    const journal = this.getSickDayJournal();
+    journal.unshift(entry);
+    localStorage.setItem(STORAGE_KEYS.SICK_DAY_JOURNAL, JSON.stringify(journal));
+  },
+
+  deleteSickDayJournalEntry(id: string): void {
+    const journal = this.getSickDayJournal().filter(e => e.id !== id);
+    localStorage.setItem(STORAGE_KEYS.SICK_DAY_JOURNAL, JSON.stringify(journal));
+  },
+
+  getScenarioHistory(): ScenarioHistoryEntry[] {
+    const data = localStorage.getItem(STORAGE_KEYS.SCENARIO_HISTORY);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addScenarioHistory(entry: ScenarioHistoryEntry): void {
+    const history = this.getScenarioHistory();
+    history.unshift(entry);
+    const trimmed = history.slice(0, 50);
+    localStorage.setItem(STORAGE_KEYS.SCENARIO_HISTORY, JSON.stringify(trimmed));
   },
 
   getCommunityPosts(topic?: CommunityTopicId): CommunityPost[] {
