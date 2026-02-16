@@ -532,7 +532,7 @@ export default function Ratios() {
       <Card data-testid="card-quick-actions">
         <CardContent className="p-4 space-y-3">
           <h3 className="font-medium">Quick Actions</h3>
-          <Link href="/advisor?tab=tools&tool=ratio-adviser">
+          <Link href="/advisor?tab=ratios">
             <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-go-ratio-adviser">
               <Search className="h-4 w-4" />
               Use Ratio Adviser

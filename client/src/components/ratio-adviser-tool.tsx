@@ -13,8 +13,6 @@ import {
   RotateCcw,
   TrendingDown,
   TrendingUp,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { UserSettings } from "@/lib/storage";
 
@@ -122,8 +120,7 @@ function getAdviserResult(
   };
 }
 
-export function RatioAdviserTool({ settings, bgUnit, defaultOpen = false }: { settings: UserSettings; bgUnit: string; defaultOpen?: boolean }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+export function RatioAdviserTool({ settings, bgUnit }: { settings: UserSettings; bgUnit: string }) {
   const [step, setStep] = useState(0);
   const [selectedMeal, setSelectedMeal] = useState<MealKey | null>(null);
   const [pattern, setPattern] = useState<PatternAnswer | null>(null);
@@ -180,24 +177,15 @@ export function RatioAdviserTool({ settings, bgUnit, defaultOpen = false }: { se
   return (
     <Card data-testid="card-ratio-adviser">
       <CardHeader className="pb-2">
-        <div
-          className="flex items-center justify-between gap-2 cursor-pointer"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <div className="flex items-center gap-2">
-            <Search className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Ratio Adviser</CardTitle>
-          </div>
-          {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        <div className="flex items-center gap-2">
+          <Search className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base">Ratio Adviser</CardTitle>
         </div>
-        {!isOpen && (
-          <p className="text-sm text-muted-foreground mt-1">
-            Wondering if a ratio needs adjusting? This guided tool helps you spot patterns.
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground mt-1">
+          Wondering if a ratio needs adjusting? Answer a few questions to spot patterns.
+        </p>
       </CardHeader>
-      {isOpen && (
-        <CardContent className="space-y-4">
+      <CardContent className="space-y-4">
           <div className="bg-muted/30 rounded-lg p-3 space-y-1">
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <AlertCircle className="h-4 w-4 shrink-0" />
@@ -388,7 +376,6 @@ export function RatioAdviserTool({ settings, bgUnit, defaultOpen = false }: { se
             </div>
           )}
         </CardContent>
-      )}
     </Card>
   );
 }

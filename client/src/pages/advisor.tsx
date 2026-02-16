@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, Wrench } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, Wrench, Search } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
@@ -456,9 +456,10 @@ function RatioCalculationGuide({ settings, bgUnits }: { settings: UserSettings; 
 function getInitialTab(): string {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get("tab");
-  if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools") {
+  if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools" || tab === "ratios") {
     return tab;
   }
+  if (tab === "ratio-adviser") return "ratios";
   return "meal";
 }
 
@@ -466,16 +467,15 @@ export default function Advisor() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
-  const [autoOpenRatioAdviser, setAutoOpenRatioAdviser] = useState(false);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
-    if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools") {
+    if (tab === "meal" || tab === "exercise" || tab === "routines" || tab === "tools" || tab === "ratios") {
       setActiveTab(tab);
     }
-    if (params.get("tool") === "ratio-adviser") {
-      setAutoOpenRatioAdviser(true);
+    if (tab === "ratio-adviser") {
+      setActiveTab("ratios");
     }
   }, []);
   
@@ -754,18 +754,21 @@ export default function Advisor() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid w-full grid-cols-4 max-w-xl">
-          <TabsTrigger value="meal" className="gap-2" data-testid="tab-meal">
-            <Utensils className="h-4 w-4" />Meal
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+          <TabsTrigger value="meal" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-meal">
+            <Utensils className="h-4 w-4" /><span>Meal</span>
           </TabsTrigger>
-          <TabsTrigger value="exercise" className="gap-2" data-testid="tab-exercise">
-            <Dumbbell className="h-4 w-4" />Exercise
+          <TabsTrigger value="exercise" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-exercise">
+            <Dumbbell className="h-4 w-4" /><span>Exercise</span>
           </TabsTrigger>
-          <TabsTrigger value="routines" className="gap-2" data-testid="tab-routines">
-            <Repeat className="h-4 w-4" />Routines
+          <TabsTrigger value="routines" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-routines">
+            <Repeat className="h-4 w-4" /><span>Routines</span>
           </TabsTrigger>
-          <TabsTrigger value="tools" className="gap-2" data-testid="tab-tools">
-            <Wrench className="h-4 w-4" />Tools
+          <TabsTrigger value="ratios" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-ratios">
+            <Search className="h-4 w-4" /><span>Ratios</span>
+          </TabsTrigger>
+          <TabsTrigger value="tools" className="gap-1.5 text-xs sm:text-sm" data-testid="tab-tools">
+            <Wrench className="h-4 w-4" /><span>Tools</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1607,7 +1610,10 @@ export default function Advisor() {
             </div>
           </Card>
 
-          <RatioAdviserTool settings={settings} bgUnit={bgUnits} defaultOpen={autoOpenRatioAdviser} />
+        </TabsContent>
+
+        <TabsContent value="ratios" className="space-y-4 mt-4 animate-fade-in-up">
+          <RatioAdviserTool settings={settings} bgUnit={bgUnits} />
         </TabsContent>
       </Tabs>
     </div>
