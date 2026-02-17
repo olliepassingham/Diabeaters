@@ -80,7 +80,6 @@ export interface UserSettings {
   reservoirsPerBox?: number;
   insulinCartridgeUnits?: number;
   basalInjectionTime?: string;
-  primingEnabled?: boolean;
   primingUnitsPerInjection?: number;
 }
 
@@ -978,7 +977,7 @@ export const storage = {
     const s = settings || this.getSettings();
     const profile = this.getProfile();
     const isPump = profile?.insulinDeliveryMethod === "pump";
-    if (isPump || !s.primingEnabled) return 0;
+    if (isPump) return 0;
     const unitsPerPrime = s.primingUnitsPerInjection || 0;
     const injections = s.injectionsPerDay || 0;
     if (unitsPerPrime <= 0 || injections <= 0) return 0;

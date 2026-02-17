@@ -212,6 +212,7 @@ function UsageTab({
   shortActingUnitsPerDay, setShortActingUnitsPerDay,
   longActingUnitsPerDay, setLongActingUnitsPerDay,
   injectionsPerDay, setInjectionsPerDay,
+  primingUnits, setPrimingUnits,
   cgmDays, setCgmDays,
   siteChangeDays, setSiteChangeDays,
   reservoirChangeDays, setReservoirChangeDays,
@@ -228,6 +229,7 @@ function UsageTab({
   shortActingUnitsPerDay: string; setShortActingUnitsPerDay: (v: string) => void;
   longActingUnitsPerDay: string; setLongActingUnitsPerDay: (v: string) => void;
   injectionsPerDay: string; setInjectionsPerDay: (v: string) => void;
+  primingUnits: string; setPrimingUnits: (v: string) => void;
   cgmDays: string; setCgmDays: (v: string) => void;
   siteChangeDays: string; setSiteChangeDays: (v: string) => void;
   reservoirChangeDays: string; setReservoirChangeDays: (v: string) => void;
@@ -315,6 +317,14 @@ function UsageTab({
             <div className="space-y-2">
               <Label htmlFor="injections-per-day">Injections/Day</Label>
               <Input id="injections-per-day" type="number" placeholder="e.g., 4" value={injectionsPerDay} onChange={(e) => setInjectionsPerDay(e.target.value)} data-testid="input-injections-per-day" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <Label htmlFor="priming-units">Pen Priming (units)</Label>
+                <InfoTooltip {...DIABETES_TERMS.penPriming} />
+              </div>
+              <Input id="priming-units" type="number" min="0" max="5" step="0.5" placeholder="e.g., 2" value={primingUnits} onChange={(e) => setPrimingUnits(e.target.value)} data-testid="input-priming-units" />
+              <p className="text-xs text-muted-foreground">Units you expel before each injection</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cgm-days">CGM Sensor Duration (days)</Label>
@@ -766,6 +776,7 @@ export default function Settings() {
   const [shortActingUnitsPerDay, setShortActingUnitsPerDay] = useState("");
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
   const [injectionsPerDay, setInjectionsPerDay] = useState("");
+  const [primingUnits, setPrimingUnits] = useState("");
   const [cgmDays, setCgmDays] = useState("");
   const [siteChangeDays, setSiteChangeDays] = useState("");
   const [reservoirChangeDays, setReservoirChangeDays] = useState("");
@@ -837,6 +848,7 @@ export default function Settings() {
       setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
+      setPrimingUnits(storedSettings.primingUnitsPerInjection?.toString() || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
       setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
@@ -930,6 +942,7 @@ export default function Settings() {
       shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
       longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
       injectionsPerDay: injectionsPerDay ? parseInt(injectionsPerDay) : undefined,
+      primingUnitsPerInjection: primingUnits ? parseFloat(primingUnits) : undefined,
       cgmDays: cgmDays ? parseInt(cgmDays) : undefined,
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
       reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
@@ -1107,6 +1120,7 @@ export default function Settings() {
                 shortActingUnitsPerDay={shortActingUnitsPerDay} setShortActingUnitsPerDay={setShortActingUnitsPerDay}
                 longActingUnitsPerDay={longActingUnitsPerDay} setLongActingUnitsPerDay={setLongActingUnitsPerDay}
                 injectionsPerDay={injectionsPerDay} setInjectionsPerDay={setInjectionsPerDay}
+                primingUnits={primingUnits} setPrimingUnits={setPrimingUnits}
                 cgmDays={cgmDays} setCgmDays={setCgmDays}
                 siteChangeDays={siteChangeDays} setSiteChangeDays={setSiteChangeDays}
                 reservoirChangeDays={reservoirChangeDays} setReservoirChangeDays={setReservoirChangeDays}

@@ -104,4 +104,9 @@ export const DIABETES_TERMS = {
     explanation: "How many days each glucose sensor lasts before you need to replace it with a new one. This varies by brand and model.",
     example: "FreeStyle Libre sensors last 14 days, Dexcom G7 sensors last 10 days.",
   },
+  penPriming: {
+    term: "Pen Priming (Air Shot)",
+    explanation: "Before each injection, it's recommended to expel a small amount of insulin into the air — called an 'air shot' or 'priming'. This clears air bubbles from the needle tip and ensures you get an accurate dose. The insulin used for priming doesn't go into your body, so it depletes your supply faster than your actual dose alone. Setting this helps the Supply Tracker give you more accurate depletion forecasts.",
+    example: "Most people prime 2 units before each injection. With 4 injections a day, that's 8 units of insulin used just for priming.",
+  },
 } as const;
