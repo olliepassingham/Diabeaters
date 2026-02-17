@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane } from "lucide-react";
@@ -149,90 +148,6 @@ function calculateMealDose(
   };
 }
 
-function generateExerciseTypeGuide(bgUnits: string = "mmol/L"): string {
-  const lowThreshold = bgUnits === "mmol/L" ? "5.0" : "90";
-  const idealLow = bgUnits === "mmol/L" ? "7.0" : "126";
-  const idealHigh = bgUnits === "mmol/L" ? "10.0" : "180";
-  const highStart = bgUnits === "mmol/L" ? "8.0" : "144";
-
-  return `**Exercise Type Guide for Diabetics**
-
-Different types of exercise affect blood sugar in different ways. Understanding this can help you exercise with confidence.
-
----
-
-**CARDIO (Running, Cycling, Swimming)**
-*Blood sugar effect:* Usually LOWERS blood sugar
-*Why:* Muscles use glucose for sustained energy
-*Timing:* Effect starts quickly, can last hours after
-
-*Tips:*
-- Start with BG ${idealLow}-${idealHigh} ${bgUnits}
-- May need 15-30g carbs before longer sessions
-- Reduce bolus 30-50% for meal before exercise
-- Watch for delayed lows up to 24 hours later
-
----
-
-**STRENGTH TRAINING (Weights, Resistance)**
-*Blood sugar effect:* Can RAISE then LOWER blood sugar
-*Why:* Intense effort triggers adrenaline (raises BG), then muscles refuel (lowers BG)
-*Timing:* May spike during, then drop 2-6 hours after
-
-*Tips:*
-- Starting BG can be slightly higher (${highStart}+ ${bgUnits} is OK)
-- Don't correct small rises during workout
-- Monitor for delayed lows in the evening/overnight
-- Consider reduced basal if doing heavy sessions
-
----
-
-**HIIT (High Intensity Interval Training)**
-*Blood sugar effect:* Often RAISES during, LOWERS after
-*Why:* Intense bursts release stress hormones, then glucose uptake increases during recovery
-*Timing:* Spikes during, drops 1-4 hours post-exercise
-
-*Tips:*
-- Don't start if BG below ${lowThreshold} ${bgUnits}
-- Expect a temporary rise - don't over-correct
-- Have snacks ready for the post-workout drop
-- Shorter sessions may be easier to manage
-
----
-
-**YOGA / STRETCHING / WALKING**
-*Blood sugar effect:* Gentle LOWERING or stable
-*Why:* Low intensity, steady glucose use
-*Timing:* Gradual effect, minimal delayed impact
-
-*Tips:*
-- Great option when BG is already on the lower side
-- Usually no carb pre-load needed
-- Good for active recovery days
-- Walking after meals can help reduce spikes
-
----
-
-**TEAM SPORTS (Football, Basketball, Tennis)**
-*Blood sugar effect:* UNPREDICTABLE - can go either way
-*Why:* Mix of sprinting (raises) and sustained activity (lowers), plus competition adrenaline
-*Timing:* Variable during, often drops after
-
-*Tips:*
-- Check BG every 30 minutes during games
-- Carry fast-acting glucose on the sideline
-- Consider slightly higher starting BG (${highStart}+ ${bgUnits})
-- Log your patterns for each sport
-
----
-
-**General Gym Tips:**
-1. Always carry fast-acting glucose
-2. Tell a gym buddy about your diabetes
-3. Keep a log of how each activity affects you
-4. Stay hydrated - dehydration affects BG readings
-5. Have your phone accessible for emergencies`;
-}
 
 
 interface ExercisePlanResult {
@@ -429,7 +344,6 @@ export default function Advisor() {
   const [exerciseType, setExerciseType] = useState("cardio");
   const [exerciseDuration, setExerciseDuration] = useState("");
   const [exerciseIntensity, setExerciseIntensity] = useState("moderate");
-  const [showExerciseGuide, setShowExerciseGuide] = useState(false);
   
   const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
@@ -1440,31 +1354,6 @@ export default function Advisor() {
             </Card>
           )}
 
-          <Card className="border-0 bg-transparent shadow-none">
-            <Collapsible open={showExerciseGuide} onOpenChange={setShowExerciseGuide}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between p-3 h-auto" data-testid="button-exercise-guide">
-                  <div className="flex items-center gap-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-sm">Exercise Type Guide</span>
-                  </div>
-                  {showExerciseGuide ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="px-3 pb-3">
-                <ScrollArea className="h-72">
-                  <div className="max-w-none">
-                    <pre className="whitespace-pre-wrap font-sans text-sm bg-transparent p-0 text-foreground">
-                      {generateExerciseTypeGuide(bgUnits)}
-                    </pre>
-                  </div>
-                </ScrollArea>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Not medical advice. Everyone responds differently to exercise.
-                </p>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
 
           <Card className="border-dashed border-2 bg-muted/20">
             <CardContent className="p-6 text-center space-y-2">
