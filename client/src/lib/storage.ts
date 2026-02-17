@@ -636,6 +636,9 @@ export const storage = {
         supplies[existingIndex].notes = supply.notes;
       }
       localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+      if (supply.dailyUsage > 0) {
+        this.syncSupplyUsageToSettings(supply.type, supply.dailyUsage);
+      }
       return { supply: supplies[existingIndex], merged: true };
     }
     
@@ -647,6 +650,9 @@ export const storage = {
     };
     supplies.push(newSupply);
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    if (supply.dailyUsage > 0) {
+      this.syncSupplyUsageToSettings(supply.type, supply.dailyUsage);
+    }
     return { supply: newSupply, merged: false };
   },
 
@@ -657,8 +663,6 @@ export const storage = {
     
     const current = supplies[index];
     
-    // If currentQuantity is changing but quantityAtPickup is not explicitly set,
-    // adjust quantityAtPickup by the same delta to keep automatic deduction accurate
     if (updates.currentQuantity !== undefined && 
         updates.quantityAtPickup === undefined && 
         current.quantityAtPickup !== undefined) {
@@ -668,6 +672,10 @@ export const storage = {
     
     supplies[index] = { ...current, ...updates };
     localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    if (updates.dailyUsage !== undefined && updates.dailyUsage > 0) {
+      const supplyType = updates.type || current.type;
+      this.syncSupplyUsageToSettings(supplyType, updates.dailyUsage);
+    }
     return supplies[index];
   },
 
@@ -1031,6 +1039,65 @@ export const storage = {
     }
 
     return supply.dailyUsage || 0;
+  },
+
+  syncSupplyUsageToSettings(supplyType: Supply["type"], newDailyUsage: number): void {
+    const settings = this.getSettings();
+    const profile = this.getProfile();
+    const isPump = profile?.insulinDeliveryMethod === "pump";
+    let changed = false;
+
+    if (supplyType === "needle" && !isPump) {
+      if (newDailyUsage > 0 && settings.injectionsPerDay !== newDailyUsage) {
+        settings.injectionsPerDay = newDailyUsage;
+        changed = true;
+      }
+    } else if (supplyType === "insulin_short") {
+      if (newDailyUsage > 0 && settings.shortActingUnitsPerDay !== newDailyUsage) {
+        settings.shortActingUnitsPerDay = newDailyUsage;
+        changed = true;
+      }
+    } else if (supplyType === "insulin_long" && !isPump) {
+      if (newDailyUsage > 0 && settings.longActingUnitsPerDay !== newDailyUsage) {
+        settings.longActingUnitsPerDay = newDailyUsage;
+        changed = true;
+      }
+    } else if (supplyType === "insulin_vial" || supplyType === "insulin") {
+      if (newDailyUsage > 0 && settings.tdd !== newDailyUsage) {
+        settings.tdd = newDailyUsage;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.saveSettings(settings);
+    }
+  },
+
+  syncSettingsToSupplyUsage(settingKey: string, newValue: number): void {
+    const supplies = this.getSupplies();
+    let changed = false;
+
+    const typeMap: Record<string, Supply["type"][]> = {
+      injectionsPerDay: ["needle"],
+      shortActingUnitsPerDay: ["insulin_short"],
+      longActingUnitsPerDay: ["insulin_long"],
+      tdd: ["insulin", "insulin_vial"],
+    };
+
+    const targetTypes = typeMap[settingKey];
+    if (!targetTypes || newValue <= 0) return;
+
+    for (const supply of supplies) {
+      if (targetTypes.includes(supply.type) && supply.dailyUsage !== newValue) {
+        supply.dailyUsage = newValue;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    }
   },
 
   /**

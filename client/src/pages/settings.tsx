@@ -913,6 +913,9 @@ export default function Settings() {
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
+    if (newSettings.tdd && newSettings.tdd > 0) {
+      storage.syncSettingsToSupplyUsage("tdd", newSettings.tdd);
+    }
     if (profile) {
       const updatedProfile = { ...profile, ratioFormat };
       storage.saveProfile(updatedProfile);
@@ -940,6 +943,13 @@ export default function Settings() {
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
+    const syncKeys = ["injectionsPerDay", "shortActingUnitsPerDay", "longActingUnitsPerDay"] as const;
+    for (const key of syncKeys) {
+      const val = newSettings[key];
+      if (val && val > 0) {
+        storage.syncSettingsToSupplyUsage(key, val);
+      }
+    }
     toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
   };
 
