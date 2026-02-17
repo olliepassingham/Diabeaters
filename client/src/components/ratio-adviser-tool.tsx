@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "wouter";
 import {
   Sun,
   Sunset,
@@ -132,11 +131,12 @@ interface RatioAdviserProps {
   settings: UserSettings;
   bgUnit: string;
   onSettingsUpdate?: (settings: UserSettings) => void;
+  onNavigateToMeal?: () => void;
 }
 
 type AdviserMode = "detect" | "refine" | "scratch_intro" | "scratch_tdd" | "scratch_result" | "scratch_saved";
 
-export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAdviserProps) {
+export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigateToMeal }: RatioAdviserProps) {
   const hasAnyRatio = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
 
   const [mode, setMode] = useState<AdviserMode>(hasAnyRatio ? "refine" : "detect");
@@ -503,12 +503,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAd
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Link href="/adviser?tab=meal">
-              <Button data-testid="button-try-meal-planner">
-                <ArrowRight className="h-4 w-4 mr-1" />
-                Try the Meal Planner
-              </Button>
-            </Link>
+            <Button data-testid="button-try-meal-planner" onClick={() => onNavigateToMeal?.()}>
+              <ArrowRight className="h-4 w-4 mr-1" />
+              Try the Meal Planner
+            </Button>
             <Button variant="outline" size="sm" onClick={() => { setMode("refine"); handleReset(); }} data-testid="button-check-ratios">
               <Search className="h-4 w-4 mr-1" />
               Check a ratio

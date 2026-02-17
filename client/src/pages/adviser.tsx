@@ -1551,7 +1551,7 @@ export default function Adviser() {
               </Button>
             </Link>
           )}
-          <RatioAdviserTool settings={settings} bgUnit={bgUnits} onSettingsUpdate={(s) => setSettings(s)} />
+          <RatioAdviserTool settings={settings} bgUnit={bgUnits} onSettingsUpdate={(s) => setSettings(s)} onNavigateToMeal={() => setActiveTab("meal")} />
         </TabsContent>
       </Tabs>
     </div>
