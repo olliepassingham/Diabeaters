@@ -1697,7 +1697,7 @@ export default function Advisor() {
               </Button>
             </Link>
           )}
-          <RatioAdviserTool settings={settings} bgUnit={bgUnits} />
+          <RatioAdviserTool settings={settings} bgUnit={bgUnits} onSettingsUpdate={(s) => setSettings(s)} />
         </TabsContent>
       </Tabs>
     </div>

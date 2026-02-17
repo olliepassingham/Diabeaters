@@ -238,7 +238,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           {renderStep()}
         </div>
 
-        {(showBackButton || showNextButton) && currentStep !== "first_win" && (
+        {(showBackButton || showNextButton) && (currentStep as string) !== "first_win" && (
           <div className="flex justify-between gap-4">
             {showBackButton ? (
               <Button variant="outline" onClick={handleBack} data-testid="button-onboarding-back">
@@ -852,19 +852,36 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
       };
     }
     if (struggle === "meals") {
+      const hasRatios = !!(data.breakfastRatio || data.lunchRatio || data.dinnerRatio);
+      if (hasRatios) {
+        return {
+          icon: Utensils,
+          iconColor: "text-amber-600 dark:text-amber-400",
+          iconBg: "bg-amber-500/10",
+          title: "Your Meal Planner is ready",
+          subtitle: "Let's take the stress out of mealtimes",
+          features: [
+            { icon: Sparkles, text: "Get dose suggestions based on your carbs and ratios", highlight: true },
+            { icon: Clock, text: "Automatic time-of-day ratio selection" },
+            { icon: TrendingDown, text: "Exercise adjustments built right in" },
+          ],
+          ctaText: "Try a Meal Calculation",
+          ctaPath: "/advisor?tab=meal",
+        };
+      }
       return {
         icon: Utensils,
         iconColor: "text-amber-600 dark:text-amber-400",
         iconBg: "bg-amber-500/10",
-        title: "Your Meal Planner is ready",
-        subtitle: "Let's take the stress out of mealtimes",
+        title: "Let's work out your ratios first",
+        subtitle: "The Meal Planner needs your carb ratios to calculate doses — let's find yours",
         features: [
-          { icon: Sparkles, text: "Get dose suggestions based on your carbs and ratios", highlight: true },
-          { icon: Clock, text: "Automatic time-of-day ratio selection" },
-          { icon: TrendingDown, text: "Exercise adjustments built right in" },
+          { icon: Sparkles, text: "Guided questionnaire to estimate your starting ratios", highlight: true },
+          { icon: Clock, text: "Works even if you don't know your ratios yet" },
+          { icon: TrendingDown, text: "Then you'll be ready to use the Meal Planner" },
         ],
-        ctaText: "Try a Meal Calculation",
-        ctaPath: "/advisor?tab=meal",
+        ctaText: "Go to Ratio Adviser",
+        ctaPath: "/advisor?tab=ratio-adviser",
       };
     }
     if (struggle === "exercise") {

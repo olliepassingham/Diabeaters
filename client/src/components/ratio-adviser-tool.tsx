@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Link } from "wouter";
 import {
   Sun,
   Sunset,
@@ -13,8 +16,13 @@ import {
   RotateCcw,
   TrendingDown,
   TrendingUp,
+  Sparkles,
+  Calculator,
+  ArrowRight,
+  Save,
 } from "lucide-react";
-import { UserSettings } from "@/lib/storage";
+import { storage, UserSettings } from "@/lib/storage";
+import { formatRatioForStorage } from "@/lib/ratio-utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -108,11 +116,11 @@ function getAdviserResult(
   }
 
   return {
-    summary: `${mealLabel} pattern is variable`,
+    summary: `${meal.charAt(0).toUpperCase() + meal.slice(1)} pattern is variable`,
     direction: "monitor",
-    detail: `Your post-${mealLabel.toLowerCase()} readings are sometimes high${ratioText}. Variable patterns can be harder to pin down \u2014 it might be the ratio, but it could also be affected by the type of food, portion estimation, activity, or stress.`,
+    detail: `Your post-${meal.toLowerCase()} readings are sometimes high${ratioText}. Variable patterns can be harder to pin down \u2014 it might be the ratio, but it could also be affected by the type of food, portion estimation, activity, or stress.`,
     talkingPoints: [
-      `Post-${mealLabel.toLowerCase()} readings are inconsistent`,
+      `Post-${meal.toLowerCase()} readings are inconsistent`,
       "Try eating a similar, measured meal for a few days to isolate the ratio",
       "Variable patterns might point to food type (high fat/protein) rather than ratio",
       "Keep a brief food + BG diary for 5-7 days to spot trends",
@@ -120,13 +128,39 @@ function getAdviserResult(
   };
 }
 
-export function RatioAdviserTool({ settings, bgUnit }: { settings: UserSettings; bgUnit: string }) {
+interface RatioAdviserProps {
+  settings: UserSettings;
+  bgUnit: string;
+  onSettingsUpdate?: (settings: UserSettings) => void;
+}
+
+type AdviserMode = "detect" | "refine" | "scratch_intro" | "scratch_tdd" | "scratch_result" | "scratch_saved";
+
+export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAdviserProps) {
+  const hasAnyRatio = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
+
+  const [mode, setMode] = useState<AdviserMode>(hasAnyRatio ? "refine" : "detect");
   const [step, setStep] = useState(0);
   const [selectedMeal, setSelectedMeal] = useState<MealKey | null>(null);
   const [pattern, setPattern] = useState<PatternAnswer | null>(null);
   const [timing, setTiming] = useState<TimingAnswer | null>(null);
   const [frequency, setFrequency] = useState<FrequencyAnswer | null>(null);
   const [result, setResult] = useState<AdviserResult | null>(null);
+
+  const [tddInput, setTddInput] = useState(settings.tdd ? settings.tdd.toString() : "");
+  const [estimatedRatios, setEstimatedRatios] = useState<{ breakfast: number; lunch: number; dinner: number; snack: number } | null>(null);
+
+  useEffect(() => {
+    const ratiosExist = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
+    if (ratiosExist && (mode === "detect")) {
+      setMode("refine");
+    } else if (!ratiosExist && mode === "refine") {
+      setMode("detect");
+    }
+    if (settings.tdd && !tddInput) {
+      setTddInput(settings.tdd.toString());
+    }
+  }, [settings]);
 
   const mealOptions: { key: MealKey; label: string; icon: typeof Sun; ratio?: string }[] = [
     { key: "breakfast", label: "Breakfast", icon: Sun, ratio: settings.breakfastRatio },
@@ -172,7 +206,318 @@ export function RatioAdviserTool({ settings, bgUnit }: { settings: UserSettings;
     setStep(4);
   };
 
+  const handleCalculateFromTDD = () => {
+    const tdd = parseFloat(tddInput);
+    if (!tdd || tdd <= 0) return;
+
+    const baseRatio = Math.round((500 / tdd) * 10) / 10;
+    const breakfastRatio = Math.round((baseRatio * 0.85) * 10) / 10;
+    const lunchRatio = baseRatio;
+    const dinnerRatio = Math.round((baseRatio * 0.95) * 10) / 10;
+    const snackRatio = baseRatio;
+
+    setEstimatedRatios({ breakfast: breakfastRatio, lunch: lunchRatio, dinner: dinnerRatio, snack: snackRatio });
+    setMode("scratch_result");
+  };
+
+  const handleUseDefaults = () => {
+    setEstimatedRatios({ breakfast: 8, lunch: 10, dinner: 9, snack: 10 });
+    setMode("scratch_result");
+  };
+
+  const handleSaveEstimatedRatios = () => {
+    if (!estimatedRatios) return;
+
+    const updatedSettings: UserSettings = {
+      ...settings,
+      breakfastRatio: formatRatioForStorage(estimatedRatios.breakfast),
+      lunchRatio: formatRatioForStorage(estimatedRatios.lunch),
+      dinnerRatio: formatRatioForStorage(estimatedRatios.dinner),
+      snackRatio: formatRatioForStorage(estimatedRatios.snack),
+    };
+
+    if (tddInput && parseFloat(tddInput) > 0) {
+      updatedSettings.tdd = parseFloat(tddInput);
+    }
+
+    storage.saveSettings(updatedSettings);
+    if (onSettingsUpdate) {
+      onSettingsUpdate(updatedSettings);
+    }
+    setMode("scratch_saved");
+  };
+
   const stepLabels = ["Select meal", "Post-meal pattern", "When does it happen?", "How often?", "Assessment"];
+
+  if (mode === "detect") {
+    return (
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Ratio Adviser</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            It looks like you haven't set up your carb ratios yet. Would you like help working them out?
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+            <p className="text-sm text-muted-foreground flex items-start gap-1">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span><strong>Not medical advice.</strong> This tool provides estimated starting points only. Always confirm any ratio changes with your diabetes team before using them.</span>
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">What describes you best?</p>
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 justify-start text-left"
+              onClick={() => setMode("scratch_intro")}
+              data-testid="button-adviser-no-ratios"
+            >
+              <div>
+                <p className="font-medium text-sm">I don't know my ratios yet</p>
+                <p className="text-xs text-muted-foreground">Help me estimate starting ratios</p>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 justify-start text-left"
+              onClick={() => setMode("refine")}
+              data-testid="button-adviser-have-ratios"
+            >
+              <div>
+                <p className="font-medium text-sm">I have ratios but haven't entered them</p>
+                <p className="text-xs text-muted-foreground">I'll enter them in Settings, then come back to check if they need adjusting</p>
+              </div>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (mode === "scratch_intro") {
+    return (
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Estimate Your Starting Ratios</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-sm text-muted-foreground">
+              A <strong>carb ratio</strong> tells you how many grams of carbohydrate are covered by 1 unit of fast-acting insulin. For example, a ratio of 1:10 means 1 unit of insulin covers 10g of carbs.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm font-medium">How would you like to estimate your ratios?</p>
+
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 justify-start text-left"
+              onClick={() => setMode("scratch_tdd")}
+              data-testid="button-estimate-from-tdd"
+            >
+              <div className="flex items-start gap-3">
+                <Calculator className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">I know my Total Daily Dose (TDD)</p>
+                  <p className="text-xs text-muted-foreground">We'll use the 500 rule to estimate your ratios based on how much insulin you take each day</p>
+                </div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 justify-start text-left"
+              onClick={handleUseDefaults}
+              data-testid="button-use-defaults"
+            >
+              <div className="flex items-start gap-3">
+                <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-sm">I don't know my TDD</p>
+                  <p className="text-xs text-muted-foreground">We'll use common starting points that you can adjust over time with your diabetes team</p>
+                </div>
+              </div>
+            </Button>
+          </div>
+
+          <Button variant="ghost" size="sm" onClick={() => setMode("detect")} data-testid="button-back-detect">
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (mode === "scratch_tdd") {
+    return (
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Calculate from Your TDD</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-sm text-muted-foreground">
+              Your <strong>Total Daily Dose (TDD)</strong> is the total amount of insulin you take in a typical day, including both fast-acting (bolus) and long-acting (basal) insulin combined.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tdd-input">Total Daily Dose (units)</Label>
+            <Input
+              id="tdd-input"
+              type="number"
+              placeholder="e.g. 40"
+              value={tddInput}
+              onChange={(e) => setTddInput(e.target.value)}
+              data-testid="input-tdd-estimate"
+            />
+            {tddInput && parseFloat(tddInput) > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Using the 500 rule: 500 / {tddInput} = approximately 1:{Math.round((500 / parseFloat(tddInput)) * 10) / 10}g base ratio
+              </p>
+            )}
+          </div>
+
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground flex items-start gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>The 500 rule is a common starting-point formula. Breakfast ratios are often slightly stronger (more insulin per gram of carb) due to the dawn phenomenon. These are estimates only.</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              onClick={handleCalculateFromTDD}
+              disabled={!tddInput || parseFloat(tddInput) <= 0}
+              data-testid="button-calculate-ratios"
+            >
+              <Calculator className="h-4 w-4 mr-1" />
+              Calculate My Ratios
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-intro">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (mode === "scratch_result" && estimatedRatios) {
+    return (
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Your Estimated Starting Ratios</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-sm text-muted-foreground flex items-start gap-1">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span><strong>These are estimated starting points only.</strong> Please discuss these with your diabetes team before relying on them. Your actual ratios may differ.</span>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { key: "breakfast" as const, label: "Breakfast", icon: Sun, note: "Often stronger due to dawn phenomenon" },
+              { key: "lunch" as const, label: "Lunch", icon: Sunset, note: "Base ratio" },
+              { key: "dinner" as const, label: "Dinner", icon: Moon, note: "Slightly stronger for most people" },
+              { key: "snack" as const, label: "Snack", icon: Cookie, note: "Same as base ratio" },
+            ]).map(({ key, label, icon: Icon, note }) => (
+              <div key={key} className="border rounded-lg p-3 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{label}</span>
+                </div>
+                <p className="text-lg font-semibold text-primary">1:{estimatedRatios[key]}g</p>
+                <p className="text-xs text-muted-foreground">{note}</p>
+              </div>
+            ))}
+          </div>
+
+          {tddInput && parseFloat(tddInput) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Based on TDD of {tddInput} units using the 500 rule, with adjustments for meal timing.
+            </p>
+          )}
+          {(!tddInput || parseFloat(tddInput) <= 0) && (
+            <p className="text-xs text-muted-foreground">
+              Based on common starting points for Type 1 diabetes. These are conservative estimates.
+            </p>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button onClick={handleSaveEstimatedRatios} data-testid="button-save-estimated-ratios">
+              <Save className="h-4 w-4 mr-1" />
+              Save These Ratios
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-method">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Try a different method
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (mode === "scratch_saved") {
+    return (
+      <Card data-testid="card-ratio-adviser">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <CardTitle className="text-base">Ratios Saved</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-2">
+            <p className="text-sm font-medium">Your estimated starting ratios have been saved.</p>
+            <p className="text-sm text-muted-foreground">
+              You can now use the Meal Planner to get dose suggestions. As you learn how your body responds, come back here to check whether your ratios need adjusting.
+            </p>
+          </div>
+
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground flex items-start gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>Remember: these are starting estimates. Always discuss ratio changes with your diabetes team. You can edit your ratios any time in the Ratios page or Settings.</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/advisor?tab=meal">
+              <Button data-testid="button-try-meal-planner">
+                <ArrowRight className="h-4 w-4 mr-1" />
+                Try the Meal Planner
+              </Button>
+            </Link>
+            <Button variant="outline" size="sm" onClick={() => { setMode("refine"); handleReset(); }} data-testid="button-check-ratios">
+              <Search className="h-4 w-4 mr-1" />
+              Check a ratio
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card data-testid="card-ratio-adviser">
