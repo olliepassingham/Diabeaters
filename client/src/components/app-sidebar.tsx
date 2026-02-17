@@ -27,8 +27,8 @@ const items = [
     icon: Package,
   },
   {
-    title: "Activity Advisor",
-    url: "/advisor",
+    title: "Activity Adviser",
+    url: "/adviser",
     icon: Bot,
   },
   {

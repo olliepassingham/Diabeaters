@@ -312,7 +312,7 @@ function getInitialTab(): string {
   return "meal";
 }
 
-export default function Advisor() {
+export default function Adviser() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -564,11 +564,11 @@ export default function Advisor() {
       <FaceLogoWatermark />
       <div className="mb-4 flex items-center gap-2">
         <div>
-          <h1 className="text-3xl font-semibold">Activity Advisor</h1>
+          <h1 className="text-3xl font-semibold">Activity Adviser</h1>
           <p className="text-muted-foreground mt-1">Get calculated recommendations for meals and exercise based on your settings.</p>
         </div>
         <PageInfoDialog
-          title="About Activity Advisor"
+          title="About Activity Adviser"
           description="Get calculated recommendations for meals and exercise"
         >
           <InfoSection title="Meal Tab">
@@ -1017,7 +1017,7 @@ export default function Advisor() {
           <Card className="border-dashed border-2 bg-muted/20">
             <CardContent className="p-6 text-center space-y-2">
               <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-              <p className="font-medium text-muted-foreground">Ask the AI Advisor</p>
+              <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
               <p className="text-sm text-muted-foreground/70">Conversational meal planning with personalised AI recommendations is coming in a future update.</p>
             </CardContent>
           </Card>
@@ -1358,7 +1358,7 @@ export default function Advisor() {
           <Card className="border-dashed border-2 bg-muted/20">
             <CardContent className="p-6 text-center space-y-2">
               <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-              <p className="font-medium text-muted-foreground">Ask the AI Advisor</p>
+              <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
               <p className="text-sm text-muted-foreground/70">Conversational exercise planning with personalised AI recommendations is coming in a future update.</p>
             </CardContent>
           </Card>

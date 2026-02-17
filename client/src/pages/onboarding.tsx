@@ -866,7 +866,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
             { icon: TrendingDown, text: "Exercise adjustments built right in" },
           ],
           ctaText: "Try a Meal Calculation",
-          ctaPath: "/advisor?tab=meal",
+          ctaPath: "/adviser?tab=meal",
         };
       }
       return {
@@ -881,7 +881,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
           { icon: TrendingDown, text: "Then you'll be ready to use the Meal Planner" },
         ],
         ctaText: "Go to Ratio Adviser",
-        ctaPath: "/advisor?tab=ratio-adviser",
+        ctaPath: "/adviser?tab=ratio-adviser",
       };
     }
     if (struggle === "exercise") {
@@ -897,7 +897,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
           { icon: TrendingDown, text: "Recovery recommendations to avoid late lows" },
         ],
         ctaText: "Plan an Activity",
-        ctaPath: "/advisor?tab=exercise",
+        ctaPath: "/adviser?tab=exercise",
       };
     }
     return {

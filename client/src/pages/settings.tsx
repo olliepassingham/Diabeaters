@@ -1029,7 +1029,7 @@ export default function Settings() {
             <p>Set your name and choose your preferred units for blood glucose (mmol/L or mg/dL) and carbohydrates.</p>
           </InfoSection>
           <InfoSection title="Insulin & Ratios">
-            <p>Enter your insulin-to-carb ratios, correction factor, and target range. These are used by the Activity Advisor for bolus suggestions.</p>
+            <p>Enter your insulin-to-carb ratios, correction factor, and target range. These are used by the Activity Adviser for bolus suggestions.</p>
           </InfoSection>
           <InfoSection title="Supply Usage">
             <p>Set your typical daily insulin usage and CGM wear time. This helps calculate accurate depletion forecasts in Supply Tracker.</p>

@@ -142,7 +142,7 @@ export function ProfileMenu() {
                 <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Current</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                You have access to all core features including supply tracking, activity advisor, and community.
+                You have access to all core features including supply tracking, activity adviser, and community.
               </p>
             </div>
             <div className="p-4 rounded-lg border">
@@ -217,7 +217,7 @@ export function ProfileMenu() {
               
               <div className="p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium">Activity Advisor</span>
+                  <span className="font-medium">Activity Adviser</span>
                   <span className="text-xs text-muted-foreground">New</span>
                 </div>
                 <p className="text-sm text-muted-foreground">

@@ -35,7 +35,7 @@ export function RoutinesWidget({ compact = false }: { compact?: boolean }) {
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-routines">
       <CardHeader className="pb-2">
-        <Link href="/advisor?tab=routines">
+        <Link href="/adviser?tab=routines">
           <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
             <Repeat className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             <CardTitle className="text-base">Routines</CardTitle>
@@ -49,7 +49,7 @@ export function RoutinesWidget({ compact = false }: { compact?: boolean }) {
         {hasRoutines ? (
           <div className="space-y-2">
             {displayRoutines.slice(0, compact ? 2 : 3).map((routine) => (
-              <Link key={routine.id} href="/advisor?tab=routines">
+              <Link key={routine.id} href="/adviser?tab=routines">
                 <div className="p-2.5 rounded-lg bg-muted/30 hover-elevate cursor-pointer" data-testid={`routine-item-${routine.id}`}>
                   <div className="flex items-center gap-2">
                     <div className="text-emerald-600 dark:text-emerald-400">
@@ -97,7 +97,7 @@ export function RoutinesWidget({ compact = false }: { compact?: boolean }) {
           </div>
         )}
 
-        <Link href="/advisor?tab=routines">
+        <Link href="/adviser?tab=routines">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-view-routines">
             {hasRoutines ? "View All Routines" : "Create a Routine"}
             <ArrowRight className="h-4 w-4 ml-1" />

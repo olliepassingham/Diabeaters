@@ -503,7 +503,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAd
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Link href="/advisor?tab=meal">
+            <Link href="/adviser?tab=meal">
               <Button data-testid="button-try-meal-planner">
                 <ArrowRight className="h-4 w-4 mr-1" />
                 Try the Meal Planner

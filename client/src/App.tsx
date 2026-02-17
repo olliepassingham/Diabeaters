@@ -35,7 +35,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import Dashboard from "@/pages/dashboard";
 import Supplies from "@/pages/supplies";
 import Scenarios from "@/pages/scenarios";
-import Advisor from "@/pages/advisor";
+import Adviser from "@/pages/adviser";
 import AICoach from "@/pages/ai-coach";
 import Settings from "@/pages/settings";
 import HelpNow from "@/pages/help-now";
@@ -55,7 +55,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/supplies" component={Supplies} />
       <Route path="/scenarios" component={Scenarios} />
-      <Route path="/advisor" component={Advisor} />
+      <Route path="/adviser" component={Adviser} />
       <Route path="/ai-coach" component={AICoach} />
       <Route path="/community" component={Community} />
       <Route path="/appointments" component={Appointments} />
@@ -95,8 +95,8 @@ function AppContent() {
       const struggle = localStorage.getItem("diabeater_onboarding_struggle");
       const routes: Record<string, string> = {
         supplies: "/supplies",
-        meals: "/advisor?tab=meal",
-        exercise: "/advisor?tab=exercise",
+        meals: "/adviser?tab=meal",
+        exercise: "/adviser?tab=exercise",
         overview: "/",
       };
       setLocation(struggle && routes[struggle] ? routes[struggle] : "/");

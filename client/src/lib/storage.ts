@@ -127,7 +127,7 @@ export interface CarerPrivacySettings {
   shareAppointments: boolean;
   shareScenarios: boolean;
   shareHypoAlerts: boolean;
-  shareActivityAdvisor: boolean;
+  shareActivityAdviser: boolean;
 }
 
 export interface CarerActivityLogEntry {
@@ -524,12 +524,12 @@ export interface Routine {
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
-  { id: "activity", label: "Activity", href: "/advisor", iconName: "Dumbbell", color: "text-green-600" },
+  { id: "activity", label: "Activity", href: "/adviser", iconName: "Dumbbell", color: "text-green-600" },
   { id: "bedtime", label: "Bedtime", href: "/scenarios?tab=bedtime", iconName: "Moon", color: "text-indigo-600" },
-  { id: "routines", label: "Routines", href: "/advisor?tab=routines", iconName: "Repeat", color: "text-emerald-600" },
+  { id: "routines", label: "Routines", href: "/adviser?tab=routines", iconName: "Repeat", color: "text-emerald-600" },
   { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
   { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
-  { id: "ratios", label: "Ratios", href: "/advisor", iconName: "Calculator", color: "text-teal-600" },
+  { id: "ratios", label: "Ratios", href: "/adviser", iconName: "Calculator", color: "text-teal-600" },
   { id: "community", label: "Community", href: "/community?tab=posts", iconName: "Users", color: "text-indigo-600" },
   { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
   { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
@@ -2366,7 +2366,7 @@ export const storage = {
       shareAppointments: true,
       shareScenarios: true,
       shareHypoAlerts: true,
-      shareActivityAdvisor: false,
+      shareActivityAdviser: false,
     };
   },
 

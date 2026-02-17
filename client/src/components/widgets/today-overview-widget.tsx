@@ -96,7 +96,7 @@ export function TodayOverviewWidget({ compact = false }: { compact?: boolean }) 
           </Link>
         )}
 
-        <Link href="/advisor">
+        <Link href="/adviser">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-view-today">
             {compact ? "Plan" : "Plan Today"}
             <ArrowRight className="h-4 w-4 ml-1" />

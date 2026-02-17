@@ -81,7 +81,7 @@ function generateInsights(supplies: Supply[], scenarioState: ScenarioState): AII
       title: "All Clear",
       message: "Your supplies are well-stocked and no active scenarios. Keep it up!",
       priority: "info",
-      actionLink: "/advisor",
+      actionLink: "/adviser",
       actionLabel: "Plan an Activity",
     });
   }

@@ -14,7 +14,7 @@ import { Calendar, Users, Heart, ShoppingBag, Settings, Phone, MessageCircle } f
 const primaryTabs = [
   { title: "Home", url: "/", icon: Home },
   { title: "Supplies", url: "/supplies", icon: Package },
-  { title: "Advisor", url: "/advisor", icon: Bot },
+  { title: "Adviser", url: "/adviser", icon: Bot },
   { title: "Scenarios", url: "/scenarios", icon: AlertTriangle },
 ];
 

@@ -22,7 +22,7 @@ export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }
   return (
     <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-activity-adviser">
       <CardHeader className="pb-2">
-        <Link href="/advisor">
+        <Link href="/adviser">
           <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
             <Activity className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">Activity Adviser</CardTitle>
@@ -48,7 +48,7 @@ export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }
         )}
 
         {routineCount > 0 && !compact && (
-          <Link href="/advisor?tab=routines">
+          <Link href="/adviser?tab=routines">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover-elevate cursor-pointer" data-testid="card-routines-shortcut">
               <Repeat className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               <span className="text-sm text-emerald-800 dark:text-emerald-200">
@@ -59,7 +59,7 @@ export function ActivityAdviserWidget({ compact = false }: { compact?: boolean }
           </Link>
         )}
         
-        <Link href="/advisor" className="w-full">
+        <Link href="/adviser" className="w-full">
           <Button variant="secondary" size="sm" className="w-full" data-testid="button-plan-activity">
             {compact ? "Plan" : "Plan Activity"}
             <ArrowRight className="h-4 w-4 ml-1" />

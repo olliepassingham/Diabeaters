@@ -326,7 +326,7 @@ export default function FamilyCarers() {
                 { key: "shareAppointments" as const, label: "Appointments", desc: "Carers can see upcoming clinic visits, eye checks, and other appointments" },
                 { key: "shareScenarios" as const, label: "Scenario Status", desc: "Carers are notified when you activate Sick Day or Travel mode" },
                 { key: "shareHypoAlerts" as const, label: "Hypo Alerts", desc: "Carers receive a notification when you log a hypo treatment" },
-                { key: "shareActivityAdvisor" as const, label: "Activity Recommendations", desc: "Carers can see your meal and exercise plans from the Activity Adviser" },
+                { key: "shareActivityAdviser" as const, label: "Activity Recommendations", desc: "Carers can see your meal and exercise plans from the Activity Adviser" },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between gap-4 py-2">
                   <div className="flex-1">

@@ -52,7 +52,7 @@ Medical applications demand clarity, trust, and efficiency. The design emphasize
 **Side Navigation (Desktop):**
 - Dashboard overview
 - Supply Tracker
-- AI Advisor
+- AI Adviser
 - Settings/Profile
 - Active state: subtle background treatment with left border accent
 
@@ -71,7 +71,7 @@ Medical applications demand clarity, trust, and efficiency. The design emphasize
 - Large numbers (48px) with descriptive labels below
 - Minimal decoration, focus on data
 
-### AI Advisor Interface
+### AI Adviser Interface
 
 **Chat-Style Interface:**
 - Message bubbles: User messages (right-aligned), AI responses (left-aligned)
@@ -150,7 +150,7 @@ Medical applications demand clarity, trust, and efficiency. The design emphasize
 - Floating action button (bottom-right) for adding new supply
 - Empty state: Illustration + "Add your first supply" CTA
 
-### AI Advisor Page
+### AI Adviser Page
 - Chat interface occupies full content area
 - Quick action cards at top: "Plan Meal", "Before Exercise", "Adjust Ratio"
 - Conversation history scrollable
@@ -197,7 +197,7 @@ Medical applications demand clarity, trust, and efficiency. The design emphasize
 
 **Supporting Imagery:**
 - Empty state illustrations: Friendly, minimal line art for "no supplies yet" states
-- AI advisor avatar: Simple, trustworthy icon (medical professional style)
+- AI adviser avatar: Simple, trustworthy icon (medical professional style)
 - Icon set: Medical-themed icons for supply types (syringe, insulin vial, CGM sensor) from Heroicons or custom medical icon set
 - Tutorial/onboarding: Optional step-by-step illustrations for first-time setup
 
