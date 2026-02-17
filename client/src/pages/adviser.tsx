@@ -661,6 +661,26 @@ export default function Adviser() {
               </Button>
             </Link>
           )}
+          {(!settings.breakfastRatio && !settings.lunchRatio && !settings.dinnerRatio) && (
+            <Card className="border-primary/30 bg-primary/5" data-testid="card-no-ratios-guidance">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Calculator className="h-6 w-6 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-base">Let's get your ratios set up first</h3>
+                    <p className="text-sm text-muted-foreground">
+                      The meal planner needs your insulin-to-carb ratios to suggest doses. The Ratio Adviser can help you work these out in a couple of minutes.
+                    </p>
+                  </div>
+                </div>
+                <Button className="w-full gap-2" onClick={() => setActiveTab("ratios")} data-testid="button-go-ratio-adviser">
+                  Go to Ratio Adviser
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -773,11 +793,6 @@ export default function Adviser() {
                     <span className={getRatioForMeal("snack") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("snack")}</span>
                   </div>
                 </div>
-                {(!settings.breakfastRatio && !settings.lunchRatio && !settings.dinnerRatio) && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    <Link href="/settings" className="text-primary hover:underline" data-testid="link-settings-ratios">Set your ratios in Settings</Link> for accurate calculations.
-                  </p>
-                )}
               </div>
 
               <Button onClick={handleQuickMealPlan} disabled={!mealCarbs} className="w-full" data-testid="button-get-meal-advice">
@@ -803,8 +818,12 @@ export default function Adviser() {
                 </div>
 
                 {mealResult.error === "no_ratios" ? (
-                  <div className="p-4 bg-muted rounded-lg text-center">
-                    <p className="text-sm text-muted-foreground">Add your carb ratios or TDD in <Link href="/settings" className="text-primary hover:underline">Settings</Link> to get dose suggestions.</p>
+                  <div className="p-4 bg-muted rounded-lg text-center space-y-2">
+                    <p className="text-sm text-muted-foreground">You need insulin-to-carb ratios before the meal planner can suggest doses.</p>
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setMealResult(null); setActiveTab("ratios"); }} data-testid="button-no-ratios-go-adviser">
+                      <Calculator className="h-3.5 w-3.5" />
+                      Go to Ratio Adviser
+                    </Button>
                   </div>
                 ) : mealResult.exerciseContext === "during" ? (
                   <div className="space-y-3">
