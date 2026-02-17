@@ -328,7 +328,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAd
                 <Calculator className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-sm">I know my Total Daily Dose (TDD)</p>
-                  <p className="text-xs text-muted-foreground">We'll use the 500 rule to estimate your ratios based on how much insulin you take each day</p>
+                  <p className="text-xs text-muted-foreground">Estimate using the 500 rule</p>
                 </div>
               </div>
             </Button>
@@ -343,7 +343,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate }: RatioAd
                 <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-sm">I don't know my TDD</p>
-                  <p className="text-xs text-muted-foreground">We'll use common starting points that you can adjust over time with your diabetes team</p>
+                  <p className="text-xs text-muted-foreground">Use common starting points to adjust later</p>
                 </div>
               </div>
             </Button>
