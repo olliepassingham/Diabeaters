@@ -80,6 +80,8 @@ export interface UserSettings {
   reservoirsPerBox?: number;
   insulinCartridgeUnits?: number;
   basalInjectionTime?: string;
+  primingEnabled?: boolean;
+  primingUnitsPerInjection?: number;
 }
 
 export interface Supply {
@@ -972,6 +974,17 @@ export const storage = {
    * For CGM/infusion/reservoir: handled separately via settings intervals
    * For other: uses supply.dailyUsage
    */
+  getPrimingWastePerDay(settings?: UserSettings): number {
+    const s = settings || this.getSettings();
+    const profile = this.getProfile();
+    const isPump = profile?.insulinDeliveryMethod === "pump";
+    if (isPump || !s.primingEnabled) return 0;
+    const unitsPerPrime = s.primingUnitsPerInjection || 0;
+    const injections = s.injectionsPerDay || 0;
+    if (unitsPerPrime <= 0 || injections <= 0) return 0;
+    return unitsPerPrime * injections;
+  },
+
   getEffectiveDailyUsage(supply: Supply, settings?: UserSettings): number {
     if (supply.dailyUsage === 0) {
       return 0;
@@ -986,56 +999,58 @@ export const storage = {
       return supply.dailyUsage || 0;
     }
 
+    const primingWaste = this.getPrimingWastePerDay(s);
+
     if (supply.type === "insulin_vial") {
+      let base = 0;
       if (s.tdd && s.tdd > 0) {
-        return s.tdd;
+        base = s.tdd;
+      } else {
+        const shortActing = s.shortActingUnitsPerDay || 0;
+        const longActing = s.longActingUnitsPerDay || 0;
+        if (shortActing + longActing > 0) {
+          base = shortActing + longActing;
+        } else if (supply.dailyUsage && supply.dailyUsage > 0) {
+          base = supply.dailyUsage;
+        }
       }
-      const shortActing = s.shortActingUnitsPerDay || 0;
-      const longActing = s.longActingUnitsPerDay || 0;
-      if (shortActing + longActing > 0) {
-        return shortActing + longActing;
-      }
-      if (supply.dailyUsage && supply.dailyUsage > 0) {
-        return supply.dailyUsage;
-      }
-      return 0;
+      return base > 0 ? base + primingWaste : 0;
     }
 
     if (supply.type === "insulin_short") {
+      let base = 0;
       const shortActing = s.shortActingUnitsPerDay || 0;
       if (shortActing > 0) {
-        return shortActing;
+        base = shortActing;
+      } else if (supply.dailyUsage && supply.dailyUsage > 0) {
+        base = supply.dailyUsage;
       }
-      if (supply.dailyUsage && supply.dailyUsage > 0) {
-        return supply.dailyUsage;
-      }
-      return 0;
+      return base > 0 ? base + primingWaste : 0;
     }
 
     if (supply.type === "insulin_long") {
+      let base = 0;
       const longActing = s.longActingUnitsPerDay || 0;
       if (longActing > 0) {
-        return longActing;
+        base = longActing;
+      } else if (supply.dailyUsage && supply.dailyUsage > 0) {
+        base = supply.dailyUsage;
       }
-      if (supply.dailyUsage && supply.dailyUsage > 0) {
-        return supply.dailyUsage;
-      }
-      return 0;
+      return base > 0 ? base + primingWaste : 0;
     }
 
     if (supply.type === "insulin") {
+      let base = 0;
       const shortActing = s.shortActingUnitsPerDay || 0;
       const longActing = s.longActingUnitsPerDay || 0;
       if (shortActing + longActing > 0) {
-        return shortActing + longActing;
+        base = shortActing + longActing;
+      } else if (s.tdd && s.tdd > 0) {
+        base = s.tdd;
+      } else if (supply.dailyUsage && supply.dailyUsage > 0) {
+        base = supply.dailyUsage;
       }
-      if (s.tdd && s.tdd > 0) {
-        return s.tdd;
-      }
-      if (supply.dailyUsage && supply.dailyUsage > 0) {
-        return supply.dailyUsage;
-      }
-      return 0;
+      return base > 0 ? base + primingWaste : 0;
     }
 
     return supply.dailyUsage || 0;

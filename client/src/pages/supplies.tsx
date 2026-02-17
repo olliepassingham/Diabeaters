@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -123,6 +124,99 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
         })}
 
       </CardContent>
+    </Card>
+  );
+}
+
+function PrimingSettingsCard({ onUpdate }: { onUpdate: () => void }) {
+  const profile = storage.getProfile();
+  const isPump = profile?.insulinDeliveryMethod === "pump";
+  if (isPump) return null;
+
+  const settings = storage.getSettings();
+  const [enabled, setEnabled] = useState(settings.primingEnabled || false);
+  const [unitsPerPrime, setUnitsPerPrime] = useState((settings.primingUnitsPerInjection || 2).toString());
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    const s = storage.getSettings();
+    s.primingEnabled = checked;
+    if (checked && !s.primingUnitsPerInjection) {
+      s.primingUnitsPerInjection = 2;
+      setUnitsPerPrime("2");
+    }
+    storage.saveSettings(s);
+    onUpdate();
+  };
+
+  const handleUnitsChange = (val: string) => {
+    setUnitsPerPrime(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0) {
+      const s = storage.getSettings();
+      s.primingUnitsPerInjection = num;
+      storage.saveSettings(s);
+      onUpdate();
+    }
+  };
+
+  const injectionsPerDay = settings.injectionsPerDay || 0;
+  const dailyWaste = enabled && injectionsPerDay > 0 ? (parseFloat(unitsPerPrime) || 0) * injectionsPerDay : 0;
+
+  return (
+    <Card data-testid="card-priming-settings">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Syringe className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Pen Priming (Air Shot)</CardTitle>
+          </div>
+          <Switch
+            checked={enabled}
+            onCheckedChange={handleToggle}
+            data-testid="switch-priming-enabled"
+          />
+        </div>
+        <CardDescription>
+          Before each injection, it's recommended to expel 1-2 units of insulin into the air (an "air shot") to clear any air bubbles from the needle and ensure accurate dosing. This uses insulin that doesn't go into your body — so your supplies deplete faster than your actual dose suggests.
+        </CardDescription>
+      </CardHeader>
+      {enabled && (
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="priming-units" className="text-sm">Units per prime</Label>
+            <Input
+              id="priming-units"
+              type="number"
+              min="0.5"
+              max="5"
+              step="0.5"
+              value={unitsPerPrime}
+              onChange={(e) => handleUnitsChange(e.target.value)}
+              className="w-24"
+              data-testid="input-priming-units"
+            />
+            <p className="text-xs text-muted-foreground">Most people prime 2 units per injection</p>
+          </div>
+          {injectionsPerDay > 0 ? (
+            <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
+              <p className="text-muted-foreground">
+                With {injectionsPerDay} injection{injectionsPerDay > 1 ? "s" : ""}/day at {unitsPerPrime}u per prime:
+              </p>
+              <p className="font-medium">
+                ~{dailyWaste}u wasted daily ({Math.round(dailyWaste * 7)}u/week)
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This is added to your insulin depletion forecasts automatically.
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Set your injections per day in Settings (Usual Habits) to see the daily waste calculation.
+            </p>
+          )}
+        </CardContent>
+      )}
     </Card>
   );
 }
@@ -1094,14 +1188,23 @@ function SupplyCard({
             </div>
           ) : (() => {
             const effectiveUsage = storage.getEffectiveDailyUsage(supply);
+            const primingWaste = isInsulinType(supply.type) ? storage.getPrimingWastePerDay() : 0;
+            const baseUsage = effectiveUsage - primingWaste;
             return (
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span>Daily usage</span>
-                <span>
-                  {effectiveUsage > 0 ? effectiveUsage : supply.dailyUsage}/day
-                  {isInsulinType(supply.type) && " units"}
-                  {supply.type === "needle" && " needles"}
-                </span>
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Daily usage</span>
+                  <span>
+                    {effectiveUsage > 0 ? effectiveUsage : supply.dailyUsage}/day
+                    {isInsulinType(supply.type) && " units"}
+                    {supply.type === "needle" && " needles"}
+                  </span>
+                </div>
+                {primingWaste > 0 && baseUsage > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    ({baseUsage}u dose + {primingWaste}u priming waste)
+                  </p>
+                )}
               </div>
             );
           })()}
@@ -2231,6 +2334,7 @@ export default function Supplies() {
           onSave={handleSavePrescriptionCycle} 
           supplies={supplies}
         />
+        <PrimingSettingsCard onUpdate={refreshSupplies} />
         <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
         <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
         <CombinedScenarioImpactPanel supplies={supplies} scenarioState={scenarioState} />
