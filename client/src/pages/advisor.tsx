@@ -386,67 +386,6 @@ function calculateExercisePlan(message: string, settings: UserSettings, bgUnits:
 }
 
 
-function RatioCalculationGuide({ settings, bgUnits, ratioFormat }: { settings: UserSettings; bgUnits: string; ratioFormat: RatioFormat }) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const correctionRule = bgUnits === "mmol/L" ? 100 : 1800;
-  const ruleName = bgUnits === "mmol/L" ? "100 Rule" : "1800 Rule";
-  const exampleResult = bgUnits === "mmol/L" ? "2.5" : "45";
-  
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between p-3 h-auto" data-testid="button-ratio-guide">
-          <div className="flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-primary" />
-            <span className="font-medium text-sm">How to Calculate Insulin Ratios</span>
-          </div>
-          {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-3">
-        <div className="space-y-4 text-sm text-muted-foreground">
-          <div>
-            <p className="font-medium text-foreground">Starting Point: The 500 Rule</p>
-            <p>500 ÷ TDD = grams of carbs covered by 1 unit</p>
-            {settings.tdd && (
-              <p className="text-primary">Your starting estimate: 500 ÷ {settings.tdd} = {formatRatioForDisplay(Math.round(500 / settings.tdd), ratioFormat)}</p>
-            )}
-          </div>
-          
-          <div>
-            <p className="font-medium text-foreground">Fine-Tuning by Trial</p>
-            <p>The 500 rule gives you a starting point, but everyone is different. Here's how to adjust:</p>
-            <ol className="list-decimal list-inside space-y-1 mt-2 text-xs">
-              <li>Start with your calculated ratio (e.g., {formatRatioForDisplay(10, ratioFormat)})</li>
-              <li>Eat a measured meal with known carbs when blood sugar is stable</li>
-              <li>Check blood sugar 2-3 hours after eating</li>
-              <li>If still high: try a stronger ratio (e.g., {formatRatioForDisplay(8, ratioFormat)})</li>
-              <li>If going low: try a weaker ratio (e.g., {formatRatioForDisplay(12, ratioFormat)})</li>
-              <li>Repeat until you find what works for each meal</li>
-            </ol>
-          </div>
-
-          <div>
-            <p className="font-medium text-foreground">Correction Factor: {ruleName}</p>
-            <p>{correctionRule} ÷ TDD = {bgUnits} drop per 1 unit</p>
-            {settings.tdd && (
-              <p className="text-primary">Your estimate: {correctionRule} ÷ {settings.tdd} = {Math.round(correctionRule / settings.tdd * 10) / 10} {bgUnits}</p>
-            )}
-          </div>
-
-          <div className="text-xs bg-muted p-2 rounded">
-            <p><strong>Why ratios differ by meal:</strong></p>
-            <p>Many people need stronger ratios at breakfast (e.g., {formatRatioForDisplay(8, ratioFormat)}) due to morning hormone changes, and weaker ratios at lunch/dinner (e.g., {formatRatioForDisplay(12, ratioFormat)}). Trial each meal separately.</p>
-          </div>
-          
-          <p className="text-xs text-muted-foreground italic">Note: Always work with your healthcare team when adjusting ratios. Keep a log of your trials to spot patterns.</p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
 
 function getInitialTab(): string {
   const params = new URLSearchParams(window.location.search);
@@ -1030,9 +969,16 @@ export default function Advisor() {
             </div>
           )}
 
-          <Card className="border-0 bg-transparent shadow-none">
-            <RatioCalculationGuide settings={settings} bgUnits={bgUnits} ratioFormat={profile.ratioFormat || "per10g"} />
-          </Card>
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            data-testid="button-open-ratio-adviser"
+            onClick={() => setActiveTab("ratios")}
+          >
+            <Calculator className="h-4 w-4 text-primary" />
+            <span>Ratio Adviser</span>
+            <span className="ml-auto text-xs text-muted-foreground">Review or estimate your ratios</span>
+          </Button>
 
           <Card>
             <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
