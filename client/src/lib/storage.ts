@@ -573,7 +573,7 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 2, size: "half" },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 3, size: "full" },
   { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
-  { id: "scenario-status", type: "scenario-status", enabled: true, order: 5, size: "half" },
+  { id: "routines", type: "routines", enabled: true, order: 5, size: "half" },
   { id: "community", type: "community", enabled: true, order: 6, size: "full" },
   { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
   { id: "help-now-info", type: "help-now-info", enabled: false, order: 8, size: "half" },
@@ -581,7 +581,7 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "travel-mode", type: "travel-mode", enabled: false, order: 10, size: "half" },
   { id: "sick-day", type: "sick-day", enabled: false, order: 11, size: "half" },
   { id: "messages", type: "messages", enabled: false, order: 12, size: "half" },
-  { id: "routines", type: "routines", enabled: false, order: 13, size: "half" },
+  { id: "scenario-status", type: "scenario-status", enabled: false, order: 13, size: "half" },
 ];
 
 function generateId(): string {
