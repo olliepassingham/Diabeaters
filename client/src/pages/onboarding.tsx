@@ -608,7 +608,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
           <CardContent className="pt-6 space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-1">
-                Carb Ratios (units per 10g carbs)
+                Carb Ratios (units:10g carbs)
                 <InfoTooltip {...DIABETES_TERMS.carbRatio} />
               </Label>
               <div className="grid grid-cols-3 gap-3">

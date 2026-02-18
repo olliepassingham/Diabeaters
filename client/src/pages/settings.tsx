@@ -161,15 +161,15 @@ function InsulinTab({
             <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="per10g" id="ratio-format-per10g" data-testid="radio-ratio-format-per10g" />
-                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">Units per 10g</Label>
+                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">Units:10g</Label>
               </div>
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="perCP" id="ratio-format-perCP" data-testid="radio-ratio-format-perCP" />
-                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">Units per CP</Label>
+                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">Units:1 CP</Label>
               </div>
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="1toXg" id="ratio-format-1toXg" data-testid="radio-ratio-format-1toXg" />
-                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">1 unit per Xg</Label>
+                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">1 unit:Xg</Label>
               </div>
             </RadioGroup>
           </div>

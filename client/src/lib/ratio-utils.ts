@@ -35,11 +35,11 @@ export function formatRatioForDisplay(gramsPerUnit: number, format: RatioFormat,
     const portionSize = getCarbPortionSize(cpSize);
     const unitsPerCP = portionSize / gramsPerUnit;
     const rounded = Math.round(unitsPerCP * 10) / 10;
-    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}u per 1 CP`;
+    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}u:1 CP`;
   }
   const unitsPer10g = 10 / gramsPerUnit;
   const rounded = Math.round(unitsPer10g * 10) / 10;
-  return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}u per 10g`;
+  return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}u:10g`;
 }
 
 export function formatRatioForStorage(gramsPerUnit: number): string {
@@ -54,12 +54,12 @@ export function formatRatioInputPlaceholder(format: RatioFormat): string {
 }
 
 export function formatRatioInputLabel(format: RatioFormat, cpSize?: number): string {
-  if (format === "1toXg") return "grams per 1 unit";
+  if (format === "1toXg") return "grams:1 unit";
   if (format === "perCP") {
     const portionSize = getCarbPortionSize(cpSize);
-    return `units per 1 CP (${portionSize}g)`;
+    return `units:1 CP (${portionSize}g)`;
   }
-  return "units per 10g";
+  return "units:10g";
 }
 
 export function parseInputToGramsPerUnit(inputValue: string, format: RatioFormat, cpSize?: number): number | null {

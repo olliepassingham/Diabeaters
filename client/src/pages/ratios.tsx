@@ -402,7 +402,7 @@ export default function Ratios() {
               <h3 className="font-medium text-lg">No ratios set yet</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Your insulin-to-carb ratios tell you how many grams of carbohydrate are covered by 1 unit of insulin.
-                For example, {ratioFormat === "per10g" ? "1.0u per 10g means 1 unit covers 10g of carbs" : "1:10 means 1 unit covers 10g of carbs"}.
+                For example, {ratioFormat === "per10g" ? "1.0u:10g means 1 unit covers 10g of carbs" : "1:10 means 1 unit covers 10g of carbs"}.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
                 These are usually provided by your diabetes team and can vary by time of day.

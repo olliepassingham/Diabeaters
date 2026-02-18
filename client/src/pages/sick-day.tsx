@@ -1649,7 +1649,7 @@ export default function SickDay() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Higher units per 10g = more insulin to overcome illness-related insulin resistance
+                  Higher units:10g = more insulin to overcome illness-related insulin resistance
                 </p>
               </div>
 
