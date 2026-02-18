@@ -410,17 +410,18 @@ export default function Adviser() {
     let totalUnits = 0;
     let ratioUsed = "";
     const ratioFmt: RatioFormat = profile.ratioFormat || "per10g";
+    const cpSize = profile?.carbPortionSize;
     
     if (selectedRatio) {
       const gpu = parseRatioToGramsPerUnit(selectedRatio);
       if (gpu && gpu > 0) {
         totalUnits = Math.round((carbValue / gpu) * 10) / 10;
-        ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt)})`;
+        ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt, cpSize)})`;
       }
     } else if (settings.tdd) {
       const estimatedRatio = Math.round(500 / settings.tdd);
       totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
-      ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt)})`;
+      ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt, cpSize)})`;
     }
     
     if (totalUnits <= 0) {

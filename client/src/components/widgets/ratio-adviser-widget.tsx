@@ -29,14 +29,14 @@ function getScenarioFactor(scenarioState: ScenarioState): { factor: number; labe
   return null;
 }
 
-function displayRatio(storedRatio: string | undefined, ratioFormat: RatioFormat, scenarioFactor?: number): { base: string; adjusted: string | null } {
+function displayRatio(storedRatio: string | undefined, ratioFormat: RatioFormat, scenarioFactor?: number, cpSize?: number): { base: string; adjusted: string | null } {
   if (!storedRatio) return { base: "", adjusted: null };
   const gpu = parseRatioToGramsPerUnit(storedRatio);
   if (!gpu) return { base: storedRatio, adjusted: null };
-  const baseDisplay = formatRatioForDisplay(gpu, ratioFormat);
+  const baseDisplay = formatRatioForDisplay(gpu, ratioFormat, cpSize);
   if (scenarioFactor) {
     const adjustedGpu = gpu * scenarioFactor;
-    const adjustedDisplay = formatRatioForDisplay(adjustedGpu, ratioFormat);
+    const adjustedDisplay = formatRatioForDisplay(adjustedGpu, ratioFormat, cpSize);
     return { base: baseDisplay, adjusted: adjustedDisplay };
   }
   return { base: baseDisplay, adjusted: null };
@@ -46,6 +46,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
   const [settings, setSettings] = useState<UserSettings>({});
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
+  const [cpSize, setCpSize] = useState<number | undefined>();
 
   useEffect(() => {
     setSettings(storage.getSettings());
@@ -54,6 +55,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
     if (profile?.ratioFormat) {
       setRatioFormat(profile.ratioFormat);
     }
+    setCpSize(profile?.carbPortionSize);
   }, []);
 
   const hasRatios = settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio;
@@ -86,7 +88,7 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
         {hasRatios ? (
           <div className="grid grid-cols-2 gap-2">
             {ratios.map((r) => {
-              const { base, adjusted } = displayRatio(r.value, ratioFormat, scenario?.factor);
+              const { base, adjusted } = displayRatio(r.value, ratioFormat, scenario?.factor, cpSize);
               return (
                 <div key={r.label} className="p-2 rounded-lg bg-muted/30 text-center">
                   <p className="text-xs text-muted-foreground">{r.label}</p>

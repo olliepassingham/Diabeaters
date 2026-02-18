@@ -159,18 +159,20 @@ function calculateSickDayRecommendations(
 
   // === RATIO AND OTHER ADJUSTMENTS ===
   
-  const ratioFmt: RatioFormat = storage.getProfile()?.ratioFormat || "per10g";
+  const sickDayProfile = storage.getProfile();
+  const ratioFmt: RatioFormat = sickDayProfile?.ratioFormat || "per10g";
+  const cpSize = sickDayProfile?.carbPortionSize;
 
   const adjustRatio = (ratio: string | undefined, multiplier: number): string => {
     const gpu = parseRatioToGramsPerUnit(ratio);
-    if (!gpu) return formatRatioForDisplay(10, ratioFmt);
+    if (!gpu) return formatRatioForDisplay(10, ratioFmt, cpSize);
     const adjustedGpu = gpu / multiplier;
-    return formatRatioForDisplay(adjustedGpu, ratioFmt);
+    return formatRatioForDisplay(adjustedGpu, ratioFmt, cpSize);
   };
 
   const getOriginalRatio = (ratio: string | undefined): string => {
     const gpu = parseRatioToGramsPerUnit(ratio);
-    return formatRatioForDisplay(gpu || 10, ratioFmt);
+    return formatRatioForDisplay(gpu || 10, ratioFmt, cpSize);
   };
 
   let ratioMultiplier = 1;

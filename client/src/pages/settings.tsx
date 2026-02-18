@@ -99,6 +99,7 @@ function InsulinTab({
   breakfastRatio, setBreakfastRatio, lunchRatio, setLunchRatio,
   dinnerRatio, setDinnerRatio, snackRatio, setSnackRatio,
   ratioFormat, onRatioFormatChange,
+  carbPortionSize, onCarbPortionSizeChange,
   onSave
 }: {
   bgUnits: string;
@@ -111,6 +112,7 @@ function InsulinTab({
   dinnerRatio: string; setDinnerRatio: (v: string) => void;
   snackRatio: string; setSnackRatio: (v: string) => void;
   ratioFormat: RatioFormat; onRatioFormatChange: (format: RatioFormat) => void;
+  carbPortionSize: string; onCarbPortionSizeChange: (size: string) => void;
   onSave: () => void;
 }) {
   return (
@@ -156,10 +158,14 @@ function InsulinTab({
         <div className="space-y-3">
           <div className="flex items-center gap-4 flex-wrap">
             <Label className="text-sm font-medium">Ratio format:</Label>
-            <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4">
+            <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="per10g" id="ratio-format-per10g" data-testid="radio-ratio-format-per10g" />
                 <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">Units per 10g</Label>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <RadioGroupItem value="perCP" id="ratio-format-perCP" data-testid="radio-ratio-format-perCP" />
+                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">Units per CP</Label>
               </div>
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="1toXg" id="ratio-format-1toXg" data-testid="radio-ratio-format-1toXg" />
@@ -168,30 +174,62 @@ function InsulinTab({
             </RadioGroup>
           </div>
 
+          {ratioFormat === "perCP" && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <Label className="text-sm text-muted-foreground">1 Carb Portion (CP) =</Label>
+              <div className="flex items-center gap-2">
+                {["10", "12", "15"].map((size) => (
+                  <Button
+                    key={size}
+                    type="button"
+                    variant={carbPortionSize === size ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => onCarbPortionSizeChange(size)}
+                    data-testid={`button-cp-size-${size}`}
+                  >
+                    {size}g
+                  </Button>
+                ))}
+                <Input
+                  type="number"
+                  min="1"
+                  max="30"
+                  step="1"
+                  className="w-20"
+                  placeholder="Custom"
+                  value={!["10", "12", "15"].includes(carbPortionSize) ? carbPortionSize : ""}
+                  onChange={(e) => onCarbPortionSizeChange(e.target.value)}
+                  data-testid="input-cp-size-custom"
+                />
+                <span className="text-sm text-muted-foreground">g</span>
+              </div>
+            </div>
+          )}
+
           <Label className="text-sm font-medium flex items-center">
-            Carb Ratios ({formatRatioInputLabel(ratioFormat)})
+            Carb Ratios ({formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)})
             <InfoTooltip {...DIABETES_TERMS.carbRatio} />
           </Label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
               <Input id="breakfast-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={breakfastRatio} onChange={(e) => setBreakfastRatio(e.target.value)} data-testid="input-breakfast-ratio" />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="lunch-ratio" className="text-xs text-muted-foreground">Lunch</Label>
               <Input id="lunch-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={lunchRatio} onChange={(e) => setLunchRatio(e.target.value)} data-testid="input-lunch-ratio" />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dinner-ratio" className="text-xs text-muted-foreground">Dinner</Label>
               <Input id="dinner-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={dinnerRatio} onChange={(e) => setDinnerRatio(e.target.value)} data-testid="input-dinner-ratio" />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="snack-ratio" className="text-xs text-muted-foreground">Snack</Label>
               <Input id="snack-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={snackRatio} onChange={(e) => setSnackRatio(e.target.value)} data-testid="input-snack-ratio" />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat)}</p>
+              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
           </div>
         </div>
@@ -780,6 +818,7 @@ export default function Settings() {
   const [targetBgLow, setTargetBgLow] = useState("");
   const [targetBgHigh, setTargetBgHigh] = useState("");
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
+  const [carbPortionSize, setCarbPortionSize] = useState("10");
   
   const [shortActingUnitsPerDay, setShortActingUnitsPerDay] = useState("");
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
@@ -840,18 +879,20 @@ export default function Settings() {
 
     const format: RatioFormat = storedProfile?.ratioFormat || "per10g";
     setRatioFormat(format);
+    setCarbPortionSize(storedProfile?.carbPortionSize?.toString() || "10");
     
     if (storedSettings) {
       setSettings(storedSettings);
       setTdd(storedSettings.tdd?.toString() || "");
+      const cpSize = storedProfile?.carbPortionSize;
       const bGpu = parseRatioToGramsPerUnit(storedSettings.breakfastRatio);
-      setBreakfastRatio(bGpu ? gramsPerUnitToInputValue(bGpu, format) : "");
+      setBreakfastRatio(bGpu ? gramsPerUnitToInputValue(bGpu, format, cpSize) : "");
       const lGpu = parseRatioToGramsPerUnit(storedSettings.lunchRatio);
-      setLunchRatio(lGpu ? gramsPerUnitToInputValue(lGpu, format) : "");
+      setLunchRatio(lGpu ? gramsPerUnitToInputValue(lGpu, format, cpSize) : "");
       const dGpu = parseRatioToGramsPerUnit(storedSettings.dinnerRatio);
-      setDinnerRatio(dGpu ? gramsPerUnitToInputValue(dGpu, format) : "");
+      setDinnerRatio(dGpu ? gramsPerUnitToInputValue(dGpu, format, cpSize) : "");
       const sGpu = parseRatioToGramsPerUnit(storedSettings.snackRatio);
-      setSnackRatio(sGpu ? gramsPerUnitToInputValue(sGpu, format) : "");
+      setSnackRatio(sGpu ? gramsPerUnitToInputValue(sGpu, format, cpSize) : "");
       setCorrectionFactor(storedSettings.correctionFactor?.toString() || "");
       setTargetBgLow(storedSettings.targetBgLow?.toString() || "");
       setTargetBgHigh(storedSettings.targetBgHigh?.toString() || "");
@@ -917,10 +958,11 @@ export default function Settings() {
 
   const handleRatioFormatChange = (newFormat: RatioFormat) => {
     const oldFormat = ratioFormat;
+    const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
     const convertValue = (val: string) => {
       if (!val) return "";
-      const gpu = parseInputToGramsPerUnit(val, oldFormat);
-      return gpu ? gramsPerUnitToInputValue(gpu, newFormat) : val;
+      const gpu = parseInputToGramsPerUnit(val, oldFormat, cpSize);
+      return gpu ? gramsPerUnitToInputValue(gpu, newFormat, cpSize) : val;
     };
     setBreakfastRatio(convertValue(breakfastRatio));
     setLunchRatio(convertValue(lunchRatio));
@@ -929,11 +971,29 @@ export default function Settings() {
     setRatioFormat(newFormat);
   };
 
+  const handleCarbPortionSizeChange = (newSize: string) => {
+    const oldCpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
+    const newCpSize = newSize ? parseFloat(newSize) : undefined;
+    setCarbPortionSize(newSize);
+    if (ratioFormat === "perCP" && newCpSize && newCpSize > 0) {
+      const convertValue = (val: string) => {
+        if (!val) return "";
+        const gpu = parseInputToGramsPerUnit(val, "perCP", oldCpSize);
+        return gpu ? gramsPerUnitToInputValue(gpu, "perCP", newCpSize) : val;
+      };
+      setBreakfastRatio(convertValue(breakfastRatio));
+      setLunchRatio(convertValue(lunchRatio));
+      setDinnerRatio(convertValue(dinnerRatio));
+      setSnackRatio(convertValue(snackRatio));
+    }
+  };
+
   const handleSaveInsulin = () => {
-    const bGpu = parseInputToGramsPerUnit(breakfastRatio, ratioFormat);
-    const lGpu = parseInputToGramsPerUnit(lunchRatio, ratioFormat);
-    const dGpu = parseInputToGramsPerUnit(dinnerRatio, ratioFormat);
-    const sGpu = parseInputToGramsPerUnit(snackRatio, ratioFormat);
+    const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
+    const bGpu = parseInputToGramsPerUnit(breakfastRatio, ratioFormat, cpSize);
+    const lGpu = parseInputToGramsPerUnit(lunchRatio, ratioFormat, cpSize);
+    const dGpu = parseInputToGramsPerUnit(dinnerRatio, ratioFormat, cpSize);
+    const sGpu = parseInputToGramsPerUnit(snackRatio, ratioFormat, cpSize);
     const newSettings: UserSettings = {
       ...settings,
       tdd: tdd ? parseFloat(tdd) : undefined,
@@ -951,7 +1011,7 @@ export default function Settings() {
       storage.syncSettingsToSupplyUsage("tdd", newSettings.tdd);
     }
     if (profile) {
-      const updatedProfile = { ...profile, ratioFormat };
+      const updatedProfile = { ...profile, ratioFormat, carbPortionSize: cpSize && cpSize > 0 ? cpSize : undefined };
       storage.saveProfile(updatedProfile);
       setProfile(updatedProfile);
     }
@@ -1139,6 +1199,7 @@ export default function Settings() {
                 dinnerRatio={dinnerRatio} setDinnerRatio={setDinnerRatio}
                 snackRatio={snackRatio} setSnackRatio={setSnackRatio}
                 ratioFormat={ratioFormat} onRatioFormatChange={handleRatioFormatChange}
+                carbPortionSize={carbPortionSize} onCarbPortionSizeChange={handleCarbPortionSizeChange}
                 onSave={handleSaveInsulin}
               />
             </TabsContent>

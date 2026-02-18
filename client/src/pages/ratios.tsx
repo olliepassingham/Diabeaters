@@ -142,12 +142,12 @@ function clampFactor(factor: number): number {
   return Math.max(MIN_COMBINED_FACTOR, Math.min(MAX_COMBINED_FACTOR, factor));
 }
 
-function getAdjustedRatio(baseRatio: string | undefined, factor: number, ratioFormat: RatioFormat): string | null {
+function getAdjustedRatio(baseRatio: string | undefined, factor: number, ratioFormat: RatioFormat, cpSize?: number): string | null {
   const grams = parseRatioToGramsPerUnit(baseRatio);
   if (grams === null) return null;
   const clamped = clampFactor(factor);
   const adjustedGrams = Math.round(grams * clamped * 10) / 10;
-  return formatRatioForDisplay(adjustedGrams, ratioFormat);
+  return formatRatioForDisplay(adjustedGrams, ratioFormat, cpSize);
 }
 
 function getMealIcon(meal: string) {
@@ -174,6 +174,7 @@ export default function Ratios() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
+  const [cpSize, setCpSize] = useState<number | undefined>();
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState({
     breakfastRatio: "",
@@ -193,7 +194,9 @@ export default function Ratios() {
     const s = storage.getSettings();
     const profile = storage.getProfile();
     const fmt = profile?.ratioFormat || "per10g";
+    const cpSizeVal = profile?.carbPortionSize;
     setRatioFormat(fmt);
+    setCpSize(cpSizeVal);
     setSettings(s);
     setScenarioState(storage.getScenarioState());
     setHistory(storage.getRatioHistory());
@@ -202,10 +205,10 @@ export default function Ratios() {
     const dGpu = parseRatioToGramsPerUnit(s.dinnerRatio);
     const sGpu = parseRatioToGramsPerUnit(s.snackRatio);
     setEditValues({
-      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, fmt) : s.breakfastRatio || "",
-      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, fmt) : s.lunchRatio || "",
-      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, fmt) : s.dinnerRatio || "",
-      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, fmt) : s.snackRatio || "",
+      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, fmt, cpSizeVal) : s.breakfastRatio || "",
+      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, fmt, cpSizeVal) : s.lunchRatio || "",
+      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, fmt, cpSizeVal) : s.dinnerRatio || "",
+      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, fmt, cpSizeVal) : s.snackRatio || "",
       correctionFactor: s.correctionFactor?.toString() || "",
       targetBgLow: s.targetBgLow?.toString() || "",
       targetBgHigh: s.targetBgHigh?.toString() || "",
@@ -239,10 +242,10 @@ export default function Ratios() {
       setHistory(storage.getRatioHistory());
     }
 
-    const bGpu = parseInputToGramsPerUnit(editValues.breakfastRatio, ratioFormat);
-    const lGpu = parseInputToGramsPerUnit(editValues.lunchRatio, ratioFormat);
-    const dGpu = parseInputToGramsPerUnit(editValues.dinnerRatio, ratioFormat);
-    const sGpu = parseInputToGramsPerUnit(editValues.snackRatio, ratioFormat);
+    const bGpu = parseInputToGramsPerUnit(editValues.breakfastRatio, ratioFormat, cpSize);
+    const lGpu = parseInputToGramsPerUnit(editValues.lunchRatio, ratioFormat, cpSize);
+    const dGpu = parseInputToGramsPerUnit(editValues.dinnerRatio, ratioFormat, cpSize);
+    const sGpu = parseInputToGramsPerUnit(editValues.snackRatio, ratioFormat, cpSize);
 
     const updated = {
       ...oldSettings,
@@ -265,10 +268,10 @@ export default function Ratios() {
     const dGpu = parseRatioToGramsPerUnit(settings.dinnerRatio);
     const sGpu = parseRatioToGramsPerUnit(settings.snackRatio);
     setEditValues({
-      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, ratioFormat) : settings.breakfastRatio || "",
-      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, ratioFormat) : settings.lunchRatio || "",
-      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, ratioFormat) : settings.dinnerRatio || "",
-      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, ratioFormat) : settings.snackRatio || "",
+      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, ratioFormat, cpSize) : settings.breakfastRatio || "",
+      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, ratioFormat, cpSize) : settings.lunchRatio || "",
+      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, ratioFormat, cpSize) : settings.dinnerRatio || "",
+      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, ratioFormat, cpSize) : settings.snackRatio || "",
       correctionFactor: settings.correctionFactor?.toString() || "",
       targetBgLow: settings.targetBgLow?.toString() || "",
       targetBgHigh: settings.targetBgHigh?.toString() || "",
@@ -306,10 +309,10 @@ export default function Ratios() {
     const dGpu = parseRatioToGramsPerUnit(updated.dinnerRatio);
     const sGpu = parseRatioToGramsPerUnit(updated.snackRatio);
     setEditValues({
-      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, ratioFormat) : updated.breakfastRatio || "",
-      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, ratioFormat) : updated.lunchRatio || "",
-      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, ratioFormat) : updated.dinnerRatio || "",
-      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, ratioFormat) : updated.snackRatio || "",
+      breakfastRatio: bGpu ? gramsPerUnitToInputValue(bGpu, ratioFormat, cpSize) : updated.breakfastRatio || "",
+      lunchRatio: lGpu ? gramsPerUnitToInputValue(lGpu, ratioFormat, cpSize) : updated.lunchRatio || "",
+      dinnerRatio: dGpu ? gramsPerUnitToInputValue(dGpu, ratioFormat, cpSize) : updated.dinnerRatio || "",
+      snackRatio: sGpu ? gramsPerUnitToInputValue(sGpu, ratioFormat, cpSize) : updated.snackRatio || "",
       correctionFactor: updated.correctionFactor?.toString() || "",
       targetBgLow: updated.targetBgLow?.toString() || "",
       targetBgHigh: updated.targetBgHigh?.toString() || "",
@@ -416,8 +419,8 @@ export default function Ratios() {
             const Icon = getMealIcon(meal.name);
             const baseRatio = meal.ratio;
             const baseGpu = parseRatioToGramsPerUnit(baseRatio);
-            const displayRatio = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat) : baseRatio;
-            const adjustedRatio = hasAnyAdjustment ? getAdjustedRatio(baseRatio, combinedFactor, ratioFormat) : null;
+            const displayRatio = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : baseRatio;
+            const adjustedRatio = hasAnyAdjustment ? getAdjustedRatio(baseRatio, combinedFactor, ratioFormat, cpSize) : null;
 
             return (
               <Card key={meal.name} data-testid={`card-ratio-${meal.name.toLowerCase()}`}>
@@ -435,7 +438,7 @@ export default function Ratios() {
                   {editing ? (
                     <div className="space-y-1">
                       <Label htmlFor={`ratio-${meal.key}`} className="text-xs text-muted-foreground" data-testid={`label-ratio-${meal.name.toLowerCase()}`}>
-                        {formatRatioInputLabel(ratioFormat)}
+                        {formatRatioInputLabel(ratioFormat, cpSize)}
                       </Label>
                       <Input
                         id={`ratio-${meal.key}`}
@@ -612,7 +615,7 @@ export default function Ratios() {
                     <p className="text-xs font-medium text-muted-foreground">Current ratios to save:</p>
                     <div className="grid grid-cols-2 gap-1 text-sm">
                       {meals.map(m => { if (!m.ratio) return null; const gpu = parseRatioToGramsPerUnit(m.ratio); return (
-                        <p key={m.name}><span className="text-muted-foreground">{m.name}:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat) : m.ratio}</p>
+                        <p key={m.name}><span className="text-muted-foreground">{m.name}:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : m.ratio}</p>
                       ); })}
                       {settings.correctionFactor && (
                         <p><span className="text-muted-foreground">CF:</span> {settings.correctionFactor}</p>
@@ -678,10 +681,10 @@ export default function Ratios() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-sm">
-                      {entry.breakfastRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.breakfastRatio); return <p data-testid={`history-breakfast-${entry.id}`}><span className="text-muted-foreground">Breakfast:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat) : entry.breakfastRatio}</p>; })()}
-                      {entry.lunchRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.lunchRatio); return <p data-testid={`history-lunch-${entry.id}`}><span className="text-muted-foreground">Lunch:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat) : entry.lunchRatio}</p>; })()}
-                      {entry.dinnerRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.dinnerRatio); return <p data-testid={`history-dinner-${entry.id}`}><span className="text-muted-foreground">Dinner:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat) : entry.dinnerRatio}</p>; })()}
-                      {entry.snackRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.snackRatio); return <p data-testid={`history-snack-${entry.id}`}><span className="text-muted-foreground">Snack:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat) : entry.snackRatio}</p>; })()}
+                      {entry.breakfastRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.breakfastRatio); return <p data-testid={`history-breakfast-${entry.id}`}><span className="text-muted-foreground">Breakfast:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : entry.breakfastRatio}</p>; })()}
+                      {entry.lunchRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.lunchRatio); return <p data-testid={`history-lunch-${entry.id}`}><span className="text-muted-foreground">Lunch:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : entry.lunchRatio}</p>; })()}
+                      {entry.dinnerRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.dinnerRatio); return <p data-testid={`history-dinner-${entry.id}`}><span className="text-muted-foreground">Dinner:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : entry.dinnerRatio}</p>; })()}
+                      {entry.snackRatio && (() => { const gpu = parseRatioToGramsPerUnit(entry.snackRatio); return <p data-testid={`history-snack-${entry.id}`}><span className="text-muted-foreground">Snack:</span> {gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : entry.snackRatio}</p>; })()}
                       {entry.correctionFactor && <p data-testid={`history-cf-${entry.id}`}><span className="text-muted-foreground">CF:</span> {entry.correctionFactor}</p>}
                     </div>
                   </div>
