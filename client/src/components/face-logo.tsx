@@ -1,4 +1,4 @@
-import logoImage from "@assets/image_1766853776303.png";
+import logoImage from "@assets/image_1771412400865.png";
 
 interface FaceLogoProps {
   size?: number;
