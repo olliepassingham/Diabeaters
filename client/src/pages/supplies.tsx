@@ -1095,7 +1095,7 @@ function SupplyCard({
             </div>
           ) : (() => {
             const effectiveUsage = storage.getEffectiveDailyUsage(supply);
-            const primingWaste = isInsulinType(supply.type) ? storage.getPrimingWastePerDay() : 0;
+            const primingWaste = isInsulinType(supply.type) ? storage.getPrimingWastePerDay(supply.type) : 0;
             const baseUsage = effectiveUsage - primingWaste;
             return (
               <div className="space-y-0.5">

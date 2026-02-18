@@ -69,6 +69,8 @@ export interface UserSettings {
   shortActingUnitsPerDay?: number;
   longActingUnitsPerDay?: number;
   injectionsPerDay?: number;
+  shortActingInjectionsPerDay?: number;
+  longActingInjectionsPerDay?: number;
   cgmDays?: number;
   siteChangeDays?: number;
   reservoirChangeDays?: number;
@@ -973,15 +975,28 @@ export const storage = {
    * For CGM/infusion/reservoir: handled separately via settings intervals
    * For other: uses supply.dailyUsage
    */
-  getPrimingWastePerDay(settings?: UserSettings): number {
+  getPrimingWastePerDay(supplyType?: Supply["type"], settings?: UserSettings): number {
     const s = settings || this.getSettings();
     const profile = this.getProfile();
     const isPump = profile?.insulinDeliveryMethod === "pump";
     if (isPump) return 0;
     const unitsPerPrime = s.primingUnitsPerInjection || 0;
-    const injections = s.injectionsPerDay || 0;
-    if (unitsPerPrime <= 0 || injections <= 0) return 0;
-    return unitsPerPrime * injections;
+    if (unitsPerPrime <= 0) return 0;
+
+    const shortInj = s.shortActingInjectionsPerDay || 0;
+    const longInj = s.longActingInjectionsPerDay || 0;
+    const totalFromSplit = shortInj + longInj;
+    const totalInjections = totalFromSplit > 0 ? totalFromSplit : (s.injectionsPerDay || 0);
+
+    if (totalInjections <= 0) return 0;
+
+    if (totalFromSplit > 0) {
+      if (supplyType === "insulin_short") return unitsPerPrime * shortInj;
+      if (supplyType === "insulin_long") return unitsPerPrime * longInj;
+      if (supplyType === "insulin" || supplyType === "insulin_vial") return unitsPerPrime * totalInjections;
+    }
+
+    return unitsPerPrime * totalInjections;
   },
 
   getEffectiveDailyUsage(supply: Supply, settings?: UserSettings): number {
@@ -998,7 +1013,7 @@ export const storage = {
       return supply.dailyUsage || 0;
     }
 
-    const primingWaste = this.getPrimingWastePerDay(s);
+    const primingWaste = this.getPrimingWastePerDay(supply.type, s);
 
     if (supply.type === "insulin_vial") {
       let base = 0;

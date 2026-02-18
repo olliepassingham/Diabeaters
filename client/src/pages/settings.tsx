@@ -211,7 +211,8 @@ function UsageTab({
   isPumpUser, tdd,
   shortActingUnitsPerDay, setShortActingUnitsPerDay,
   longActingUnitsPerDay, setLongActingUnitsPerDay,
-  injectionsPerDay, setInjectionsPerDay,
+  shortActingInjectionsPerDay, setShortActingInjectionsPerDay,
+  longActingInjectionsPerDay, setLongActingInjectionsPerDay,
   primingUnits, setPrimingUnits,
   cgmDays, setCgmDays,
   siteChangeDays, setSiteChangeDays,
@@ -228,7 +229,8 @@ function UsageTab({
   isPumpUser: boolean; tdd: string;
   shortActingUnitsPerDay: string; setShortActingUnitsPerDay: (v: string) => void;
   longActingUnitsPerDay: string; setLongActingUnitsPerDay: (v: string) => void;
-  injectionsPerDay: string; setInjectionsPerDay: (v: string) => void;
+  shortActingInjectionsPerDay: string; setShortActingInjectionsPerDay: (v: string) => void;
+  longActingInjectionsPerDay: string; setLongActingInjectionsPerDay: (v: string) => void;
   primingUnits: string; setPrimingUnits: (v: string) => void;
   cgmDays: string; setCgmDays: (v: string) => void;
   siteChangeDays: string; setSiteChangeDays: (v: string) => void;
@@ -315,8 +317,14 @@ function UsageTab({
               <p className="text-xs text-muted-foreground">{unitsPerInsulinPen || "300"} units = 1 pen</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="injections-per-day">Injections/Day</Label>
-              <Input id="injections-per-day" type="number" placeholder="e.g., 4" value={injectionsPerDay} onChange={(e) => setInjectionsPerDay(e.target.value)} data-testid="input-injections-per-day" />
+              <Label htmlFor="short-acting-injections">Short-Acting Injections/Day</Label>
+              <Input id="short-acting-injections" type="number" placeholder="e.g., 3" value={shortActingInjectionsPerDay} onChange={(e) => setShortActingInjectionsPerDay(e.target.value)} data-testid="input-short-acting-injections" />
+              <p className="text-xs text-muted-foreground">Meals + corrections</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="long-acting-injections">Long-Acting Injections/Day</Label>
+              <Input id="long-acting-injections" type="number" placeholder="e.g., 1" value={longActingInjectionsPerDay} onChange={(e) => setLongActingInjectionsPerDay(e.target.value)} data-testid="input-long-acting-injections" />
+              <p className="text-xs text-muted-foreground">Basal doses (usually 1 or 2)</p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center">
@@ -776,6 +784,8 @@ export default function Settings() {
   const [shortActingUnitsPerDay, setShortActingUnitsPerDay] = useState("");
   const [longActingUnitsPerDay, setLongActingUnitsPerDay] = useState("");
   const [injectionsPerDay, setInjectionsPerDay] = useState("");
+  const [shortActingInjectionsPerDay, setShortActingInjectionsPerDay] = useState("");
+  const [longActingInjectionsPerDay, setLongActingInjectionsPerDay] = useState("");
   const [primingUnits, setPrimingUnits] = useState("");
   const [cgmDays, setCgmDays] = useState("");
   const [siteChangeDays, setSiteChangeDays] = useState("");
@@ -848,6 +858,18 @@ export default function Settings() {
       setShortActingUnitsPerDay(storedSettings.shortActingUnitsPerDay?.toString() || "");
       setLongActingUnitsPerDay(storedSettings.longActingUnitsPerDay?.toString() || "");
       setInjectionsPerDay(storedSettings.injectionsPerDay?.toString() || "");
+      const hasLegacyTotal = storedSettings.injectionsPerDay && storedSettings.injectionsPerDay > 0;
+      const hasSplit = storedSettings.shortActingInjectionsPerDay || storedSettings.longActingInjectionsPerDay;
+      if (hasLegacyTotal && !hasSplit) {
+        const total = storedSettings.injectionsPerDay!;
+        const longInj = Math.min(total, 1);
+        const shortInj = total - longInj;
+        setShortActingInjectionsPerDay(shortInj > 0 ? shortInj.toString() : "");
+        setLongActingInjectionsPerDay(longInj.toString());
+      } else {
+        setShortActingInjectionsPerDay(storedSettings.shortActingInjectionsPerDay?.toString() || "");
+        setLongActingInjectionsPerDay(storedSettings.longActingInjectionsPerDay?.toString() || "");
+      }
       setPrimingUnits(storedSettings.primingUnitsPerInjection?.toString() || "");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
@@ -941,7 +963,14 @@ export default function Settings() {
       ...settings,
       shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
       longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
-      injectionsPerDay: injectionsPerDay ? parseInt(injectionsPerDay) : undefined,
+      shortActingInjectionsPerDay: shortActingInjectionsPerDay ? parseInt(shortActingInjectionsPerDay) : undefined,
+      longActingInjectionsPerDay: longActingInjectionsPerDay ? parseInt(longActingInjectionsPerDay) : undefined,
+      injectionsPerDay: (() => {
+        const shortInj = shortActingInjectionsPerDay ? parseInt(shortActingInjectionsPerDay) : 0;
+        const longInj = longActingInjectionsPerDay ? parseInt(longActingInjectionsPerDay) : 0;
+        const total = shortInj + longInj;
+        return total > 0 ? total : (injectionsPerDay ? parseInt(injectionsPerDay) : undefined);
+      })(),
       primingUnitsPerInjection: primingUnits ? parseFloat(primingUnits) : undefined,
       cgmDays: cgmDays ? parseInt(cgmDays) : undefined,
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
@@ -958,7 +987,7 @@ export default function Settings() {
     setSettings(newSettings);
     const syncKeys = ["injectionsPerDay", "shortActingUnitsPerDay", "longActingUnitsPerDay"] as const;
     for (const key of syncKeys) {
-      const val = newSettings[key];
+      const val = newSettings[key] as number | undefined;
       if (val && val > 0) {
         storage.syncSettingsToSupplyUsage(key, val);
       }
@@ -1119,7 +1148,8 @@ export default function Settings() {
                 isPumpUser={isPumpUser} tdd={tdd}
                 shortActingUnitsPerDay={shortActingUnitsPerDay} setShortActingUnitsPerDay={setShortActingUnitsPerDay}
                 longActingUnitsPerDay={longActingUnitsPerDay} setLongActingUnitsPerDay={setLongActingUnitsPerDay}
-                injectionsPerDay={injectionsPerDay} setInjectionsPerDay={setInjectionsPerDay}
+                shortActingInjectionsPerDay={shortActingInjectionsPerDay} setShortActingInjectionsPerDay={setShortActingInjectionsPerDay}
+                longActingInjectionsPerDay={longActingInjectionsPerDay} setLongActingInjectionsPerDay={setLongActingInjectionsPerDay}
                 primingUnits={primingUnits} setPrimingUnits={setPrimingUnits}
                 cgmDays={cgmDays} setCgmDays={setCgmDays}
                 siteChangeDays={siteChangeDays} setSiteChangeDays={setSiteChangeDays}
