@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Moon, Thermometer, Plane, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Bedtime from "./bedtime";
@@ -29,6 +30,7 @@ export default function Scenarios() {
       setActiveTab(tab);
     }
     setScenarioHistory(storage.getScenarioHistory().slice(0, 10));
+    trackFeatureEngagement(`scenarios-${tab || "bedtime"}`);
   }, []);
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +44,7 @@ export default function Appointments() {
 
   useEffect(() => {
     setAppointments(storage.getAppointments());
+    trackFeatureEngagement("appointments");
   }, []);
 
   const handleAdd = () => {

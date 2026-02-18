@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane } from "lucide-react";
@@ -330,6 +331,10 @@ export default function Adviser() {
     }
     if (params.get("from") === "ratios") {
       setCameFromRatios(true);
+    }
+    const trackTab = tab || "meal";
+    if (trackTab === "meal" || trackTab === "exercise") {
+      trackFeatureEngagement(`adviser-${trackTab}`);
     }
   }, []);
   

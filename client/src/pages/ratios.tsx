@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -200,6 +201,7 @@ export default function Ratios() {
     setSettings(s);
     setScenarioState(storage.getScenarioState());
     setHistory(storage.getRatioHistory());
+    trackFeatureEngagement("ratios");
     const bGpu = parseRatioToGramsPerUnit(s.breakfastRatio);
     const lGpu = parseRatioToGramsPerUnit(s.lunchRatio);
     const dGpu = parseRatioToGramsPerUnit(s.dinnerRatio);

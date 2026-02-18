@@ -18,6 +18,8 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioForStorage, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
+import { validateTDD, validateCorrectionFactor, validateTargetBgLow, validateTargetBgHigh, validateTargetRange, validateCarbRatio } from "@/lib/clinical-validation";
+import { ClinicalWarningHint } from "@/components/clinical-warning";
 
 function ProfileTab({ 
   name, setName, bgUnits, setBgUnits, 
@@ -132,6 +134,7 @@ function InsulinTab({
               <InfoTooltip {...DIABETES_TERMS.tdd} />
             </Label>
             <Input id="tdd" type="number" placeholder="e.g., 40" value={tdd} onChange={(e) => setTdd(e.target.value)} data-testid="input-tdd" />
+            <ClinicalWarningHint warning={validateTDD(tdd)} />
             <p className="text-xs text-muted-foreground">Units per day</p>
           </div>
           <div className="space-y-2">
@@ -140,6 +143,7 @@ function InsulinTab({
               <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
             </Label>
             <Input id="correction-factor" type="number" step="0.1" placeholder={bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={correctionFactor} onChange={(e) => setCorrectionFactor(e.target.value)} data-testid="input-correction-factor" />
+            <ClinicalWarningHint warning={validateCorrectionFactor(correctionFactor, bgUnits)} />
             <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
           </div>
           <div className="space-y-2">
@@ -152,6 +156,9 @@ function InsulinTab({
               <span className="text-muted-foreground">-</span>
               <Input type="number" placeholder="High" value={targetBgHigh} onChange={(e) => setTargetBgHigh(e.target.value)} data-testid="input-target-bg-high" />
             </div>
+            <ClinicalWarningHint warning={validateTargetBgLow(targetBgLow, bgUnits)} />
+            <ClinicalWarningHint warning={validateTargetBgHigh(targetBgHigh, bgUnits)} />
+            <ClinicalWarningHint warning={validateTargetRange(targetBgLow, targetBgHigh)} />
           </div>
         </div>
 
@@ -220,21 +227,25 @@ function InsulinTab({
             <div className="space-y-2">
               <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
               <Input id="breakfast-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={breakfastRatio} onChange={(e) => setBreakfastRatio(e.target.value)} data-testid="input-breakfast-ratio" />
+              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(breakfastRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
               <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="lunch-ratio" className="text-xs text-muted-foreground">Lunch</Label>
               <Input id="lunch-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={lunchRatio} onChange={(e) => setLunchRatio(e.target.value)} data-testid="input-lunch-ratio" />
+              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(lunchRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
               <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="dinner-ratio" className="text-xs text-muted-foreground">Dinner</Label>
               <Input id="dinner-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={dinnerRatio} onChange={(e) => setDinnerRatio(e.target.value)} data-testid="input-dinner-ratio" />
+              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(dinnerRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
               <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="snack-ratio" className="text-xs text-muted-foreground">Snack</Label>
               <Input id="snack-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={snackRatio} onChange={(e) => setSnackRatio(e.target.value)} data-testid="input-snack-ratio" />
+              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(snackRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
               <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
             </div>
           </div>

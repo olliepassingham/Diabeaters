@@ -12,6 +12,8 @@ import { FaceLogo } from "@/components/face-logo";
 import { storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
+import { ClinicalWarningHint } from "@/components/clinical-warning";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -515,6 +517,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                     onChange={(e) => updateData("tdd", e.target.value)}
                     data-testid="input-onboarding-tdd"
                   />
+                  <ClinicalWarningHint warning={validateTDD(data.tdd)} />
                   <p className="text-xs text-muted-foreground">All insulin your pump delivers in a day</p>
                 </div>
                 <div className="space-y-2">
@@ -622,6 +625,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                     onChange={(e) => updateData("breakfastRatio", e.target.value)}
                     data-testid="input-onboarding-breakfast-ratio"
                   />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.breakfastRatio, "per10g"))} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Lunch</Label>
@@ -633,6 +637,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                     onChange={(e) => updateData("lunchRatio", e.target.value)}
                     data-testid="input-onboarding-lunch-ratio"
                   />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.lunchRatio, "per10g"))} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Dinner</Label>
@@ -644,6 +649,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                     onChange={(e) => updateData("dinnerRatio", e.target.value)}
                     data-testid="input-onboarding-dinner-ratio"
                   />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.dinnerRatio, "per10g"))} />
                 </div>
               </div>
             </div>
@@ -661,6 +667,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                 onChange={(e) => updateData("correctionFactor", e.target.value)}
                 data-testid="input-onboarding-correction"
               />
+              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
               <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
             </div>
             <p className="text-xs text-muted-foreground italic">
@@ -702,6 +709,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                 onChange={(e) => updateData("tdd", e.target.value)}
                 data-testid="input-onboarding-tdd"
               />
+              <ClinicalWarningHint warning={validateTDD(data.tdd)} />
               <p className="text-xs text-muted-foreground">All insulin you take in a day — this helps calculate exercise adjustments</p>
             </div>
             <div className="space-y-2">
@@ -718,6 +726,7 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
                 onChange={(e) => updateData("correctionFactor", e.target.value)}
                 data-testid="input-onboarding-correction"
               />
+              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
             </div>
             <p className="text-xs text-muted-foreground italic">
               You can always update these later in Settings.

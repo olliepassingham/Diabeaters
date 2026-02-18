@@ -30,6 +30,8 @@ import {
   RoutinesWidget,
   WidgetLibrary,
 } from "@/components/widgets";
+import { WelcomeWidget } from "@/components/widgets/welcome-widget";
+import { DiscoveryPrompt } from "@/components/discovery-prompts";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -734,6 +736,18 @@ export default function Dashboard() {
       {!isEditing && showBackupReminder && (
         <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
           <BackupReminderCard onDismiss={() => setShowBackupReminder(false)} />
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+          <WelcomeWidget />
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="animate-fade-in-up" style={{ animationDelay: '140ms' }}>
+          <DiscoveryPrompt />
         </div>
       )}
 
