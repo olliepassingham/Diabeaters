@@ -41,6 +41,7 @@ import {
   ChevronUp,
   Info,
   Search,
+  Settings,
 } from "lucide-react";
 import { storage, UserSettings, ScenarioState, RatioHistoryEntry } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay, formatRatioForStorage, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
@@ -330,6 +331,12 @@ export default function Ratios() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/settings?tab=insulin">
+            <Button variant="outline" size="sm" data-testid="button-ratio-settings">
+              <Settings className="h-4 w-4 mr-1" />
+              Settings
+            </Button>
+          </Link>
           {!editing ? (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="button-edit-ratios">
               <Pencil className="h-4 w-4 mr-1" />

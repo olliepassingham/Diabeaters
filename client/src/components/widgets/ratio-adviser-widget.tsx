@@ -4,13 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Syringe, ArrowRight, AlertCircle, Pill, ThermometerSun, ThermometerSnowflake } from "lucide-react";
 import { Link } from "wouter";
-import { storage, UserSettings, ScenarioState } from "@/lib/storage";
-
-function parseRatio(ratio?: string): number | null {
-  if (!ratio) return null;
-  const match = ratio.match(/1\s*:\s*(\d+(?:\.\d+)?)/);
-  return match ? parseFloat(match[1]) : null;
-}
+import { storage, UserSettings, ScenarioState, RatioFormat } from "@/lib/storage";
+import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 
 function getScenarioFactor(scenarioState: ScenarioState): { factor: number; label: string; icon: typeof Pill } | null {
   if (scenarioState.sickDayActive) {
@@ -34,13 +29,31 @@ function getScenarioFactor(scenarioState: ScenarioState): { factor: number; labe
   return null;
 }
 
+function displayRatio(storedRatio: string | undefined, ratioFormat: RatioFormat, scenarioFactor?: number): { base: string; adjusted: string | null } {
+  if (!storedRatio) return { base: "", adjusted: null };
+  const gpu = parseRatioToGramsPerUnit(storedRatio);
+  if (!gpu) return { base: storedRatio, adjusted: null };
+  const baseDisplay = formatRatioForDisplay(gpu, ratioFormat);
+  if (scenarioFactor) {
+    const adjustedGpu = gpu * scenarioFactor;
+    const adjustedDisplay = formatRatioForDisplay(adjustedGpu, ratioFormat);
+    return { base: baseDisplay, adjusted: adjustedDisplay };
+  }
+  return { base: baseDisplay, adjusted: null };
+}
+
 export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
   const [settings, setSettings] = useState<UserSettings>({});
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
 
   useEffect(() => {
     setSettings(storage.getSettings());
     setScenarioState(storage.getScenarioState());
+    const profile = storage.getProfile();
+    if (profile?.ratioFormat) {
+      setRatioFormat(profile.ratioFormat);
+    }
   }, []);
 
   const hasRatios = settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio;
@@ -73,18 +86,17 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
         {hasRatios ? (
           <div className="grid grid-cols-2 gap-2">
             {ratios.map((r) => {
-              const baseGrams = parseRatio(r.value);
-              const adjusted = scenario && baseGrams ? `1:${Math.round(baseGrams * scenario.factor)}` : null;
+              const { base, adjusted } = displayRatio(r.value, ratioFormat, scenario?.factor);
               return (
                 <div key={r.label} className="p-2 rounded-lg bg-muted/30 text-center">
                   <p className="text-xs text-muted-foreground">{r.label}</p>
                   {scenario && adjusted ? (
                     <div>
-                      <p className="text-xs text-muted-foreground line-through">{r.value}</p>
+                      <p className="text-xs text-muted-foreground line-through">{base}</p>
                       <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{adjusted}</p>
                     </div>
                   ) : (
-                    <p className="text-sm font-medium">{r.value}</p>
+                    <p className="text-sm font-medium">{base}</p>
                   )}
                 </div>
               );
