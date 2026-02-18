@@ -20,8 +20,8 @@ import {
   ArrowRight,
   Save,
 } from "lucide-react";
-import { storage, UserSettings } from "@/lib/storage";
-import { formatRatioForStorage } from "@/lib/ratio-utils";
+import { storage, UserSettings, RatioFormat } from "@/lib/storage";
+import { formatRatioForStorage, formatRatioForDisplay, parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -150,6 +150,17 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const [tddInput, setTddInput] = useState(settings.tdd ? settings.tdd.toString() : "");
   const [estimatedRatios, setEstimatedRatios] = useState<{ breakfast: number; lunch: number; dinner: number; snack: number } | null>(null);
 
+  const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
+  const [cpSize, setCpSize] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const profile = storage.getProfile();
+    if (profile?.ratioFormat) {
+      setRatioFormat(profile.ratioFormat);
+    }
+    setCpSize(profile?.carbPortionSize);
+  }, []);
+
   useEffect(() => {
     const ratiosExist = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
     if (ratiosExist && (mode === "detect")) {
@@ -162,11 +173,18 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
     }
   }, [settings]);
 
+  const formatStoredRatio = (storedRatio: string | undefined): string | undefined => {
+    if (!storedRatio) return undefined;
+    const gpu = parseRatioToGramsPerUnit(storedRatio);
+    if (!gpu) return storedRatio;
+    return formatRatioForDisplay(gpu, ratioFormat, cpSize);
+  };
+
   const mealOptions: { key: MealKey; label: string; icon: typeof Sun; ratio?: string }[] = [
-    { key: "breakfast", label: "Breakfast", icon: Sun, ratio: settings.breakfastRatio },
-    { key: "lunch", label: "Lunch", icon: Sunset, ratio: settings.lunchRatio },
-    { key: "dinner", label: "Dinner", icon: Moon, ratio: settings.dinnerRatio },
-    { key: "snack", label: "Snack", icon: Cookie, ratio: settings.snackRatio },
+    { key: "breakfast", label: "Breakfast", icon: Sun, ratio: formatStoredRatio(settings.breakfastRatio) },
+    { key: "lunch", label: "Lunch", icon: Sunset, ratio: formatStoredRatio(settings.lunchRatio) },
+    { key: "dinner", label: "Dinner", icon: Moon, ratio: formatStoredRatio(settings.dinnerRatio) },
+    { key: "snack", label: "Snack", icon: Cookie, ratio: formatStoredRatio(settings.snackRatio) },
   ];
 
   const handleReset = () => {
@@ -186,7 +204,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const handleSelectPattern = (p: PatternAnswer) => {
     setPattern(p);
     if (p === "on_target" || p === "not_sure") {
-      const currentRatio = selectedMeal ? settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined : undefined;
+      const currentRatio = selectedMeal ? formatStoredRatio(settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined) : undefined;
       setResult(getAdviserResult(selectedMeal!, p, "not_sure", "not_sure", currentRatio));
       setStep(4);
     } else {
@@ -201,7 +219,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   const handleSelectFrequency = (f: FrequencyAnswer) => {
     setFrequency(f);
-    const currentRatio = selectedMeal ? settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined : undefined;
+    const currentRatio = selectedMeal ? formatStoredRatio(settings[`${selectedMeal}Ratio` as keyof UserSettings] as string | undefined) : undefined;
     setResult(getAdviserResult(selectedMeal!, pattern!, timing!, f, currentRatio));
     setStep(4);
   };
@@ -386,7 +404,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             />
             {tddInput && parseFloat(tddInput) > 0 && (
               <p className="text-xs text-muted-foreground">
-                Using the 500 rule: 500 / {tddInput} = approximately 1:{Math.round((500 / parseFloat(tddInput)) * 10) / 10}g base ratio
+                Using the 500 rule: 500 / {tddInput} = approximately {formatRatioForDisplay(Math.round((500 / parseFloat(tddInput)) * 10) / 10, ratioFormat, cpSize)} base ratio
               </p>
             )}
           </div>
@@ -446,7 +464,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                   <Icon className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{label}</span>
                 </div>
-                <p className="text-lg font-semibold text-primary">1:{estimatedRatios[key]}g</p>
+                <p className="text-lg font-semibold text-primary">{formatRatioForDisplay(estimatedRatios[key], ratioFormat, cpSize)}</p>
                 <p className="text-xs text-muted-foreground">{note}</p>
               </div>
             ))}
