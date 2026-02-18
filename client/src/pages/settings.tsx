@@ -8,11 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check, ArrowRight } from "lucide-react";
 import { useTheme, COLOUR_THEMES, ColourThemeId } from "@/hooks/use-theme";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -206,10 +206,16 @@ function InsulinTab({
             </div>
           )}
 
-          <Label className="text-sm font-medium flex items-center">
-            Carb Ratios ({formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)})
-            <InfoTooltip {...DIABETES_TERMS.carbRatio} />
-          </Label>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Label className="text-sm font-medium flex items-center">
+              Carb Ratios ({formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)})
+              <InfoTooltip {...DIABETES_TERMS.carbRatio} />
+            </Label>
+            <Link href="/adviser?tab=ratios" className="text-xs text-muted-foreground flex items-center gap-1 hover:underline" data-testid="link-go-ratio-adviser">
+              Not sure? Try the Ratio Adviser
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
