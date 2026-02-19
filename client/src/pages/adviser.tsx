@@ -20,6 +20,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { useReleaseMode } from "@/lib/release-mode";
 
 
 function roundToHalf(value: number): number {
@@ -319,6 +320,7 @@ export default function Adviser() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [cameFromRatios, setCameFromRatios] = useState(false);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const { isBetaVisible } = useReleaseMode();
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1039,13 +1041,15 @@ export default function Adviser() {
             </Collapsible>
           </Card>
 
-          <Card className="border-dashed border-2 bg-muted/20">
-            <CardContent className="p-6 text-center space-y-2">
-              <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-              <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
-              <p className="text-sm text-muted-foreground/70">Conversational meal planning with personalised AI recommendations is coming in a future update.</p>
-            </CardContent>
-          </Card>
+          {isBetaVisible && (
+            <Card className="border-dashed border-2 bg-muted/20">
+              <CardContent className="p-6 text-center space-y-2">
+                <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+                <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
+                <p className="text-sm text-muted-foreground/70">Conversational meal planning with personalised AI recommendations is coming in a future update.</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="exercise" className="space-y-4 mt-4 animate-fade-in-up">
@@ -1380,13 +1384,15 @@ export default function Adviser() {
           )}
 
 
-          <Card className="border-dashed border-2 bg-muted/20">
-            <CardContent className="p-6 text-center space-y-2">
-              <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
-              <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
-              <p className="text-sm text-muted-foreground/70">Conversational exercise planning with personalised AI recommendations is coming in a future update.</p>
-            </CardContent>
-          </Card>
+          {isBetaVisible && (
+            <Card className="border-dashed border-2 bg-muted/20">
+              <CardContent className="p-6 text-center space-y-2">
+                <Sparkles className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+                <p className="font-medium text-muted-foreground">Ask the AI Adviser</p>
+                <p className="text-sm text-muted-foreground/70">Conversational exercise planning with personalised AI recommendations is coming in a future update.</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="routines" className="mt-4 animate-fade-in-up">
