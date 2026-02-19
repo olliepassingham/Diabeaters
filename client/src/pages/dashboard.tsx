@@ -709,10 +709,10 @@ export default function Dashboard() {
     setRefreshKey(prev => prev + 1);
   };
 
-  // Filter widgets: remove settings-completion from the list if we're showing it separately
+  const BETA_WIDGET_TYPES = ["community", "messages"];
   const enabledWidgets = widgets
     .filter(w => w.enabled)
-    .filter(w => !isSettingsComplete || w.type !== "settings-completion" ? true : true) // Keep settings widget in normal flow when complete
+    .filter(w => isBetaVisible || !BETA_WIDGET_TYPES.includes(w.type))
     .sort((a, b) => a.order - b.order);
 
   // When settings incomplete, filter out settings-completion widget from normal flow (we show SetupPromptCard instead)

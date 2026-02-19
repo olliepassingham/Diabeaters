@@ -27,6 +27,7 @@ import {
   Repeat
 } from "lucide-react";
 import { DashboardWidget, WidgetType, WidgetSize } from "@/lib/storage";
+import { useReleaseMode } from "@/lib/release-mode";
 import {
   DndContext,
   closestCenter,
@@ -270,7 +271,9 @@ function SortableWidgetItem({
 
 export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onResizeWidget, onReorderWidgets, onClose }: WidgetLibraryProps) {
   const [activeCategory, setActiveCategory] = useState<WidgetCategory | "all">("all");
-  const sortedWidgets = [...widgets].sort((a, b) => a.order - b.order);
+  const { isBetaVisible } = useReleaseMode();
+  const visibleWidgets = isBetaVisible ? widgets : widgets.filter(w => !WIDGET_INFO[w.type]?.beta);
+  const sortedWidgets = [...visibleWidgets].sort((a, b) => a.order - b.order);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -302,7 +305,8 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onResizeW
     }
   }, [sortedWidgets, onReorderWidgets]);
 
-  const categories: WidgetCategory[] = ["health", "supplies", "planning", "social", "setup"];
+  const categories: WidgetCategory[] = (["health", "supplies", "planning", "social", "setup"] as WidgetCategory[])
+    .filter(cat => sortedWidgets.some(w => WIDGET_INFO[w.type]?.category === cat));
   
   const filteredWidgets = activeCategory === "all" 
     ? sortedWidgets 
@@ -311,7 +315,7 @@ export function WidgetLibrary({ widgets, onToggleWidget, onMoveWidget, onResizeW
         return info && info.category === activeCategory;
       });
 
-  const enabledCount = widgets.filter(w => w.enabled).length;
+  const enabledCount = visibleWidgets.filter(w => w.enabled).length;
   const isFiltered = activeCategory !== "all";
 
   return (

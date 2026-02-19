@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, ArrowRight, Package, Utensils, Dumbbell, Moon, Plane, Calculator, MessageCircle, Calendar } from "lucide-react";
 import { Link } from "wouter";
+import { useReleaseMode } from "@/lib/release-mode";
 
 const ENGAGEMENT_KEY = "diabeater_feature_engagement";
 const DISMISSED_PROMPTS_KEY = "diabeater_dismissed_prompts";
@@ -19,6 +20,7 @@ interface FeaturePrompt {
   iconColor: string;
   iconBg: string;
   requiresEngagement?: string[];
+  beta?: boolean;
 }
 
 const PROMPTS: FeaturePrompt[] = [
@@ -92,6 +94,7 @@ const PROMPTS: FeaturePrompt[] = [
     iconColor: "text-purple-600 dark:text-purple-400",
     iconBg: "bg-purple-500/10",
     requiresEngagement: ["supplies", "adviser-meal"],
+    beta: true,
   },
   {
     id: "discover-appointments",
@@ -131,6 +134,7 @@ export function trackFeatureEngagement(feature: string) {
 
 export function DiscoveryPrompt() {
   const [currentPrompt, setCurrentPrompt] = useState<FeaturePrompt | null>(null);
+  const { isBetaVisible } = useReleaseMode();
 
   const findNextPrompt = useCallback(() => {
     const engagement = getEngagement();
@@ -141,6 +145,7 @@ export function DiscoveryPrompt() {
 
     for (const prompt of PROMPTS) {
       if (dismissed.includes(prompt.id)) continue;
+      if (prompt.beta && !isBetaVisible) continue;
 
       if ((engagement[prompt.feature] || 0) > 0) continue;
 
@@ -154,7 +159,7 @@ export function DiscoveryPrompt() {
       return prompt;
     }
     return null;
-  }, []);
+  }, [isBetaVisible]);
 
   useEffect(() => {
     setCurrentPrompt(findNextPrompt());
