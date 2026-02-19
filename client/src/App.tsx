@@ -1,6 +1,6 @@
 
 // client/src/App.tsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -11,10 +11,6 @@ import { Toaster } from "@/components/ui/toaster";
 // ✅ TooltipProvider is a named export
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-// ✅ SidebarProvider / SidebarTrigger are named exports from ui/sidebar.tsx
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-
-import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { ProfileMenu } from "@/components/profile-menu";
 import { FaceLogo } from "@/components/face-logo";
@@ -122,57 +118,44 @@ function AppContent() {
     );
   }
 
-  const style = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3rem",
-  } as React.CSSProperties;
-
   return (
-    <SidebarProvider style={style}>
-      <div className="flex h-screen w-full">
-        <div className="hidden md:block">
-          <AppSidebar />
+    <div className="flex flex-col h-screen w-full">
+      <OfflineBanner />
+      <SickDayBanner />
+      <TravelBanner />
+      <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-30">
+        <button
+          onClick={() => {
+            if (location !== "/") {
+              setLocation("/");
+            }
+          }}
+          className={`flex items-center gap-3 transition-all duration-200 ${
+            location === "/"
+              ? "cursor-default"
+              : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
+          }`}
+          data-testid="button-home-brand"
+        >
+          <FaceLogo size={40} />
+          <span className="font-semibold text-xl">Diabeaters</span>
+        </button>
+        <div className="flex items-center gap-2">
+          <MessagesIcon />
+          <NotificationBell />
+          <ProfileMenu />
         </div>
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <OfflineBanner />
-          <SickDayBanner />
-          <TravelBanner />
-          <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-30">
-            <SidebarTrigger className="hidden md:flex" data-testid="button-sidebar-toggle" />
-            <button
-              onClick={() => {
-                if (location !== "/") {
-                  setLocation("/");
-                }
-              }}
-              className={`flex items-center gap-3 transition-all duration-200 ${
-                location === "/"
-                  ? "cursor-default"
-                  : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
-              }`}
-              data-testid="button-home-brand"
-            >
-              <FaceLogo size={40} />
-              <span className="font-semibold text-xl">Diabeaters</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <MessagesIcon />
-              <NotificationBell />
-              <ProfileMenu />
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
-            <div key={location} className="animate-fade-in-up">
-              <Router />
-            </div>
-          </main>
-          <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground mb-12">
-            <p>Copyright PassingTime Ltd {new Date().getFullYear()}</p>
-          </footer>
+      </header>
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
+        <div key={location} className="animate-fade-in-up">
+          <Router />
         </div>
-      </div>
+      </main>
+      <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground mb-12">
+        <p>Copyright PassingTime Ltd {new Date().getFullYear()}</p>
+      </footer>
       <BottomNav />
-    </SidebarProvider>
+    </div>
   );
 }
 
