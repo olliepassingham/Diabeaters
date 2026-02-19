@@ -269,7 +269,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         )}
 
         <p className="text-center text-xs text-muted-foreground pt-4">
-          Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}
+          Copyright PassingTime Ltd {new Date().getFullYear()}
         </p>
       </div>
     </div>

@@ -29,6 +29,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 
 // Error boundary for production
 import { ErrorBoundary } from "@/components/error-boundary";
+import { useReleaseMode } from "@/lib/release-mode";
 
 // Pages — your pages appear to be default exports (based on your existing imports)
 // If any are named, change imports accordingly.
@@ -50,21 +51,23 @@ import Ratios from "@/pages/ratios";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const { isBetaVisible } = useReleaseMode();
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/supplies" component={Supplies} />
       <Route path="/scenarios" component={Scenarios} />
       <Route path="/adviser" component={Adviser} />
-      <Route path="/ai-coach" component={AICoach} />
-      <Route path="/community" component={Community} />
+      {isBetaVisible && <Route path="/ai-coach" component={AICoach} />}
+      {isBetaVisible && <Route path="/community" component={Community} />}
       <Route path="/appointments" component={Appointments} />
       <Route path="/emergency-card" component={EmergencyCard} />
-            <Route path="/settings" component={Settings} />
+      <Route path="/settings" component={Settings} />
       <Route path="/help-now" component={HelpNow} />
-      <Route path="/shop" component={Shop} />
-      <Route path="/family-carers" component={FamilyCarers} />
-      <Route path="/carer-view" component={CarerView} />
+      {isBetaVisible && <Route path="/shop" component={Shop} />}
+      {isBetaVisible && <Route path="/family-carers" component={FamilyCarers} />}
+      {isBetaVisible && <Route path="/carer-view" component={CarerView} />}
       <Route path="/ratios" component={Ratios} />
       <Route component={NotFound} />
     </Switch>
@@ -164,7 +167,7 @@ function AppContent() {
             </div>
           </main>
           <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground mb-12">
-            <p>Prototype - Copyright PassingTime Ltd {new Date().getFullYear()}</p>
+            <p>Copyright PassingTime Ltd {new Date().getFullYear()}</p>
           </footer>
         </div>
       </div>

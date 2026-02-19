@@ -32,6 +32,7 @@ import {
 } from "@/components/widgets";
 import { WelcomeWidget } from "@/components/widgets/welcome-widget";
 import { DiscoveryPrompt } from "@/components/discovery-prompts";
+import { useReleaseMode } from "@/lib/release-mode";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -226,6 +227,7 @@ function DashboardInfoDialog() {
 function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
   const isUrgent = status === "action";
   const { toast } = useToast();
+  const { isBetaVisible: heroBetaVisible } = useReleaseMode();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [hypoGlucose, setHypoGlucose] = useState("");
   const [hypoTreatment, setHypoTreatment] = useState("");
@@ -289,16 +291,18 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         </Button>
         <div className="flex items-center gap-2 shrink-0">
           <DashboardInfoDialog />
-          <Link href="/ai-coach">
-            <Button 
-              variant="outline"
-              size="icon"
-              className="rounded-full"
-              data-testid="button-ai-coach"
-            >
-              <MessageCircle className="h-4 w-4" />
-            </Button>
-          </Link>
+          {heroBetaVisible && (
+            <Link href="/ai-coach">
+              <Button 
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                data-testid="button-ai-coach"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
           <Button 
             variant="outline" 
             size="icon"
@@ -316,7 +320,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-600" />
               Log Hypo Treatment
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Beta</Badge>
+              {heroBetaVisible && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Beta</Badge>}
             </DialogTitle>
             <DialogDescription>
               Record details about your hypo treatment.
@@ -364,7 +368,9 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
               <p className="text-sm text-muted-foreground">
-                Carer notifications coming soon. For now, your hypo is saved locally for your own records.
+                {heroBetaVisible
+                  ? "Carer notifications coming soon. For now, your hypo is saved locally for your own records."
+                  : "Your hypo treatment is saved locally for your own records."}
               </p>
             </div>
             <Button
@@ -610,6 +616,7 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
 }
 
 export default function Dashboard() {
+  const { isBetaVisible } = useReleaseMode();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });

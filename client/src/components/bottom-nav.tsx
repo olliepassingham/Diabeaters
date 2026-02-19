@@ -2,6 +2,7 @@ import { Home, Package, Bot, AlertTriangle, MoreHorizontal } from "lucide-react"
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { useReleaseMode } from "@/lib/release-mode";
 import {
   Sheet,
   SheetContent,
@@ -30,8 +31,10 @@ const moreItems = [
 export function BottomNav() {
   const [location] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const { isBetaVisible } = useReleaseMode();
 
-  const isMoreActive = moreItems.some(item => location === item.url);
+  const visibleMoreItems = moreItems.filter(item => !("beta" in item && item.beta) || isBetaVisible);
+  const isMoreActive = visibleMoreItems.some(item => location === item.url);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t safe-area-bottom" data-testid="nav-bottom">
@@ -74,7 +77,7 @@ export function BottomNav() {
               <SheetTitle className="text-left">More</SheetTitle>
             </SheetHeader>
             <div className="grid grid-cols-3 gap-3 pt-2">
-              {moreItems.map((item) => {
+              {visibleMoreItems.map((item) => {
                 const isActive = location === item.url;
                 return (
                   <Link key={item.url} href={item.url}>

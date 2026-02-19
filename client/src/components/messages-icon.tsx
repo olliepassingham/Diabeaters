@@ -4,10 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Mail } from "lucide-react";
 import { storage } from "@/lib/storage";
 import { useLocation } from "wouter";
+import { useReleaseMode } from "@/lib/release-mode";
 
 export function MessagesIcon() {
   const [, setLocation] = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
+  const { isBetaVisible } = useReleaseMode();
 
   useEffect(() => {
     const loadUnread = () => {
@@ -18,6 +20,8 @@ export function MessagesIcon() {
     const interval = setInterval(loadUnread, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  if (!isBetaVisible) return null;
 
   return (
     <Button 

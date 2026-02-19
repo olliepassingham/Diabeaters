@@ -2,6 +2,7 @@ import { Home, Package, Bot, Settings, Phone, Users, Calendar, AlertTriangle, Sh
 import { Link, useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogo } from "@/components/face-logo";
+import { useReleaseMode } from "@/lib/release-mode";
 import {
   Sidebar,
   SidebarContent,
@@ -68,6 +69,9 @@ const items = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { isBetaVisible } = useReleaseMode();
+
+  const visibleItems = items.filter(item => !("beta" in item && item.beta) || isBetaVisible);
 
   return (
     <Sidebar>
@@ -86,7 +90,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                     <Link href={item.url}>
