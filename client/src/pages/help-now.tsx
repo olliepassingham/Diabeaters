@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, Phone, Plus, User, Trash2, Heart, Settings, X, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, Phone, Plus, User, Trash2, Heart, Settings, X, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { storage, EmergencyContact, UserProfile } from "@/lib/storage";
 
@@ -458,6 +459,18 @@ export default function HelpNow() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pb-4 mt-4">
+        <span className="flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Not medical advice — always follow your diabetes team's guidance
+        </span>
+        <span className="text-muted-foreground/50">|</span>
+        <Link href="/settings?tab=sources" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
+          <BookOpen className="h-3 w-3" />
+          Sources
+        </Link>
+      </div>
     </div>
   );
 }

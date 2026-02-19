@@ -30,6 +30,7 @@ import {
   Save,
   X,
   AlertCircle,
+  BookOpen,
   ThermometerSun,
   ThermometerSnowflake,
   Pill,
@@ -697,9 +698,16 @@ export default function Ratios() {
         )}
       </Card>
 
-      <div className="flex items-center gap-1 text-xs text-muted-foreground justify-center pb-4">
-        <AlertCircle className="h-3 w-3" />
-        <span>Not medical advice — always follow your diabetes team's guidance</span>
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pb-4">
+        <span className="flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Not medical advice — always follow your diabetes team's guidance
+        </span>
+        <span className="text-muted-foreground/50">|</span>
+        <Link href="/settings?tab=sources" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
+          <BookOpen className="h-3 w-3" />
+          Sources
+        </Link>
       </div>
     </div>
   );

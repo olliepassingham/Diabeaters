@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane, BookOpen } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
@@ -1560,6 +1560,18 @@ export default function Adviser() {
           <RatioAdviserTool settings={settings} bgUnit={bgUnits} onSettingsUpdate={(s) => setSettings(s)} onNavigateToMeal={() => setActiveTab("meal")} />
         </TabsContent>
       </Tabs>
+
+      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pb-4 mt-4">
+        <span className="flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          Not medical advice — always follow your diabetes team's guidance
+        </span>
+        <span className="text-muted-foreground/50">|</span>
+        <Link href="/settings?tab=sources" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
+          <BookOpen className="h-3 w-3" />
+          Sources
+        </Link>
+      </div>
     </div>
   );
 }

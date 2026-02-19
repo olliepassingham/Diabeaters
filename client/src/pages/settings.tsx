@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check, ArrowRight } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 import { useTheme, COLOUR_THEMES, ColourThemeId } from "@/hooks/use-theme";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -648,6 +648,92 @@ function EmergencyContactsTab({
   );
 }
 
+const SOURCES = [
+  {
+    category: "General Diabetes Management",
+    sources: [
+      { org: "International Diabetes Federation (IDF)", title: "IDF Diabetes Atlas", url: "https://diabetesatlas.org/" },
+      { org: "NHS UK", title: "Type 1 Diabetes Overview", url: "https://www.nhs.uk/conditions/type-1-diabetes/" },
+      { org: "American Diabetes Association (ADA)", title: "Standards of Medical Care in Diabetes", url: "https://diabetes.org/about-diabetes/type-1" },
+    ],
+  },
+  {
+    category: "Hypoglycaemia Treatment",
+    sources: [
+      { org: "Diabetes UK", title: "Hypoglycaemia (Low Blood Sugar) Guidance", url: "https://www.diabetes.org.uk/about-diabetes/hypos" },
+      { org: "Mayo Clinic", title: "Hypoglycemia: Symptoms & Treatment", url: "https://www.mayoclinic.org/diseases-conditions/hypoglycemia/symptoms-causes/syc-20373685" },
+    ],
+  },
+  {
+    category: "Carbohydrate Counting & Insulin Ratios",
+    sources: [
+      { org: "NHS", title: "Carb Counting for People with Type 1 Diabetes", url: "https://www.nhs.uk/conditions/type-1-diabetes/understanding-food/" },
+      { org: "Diabetes UK", title: "Carbohydrate Counting", url: "https://www.diabetes.org.uk/guide-to-diabetes/enjoy-food/carbohydrates-and-diabetes/carb-counting" },
+      { org: "ISPAD", title: "International Society for Pediatric and Adolescent Diabetes Guidelines", url: "https://www.ispad.org/" },
+    ],
+  },
+  {
+    category: "Exercise & Insulin Adjustment",
+    sources: [
+      { org: "JDRF", title: "Exercise and Type 1 Diabetes", url: "https://www.jdrf.org/t1d-resources/living-with-t1d/exercise/" },
+      { org: "American Diabetes Association (ADA)", title: "Physical Activity and Diabetes", url: "https://diabetes.org/health-wellness/fitness" },
+    ],
+  },
+];
+
+function SourcesTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-primary" />
+          <CardTitle>Sources & References</CardTitle>
+        </div>
+        <CardDescription>
+          The guidance in this app is informed by the following reputable, publicly accessible sources. This app does not provide medical advice — always consult your diabetes team.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6" data-testid="sources-content">
+        {SOURCES.map((section) => (
+          <div key={section.category} className="space-y-2">
+            <h3 className="text-sm font-semibold" data-testid={`sources-heading-${section.category.toLowerCase().replace(/\s+/g, "-")}`}>
+              {section.category}
+            </h3>
+            <ul className="space-y-1.5">
+              {section.sources.map((source) => (
+                <li key={source.title} className="text-sm flex items-start gap-2">
+                  <span className="text-muted-foreground shrink-0 mt-0.5">-</span>
+                  <span>
+                    <span className="font-medium">{source.org}</span>
+                    <span className="text-muted-foreground"> — {source.title}</span>
+                    {source.url && (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 ml-1.5 text-primary hover:underline"
+                        data-testid={`link-source-${source.org.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span className="sr-only">Visit {source.org}</span>
+                      </a>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <div className="pt-2 border-t">
+          <p className="text-xs text-muted-foreground">
+            These sources are provided for reference only. Diabeaters does not replace professional medical advice. Always follow the guidance of your diabetes healthcare team.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AppearanceTab() {
   const { theme, colourTheme, toggleTheme, setColourTheme } = useTheme();
   const { toast } = useToast();
@@ -817,7 +903,7 @@ export default function Settings() {
   const [, setLocation] = useLocation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
-  const validTabs = ["profile", "insulin", "usage", "notifications", "contacts", "data", "appearance"];
+  const validTabs = ["profile", "insulin", "usage", "notifications", "contacts", "data", "appearance", "sources"];
   const urlTab = new URLSearchParams(window.location.search).get("tab");
   const [activeTab, setActiveTab] = useState(urlTab && validTabs.includes(urlTab) ? urlTab : "profile");
   
@@ -1164,7 +1250,7 @@ export default function Settings() {
 
       <div className="max-w-3xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="settings-tabs">
-          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-7" data-testid="settings-tab-list">
+          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-8" data-testid="settings-tab-list">
             <TabsTrigger value="profile" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-profile">
               <User className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Profile</span>
@@ -1192,6 +1278,10 @@ export default function Settings() {
             <TabsTrigger value="appearance" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-appearance">
               <Palette className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Theme</span>
+            </TabsTrigger>
+            <TabsTrigger value="sources" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-sources">
+              <BookOpen className="h-4 w-4 mr-1.5 shrink-0" />
+              <span>Sources</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1268,6 +1358,10 @@ export default function Settings() {
 
             <TabsContent value="appearance" className="animate-fade-in-up">
               <AppearanceTab />
+            </TabsContent>
+
+            <TabsContent value="sources" className="animate-fade-in-up">
+              <SourcesTab />
             </TabsContent>
           </div>
         </Tabs>
