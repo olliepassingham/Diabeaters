@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { User, Crown, HelpCircle, Sparkles, Shield, FileText, Moon, Sun, ChevronRight } from "lucide-react";
+import { useReleaseMode } from "@/lib/release-mode";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ export function ProfileMenu() {
   const [feedbackText, setFeedbackText] = useState("");
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
+  const { isBetaVisible } = useReleaseMode();
 
   const handleSubmitFeedback = () => {
     if (feedbackText.trim()) {
@@ -145,18 +147,20 @@ export function ProfileMenu() {
                 You have access to all core features including supply tracking, activity adviser, and community.
               </p>
             </div>
-            <div className="p-4 rounded-lg border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-lg">Premium</span>
-                <span className="text-sm text-muted-foreground">Coming soon</span>
+            {isBetaVisible && (
+              <div className="p-4 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-lg">Premium</span>
+                  <span className="text-sm text-muted-foreground">Coming soon</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Enhanced features including advanced analytics, unlimited AI queries, and priority support.
+                </p>
+                <Button variant="outline" disabled className="w-full">
+                  Notify me when available
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Enhanced features including advanced analytics, unlimited AI queries, and priority support.
-              </p>
-              <Button variant="outline" disabled className="w-full">
-                Notify me when available
-              </Button>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

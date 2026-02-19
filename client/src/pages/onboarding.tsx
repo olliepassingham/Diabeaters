@@ -13,6 +13,7 @@ import { storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
+import { useReleaseMode } from "@/lib/release-mode";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
@@ -277,6 +278,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 }
 
 function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+  const { isBetaVisible } = useReleaseMode();
   return (
     <div className="text-center space-y-8">
       <div className="space-y-4">
@@ -329,24 +331,28 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
                   <Check className="h-4 w-4 text-primary" />
                 )}
               </button>
-              <button
-                type="button"
-                disabled
-                className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
-                data-testid="button-diabetes-type2"
-              >
-                <span className="font-medium text-sm text-muted-foreground">Type 2</span>
-                <span className="text-xs text-muted-foreground">Coming soon</span>
-              </button>
-              <button
-                type="button"
-                disabled
-                className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
-                data-testid="button-diabetes-gestational"
-              >
-                <span className="font-medium text-sm text-muted-foreground">Gestational</span>
-                <span className="text-xs text-muted-foreground">Coming soon</span>
-              </button>
+              {isBetaVisible && (
+                <>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
+                    data-testid="button-diabetes-type2"
+                  >
+                    <span className="font-medium text-sm text-muted-foreground">Type 2</span>
+                    <span className="text-xs text-muted-foreground">Coming soon</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled
+                    className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
+                    data-testid="button-diabetes-gestational"
+                  >
+                    <span className="font-medium text-sm text-muted-foreground">Gestational</span>
+                    <span className="text-xs text-muted-foreground">Coming soon</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </CardContent>
