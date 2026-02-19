@@ -563,8 +563,10 @@ export default function Adviser() {
     };
     const val = ratioMap[meal];
     if (!val) return "Not set";
-    if (val.includes(":")) return val;
-    return `${val} u/10g`;
+    const gpu = parseRatioToGramsPerUnit(val);
+    if (!gpu || gpu <= 0) return "Not set";
+    const fmt: RatioFormat = profile.ratioFormat || "per10g";
+    return formatRatioForDisplay(gpu, fmt, profile.carbPortionSize);
   };
 
   return (
