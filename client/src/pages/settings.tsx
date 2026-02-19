@@ -17,7 +17,6 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioForStorage, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
-import { useReleaseMode, type ReleaseMode } from "@/lib/release-mode";
 import type { RatioFormat } from "@/lib/storage";
 import { validateTDD, validateCorrectionFactor, validateTargetBgLow, validateTargetBgHigh, validateTargetRange, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
@@ -820,7 +819,6 @@ function AppearanceTab() {
 
 function DataTab() {
   const { toast } = useToast();
-  const { mode, setMode: setReleaseMode } = useReleaseMode();
 
   const handleExport = () => {
     const data = storage.exportAllData();
@@ -896,32 +894,6 @@ function DataTab() {
           </p>
         </div>
 
-        <div className="border-t pt-4 space-y-3">
-          <div className="space-y-1">
-            <Label className="font-medium">Release Mode</Label>
-            <p className="text-sm text-muted-foreground">
-              Controls which features are visible. "App Store" hides beta and preview features for a polished release.
-            </p>
-          </div>
-          <Select value={mode} onValueChange={(v) => {
-            setReleaseMode(v as ReleaseMode);
-            toast({
-              title: v === "appstore" ? "App Store mode enabled" : "Full mode enabled",
-              description: v === "appstore"
-                ? "Beta features are now hidden. Refresh other open tabs to apply."
-                : "All features including beta previews are now visible.",
-            });
-            setTimeout(() => window.location.reload(), 800);
-          }}>
-            <SelectTrigger data-testid="select-release-mode">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="full">Full (all features visible)</SelectItem>
-              <SelectItem value="appstore">App Store (hide beta features)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </CardContent>
     </Card>
   );

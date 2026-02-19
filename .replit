@@ -39,3 +39,8 @@ deploymentTarget = "cloudrun"
 
 [[deployment.healthChecks]]
 path = "/health"
+
+[userenv]
+
+[userenv.development]
+VITE_RELEASE_MODE = "full"
