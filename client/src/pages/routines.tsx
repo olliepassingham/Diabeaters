@@ -95,7 +95,10 @@ function getIntensityStyle(intensity: ExerciseIntensity): string {
 }
 
 export function RoutinesContent() {
-  const [activeSection, setActiveSection] = useState<"meals" | "exercise">("meals");
+  const [activeSection, setActiveSection] = useState<"meals" | "exercise">(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("section") === "exercise" ? "exercise" : "meals";
+  });
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);

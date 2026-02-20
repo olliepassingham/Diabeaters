@@ -12,5 +12,5 @@ export { HelpNowInfoWidget } from "./help-now-info-widget";
 export { AppointmentsWidget } from "./appointments-widget";
 export { TipOfDayWidget } from "./tip-of-day-widget";
 export { RoutinesWidget } from "./routines-widget";
-export { ComingUpWidget } from "./coming-up-widget";
+export { QuickExerciseWidget } from "./coming-up-widget";
 export { WidgetLibrary, WIDGET_INFO } from "./widget-library";

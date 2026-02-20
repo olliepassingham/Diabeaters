@@ -338,6 +338,28 @@ export default function Adviser() {
     if (trackTab === "meal" || trackTab === "exercise") {
       trackFeatureEngagement(`adviser-${trackTab}`);
     }
+
+    const validTypes = ["cardio", "strength", "hiit", "yoga", "walking", "sports", "swimming"];
+    const validIntensities = ["light", "moderate", "intense"];
+    const prefillType = params.get("type");
+    const prefillDuration = params.get("duration");
+    const prefillIntensity = params.get("intensity");
+    if (tab === "exercise" && prefillType && prefillDuration && validTypes.includes(prefillType)) {
+      setExerciseType(prefillType);
+      setExerciseDuration(prefillDuration);
+      if (prefillIntensity && validIntensities.includes(prefillIntensity)) setExerciseIntensity(prefillIntensity);
+      if (params.get("auto") === "1") {
+        const tryClick = (attempts: number) => {
+          const btn = document.querySelector('[data-testid="button-get-exercise-advice"]') as HTMLButtonElement;
+          if (btn && !btn.disabled) {
+            btn.click();
+          } else if (attempts > 0) {
+            setTimeout(() => tryClick(attempts - 1), 200);
+          }
+        };
+        setTimeout(() => tryClick(5), 300);
+      }
+    }
   }, []);
   
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
@@ -1455,7 +1477,7 @@ export default function Adviser() {
                     </button>
                   );
                 })}
-                <Link href="/adviser?tab=routines" className="block">
+                <Link href="/adviser?tab=routines&section=exercise" className="block">
                   <Button variant="ghost" size="sm" className="w-full mt-1 text-xs" data-testid="link-manage-routines">
                     <Repeat className="h-3 w-3 mr-1" />
                     Manage Routines

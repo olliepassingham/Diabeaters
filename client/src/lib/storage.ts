@@ -280,7 +280,7 @@ export type WidgetType =
   | "appointments"
   | "tip-of-day"
   | "routines"
-  | "coming-up";
+  | "quick-exercise";
 
 export type WidgetSize = "full" | "half";
 
@@ -597,12 +597,12 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "messages": "half",
   "tip-of-day": "half",
   "routines": "half",
-  "coming-up": "half",
+  "quick-exercise": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
-  { id: "coming-up", type: "coming-up", enabled: true, order: 1, size: "half" },
+  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 1, size: "half" },
   { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 2, size: "half" },
   { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 4, size: "full" },
@@ -2430,6 +2430,18 @@ export const storage = {
     };
     localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(routines));
     return routines[index];
+  },
+
+  getRecentExercises(limit: number = 5): ExerciseRoutine[] {
+    const routines = this.getExerciseRoutines();
+    return [...routines]
+      .sort((a, b) => {
+        if (a.lastUsed && b.lastUsed) return new Date(b.lastUsed).getTime() - new Date(a.lastUsed).getTime();
+        if (a.lastUsed) return -1;
+        if (b.lastUsed) return 1;
+        return b.timesUsed - a.timesUsed || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
+      .slice(0, limit);
   },
 
   getNextScheduledExercise(): UpcomingExercise | null {

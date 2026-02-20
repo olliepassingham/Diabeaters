@@ -167,10 +167,10 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     icon: Repeat,
     category: "planning",
   },
-  "coming-up": {
-    type: "coming-up",
-    name: "Coming Up",
-    description: "Your next scheduled exercise with preparation tips",
+  "quick-exercise": {
+    type: "quick-exercise",
+    name: "Quick Exercise",
+    description: "Tap a saved exercise for instant diabetes-aware workout advice",
     icon: Dumbbell,
     category: "planning",
   },

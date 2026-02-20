@@ -28,7 +28,7 @@ import {
   TipOfDayWidget,
   AppointmentsWidget,
   RoutinesWidget,
-  ComingUpWidget,
+  QuickExerciseWidget,
   WidgetLibrary,
 } from "@/components/widgets";
 import { WelcomeWidget } from "@/components/widgets/welcome-widget";
@@ -611,8 +611,8 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
       return <TipOfDayWidget compact={compact} />;
     case "routines":
       return <RoutinesWidget compact={compact} />;
-    case "coming-up":
-      return <ComingUpWidget compact={compact} />;
+    case "quick-exercise":
+      return <QuickExerciseWidget compact={compact} />;
     default:
       return null;
   }
