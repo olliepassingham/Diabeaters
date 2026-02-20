@@ -132,11 +132,13 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
 function PrescriptionCyclePanel({ 
   cycle, 
   onSave, 
-  supplies 
+  supplies,
+  scenarioState 
 }: { 
   cycle: PrescriptionCycle | null; 
   onSave: (cycle: PrescriptionCycle) => void;
   supplies: Supply[];
+  scenarioState: ScenarioState;
 }) {
   const [editing, setEditing] = useState(false);
   const [intervalDays, setIntervalDays] = useState(cycle?.intervalDays?.toString() || "28");
@@ -169,7 +171,32 @@ function PrescriptionCyclePanel({
     setEditing(false);
   };
 
-  const getNextOrderDate = (): Date | null => {
+  const travelStart = scenarioState.travelModeActive && scenarioState.travelStartDate 
+    ? new Date(scenarioState.travelStartDate) : null;
+  const travelEnd = scenarioState.travelModeActive && scenarioState.travelEndDate 
+    ? new Date(scenarioState.travelEndDate) : null;
+
+  const fallsDuringTravel = (date: Date): boolean => {
+    if (!travelStart || !travelEnd) return false;
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const ts = new Date(travelStart);
+    ts.setHours(0, 0, 0, 0);
+    const te = new Date(travelEnd);
+    te.setHours(0, 0, 0, 0);
+    return d >= ts && d <= te;
+  };
+
+  const adjustForTravel = (date: Date): { date: Date; adjusted: boolean } => {
+    if (fallsDuringTravel(date) && travelStart) {
+      const dayBefore = addDays(new Date(travelStart), -1);
+      dayBefore.setHours(12, 0, 0, 0);
+      return { date: dayBefore, adjusted: true };
+    }
+    return { date, adjusted: false };
+  };
+
+  const getRawNextOrderDate = (): Date | null => {
     if (!cycle) return null;
     const interval = cycle.intervalDays || 28;
     const lead = Math.min(cycle.leadTimeDays || 5, interval - 1);
@@ -182,7 +209,7 @@ function PrescriptionCyclePanel({
     return null;
   };
 
-  const getNextCollectionDate = (): Date | null => {
+  const getRawNextCollectionDate = (): Date | null => {
     if (!cycle) return null;
     const interval = cycle.intervalDays || 28;
     if (cycle.lastCollectionDate) {
@@ -195,20 +222,34 @@ function PrescriptionCyclePanel({
     return null;
   };
 
+  const getNextOrderDate = (): { date: Date; adjusted: boolean } | null => {
+    const raw = getRawNextOrderDate();
+    if (!raw) return null;
+    return adjustForTravel(raw);
+  };
+
+  const getNextCollectionDate = (): { date: Date; adjusted: boolean } | null => {
+    const raw = getRawNextCollectionDate();
+    if (!raw) return null;
+    return adjustForTravel(raw);
+  };
+
   const getDaysUntilOrder = (): number | null => {
-    const nextOrder = getNextOrderDate();
-    if (!nextOrder) return null;
-    return differenceInDays(nextOrder, new Date());
+    const result = getNextOrderDate();
+    if (!result) return null;
+    return differenceInDays(result.date, new Date());
   };
 
   const getDaysUntilCollection = (): number | null => {
-    const nextCollection = getNextCollectionDate();
-    if (!nextCollection) return null;
-    return differenceInDays(nextCollection, new Date());
+    const result = getNextCollectionDate();
+    if (!result) return null;
+    return differenceInDays(result.date, new Date());
   };
 
   const daysUntilOrder = getDaysUntilOrder();
   const daysUntilCollection = getDaysUntilCollection();
+  const orderAdjustedForTravel = getNextOrderDate()?.adjusted || false;
+  const collectionAdjustedForTravel = getNextCollectionDate()?.adjusted || false;
   const needsSetup = !cycle;
   const orderOverdue = daysUntilOrder !== null && daysUntilOrder < 0;
   const orderSoon = daysUntilOrder !== null && daysUntilOrder >= 0 && daysUntilOrder <= 3;
@@ -306,22 +347,30 @@ function PrescriptionCyclePanel({
               <div className="space-y-2">
                 {daysUntilOrder !== null && (
                   <div className={`p-3 rounded-lg ${
+                    orderAdjustedForTravel ? "bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" :
                     orderOverdue ? "bg-red-50 dark:bg-red-950/30" : 
                     orderSoon ? "bg-yellow-50 dark:bg-yellow-950/30" : "bg-muted/30"
                   }`} data-testid="card-next-order">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-xs text-muted-foreground mb-0.5">
-                          {orderOverdue ? "Reorder overdue" : "Reorder by"}
+                          {orderAdjustedForTravel ? "Reorder before trip" : orderOverdue ? "Reorder overdue" : "Reorder by"}
                         </p>
                         <p className={`text-sm font-medium ${
+                          orderAdjustedForTravel ? "text-blue-700 dark:text-blue-400" :
                           orderOverdue ? "text-red-700 dark:text-red-400" : 
                           orderSoon ? "text-yellow-700 dark:text-yellow-400" : ""
                         }`}>
-                          {format(getNextOrderDate()!, "d MMMM yyyy")}
+                          {format(getNextOrderDate()!.date, "d MMMM yyyy")}
                         </p>
+                        {orderAdjustedForTravel && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1">
+                            <Plane className="h-3 w-3" />
+                            Moved earlier — your trip starts {format(travelStart!, "d MMM")}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant={orderOverdue ? "destructive" : orderSoon ? "secondary" : "outline"}>
+                      <Badge variant={orderAdjustedForTravel ? "secondary" : orderOverdue ? "destructive" : orderSoon ? "secondary" : "outline"}>
                         {orderOverdue ? `${Math.abs(daysUntilOrder)} days overdue` : 
                          daysUntilOrder === 0 ? "Today" :
                          `${daysUntilOrder} day${daysUntilOrder !== 1 ? "s" : ""}`}
@@ -331,15 +380,25 @@ function PrescriptionCyclePanel({
                 )}
 
                 {daysUntilCollection !== null && (
-                  <div className="p-3 rounded-lg bg-muted/30" data-testid="card-next-collection">
+                  <div className={`p-3 rounded-lg ${
+                    collectionAdjustedForTravel ? "bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" : "bg-muted/30"
+                  }`} data-testid="card-next-collection">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-0.5">Next collection due</p>
-                        <p className="text-sm font-medium">
-                          {format(getNextCollectionDate()!, "d MMMM yyyy")}
+                        <p className="text-xs text-muted-foreground mb-0.5">
+                          {collectionAdjustedForTravel ? "Collect before trip" : "Next collection due"}
                         </p>
+                        <p className={`text-sm font-medium ${collectionAdjustedForTravel ? "text-blue-700 dark:text-blue-400" : ""}`}>
+                          {format(getNextCollectionDate()!.date, "d MMMM yyyy")}
+                        </p>
+                        {collectionAdjustedForTravel && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5 flex items-center gap-1">
+                            <Plane className="h-3 w-3" />
+                            Moved earlier — your trip starts {format(travelStart!, "d MMM")}
+                          </p>
+                        )}
                       </div>
-                      <Badge variant="outline">
+                      <Badge variant={collectionAdjustedForTravel ? "secondary" : "outline"}>
                         {daysUntilCollection! <= 0 ? "Now" : 
                          `${daysUntilCollection} day${daysUntilCollection !== 1 ? "s" : ""}`}
                       </Badge>
@@ -2242,6 +2301,7 @@ export default function Supplies() {
           cycle={prescriptionCycle} 
           onSave={handleSavePrescriptionCycle} 
           supplies={supplies}
+          scenarioState={scenarioState}
         />
         <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
         <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
