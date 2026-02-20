@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Sparkles, Star, TrendingUp, History, Info, Tag, Dumbbell } from "lucide-react";
+import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Sparkles, Star, TrendingUp, History, Info, Tag, Dumbbell, Play } from "lucide-react";
 import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity } from "@/lib/storage";
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils }[] = [
   { value: "breakfast", label: "Breakfast", icon: Coffee },
@@ -80,6 +81,7 @@ function getIntensityStyle(intensity: ExerciseIntensity): string {
 }
 
 export function RoutinesContent() {
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<"meals" | "exercise">(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("section") === "exercise" ? "exercise" : "meals";
@@ -234,7 +236,30 @@ export function RoutinesContent() {
   };
 
   const handleUseExercise = (id: string) => {
-    storage.useExerciseRoutine(id);
+    const existing = storage.getActiveExercise();
+    if (existing) {
+      toast({
+        title: "Exercise already active",
+        description: `"${existing.exerciseName}" is in progress. Finish it first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const routine = storage.useExerciseRoutine(id);
+    if (routine) {
+      storage.startExerciseSession({
+        routineId: routine.id,
+        exerciseName: routine.name,
+        exerciseType: routine.exerciseType,
+        intensity: routine.intensity,
+        durationMinutes: routine.durationMinutes,
+      });
+      toast({
+        title: "Exercise mode started",
+        description: `${routine.name} — check the banner for your pre-exercise checklist`,
+      });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     setExerciseRoutines(storage.getExerciseRoutines());
   };
 
@@ -802,12 +827,11 @@ export function RoutinesContent() {
                     <div className="flex items-center gap-1 shrink-0">
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={() => handleUseExercise(routine.id)}
                         data-testid={`button-use-exercise-${routine.id}`}
                       >
-                        <Check className="h-4 w-4 mr-1" />
-                        Use
+                        <Play className="h-4 w-4 mr-1" />
+                        Start
                       </Button>
                       <Button
                         size="icon"

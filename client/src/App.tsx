@@ -19,6 +19,7 @@ import { MessagesIcon } from "@/components/messages-icon";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SickDayBanner } from "@/components/sick-day-banner";
 import { TravelBanner } from "@/components/travel-banner";
+import { ActiveExerciseBanner } from "@/components/active-exercise-banner";
 
 // ✅ Hooks — named exports
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -123,6 +124,7 @@ function AppContent() {
       <OfflineBanner />
       <SickDayBanner />
       <TravelBanner />
+      <ActiveExerciseBanner />
       <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-30">
         <button
           onClick={() => {

@@ -21,6 +21,7 @@ import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useReleaseMode } from "@/lib/release-mode";
+import { useToast } from "@/hooks/use-toast";
 
 
 function roundToHalf(value: number): number {
@@ -315,6 +316,7 @@ function getInitialTab(): string {
 }
 
 export default function Adviser() {
+  const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -392,12 +394,27 @@ export default function Adviser() {
   };
 
   const applyExerciseRoutine = (routine: ExerciseRoutine) => {
+    const existing = storage.getActiveExercise();
+    if (existing) {
+      toast({
+        title: "Exercise already active",
+        description: `"${existing.exerciseName}" is in progress. Finish it first.`,
+        variant: "destructive",
+      });
+      return;
+    }
     setExerciseType(routine.exerciseType);
     setExerciseDuration(String(routine.durationMinutes));
     setExerciseIntensity(routine.intensity);
     storage.useExerciseRoutine(routine.id);
-    const el = document.getElementById("exercise-type");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    storage.startExerciseSession({
+      routineId: routine.id,
+      exerciseName: routine.name,
+      exerciseType: routine.exerciseType,
+      intensity: routine.intensity,
+      durationMinutes: routine.durationMinutes,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Split Bolus Calculator state

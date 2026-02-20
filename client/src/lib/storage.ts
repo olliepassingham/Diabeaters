@@ -41,6 +41,8 @@ const STORAGE_KEYS = {
   SICK_DAY_JOURNAL: "diabeater_sick_day_journal",
   SCENARIO_HISTORY: "diabeater_scenario_history",
   EXERCISE_ROUTINES: "diabeater_exercise_routines",
+  ACTIVE_EXERCISE: "diabeater_active_exercise",
+  EXERCISE_OUTCOMES: "diabeater_exercise_outcomes",
 } as const;
 
 export type RatioFormat = "per10g" | "1toXg" | "perCP";
@@ -542,6 +544,42 @@ export interface ExerciseRoutine {
   lastUsed?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ExercisePhase = "pre" | "active" | "recovery";
+
+export interface ActiveExerciseSession {
+  id: string;
+  routineId?: string;
+  exerciseName: string;
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  durationMinutes: number;
+  phase: ExercisePhase;
+  startedAt: string;
+  exerciseStartedAt?: string;
+  exerciseEndedAt?: string;
+  recoveryEndsAt?: string;
+  recoveryMinutes: number;
+  midCheckDone: boolean;
+  preChecklist: {
+    bgChecked: boolean;
+    carbsConsidered: boolean;
+    basalAdjusted: boolean;
+  };
+}
+
+export interface ExerciseOutcome {
+  id: string;
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  durationMinutes: number;
+  exerciseName: string;
+  bgResponse?: "dropped" | "stable" | "rose";
+  bgSeverity?: "a_lot" | "a_little";
+  feltHypo: boolean;
+  notes?: string;
+  completedAt: string;
 }
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
@@ -2430,6 +2468,123 @@ export const storage = {
       .slice(0, limit);
   },
 
+
+  getActiveExercise(): ActiveExerciseSession | null {
+    const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EXERCISE);
+    return data ? JSON.parse(data) : null;
+  },
+
+  startExerciseSession(params: {
+    routineId?: string;
+    exerciseName: string;
+    exerciseType: ExerciseType;
+    intensity: ExerciseIntensity;
+    durationMinutes: number;
+    recoveryMinutes?: number;
+  }): ActiveExerciseSession {
+    const session: ActiveExerciseSession = {
+      id: generateId(),
+      routineId: params.routineId,
+      exerciseName: params.exerciseName,
+      exerciseType: params.exerciseType,
+      intensity: params.intensity,
+      durationMinutes: params.durationMinutes,
+      phase: "pre",
+      startedAt: new Date().toISOString(),
+      recoveryMinutes: params.recoveryMinutes ?? (params.intensity === "intense" ? 120 : params.intensity === "moderate" ? 90 : 60),
+      midCheckDone: false,
+      preChecklist: {
+        bgChecked: false,
+        carbsConsidered: false,
+        basalAdjusted: false,
+      },
+    };
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(session));
+    return session;
+  },
+
+  updateActiveExercise(updates: Partial<ActiveExerciseSession>): ActiveExerciseSession | null {
+    const session = this.getActiveExercise();
+    if (!session) return null;
+    const updated = { ...session, ...updates };
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(updated));
+    return updated;
+  },
+
+  startExercisePhase(): ActiveExerciseSession | null {
+    return this.updateActiveExercise({
+      phase: "active",
+      exerciseStartedAt: new Date().toISOString(),
+    });
+  },
+
+  finishExercisePhase(): ActiveExerciseSession | null {
+    const session = this.getActiveExercise();
+    if (!session) return null;
+    const now = new Date();
+    const recoveryEnds = new Date(now.getTime() + session.recoveryMinutes * 60 * 1000);
+    return this.updateActiveExercise({
+      phase: "recovery",
+      exerciseEndedAt: now.toISOString(),
+      recoveryEndsAt: recoveryEnds.toISOString(),
+    });
+  },
+
+  endExerciseSession(): ActiveExerciseSession | null {
+    const session = this.getActiveExercise();
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
+    return session;
+  },
+
+  getExerciseOutcomes(): ExerciseOutcome[] {
+    const data = localStorage.getItem(STORAGE_KEYS.EXERCISE_OUTCOMES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  addExerciseOutcome(outcome: Omit<ExerciseOutcome, "id" | "completedAt">): ExerciseOutcome {
+    const outcomes = this.getExerciseOutcomes();
+    const newOutcome: ExerciseOutcome = {
+      ...outcome,
+      id: generateId(),
+      completedAt: new Date().toISOString(),
+    };
+    outcomes.unshift(newOutcome);
+    if (outcomes.length > 100) outcomes.pop();
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(outcomes));
+    return newOutcome;
+  },
+
+  getExercisePatterns(exerciseType: ExerciseType, intensity?: ExerciseIntensity): {
+    totalSessions: number;
+    droppedCount: number;
+    stableCount: number;
+    roseCount: number;
+    hypoCount: number;
+    avgPattern: string;
+  } {
+    const outcomes = this.getExerciseOutcomes().filter(o => {
+      if (o.exerciseType !== exerciseType) return false;
+      if (intensity && o.intensity !== intensity) return false;
+      return !!o.bgResponse;
+    });
+    const total = outcomes.length;
+    if (total === 0) return { totalSessions: 0, droppedCount: 0, stableCount: 0, roseCount: 0, hypoCount: 0, avgPattern: "" };
+    const dropped = outcomes.filter(o => o.bgResponse === "dropped").length;
+    const stable = outcomes.filter(o => o.bgResponse === "stable").length;
+    const rose = outcomes.filter(o => o.bgResponse === "rose").length;
+    const hypo = outcomes.filter(o => o.feltHypo).length;
+
+    let avgPattern = "";
+    if (dropped > stable && dropped > rose) {
+      avgPattern = `BG typically drops after ${exerciseType}`;
+    } else if (stable >= dropped && stable >= rose) {
+      avgPattern = `BG usually stays stable during ${exerciseType}`;
+    } else {
+      avgPattern = `BG tends to rise during ${exerciseType}`;
+    }
+
+    return { totalSessions: total, droppedCount: dropped, stableCount: stable, roseCount: rose, hypoCount: hypo, avgPattern };
+  },
 
   exportAllData(): string {
     const data: Record<string, unknown> = {};
