@@ -296,6 +296,9 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
             Stay one step ahead of your diabetes.
             Less guessing, more living.
           </p>
+          <p className="text-sm text-muted-foreground/70 max-w-xs mx-auto">
+            No complicated setup. Just the bits that matter to you.
+          </p>
         </div>
       </div>
 
