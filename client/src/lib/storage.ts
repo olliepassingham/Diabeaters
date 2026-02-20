@@ -537,25 +537,11 @@ export interface ExerciseRoutine {
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
   durationMinutes: number;
-  scheduledDays: number[];
-  scheduledTime: string;
   notes?: string;
   timesUsed: number;
   lastUsed?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface UpcomingExercise {
-  routine: ExerciseRoutine;
-  nextOccurrence: Date;
-  minutesUntil: number;
-  prepTips: PrepTip[];
-}
-
-export interface PrepTip {
-  type: "carb" | "insulin" | "supply" | "recovery";
-  message: string;
 }
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
@@ -2444,87 +2430,6 @@ export const storage = {
       .slice(0, limit);
   },
 
-  getNextScheduledExercise(): UpcomingExercise | null {
-    const upcoming = this.getUpcomingExercises(1);
-    return upcoming.length > 0 ? upcoming[0] : null;
-  },
-
-  getUpcomingExercises(limit: number = 5): UpcomingExercise[] {
-    const routines = this.getExerciseRoutines();
-    if (routines.length === 0) return [];
-
-    const now = new Date();
-    const results: UpcomingExercise[] = [];
-
-    for (const routine of routines) {
-      if (routine.scheduledDays.length === 0 || !routine.scheduledTime) continue;
-
-      const [hours, minutes] = routine.scheduledTime.split(":").map(Number);
-      let nextOccurrence: Date | null = null;
-
-      for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
-        const candidate = new Date(now);
-        candidate.setDate(candidate.getDate() + dayOffset);
-        candidate.setHours(hours, minutes, 0, 0);
-
-        if (routine.scheduledDays.includes(candidate.getDay())) {
-          if (candidate.getTime() > now.getTime()) {
-            nextOccurrence = candidate;
-            break;
-          }
-        }
-      }
-
-      if (nextOccurrence) {
-        const minutesUntil = Math.round((nextOccurrence.getTime() - now.getTime()) / 60000);
-        const prepTips = this.getExercisePrepTips(routine, minutesUntil);
-        results.push({ routine, nextOccurrence, minutesUntil, prepTips });
-      }
-    }
-
-    results.sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
-    return results.slice(0, limit);
-  },
-
-  getExercisePrepTips(routine: ExerciseRoutine, minutesUntil: number): PrepTip[] {
-    const tips: PrepTip[] = [];
-    const isHighIntensity = routine.intensity === "intense";
-    const isModeRate = routine.intensity === "moderate";
-    const isLong = routine.durationMinutes >= 60;
-    const isSoon = minutesUntil <= 120;
-    const isToday = minutesUntil <= 720;
-
-    if (isSoon) {
-      if (isHighIntensity || isLong) {
-        tips.push({ type: "carb", message: `Have a 15-30g carb snack before your ${routine.durationMinutes}min session` });
-      } else if (isModeRate) {
-        tips.push({ type: "carb", message: "Consider a small snack (10-15g carbs) if your BG is below target" });
-      }
-
-      if (isHighIntensity) {
-        tips.push({ type: "insulin", message: "Consider reducing your next bolus — intense exercise can cause delayed lows. Not medical advice." });
-      } else if (routine.exerciseType === "cardio" || routine.exerciseType === "swimming") {
-        tips.push({ type: "insulin", message: "Cardio can lower BG for hours — monitor closely after. Not medical advice." });
-      }
-
-      tips.push({ type: "supply", message: "Check you have glucose tabs and your CGM/monitor ready" });
-    } else if (isToday) {
-      if (isHighIntensity || isLong) {
-        tips.push({ type: "carb", message: `Your ${routine.name} is later today — plan a snack 1-2 hours before` });
-      }
-      if (isHighIntensity) {
-        tips.push({ type: "insulin", message: `You may want to adjust your bolus ahead of ${routine.name}. Not medical advice.` });
-      }
-    } else {
-      tips.push({ type: "carb", message: `${routine.name} coming up — make sure you have snacks ready` });
-    }
-
-    if (isSoon && (isHighIntensity || isLong)) {
-      tips.push({ type: "recovery", message: "Watch for delayed lows tonight — consider a bedtime snack" });
-    }
-
-    return tips;
-  },
 
   exportAllData(): string {
     const data: Record<string, unknown> = {};
