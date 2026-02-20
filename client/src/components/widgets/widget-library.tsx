@@ -24,7 +24,8 @@ import {
   Heart,
   Shield,
   MessageSquare,
-  Repeat
+  Repeat,
+  Dumbbell
 } from "lucide-react";
 import { DashboardWidget, WidgetType, WidgetSize } from "@/lib/storage";
 import { useReleaseMode } from "@/lib/release-mode";
@@ -164,6 +165,13 @@ export const WIDGET_INFO: Record<WidgetType, WidgetInfo> = {
     name: "Routines",
     description: "Quick access to your saved meal and activity routines",
     icon: Repeat,
+    category: "planning",
+  },
+  "coming-up": {
+    type: "coming-up",
+    name: "Coming Up",
+    description: "Your next scheduled exercise with preparation tips",
+    icon: Dumbbell,
     category: "planning",
   },
 };

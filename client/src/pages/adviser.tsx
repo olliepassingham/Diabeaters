@@ -6,12 +6,12 @@ import { Label } from "@/components/ui/label";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane, BookOpen } from "lucide-react";
+import { Utensils, Dumbbell, AlertCircle, Info, Calculator, ChevronDown, ChevronUp, Clock, Droplet, Pizza, Repeat, X, Sparkles, Play, Zap, Heart, Moon, Apple, ArrowRight, ArrowLeft, Wrench, Search, Thermometer, Plane, BookOpen, Calendar } from "lucide-react";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RoutinesContent } from "./routines";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
-import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat } from "@/lib/storage";
+import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, UpcomingExercise } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -357,6 +357,26 @@ export default function Adviser() {
   const [exerciseWithin, setExerciseWithin] = useState("2");
   
   const [sessionTimingFromNow, setSessionTimingFromNow] = useState("60");
+
+  const [upcomingExercises, setUpcomingExercises] = useState<UpcomingExercise[]>([]);
+
+  useEffect(() => {
+    setUpcomingExercises(storage.getUpcomingExercises());
+  }, []);
+
+  const exerciseLabelsMap: Record<string, string> = {
+    cardio: "Cardio", strength: "Strength", hiit: "HIIT", yoga: "Yoga/Pilates",
+    walking: "Walking", sports: "Team Sports", swimming: "Swimming"
+  };
+
+  const applyScheduledRoutine = (exercise: UpcomingExercise) => {
+    setExerciseType(exercise.routine.exerciseType);
+    setExerciseDuration(String(exercise.routine.durationMinutes));
+    setExerciseIntensity(exercise.routine.intensity);
+    storage.useExerciseRoutine(exercise.routine.id);
+    const el = document.getElementById("exercise-type");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   // Split Bolus Calculator state
   const [splitCarbs, setSplitCarbs] = useState("");
@@ -1385,6 +1405,65 @@ export default function Adviser() {
             </Card>
           )}
 
+
+          {upcomingExercises.length > 0 && (
+            <Card data-testid="card-scheduled-routines">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Scheduled Routines
+                </CardTitle>
+                <CardDescription>Your upcoming exercise sessions. Tap to prefill the planner.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {upcomingExercises.slice(0, 3).map((exercise, idx) => {
+                  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                  const nextDate = new Date(exercise.nextOccurrence);
+                  const isToday = new Date().toDateString() === nextDate.toDateString();
+                  const isTomorrow = (() => {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    return tomorrow.toDateString() === nextDate.toDateString();
+                  })();
+                  const dayLabel = isToday ? "Today" : isTomorrow ? "Tomorrow" : dayNames[nextDate.getDay()];
+
+                  return (
+                    <button
+                      key={exercise.routine.id || idx}
+                      onClick={() => applyScheduledRoutine(exercise)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover-elevate text-left"
+                      data-testid={`button-apply-routine-${idx}`}
+                    >
+                      <div className="flex flex-col items-center justify-center min-w-[3rem] p-1.5 rounded-md bg-primary/10">
+                        <span className="text-xs font-medium text-primary">{dayLabel}</span>
+                        <span className="text-xs text-muted-foreground">{exercise.routine.scheduledTime}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {exerciseLabelsMap[exercise.routine.exerciseType] || exercise.routine.exerciseType}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {exercise.routine.durationMinutes} min · {exercise.routine.intensity}
+                        </p>
+                      </div>
+                      {exercise.prepTips.length > 0 && (
+                        <Badge variant="secondary" className="text-xs flex-shrink-0">
+                          {exercise.prepTips.length} tip{exercise.prepTips.length !== 1 ? "s" : ""}
+                        </Badge>
+                      )}
+                      <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                  );
+                })}
+                <Link href="/adviser?tab=routines" className="block">
+                  <Button variant="ghost" size="sm" className="w-full mt-1 text-xs" data-testid="link-manage-routines">
+                    <Repeat className="h-3 w-3 mr-1" />
+                    Manage Routines
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
 
           {isBetaVisible && (
             <Card className="border-dashed border-2 bg-muted/20">

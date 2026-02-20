@@ -40,6 +40,7 @@ const STORAGE_KEYS = {
   BEDTIME_LOGS: "diabeater_bedtime_logs",
   SICK_DAY_JOURNAL: "diabeater_sick_day_journal",
   SCENARIO_HISTORY: "diabeater_scenario_history",
+  EXERCISE_ROUTINES: "diabeater_exercise_routines",
 } as const;
 
 export type RatioFormat = "per10g" | "1toXg" | "perCP";
@@ -278,7 +279,8 @@ export type WidgetType =
   | "help-now-info"
   | "appointments"
   | "tip-of-day"
-  | "routines";
+  | "routines"
+  | "coming-up";
 
 export type WidgetSize = "full" | "half";
 
@@ -526,6 +528,36 @@ export interface Routine {
   updatedAt: string;
 }
 
+export type ExerciseType = "cardio" | "strength" | "hiit" | "yoga" | "walking" | "sports" | "swimming";
+export type ExerciseIntensity = "light" | "moderate" | "intense";
+
+export interface ExerciseRoutine {
+  id: string;
+  name: string;
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  durationMinutes: number;
+  scheduledDays: number[];
+  scheduledTime: string;
+  notes?: string;
+  timesUsed: number;
+  lastUsed?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpcomingExercise {
+  routine: ExerciseRoutine;
+  nextOccurrence: Date;
+  minutesUntil: number;
+  prepTips: PrepTip[];
+}
+
+export interface PrepTip {
+  type: "carb" | "insulin" | "supply" | "recovery";
+  message: string;
+}
+
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/adviser", iconName: "Dumbbell", color: "text-green-600" },
@@ -565,15 +597,17 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "messages": "half",
   "tip-of-day": "half",
   "routines": "half",
+  "coming-up": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 1, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 2, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 3, size: "full" },
-  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
-  { id: "routines", type: "routines", enabled: true, order: 5, size: "half" },
+  { id: "coming-up", type: "coming-up", enabled: true, order: 1, size: "half" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 2, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 4, size: "full" },
+  { id: "appointments", type: "appointments", enabled: true, order: 5, size: "half" },
+  { id: "routines", type: "routines", enabled: true, order: 6, size: "half" },
   { id: "community", type: "community", enabled: true, order: 6, size: "full" },
   { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
   { id: "help-now-info", type: "help-now-info", enabled: false, order: 8, size: "half" },
@@ -2342,6 +2376,142 @@ export const storage = {
       .filter(r => r.lastUsed)
       .sort((a, b) => new Date(b.lastUsed!).getTime() - new Date(a.lastUsed!).getTime())
       .slice(0, limit);
+  },
+
+  getExerciseRoutines(): ExerciseRoutine[] {
+    const data = localStorage.getItem(STORAGE_KEYS.EXERCISE_ROUTINES);
+    return data ? JSON.parse(data) : [];
+  },
+
+  getExerciseRoutine(id: string): ExerciseRoutine | null {
+    return this.getExerciseRoutines().find(r => r.id === id) || null;
+  },
+
+  addExerciseRoutine(routine: Omit<ExerciseRoutine, "id" | "timesUsed" | "createdAt" | "updatedAt">): ExerciseRoutine {
+    const routines = this.getExerciseRoutines();
+    const newRoutine: ExerciseRoutine = {
+      ...routine,
+      id: generateId(),
+      timesUsed: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    routines.push(newRoutine);
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(routines));
+    return newRoutine;
+  },
+
+  updateExerciseRoutine(id: string, updates: Partial<Omit<ExerciseRoutine, "id" | "createdAt">>): ExerciseRoutine | null {
+    const routines = this.getExerciseRoutines();
+    const index = routines.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    routines[index] = { ...routines[index], ...updates, updatedAt: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(routines));
+    return routines[index];
+  },
+
+  deleteExerciseRoutine(id: string): boolean {
+    const routines = this.getExerciseRoutines();
+    const filtered = routines.filter(r => r.id !== id);
+    if (filtered.length === routines.length) return false;
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(filtered));
+    return true;
+  },
+
+  useExerciseRoutine(id: string): ExerciseRoutine | null {
+    const routines = this.getExerciseRoutines();
+    const index = routines.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    routines[index] = {
+      ...routines[index],
+      timesUsed: routines[index].timesUsed + 1,
+      lastUsed: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(routines));
+    return routines[index];
+  },
+
+  getNextScheduledExercise(): UpcomingExercise | null {
+    const upcoming = this.getUpcomingExercises(1);
+    return upcoming.length > 0 ? upcoming[0] : null;
+  },
+
+  getUpcomingExercises(limit: number = 5): UpcomingExercise[] {
+    const routines = this.getExerciseRoutines();
+    if (routines.length === 0) return [];
+
+    const now = new Date();
+    const results: UpcomingExercise[] = [];
+
+    for (const routine of routines) {
+      if (routine.scheduledDays.length === 0 || !routine.scheduledTime) continue;
+
+      const [hours, minutes] = routine.scheduledTime.split(":").map(Number);
+      let nextOccurrence: Date | null = null;
+
+      for (let dayOffset = 0; dayOffset < 8; dayOffset++) {
+        const candidate = new Date(now);
+        candidate.setDate(candidate.getDate() + dayOffset);
+        candidate.setHours(hours, minutes, 0, 0);
+
+        if (routine.scheduledDays.includes(candidate.getDay())) {
+          if (candidate.getTime() > now.getTime()) {
+            nextOccurrence = candidate;
+            break;
+          }
+        }
+      }
+
+      if (nextOccurrence) {
+        const minutesUntil = Math.round((nextOccurrence.getTime() - now.getTime()) / 60000);
+        const prepTips = this.getExercisePrepTips(routine, minutesUntil);
+        results.push({ routine, nextOccurrence, minutesUntil, prepTips });
+      }
+    }
+
+    results.sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
+    return results.slice(0, limit);
+  },
+
+  getExercisePrepTips(routine: ExerciseRoutine, minutesUntil: number): PrepTip[] {
+    const tips: PrepTip[] = [];
+    const isHighIntensity = routine.intensity === "intense";
+    const isModeRate = routine.intensity === "moderate";
+    const isLong = routine.durationMinutes >= 60;
+    const isSoon = minutesUntil <= 120;
+    const isToday = minutesUntil <= 720;
+
+    if (isSoon) {
+      if (isHighIntensity || isLong) {
+        tips.push({ type: "carb", message: `Have a 15-30g carb snack before your ${routine.durationMinutes}min session` });
+      } else if (isModeRate) {
+        tips.push({ type: "carb", message: "Consider a small snack (10-15g carbs) if your BG is below target" });
+      }
+
+      if (isHighIntensity) {
+        tips.push({ type: "insulin", message: "Consider reducing your next bolus — intense exercise can cause delayed lows. Not medical advice." });
+      } else if (routine.exerciseType === "cardio" || routine.exerciseType === "swimming") {
+        tips.push({ type: "insulin", message: "Cardio can lower BG for hours — monitor closely after. Not medical advice." });
+      }
+
+      tips.push({ type: "supply", message: "Check you have glucose tabs and your CGM/monitor ready" });
+    } else if (isToday) {
+      if (isHighIntensity || isLong) {
+        tips.push({ type: "carb", message: `Your ${routine.name} is later today — plan a snack 1-2 hours before` });
+      }
+      if (isHighIntensity) {
+        tips.push({ type: "insulin", message: `You may want to adjust your bolus ahead of ${routine.name}. Not medical advice.` });
+      }
+    } else {
+      tips.push({ type: "carb", message: `${routine.name} coming up — make sure you have snacks ready` });
+    }
+
+    if (isSoon && (isHighIntensity || isLong)) {
+      tips.push({ type: "recovery", message: "Watch for delayed lows tonight — consider a bedtime snack" });
+    }
+
+    return tips;
   },
 
   exportAllData(): string {

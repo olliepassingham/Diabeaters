@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Sparkles, Star, TrendingUp, History, Info, Tag } from "lucide-react";
-import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings } from "@/lib/storage";
+import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Sparkles, Star, TrendingUp, History, Info, Tag, Dumbbell, Calendar } from "lucide-react";
+import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, UpcomingExercise } from "@/lib/storage";
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
@@ -55,7 +55,47 @@ function getOutcomeLabel(outcome: RoutineOutcome) {
   return found ? found.label.split(" - ")[0] : "Okay";
 }
 
+const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = [
+  { value: "cardio", label: "Cardio" },
+  { value: "strength", label: "Strength" },
+  { value: "hiit", label: "HIIT" },
+  { value: "yoga", label: "Yoga" },
+  { value: "walking", label: "Walking" },
+  { value: "sports", label: "Sports" },
+  { value: "swimming", label: "Swimming" },
+];
+
+const EXERCISE_INTENSITIES: { value: ExerciseIntensity; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "moderate", label: "Moderate" },
+  { value: "intense", label: "Intense" },
+];
+
+const DAY_LABELS = [
+  { value: 0, label: "Sun" },
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+];
+
+function formatScheduleDays(days: number[]): string {
+  const sorted = [...days].sort((a, b) => a - b);
+  return sorted.map(d => DAY_LABELS.find(dl => dl.value === d)?.label || "").join(", ");
+}
+
+function getIntensityStyle(intensity: ExerciseIntensity): string {
+  switch (intensity) {
+    case "light": return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+    case "moderate": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+    case "intense": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+  }
+}
+
 export function RoutinesContent() {
+  const [activeSection, setActiveSection] = useState<"meals" | "exercise">("meals");
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -75,9 +115,23 @@ export function RoutinesContent() {
   const [outcomeNotes, setOutcomeNotes] = useState("");
   const [tags, setTags] = useState("");
 
+  const [exerciseRoutines, setExerciseRoutines] = useState<ExerciseRoutine[]>([]);
+  const [upcomingExercises, setUpcomingExercises] = useState<UpcomingExercise[]>([]);
+  const [isExerciseAddOpen, setIsExerciseAddOpen] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<ExerciseRoutine | null>(null);
+  const [exName, setExName] = useState("");
+  const [exType, setExType] = useState<ExerciseType>("cardio");
+  const [exIntensity, setExIntensity] = useState<ExerciseIntensity>("moderate");
+  const [exDuration, setExDuration] = useState("");
+  const [exDays, setExDays] = useState<number[]>([]);
+  const [exTime, setExTime] = useState("08:00");
+  const [exNotes, setExNotes] = useState("");
+
   useEffect(() => {
     setRoutines(storage.getRoutines());
     setSettings(storage.getSettings());
+    setExerciseRoutines(storage.getExerciseRoutines());
+    setUpcomingExercises(storage.getUpcomingExercises());
   }, []);
 
   const resetForm = () => {
@@ -149,6 +203,70 @@ export function RoutinesContent() {
     setRoutines(storage.getRoutines());
   };
 
+  const resetExerciseForm = () => {
+    setExName("");
+    setExType("cardio");
+    setExIntensity("moderate");
+    setExDuration("");
+    setExDays([]);
+    setExTime("08:00");
+    setExNotes("");
+    setEditingExercise(null);
+  };
+
+  const openExerciseEditDialog = (routine: ExerciseRoutine) => {
+    setEditingExercise(routine);
+    setExName(routine.name);
+    setExType(routine.exerciseType);
+    setExIntensity(routine.intensity);
+    setExDuration(routine.durationMinutes.toString());
+    setExDays([...routine.scheduledDays]);
+    setExTime(routine.scheduledTime);
+    setExNotes(routine.notes || "");
+    setIsExerciseAddOpen(true);
+  };
+
+  const handleExerciseSave = () => {
+    if (!exName || !exDuration || exDays.length === 0) return;
+
+    const routineData = {
+      name: exName,
+      exerciseType: exType,
+      intensity: exIntensity,
+      durationMinutes: parseInt(exDuration),
+      scheduledDays: exDays,
+      scheduledTime: exTime,
+      notes: exNotes || undefined,
+    };
+
+    if (editingExercise) {
+      storage.updateExerciseRoutine(editingExercise.id, routineData);
+    } else {
+      storage.addExerciseRoutine(routineData);
+    }
+
+    setExerciseRoutines(storage.getExerciseRoutines());
+    setUpcomingExercises(storage.getUpcomingExercises());
+    setIsExerciseAddOpen(false);
+    resetExerciseForm();
+  };
+
+  const handleExerciseDelete = (id: string) => {
+    storage.deleteExerciseRoutine(id);
+    setExerciseRoutines(storage.getExerciseRoutines());
+    setUpcomingExercises(storage.getUpcomingExercises());
+  };
+
+  const handleUseExercise = (id: string) => {
+    storage.useExerciseRoutine(id);
+    setExerciseRoutines(storage.getExerciseRoutines());
+    setUpcomingExercises(storage.getUpcomingExercises());
+  };
+
+  const toggleExerciseDay = (day: number) => {
+    setExDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
   const filteredRoutines = filterMealType === "all" 
     ? routines 
     : routines.filter(r => r.mealType === filterMealType);
@@ -167,11 +285,17 @@ export function RoutinesContent() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900">
-              <Repeat className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              {activeSection === "meals" ? (
+                <Repeat className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-bold">My Routines</h1>
-              <p className="text-muted-foreground text-sm">Meals and moments that worked well</p>
+              <p className="text-muted-foreground text-sm" data-testid="text-section-subtitle">
+                {activeSection === "meals" ? "Meals and moments that worked well" : "Your scheduled exercise routines"}
+              </p>
             </div>
           </div>
           <PageInfoDialog title="About Routines" description="Save and recall your successful meals and moments">
@@ -190,6 +314,27 @@ export function RoutinesContent() {
           </PageInfoDialog>
         </div>
 
+        <div className="flex gap-2" data-testid="section-switcher">
+          <Button
+            variant={activeSection === "meals" ? "default" : "outline"}
+            onClick={() => setActiveSection("meals")}
+            data-testid="button-section-meals"
+          >
+            <Utensils className="h-4 w-4 mr-2" />
+            Meal Routines
+          </Button>
+          <Button
+            variant={activeSection === "exercise" ? "default" : "outline"}
+            onClick={() => setActiveSection("exercise")}
+            data-testid="button-section-exercise"
+          >
+            <Dumbbell className="h-4 w-4 mr-2" />
+            Exercise Routines
+          </Button>
+        </div>
+
+        {activeSection === "meals" && (
+        <>
         <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
@@ -525,6 +670,267 @@ export function RoutinesContent() {
             )}
           </div>
         </Tabs>
+        </>
+        )}
+
+        {activeSection === "exercise" && (
+        <>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-100 dark:border-green-900">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Dumbbell className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-green-800 dark:text-green-200">Exercise Schedule</p>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  Plan and track your exercise routines. Set your schedule and log when you complete workouts.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {upcomingExercises.length > 0 && (
+          <Card className="border-green-200 dark:border-green-800">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Calendar className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span className="font-medium text-sm">Next up</span>
+              </div>
+              <div className="space-y-2">
+                {upcomingExercises.slice(0, 3).map((upcoming, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2 text-sm" data-testid={`text-upcoming-exercise-${i}`}>
+                    <div className="flex items-center gap-2">
+                      <Dumbbell className="h-3 w-3 text-green-600 dark:text-green-400" />
+                      <span className="font-medium">{upcoming.routine.name}</span>
+                      <span className="text-muted-foreground">
+                        {upcoming.minutesUntil < 60
+                          ? `in ${upcoming.minutesUntil} min`
+                          : upcoming.minutesUntil < 1440
+                          ? `in ${Math.round(upcoming.minutesUntil / 60)}h`
+                          : `in ${Math.round(upcoming.minutesUntil / 1440)}d`}
+                      </span>
+                    </div>
+                    <Badge variant="outline" className="text-xs">{upcoming.routine.exerciseType}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <Dialog open={isExerciseAddOpen} onOpenChange={(open) => { setIsExerciseAddOpen(open); if (!open) resetExerciseForm(); }}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-exercise-routine">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Exercise Routine
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg !grid-rows-[auto_1fr_auto] max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>{editingExercise ? "Edit Exercise Routine" : "Add Exercise Routine"}</DialogTitle>
+                <DialogDescription>
+                  Schedule a regular exercise routine
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 overflow-y-auto pr-2 -mr-2" style={{ maxHeight: 'calc(80vh - 180px)' }}>
+                <div className="space-y-2">
+                  <Label htmlFor="exercise-name">Name</Label>
+                  <Input
+                    id="exercise-name"
+                    placeholder="e.g., 'Morning jog' or 'Gym session'"
+                    value={exName}
+                    onChange={(e) => setExName(e.target.value)}
+                    data-testid="input-exercise-name"
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Exercise type</Label>
+                    <Select value={exType} onValueChange={(v: ExerciseType) => setExType(v)}>
+                      <SelectTrigger data-testid="select-exercise-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXERCISE_TYPES.map(et => (
+                          <SelectItem key={et.value} value={et.value} data-testid={`option-exercise-type-${et.value}`}>{et.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Intensity</Label>
+                    <Select value={exIntensity} onValueChange={(v: ExerciseIntensity) => setExIntensity(v)}>
+                      <SelectTrigger data-testid="select-exercise-intensity">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EXERCISE_INTENSITIES.map(ei => (
+                          <SelectItem key={ei.value} value={ei.value} data-testid={`option-exercise-intensity-${ei.value}`}>{ei.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="exercise-duration">Duration (minutes)</Label>
+                    <Input
+                      id="exercise-duration"
+                      type="number"
+                      placeholder="e.g., 30"
+                      value={exDuration}
+                      onChange={(e) => setExDuration(e.target.value)}
+                      data-testid="input-exercise-duration"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="exercise-time">Scheduled time</Label>
+                    <Input
+                      id="exercise-time"
+                      type="time"
+                      value={exTime}
+                      onChange={(e) => setExTime(e.target.value)}
+                      data-testid="input-exercise-time"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Scheduled days</Label>
+                  <div className="flex gap-1 flex-wrap" data-testid="day-selector">
+                    {DAY_LABELS.map(day => (
+                      <Button
+                        key={day.value}
+                        type="button"
+                        size="sm"
+                        variant={exDays.includes(day.value) ? "default" : "outline"}
+                        className={`toggle-elevate ${exDays.includes(day.value) ? "toggle-elevated" : ""}`}
+                        onClick={() => toggleExerciseDay(day.value)}
+                        data-testid={`button-day-${day.value}`}
+                      >
+                        {day.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="exercise-notes">Notes (optional)</Label>
+                  <Textarea
+                    id="exercise-notes"
+                    placeholder="Any notes about this routine..."
+                    value={exNotes}
+                    onChange={(e) => setExNotes(e.target.value)}
+                    className="resize-none"
+                    rows={2}
+                    data-testid="input-exercise-notes"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="border-t pt-4">
+                <DialogClose asChild>
+                  <Button variant="outline" data-testid="button-cancel-exercise">Cancel</Button>
+                </DialogClose>
+                <Button onClick={handleExerciseSave} disabled={!exName || !exDuration || exDays.length === 0} data-testid="button-save-exercise">
+                  {editingExercise ? "Save Changes" : "Add Routine"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {exerciseRoutines.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <Dumbbell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-medium text-lg mb-2">No exercise routines yet</h3>
+                <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                  Add your first exercise routine to start tracking your workouts and building healthy habits.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {exerciseRoutines.map((routine) => (
+              <Card key={routine.id} data-testid={`card-exercise-routine-${routine.id}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900 shrink-0">
+                        <Dumbbell className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-medium" data-testid={`text-exercise-name-${routine.id}`}>{routine.name}</h3>
+                          <Badge variant="outline" className="text-xs">{EXERCISE_TYPES.find(t => t.value === routine.exerciseType)?.label}</Badge>
+                          <Badge className={`text-xs ${getIntensityStyle(routine.intensity)}`}>
+                            {EXERCISE_INTENSITIES.find(i => i.value === routine.intensity)?.label}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                          <span className="flex items-center gap-1" data-testid={`text-exercise-schedule-${routine.id}`}>
+                            <Calendar className="h-3 w-3" />
+                            {formatScheduleDays(routine.scheduledDays)} at {routine.scheduledTime}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {routine.durationMinutes} min
+                          </span>
+                          {routine.timesUsed > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Star className="h-3 w-3" />
+                              Used {routine.timesUsed}x
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUseExercise(routine.id)}
+                        data-testid={`button-use-exercise-${routine.id}`}
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Use
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openExerciseEditDialog(routine)}
+                        data-testid={`button-edit-exercise-${routine.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleExerciseDelete(routine.id)}
+                        className="text-destructive"
+                        data-testid={`button-delete-exercise-${routine.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  {routine.notes && (
+                    <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+                      <span className="font-medium">Notes:</span> {routine.notes}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+        </>
+        )}
 
         <Card data-testid="card-routines-disclaimer">
           <CardContent className="pt-6">
