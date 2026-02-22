@@ -851,6 +851,61 @@ export const storage = {
     return this.updateSupply(id, { isOnOrder: false, orderedDate: undefined });
   },
 
+  getItemDuration(type: Supply["type"]): number {
+    const settings = this.getSettings();
+    if (type === "cgm") return settings.cgmDays || 14;
+    if (type === "infusion_set") return settings.siteChangeDays || 3;
+    if (type === "reservoir") return settings.reservoirChangeDays || 3;
+    return 0;
+  },
+
+  getActiveItemInfo(supply: Supply): { daysLeft: number; isExpired: boolean; effectiveStartDate: string } | null {
+    if (!supply.activeItemStartDate) return null;
+    const duration = this.getItemDuration(supply.type);
+    if (duration <= 0) return null;
+
+    const activeStart = new Date(supply.activeItemStartDate);
+    const today = new Date();
+    activeStart.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const daysSinceOriginalStart = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceOriginalStart < duration) {
+      const daysLeft = duration - daysSinceOriginalStart;
+      return { daysLeft, isExpired: false, effectiveStartDate: supply.activeItemStartDate };
+    }
+
+    const cyclesCompleted = Math.floor(daysSinceOriginalStart / duration);
+    const effectiveStart = new Date(activeStart);
+    effectiveStart.setDate(effectiveStart.getDate() + cyclesCompleted * duration);
+    const daysIntoCurrentCycle = daysSinceOriginalStart - cyclesCompleted * duration;
+    const daysLeft = Math.max(0, duration - daysIntoCurrentCycle);
+
+    return {
+      daysLeft,
+      isExpired: daysLeft === 0,
+      effectiveStartDate: effectiveStart.toISOString(),
+    };
+  },
+
+  markItemChangedEarly(id: string): Supply | null {
+    const supply = this.getSupplies().find(s => s.id === id);
+    if (!supply) return null;
+    const info = this.getActiveItemInfo(supply);
+    if (!info) return null;
+
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const adjustedQty = this.getAdjustedQuantity(supply);
+    const newQuantity = Math.max(0, adjustedQty - 1);
+    return this.updateSupply(id, {
+      activeItemStartDate: today.toISOString(),
+      currentQuantity: newQuantity,
+      quantityAtPickup: newQuantity,
+      lastPickupDate: new Date().toISOString(),
+    });
+  },
+
   getSmartPrescriptionAdvice(supplies: Supply[]): {
     collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[];
     skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[];

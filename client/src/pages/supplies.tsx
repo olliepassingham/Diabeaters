@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -925,6 +925,7 @@ function SupplyCard({
   onLogPickup,
   onMarkOrdered,
   onClearOrder,
+  onRefresh,
 }: { 
   supply: Supply; 
   onEdit: (supply: Supply) => void;
@@ -933,6 +934,7 @@ function SupplyCard({
   onLogPickup: (supply: Supply) => void;
   onMarkOrdered: (id: string) => void;
   onClearOrder: (id: string) => void;
+  onRefresh: () => void;
 }) {
   const adjustedQuantity = storage.getAdjustedQuantity(supply);
   const daysRemaining = storage.getDaysRemaining(supply);
@@ -1088,19 +1090,25 @@ function SupplyCard({
                 <span>{storage.getSettings().cgmDays || 14} days each</span>
               </div>
               {supply.activeItemStartDate && (() => {
-                const settings = storage.getSettings();
-                const itemDuration = settings.cgmDays || 14;
-                const activeStart = new Date(supply.activeItemStartDate);
-                const today = new Date();
-                activeStart.setHours(0, 0, 0, 0);
-                today.setHours(0, 0, 0, 0);
-                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
-                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
-                const isExpired = daysLeft === 0;
+                const info = storage.getActiveItemInfo(supply);
+                if (!info) return null;
+                const changeSoon = info.daysLeft <= 1;
                 return (
-                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                    <span>Active sensor</span>
-                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  <div className="space-y-1">
+                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                      <span>Active sensor</span>
+                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                      data-testid={`button-change-early-${supply.id}`}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1.5" />
+                      {changeSoon ? "Changed sensor" : "Changed early"}
+                    </Button>
                   </div>
                 );
               })()}
@@ -1112,19 +1120,25 @@ function SupplyCard({
                 <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
               </div>
               {supply.activeItemStartDate && (() => {
-                const settings = storage.getSettings();
-                const itemDuration = settings.siteChangeDays || 3;
-                const activeStart = new Date(supply.activeItemStartDate);
-                const today = new Date();
-                activeStart.setHours(0, 0, 0, 0);
-                today.setHours(0, 0, 0, 0);
-                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
-                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
-                const isExpired = daysLeft === 0;
+                const info = storage.getActiveItemInfo(supply);
+                if (!info) return null;
+                const changeSoon = info.daysLeft <= 1;
                 return (
-                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                    <span>Active set</span>
-                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  <div className="space-y-1">
+                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                      <span>Active set</span>
+                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                      data-testid={`button-change-early-${supply.id}`}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1.5" />
+                      {changeSoon ? "Changed set" : "Changed early"}
+                    </Button>
                   </div>
                 );
               })()}
@@ -1136,19 +1150,25 @@ function SupplyCard({
                 <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
               </div>
               {supply.activeItemStartDate && (() => {
-                const settings = storage.getSettings();
-                const itemDuration = settings.reservoirChangeDays || 3;
-                const activeStart = new Date(supply.activeItemStartDate);
-                const today = new Date();
-                activeStart.setHours(0, 0, 0, 0);
-                today.setHours(0, 0, 0, 0);
-                const daysSinceActive = Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24));
-                const daysLeft = Math.max(0, itemDuration - daysSinceActive);
-                const isExpired = daysLeft === 0;
+                const info = storage.getActiveItemInfo(supply);
+                if (!info) return null;
+                const changeSoon = info.daysLeft <= 1;
                 return (
-                  <div className={`flex items-center justify-between ${isExpired ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                    <span>Active reservoir</span>
-                    <span>{isExpired ? "Due for change" : `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left`}</span>
+                  <div className="space-y-1">
+                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                      <span>Active reservoir</span>
+                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                      data-testid={`button-change-early-${supply.id}`}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1.5" />
+                      {changeSoon ? "Changed reservoir" : "Changed early"}
+                    </Button>
                   </div>
                 );
               })()}
@@ -2365,6 +2385,7 @@ export default function Supplies() {
                       onLogPickup={handleLogPickup}
                       onMarkOrdered={handleMarkOrdered}
                       onClearOrder={handleClearOrder}
+                      onRefresh={() => setSupplies(storage.getSupplies())}
                     />
                   </div>
                 ))}
