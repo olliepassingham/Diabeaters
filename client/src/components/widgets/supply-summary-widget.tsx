@@ -44,9 +44,9 @@ export function SupplySummaryWidget({ compact = false }: { compact?: boolean }) 
       </CardHeader>
       <CardContent className="space-y-3">
         {minDays !== null ? (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Supplies last at least</span>
-            <span className={`text-lg font-semibold ${minDays <= 3 ? "text-red-600" : minDays <= 7 ? "text-yellow-600" : "text-green-600"}`} data-testid="text-min-days">
+          <div className={compact ? "text-center" : "flex items-center justify-between gap-2"}>
+            <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>{compact ? "Lasts at least" : "Supplies last at least"}</span>
+            <span className={`${compact ? "text-base" : "text-lg"} font-semibold ${minDays <= 3 ? "text-red-600" : minDays <= 7 ? "text-yellow-600" : "text-green-600"}`} data-testid="text-min-days">
               {minDays} days
             </span>
           </div>

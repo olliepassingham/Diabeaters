@@ -42,7 +42,7 @@ export function HelpNowInfoWidget({ compact = false }: { compact?: boolean }) {
           </p>
         )}
         
-        <div className="grid grid-cols-2 gap-2">
+        <div className={compact ? "space-y-2" : "grid grid-cols-2 gap-2"}>
           <Link href="/help-now">
             <Button variant="destructive" size="sm" className="w-full" data-testid="button-help-now-widget">
               Help Now
@@ -50,7 +50,7 @@ export function HelpNowInfoWidget({ compact = false }: { compact?: boolean }) {
           </Link>
           <Link href="/settings#emergency-contacts">
             <Button variant="outline" size="sm" className="w-full" data-testid="button-edit-contacts">
-              Edit Contacts
+              {compact ? "Edit" : "Edit Contacts"}
             </Button>
           </Link>
         </div>

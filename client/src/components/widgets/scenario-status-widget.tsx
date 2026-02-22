@@ -115,67 +115,75 @@ export function ScenarioStatusWidget({ compact = false }: { compact?: boolean })
       </CardHeader>
       <CardContent className="space-y-3">
         {scenarioState.travelModeActive && (
-          <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Plane className="h-4 w-4 text-blue-600" />
-              <div>
-                <p className="text-sm font-medium">Travel Mode</p>
-                <p className="text-xs text-muted-foreground">
-                  {scenarioState.travelDestination || "Active"} 
-                  {scenarioState.travelEndDate && ` until ${new Date(scenarioState.travelEndDate).toLocaleDateString()}`}
-                </p>
+          <div className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} bg-blue-50 dark:bg-blue-950/30 rounded-lg`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <Plane className="h-4 w-4 text-blue-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{compact ? "Travel" : "Travel Mode"}</p>
+                {!compact && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {scenarioState.travelDestination || "Active"} 
+                    {scenarioState.travelEndDate && ` until ${new Date(scenarioState.travelEndDate).toLocaleDateString()}`}
+                  </p>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <Link href="/scenarios?tab=travel">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-travel">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                onClick={handleExitTravelMode}
-                data-testid="button-exit-travel"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {!compact && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={handleExitTravelMode}
+                  data-testid="button-exit-travel"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         )}
 
         {scenarioState.sickDayActive && (
-          <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-            <div className="flex items-center gap-2">
-              <Thermometer className="h-4 w-4 text-orange-600" />
-              <div>
-                <p className="text-sm font-medium">Sick Day Mode</p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {scenarioState.sickDaySeverity || "Moderate"} severity
-                </p>
+          <div className={`flex items-center justify-between ${compact ? "p-2" : "p-3"} bg-orange-50 dark:bg-orange-950/30 rounded-lg`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <Thermometer className="h-4 w-4 text-orange-600 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{compact ? "Sick Day" : "Sick Day Mode"}</p>
+                {!compact && (
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {scenarioState.sickDaySeverity || "Moderate"} severity
+                  </p>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <Link href="/scenarios?tab=sick-day">
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid="button-view-sick-day">
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                onClick={handleExitSickDay}
-                data-testid="button-exit-sick-day"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {!compact && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={handleExitSickDay}
+                  data-testid="button-exit-sick-day"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         )}
 
-        {isEvening && (
+        {isEvening && !compact && (
           <Link href="/scenarios?tab=bedtime">
             <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg hover-elevate cursor-pointer" data-testid="card-bedtime-prompt">
               <div className="flex items-center gap-2">

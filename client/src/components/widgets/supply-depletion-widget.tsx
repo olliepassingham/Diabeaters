@@ -24,12 +24,12 @@ export function SupplyDepletionWidget({ compact = false }: { compact?: boolean }
 
   if (supplies.length === 0) {
     return (
-      <Card data-testid="widget-supply-depletion">
+      <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-supply-depletion">
         <CardHeader className="pb-2">
           <Link href="/supplies">
             <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
               <TrendingDown className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Depletion Forecast</CardTitle>
+              <CardTitle className="text-base">{compact ? "Depletion" : "Depletion Forecast"}</CardTitle>
             </div>
           </Link>
         </CardHeader>
@@ -56,20 +56,22 @@ export function SupplyDepletionWidget({ compact = false }: { compact?: boolean }
   const maxDays = Math.max(...supplyData.map(d => d.daysRemaining), 30);
 
   return (
-    <Card data-testid="widget-supply-depletion">
+    <Card className={compact ? "flex flex-col overflow-hidden" : ""} data-testid="widget-supply-depletion">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <Link href="/supplies">
             <div className="flex items-center gap-2 hover:opacity-70 transition-opacity cursor-pointer">
               <TrendingDown className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Depletion Forecast</CardTitle>
+              <CardTitle className="text-base">{compact ? "Depletion" : "Depletion Forecast"}</CardTitle>
             </div>
           </Link>
-          <Link href="/supplies">
-            <Button variant="ghost" size="sm" className="text-xs h-7" data-testid="button-depletion-edit">
-              Edit
-            </Button>
-          </Link>
+          {!compact && (
+            <Link href="/supplies">
+              <Button variant="ghost" size="sm" className="text-xs h-7" data-testid="button-depletion-edit">
+                Edit
+              </Button>
+            </Link>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-2">

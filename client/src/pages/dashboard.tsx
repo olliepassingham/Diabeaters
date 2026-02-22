@@ -794,10 +794,10 @@ export default function Dashboard() {
                   rows.push(
                     <Card key={`pair-${widget.id}-${next.id}`} className="overflow-hidden">
                       <div className="grid grid-cols-2 divide-x divide-border">
-                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none" data-testid={`widget-container-${widget.type}`}>
+                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none [&>*]:h-full" data-testid={`widget-container-${widget.type}`}>
                           <WidgetRenderer type={widget.type} size={widget.size} />
                         </div>
-                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none" data-testid={`widget-container-${next.type}`}>
+                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none [&>*]:h-full" data-testid={`widget-container-${next.type}`}>
                           <WidgetRenderer type={next.type} size={next.size} />
                         </div>
                       </div>
