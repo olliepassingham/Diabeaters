@@ -86,16 +86,16 @@ export function RatioAdviserWidget({ compact = false }: { compact?: boolean }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {hasRatios ? (
-          <div className={compact ? "space-y-1.5" : "grid grid-cols-2 gap-2"}>
+          <div className={compact ? "space-y-2" : "grid grid-cols-2 gap-2"}>
             {ratios.map((r) => {
               const { base, adjusted } = displayRatio(r.value, ratioFormat, scenario?.factor, cpSize);
               return compact ? (
-                <div key={r.label} className="flex items-center justify-between px-2 py-1 rounded-md bg-muted/30">
-                  <span className="text-xs text-muted-foreground">{r.label}</span>
+                <div key={r.label} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-muted/30">
+                  <span className="text-sm text-muted-foreground">{r.label}</span>
                   {scenario && adjusted ? (
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{adjusted}</span>
+                    <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">{adjusted}</span>
                   ) : (
-                    <span className="text-xs font-medium">{base}</span>
+                    <span className="text-sm font-semibold">{base}</span>
                   )}
                 </div>
               ) : (
