@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { 
   Dumbbell, Play, Square, Heart, ChevronDown, ChevronUp, 
   Check, Clock, AlertTriangle, TrendingDown, TrendingUp, 
-  Minus, Droplet, Zap, Shield
+  Minus, Droplet, Zap, Shield, Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -495,14 +495,20 @@ export function ActiveExerciseBanner() {
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 {typeConfig?.midCheckMessage ?? "How are you feeling? Any signs of low blood sugar?"}
                               </p>
-                              <div className="flex gap-2 mt-2">
+                              <div className="flex gap-2 mt-2 flex-wrap">
                                 <Button size="sm" variant="outline" onClick={handleDismissMidCheck} data-testid="button-midcheck-ok">
                                   Feeling fine
                                 </Button>
                                 <Link href="/help-now">
                                   <Button size="sm" variant="destructive" data-testid="button-midcheck-hypo">
                                     <Zap className="h-3 w-3 mr-1" />
-                                    Need help
+                                    Help Now
+                                  </Button>
+                                </Link>
+                                <Link href="/adviser?tab=tools">
+                                  <Button size="sm" variant="outline" data-testid="button-midcheck-hypo-calc">
+                                    <Calculator className="h-3 w-3 mr-1" />
+                                    Hypo Calc
                                   </Button>
                                 </Link>
                               </div>
@@ -519,15 +525,21 @@ export function ActiveExerciseBanner() {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" onClick={handleFinishExercise} data-testid="button-finish-exercise">
                         <Square className="h-3.5 w-3.5 mr-1.5" />
                         Finish Exercise
                       </Button>
                       <Link href="/help-now">
-                        <Button size="sm" variant="outline" data-testid="button-hypo-during-exercise">
+                        <Button size="sm" variant="destructive" data-testid="button-hypo-during-exercise">
                           <Zap className="h-3.5 w-3.5 mr-1.5" />
-                          Hypo Help
+                          Help Now
+                        </Button>
+                      </Link>
+                      <Link href="/adviser?tab=tools">
+                        <Button size="sm" variant="outline" data-testid="button-hypo-calc-during-exercise">
+                          <Calculator className="h-3.5 w-3.5 mr-1.5" />
+                          Hypo Calc
                         </Button>
                       </Link>
                     </div>
@@ -557,7 +569,7 @@ export function ActiveExerciseBanner() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" onClick={handleEndSession} data-testid="button-end-recovery">
                         <Check className="h-3.5 w-3.5 mr-1.5" />
                         End Recovery
@@ -566,9 +578,15 @@ export function ActiveExerciseBanner() {
                         Skip
                       </Button>
                       <Link href="/help-now">
-                        <Button size="sm" variant="ghost" data-testid="button-hypo-recovery">
+                        <Button size="sm" variant="destructive" data-testid="button-hypo-recovery">
                           <Zap className="h-3.5 w-3.5 mr-1" />
-                          Hypo
+                          Help Now
+                        </Button>
+                      </Link>
+                      <Link href="/adviser?tab=tools">
+                        <Button size="sm" variant="ghost" data-testid="button-hypo-calc-recovery">
+                          <Calculator className="h-3.5 w-3.5 mr-1" />
+                          Hypo Calc
                         </Button>
                       </Link>
                     </div>
