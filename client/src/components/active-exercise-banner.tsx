@@ -46,6 +46,135 @@ const PHASE_BADGE_STYLES: Record<ExercisePhase, string> = {
   recovery: "bg-amber-600 text-white dark:bg-amber-500",
 };
 
+interface ExerciseTypeConfig {
+  preTips: (isPump: boolean, durationMinutes: number) => string[];
+  checklistLabels: { bg: string; carbs: string; basal: string };
+  midCheckMessage: string;
+  midCheckTiming: number;
+  recoveryMessage: string;
+  delayedWarning: string | null;
+  activeReminder: string | null;
+}
+
+const EXERCISE_TYPE_CONFIG: Record<ExerciseType, ExerciseTypeConfig> = {
+  cardio: {
+    preTips: (isPump, dur) => {
+      const tips: string[] = [];
+      tips.push("Cardio typically causes a sustained BG drop — have fast-acting carbs ready");
+      if (isPump) tips.push("Consider reducing basal rate by 50% starting 60-90 min before");
+      else tips.push("Long-acting insulin increases hypo risk during sustained cardio");
+      if (dur >= 60) tips.push("For sessions over 60 min, take 15-30g carbs every 30-45 min");
+      tips.push("Keep hypo treatment within easy reach");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Fast-acting carbs ready", basal: "Reduced basal rate" },
+    midCheckMessage: "Halfway through — feeling shaky or lightheaded? Cardio can cause steady BG drops.",
+    midCheckTiming: 0.5,
+    recoveryMessage: "BG may continue to drop for several hours after cardio",
+    delayedWarning: "Sustained cardio can cause delayed hypos, especially overnight",
+    activeReminder: "Sip water regularly and watch for early hypo signs",
+  },
+  strength: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("Strength training often causes BG to rise during exercise, then drop after");
+      tips.push("The adrenaline response to heavy lifting can temporarily raise BG");
+      if (isPump) tips.push("You may not need to reduce basal for strength — monitor the pattern");
+      else tips.push("Be aware of delayed BG drops 1-2 hours after strength work");
+      tips.push("Keep hypo treatment nearby for the post-workout window");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Post-workout snack planned", basal: "Reviewed basal rate" },
+    midCheckMessage: "How's your BG? Strength training can cause a temporary rise — that's normal.",
+    midCheckTiming: 0.5,
+    recoveryMessage: "BG may drop in the hours after strength training as muscles refuel",
+    delayedWarning: "Heavy lifting can cause delayed hypos as muscles replenish glycogen",
+    activeReminder: "A BG rise during lifting is normal — it usually comes down after",
+  },
+  hiit: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("HIIT causes a BG rollercoaster — expect a spike during, then a crash after");
+      tips.push("The intense intervals trigger adrenaline which raises BG temporarily");
+      if (isPump) tips.push("Consider a small basal reduction — but watch for the post-HIIT drop");
+      else tips.push("The post-HIIT BG drop can be significant — plan a snack for afterwards");
+      tips.push("Have fast-acting carbs and water at arm's reach");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Recovery carbs ready", basal: "Adjusted basal for HIIT" },
+    midCheckMessage: "Quick check — HIIT can mask hypo symptoms with adrenaline. How are you feeling?",
+    midCheckTiming: 0.4,
+    recoveryMessage: "Post-HIIT BG crashes can be sharp — monitor closely for the next few hours",
+    delayedWarning: "HIIT has one of the highest risks of delayed hypos — stay alert tonight",
+    activeReminder: "Adrenaline may mask hypo symptoms — pause if anything feels off",
+  },
+  yoga: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("Yoga has a gentle BG impact — relaxation can actually help insulin sensitivity");
+      if (isPump) tips.push("Basal adjustment usually isn't needed for yoga");
+      tips.push("Stay hydrated and listen to your body during poses");
+      tips.push("Keep glucose tablets nearby just in case");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Light snack if needed", basal: "Reviewed basal rate" },
+    midCheckMessage: "Gentle check-in — how are you feeling? Take a moment to tune into your body.",
+    midCheckTiming: 0.6,
+    recoveryMessage: "Yoga's effect on BG is usually mild — a short recovery window is fine",
+    delayedWarning: null,
+    activeReminder: null,
+  },
+  walking: {
+    preTips: (_isPump, dur) => {
+      const tips: string[] = [];
+      tips.push("Walking has a mild, steady BG-lowering effect — great for after meals");
+      if (dur >= 60) tips.push("For longer walks, bring a small snack and your glucose tablets");
+      tips.push("Enjoy your walk — keep glucose tablets in your pocket");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Snack packed for the walk", basal: "Reviewed basal rate" },
+    midCheckMessage: "How are you doing? Feeling good to keep going?",
+    midCheckTiming: 0.6,
+    recoveryMessage: "A short recovery window after walking — BG usually settles quickly",
+    delayedWarning: null,
+    activeReminder: null,
+  },
+  swimming: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("Hypo symptoms are harder to spot in water — check BG before getting in");
+      tips.push("Keep fast-acting glucose at the poolside, not in the changing room");
+      if (isPump) tips.push("If disconnecting your pump, note how long you'll be without basal");
+      else tips.push("Water exercise can increase insulin absorption — watch for faster drops");
+      tips.push("Get out of the water immediately if you feel any hypo symptoms");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Glucose at poolside", basal: "Pump plan sorted" },
+    midCheckMessage: "Time for a poolside check — get out of the water and test your BG if you can.",
+    midCheckTiming: 0.4,
+    recoveryMessage: "Swimming can cause delayed BG drops — keep snacks handy after your swim",
+    delayedWarning: "Cold water swimming especially can cause delayed hypos for hours afterwards",
+    activeReminder: "If anything feels off, get out of the water first — then check BG",
+  },
+  sports: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("Team sports have unpredictable intensity — BG can swing either way");
+      tips.push("Adrenaline from competition can temporarily raise BG");
+      if (isPump) tips.push("Consider a moderate basal reduction — but the adrenaline may offset it");
+      else tips.push("Keep glucose and snacks on the sideline, easily accessible");
+      tips.push("Tell a teammate or coach where your hypo treatment is");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Glucose on the sideline", basal: "Adjusted basal rate" },
+    midCheckMessage: "Half-time check — how's your energy? Competition adrenaline can mask low BG signs.",
+    midCheckTiming: 0.5,
+    recoveryMessage: "Post-match BG drops are common once the adrenaline wears off",
+    delayedWarning: "Competitive sports can cause delayed hypos as adrenaline fades — stay alert",
+    activeReminder: "Let someone nearby know where your hypo treatment is",
+  },
+};
+
 function formatElapsed(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -67,29 +196,12 @@ function formatRemaining(ms: number): string {
 }
 
 function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean): string[] {
-  const tips: string[] = [];
-  const { intensity, exerciseType } = session;
+  const config = EXERCISE_TYPE_CONFIG[session.exerciseType];
+  return config.preTips(isPump, session.durationMinutes);
+}
 
-  if (intensity === "intense" || intensity === "moderate") {
-    tips.push("Consider having 15-20g of fast-acting carbs if BG is below 7 mmol/L");
-  }
-  if (intensity === "intense") {
-    tips.push("High intensity exercise may cause BG to rise initially, then drop later");
-  }
-  if (isPump && (intensity === "intense" || intensity === "moderate")) {
-    tips.push("Consider reducing basal rate by 50% starting 60-90 minutes before exercise");
-  }
-  if (!isPump && (intensity === "intense" || intensity === "moderate")) {
-    tips.push("If on long-acting insulin, be aware of increased hypo risk post-exercise");
-  }
-  if (exerciseType === "swimming") {
-    tips.push("Keep fast-acting glucose at the poolside in case of a hypo");
-  }
-  if (session.durationMinutes >= 60) {
-    tips.push("For sessions over 60 min, consider 15-30g carbs every 30-45 min");
-  }
-  tips.push("Keep hypo treatment within easy reach during exercise");
-  return tips;
+function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
+  return EXERCISE_TYPE_CONFIG[type];
 }
 
 export function ActiveExerciseBanner() {
@@ -128,8 +240,9 @@ export function ActiveExerciseBanner() {
         const elapsedMs = now - start;
         setElapsed(elapsedMs);
 
-        const halfwayMs = session.durationMinutes * 60 * 1000 / 2;
-        if (!session.midCheckDone && elapsedMs >= halfwayMs) {
+        const typeConfig = getTypeConfig(session.exerciseType);
+        const checkTimingMs = session.durationMinutes * 60 * 1000 * typeConfig.midCheckTiming;
+        if (!session.midCheckDone && elapsedMs >= checkTimingMs) {
           setShowMidCheck(true);
         }
 
@@ -210,6 +323,7 @@ export function ActiveExerciseBanner() {
   if (!session && !showOutcomeDialog) return null;
 
   const tips = session ? getPreExerciseTips(session, isPump) : [];
+  const typeConfig = session ? getTypeConfig(session.exerciseType) : null;
   const progressPercent = session?.phase === "active" && session.exerciseStartedAt
     ? Math.min(100, (elapsed / (session.durationMinutes * 60 * 1000)) * 100)
     : 0;
@@ -312,7 +426,7 @@ export function ActiveExerciseBanner() {
                         }`}>
                           {session.preChecklist.bgChecked && <Check className="h-3 w-3" />}
                         </div>
-                        <span>Checked blood glucose</span>
+                        <span>{typeConfig?.checklistLabels.bg ?? "Checked blood glucose"}</span>
                       </button>
                       <button
                         onClick={() => handleChecklistToggle("carbsConsidered")}
@@ -326,7 +440,7 @@ export function ActiveExerciseBanner() {
                         }`}>
                           {session.preChecklist.carbsConsidered && <Check className="h-3 w-3" />}
                         </div>
-                        <span>Considered carb loading</span>
+                        <span>{typeConfig?.checklistLabels.carbs ?? "Considered carb loading"}</span>
                       </button>
                       {isPump && (
                         <button
@@ -341,7 +455,7 @@ export function ActiveExerciseBanner() {
                           }`}>
                             {session.preChecklist.basalAdjusted && <Check className="h-3 w-3" />}
                           </div>
-                          <span>Adjusted basal rate</span>
+                          <span>{typeConfig?.checklistLabels.basal ?? "Adjusted basal rate"}</span>
                         </button>
                       )}
                     </div>
@@ -377,9 +491,9 @@ export function ActiveExerciseBanner() {
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium">Halfway check</p>
+                              <p className="text-xs font-medium">Mid-exercise check</p>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                How are you feeling? Any signs of low blood sugar?
+                                {typeConfig?.midCheckMessage ?? "How are you feeling? Any signs of low blood sugar?"}
                               </p>
                               <div className="flex gap-2 mt-2">
                                 <Button size="sm" variant="outline" onClick={handleDismissMidCheck} data-testid="button-midcheck-ok">
@@ -396,6 +510,13 @@ export function ActiveExerciseBanner() {
                           </div>
                         </CardContent>
                       </Card>
+                    )}
+
+                    {typeConfig?.activeReminder && (
+                      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
+                        <span>{typeConfig.activeReminder}</span>
+                      </div>
                     )}
 
                     <div className="flex items-center gap-2">
@@ -419,13 +540,13 @@ export function ActiveExerciseBanner() {
                       <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 shrink-0 mt-0.5" />
                         <span>
-                          Recovery window active — BG may continue to change for the next {formatRemaining(recoveryRemaining)}
+                          {typeConfig?.recoveryMessage ?? "Recovery window active"} — {formatRemaining(recoveryRemaining)} remaining
                         </span>
                       </div>
-                      {session.intensity === "intense" && (
+                      {typeConfig?.delayedWarning && (session.intensity === "intense" || session.intensity === "moderate") && (
                         <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                           <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
-                          <span>Intense exercise can cause delayed hypos for up to 24 hours</span>
+                          <span>{typeConfig.delayedWarning}</span>
                         </div>
                       )}
                       {isEvening && (

@@ -2491,7 +2491,7 @@ export const storage = {
       durationMinutes: params.durationMinutes,
       phase: "pre",
       startedAt: new Date().toISOString(),
-      recoveryMinutes: params.recoveryMinutes ?? (params.intensity === "intense" ? 120 : params.intensity === "moderate" ? 90 : 60),
+      recoveryMinutes: params.recoveryMinutes ?? this.getDefaultRecoveryMinutes(params.exerciseType, params.intensity),
       midCheckDone: false,
       preChecklist: {
         bgChecked: false,
@@ -2501,6 +2501,19 @@ export const storage = {
     };
     localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(session));
     return session;
+  },
+
+  getDefaultRecoveryMinutes(exerciseType: ExerciseType, intensity: ExerciseIntensity): number {
+    const typeDefaults: Record<ExerciseType, (i: ExerciseIntensity) => number> = {
+      cardio: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+      strength: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+      hiit: (i) => i === "intense" ? 150 : i === "moderate" ? 120 : 90,
+      yoga: () => 30,
+      walking: () => 30,
+      swimming: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+      sports: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+    };
+    return typeDefaults[exerciseType](intensity);
   },
 
   updateActiveExercise(updates: Partial<ActiveExerciseSession>): ActiveExerciseSession | null {
