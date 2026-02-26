@@ -6,7 +6,23 @@ import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, 
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-import { storage, Supply, ScenarioState, UserProfile, DashboardWidget, WidgetSize, HypoTreatment, CarerLink } from "@/lib/storage";
+import {
+  storage,
+  Supply as LocalSupply,
+  ScenarioState,
+  UserProfile,
+  DashboardWidget,
+  WidgetSize,
+  HypoTreatment,
+  CarerLink,
+} from "@/lib/storage";
+import {
+  listSuppliesForUser,
+  addSupply,
+  updateSupply,
+  deleteSupply,
+  type Supply as RemoteSupply,
+} from "@/lib/supplies";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -37,7 +53,7 @@ import { useReleaseMode } from "@/lib/release-mode";
 
 type HealthStatus = "stable" | "watch" | "action";
 
-function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState): HealthStatus {
+function getHealthStatus(supplies: LocalSupply[], scenarioState: ScenarioState): HealthStatus {
   const supplyStatuses = supplies.map(s => storage.getSupplyStatus(s));
   const hasCritical = supplyStatuses.includes("critical");
   const hasLow = supplyStatuses.includes("low");
@@ -621,7 +637,7 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
 export default function Dashboard() {
   const { isBetaVisible } = useReleaseMode();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [supplies, setSupplies] = useState<Supply[]>([]);
+  const [supplies, setSupplies] = useState<LocalSupply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -630,6 +646,12 @@ export default function Dashboard() {
   const [settingsCompletion, setSettingsCompletion] = useState({ percentage: 0, completed: 0, total: 5 });
   const [isLoading, setIsLoading] = useState(true);
   const [showBackupReminder, setShowBackupReminder] = useState(false);
+
+  const [remoteSupplies, setRemoteSupplies] = useState<RemoteSupply[]>([]);
+  const [remoteLoading, setRemoteLoading] = useState(true);
+  const [remoteError, setRemoteError] = useState<string | null>(null);
+  const [newSupplyName, setNewSupplyName] = useState("");
+  const [newSupplyQuantity, setNewSupplyQuantity] = useState("0");
 
   // Refresh data on mount and when refreshKey changes
   useEffect(() => {
@@ -663,6 +685,85 @@ export default function Dashboard() {
       window.removeEventListener('focus', handleFocus);
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchRemoteSupplies = async () => {
+      setRemoteLoading(true);
+      const { data, error } = await listSuppliesForUser();
+
+      if (cancelled) return;
+
+      if (error) {
+        setRemoteError(error.message);
+        setRemoteSupplies([]);
+      } else {
+        setRemoteError(null);
+        setRemoteSupplies(data ?? []);
+      }
+
+      setRemoteLoading(false);
+    };
+
+    fetchRemoteSupplies();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleAddRemoteSupply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = newSupplyName.trim();
+    const qty = Number.parseInt(newSupplyQuantity, 10);
+
+    if (!trimmedName) return;
+    if (Number.isNaN(qty) || qty < 0) return;
+
+    const { error } = await addSupply({ name: trimmedName, quantity: qty });
+    if (error) {
+      setRemoteError(error.message);
+      return;
+    }
+
+    setNewSupplyName("");
+    setNewSupplyQuantity("0");
+
+    const { data, error: refreshError } = await listSuppliesForUser();
+    if (refreshError) {
+      setRemoteError(refreshError.message);
+    } else {
+      setRemoteError(null);
+      setRemoteSupplies(data ?? []);
+    }
+  };
+
+  const handleAdjustQuantity = async (id: string, delta: number) => {
+    const existing = remoteSupplies.find((s) => s.id === id);
+    if (!existing) return;
+
+    const nextQty = Math.max(0, existing.quantity + delta);
+    const { error } = await updateSupply(id, { quantity: nextQty });
+    if (error) {
+      setRemoteError(error.message);
+      return;
+    }
+
+    setRemoteSupplies((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, quantity: nextQty } : s)),
+    );
+  };
+
+  const handleDeleteRemoteSupply = async (id: string) => {
+    const { error } = await deleteSupply(id);
+    if (error) {
+      setRemoteError(error.message);
+      return;
+    }
+
+    setRemoteSupplies((prev) => prev.filter((s) => s.id !== id));
+  };
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
@@ -736,6 +837,115 @@ export default function Dashboard() {
       <div className="animate-fade-in" style={{ animationDelay: '50ms' }}>
         <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
       </div>
+
+      {!isEditing && (
+        <div className="animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+          <Card className="border-dashed">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm font-semibold">Cloud supplies</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Synced per account via Supabase.
+                  </p>
+                </div>
+                {remoteLoading && (
+                  <span className="text-[11px] text-muted-foreground">
+                    Loading…
+                  </span>
+                )}
+              </div>
+
+              {remoteError && (
+                <p className="text-xs text-destructive">{remoteError}</p>
+              )}
+
+              <form
+                onSubmit={handleAddRemoteSupply}
+                className="flex flex-col sm:flex-row gap-2"
+              >
+                <Input
+                  placeholder="Supply name"
+                  value={newSupplyName}
+                  onChange={(e) => setNewSupplyName(e.target.value)}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  className="w-full sm:w-24"
+                  value={newSupplyQuantity}
+                  onChange={(e) => setNewSupplyQuantity(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  disabled={remoteLoading}
+                >
+                  Add
+                </Button>
+              </form>
+
+              <div className="border-t pt-3 mt-1">
+                {remoteSupplies.length === 0 && !remoteLoading ? (
+                  <p className="text-xs text-muted-foreground">
+                    No supplies saved yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {remoteSupplies.map((s) => (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between gap-2 text-sm"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate">{s.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Updated{" "}
+                            {new Date(s.updated_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 px-0"
+                            onClick={() => handleAdjustQuantity(s.id, -1)}
+                          >
+                            -
+                          </Button>
+                          <span className="w-8 text-center text-xs">
+                            {s.quantity}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 px-0"
+                            onClick={() => handleAdjustQuantity(s.id, 1)}
+                          >
+                            +
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-[11px] text-destructive"
+                            onClick={() => handleDeleteRemoteSupply(s.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {!isEditing && !isSettingsComplete && (
         <div className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>

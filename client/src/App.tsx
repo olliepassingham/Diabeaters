@@ -1,6 +1,6 @@
 
 // client/src/App.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ComponentType } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -28,6 +28,10 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useReleaseMode } from "@/lib/release-mode";
 
+import { getCurrentUser, onAuthStateChange, logout } from "@/lib/auth";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+
 // Pages — your pages appear to be default exports (based on your existing imports)
 // If any are named, change imports accordingly.
 import Dashboard from "@/pages/dashboard";
@@ -47,12 +51,71 @@ import CarerView from "@/pages/carer-view";
 import Ratios from "@/pages/ratios";
 import NotFound from "@/pages/not-found";
 
+function requireAuth<P>(Component: ComponentType<P>) {
+  return function RequireAuth(props: P) {
+    const [, setLocation] = useLocation();
+    const [checking, setChecking] = useState(true);
+    const [hasUser, setHasUser] = useState(false);
+
+    useEffect(() => {
+      let isMounted = true;
+
+      (async () => {
+        const { data } = await getCurrentUser();
+        if (!isMounted) return;
+
+        const userPresent = !!data?.user;
+        setHasUser(userPresent);
+        setChecking(false);
+
+        if (!userPresent) {
+          setLocation("/login");
+        }
+      })();
+
+      const { data } = onAuthStateChange((event, session) => {
+        if (!isMounted) return;
+        const userPresent = !!session?.user;
+        setHasUser(userPresent);
+        if (!userPresent) {
+          setLocation("/login");
+        }
+      });
+
+      return () => {
+        isMounted = false;
+        data?.unsubscribe();
+      };
+    }, [setLocation]);
+
+    if (checking) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">
+            Checking session...
+          </div>
+        </div>
+      );
+    }
+
+    if (!hasUser) {
+      return null;
+    }
+
+    return <Component {...props} />;
+  };
+}
+
+const ProtectedDashboard = requireAuth(Dashboard);
+
 function Router() {
   const { isBetaVisible } = useReleaseMode();
 
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/" component={ProtectedDashboard} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route path="/supplies" component={Supplies} />
       <Route path="/scenarios" component={Scenarios} />
       <Route path="/adviser" component={Adviser} />
@@ -76,6 +139,27 @@ function AppContent() {
   const [location] = useLocation();
   const [hasChecked, setHasChecked] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      const { data } = await getCurrentUser();
+      if (!isMounted) return;
+      setIsAuthenticated(!!data?.user);
+    })();
+
+    const { data } = onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => {
+      isMounted = false;
+      data?.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const completed = localStorage.getItem("diabeater_onboarding_completed");
@@ -146,6 +230,17 @@ function AppContent() {
           <MessagesIcon />
           <NotificationBell />
           <ProfileMenu />
+          {isAuthenticated && (
+            <button
+              onClick={async () => {
+                await logout();
+                setLocation("/login");
+              }}
+              className="text-xs px-3 py-1 rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Log out
+            </button>
+          )}
         </div>
       </header>
       <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
