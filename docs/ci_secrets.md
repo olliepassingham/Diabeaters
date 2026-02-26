@@ -49,3 +49,5 @@ Add each secret by name. Values are never displayed after saving.
 2. Add the five secrets to GitHub Actions.
 3. Push to `main` to trigger the workflow.
 4. The production URL will appear in the Vercel deploy summary.
+
+**Note:** Staging uses separate secrets. See [ci_secrets_staging.md](ci_secrets_staging.md) for `develop` deployments.

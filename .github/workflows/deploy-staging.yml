@@ -1,0 +1,53 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check required secrets (staging)
+        run: npx tsx scripts/check-secrets-staging.ci.ts
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_SUPABASE_URL_STAGING: ${{ secrets.VITE_SUPABASE_URL_STAGING }}
+          VITE_SUPABASE_ANON_KEY_STAGING: ${{ secrets.VITE_SUPABASE_ANON_KEY_STAGING }}
+
+      - name: Build (staging)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL_STAGING }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY_STAGING }}
+          VITE_APP_ENV: staging
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Deploy to Vercel (Preview)
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> $GITHUB_OUTPUT
+          echo "Staging URL: $url"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Summary
+        run: |
+          echo "## Staging deploy complete" >> $GITHUB_STEP_SUMMARY
+          echo "URL: ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY

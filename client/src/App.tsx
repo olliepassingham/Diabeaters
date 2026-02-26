@@ -7,6 +7,8 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DevBanner } from "@/components/DevBanner";
+import { StagingBanner } from "@/components/StagingBanner";
+import { isStaging } from "@/lib/flags";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
@@ -315,10 +317,11 @@ function AppContent() {
   }
 
   return (
-    <>
+    <div className={isStaging ? "pt-10" : ""}>
+      <StagingBanner />
       <DevBanner />
       <MainRouter />
-    </>
+    </div>
   );
 }
 

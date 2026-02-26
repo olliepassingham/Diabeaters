@@ -66,6 +66,7 @@ import {
 import { WelcomeWidget } from "@/components/widgets/welcome-widget";
 import { DiscoveryPrompt } from "@/components/discovery-prompts";
 import { useReleaseMode } from "@/lib/release-mode";
+import { StagingChip } from "@/components/StagingChip";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -218,9 +219,12 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
     <div className="p-4" data-testid="card-header">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-greeting">
-            {greeting()}{firstName ? `, ${firstName}` : ""}
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-semibold" data-testid="text-greeting">
+              {greeting()}{firstName ? `, ${firstName}` : ""}
+            </h1>
+            <StagingChip />
+          </div>
           <p className="text-muted-foreground text-sm">Here's your diabetes today</p>
         </div>
         <StatusPill status={status} />

@@ -5,6 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env
+.env.staging
 test-results
 playwright-report
 playwright/.cache
+client/public/robots.txt

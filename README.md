@@ -15,12 +15,36 @@ The above disclaimer appears in:
 - Activity Adviser and similar features present guidance based on user-entered ratios; they do not make clinical recommendations.
 - Users are consistently reminded to consult their healthcare professional.
 
+## Environments
+
+| Environment | Host           | Branch   | Notes                                      |
+|-------------|----------------|----------|--------------------------------------------|
+| Development | localhost:5173 | local    | `.env` with `VITE_APP_ENV=development`     |
+| Staging     | Vercel Preview | `develop`| `.env.staging`, staging Supabase, no-index |
+| Production  | Vercel Prod    | `main`   | Production Supabase, indexing allowed      |
+
+**Required env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_ENV` (optional; defaults to `development` when `DEV`, `production` when `PROD`). Vite exposes `VITE_*` to the client via `import.meta.env`. Copy `.env.example` or `.env.staging.example` as needed. Restart dev server after changing `.env`.
+
+**How `VITE_APP_ENV` controls the app:**
+- **Banners:** Staging shows a top ribbon “Staging — not for real use” and a “Preview: this feature is in staging” chip on the dashboard. Production shows neither.
+- **Robots:** Staging builds emit `Disallow: /`; production emits `Allow: /`. Search engines should not index staging.
+- **Feature flags:** Use `isStaging`, `isProd`, `isDev` from `@/lib/flags` for conditional UI or analytics (e.g. only enable tracking in production).
+
+```ts
+import { isStaging } from "@/lib/flags";
+
+if (isStaging) {
+  // Show "Preview: this feature is in staging" chip, or skip analytics
+}
+```
+
 ## Local Env
 
 - **Supabase credentials**: In your Supabase project, go to **Project Settings → API** and copy the **project URL** and **public anon key**.
 - **.env variables**: Put them in the root `.env` file as:
   - `VITE_SUPABASE_URL=...`
   - `VITE_SUPABASE_ANON_KEY=...`
+  - `VITE_APP_ENV=development` (optional; see `.env.example`)
 - **Vite prefix**: The `VITE_` prefix is required for Vite to expose these values to the client (`import.meta.env.VITE_SUPABASE_URL`, etc.).
 - **Restart dev server**: After changing `.env`, stop and restart `npm run dev` so Vite picks up the new values.
 
@@ -249,7 +273,9 @@ Capacitor wraps the web app in a native iOS shell. The `ios/` platform is config
 
 ### Server URL
 
-`capacitor.config.ts` is set to load the app from `https://diabeaters.vercel.app`. The WebView loads this deployed Vercel URL; bundled assets in `ios/App/App/public` are used as fallback when offline. `cleartext: false` enforces HTTPS only.
+`capacitor.config.ts` is set to load the app from `https://diabeaters.vercel.app` (production). The WebView loads this deployed Vercel URL; bundled assets in `ios/App/App/public` are used as fallback when offline. `cleartext: false` enforces HTTPS only.
+
+**Staging testing:** To test the staging URL inside the iOS wrapper, temporarily change `server.url` in `capacitor.config.ts` to your staging URL and run `npx cap sync ios`. Do not ship to the App Store with a staging URL; revert to production before archiving.
 
 ### ATS (App Transport Security)
 
@@ -496,3 +522,11 @@ Or in the Xcode plist editor: **App Transport Security Settings** → **Allow Ar
 - **Data**: If you collect health-related data, state it in the Privacy Policy and in App Store metadata.
 - **Login/signup**: If you have Supabase auth, mention account creation and data storage in the listing and Privacy Policy.
 
+## Typical flow (branching)
+
+1. `git checkout -b feature/xyz` from `develop`
+2. Push → Vercel Preview URL auto-generated for the branch
+3. Merge to `develop` → Staging URL updates
+4. Merge `develop` → `main` → Production goes live
+
+See [docs/branching.md](docs/branching.md) for the full model.
