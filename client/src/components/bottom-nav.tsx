@@ -10,7 +10,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Calendar, Users, Heart, ShoppingBag, Settings, Phone, MessageCircle } from "lucide-react";
+import { Calendar, Users, Heart, ShoppingBag, Settings, Phone, MessageCircle, User } from "lucide-react";
 
 const primaryTabs = [
   { title: "Home", url: "/", icon: Home },
@@ -20,6 +20,7 @@ const primaryTabs = [
 ];
 
 const moreItems = [
+  { title: "Account", url: "/account", icon: User },
   { title: "Appointments", url: "/appointments", icon: Calendar },
   { title: "AI Coach", url: "/ai-coach", icon: MessageCircle, beta: true },
   { title: "Community", url: "/community", icon: Users, beta: true },

@@ -1,5 +1,5 @@
 import type { AuthError, PostgrestError } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 export type Supply = {
   id: string;
@@ -16,19 +16,26 @@ type SuppliesResult<T> = {
   error: SuppliesError | null;
 };
 
+const NOT_CONFIGURED = new Error(
+  "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env",
+);
+
 async function getCurrentUserId(): Promise<SuppliesResult<string>> {
-  const { data, error } = await supabase.auth.getUser();
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
 
-  if (error) {
-    return { data: null, error };
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return { data: null, error };
+    const userId = data?.user?.id;
+    if (!userId) return { data: null, error: new Error("Not authenticated") };
+    return { data: userId, error: null };
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
   }
-
-  const userId = data?.user?.id;
-  if (!userId) {
-    return { data: null, error: new Error("Not authenticated") };
-  }
-
-  return { data: userId, error: null };
 }
 
 /**
@@ -38,23 +45,30 @@ async function getCurrentUserId(): Promise<SuppliesResult<string>> {
 export async function listSuppliesForUser(
   userId?: string,
 ): Promise<SuppliesResult<Supply[]>> {
-  let effectiveUserId = userId;
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
 
-  if (!effectiveUserId) {
-    const { data: uid, error } = await getCurrentUserId();
-    if (error || !uid) {
-      return { data: null, error: error ?? new Error("Not authenticated") };
+  try {
+    let effectiveUserId = userId;
+    if (!effectiveUserId) {
+      const { data: uid, error } = await getCurrentUserId();
+      if (error || !uid) {
+        return { data: null, error: error ?? new Error("Not authenticated") };
+      }
+      effectiveUserId = uid;
     }
-    effectiveUserId = uid;
+    const { data, error } = await supabase
+      .from("supplies")
+      .select("*")
+      .eq("user_id", effectiveUserId)
+      .order("updated_at", { ascending: false });
+    return { data: (data as Supply[] | null) ?? null, error };
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
   }
-
-  const { data, error } = await supabase
-    .from("supplies")
-    .select("*")
-    .eq("user_id", effectiveUserId)
-    .order("updated_at", { ascending: false });
-
-  return { data: (data as Supply[] | null) ?? null, error };
 }
 
 /**
@@ -65,24 +79,27 @@ export async function addSupply(args: {
   name: string;
   quantity: number;
 }): Promise<SuppliesResult<Supply>> {
-  const { data: userId, error: userError } = await getCurrentUserId();
-  if (userError || !userId) {
-    return { data: null, error: userError ?? new Error("Not authenticated") };
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  try {
+    const { data: userId, error: userError } = await getCurrentUserId();
+    if (userError || !userId) {
+      return { data: null, error: userError ?? new Error("Not authenticated") };
+    }
+    const { name, quantity } = args;
+    const { data, error } = await supabase
+      .from("supplies")
+      .insert({ user_id: userId, name, quantity })
+      .select("*")
+      .single();
+    return { data: (data as Supply | null) ?? null, error };
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
   }
-
-  const { name, quantity } = args;
-
-  const { data, error } = await supabase
-    .from("supplies")
-    .insert({
-      user_id: userId,
-      name,
-      quantity,
-    })
-    .select("*")
-    .single();
-
-  return { data: (data as Supply | null) ?? null, error };
 }
 
 /**
@@ -93,22 +110,27 @@ export async function updateSupply(
   id: string,
   fields: Partial<{ name: string; quantity: number }>,
 ): Promise<SuppliesResult<Supply>> {
-  if (!id) {
-    return { data: null, error: new Error("Supply id is required") };
-  }
-
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+  if (!id) return { data: null, error: new Error("Supply id is required") };
   if (Object.keys(fields).length === 0) {
     return { data: null, error: new Error("No fields to update") };
   }
 
-  const { data, error } = await supabase
-    .from("supplies")
-    .update(fields)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  return { data: (data as Supply | null) ?? null, error };
+  try {
+    const { data, error } = await supabase
+      .from("supplies")
+      .update(fields)
+      .eq("id", id)
+      .select("*")
+      .single();
+    return { data: (data as Supply | null) ?? null, error };
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
+  }
 }
 
 /**
@@ -117,17 +139,22 @@ export async function updateSupply(
 export async function deleteSupply(
   id: string,
 ): Promise<SuppliesResult<Supply>> {
-  if (!id) {
-    return { data: null, error: new Error("Supply id is required") };
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+  if (!id) return { data: null, error: new Error("Supply id is required") };
+
+  try {
+    const { data, error } = await supabase
+      .from("supplies")
+      .delete()
+      .eq("id", id)
+      .select("*")
+      .single();
+    return { data: (data as Supply | null) ?? null, error };
+  } catch (e) {
+    return {
+      data: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
   }
-
-  const { data, error } = await supabase
-    .from("supplies")
-    .delete()
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  return { data: (data as Supply | null) ?? null, error };
 }
-

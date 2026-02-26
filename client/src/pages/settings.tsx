@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings, EmergencyContact } from "@/lib/storage";
-import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
+import { User, Syringe, Activity, Save, Bell, Phone, Plus, Trash2, Star, Download, Upload, Package, Palette, Sun, Moon, Check, ArrowRight, BookOpen, ExternalLink, Info } from "lucide-react";
 import { useTheme, COLOUR_THEMES, ColourThemeId } from "@/hooks/use-theme";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -20,6 +20,7 @@ import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPe
 import type { RatioFormat } from "@/lib/storage";
 import { validateTDD, validateCorrectionFactor, validateTargetBgLow, validateTargetBgHigh, validateTargetRange, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
+import { Disclaimer } from "@/components/disclaimer";
 
 function ProfileTab({ 
   name, setName, bgUnits, setBgUnits, 
@@ -1251,7 +1252,7 @@ export default function Settings() {
 
       <div className="max-w-3xl">
         <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="settings-tabs">
-          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-8" data-testid="settings-tab-list">
+          <TabsList className="h-auto flex flex-wrap gap-1 w-full sm:grid sm:grid-cols-9" data-testid="settings-tab-list">
             <TabsTrigger value="profile" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-profile">
               <User className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Profile</span>
@@ -1283,6 +1284,10 @@ export default function Settings() {
             <TabsTrigger value="sources" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-sources">
               <BookOpen className="h-4 w-4 mr-1.5 shrink-0" />
               <span>Sources</span>
+            </TabsTrigger>
+            <TabsTrigger value="about" className="flex-1 min-w-[calc(33%-4px)] sm:min-w-0" data-testid="tab-about">
+              <Info className="h-4 w-4 mr-1.5 shrink-0" />
+              <span>About</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1363,6 +1368,39 @@ export default function Settings() {
 
             <TabsContent value="sources" className="animate-fade-in-up">
               <SourcesTab />
+            </TabsContent>
+
+            <TabsContent value="about" className="animate-fade-in-up">
+              <Card className="mb-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Account
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your email, password, and verification
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href="/account">
+                    <Button variant="outline" data-testid="settings-link-account">
+                      Open Account settings
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Info className="h-5 w-5 text-primary" />
+                    Data &amp; Safety
+                  </CardTitle>
+                  <CardDescription>About Diabeaters and your data</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Disclaimer />
+                </CardContent>
+              </Card>
             </TabsContent>
           </div>
         </Tabs>

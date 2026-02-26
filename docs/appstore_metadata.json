@@ -1,0 +1,33 @@
+{
+  "name": "Diabeaters",
+  "subtitle": "Type 1 Diabetes Companion (Lifestyle, not medical advice)",
+  "privacyPolicyUrl": "https://YOUR_DOMAIN/privacy",
+  "marketingUrl": "https://YOUR_DOMAIN/",
+  "supportUrl": "https://YOUR_DOMAIN/support",
+  "primaryCategory": "HEALTH_AND_FITNESS",
+  "keywords": [
+    "type 1 diabetes",
+    "supplies",
+    "routines",
+    "lifestyle",
+    "organiser",
+    "hypo help",
+    "dashboard"
+  ],
+  "copyright": "© PassingTime Ltd 2026",
+  "tradeRepresentativeContactInfo": "",
+  "ageRating": "4+",
+  "contentRights": "No third-party content requiring rights",
+  "routingAppCoverageFile": null,
+  "screenshots": {
+    "iphone65": ["<upload later>"],
+    "iphone61": ["<upload later>"],
+    "iphone55": ["<upload later>"],
+    "ipadPro129": ["<optional>"],
+    "ipadPro3Gen129": ["<optional>"]
+  },
+  "description": "Keep T1D life simple. Diabeaters helps you track supplies, manage routines, and feel ready for meals, exercise, and travel. Clean, modern design. Not a medical device. No dosing advice.",
+  "promotionalText": "A simpler, calmer daily flow for T1D. Plan, prepare, and move with confidence.",
+  "releaseNotes": "Performance improvements and onboarding refinements.",
+  "languages": ["en-GB", "en-US"]
+}

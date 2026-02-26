@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { User, Crown, HelpCircle, Sparkles, Shield, FileText, Moon, Sun, ChevronRight } from "lucide-react";
 import { useReleaseMode } from "@/lib/release-mode";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 type DialogType = "plan" | "question" | "whats-new" | "privacy" | "terms" | null;
 
 export function ProfileMenu() {
+  const [, setLocation] = useLocation();
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
   const [feedbackText, setFeedbackText] = useState("");
   const { theme, toggleTheme } = useTheme();
@@ -51,6 +53,16 @@ export function ProfileMenu() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem
+            onClick={() => setLocation("/account")}
+            data-testid="menu-item-account"
+            className="cursor-pointer flex items-center"
+          >
+            <User className="mr-2 h-4 w-4" />
+            Account
+            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={() => setActiveDialog("plan")}
             data-testid="menu-item-plan"

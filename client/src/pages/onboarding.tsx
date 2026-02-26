@@ -15,6 +15,8 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
 import { useReleaseMode } from "@/lib/release-mode";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
+import { Disclaimer } from "@/components/disclaimer";
+import { Link } from "wouter";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -270,7 +272,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         )}
 
         <p className="text-center text-xs text-muted-foreground pt-4">
-          Copyright PassingTime Ltd {new Date().getFullYear()}
+          Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
+          · <Link href="/privacy"><span className="underline cursor-pointer">Privacy</span></Link>{" "}
+          · <Link href="/support"><span className="underline cursor-pointer">Support</span></Link>
         </p>
       </div>
     </div>
@@ -814,17 +818,7 @@ function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData
         <CardContent className="pt-6 space-y-4">
           <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg">
             <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
-            <div className="text-sm space-y-2">
-              <p className="font-medium text-yellow-900 dark:text-yellow-100">
-                Diabeaters does not provide medical advice.
-              </p>
-              <ul className="space-y-1.5 text-yellow-800 dark:text-yellow-200 ml-4 list-disc">
-                <li>All suggestions are for information only</li>
-                <li>Never adjust insulin without your healthcare team</li>
-                <li>In emergencies, call 999 immediately</li>
-                <li>This is a companion tool, not a replacement for medical care</li>
-              </ul>
-            </div>
+            <Disclaimer className="text-yellow-900 dark:text-yellow-100" />
           </div>
 
           <div

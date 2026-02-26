@@ -1,0 +1,32 @@
+App Review Notes – Diabeaters
+
+Purpose
+• Lifestyle companion for people living with Type 1 diabetes (organisation & preparedness)
+• Not a medical device; no medical advice or dosing guidance
+• Features: supply tracking, routines, meal/exercise/travel planning, dashboard
+
+Data sources
+• Educational content is general, non-diagnostic, and cited in-app where applicable
+• No real-time medical measurements interpreted
+• No diagnosis, treatment, or cure claims
+
+Safety (Guideline 1.4.1)
+• Medical disclaimers shown during onboarding and in Settings → About
+• Canonical disclaimer: "Diabeaters provides general lifestyle organisation for people living with Type 1 diabetes. It does not provide medical advice and is not a medical device. Always follow guidance from your healthcare professional."
+• Native disclaimer string in ios/App/App/Disclaimer.swift
+
+Account
+• Email/password and OAuth (Apple, Google, Microsoft) via Supabase Auth
+• Test account can be created by reviewer directly (no demo credentials required)
+
+Network
+• All content served over HTTPS only (NSAppTransportSecurity/ATS enforces HTTPS-only)
+• External links open in SFSafariViewController (via @capacitor/browser when wired)
+
+Privacy
+• Minimal data; no protected health information required
+• See docs/data_collection.md for details
+
+Contact
+• Support email/URL in Settings and on the Support URL
+• Privacy policy URL and marketing URL in App Store metadata

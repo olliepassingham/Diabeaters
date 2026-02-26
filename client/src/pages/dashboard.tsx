@@ -2,7 +2,23 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Settings, AlertCircle, ArrowRight, MessageCircle, CheckCircle2, Bell, Download, X, History, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Phone,
+  Settings,
+  AlertCircle,
+  ArrowRight,
+  MessageCircle,
+  CheckCircle2,
+  Bell,
+  Download,
+  X,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Minus,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
@@ -636,6 +652,7 @@ function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSi
 
 export default function Dashboard() {
   const { isBetaVisible } = useReleaseMode();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
@@ -698,6 +715,7 @@ export default function Dashboard() {
       if (error) {
         setRemoteError(error.message);
         setRemoteSupplies([]);
+        toast({ title: "Failed to load supplies", description: error.message, variant: "destructive" });
       } else {
         setRemoteError(null);
         setRemoteSupplies(data ?? []);
@@ -724,6 +742,7 @@ export default function Dashboard() {
     const { error } = await addSupply({ name: trimmedName, quantity: qty });
     if (error) {
       setRemoteError(error.message);
+      toast({ title: "Failed to add supply", description: error.message, variant: "destructive" });
       return;
     }
 
@@ -733,6 +752,7 @@ export default function Dashboard() {
     const { data, error: refreshError } = await listSuppliesForUser();
     if (refreshError) {
       setRemoteError(refreshError.message);
+      toast({ title: "Failed to refresh supplies", description: refreshError.message, variant: "destructive" });
     } else {
       setRemoteError(null);
       setRemoteSupplies(data ?? []);
@@ -747,6 +767,7 @@ export default function Dashboard() {
     const { error } = await updateSupply(id, { quantity: nextQty });
     if (error) {
       setRemoteError(error.message);
+      toast({ title: "Failed to update supply", description: error.message, variant: "destructive" });
       return;
     }
 
@@ -759,6 +780,7 @@ export default function Dashboard() {
     const { error } = await deleteSupply(id);
     if (error) {
       setRemoteError(error.message);
+      toast({ title: "Failed to delete supply", description: error.message, variant: "destructive" });
       return;
     }
 
@@ -887,19 +909,25 @@ export default function Dashboard() {
               </form>
 
               <div className="border-t pt-3 mt-1">
-                {remoteSupplies.length === 0 && !remoteLoading ? (
+                {remoteLoading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <Skeleton className="h-14 rounded-md" />
+                    <Skeleton className="h-14 rounded-md hidden md:block" />
+                  </div>
+                ) : remoteSupplies.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No supplies saved yet.
+                    You haven&apos;t added any cloud supplies yet. Use the form
+                    above to get started.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {remoteSupplies.map((s) => (
-                      <li
+                      <div
                         key={s.id}
-                        className="flex items-center justify-between gap-2 text-sm"
+                        className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="truncate">{s.name}</p>
+                          <p className="truncate font-medium">{s.name}</p>
                           <p className="text-[11px] text-muted-foreground">
                             Updated{" "}
                             {new Date(s.updated_at).toLocaleDateString()}
@@ -910,10 +938,11 @@ export default function Dashboard() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-7 w-7 px-0"
+                            className="h-7 w-7 p-0"
+                            aria-label="Decrease quantity"
                             onClick={() => handleAdjustQuantity(s.id, -1)}
                           >
-                            -
+                            <Minus className="h-3 w-3" />
                           </Button>
                           <span className="w-8 text-center text-xs">
                             {s.quantity}
@@ -922,24 +951,26 @@ export default function Dashboard() {
                             type="button"
                             size="sm"
                             variant="outline"
-                            className="h-7 w-7 px-0"
+                            className="h-7 w-7 p-0"
+                            aria-label="Increase quantity"
                             onClick={() => handleAdjustQuantity(s.id, 1)}
                           >
-                            +
+                            <Plus className="h-3 w-3" />
                           </Button>
                           <Button
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-7 px-2 text-[11px] text-destructive"
+                            className="h-7 w-7 p-0 text-destructive"
+                            aria-label="Delete supply"
                             onClick={() => handleDeleteRemoteSupply(s.id)}
                           >
-                            Delete
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
             </CardContent>
