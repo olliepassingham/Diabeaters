@@ -210,7 +210,11 @@ Footer links appear on onboarding and the dashboard. **Replace placeholder URLs*
 
 ## Account page
 
-[/account](/account) – Manage email, password, verification, and sign out. Accessible to signed-in users (including unverified). Linked from the header, footer, profile menu, and Settings → About.
+[/account](/account) – Manage email, password, verification, profile (full name, avatar), and sign out. Accessible to signed-in users (including unverified). Linked from the header, footer, profile menu, and Settings → About.
+
+## Profile & Avatars
+
+Profile editing and avatar upload are available on the [Account](/account) page. Avatars are stored in a private Supabase Storage bucket (`avatars`) and served via time-limited signed URLs. See [docs/storage_avatars.md](docs/storage_avatars.md) for bucket creation, RLS policies, and rollout steps (STAGING first, then PRODUCTION on promotion).
 
 ## Build
 
