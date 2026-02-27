@@ -67,7 +67,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Build System
 - **Development**: Vite dev server with HMR, proxied through Express
-- **Production**: Vite builds to `dist/public`, Express serves static files
+- **Production**: Vite builds to `dist`, Express serves static files from bundled output
 - **TypeScript**: Strict mode enabled, path aliases for `@/` (client) and `@shared/` (shared)
 
 ## External Dependencies

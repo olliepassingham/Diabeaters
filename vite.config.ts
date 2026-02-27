@@ -31,9 +31,9 @@ export default defineConfig({
   // base: "/" is Vite default; root domain serving, no subpath
   base: "/",
 
-  // Build the client to dist/public where your Express server serves from
+  // Build output for Vercel static deploy (dist/) and legacy server (dist/public via build:server)
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
 

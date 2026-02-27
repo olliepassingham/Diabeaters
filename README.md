@@ -233,7 +233,7 @@ Production builds use env vars from Vercel only (not `.env`). Add them before de
    vercel deploy --prod
    ```
 
-The `vercel.json` in the repo configures build, output dir (`dist/public`), and SPA rewrites. No `.env` is used in production.
+The `vercel.json` in the repo configures build, output dir (`dist`), and SPA rewrites. No `.env` is used in production.
 
 ## iOS (Capacitor)
 
@@ -364,10 +364,10 @@ Step-by-step guide to wrap the deployed web app in a native iOS shell using WKWe
 npm run build
 ```
 
-Output is in `dist/public/`. Choose one of:
+Output is in `dist/`. Choose one of:
 
 - **Option A – Remote URL**: Deploy to Vercel/Netlify and use the live URL (e.g. `https://your-app.vercel.app`). No file copying.
-- **Option B – Bundled**: Add `dist/public/` to the Xcode project so the app loads files from the bundle. Drag the `dist/public` folder into Xcode and check "Copy items if needed" and your app target.
+- **Option B – Bundled**: Add `dist/` to the Xcode project so the app loads files from the bundle. Drag the `dist` folder into Xcode and check "Copy items if needed" and your app target.
 
 ### 2. Create the project
 
@@ -428,10 +428,10 @@ final class WebViewController: UIViewController {
         if let urlString = remoteURL, let url = URL(string: urlString) {
             webView.load(URLRequest(url: url))
         } else {
-            if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "public") {
+            if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "dist") {
                 webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
             } else {
-                fatalError("Bundled index.html not found. Add dist/public to the project.")
+                fatalError("Bundled index.html not found. Add dist to the project.")
             }
         }
     }
@@ -482,12 +482,12 @@ Add or merge:
 
 Or in the Xcode plist editor: **App Transport Security Settings** → **Allow Arbitrary Loads** = NO. This restricts the app to HTTPS.
 
-### 6. Bundle `dist/public` (Option B only)
+### 6. Bundle `dist` (Option B only)
 
 1. Build with `npm run build`.
-2. Drag the `dist/public` folder into the Xcode project navigator.
+2. Drag the `dist` folder into the Xcode project navigator.
 3. Check **Copy items if needed** and your app target.
-4. In **Build Phases → Copy Bundle Resources**, confirm `public/index.html` and assets are included.
+4. In **Build Phases → Copy Bundle Resources**, confirm `index.html` and assets are included.
 5. In `WebViewController`, set `remoteURL = nil` and rely on `loadFileURL` for bundled loading.
 
 ### 7. App Store Review – disclaimers and no medical claims
