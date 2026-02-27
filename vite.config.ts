@@ -28,6 +28,9 @@ export default defineConfig({
   // Your Vite app lives in /client (index.html and src/**)
   root: path.resolve(import.meta.dirname, "client"),
 
+  // base: "/" is Vite default; root domain serving, no subpath
+  base: "/",
+
   // Build the client to dist/public where your Express server serves from
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),

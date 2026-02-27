@@ -197,6 +197,8 @@ Footer links appear on onboarding and the dashboard. **Replace placeholder URLs*
 
 Push to `main` to trigger an automatic deploy. First deploy may take a few minutes. The production URL is printed in the Vercel workflow summary.
 
+`vercel.json` configures SPA fallback: `handle: filesystem` serves static assets first, then any non-file route is served `index.html` for client-side routing.
+
 **Required secrets:** Add the five GitHub Actions secrets before the first run. See [docs/ci_secrets.md](docs/ci_secrets.md) for copy-paste instructions (Vercel token, org/project IDs, Supabase URL and anon key).
 
 ## Deploy to Vercel (manual)
