@@ -1,0 +1,1 @@
+Initial public TestFlight for Diabeaters. Includes secure login (email/password + OAuth), supplies tracking with per-user data (RLS), and a modern dashboard. Not a medical device; no dosing advice.

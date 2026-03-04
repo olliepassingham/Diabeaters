@@ -41,19 +41,41 @@ if (isStaging) {
 ## Local Env
 
 - **Supabase credentials**: In your Supabase project, go to **Project Settings → API** and copy the **project URL** and **public anon key**.
-- **.env variables**: Put them in the root `.env` file as:
+- **.env variables**: Put them in **app/.env** (Vite app folder) as:
   - `VITE_SUPABASE_URL=...`
   - `VITE_SUPABASE_ANON_KEY=...`
   - `VITE_APP_ENV=development` (optional; see `.env.example`)
 - **Vite prefix**: The `VITE_` prefix is required for Vite to expose these values to the client (`import.meta.env.VITE_SUPABASE_URL`, etc.).
-- **Restart dev server**: After changing `.env`, stop and restart `npm run dev` so Vite picks up the new values.
+- **Restart dev server**: After changing `.env`, stop and restart `npm run dev` (from inside **app/**) so Vite picks up the new values.
 
 ## Local Development
 
 - **Node**: Node 18+ recommended.
-- **Install deps**: `npm install`
-- **Env file**: Create a root `.env` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-- **Run dev server**: `npm run dev` → open `http://localhost:5173/`
+- **Frontend (Vite)**  
+  From repo root:
+  ```bash
+  cd app && npm install && npm run dev
+  ```
+  Or from root: `npm run web:dev`  
+  Opens **http://localhost:5173**
+- **Backend**  
+  From repo root: `npm run dev:server` (or your existing server command).
+- **Env**
+  - `VITE_*` variables live in **app/.env** (same folder as the Vite app).
+  - Server-only env (if any) in **root/.env.server**.
+- **Pitfall**: Running `vite` or `npm run dev` from the repo root will not start the frontend; the frontend runs from **app/** (or via `npm run web:dev`).
+
+---
+
+### Quick reference
+
+| Goal           | Command |
+|----------------|--------|
+| Frontend dev   | `cd app && npm run dev` or `npm run web:dev` |
+| Frontend build | `cd app && npm run build` or `npm run web:build` |
+| Backend dev    | `npm run dev:server` |
+
+---
 
 ## Supabase URL Configuration (copy/paste)
 
@@ -111,13 +133,38 @@ See **Supabase URL Configuration (copy/paste)** above.
 
 1. User signs up → app redirects to `/check-email`
 2. User clicks verification link in email → goes to `/auth/callback` → session is set
-3. If verified → redirect to dashboard; otherwise → `/check-email`
+3. If verified → redirect to `/verified-success` (short confirmation screen) → user continues to dashboard
+4. If still unverified → `/check-email`
 4. User can resend verification email from `/check-email`
 
 ### iOS wrapper note
 
 The email link opens in the system browser (SFSafariViewController). The WebView session reflects verification after the user returns and logs in if needed.
 
+## Offline (lite)
+
+Cloud features are designed to be usable when connectivity is unreliable.
+
+- **Cloud supplies**: Uses a small *read-through cache* of the last successful server list.
+- **When offline**:
+  - Reads show the last cached cloud supplies.
+  - Adds/updates/deletes are **queued** locally.
+  - The offline banner shows how many changes are queued.
+- **When back online**:
+  - The queue is flushed in order.
+  - For updates/deletes, if a newer server version exists, the queued change is skipped.
+
+**Limitations:** no conflict merging beyond a simple “skip if server is newer”. This is intentionally conservative.
+
+## Observability (Sentry)
+
+Sentry is optional in the frontend.
+
+- **Env var**: `VITE_SENTRY_DSN`
+- **Environment tag**: derived from `VITE_APP_ENV` (`development`, `staging`, `production`)
+- **PII**: scrubbed. The app only sets user context as `{ id }` (no email/name/notes).
+
+To disable Sentry in local or staging, leave `VITE_SENTRY_DSN` blank/unset.
 ## Password Reset (Supabase)
 
 ### URL configuration
@@ -210,11 +257,11 @@ Footer links appear on onboarding and the dashboard. **Replace placeholder URLs*
 
 ## Account page
 
-[/account](/account) – Manage email, password, verification, profile (full name, avatar), and sign out. Accessible to signed-in users (including unverified). Linked from the header, footer, profile menu, and Settings → About.
+[/account](/account) – Manage your account: display name, avatar, password reset, and sign out. Accessible to signed-in users (including unverified). Linked from the header, footer, profile menu, and Settings → About.
 
-## Profile & Avatars
+**Profile data** is stored in the Supabase `profiles` table (`id`, `full_name`, `avatar_url`). If no profile row exists on first visit, one is created via upsert.
 
-Profile editing and avatar upload are available on the [Account](/account) page. Avatars are stored in a private Supabase Storage bucket (`avatars`) and served via time-limited signed URLs. See [docs/storage_avatars.md](docs/storage_avatars.md) for bucket creation, RLS policies, and rollout steps (STAGING first, then PRODUCTION on promotion).
+**Avatars** use path pattern `avatars/{userId}/{timestamp}-{filename}` in a private Storage bucket. Images are served via time-limited signed URLs (1 hour expiry). See [docs/account_feature.md](docs/account_feature.md) for full behaviour and [docs/storage_avatars.md](docs/storage_avatars.md) for bucket creation, RLS policies, and rollout steps. **Staging first, then repeat bucket + RLS in Production on promotion.**
 
 ## Build
 

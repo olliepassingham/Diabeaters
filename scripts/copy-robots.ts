@@ -7,7 +7,7 @@ import { copyFileSync, existsSync } from "fs";
 import { join } from "path";
 
 const ROOT = process.cwd();
-const PUBLIC = join(ROOT, "client", "public");
+const PUBLIC = join(ROOT, "app", "public");
 const DIST = join(ROOT, "dist", "public");
 const env = (process.env.VITE_APP_ENV ?? "production").trim().toLowerCase();
 const isStaging = env === "staging";

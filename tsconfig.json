@@ -1,6 +1,6 @@
 
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
+  "include": ["app/src/**/*", "shared/**/*", "server/**/*"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     // Build / emit behavior
@@ -28,7 +28,7 @@
     // Path aliases (align with Vite)
     "baseUrl": ".",
     "paths": {
-      "@/*": ["client/src/*"],
+      "@/*": ["app/src/*"],
       "@shared/*": ["shared/*"],
       "@assets/*": ["attached_assets/*"] // OPTIONAL: add if you import @assets in code
     },
