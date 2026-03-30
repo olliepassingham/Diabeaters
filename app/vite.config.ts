@@ -5,19 +5,22 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(appDir, "..");
 
 export default defineConfig(({ mode }) => {
   if (mode === "development") {
-    const env = loadEnv(mode, appDir, "VITE_");
+    const env = loadEnv(mode, repoRoot, "VITE_");
     console.log(
-      "[vite] VITE_SUPABASE_URL (import.meta.env, envDir=app only):",
+      "[vite] VITE_SUPABASE_URL (import.meta.env, envDir=repo root):",
       env.VITE_SUPABASE_URL?.trim() || "(empty)",
     );
   }
 
   return {
     plugins: [react()],
-    envDir: appDir,
+    // Keep a single source of truth for local env files: repo root (.env / .env.local).
+    // Vercel injects these at build time, so no committed .env is needed.
+    envDir: repoRoot,
 
     test: {
       environment: "jsdom",

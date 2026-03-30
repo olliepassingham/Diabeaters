@@ -20,7 +20,7 @@ function describeAuthNetworkError(message: string): string {
     m.includes("networkerror") ||
     m.includes("network request failed")
   ) {
-    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in app/.env, restart the dev server after env changes, and ensure your Supabase project is active.";
+    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in .env/.env.local, restart the dev server after env changes, and ensure your Supabase project is active.";
   }
   return message;
 }

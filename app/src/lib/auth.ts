@@ -124,7 +124,8 @@ export async function signInWithProvider(
         queryParams: { prompt: "consent" },
       },
     });
-    return { data, error };
+    if (data?.url) return { data: { url: data.url }, error };
+    return { data: null, error: error ?? new Error("Could not start OAuth sign-in") };
   } catch (e) {
     return {
       data: null,
@@ -191,7 +192,7 @@ export async function sendPasswordResetEmail(
 
 export async function updatePassword(
   newPassword: string,
-): Promise<AuthResult<{ user: User }>> {
+): Promise<AuthResult<{ user: User | null }>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
 
@@ -210,17 +211,15 @@ export async function updatePassword(
 
 export async function updateEmail(
   newEmail: string,
-): Promise<AuthResult<{ user: User }>> {
+): Promise<AuthResult<{ user: User | null }>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
 
   try {
-    const { data, error } = await supabase.auth.updateUser({
-      email: newEmail,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    const { data, error } = await supabase.auth.updateUser(
+      { email: newEmail },
+      { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    );
     return { data, error };
   } catch (e) {
     return {
@@ -270,10 +269,8 @@ export function onAuthStateChange(
     return { data: null, error: NOT_CONFIGURED };
   }
 
-  const {
-    data: { subscription },
-    error,
-  } = supabase.auth.onAuthStateChange(cb);
+  const res = supabase.auth.onAuthStateChange(cb);
+  const subscription = res.data?.subscription;
 
   return {
     data: subscription
@@ -283,6 +280,7 @@ export function onAuthStateChange(
           },
         }
       : null,
-    error,
+    // Older/newer supabase-js typings differ on whether an `error` is present here.
+    error: (res as unknown as { error?: AuthError | null }).error ?? null,
   };
 }

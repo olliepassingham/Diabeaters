@@ -9,7 +9,7 @@ if (!hasSupabaseEnv) {
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console
     console.warn(
-      "Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in app/.env (restart dev server after changes).",
+      "Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env/.env.local (restart dev server after changes).",
     );
   }
 }

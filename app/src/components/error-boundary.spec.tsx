@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { ErrorBoundary } from "./error-boundary";
 
-function Boom() {
+function Boom(): never {
   throw new Error("boom");
 }
 

@@ -101,6 +101,10 @@ export interface Supply {
   isOnOrder?: boolean;
   orderedDate?: string;
   activeItemStartDate?: string;
+  /** Cloud row id from Supabase `public.supplies` (if linked). */
+  cloud_id?: string | null;
+  /** Last-write-wins timestamp for cloud/local reconciliation (ISO). */
+  updated_at?: string;
 }
 
 export type SupplyType = Supply["type"];
@@ -151,6 +155,8 @@ export interface HypoTreatment {
   treatment?: string;
   notes?: string;
   carerNotified: boolean;
+  /** Supabase hypo_logs row id (if synced). */
+  supabaseHypoLogId?: string;
   followUpGlucose?: number;
   followUpTime?: string;
 }
@@ -2697,9 +2703,10 @@ export const storage = {
     return data ? JSON.parse(data) : [];
   },
 
-  addHypoTreatment(treatment: Omit<HypoTreatment, "id">) {
+  addHypoTreatment(treatment: Omit<HypoTreatment, "id">): HypoTreatment {
     const treatments = this.getHypoTreatments();
-    treatments.unshift({ ...treatment, id: crypto.randomUUID() });
+    const created: HypoTreatment = { ...treatment, id: crypto.randomUUID() };
+    treatments.unshift(created);
     if (treatments.length > 100) treatments.splice(100);
     localStorage.setItem(STORAGE_KEYS.HYPO_TREATMENTS, JSON.stringify(treatments));
     if (treatment.carerNotified) {
@@ -2709,6 +2716,52 @@ export const storage = {
         detail: "Hypo treatment logged and carers notified",
       });
     }
+    return created;
+  },
+
+  patchHypoTreatment(id: string, updates: Partial<HypoTreatment>): HypoTreatment | null {
+    const treatments = this.getHypoTreatments();
+    const idx = treatments.findIndex((t) => t.id === id);
+    if (idx === -1) return null;
+    treatments[idx] = { ...treatments[idx], ...updates };
+    localStorage.setItem(STORAGE_KEYS.HYPO_TREATMENTS, JSON.stringify(treatments));
+    return treatments[idx];
+  },
+
+  updateHypoTreatmentCarerNotified(id: string, carerNotified: boolean): HypoTreatment | null {
+    return this.patchHypoTreatment(id, { carerNotified });
+  },
+
+  /**
+   * Supply cloud reconciliation: import a cloud row as a new local supply.
+   * Used by `app/src/lib/supplies.ts`.
+   */
+  importSupplyFromCloudReconcile(row: {
+    id: string;
+    name: string;
+    quantity: number;
+    updated_at: string;
+    unit?: string | null;
+    category?: string | null;
+    notes?: string | null;
+  }): Supply {
+    const supplies = this.getSupplies();
+    const type = (row.category as Supply["type"]) || "other";
+    const newSupply: Supply = {
+      id: generateId(),
+      name: row.name,
+      type,
+      currentQuantity: Math.max(0, Math.round(Number(row.quantity))),
+      dailyUsage: 0,
+      quantityAtPickup: Math.max(0, Math.round(Number(row.quantity))),
+      lastPickupDate: new Date().toISOString(),
+      notes: row.notes ?? undefined,
+      cloud_id: row.id,
+      updated_at: row.updated_at,
+    };
+    supplies.push(newSupply);
+    localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    return newSupply;
   },
 
   getCarerMode(): boolean {

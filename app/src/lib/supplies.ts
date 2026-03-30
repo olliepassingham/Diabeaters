@@ -262,13 +262,9 @@ export async function syncToCloud(local: LocalSupply): Promise<void> {
         return;
       }
 
-      storage.updateSupply(
-        local.id,
-        {
-          updated_at: (data?.updated_at as string) || clientTs,
-        },
-        { skipCloudSync: true },
-      );
+      storage.updateSupply(local.id, {
+        updated_at: (data?.updated_at as string) || clientTs,
+      });
     } else {
       const insertRow = {
         user_id: userId,
@@ -290,14 +286,10 @@ export async function syncToCloud(local: LocalSupply): Promise<void> {
         return;
       }
 
-      storage.updateSupply(
-        local.id,
-        {
-          cloud_id: data.id as string,
-          updated_at: (data.updated_at as string) || clientTs,
-        },
-        { skipCloudSync: true },
-      );
+      storage.updateSupply(local.id, {
+        cloud_id: data.id as string,
+        updated_at: (data.updated_at as string) || clientTs,
+      });
     }
   } catch {
     emitSupplySyncToast("retry");
@@ -429,7 +421,7 @@ export async function reconcileSupplies(): Promise<void> {
     if (!local.cloud_id) continue;
     const c = cloudById.get(local.cloud_id);
     if (!c) {
-      storage.updateSupply(local.id, { cloud_id: null }, { skipCloudSync: true });
+      storage.updateSupply(local.id, { cloud_id: null });
       continue;
     }
     matchedCloudIds.add(c.id);
@@ -438,7 +430,7 @@ export async function reconcileSupplies(): Promise<void> {
     if (decision === "local" || decision === "tie") {
       await syncToCloud({ ...local, cloud_id: c.id });
     } else {
-      storage.updateSupply(local.id, cloudRowToLocalUpdates(c), { skipCloudSync: true });
+      storage.updateSupply(local.id, cloudRowToLocalUpdates(c));
     }
   }
 
@@ -457,10 +449,10 @@ export async function reconcileSupplies(): Promise<void> {
     const localTs = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
     const decision = compareUpdatedAtForSync(localTs, c.updated_at);
     if (decision === "local" || decision === "tie") {
-      storage.updateSupply(local.id, { cloud_id: c.id }, { skipCloudSync: true });
+      storage.updateSupply(local.id, { cloud_id: c.id });
       await syncToCloud({ ...local, cloud_id: c.id });
     } else {
-      storage.updateSupply(local.id, cloudRowToLocalUpdates(c), { skipCloudSync: true });
+      storage.updateSupply(local.id, cloudRowToLocalUpdates(c));
     }
   }
 
@@ -674,7 +666,7 @@ async function flushLocalSyncEntry(
         if (isRlsOrAuthError(error)) return { status: "failed", error: new Error(String(error.message)) };
         return { status: "failed", error: new Error(String(error.message)) };
       }
-      storage.updateSupply(entry.localId, { updated_at: p.updated_at }, { skipCloudSync: true });
+      storage.updateSupply(entry.localId, { updated_at: p.updated_at });
     } else {
       const { data, error } = await supabase
         .from("supplies")
@@ -694,11 +686,10 @@ async function flushLocalSyncEntry(
         if (isRlsOrAuthError(error)) return { status: "failed", error: new Error(String(error.message)) };
         return { status: "failed", error: new Error(String(error.message)) };
       }
-      storage.updateSupply(
-        entry.localId,
-        { cloud_id: data.id as string, updated_at: (data.updated_at as string) || p.updated_at },
-        { skipCloudSync: true },
-      );
+      storage.updateSupply(entry.localId, {
+        cloud_id: data.id as string,
+        updated_at: (data.updated_at as string) || p.updated_at,
+      });
     }
     return { status: "ok" };
   } catch (e) {

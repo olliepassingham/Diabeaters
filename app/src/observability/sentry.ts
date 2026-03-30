@@ -65,16 +65,20 @@ export function initSentry() {
 
   const tracesSampleRate = ENV === "production" ? 0.1 : 0.5;
 
-  Sentry.init({
-    dsn: DSN,
-    environment: ENV,
-    tracesSampleRate,
-    beforeSend: (event) => scrubEvent(event),
-    beforeBreadcrumb: (breadcrumb) => {
-      if (breadcrumb.message) breadcrumb.message = scrubText(breadcrumb.message);
-      return breadcrumb;
-    },
-  });
+  Sentry.init(
+    {
+      dsn: DSN,
+      environment: ENV,
+      tracesSampleRate,
+      // Sentry typings vary by SDK version; this hook typing is especially brittle.
+      // Cast the init options to keep strict TS for the rest of the app.
+      beforeSend: (event: unknown) => scrubEvent(event as Sentry.Event),
+      beforeBreadcrumb: (breadcrumb: Sentry.Breadcrumb) => {
+        if (breadcrumb.message) breadcrumb.message = scrubText(breadcrumb.message);
+        return breadcrumb;
+      },
+    } as unknown as Parameters<typeof Sentry.init>[0],
+  );
 }
 
 export function setSentryUserId(userId: string | null) {

@@ -32,7 +32,7 @@ function jitter(ms: number): number {
   return Math.max(0, Math.round(ms + delta));
 }
 
-async function sleep(ms: number, signal?: AbortSignal) {
+async function sleep(ms: number, signal?: AbortSignal | null) {
   if (ms <= 0) return;
   await new Promise<void>((resolve, reject) => {
     const t = setTimeout(resolve, ms);

@@ -4,7 +4,9 @@ dist
 server/public
 *.tar.gz
 .env
+.env.local
 .env.staging
+.env.staging.local
 .env.server
 app/.env
 test-results

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { getSupabase } from "@/lib/supabase";
 import {
   clearCarerIntent,
   clearPendingCarer,
+  setCarerIntent,
   setCarerLinkedBannerMessage,
 } from "@/lib/carer-session";
 import { Info } from "lucide-react";
