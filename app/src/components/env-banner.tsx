@@ -1,9 +1,9 @@
-import { hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 
 /** Dev-only banner when Supabase env vars are missing. Never shown in production. */
 export function EnvBanner() {
   if (import.meta.env.PROD) return null;
-  if (import.meta.env.DEV && hasSupabaseEnv) return null;
+  if (import.meta.env.DEV && getSupabase()) return null;
 
   return (
     <div
@@ -11,7 +11,7 @@ export function EnvBanner() {
       role="alert"
     >
       Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-      in .env and restart the dev server.
+      in .env.local (preferred) or .env, then restart the dev server.
     </div>
   );
 }

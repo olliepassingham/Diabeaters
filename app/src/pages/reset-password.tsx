@@ -61,7 +61,7 @@ export default function ResetPassword() {
 
   if (hasSession === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">
           Checking reset link…
         </div>
@@ -71,7 +71,7 @@ export default function ResetPassword() {
 
   if (!hasSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
         <Card className="w-full max-w-md" data-testid="reset-password-invalid">
           <CardHeader>
             <CardTitle className="text-xl">Invalid or expired link</CardTitle>
@@ -100,7 +100,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-xl">Set new password</CardTitle>

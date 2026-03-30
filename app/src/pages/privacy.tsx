@@ -4,7 +4,7 @@ import { FaceLogo } from "@/components/face-logo";
 
 export default function Privacy() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="p-4 border-b">
         <Link href="/">
           <div className="flex items-center gap-3 cursor-pointer hover:opacity-80">
@@ -60,6 +60,15 @@ export default function Privacy() {
             <h2 className="text-base font-semibold mt-6">Contact</h2>
             <p>
               For questions or deletion requests: <em>[Contact email – replace with your support address]</em>
+            </p>
+
+            <h2 id="terms" className="text-base font-semibold mt-6 scroll-mt-20">
+              Terms of use
+            </h2>
+            <p>
+              By using Diabeaters you agree to use it as a personal lifestyle aid only. It is not medical advice,
+              diagnosis, or treatment. Always follow your healthcare team. The app is provided &quot;as is&quot; without
+              warranties; we are not liable for decisions you make based on app content.
             </p>
           </CardContent>
         </Card>

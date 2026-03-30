@@ -40,7 +40,7 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
     title: "Let's tackle exercise together",
     message: "Exercise throwing your levels off? The Exercise Planner can suggest carb and insulin adjustments for your workout.",
     cta: "Open Exercise Planner",
-    link: "/adviser?tab=exercise",
+    link: "/scenarios/exercise",
     iconColor: "text-green-600 dark:text-green-400",
     iconBg: "bg-green-500/10",
   },

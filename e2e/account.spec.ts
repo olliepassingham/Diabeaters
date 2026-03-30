@@ -40,15 +40,12 @@ test.describe("Account page", () => {
     });
 
     await page.goto("/account");
-    await expect(page.getByRole("heading", { name: "Your Account", level: 1 })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Test User", level: 1 })).toBeVisible({
       timeout: 5000,
     });
     await expect(page.getByText("test@example.com")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Profile summary" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Avatar" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Display name" })).toBeVisible();
+    await expect(page.getByTestId("link-account-settings")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Actions" })).toBeVisible();
-    await expect(page.getByTestId("name-input")).toBeVisible();
   });
 
   test("placeholder avatar shown when no avatar_url", async ({
@@ -198,38 +195,6 @@ test.describe("Account page", () => {
     await expect(img).toHaveAttribute("src", /signed-avatar/);
   });
 
-  test("save name updates profile and shows success", async ({ page, context }) => {
-    await context.route("**/auth/v1/user**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "test-user-1",
-          email: "test@example.com",
-          email_confirmed_at: new Date().toISOString(),
-        }),
-      });
-    });
-    await context.route("**/rest/v1/profiles**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body:
-          route.request().method() === "GET"
-            ? JSON.stringify([{ id: "test-user-1", full_name: null, avatar_url: null }])
-            : JSON.stringify([{ id: "test-user-1", full_name: "New Name", avatar_url: null }]),
-      });
-    });
-
-    await page.goto("/account");
-    await expect(page.getByTestId("name-input")).toBeVisible({
-      timeout: 5000,
-    });
-    await page.getByTestId("name-input").fill("New Name");
-    await page.getByTestId("profile-save").click();
-    await expect(page.getByText("Changes saved")).toBeVisible({ timeout: 5000 });
-  });
-
   test("reset password link is present", async ({ page, context }) => {
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
@@ -280,11 +245,12 @@ test.describe("Account page", () => {
     });
 
     await page.goto("/account");
-    await expect(page.getByTestId("btn-logout")).toBeVisible({
+    await page.getByTestId("button-profile-menu").click();
+    await expect(page.getByTestId("menu-item-log-out")).toBeVisible({
       timeout: 5000,
     });
-    await page.getByTestId("btn-logout").click();
-    await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
+    await page.getByTestId("menu-item-log-out").click();
+    await expect(page).toHaveURL(/\/welcome/, { timeout: 5000 });
   });
 
   test("account deletion link is present", async ({ page, context }) => {

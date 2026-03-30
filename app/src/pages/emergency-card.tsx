@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Globe, Phone, Syringe, Heart, Download, Share2, Info } from "lucide-react";
-import { storage, UserProfile, EmergencyContact } from "@/lib/storage";
+import { storage, UserProfile } from "@/lib/storage";
+import { useProfile } from "@/lib/profile";
+import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
+import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
+import { PageHeader, PageShell } from "@/components/layout";
 
 const LANGUAGES = [
   { code: "en", name: "English", flag: "GB" },
@@ -191,24 +195,25 @@ const TRANSLATIONS: Record<string, {
 };
 
 export default function EmergencyCard() {
+  const { profile: cloudProfile } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [selectedLang, setSelectedLang] = useState("en");
+  const { data: emergency } = useEmergencyProfile();
 
   useEffect(() => {
     setProfile(storage.getProfile());
-    setContacts(storage.getEmergencyContacts());
   }, []);
 
   const t = TRANSLATIONS[selectedLang] || TRANSLATIONS.en;
-  const primaryContact = contacts.find(c => c.isPrimary) || contacts[0];
+  const primaryContact = toLegacyPrimaryContact(emergency);
+  const displayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
   const selectedLangInfo = LANGUAGES.find(l => l.code === selectedLang);
 
   const handleShare = async () => {
     const insulinInfo = profile?.usingInsulin 
       ? `${t.needsInsulin}${profile.insulinDeliveryMethod === "pump" ? " (Insulin Pump)" : ""}`
       : "";
-    const text = `${t.title}\n${t.hasDisease}\n${insulinInfo}\n\n${t.ifUnconscious}\n• ${t.doNotGiveInsulin}\n• ${t.giveGlucose}\n• ${t.callEmergency}${primaryContact ? `\n\n${t.emergencyContact}: ${primaryContact.name} - ${primaryContact.phone}` : ""}`;
+    const text = `${t.title}\n${t.hasDisease}\n${insulinInfo}\n\n${t.ifUnconscious}\n• ${t.doNotGiveInsulin}\n• ${t.giveGlucose}\n• ${t.callEmergency}${primaryContact ? `\n\n${t.emergencyContact}: ${primaryContact.name} - ${primaryContact.phone}` : ""}${emergency.phoneSecondary?.trim() ? `\n${t.emergencyContact} (2): ${emergency.phoneSecondary}` : ""}`;
     
     if (navigator.share) {
       try {
@@ -223,14 +228,16 @@ export default function EmergencyCard() {
   };
 
   return (
-    <div className="space-y-6 max-w-lg mx-auto pb-8">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <AlertTriangle className="h-6 w-6 text-red-600" />
-          Emergency Card
-        </h1>
-        <p className="text-muted-foreground">Digital medical alert card in multiple languages</p>
-      </div>
+    <PageShell variant="narrow" className="space-y-6">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <AlertTriangle className="h-6 w-6 text-red-600 shrink-0" />
+            Emergency Card
+          </span>
+        }
+        description="Digital medical alert card in multiple languages"
+      />
 
       <div className="flex items-center gap-3">
         <Globe className="h-5 w-5 text-primary" />
@@ -322,13 +329,18 @@ export default function EmergencyCard() {
             </div>
           )}
 
-          {profile?.name && (
+          {displayName && (
             <div className="border-t border-red-200 dark:border-red-800 pt-4 text-center">
               <p className="text-sm text-muted-foreground">{t.medicalInfo}</p>
-              <p className="font-medium">{profile.name}</p>
-              {profile.diabetesType && (
+              <p className="font-medium">{displayName}</p>
+              {profile?.diabetesType && (
                 <Badge variant="outline" className="mt-1">
-                  {profile.diabetesType === "type1" ? "Type 1" : profile.diabetesType === "type2" ? "Type 2" : "Gestational"} Diabetes
+                  {profile.diabetesType === "type1"
+                    ? "Type 1"
+                    : profile.diabetesType === "type2"
+                      ? "Type 2"
+                      : "Gestational"}{" "}
+                  Diabetes
                 </Badge>
               )}
             </div>
@@ -358,12 +370,12 @@ export default function EmergencyCard() {
                 <li>Save a screenshot to your phone's home screen</li>
                 <li>Print a copy to keep in your wallet</li>
                 <li>Select the local language when travelling abroad</li>
-                <li>Add your emergency contact in Settings for it to appear here</li>
+                <li>Add your emergency contact under Account or Settings — it appears here automatically</li>
               </ul>
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

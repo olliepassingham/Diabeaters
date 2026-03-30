@@ -1,12 +1,29 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { login, signInWithProvider, isUserVerified } from "@/lib/auth";
+import { getLinkedPatientForCarer } from "@/lib/carers";
+import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { PageShell } from "@/components/layout";
+
+/** Browser-specific messages when fetch to Supabase never completes. */
+function describeAuthNetworkError(message: string): string {
+  const m = message.toLowerCase();
+  if (
+    m === "failed to fetch" ||
+    m === "load failed" ||
+    m.includes("networkerror") ||
+    m.includes("network request failed")
+  ) {
+    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in app/.env, restart the dev server after env changes, and ensure your Supabase project is active.";
+  }
+  return message;
+}
 
 export default function Login() {
   const { toast } = useToast();
@@ -19,6 +36,14 @@ export default function Login() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get("error");
+    const next = params.get("next");
+    if (next?.startsWith("/") && !next.startsWith("//")) {
+      try {
+        sessionStorage.setItem("diabeater_post_verify_next", next);
+      } catch {
+        // ignore
+      }
+    }
     if (err) {
       toast({
         title: "Sign in failed",
@@ -32,9 +57,10 @@ export default function Login() {
   async function handleOAuth(provider: "apple" | "google" | "azure") {
     const { data, error } = await signInWithProvider(provider);
     if (error) {
+      const description = describeAuthNetworkError(error.message);
       toast({
         title: "Sign in failed",
-        description: error.message,
+        description,
         variant: "destructive",
       });
       return;
@@ -51,8 +77,9 @@ export default function Login() {
     setSubmitting(false);
 
     if (error) {
-      setError(error.message);
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      const description = describeAuthNetworkError(error.message);
+      setError(description);
+      toast({ title: "Login failed", description, variant: "destructive" });
       return;
     }
 
@@ -61,12 +88,28 @@ export default function Login() {
       return;
     }
 
+    const link = await getLinkedPatientForCarer();
+    if (link.data) {
+      setLocation("/carer-view");
+      return;
+    }
+    if (hasCarerIntent() || hasPendingCarer()) {
+      setLocation("/carer-setup");
+      return;
+    }
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next?.startsWith("/") && !next.startsWith("//")) {
+      setLocation(next);
+      return;
+    }
+
     setLocation("/");
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
+      <PageShell variant="narrow" className="w-full max-w-md">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-xl">Log in to Diabeaters</CardTitle>
         </CardHeader>
@@ -93,9 +136,12 @@ export default function Login() {
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
                 <Link href="/reset-request">
-                  <span className="text-xs underline cursor-pointer hover:text-foreground text-muted-foreground">
+                  <button
+                    type="button"
+                    className="min-h-11 px-2 -mx-2 text-xs underline text-muted-foreground hover:text-foreground"
+                  >
                     Forgot your password?
-                  </span>
+                  </button>
                 </Link>
               </div>
               <Input
@@ -165,8 +211,16 @@ export default function Login() {
               </span>
             </Link>
           </p>
+          <p className="text-xs text-center pt-2">
+            <Link href="/welcome">
+              <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
+                Choose Family Member / Carer on the welcome screen
+              </span>
+            </Link>
+          </p>
         </CardContent>
       </Card>
+      </PageShell>
     </div>
   );
 }

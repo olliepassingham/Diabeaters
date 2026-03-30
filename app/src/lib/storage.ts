@@ -22,7 +22,6 @@ const STORAGE_KEYS = {
   LAST_NOTIFICATION_CHECK: "diabeater_last_notification_check",
   APPOINTMENTS: "diabeater_appointments",
   EVENTS: "diabeater_events",
-  AI_COACH_HISTORY: "diabeater_ai_coach_history",
   ROUTINES: "diabeater_routines",
   PRESCRIPTION_CYCLE: "diabeater_prescription_cycle",
   CARER_LINKS: "diabeater_carer_links",
@@ -267,20 +266,14 @@ export interface ActivityLog {
   createdAt: string;
 }
 
-export type WidgetType = 
-  | "supply-summary" 
+export type WidgetType =
+  | "supply-summary"
   | "supply-depletion"
-  | "scenario-status" 
-  | "settings-completion" 
-  | "community"
-  | "messages"
-  | "activity-adviser"
+  | "settings-completion"
   | "ratio-adviser"
-  | "travel-mode"
-  | "sick-day"
-  | "help-now-info"
-  | "appointments"
+  | "welcome"
   | "tip-of-day"
+  | "appointments"
   | "routines"
   | "quick-exercise";
 
@@ -433,6 +426,8 @@ export interface NotificationSettings {
   criticalThresholdDays: number;
   lowThresholdDays: number;
   browserNotifications: boolean;
+  hypoAlerts?: boolean;
+  scenarioAlerts?: boolean;
 }
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
@@ -489,23 +484,14 @@ export type QuickActionId =
   | "travel" 
   | "ratios" 
   | "routines"
-  | "community"
   | "settings"
   | "appointments"
-  | "events"
   | "emergency-card";
 
 export interface QuickActionConfig {
   id: QuickActionId;
   enabled: boolean;
   order: number;
-}
-
-export interface AICoachMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
 }
 
 export type RoutineMealType = "breakfast" | "lunch" | "dinner" | "snack" | "other";
@@ -548,6 +534,9 @@ export interface ExerciseRoutine {
 
 export type ExercisePhase = "pre" | "active" | "recovery";
 
+/** Optional CGM-style direction; fingerstick users often pick not_sure. */
+export type ExerciseBgTrend = "rising" | "flat" | "falling" | "not_sure";
+
 export interface ActiveExerciseSession {
   id: string;
   routineId?: string;
@@ -567,6 +556,21 @@ export interface ActiveExerciseSession {
     carbsConsidered: boolean;
     basalAdjusted: boolean;
   };
+  /** Optional BG log — pre-exercise (educational prompts only; not dosing). */
+  preBg?: number;
+  preTrend?: ExerciseBgTrend;
+  preBgAt?: string;
+  preBgSkipped?: boolean;
+  /** Mid-session reading (often at timed check-in). */
+  midBg?: number;
+  midTrend?: ExerciseBgTrend;
+  midBgAt?: string;
+  midBgSkipped?: boolean;
+  /** Start of recovery window. */
+  recoveryBg?: number;
+  recoveryTrend?: ExerciseBgTrend;
+  recoveryBgAt?: string;
+  recoveryBgSkipped?: boolean;
 }
 
 export interface ExerciseOutcome {
@@ -585,14 +589,12 @@ export interface ExerciseOutcome {
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
   { id: "supplies", label: "Supplies", href: "/supplies", iconName: "Package", color: "text-blue-600" },
   { id: "activity", label: "Activity", href: "/adviser", iconName: "Dumbbell", color: "text-green-600" },
-  { id: "bedtime", label: "Bedtime", href: "/scenarios?tab=bedtime", iconName: "Moon", color: "text-indigo-600" },
-  { id: "routines", label: "Routines", href: "/adviser?tab=routines", iconName: "Repeat", color: "text-emerald-600" },
-  { id: "sick-day", label: "Sick Day", href: "/scenarios?tab=sick-day", iconName: "Thermometer", color: "text-orange-600" },
-  { id: "travel", label: "Travel", href: "/scenarios?tab=travel", iconName: "Plane", color: "text-purple-600" },
-  { id: "ratios", label: "Ratios", href: "/adviser", iconName: "Calculator", color: "text-teal-600" },
-  { id: "community", label: "Community", href: "/community?tab=posts", iconName: "Users", color: "text-indigo-600" },
+  { id: "bedtime", label: "Bedtime", href: "/scenarios/bedtime", iconName: "Moon", color: "text-indigo-600" },
+  { id: "routines", label: "Routines", href: "/tools/routines", iconName: "Repeat", color: "text-emerald-600" },
+  { id: "sick-day", label: "Sick Day", href: "/scenarios/sick-day", iconName: "Thermometer", color: "text-orange-600" },
+  { id: "travel", label: "Travel", href: "/scenarios/travel", iconName: "Plane", color: "text-purple-600" },
+  { id: "ratios", label: "Ratios", href: "/ratios", iconName: "Calculator", color: "text-teal-600" },
   { id: "appointments", label: "Appointments", href: "/appointments", iconName: "Calendar", color: "text-cyan-600" },
-  { id: "events", label: "Events", href: "/community?tab=events", iconName: "CalendarDays", color: "text-violet-600" },
   { id: "emergency-card", label: "Travel Emergency", href: "/emergency-card", iconName: "ShieldAlert", color: "text-red-600" },
   { id: "settings", label: "Settings", href: "/settings", iconName: "Settings", color: "text-gray-600" },
 ];
@@ -604,21 +606,14 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "settings", enabled: true, order: 3 },
 ];
 
-// Default widget layout for new users: Quick Actions + Ratios (side by side), Supply Summary (full), Appointments + Scenarios (side by side), Community (full)
-// Other widgets start disabled but can be added via customization
+// Default widget layout for new users — other widgets start disabled but can be added via customization
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "supply-summary": "full",
   "supply-depletion": "full",
   "appointments": "half",
-  "community": "full",
   "ratio-adviser": "half",
   "settings-completion": "half",
-  "scenario-status": "half",
-  "activity-adviser": "half",
-  "travel-mode": "half",
-  "sick-day": "half",
-  "help-now-info": "half",
-  "messages": "half",
+  "welcome": "full",
   "tip-of-day": "half",
   "routines": "half",
   "quick-exercise": "half",
@@ -626,20 +621,14 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
-  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 1, size: "half" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 2, size: "half" },
   { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 4, size: "full" },
-  { id: "appointments", type: "appointments", enabled: true, order: 5, size: "half" },
-  { id: "routines", type: "routines", enabled: true, order: 6, size: "half" },
-  { id: "community", type: "community", enabled: true, order: 6, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
-  { id: "help-now-info", type: "help-now-info", enabled: false, order: 8, size: "half" },
-  { id: "activity-adviser", type: "activity-adviser", enabled: false, order: 9, size: "half" },
-  { id: "travel-mode", type: "travel-mode", enabled: false, order: 10, size: "half" },
-  { id: "sick-day", type: "sick-day", enabled: false, order: 11, size: "half" },
-  { id: "messages", type: "messages", enabled: false, order: 12, size: "half" },
-  { id: "scenario-status", type: "scenario-status", enabled: false, order: 13, size: "half" },
+  { id: "welcome", type: "welcome", enabled: true, order: 5, size: "full" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 7, size: "half" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
+  { id: "routines", type: "routines", enabled: false, order: 14, size: "half" },
+  { id: "quick-exercise", type: "quick-exercise", enabled: false, order: 15, size: "half" },
 ];
 
 function generateId(): string {
@@ -1952,6 +1941,8 @@ export const storage = {
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
       browserNotifications: false,
+      hypoAlerts: true,
+      scenarioAlerts: true,
     };
   },
 
@@ -2353,31 +2344,6 @@ export const storage = {
     if (filtered.length === events.length) return false;
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(filtered));
     return true;
-  },
-
-  // AI Coach conversation history
-  getAICoachHistory(): AICoachMessage[] {
-    const data = localStorage.getItem(STORAGE_KEYS.AI_COACH_HISTORY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  addAICoachMessage(role: "user" | "assistant", content: string): AICoachMessage {
-    const history = this.getAICoachHistory();
-    const message: AICoachMessage = {
-      id: generateId(),
-      role,
-      content,
-      timestamp: new Date().toISOString(),
-    };
-    history.push(message);
-    // Keep last 100 messages to avoid localStorage limits
-    const trimmed = history.slice(-100);
-    localStorage.setItem(STORAGE_KEYS.AI_COACH_HISTORY, JSON.stringify(trimmed));
-    return message;
-  },
-
-  clearAICoachHistory(): void {
-    localStorage.removeItem(STORAGE_KEYS.AI_COACH_HISTORY);
   },
 
   // Routines - personal success patterns

@@ -16,6 +16,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 const typeIcons: Record<string, any> = {
   needle: Syringe,
@@ -57,7 +58,7 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
   const maxDays = Math.max(...supplyData.map(d => d.daysRemaining), 30);
 
   return (
-    <Card data-testid="card-depletion-timeline">
+    <Card className="shadow-md" data-testid="card-depletion-timeline">
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5 text-primary" />
@@ -2229,25 +2230,23 @@ export default function Supplies() {
   };
 
   return (
-    <div className="space-y-6 relative">
+    <PageShell variant="standard" className="relative space-y-4">
       <FaceLogoWatermark />
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-3xl font-semibold">Supply Tracker</h1>
-            <p className="text-muted-foreground mt-1">
-              Monitor and manage your diabetes supplies.
-              {lowStockCount > 0 && (
-                <span className="text-yellow-600 dark:text-yellow-500 ml-2">
-                  ({lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low)
-                </span>
-              )}
-            </p>
-          </div>
-          <PageInfoDialog
-            title="About Supply Tracker"
-            description="Keep tabs on your diabetes supplies"
-          >
+      <PageHeader
+        leading={<PageBackButton />}
+        title="Supply Tracker"
+        description={
+          <>
+            Monitor and manage your diabetes supplies.
+            {lowStockCount > 0 && (
+              <span className="text-yellow-600 dark:text-yellow-500 ml-2">
+                ({lowStockCount} item{lowStockCount > 1 ? "s" : ""} running low)
+              </span>
+            )}
+          </>
+        }
+        actions={
+          <PageInfoDialog title="About Supply Tracker" description="Keep tabs on your diabetes supplies">
             <InfoSection title="Adding Supplies">
               <p>Click "Add Supply" to add insulin, needles, CGM sensors, or other items. Set a daily usage amount and the app will calculate when you'll run out.</p>
             </InfoSection>
@@ -2273,7 +2272,9 @@ export default function Supplies() {
               <p>When Travel Mode or Sick Day Mode is active, you'll see how your supply levels are affected — including extra supplies needed for travel and adjusted depletion forecasts when unwell.</p>
             </InfoSection>
           </PageInfoDialog>
-        </div>
+        }
+      />
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={handleAddNew} data-testid="button-add-new-supply">
@@ -2302,7 +2303,7 @@ export default function Supplies() {
                 Add Usual
               </Button>
             )}
-            <Link href="/settings#usual-habits">
+            <Link href="/settings/usage#settings-usage">
               <Button variant="outline" size="sm" data-testid="button-usage-settings">
                 <Settings className="h-4 w-4 mr-1" />
                 Habits
@@ -2316,7 +2317,7 @@ export default function Supplies() {
         <DepletionTimeline supplies={supplies} onSupplyClick={handleTimelineClick} />
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PrescriptionCyclePanel 
           cycle={prescriptionCycle} 
           onSave={handleSavePrescriptionCycle} 
@@ -2417,6 +2418,6 @@ export default function Supplies() {
         currentSupplies={supplies}
         onSave={handleSaveUsualPrescription}
       />
-    </div>
+    </PageShell>
   );
 }

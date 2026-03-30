@@ -19,9 +19,20 @@ import {
   Calculator,
   ArrowRight,
   Save,
+  Copy,
+  ChevronDown,
+  BookOpen,
 } from "lucide-react";
+import { Link } from "wouter";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings, RatioFormat } from "@/lib/storage";
-import { formatRatioForStorage, formatRatioForDisplay, parseRatioToGramsPerUnit } from "@/lib/ratio-utils";
+import {
+  formatRatioForStorage,
+  formatRatioForDisplay,
+  parseRatioToGramsPerUnit,
+  calculateDoseFromCarbs,
+} from "@/lib/ratio-utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -127,6 +138,18 @@ function getAdviserResult(
   };
 }
 
+function roundToHalf(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
+function mealLabel(key: MealKey): string {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function settingsRatioKey(meal: MealKey): keyof UserSettings {
+  return `${meal}Ratio` as keyof UserSettings;
+}
+
 interface RatioAdviserProps {
   settings: UserSettings;
   bgUnit: string;
@@ -137,6 +160,7 @@ interface RatioAdviserProps {
 type AdviserMode = "detect" | "refine" | "scratch_intro" | "scratch_tdd" | "scratch_result" | "scratch_saved";
 
 export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigateToMeal }: RatioAdviserProps) {
+  const { toast } = useToast();
   const hasAnyRatio = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
 
   const [mode, setMode] = useState<AdviserMode>(hasAnyRatio ? "refine" : "detect");
@@ -153,6 +177,9 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
   const [cpSize, setCpSize] = useState<number | undefined>(undefined);
 
+  const [previewMeal, setPreviewMeal] = useState<MealKey>("lunch");
+  const [previewCarbs, setPreviewCarbs] = useState("");
+
   useEffect(() => {
     const profile = storage.getProfile();
     if (profile?.ratioFormat) {
@@ -163,15 +190,16 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   useEffect(() => {
     const ratiosExist = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
-    if (ratiosExist && (mode === "detect")) {
+    if (ratiosExist && mode === "detect") {
       setMode("refine");
     } else if (!ratiosExist && mode === "refine") {
       setMode("detect");
     }
-    if (settings.tdd && !tddInput) {
+    if (settings.tdd && tddInput === "") {
       setTddInput(settings.tdd.toString());
     }
-  }, [settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync TDD placeholder when settings load; avoid fighting user input
+  }, [settings, mode]);
 
   const formatStoredRatio = (storedRatio: string | undefined): string | undefined => {
     if (!storedRatio) return undefined;
@@ -246,6 +274,20 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const handleSaveEstimatedRatios = () => {
     if (!estimatedRatios) return;
 
+    const bounds = { min: 1, max: 150 };
+    const meals: MealKey[] = ["breakfast", "lunch", "dinner", "snack"];
+    for (const m of meals) {
+      const v = estimatedRatios[m];
+      if (!Number.isFinite(v) || v < bounds.min || v > bounds.max) {
+        toast({
+          title: "Check your numbers",
+          description: `Each meal needs a value between ${bounds.min} and ${bounds.max} grams of carb per 1 unit.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const updatedSettings: UserSettings = {
       ...settings,
       breakfastRatio: formatRatioForStorage(estimatedRatios.breakfast),
@@ -264,6 +306,36 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
     }
     setMode("scratch_saved");
   };
+
+  const copyAssessmentToClipboard = async () => {
+    if (!result || !selectedMeal) return;
+    const meal = mealLabel(selectedMeal);
+    const lines = [
+      `Diabeaters Ratio Adviser — ${meal}`,
+      "",
+      result.summary,
+      "",
+      result.detail,
+      "",
+      "Talking points for my diabetes team:",
+      ...result.talkingPoints.map((p) => `• ${p}`),
+      "",
+      "Not medical advice — for discussion with my care team only.",
+    ];
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      toast({ title: "Copied", description: "You can paste this into notes or take it to your clinic." });
+    } catch {
+      toast({ title: "Could not copy", description: "Try selecting the text manually.", variant: "destructive" });
+    }
+  };
+
+  const previewRatioStr = settings[settingsRatioKey(previewMeal)] as string | undefined;
+  const previewCarbsNum = parseFloat(previewCarbs);
+  const previewExact =
+    Number.isFinite(previewCarbsNum) && previewCarbsNum > 0 ? calculateDoseFromCarbs(previewCarbsNum, previewRatioStr) : 0;
+  const previewRounded = previewExact > 0 ? roundToHalf(previewExact) : 0;
+  const previewHasRatio = !!previewRatioStr && parseRatioToGramsPerUnit(previewRatioStr);
 
   const stepLabels = ["Select meal", "Post-meal pattern", "When does it happen?", "How often?", "Assessment"];
 
@@ -367,7 +439,12 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             </Button>
           </div>
 
-          <Button variant="ghost" size="sm" onClick={() => setMode("detect")} data-testid="button-back-detect">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setMode(hasAnyRatio ? "refine" : "detect")}
+            data-testid="button-back-detect"
+          >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
           </Button>
@@ -409,10 +486,18 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             )}
           </div>
 
-          <div className="bg-muted/30 rounded-lg p-3">
+          <div className="bg-muted/30 rounded-lg p-3 space-y-2">
             <p className="text-xs text-muted-foreground flex items-start gap-1">
               <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-              <span>The 500 rule is a common starting-point formula. Breakfast ratios are often slightly stronger (more insulin per gram of carb) due to the dawn phenomenon. These are estimates only.</span>
+              <span>
+                The <strong>500 rule</strong> estimates grams of carb covered by 1 unit as roughly{" "}
+                <strong>500 ÷ TDD</strong> (bolus + basal combined). Some teams use <strong>450</strong> or{" "}
+                <strong>400</strong> for people who are more sensitive to insulin — your team will choose what fits you.
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Breakfast is often a bit stronger (more insulin per gram) because of dawn phenomenon; dinner is sometimes
+              slightly stronger than lunch. These are starting points only.
             </p>
           </div>
 
@@ -459,12 +544,34 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               { key: "dinner" as const, label: "Dinner", icon: Moon, note: "Slightly stronger for most people" },
               { key: "snack" as const, label: "Snack", icon: Cookie, note: "Same as base ratio" },
             ]).map(({ key, label, icon: Icon, note }) => (
-              <div key={key} className="border rounded-lg p-3 space-y-1">
+              <div key={key} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-1.5">
                   <Icon className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{label}</span>
                 </div>
-                <p className="text-lg font-semibold text-primary">{formatRatioForDisplay(estimatedRatios[key], ratioFormat, cpSize)}</p>
+                <div className="space-y-1">
+                  <Label htmlFor={`estimate-${key}`} className="text-xs text-muted-foreground">
+                    Grams carb per 1 unit (1:X g)
+                  </Label>
+                  <Input
+                    id={`estimate-${key}`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min={1}
+                    max={150}
+                    className="h-9"
+                    value={estimatedRatios[key]}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (!Number.isNaN(v)) {
+                        setEstimatedRatios((prev) => (prev ? { ...prev, [key]: v } : prev));
+                      }
+                    }}
+                    data-testid={`input-estimate-ratio-${key}`}
+                  />
+                </div>
+                <p className="text-sm font-medium text-primary">{formatRatioForDisplay(estimatedRatios[key], ratioFormat, cpSize)}</p>
                 <p className="text-xs text-muted-foreground">{note}</p>
               </div>
             ))}
@@ -558,6 +665,91 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             and prepare talking points for your next clinic appointment.
           </p>
 
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="justify-start" onClick={() => setMode("scratch_intro")} data-testid="button-open-estimate-flow">
+              <Sparkles className="h-4 w-4" />
+              Estimate starting ratios
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-ratios-page">
+              <Link href="/ratios">Edit ratios &amp; ISF</Link>
+            </Button>
+            <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-isf">
+              <Link href="/ratios">Correction factor (ISF)</Link>
+            </Button>
+          </div>
+
+          {hasAnyRatio && step === 0 && (
+            <Collapsible className="border rounded-lg px-3 py-2">
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
+                <span className="flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-primary" />
+                  Quick carb bolus preview (your saved ratio)
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-3 pb-3 pt-1">
+                <p className="text-xs text-muted-foreground">
+                  Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {mealOptions.map(({ key, label, icon: Icon }) => (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant={previewMeal === key ? "default" : "outline"}
+                      className="h-auto min-h-9 justify-start gap-2 py-2"
+                      onClick={() => setPreviewMeal(key)}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
+                  <Input
+                    id="preview-carbs"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="1"
+                    placeholder="e.g. 45"
+                    value={previewCarbs}
+                    onChange={(e) => setPreviewCarbs(e.target.value)}
+                    data-testid="input-ratio-preview-carbs"
+                  />
+                </div>
+                {previewCarbsNum > 0 && (
+                  <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
+                    {!previewHasRatio ? (
+                      <p className="text-muted-foreground">
+                        No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Add it on the{" "}
+                        <Link href="/ratios" className="text-primary underline underline-offset-2">
+                          Ratios
+                        </Link>{" "}
+                        page.
+                      </p>
+                    ) : (
+                      <>
+                        <p>
+                          <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
+                          <span className="font-semibold tabular-nums">{previewRounded} units</span>
+                          {Math.abs(previewRounded - previewExact) >= 0.05 && (
+                            <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to 0.5u)</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Ratio used: {formatStoredRatio(previewRatioStr)} — carb-only; confirm with your team before dosing.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
           {step > 0 && step < 4 && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {stepLabels.map((label, i) => (
@@ -595,7 +787,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           {step === 1 && selectedMeal && (
             <div className="space-y-3">
               <p className="text-sm font-medium">
-                After {selectedMeal}, where do your blood sugars tend to end up?
+                After {mealLabel(selectedMeal).toLowerCase()}, where do your blood sugars tend to end up?
               </p>
               <div className="space-y-2">
                 {([
@@ -723,10 +915,49 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                 </ul>
               </div>
 
+              {(result.direction === "tighten" || result.direction === "loosen") && (
+                <Collapsible className="border rounded-lg px-3 py-2">
+                  <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
+                    <span className="flex items-center gap-2 text-left">
+                      <BookOpen className="h-4 w-4 shrink-0 text-primary" />
+                      How teams often approach ratio changes
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 pb-3 text-xs text-muted-foreground leading-relaxed">
+                    <p>
+                      Many clinics change carb ratios in <strong>small steps</strong> (often around 10–20% at a time), then
+                      review glucose data for several days before the next tweak. They also rule out carb counting,
+                      timing, illness, stress, and activity before blaming the ratio alone.
+                    </p>
+                    <p>
+                      <strong>Do not change ratios on your own</strong> unless your team has given you a clear plan for
+                      self-adjustment. This app does not calculate a new ratio for you.
+                    </p>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
               <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={copyAssessmentToClipboard} data-testid="button-copy-ratio-assessment">
+                  <Copy className="h-4 w-4 mr-1" />
+                  Copy summary
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-adviser-start-over">
                   <RotateCcw className="h-4 w-4 mr-1" />
                   Check another meal
+                </Button>
+                <Button variant="outline" size="sm" asChild data-testid="link-assessment-to-ratios">
+                  <Link href="/ratios">Open Ratios page</Link>
+                </Button>
+                {onNavigateToMeal && (
+                  <Button variant="outline" size="sm" onClick={() => onNavigateToMeal()} data-testid="button-assessment-meal-planner">
+                    <ArrowRight className="h-4 w-4 mr-1" />
+                    Meal planner
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" asChild data-testid="link-assessment-isf">
+                  <Link href="/ratios">Correction factor (ISF)</Link>
                 </Button>
               </div>
 

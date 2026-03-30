@@ -40,6 +40,7 @@ import { Progress } from "@/components/ui/progress";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 interface TravelPlan {
   duration: number;
@@ -869,7 +870,12 @@ export default function Travel() {
     const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
 
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <PageShell variant="standard">
+        <PageHeader
+        leading={<PageBackButton />}
+        title="Travel"
+        description="Trip planning, packing lists, and travel mode — educational guidance only."
+      />
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
           <CardHeader>
             <div className="flex items-center gap-3 flex-wrap">
@@ -920,8 +926,8 @@ export default function Travel() {
                     Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
                   </p>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <Link href="/scenarios?tab=sick-day">
-                      <Button variant="outline" size="sm" data-testid="button-view-sick-day-from-travel">
+                    <Link href="/scenarios/sick-day">
+                      <Button variant="outline" size="sm" className="min-h-11" data-testid="button-view-sick-day-from-travel">
                         <Thermometer className="h-3 w-3 mr-1" />
                         View Sick Day Dashboard
                       </Button>
@@ -1057,9 +1063,9 @@ export default function Travel() {
                         <div 
                           key={globalIndex}
                           onClick={() => updatePackingItem(globalIndex)}
-                          className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors hover-elevate ${
-                            item.checked 
-                              ? "bg-green-50 dark:bg-green-950/30" 
+                          className={`flex min-h-[3rem] items-center gap-3 rounded-xl border border-border/50 p-3 cursor-pointer transition-colors hover-elevate ${
+                            item.checked
+                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
                               : "bg-muted/50"
                           }`}
                           data-testid={`active-packing-item-${globalIndex}`}
@@ -1212,13 +1218,18 @@ export default function Travel() {
             </Button>
           </Link>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (step === "entry") {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <PageShell variant="standard">
+        <PageHeader
+        leading={<PageBackButton />}
+        title="Travel"
+        description="Trip planning, packing lists, and travel mode — educational guidance only."
+      />
         <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -1585,13 +1596,18 @@ export default function Travel() {
             </Button>
           </Link>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   if (step === "inputs") {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <PageShell variant="standard">
+        <PageHeader
+        leading={<PageBackButton />}
+        title="Travel"
+        description="Trip planning, packing lists, and travel mode — educational guidance only."
+      />
         <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -1886,7 +1902,7 @@ export default function Travel() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </PageShell>
     );
   }
 
@@ -1899,7 +1915,12 @@ export default function Travel() {
   const checkedCount = packingList.filter(i => i.checked).length;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <PageShell variant="standard">
+      <PageHeader
+        leading={<PageBackButton />}
+        title="Travel"
+        description="Trip planning, packing lists, and travel mode — educational guidance only."
+      />
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
         <CardHeader>
           <div className="flex items-center gap-3 flex-wrap">
@@ -1990,10 +2011,10 @@ export default function Travel() {
                       <div 
                         key={idx}
                         onClick={() => toggleItem(globalIndex)}
-                        className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors hover-elevate ${
-                          item.checked 
-                            ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800" 
-                            : "bg-muted/50"
+                        className={`flex min-h-[3rem] items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors hover-elevate ${
+                          item.checked
+                            ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+                            : "border-border/50 bg-muted/50"
                         }`}
                         data-testid={`packing-item-${globalIndex}`}
                       >
@@ -2513,6 +2534,6 @@ export default function Travel() {
           </Button>
         </Link>
       </div>
-    </div>
+    </PageShell>
   );
 }

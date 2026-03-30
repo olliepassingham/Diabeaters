@@ -1,40 +1,63 @@
-import { defineConfig } from "vite";
+/// <reference types="vitest/config" />
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { fileURLToPath } from "url";
 
-const appDir = import.meta.dirname;
+const appDir = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
-  plugins: [react()],
-  envDir: appDir,
+export default defineConfig(({ mode }) => {
+  if (mode === "development") {
+    const env = loadEnv(mode, appDir, "VITE_");
+    console.log(
+      "[vite] VITE_SUPABASE_URL (import.meta.env, envDir=app only):",
+      env.VITE_SUPABASE_URL?.trim() || "(empty)",
+    );
+  }
 
-  resolve: {
-    alias: {
-      "@": path.resolve(appDir, "src"),
-      "@shared": path.resolve(appDir, "..", "shared"),
-      "@assets": path.resolve(appDir, "..", "attached_assets"),
+  return {
+    plugins: [react()],
+    envDir: appDir,
+
+    test: {
+      environment: "jsdom",
+      globals: true,
+      include: ["tests/**/*.spec.ts", "src/**/*.spec.ts"],
     },
-    dedupe: ["react", "react-dom"],
-  },
 
-  optimizeDeps: {
-    include: ["react", "react-dom", "date-fns"],
-  },
+    resolve: {
+      alias: {
+        "@": path.resolve(appDir, "src"),
+        "@shared": path.resolve(appDir, "..", "shared"),
+        "@assets": path.resolve(appDir, "..", "attached_assets"),
+      },
+      dedupe: ["react", "react-dom"],
+    },
 
-  root: appDir,
+    optimizeDeps: {
+      include: ["react", "react-dom", "date-fns"],
+    },
 
-  build: {
-    outDir: path.resolve(appDir, "..", "dist", "public"),
-    emptyOutDir: true,
-  },
+    root: appDir,
 
-  server: {
-    allowedHosts: [
-      "968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev",
-    ],
-    port: 5173,
-    strictPort: true,
-    fs: { strict: true, deny: ["**/.*"] },
-    proxy: { "/api": "http://localhost:3000" },
-  },
+    publicDir: "public",
+
+    build: {
+      outDir: "dist",
+      assetsDir: "assets",
+      emptyOutDir: true,
+    },
+
+    server: {
+      allowedHosts: [
+        "968087af-9df7-4929-8117-1d95be2fa504-00-2pu2fid2qgqx4.kirk.replit.dev",
+      ],
+      /** Stable URL: do not silently jump to 5174+ (common cause of “5173 won’t load”). */
+      port: 5173,
+      strictPort: true,
+      host: true,
+      fs: { strict: true, deny: ["**/.*"] },
+      proxy: { "/api": "http://localhost:3000" },
+    },
+  };
 });

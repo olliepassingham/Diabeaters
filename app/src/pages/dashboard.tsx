@@ -7,17 +7,12 @@ import {
   Settings,
   AlertCircle,
   ArrowRight,
-  MessageCircle,
   CheckCircle2,
   Bell,
-  Download,
   X,
   History,
   ChevronDown,
   ChevronUp,
-  Minus,
-  Plus,
-  Trash2,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -27,18 +22,8 @@ import {
   Supply as LocalSupply,
   ScenarioState,
   UserProfile,
-  DashboardWidget,
-  WidgetSize,
   HypoTreatment,
-  CarerLink,
 } from "@/lib/storage";
-import {
-  listSuppliesForUser,
-  addSupply,
-  updateSupply,
-  deleteSupply,
-  type Supply as RemoteSupply,
-} from "@/lib/supplies";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -46,28 +31,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
-import {
-  SupplySummaryWidget,
-  SupplyDepletionWidget,
-  ScenarioStatusWidget,
-  SettingsCompletionWidget,
-  CommunityWidget,
-  MessagesWidget,
-  ActivityAdviserWidget,
-  RatioAdviserWidget,
-  TravelModeWidget,
-  SickDayWidget,
-  HelpNowInfoWidget,
-  TipOfDayWidget,
-  AppointmentsWidget,
-  RoutinesWidget,
-  QuickExerciseWidget,
-  WidgetLibrary,
-} from "@/components/widgets";
 import { WelcomeWidget } from "@/components/widgets/welcome-widget";
-import { DiscoveryPrompt } from "@/components/discovery-prompts";
-import { useReleaseMode } from "@/lib/release-mode";
 import { StagingChip } from "@/components/StagingChip";
+import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
+import { DashboardWidgetSettings } from "@/components/dashboard/DashboardWidgetSettings";
+import { useAuth } from "@/lib/auth-context";
+import { useProfile } from "@/lib/profile";
+import { getSupabase } from "@/lib/supabase";
+import { insertHypoLog } from "@/lib/hypo-logs-supabase";
+import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
+import { PageHeader, PageShell } from "@/components/layout";
+import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -210,7 +184,15 @@ function StatusPill({ status }: { status: HealthStatus }) {
   );
 }
 
-function HeaderCard({ profile, status }: { profile: UserProfile | null; status: HealthStatus }) {
+function HeaderCard({
+  profile,
+  cloudFullName,
+  status,
+}: {
+  profile: UserProfile | null;
+  cloudFullName: string | null;
+  status: HealthStatus;
+}) {
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -218,26 +200,28 @@ function HeaderCard({ profile, status }: { profile: UserProfile | null; status: 
     return "Good evening";
   };
 
-  const firstName = profile?.name?.split(" ")[0] || "";
+  const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
+  const firstName = displayName.split(" ")[0] || "";
 
   return (
-    <Card className="dashboard-card-hover bg-white/80 dark:bg-neutral-900/70 border-neutral-200/60 dark:border-neutral-700/50 shadow-sm" data-testid="card-header">
-      <CardContent className="p-4 md:p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight" data-testid="dashboard-title">
-              Dashboard
-            </h1>
-            <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1" data-testid="dashboard-subtitle">
-              Your daily overview
-            </p>
-            <div className="flex items-center gap-2 flex-wrap mt-3">
-              <span className="text-lg font-medium" data-testid="text-greeting">
-                {greeting()}{firstName ? `, ${firstName}` : ""}
+    <Card
+      className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50"
+      data-testid="card-header"
+    >
+      <CardContent className="p-4 md:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="text-lg font-semibold tracking-tight text-foreground"
+                data-testid="text-greeting"
+              >
+                {greeting()}
+                {firstName ? `, ${firstName}` : ""}
               </span>
               <StagingChip />
             </div>
-            <p className="text-muted-foreground text-sm mt-0.5">Here&apos;s your diabetes today</p>
+            <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
           </div>
           <StatusPill status={status} />
         </div>
@@ -252,11 +236,11 @@ function DashboardInfoDialog() {
       title="About Your Dashboard"
       description="Your personal diabetes command centre"
     >
-      <InfoSection title="Customise Your View">
-        <p>Click the gear icon to customise your dashboard. You can show or hide widgets and rearrange them to suit your needs.</p>
+      <InfoSection title="Customise your view">
+        <p>Tap the gear button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
       </InfoSection>
-      <InfoSection title="Rearranging Widgets">
-        <p>When in customisation mode, drag the grip handle to reorder widgets. Use the category tabs to filter, and toggle the switch to show or hide a widget.</p>
+      <InfoSection title="Reordering">
+        <p>In the widget editor, drag the handle beside each row to change order. Use the width control for full or half width on larger screens.</p>
       </InfoSection>
       <InfoSection title="Status Indicator">
         <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
@@ -267,28 +251,28 @@ function DashboardInfoDialog() {
       <InfoSection title="Help Now Button">
         <p>The red Help Now button gives you instant access to emergency resources, contacts, and guidance for urgent situations.</p>
       </InfoSection>
-      <InfoSection title="AI Coach">
-        <p>The speech bubble icon opens your AI Coach - a conversational assistant that can answer questions about diabetes management. It remembers your previous conversations and uses your profile to give personalised guidance. Remember, it's not medical advice!</p>
-      </InfoSection>
     </PageInfoDialog>
   );
 }
 
-function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: () => void }) {
+function HeroCard({
+  status,
+  profile,
+  onEditWidgets,
+}: {
+  status: HealthStatus;
+  profile: UserProfile | null;
+  onEditWidgets: () => void;
+}) {
+  const { user } = useAuth();
   const isUrgent = status === "action";
   const { toast } = useToast();
-  const { isBetaVisible: heroBetaVisible } = useReleaseMode();
   const [hypoDialogOpen, setHypoDialogOpen] = useState(false);
   const [hypoGlucose, setHypoGlucose] = useState("");
   const [hypoTreatment, setHypoTreatment] = useState("");
   const [hypoNotes, setHypoNotes] = useState("");
   const [showHypoHistory, setShowHypoHistory] = useState(false);
   const [hypoHistory, setHypoHistory] = useState<HypoTreatment[]>([]);
-  const [carers, setCarers] = useState<CarerLink[]>([]);
-
-  useEffect(() => {
-    setCarers(storage.getCarerLinks());
-  }, []);
 
   useEffect(() => {
     if (hypoDialogOpen) {
@@ -298,34 +282,70 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
   }, [hypoDialogOpen]);
 
   const handleLogHypo = () => {
-    storage.addHypoTreatment({
-      timestamp: new Date().toISOString(),
-      glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
-      treatment: hypoTreatment || undefined,
-      notes: hypoNotes || undefined,
-      carerNotified: false,
-    });
-    setHypoDialogOpen(false);
-    setHypoGlucose("");
-    setHypoTreatment("");
-    setHypoNotes("");
-    setHypoHistory(storage.getHypoTreatments());
-    toast({
-      title: "Hypo treatment logged",
-      description: "Your hypo treatment has been recorded.",
-    });
+    void (async () => {
+      const created = storage.addHypoTreatment({
+        timestamp: new Date().toISOString(),
+        glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
+        treatment: hypoTreatment || undefined,
+        notes: hypoNotes || undefined,
+        carerNotified: false,
+      });
+      setHypoDialogOpen(false);
+      setHypoGlucose("");
+      setHypoTreatment("");
+      setHypoNotes("");
+      setHypoHistory(storage.getHypoTreatments());
+
+      let description = "Your hypo treatment has been recorded.";
+
+      if (user?.id && getSupabase()) {
+        const cloud = await insertHypoLog({
+          blood_glucose: created.glucoseLevel ?? null,
+          treatment: created.treatment ?? null,
+          notes: created.notes ?? null,
+        });
+
+        if (cloud.data) {
+          storage.patchHypoTreatment(created.id, { supabaseHypoLogId: cloud.data.id });
+          const notify = await invokeNotifyCarersOnHypo({
+            hypoId: cloud.data.id,
+            userId: user.id,
+          });
+
+          const eligible = notify.eligible_carers ?? 0;
+          const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
+
+          if (eligible > 0 && notify.success && delivered > 0) {
+            storage.updateHypoTreatmentCarerNotified(created.id, true);
+            description =
+              eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
+          } else if (eligible > 0 && notify.success && delivered === 0) {
+            description =
+              "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
+          }
+        }
+      }
+
+      toast({
+        title: "Hypo treatment logged",
+        description,
+      });
+    })();
   };
 
   return (
     <>
-      <Card className="dashboard-card-hover bg-white/80 dark:bg-neutral-900/70 border-neutral-200/60 dark:border-neutral-700/50 shadow-sm" data-testid="card-hero">
-        <CardContent className="p-4 md:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <Link href="/help-now" className="flex-1">
+      <Card
+        className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50"
+        data-testid="card-hero"
+      >
+        <CardContent className="px-3 py-3 md:px-4 md:py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link href="/help-now" className="min-w-0 flex-1 basis-[min(100%,12rem)]">
           <Button 
             variant="destructive" 
             size="sm"
-            className={`w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
+            className={`min-h-11 w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
             data-testid="button-help-now"
           >
             <Phone className="h-4 w-4 mr-1" />
@@ -334,7 +354,7 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         </Link>
         <Button
           size="sm"
-          className="rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0"
+          className="min-h-11 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0 px-4"
           onClick={() => setHypoDialogOpen(true)}
           data-testid="button-dashboard-treated-hypo"
         >
@@ -343,26 +363,13 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
         </Button>
         <div className="flex items-center gap-2 shrink-0">
           <DashboardInfoDialog />
-          {heroBetaVisible && (
-            <Link href="/ai-coach">
-              <Button 
-                variant="outline"
-                size="icon"
-                className="rounded-full focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-                data-testid="button-ai-coach"
-                aria-label="Open AI Coach"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </Link>
-          )}
           <Button 
             variant="outline" 
             size="icon"
-            onClick={onCustomize}
-            className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+            onClick={onEditWidgets}
+            className="min-h-11 min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
             data-testid="button-customize"
-            aria-label="Customise dashboard"
+            aria-label="Edit dashboard widgets"
           >
             <Settings className="h-4 w-4" />
           </Button>
@@ -377,7 +384,6 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-green-600" />
               Log Hypo Treatment
-              {heroBetaVisible && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Beta</Badge>}
             </DialogTitle>
             <DialogDescription>
               Record details about your hypo treatment.
@@ -425,15 +431,14 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
               <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
               <p className="text-sm text-muted-foreground">
-                {heroBetaVisible
-                  ? "Carer notifications coming soon. For now, your hypo is saved locally for your own records."
-                  : "Your hypo treatment is saved locally for your own records."}
+                Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your
+                account and notify contacts listed under Family &amp; Carers → Hypo alert contacts (push / in-app).
               </p>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="w-full gap-2 text-muted-foreground"
+              className="min-h-11 w-full gap-2 text-muted-foreground"
               onClick={() => setShowHypoHistory(!showHypoHistory)}
               data-testid="button-toggle-hypo-history"
             >
@@ -487,69 +492,54 @@ function HeroCard({ status, onCustomize }: { status: HealthStatus; onCustomize: 
 
 function DashboardSkeleton() {
   return (
-    <div className="max-w-3xl md:max-w-4xl mx-auto px-4 py-8 space-y-8 pb-24 animate-fade-in">
-      <Card className="glass-card">
+    <PageShell variant="wide" density="compact" className="animate-fade-in">
+      <Card className="border-border/70 shadow-sm">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
-              <Skeleton className="h-7 w-48 skeleton-shimmer" />
-              <Skeleton className="h-4 w-36 skeleton-shimmer" />
+              <Skeleton className="h-5 w-56 skeleton-shimmer" />
+              <Skeleton className="h-3 w-40 skeleton-shimmer" />
             </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-3 w-3 rounded-full skeleton-shimmer" />
-              <Skeleton className="h-4 w-14 skeleton-shimmer" />
-            </div>
+            <Skeleton className="h-7 w-20 rounded-full skeleton-shimmer" />
           </div>
         </CardContent>
       </Card>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <Skeleton className="h-8 flex-1 rounded-full skeleton-shimmer" />
-        <Skeleton className="h-8 w-32 rounded-full skeleton-shimmer" />
-        <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
-        <Skeleton className="h-9 w-9 rounded-md skeleton-shimmer" />
+        <Skeleton className="h-8 w-[7.5rem] rounded-full skeleton-shimmer" />
+        <Skeleton className="h-8 w-8 rounded-full skeleton-shimmer" />
+        <Skeleton className="h-8 w-8 rounded-md skeleton-shimmer" />
       </div>
-      <div className="space-y-3">
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-5 w-5 rounded skeleton-shimmer" />
-              <Skeleton className="h-5 w-32 skeleton-shimmer" />
-            </div>
-            <Skeleton className="h-20 w-full rounded-md skeleton-shimmer" />
+      <div className="space-y-2">
+        <Skeleton className="h-3 w-24 skeleton-shimmer" />
+        <Card className="border-border/70 shadow-sm">
+          <CardContent className="space-y-2 p-3">
+            <Skeleton className="h-14 w-full rounded-md skeleton-shimmer" />
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <Skeleton className="h-5 w-40 skeleton-shimmer" />
-            <div className="grid grid-cols-2 gap-3">
-              <Skeleton className="h-16 rounded-md skeleton-shimmer" />
-              <Skeleton className="h-16 rounded-md skeleton-shimmer" />
-            </div>
-          </CardContent>
-        </Card>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <Skeleton className="h-5 w-28 skeleton-shimmer" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+          <Card className="border-border/70 shadow-sm">
+            <CardContent className="space-y-2 p-3">
+              <Skeleton className="h-4 w-28 skeleton-shimmer" />
               <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4 space-y-2">
-              <Skeleton className="h-5 w-28 skeleton-shimmer" />
+          <Card className="border-border/70 shadow-sm">
+            <CardContent className="space-y-2 p-3">
+              <Skeleton className="h-4 w-28 skeleton-shimmer" />
               <Skeleton className="h-12 w-full rounded-md skeleton-shimmer" />
             </CardContent>
           </Card>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
 
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
     <Card className="dashboard-card-hover rounded-xl border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/30 glow-warning shadow-sm hover:shadow-md transition-shadow duration-200" data-testid="card-setup-prompt">
-      <CardContent className="p-4 md:p-5 space-y-4">
+      <CardContent className="space-y-3 p-3 md:p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-600" />
@@ -583,128 +573,32 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
   );
 }
 
-function BackupReminderCard({ onDismiss }: { onDismiss: () => void }) {
-  const lastBackup = storage.getLastBackupDate();
-  const lastBackupText = lastBackup 
-    ? `Last backup: ${new Date(lastBackup).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-    : "You haven't backed up yet";
-
-  const handleRemindLater = () => {
-    storage.dismissBackupReminder("later");
-    onDismiss();
-  };
-
-  const handleDontRemind = () => {
-    storage.dismissBackupReminder("permanent");
-    onDismiss();
-  };
-
-  return (
-    <Card className="dashboard-card-hover rounded-xl border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/30 shadow-sm hover:shadow-md transition-shadow duration-200" data-testid="card-backup-reminder">
-      <CardContent className="p-4 md:p-5 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Download className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
-            <div>
-              <h3 className="font-semibold" data-testid="text-backup-title">Back Up Your Data</h3>
-              <p className="text-sm text-muted-foreground">{lastBackupText}</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={handleRemindLater} className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200" data-testid="button-dismiss-backup" aria-label="Dismiss backup reminder">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Your data is stored on this device only. A backup file keeps your settings and supplies safe if anything happens to your device.
-        </p>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link href="/settings?tab=data">
-            <Button size="sm" className="gradient-primary border-primary-border" data-testid="button-backup-now">
-              <Download className="h-4 w-4 mr-1" />
-              Back Up Now
-            </Button>
-          </Link>
-          <Button size="sm" variant="ghost" onClick={handleRemindLater} data-testid="button-remind-later">
-            Remind me later
-          </Button>
-          <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={handleDontRemind} data-testid="button-dont-remind">
-            Don't remind me
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WidgetRenderer({ type, size = "full" }: { type: string; size?: WidgetSize }) {
-  const compact = size === "half";
-  switch (type) {
-    case "supply-summary":
-      return <SupplySummaryWidget compact={compact} />;
-    case "scenario-status":
-      return <ScenarioStatusWidget compact={compact} />;
-    case "settings-completion":
-      return <SettingsCompletionWidget compact={compact} />;
-    case "community":
-      return <CommunityWidget compact={compact} />;
-    case "messages":
-      return <MessagesWidget compact={compact} />;
-    case "activity-adviser":
-      return <ActivityAdviserWidget compact={compact} />;
-    case "ratio-adviser":
-      return <RatioAdviserWidget compact={compact} />;
-    case "travel-mode":
-      return <TravelModeWidget compact={compact} />;
-    case "sick-day":
-      return <SickDayWidget compact={compact} />;
-    case "help-now-info":
-      return <HelpNowInfoWidget compact={compact} />;
-    case "appointments":
-      return <AppointmentsWidget compact={compact} />;
-    case "supply-depletion":
-      return <SupplyDepletionWidget compact={compact} />;
-    case "tip-of-day":
-      return <TipOfDayWidget compact={compact} />;
-    case "routines":
-      return <RoutinesWidget compact={compact} />;
-    case "quick-exercise":
-      return <QuickExerciseWidget compact={compact} />;
-    default:
-      return null;
-  }
-}
-
 export default function Dashboard() {
-  const { isBetaVisible } = useReleaseMode();
-  const { toast } = useToast();
+  const { profile: cloudProfile } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
-  const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [widgetsDialogOpen, setWidgetsDialogOpen] = useState(false);
+  const {
+    placements,
+    activeWidgets,
+    toggleWidget,
+    setWidgetSize,
+    reorderWidgets,
+    resetWidgets,
+  } = useDashboardWidgets();
   const [isSettingsComplete, setIsSettingsComplete] = useState(false);
   const [settingsCompletion, setSettingsCompletion] = useState({ percentage: 0, completed: 0, total: 5 });
   const [isLoading, setIsLoading] = useState(true);
-  const [showBackupReminder, setShowBackupReminder] = useState(false);
-
-  const [remoteSupplies, setRemoteSupplies] = useState<RemoteSupply[]>([]);
-  const [remoteLoading, setRemoteLoading] = useState(true);
-  const [remoteError, setRemoteError] = useState<string | null>(null);
-  const [newSupplyName, setNewSupplyName] = useState("");
-  const [newSupplyQuantity, setNewSupplyQuantity] = useState("0");
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
-  // Refresh data on mount and when refreshKey changes
   useEffect(() => {
     const refreshData = () => {
       setProfile(storage.getProfile());
       setSupplies(storage.getSupplies());
       setScenarioState(storage.getScenarioState());
-      setWidgets(storage.getDashboardWidgets());
       setIsSettingsComplete(storage.isSettingsComplete());
       setSettingsCompletion(storage.getSettingsCompletion());
-      setShowBackupReminder(storage.shouldShowBackupReminder());
     };
     
     refreshData();
@@ -725,40 +619,6 @@ export default function Dashboard() {
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
-    };
-  }, [refreshKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchRemoteSupplies = async () => {
-      setRemoteLoading(true);
-      const { data, error, meta } = await listSuppliesForUser();
-
-      if (cancelled) return;
-
-      if (error) {
-        setRemoteError(error.message);
-        setRemoteSupplies([]);
-        toast({ title: "Failed to load supplies", description: error.message, variant: "destructive" });
-      } else {
-        setRemoteError(null);
-        setRemoteSupplies(data ?? []);
-        if (meta?.fromCache) {
-          toast({
-            title: "Showing cached supplies",
-            description: "We couldn’t reach the server. Your last saved cloud supplies are shown.",
-          });
-        }
-      }
-
-      setRemoteLoading(false);
-    };
-
-    fetchRemoteSupplies();
-
-    return () => {
-      cancelled = true;
     };
   }, []);
 
@@ -784,155 +644,31 @@ export default function Dashboard() {
     }
   }, []);
 
-  const handleAddRemoteSupply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedName = newSupplyName.trim();
-    const qty = Number.parseInt(newSupplyQuantity, 10);
-
-    if (!trimmedName) return;
-    if (Number.isNaN(qty) || qty < 0) return;
-
-    const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticRow: RemoteSupply = {
-      id: optimisticId,
-      user_id: "optimistic",
-      name: trimmedName,
-      quantity: qty,
-      updated_at: new Date().toISOString(),
-      _pending: true,
-    };
-    setRemoteSupplies((prev) => [optimisticRow, ...prev]);
-
-    const { error, meta } = await addSupply({ name: trimmedName, quantity: qty });
-    if (error) {
-      setRemoteSupplies((prev) => prev.filter((s) => s.id !== optimisticId));
-      setRemoteError(error.message);
-      toast({ title: "Failed to add supply", description: error.message, variant: "destructive" });
-      return;
-    }
-    if (meta?.queued) {
-      toast({ title: "Change queued", description: "We’ll sync this when you’re back online." });
-    }
-
-    setNewSupplyName("");
-    setNewSupplyQuantity("0");
-
-    const { data, error: refreshError } = await listSuppliesForUser();
-    if (refreshError) {
-      setRemoteError(refreshError.message);
-      toast({ title: "Failed to refresh supplies", description: refreshError.message, variant: "destructive" });
-    } else {
-      setRemoteError(null);
-      setRemoteSupplies(data ?? []);
-    }
-  };
-
-  const handleAdjustQuantity = async (id: string, delta: number) => {
-    const existing = remoteSupplies.find((s) => s.id === id);
-    if (!existing) return;
-
-    const nextQty = Math.max(0, existing.quantity + delta);
-    setRemoteSupplies((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, quantity: nextQty } : s)),
-    );
-    const { error, meta } = await updateSupply(id, { quantity: nextQty });
-    if (error) {
-      setRemoteSupplies((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, quantity: existing.quantity } : s)),
-      );
-      setRemoteError(error.message);
-      toast({ title: "Failed to update supply", description: error.message, variant: "destructive" });
-      return;
-    }
-    if (meta?.queued) {
-      toast({ title: "Change queued", description: "We’ll sync this when you’re back online." });
-    }
-  };
-
-  const handleDeleteRemoteSupply = async (id: string) => {
-    const existing = remoteSupplies.find((s) => s.id === id);
-    setRemoteSupplies((prev) => prev.filter((s) => s.id !== id));
-    const { error, meta } = await deleteSupply(id);
-    if (error) {
-      if (existing) {
-        setRemoteSupplies((prev) => [existing, ...prev]);
-      }
-      setRemoteError(error.message);
-      toast({ title: "Failed to delete supply", description: error.message, variant: "destructive" });
-      return;
-    }
-    if (meta?.queued) {
-      toast({ title: "Change queued", description: "We’ll sync this when you’re back online." });
-    }
-  };
-
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
-  const handleToggleWidget = (widgetId: string, enabled: boolean) => {
-    const updated = widgets.map(w => 
-      w.id === widgetId ? { ...w, enabled } : w
-    );
-    storage.saveDashboardWidgets(updated);
-    setWidgets(updated);
-  };
-
-  const handleResizeWidget = (widgetId: string, size: WidgetSize) => {
-    const updated = widgets.map(w => 
-      w.id === widgetId ? { ...w, size } : w
-    );
-    storage.saveDashboardWidgets(updated);
-    setWidgets(updated);
-  };
-
-  const handleMoveWidget = (widgetId: string, direction: "up" | "down") => {
-    const sorted = [...widgets].sort((a, b) => a.order - b.order);
-    const index = sorted.findIndex(w => w.id === widgetId);
-    
-    if (direction === "up" && index > 0) {
-      const prevOrder = sorted[index - 1].order;
-      const currOrder = sorted[index].order;
-      sorted[index - 1].order = currOrder;
-      sorted[index].order = prevOrder;
-    } else if (direction === "down" && index < sorted.length - 1) {
-      const nextOrder = sorted[index + 1].order;
-      const currOrder = sorted[index].order;
-      sorted[index + 1].order = currOrder;
-      sorted[index].order = nextOrder;
-    }
-    
-    storage.saveDashboardWidgets(sorted);
-    setWidgets(sorted);
-  };
-
-  const handleReorderWidgets = (reordered: DashboardWidget[]) => {
-    storage.saveDashboardWidgets(reordered);
-    setWidgets(reordered);
-  };
-
-  const handleCloseEditor = () => {
-    setIsEditing(false);
-    setRefreshKey(prev => prev + 1);
-  };
-
-  const BETA_WIDGET_TYPES = ["community", "messages"];
-  const enabledWidgets = widgets
-    .filter(w => w.enabled)
-    .filter(w => isBetaVisible || !BETA_WIDGET_TYPES.includes(w.type))
-    .sort((a, b) => a.order - b.order);
-
   // When settings incomplete, filter out settings-completion widget from normal flow (we show SetupPromptCard instead)
-  const widgetsToRender = isSettingsComplete 
-    ? enabledWidgets 
-    : enabledWidgets.filter(w => w.type !== "settings-completion");
+  const widgetsToRender = isSettingsComplete
+    ? activeWidgets
+    : activeWidgets.filter((w) => w.type !== "settings-completion");
 
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   return (
-    <div className="max-w-3xl md:max-w-4xl mx-auto px-4 py-8 space-y-8 pb-24" data-testid="dashboard-page">
+    <PageShell variant="wide" density="compact" data-testid="dashboard-page">
+      <PageHeader
+        screenReaderOnly
+        title={<span data-testid="dashboard-title">Dashboard</span>}
+        description={<span data-testid="dashboard-subtitle">Your daily overview</span>}
+      />
+      {/* Single vertical rhythm: PageShell `density="compact"` replaces per-section mt-* stacking */}
       <div className="animate-fade-in-down">
-        <HeaderCard profile={profile} status={healthStatus} />
+        <HeaderCard
+          profile={profile}
+          cloudFullName={cloudProfile?.full_name ?? null}
+          status={healthStatus}
+        />
       </div>
 
       {showVerifiedWelcome && (
@@ -968,232 +704,71 @@ export default function Dashboard() {
         </Alert>
       )}
       
-      <div className="animate-fade-in" style={{ animationDelay: '50ms' }}>
-        <HeroCard status={healthStatus} onCustomize={() => setIsEditing(true)} />
+      <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
+        <HeroCard
+          status={healthStatus}
+          profile={profile}
+          onEditWidgets={() => setWidgetsDialogOpen(true)}
+        />
       </div>
 
-      {!isEditing && (
-        <section className="animate-fade-in-up" style={{ animationDelay: '80ms' }} data-testid="dashboard-supplies">
-          <h2 className="dashboard-section-header">Cloud supplies</h2>
-          <Card className="dashboard-card-hover dashboard-card-scale bg-white/80 dark:bg-neutral-900/70 border-neutral-200/60 dark:border-neutral-700/50 border-dashed shadow-sm">
-            <CardContent className="p-4 md:p-5 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-medium flex items-center gap-3">
-                    Cloud supplies
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Synced per account via Supabase.
-                  </p>
-                </div>
-                {remoteLoading && (
-                  <span className="text-[11px] text-muted-foreground">
-                    Loading…
-                  </span>
-                )}
-              </div>
+      <SupplyTrackerTodaySection />
 
-              {remoteError && (
-                <p className="text-xs text-destructive">{remoteError}</p>
-              )}
-
-              <form
-                onSubmit={handleAddRemoteSupply}
-                className="flex flex-col sm:flex-row gap-2"
-              >
-                <Input
-                  placeholder="Supply name"
-                  value={newSupplyName}
-                  onChange={(e) => setNewSupplyName(e.target.value)}
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  className="w-full sm:w-24"
-                  value={newSupplyQuantity}
-                  onChange={(e) => setNewSupplyQuantity(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="w-full sm:w-auto"
-                  disabled={remoteLoading}
-                >
-                  Add
-                </Button>
-              </form>
-
-              <div className="border-t pt-3 mt-1">
-                {remoteLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <Skeleton className="h-14 rounded-md" />
-                    <Skeleton className="h-14 rounded-md hidden md:block" />
-                  </div>
-                ) : remoteSupplies.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    You haven&apos;t added any cloud supplies yet. Use the form
-                    above to get started.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {remoteSupplies.map((s) => (
-                      <div
-                        key={s.id}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                        data-testid={`cloud-supply-${s.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate font-medium flex items-center gap-2">
-                            <span>{s.name}</span>
-                            {s._pending && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
-                                Pending
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            Updated{" "}
-                            {new Date(s.updated_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0"
-                            aria-label="Decrease quantity"
-                            onClick={() => handleAdjustQuantity(s.id, -1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center text-xs" data-testid={`cloud-supply-qty-${s.id}`}>
-                            {s.quantity}
-                          </span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0"
-                            aria-label="Increase quantity"
-                            onClick={() => handleAdjustQuantity(s.id, 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-destructive"
-                            aria-label="Delete supply"
-                            onClick={() => handleDeleteRemoteSupply(s.id)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-      )}
-
-      {!isSettingsComplete && !isEditing && (
-        <section className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+      {!isSettingsComplete && (
+        <section className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
           <SetupPromptCard completion={settingsCompletion} />
         </section>
       )}
 
-      {showBackupReminder && !isEditing && (
-        <section className="animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-          <BackupReminderCard onDismiss={() => setShowBackupReminder(false)} />
-        </section>
-      )}
+      <section className="animate-fade-in-up" style={{ animationDelay: "90ms" }}>
+        <WelcomeWidget />
+      </section>
 
-      {!isEditing && (
-        <section className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-          <WelcomeWidget />
-        </section>
-      )}
+      <DashboardWidgetSettings
+        open={widgetsDialogOpen}
+        onOpenChange={setWidgetsDialogOpen}
+        placements={placements}
+        toggleWidget={toggleWidget}
+        setWidgetSize={setWidgetSize}
+        reorderWidgets={reorderWidgets}
+        resetWidgets={resetWidgets}
+      />
 
-      {!isEditing && (
-        <section className="animate-fade-in-up" style={{ animationDelay: '140ms' }}>
-          <DiscoveryPrompt />
-        </section>
-      )}
-
-      {isEditing && (
-        <div className="animate-fade-in-scale">
-          <WidgetLibrary
-            widgets={widgets}
-            onToggleWidget={handleToggleWidget}
-            onMoveWidget={handleMoveWidget}
-            onResizeWidget={handleResizeWidget}
-            onReorderWidgets={handleReorderWidgets}
-            onClose={handleCloseEditor}
-          />
+      <section className="animate-stagger mt-6" data-testid="dashboard-widgets">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {widgetsToRender.map((w) => {
+            const Comp = w.Component;
+            if (!Comp) return null;
+            return (
+              <div
+                key={w.id}
+                data-testid={`widget-container-${w.type}`}
+                className={w.size === "full" ? "md:col-span-2" : undefined}
+              >
+                <Comp layoutSize={w.size} />
+              </div>
+            );
+          })}
         </div>
-      )}
-      
-      {!isEditing && (
-        <section className="animate-stagger" data-testid="dashboard-widgets">
-          <h2 className="dashboard-section-header">Your widgets</h2>
-        <div className="flex flex-col gap-4 md:gap-6">
-          {(() => {
-            const rows: React.ReactNode[] = [];
-            let i = 0;
-            while (i < widgetsToRender.length) {
-              const widget = widgetsToRender[i];
-              if (widget.size === "full") {
-                rows.push(
-                  <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
-                    <WidgetRenderer type={widget.type} size={widget.size} />
-                  </div>
-                );
-                i++;
-              } else {
-                const next = widgetsToRender[i + 1];
-                if (next && next.size === "half") {
-                  rows.push(
-                    <Card key={`pair-${widget.id}-${next.id}`} className="overflow-hidden">
-                      <div className="grid grid-cols-2 divide-x divide-border">
-                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none [&>*]:h-full" data-testid={`widget-container-${widget.type}`}>
-                          <WidgetRenderer type={widget.type} size={widget.size} />
-                        </div>
-                        <div className="[&>*]:border-0 [&>*]:shadow-none [&>*]:rounded-none [&>*]:h-full" data-testid={`widget-container-${next.type}`}>
-                          <WidgetRenderer type={next.type} size={next.size} />
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                  i += 2;
-                } else {
-                  rows.push(
-                    <div key={widget.id} data-testid={`widget-container-${widget.type}`}>
-                      <WidgetRenderer type={widget.type} size={widget.size} />
-                    </div>
-                  );
-                  i++;
-                }
-              }
-            }
-            return rows;
-          })()}
-        </div>
-        </section>
-      )}
+      </section>
 
-      {!isEditing && widgetsToRender.length === 0 && isSettingsComplete && (
-        <div className="text-center py-12 animate-fade-in">
-          <p className="text-muted-foreground mb-4">No widgets enabled. Click "Customize Dashboard" to add some.</p>
-          <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-add-widgets">
-            Add Widgets
-          </Button>
-        </div>
+      {widgetsToRender.length === 0 && isSettingsComplete && (
+        <Card className="animate-fade-in border-border/70 shadow-sm">
+          <CardContent className="py-8 text-center md:py-10">
+            <p className="mb-4 text-sm text-muted-foreground max-w-sm mx-auto">
+              No widgets on your dashboard yet. Use the gear button above or tap below to pick what you want to see.
+            </p>
+            <Button
+              variant="default"
+              className="min-h-11 px-6"
+              onClick={() => setWidgetsDialogOpen(true)}
+              data-testid="button-add-widgets"
+            >
+              Edit widgets
+            </Button>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </PageShell>
   );
 }

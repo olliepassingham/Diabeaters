@@ -49,6 +49,7 @@ import { storage, UserSettings, ScenarioState, RatioHistoryEntry } from "@/lib/s
 import { parseRatioToGramsPerUnit, formatRatioForDisplay, formatRatioForStorage, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 interface ScenarioAdjustment {
   label: string;
@@ -327,17 +328,21 @@ export default function Ratios() {
   const bgUnit = profile?.bgUnits === "mg/dl" ? "mg/dL" : "mmol/L";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6" data-testid="page-ratios">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Syringe className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold">Your Ratios</h1>
-            <p className="text-sm text-muted-foreground">Insulin-to-carb ratios by meal</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/settings?tab=insulin">
+    <PageShell variant="standard" className="max-w-2xl" data-testid="page-ratios">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          leading={<PageBackButton />}
+          className="min-w-0 flex-1"
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Syringe className="h-6 w-6 text-primary shrink-0" />
+              Your Ratios
+            </span>
+          }
+          description="Carb ratios, correction factor (ISF), and target range"
+        />
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/settings/ratios">
             <Button variant="outline" size="sm" data-testid="button-ratio-settings">
               <Settings className="h-4 w-4 mr-1" />
               Settings
@@ -704,11 +709,11 @@ export default function Ratios() {
           Not medical advice — always follow your diabetes team's guidance
         </span>
         <span className="text-muted-foreground/50">|</span>
-        <Link href="/settings?tab=sources" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
+        <Link href="/settings/about" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
           <BookOpen className="h-3 w-3" />
           Sources
         </Link>
       </div>
-    </div>
+    </PageShell>
   );
 }

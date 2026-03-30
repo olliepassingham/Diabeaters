@@ -13,6 +13,7 @@ import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, Exerci
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 const MEAL_TYPES: { value: RoutineMealType; label: string; icon: typeof Utensils }[] = [
   { value: "breakfast", label: "Breakfast", icon: Coffee },
@@ -277,37 +278,45 @@ export function RoutinesContent() {
     : recentlyUsed;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900">
-              {activeSection === "meals" ? (
-                <Repeat className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-              ) : (
-                <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
-              )}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">My Routines</h1>
-              <p className="text-muted-foreground text-sm" data-testid="text-section-subtitle">
+    <PageShell variant="standard" className="max-w-4xl">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <PageHeader
+            leading={<PageBackButton />}
+            className="min-w-0 flex-1"
+            title={
+              <span className="flex items-start gap-3">
+                <span className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900 shrink-0">
+                  {activeSection === "meals" ? (
+                    <Repeat className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  )}
+                </span>
+                <span>My Routines</span>
+              </span>
+            }
+            description={
+              <span data-testid="text-section-subtitle">
                 {activeSection === "meals" ? "Meals and moments that worked well" : "Your scheduled exercise routines"}
-              </p>
-            </div>
-          </div>
-          <PageInfoDialog title="About Routines" description="Save and recall your successful meals and moments">
-            <InfoSection title="What are Routines?">
-              <p>Routines are your personal collection of meals and moments that went well. Save the details of what worked so you can confidently repeat success.</p>
-            </InfoSection>
-            <InfoSection title="Pattern Recall">
-              <p>This isn't about calculating doses - it's about remembering what worked. When you face a similar meal or situation, you can recall exactly what you did before.</p>
-            </InfoSection>
-            <InfoSection title="Building Confidence">
-              <p>Every successful routine you save builds your confidence and reduces the mental load of daily decisions. Over time, you'll develop a reliable library of go-to approaches.</p>
-            </InfoSection>
-            <InfoSection title="Not Medical Advice">
-              <p className="text-xs italic">[This feature helps you track patterns. It does not provide medical recommendations. Always use your own judgement and follow your healthcare team's guidance.]</p>
-            </InfoSection>
-          </PageInfoDialog>
+              </span>
+            }
+            actions={
+              <PageInfoDialog title="About Routines" description="Save and recall your successful meals and moments">
+                <InfoSection title="What are Routines?">
+                  <p>Routines are your personal collection of meals and moments that went well. Save the details of what worked so you can confidently repeat success.</p>
+                </InfoSection>
+                <InfoSection title="Pattern Recall">
+                  <p>This isn't about calculating doses - it's about remembering what worked. When you face a similar meal or situation, you can recall exactly what you did before.</p>
+                </InfoSection>
+                <InfoSection title="Building Confidence">
+                  <p>Every successful routine you save builds your confidence and reduces the mental load of daily decisions. Over time, you'll develop a reliable library of go-to approaches.</p>
+                </InfoSection>
+                <InfoSection title="Not Medical Advice">
+                  <p className="text-xs italic">[This feature helps you track patterns. It does not provide medical recommendations. Always use your own judgement and follow your healthcare team's guidance.]</p>
+                </InfoSection>
+              </PageInfoDialog>
+            }
+          />
         </div>
 
         <div className="flex gap-2" data-testid="section-switcher">
@@ -885,7 +894,7 @@ export function RoutinesContent() {
             </div>
           </CardContent>
         </Card>
-    </div>
+    </PageShell>
   );
 }
 

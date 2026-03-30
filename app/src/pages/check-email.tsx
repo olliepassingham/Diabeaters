@@ -64,7 +64,7 @@ export default function CheckEmail() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-center px-4 ${import.meta.env.DEV ? "pt-14" : ""}`}
+      className={`min-h-screen flex flex-col items-center justify-center px-4 bg-background text-foreground ${import.meta.env.DEV ? "pt-14" : ""}`}
     >
       {import.meta.env.DEV && (
         <div

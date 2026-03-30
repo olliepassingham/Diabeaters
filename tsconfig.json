@@ -37,6 +37,7 @@
     "types": ["node", "vite/client"],
 
     // DOM libs used by UI components
-    "lib": ["ES2020", "DOM", "DOM.Iterable"]
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "resolveJsonModule": true
   }
 }

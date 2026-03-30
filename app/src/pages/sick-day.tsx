@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { storage, UserSettings, Supply, SickDayJournalEntry, RatioFormat } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 
 // Conversion helpers for blood glucose units
@@ -599,7 +600,7 @@ export default function SickDay() {
     const isExtended = duration.days >= 2;
 
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <PageShell variant="standard">
         <Card className={`bg-gradient-to-br ${
           severity === "severe" 
             ? "from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800"
@@ -1303,12 +1304,13 @@ export default function SickDay() {
             </Button>
           </Link>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <PageShell variant="standard">
+      <PageHeader leading={<PageBackButton />} title="Sick Day" />
       <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-100 dark:border-orange-900">
         <CardHeader>
           <div className="flex items-center gap-3">
@@ -1368,7 +1370,7 @@ export default function SickDay() {
                       <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      From your <Link href="/settings?tab=insulin" className="text-primary hover:underline" data-testid="link-insulin-settings">Insulin & Ratios</Link>
+                      From your <Link href="/settings/ratios" className="text-primary hover:underline" data-testid="link-insulin-settings">Insulin & Ratios</Link>
                     </p>
                   </>
                 ) : (
@@ -1376,7 +1378,7 @@ export default function SickDay() {
                     <div className="p-3 rounded-md bg-muted border border-dashed">
                       <p className="text-sm text-muted-foreground">
                         TDD not configured. Please set your Total Daily Dose in{" "}
-                        <Link href="/settings?tab=insulin" className="text-primary hover:underline font-medium" data-testid="link-settings-insulin">
+                        <Link href="/settings/ratios" className="text-primary hover:underline font-medium" data-testid="link-settings-insulin">
                           Settings → Insulin & Ratios
                         </Link>{" "}
                         to use the Sick Day Adviser.
@@ -1760,6 +1762,6 @@ export default function SickDay() {
         )}
 
       </div>
-    </div>
+    </PageShell>
   );
 }

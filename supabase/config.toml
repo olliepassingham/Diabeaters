@@ -1,0 +1,13 @@
+# Minimal Supabase CLI config. Run migrations and deploy functions from repo root:
+#   supabase link
+#   supabase db push
+#   supabase functions deploy notify_carers_on_hypo --no-verify-jwt
+# Use --no-verify-jwt only if you validate JWT inside the function (this project does).
+
+project_id = ""
+
+[api]
+enabled = true
+
+[functions.notify_carers_on_hypo]
+verify_jwt = true

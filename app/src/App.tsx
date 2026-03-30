@@ -1,33 +1,32 @@
 // client/src/App.tsx
-import { useEffect, useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Switch, Route, useLocation, useSearch, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DevBanner } from "@/components/DevBanner";
+import { DevSupabaseDiagnostics } from "@/components/DevSupabaseDiagnostics";
 import { StagingBanner } from "@/components/StagingBanner";
 import { isStaging } from "@/lib/flags";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
-import { ProfileMenu } from "@/components/profile-menu";
-import { FaceLogo } from "@/components/face-logo";
-import { NotificationBell } from "@/components/notification-bell";
-import { MessagesIcon } from "@/components/messages-icon";
+import { AppTopBar } from "@/components/app-top-bar";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SickDayBanner } from "@/components/sick-day-banner";
 import { TravelBanner } from "@/components/travel-banner";
 import { ActiveExerciseBanner } from "@/components/active-exercise-banner";
 import { useToast } from "@/hooks/use-toast";
-import { flushSuppliesOfflineQueue } from "@/lib/supplies";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { useReleaseMode } from "@/lib/release-mode";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { logout, requireVerified } from "@/lib/auth";
+import { EmergencyProfileProvider } from "@/hooks/use-emergency-profile";
+import { isUserVerified, logout } from "@/lib/auth";
+import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
@@ -38,42 +37,128 @@ import CheckEmail from "@/pages/check-email";
 import Account from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
 import VerifiedSuccess from "@/pages/verified-success";
-import Supplies from "@/pages/supplies";
-import Scenarios from "@/pages/scenarios";
-import Adviser from "@/pages/adviser";
-import AICoach from "@/pages/ai-coach";
-import Settings from "@/pages/settings";
-import HelpNow from "@/pages/help-now";
-import Community from "@/pages/community";
-import Appointments from "@/pages/appointments";
-import EmergencyCard from "@/pages/emergency-card";
-import Onboarding from "@/pages/onboarding";
-import Shop from "@/pages/shop";
+import Welcome from "@/pages/welcome";
 import FamilyCarers from "@/pages/family-carers";
 import CarerView from "@/pages/carer-view";
-import Ratios from "@/pages/ratios";
+import CarerSetup from "@/pages/carer-setup";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
+import {
+  clearCarerClientSessionKeys,
+  hasCarerIntent,
+  hasPendingCarer,
+} from "@/lib/carer-session";
+import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
+import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
 import Support from "@/pages/support";
 
-/** Protects the main app layout: redirects to /login when not authenticated, /check-email when not verified. */
-function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+const ToolsPage = lazy(() => import("@/pages/tools/index"));
+const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
+const GlossaryIndex = lazy(() => import("@/pages/education/index"));
+const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
+
+const Supplies = lazy(() => import("@/pages/supplies"));
+const Adviser = lazy(() => import("@/pages/adviser"));
+const Ratios = lazy(() => import("@/pages/ratios"));
+const Routines = lazy(() => import("@/pages/routines"));
+const HelpNow = lazy(() => import("@/pages/help-now"));
+const Appointments = lazy(() => import("@/pages/appointments"));
+const EmergencyCard = lazy(() => import("@/pages/emergency-card"));
+
+const Bedtime = lazy(() => import("@/pages/bedtime"));
+const SickDay = lazy(() => import("@/pages/sick-day"));
+const Travel = lazy(() => import("@/pages/travel"));
+
+const SettingsPage = lazy(() => import("@/pages/settings"));
+
+const Scenarios = lazy(() => import("@/pages/scenarios"));
+const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
+const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
+const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
+const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
+      Loading…
+    </div>
+  );
+}
+
+function getSafeNext(pathname: string, search: string): string {
+  const p = pathname?.startsWith("/") ? pathname : `/${pathname || ""}`;
+  const qs = search ? `?${search.replace(/^\?/, "")}` : "";
+  const next = `${p}${qs}`;
+  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+}
+
+function useNativeDeepLinks() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!loading && user && !requireVerified(user, setLocation)) {
+    if (!Capacitor.isNativePlatform?.()) return;
+
+    let removed = false;
+    let handle: { remove: () => Promise<void> } | null = null;
+
+    void CapacitorApp.addListener("appUrlOpen", (event: { url: string }) => {
+      try {
+        const url = new URL(event.url);
+        const isHttp = url.protocol === "https:" || url.protocol === "http:";
+        const nextPath = isHttp
+          ? `${url.pathname}${url.search}${url.hash}`
+          : `/${url.host || ""}${url.pathname}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
+
+        const safe = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
+        setLocation(safe);
+      } catch {
+        // ignore malformed URLs
+      }
+    }).then((h) => {
+      if (removed) {
+        void h.remove();
+      } else {
+        handle = h;
+      }
+    });
+
+    return () => {
+      removed = true;
+      if (handle) void handle.remove();
+    };
+  }, [setLocation]);
+}
+
+/** Protects the main app layout: redirects to /login when not authenticated, /check-email when not verified. */
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const { loading: linkedPatientLoading } = useLinkedPatient();
+  const [pathname, setLocation] = useLocation();
+  const search = useSearch();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      const next = getSafeNext(pathname, search);
+      setLocation(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
-    if (!loading && !user) {
-      setLocation("/login");
+    if (!loading && user && !isUserVerified(user)) {
+      const next = getSafeNext(pathname, search);
+      try {
+        sessionStorage.setItem("diabeater_post_verify_next", next);
+      } catch {
+        // ignore
+      }
+      setLocation(`/check-email?message=${encodeURIComponent("Please verify your email to continue.")}`);
     }
   }, [loading, user, setLocation]);
 
-  if (loading) {
+  if (loading || linkedPatientLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">
           Checking session...
         </div>
@@ -81,7 +166,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || !requireVerified(user, setLocation)) {
+  if (!user || !isUserVerified(user)) {
     return null;
   }
 
@@ -91,17 +176,19 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 /** Requires user only (not verification). Used for /account so unverified users can resend verification. */
 function AuthOnlyLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const [, setLocation] = useLocation();
+  const [pathname, setLocation] = useLocation();
+  const search = useSearch();
 
   useEffect(() => {
     if (!loading && !user) {
-      setLocation("/login");
+      const next = getSafeNext(pathname, search);
+      setLocation(`/login?next=${encodeURIComponent(next)}`);
     }
   }, [loading, user, setLocation]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">
           Checking session...
         </div>
@@ -114,43 +201,348 @@ function AuthOnlyLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function InnerRouter() {
-  const { isBetaVisible } = useReleaseMode();
+function bypassesOnboardingGate(path: string): boolean {
+  const p = path.split("?")[0] ?? path;
+  const prefixes = [
+    "/_shots",
+    "/privacy",
+    "/support",
+    "/welcome",
+    "/login",
+    "/signup",
+    "/carer-setup",
+    "/auth/callback",
+    "/verified-success",
+    "/reset-request",
+    "/reset-password",
+    "/check-email",
+  ];
+  return prefixes.some((x) => p === x || p.startsWith(`${x}/`));
+}
 
+function PatientRouteGuard({ children }: { children: React.ReactNode }) {
+  const { isCarer, loading } = useLinkedCarer();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+    if (isCarer) {
+      setLocation("/carer-view");
+      return;
+    }
+    if (hasCarerIntent() || hasPendingCarer()) {
+      setLocation("/carer-setup");
+    }
+  }, [loading, isCarer, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
+    );
+  }
+  if (isCarer || hasCarerIntent() || hasPendingCarer()) return null;
+  return <>{children}</>;
+}
+
+/** Allows linked carers and patients; redirects pending carer signup to /carer-setup. */
+function CarerSetupIntentGuard({ children }: { children: React.ReactNode }) {
+  const { data: linkedPatient, loading } = useLinkedPatient();
+  const [, setLocation] = useLocation();
+  const isCarerMode = Boolean(linkedPatient);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
+      setLocation("/carer-setup");
+    }
+  }, [loading, isCarerMode, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
+    );
+  }
+  if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
+  return <>{children}</>;
+}
+
+function FamilyCarersGate() {
+  const { isCarer, loading } = useLinkedCarer();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+    if (isCarer) {
+      setLocation("/carer-view");
+      return;
+    }
+    if (hasCarerIntent() || hasPendingCarer()) {
+      setLocation("/carer-setup");
+    }
+  }, [loading, isCarer, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
+    );
+  }
+  if (isCarer || hasCarerIntent() || hasPendingCarer()) return null;
+  return <FamilyCarers />;
+}
+
+/**
+ * Authenticated shell — wouter <Switch> inside ProtectedLayout (same branch as Dashboard).
+ * Single app-level <Router> is in main.tsx (wouter; not react-router BrowserRouter).
+ * NotFound * last.
+ */
+function InnerRouter() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/supplies" component={Supplies} />
-      <Route path="/scenarios" component={Scenarios} />
-      <Route path="/adviser" component={Adviser} />
+      <Route path="/carer-view" component={CarerView} />
+      <Route path="/family-carers" component={FamilyCarersGate} />
+      <Route path="/">
+        <PatientRouteGuard>
+          <Dashboard />
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/supplies">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Supplies />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/exercise">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <ScenarioExercisePage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/bedtime">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Bedtime />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/sick-day">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SickDay />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/travel">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Travel />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/alcohol">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <AlcoholScenarioPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/driving">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <DrivingScenarioPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios/pump-failure">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <PumpFailurePage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/scenarios">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Scenarios />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/hypo-help">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <HypoHelpPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/routines">
+        <PatientRouteGuard>
+          <Redirect to="/routines" replace />
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/correction">
+        <PatientRouteGuard>
+          <Redirect to="/ratios" replace />
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/education">
+        <Redirect to="/education" replace />
+      </Route>
+      <Route path="/education/:slug">
+        <Suspense fallback={<RouteFallback />}>
+          <GlossaryDetail />
+        </Suspense>
+      </Route>
+      <Route path="/education">
+        <Suspense fallback={<RouteFallback />}>
+          <GlossaryIndex />
+        </Suspense>
+      </Route>
+      <Route path="/tools">
+        <Suspense fallback={<RouteFallback />}>
+          <ToolsPage />
+        </Suspense>
+      </Route>
+      <Route path="/adviser">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Adviser />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
       <Route path="/verified-success" component={VerifiedSuccess} />
-      {isBetaVisible && <Route path="/ai-coach" component={AICoach} />}
-      {isBetaVisible && <Route path="/community" component={Community} />}
-      <Route path="/appointments" component={Appointments} />
-      <Route path="/emergency-card" component={EmergencyCard} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/help-now" component={HelpNow} />
-      {isBetaVisible && <Route path="/shop" component={Shop} />}
-      {isBetaVisible && <Route path="/family-carers" component={FamilyCarers} />}
-      {isBetaVisible && <Route path="/carer-view" component={CarerView} />}
-      <Route path="/ratios" component={Ratios} />
-      <Route component={NotFound} />
+      <Route path="/appointments">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Appointments />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/emergency-card">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <EmergencyCard />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/about">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/notifications">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/appearance">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/ratios">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/usage">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/account">
+        <PatientRouteGuard>
+          <Redirect to="/account" replace />
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/help-now">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <HelpNow />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/ratios">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Ratios />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/routines">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <Routines />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="*" component={NotFound} />
     </Switch>
   );
 }
 
 function AuthenticatedShell() {
   const [location, setLocation] = useLocation();
-  const { user } = useAuth();
   const { toast } = useToast();
+  const { isCarer } = useLinkedCarer();
 
   const handleLogout = async () => {
+    clearCarerClientSessionKeys();
     await logout();
-    setLocation("/login");
+    setLocation("/welcome");
+  };
+
+  const goBrandHome = () => {
+    if (isCarer) {
+      if (location.split("?")[0] !== "/carer-view") setLocation("/carer-view");
+      return;
+    }
+    if (location.split("?")[0] !== "/") setLocation("/");
   };
 
   useEffect(() => {
+    const onSupplySyncToast = (ev: Event) => {
+      const ce = ev as CustomEvent<{ kind?: string }>;
+      const kind = ce.detail?.kind;
+      if (kind === "queued") {
+        toast({
+          title: "Change queued",
+          description: "Change queued; will sync when you're back online.",
+        });
+        return;
+      }
+      if (kind === "retry") {
+        toast({
+          title: "Couldn't sync",
+          description: "Couldn't sync now; will retry automatically.",
+          variant: "destructive",
+        });
+      }
+    };
+    window.addEventListener("diabeater:supply-sync-toast", onSupplySyncToast);
+    return () => window.removeEventListener("diabeater:supply-sync-toast", onSupplySyncToast);
+  }, [toast]);
+
+  useEffect(() => {
     const flush = async () => {
+      const { flushSuppliesOfflineQueue } = await import("@/lib/supplies");
       const { flushed, skippedNewer, failed } = await flushSuppliesOfflineQueue();
       if (flushed > 0) {
         toast({
@@ -179,48 +571,25 @@ function AuthenticatedShell() {
   }, [toast]);
 
   return (
-    <div className="flex flex-col h-screen w-full">
+    <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <OfflineBanner />
-      <SickDayBanner />
-      <TravelBanner />
-      <ActiveExerciseBanner />
-      <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-30">
-        <button
-          onClick={() => {
-            if (location !== "/") {
-              setLocation("/");
-            }
-          }}
-          className={`flex items-center gap-3 transition-all duration-200 ${
-            location === "/"
-              ? "cursor-default"
-              : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
-          }`}
-          data-testid="button-home-brand"
-        >
-          <FaceLogo size={40} />
-          <span className="font-semibold text-xl">Diabeaters</span>
-        </button>
-        <div className="flex items-center gap-2">
-          <MessagesIcon />
-          <NotificationBell />
-          <ProfileMenu />
-          {user && (
-            <button
-              onClick={handleLogout}
-              className="text-xs px-3 py-1 rounded-full border border-border text-muted-foreground hover:bg-muted transition-colors"
-            >
-              Log out
-            </button>
-          )}
-        </div>
-      </header>
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
-        <div key={location} className="animate-fade-in-up">
-          <InnerRouter />
-        </div>
+      {!isCarer && (
+        <>
+          <SickDayBanner />
+          <TravelBanner />
+          <ActiveExerciseBanner />
+        </>
+      )}
+      <AppTopBar
+        isCarer={isCarer}
+        pathOnly={location.split("?")[0] ?? location}
+        onBrandClick={goBrandHome}
+        onLogout={handleLogout}
+      />
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24 max-w-[100vw]">
+        <InnerRouter />
       </main>
-      <footer className="border-t py-3 px-6 text-center text-xs text-muted-foreground mb-12">
+      <footer className="border-0 py-3 px-6 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground">
         <p>
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
           · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
@@ -235,35 +604,52 @@ function AuthenticatedShell() {
 
 function AccountShell() {
   const [, setLocation] = useLocation();
+  const { isCarer } = useLinkedCarer();
+
+  const handleLogout = async () => {
+    clearCarerClientSessionKeys();
+    await logout();
+    setLocation("/welcome");
+  };
 
   return (
-    <div className="flex flex-col h-screen w-full">
-      <header className="flex items-center justify-between p-4 border-b transition-colors duration-200 glass-surface sticky top-0 z-30">
-        <button
-          onClick={() => setLocation("/")}
-          className="flex items-center gap-3 cursor-pointer hover:opacity-80"
-          data-testid="button-home-brand"
-        >
-          <FaceLogo size={40} />
-          <span className="font-semibold text-xl">Diabeaters</span>
-        </button>
-      </header>
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24">
+    <div className="flex flex-col h-screen w-full bg-background text-foreground">
+      <AppTopBar
+        isCarer={isCarer}
+        pathOnly="/account"
+        onBrandClick={() => setLocation(isCarer ? "/carer-view" : "/")}
+        onLogout={handleLogout}
+      />
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24 max-w-[100vw]">
         <Account />
       </main>
+      <footer className="border-0 py-3 px-6 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground">
+        <p>
+          Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
+          · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
+          · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>
+        </p>
+      </footer>
+      <BottomNav />
     </div>
   );
 }
 
+/**
+ * Top-level shell (auth, public pages). Catch-all path="*" → ProtectedLayout + app chrome.
+ * Login, signup, account, privacy, etc. are matched before *.
+ */
 function MainRouter() {
   return (
     <Switch>
+      <Route path="/welcome" component={Welcome} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/reset-request" component={ResetRequest} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/check-email" component={CheckEmail} />
+      <Route path="/carer-setup" component={CarerSetup} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
       <Route path="/account">
@@ -281,72 +667,123 @@ function MainRouter() {
 }
 
 function AppContent() {
+  useNativeDeepLinks();
   const [location, setLocation] = useLocation();
-  const [hasChecked, setHasChecked] = useState(false);
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const [appGateReady, setAppGateReady] = useState(false);
+  const [linkedCarer, setLinkedCarer] = useState(false);
+  const [patientOnboardingSatisfied, setPatientOnboardingSatisfied] = useState(true);
+  const pathOnly = location.split("?")[0] ?? location;
 
   useEffect(() => {
-    const completed = localStorage.getItem("diabeater_onboarding_completed");
-    setOnboardingCompleted(completed === "true");
-    setHasChecked(true);
-  }, []);
-
-  useEffect(() => {
-    const skipOnboardingRedirect = [
-      "/_shots",
-      "/privacy",
-      "/support",
-      "/auth/callback",
-      "/verified-success",
-      "/reset-request",
-      "/reset-password",
-      "/check-email",
-      "/account",
-    ].some((p) => location === p || location.startsWith(p + "/"));
-    if (skipOnboardingRedirect) return;
-    if (hasChecked && !onboardingCompleted && location !== "/onboarding") {
-      setLocation("/onboarding");
+    let cancelled = false;
+    async function run() {
+      if (authLoading) return;
+      if (!user?.id) {
+        setLinkedCarer(false);
+        setPatientOnboardingSatisfied(true);
+        setAppGateReady(true);
+        return;
+      }
+      const link = await getLinkedPatientForCarer();
+      if (cancelled) return;
+      if (link.data) {
+        setLinkedCarer(true);
+        setPatientOnboardingSatisfied(true);
+        setAppGateReady(true);
+        return;
+      }
+      if (hasCarerIntent() || hasPendingCarer()) {
+        setLinkedCarer(false);
+        setPatientOnboardingSatisfied(true);
+        setAppGateReady(true);
+        return;
+      }
+      const { profile } = await getProfile(user.id);
+      if (cancelled) return;
+      const fromDb = profile?.onboarding_complete === true;
+      let fromLs = false;
+      try {
+        fromLs = localStorage.getItem("diabeater_onboarding_completed") === "true";
+      } catch {
+        fromLs = false;
+      }
+      setPatientOnboardingSatisfied(fromDb || fromLs);
+      setLinkedCarer(false);
+      setAppGateReady(true);
     }
-  }, [hasChecked, onboardingCompleted, location, setLocation]);
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user?.id]);
+
+  const publicEntry = bypassesOnboardingGate(location);
+
+  useEffect(() => {
+    if (!appGateReady || authLoading) return;
+    if (publicEntry) return;
+    if (!user?.id) return;
+    if (linkedCarer) return;
+    if (hasCarerIntent() || hasPendingCarer()) return;
+    if (patientOnboardingSatisfied) return;
+    if (pathOnly === "/onboarding") return;
+    setLocation("/onboarding");
+  }, [
+    appGateReady,
+    authLoading,
+    user?.id,
+    linkedCarer,
+    patientOnboardingSatisfied,
+    pathOnly,
+    publicEntry,
+    location,
+    setLocation,
+  ]);
 
   if (location.startsWith("/_shots")) {
     return <ShotsPage />;
   }
 
-  if (location === "/privacy" || location === "/support") {
-    return <MainRouter />;
+  if (publicEntry || location === "/privacy" || location === "/support") {
+    return (
+      <div className={isStaging ? "pt-10" : ""}>
+        <StagingBanner />
+        <DevBanner />
+        <MainRouter />
+      </div>
+    );
   }
 
-  if (location === "/onboarding") {
+  if (pathOnly === "/onboarding") {
     return (
-      <Onboarding
-        onComplete={() => {
-          setOnboardingCompleted(true);
-          const struggle = localStorage.getItem("diabeater_onboarding_struggle");
-          const routes: Record<string, string> = {
-            supplies: "/supplies",
-            meals: "/adviser?tab=meal",
-            exercise: "/adviser?tab=exercise",
-            overview: "/",
-          };
-          setLocation(struggle && routes[struggle] ? routes[struggle] : "/");
+      <PatientOnboardingGate
+        onPatientComplete={() => {
+          setPatientOnboardingSatisfied(true);
         }}
       />
     );
   }
 
-  if (!hasChecked) {
+  if (!appGateReady || authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="animate-pulse text-muted-foreground">Loading…</div>
       </div>
     );
   }
 
-  if (!onboardingCompleted) {
+  if (
+    user?.id &&
+    !linkedCarer &&
+    !hasCarerIntent() &&
+    !hasPendingCarer() &&
+    !patientOnboardingSatisfied &&
+    pathOnly !== "/onboarding"
+  ) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Redirecting...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="animate-pulse text-muted-foreground">Redirecting…</div>
       </div>
     );
   }
@@ -362,17 +799,13 @@ function AppContent() {
 
 export default function App() {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/service-worker.js", { updateViaCache: "none" })
-        .then((registration) => {
-          console.log("SW registered:", registration.scope);
-          registration.update();
-        })
-        .catch((error) => {
-          console.log("SW registration failed:", error);
-        });
-    }
+    if (!(import.meta.env.PROD && "serviceWorker" in navigator)) return;
+    navigator.serviceWorker
+      .register("/service-worker.js", { updateViaCache: "none" })
+      .then((registration) => {
+        registration.update();
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -381,7 +814,10 @@ export default function App() {
         <TooltipProvider>
           <ThemeProvider>
             <AuthProvider>
-              <AppContent />
+              <EmergencyProfileProvider>
+                {import.meta.env.DEV ? <DevSupabaseDiagnostics /> : null}
+                <AppContent />
+              </EmergencyProfileProvider>
             </AuthProvider>
             <Toaster />
           </ThemeProvider>

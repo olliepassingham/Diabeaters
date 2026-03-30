@@ -8,16 +8,31 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  storage, ActiveExerciseSession, ExercisePhase, ExerciseType, 
-  ExerciseIntensity, ExerciseOutcome 
+import {
+  storage,
+  ActiveExerciseSession,
+  ExercisePhase,
+  ExerciseType,
+  ExerciseIntensity,
+  ExerciseOutcome,
+  type ExerciseBgTrend,
 } from "@/lib/storage";
+import { getExerciseGuidanceForReading } from "@/lib/exercise-reading-guidance";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
   cardio: "Cardio", strength: "Strength", hiit: "HIIT",
@@ -195,6 +210,98 @@ function formatRemaining(ms: number): string {
   return `${totalMin} min`;
 }
 
+function plannerHref(session: ActiveExerciseSession): string {
+  const q = new URLSearchParams({
+    type: session.exerciseType,
+    duration: String(session.durationMinutes),
+    intensity: session.intensity,
+  });
+  return `/scenarios/exercise?${q.toString()}`;
+}
+
+function ExerciseReadingPrompt({
+  bgUnits,
+  title,
+  description,
+  onSave,
+  onSkip,
+  saveTestId,
+  skipTestId,
+  skipLabel = "Skip",
+}: {
+  bgUnits: string;
+  title: string;
+  description?: string;
+  onSave: (bg: number, trend: ExerciseBgTrend) => void;
+  onSkip: () => void;
+  saveTestId?: string;
+  skipTestId?: string;
+  skipLabel?: string;
+}) {
+  const { toast } = useToast();
+  const [raw, setRaw] = useState("");
+  const [trend, setTrend] = useState<ExerciseBgTrend>("not_sure");
+
+  const submit = () => {
+    const bg = parseFloat(raw.replace(",", "."));
+    if (raw.trim() === "" || Number.isNaN(bg)) {
+      toast({
+        title: "Enter a BG value",
+        description: "Or tap Skip if you prefer not to log right now.",
+        variant: "destructive",
+      });
+      return;
+    }
+    onSave(bg, trend);
+    setRaw("");
+    setTrend("not_sure");
+  };
+
+  return (
+    <Card className="border-primary/25 bg-background/90 dark:bg-background/60">
+      <CardContent className="p-3 space-y-2">
+        <p className="text-xs font-medium text-foreground">{title}</p>
+        {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">BG ({bgUnits})</Label>
+            <Input
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              inputMode="decimal"
+              className="h-9 text-sm"
+              placeholder="e.g. 6.2"
+              data-testid="input-exercise-reading-bg"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Direction</Label>
+            <Select value={trend} onValueChange={(v) => setTrend(v as ExerciseBgTrend)}>
+              <SelectTrigger className="h-9 text-sm" data-testid="select-exercise-reading-trend">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rising">Rising</SelectItem>
+                <SelectItem value="flat">Flat</SelectItem>
+                <SelectItem value="falling">Falling</SelectItem>
+                <SelectItem value="not_sure">Not sure</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" type="button" onClick={submit} data-testid={saveTestId}>
+            Save reading
+          </Button>
+          <Button size="sm" type="button" variant="ghost" onClick={onSkip} data-testid={skipTestId}>
+            Skip
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean): string[] {
   const config = EXERCISE_TYPE_CONFIG[session.exerciseType];
   return config.preTips(isPump, session.durationMinutes);
@@ -214,14 +321,18 @@ export function ActiveExerciseBanner() {
   const [endingSession, setEndingSession] = useState<ActiveExerciseSession | null>(null);
   const [isPump, setIsPump] = useState(false);
   const [patterns, setPatterns] = useState<ReturnType<typeof storage.getExercisePatterns> | null>(null);
+  const [bgUnits, setBgUnits] = useState("mmol/L");
 
   const loadSession = useCallback(() => {
+    const profile = storage.getProfile();
+    setBgUnits(profile?.bgUnits || "mmol/L");
     const s = storage.getActiveExercise();
     setSession(s);
     if (s) {
       setPatterns(storage.getExercisePatterns(s.exerciseType, s.intensity));
-      const profile = storage.getProfile();
       setIsPump(profile?.insulinDeliveryMethod === "pump");
+    } else {
+      setPatterns(null);
     }
   }, []);
 
@@ -230,6 +341,10 @@ export function ActiveExerciseBanner() {
     const interval = setInterval(loadSession, 2000);
     return () => clearInterval(interval);
   }, [loadSession]);
+
+  useEffect(() => {
+    if (session?.phase !== "active") setShowMidCheck(false);
+  }, [session?.phase]);
 
   useEffect(() => {
     if (!session) return;
@@ -310,8 +425,49 @@ export function ActiveExerciseBanner() {
   };
 
   const handleDismissMidCheck = () => {
-    storage.updateActiveExercise({ midCheckDone: true });
+    storage.updateActiveExercise({ midCheckDone: true, midBgSkipped: true });
     setShowMidCheck(false);
+    loadSession();
+  };
+
+  const handleSaveMidReading = (bg: number, trend: ExerciseBgTrend) => {
+    storage.updateActiveExercise({
+      midBg: bg,
+      midTrend: trend,
+      midBgAt: new Date().toISOString(),
+      midCheckDone: true,
+    });
+    setShowMidCheck(false);
+    loadSession();
+  };
+
+  const handleSavePreReading = (bg: number, trend: ExerciseBgTrend) => {
+    if (!session) return;
+    storage.updateActiveExercise({
+      preBg: bg,
+      preTrend: trend,
+      preBgAt: new Date().toISOString(),
+      preChecklist: { ...session.preChecklist, bgChecked: true },
+    });
+    loadSession();
+  };
+
+  const handleSkipPreReading = () => {
+    storage.updateActiveExercise({ preBgSkipped: true });
+    loadSession();
+  };
+
+  const handleSaveRecoveryReading = (bg: number, trend: ExerciseBgTrend) => {
+    storage.updateActiveExercise({
+      recoveryBg: bg,
+      recoveryTrend: trend,
+      recoveryBgAt: new Date().toISOString(),
+    });
+    loadSession();
+  };
+
+  const handleSkipRecoveryReading = () => {
+    storage.updateActiveExercise({ recoveryBgSkipped: true });
     loadSession();
   };
 
@@ -320,14 +476,55 @@ export function ActiveExerciseBanner() {
     setSession(null);
   };
 
+  const isEvening = new Date().getHours() >= 18;
+
   if (!session && !showOutcomeDialog) return null;
 
-  const tips = session ? getPreExerciseTips(session, isPump) : [];
+  const basePreTips = session ? getPreExerciseTips(session, isPump) : [];
+  const preGuidance =
+    session && session.phase === "pre" && session.preBg != null
+      ? getExerciseGuidanceForReading({
+          bg: session.preBg,
+          trend: session.preTrend,
+          bgUnits,
+          exerciseType: session.exerciseType,
+          intensity: session.intensity,
+          phase: "pre",
+          isEvening,
+        })
+      : [];
+  const preTipsMerged = session ? [...preGuidance, ...basePreTips] : [];
+
+  const activeGuidance =
+    session && session.phase === "active" && session.midBg != null
+      ? getExerciseGuidanceForReading({
+          bg: session.midBg,
+          trend: session.midTrend,
+          bgUnits,
+          exerciseType: session.exerciseType,
+          intensity: session.intensity,
+          phase: "active",
+          isEvening,
+        })
+      : [];
+
+  const recoveryGuidance =
+    session && session.phase === "recovery" && session.recoveryBg != null
+      ? getExerciseGuidanceForReading({
+          bg: session.recoveryBg,
+          trend: session.recoveryTrend,
+          bgUnits,
+          exerciseType: session.exerciseType,
+          intensity: session.intensity,
+          phase: "recovery",
+          isEvening,
+        })
+      : [];
+
   const typeConfig = session ? getTypeConfig(session.exerciseType) : null;
   const progressPercent = session?.phase === "active" && session.exerciseStartedAt
     ? Math.min(100, (elapsed / (session.durationMinutes * 60 * 1000)) * 100)
     : 0;
-  const isEvening = new Date().getHours() >= 18;
 
   return (
     <>
@@ -409,6 +606,26 @@ export function ActiveExerciseBanner() {
 
                 {session.phase === "pre" && (
                   <div className="space-y-2">
+                    <Link
+                      href={plannerHref(session)}
+                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex items-center gap-1"
+                      data-testid="link-full-exercise-planner"
+                    >
+                      Open full planner — food and insulin
+                    </Link>
+
+                    {session.preBg == null && !session.preBgSkipped ? (
+                      <ExerciseReadingPrompt
+                        bgUnits={bgUnits}
+                        title="Current BG and direction"
+                        description="Optional — helps tailor the tips below. Confirm any changes with your care team."
+                        onSave={handleSavePreReading}
+                        onSkip={handleSkipPreReading}
+                        saveTestId="button-save-pre-reading"
+                        skipTestId="button-skip-pre-reading"
+                      />
+                    ) : null}
+
                     <p className="text-xs font-medium flex items-center gap-1.5">
                       <Shield className="h-3.5 w-3.5" />
                       Pre-exercise checklist
@@ -460,9 +677,9 @@ export function ActiveExerciseBanner() {
                       )}
                     </div>
 
-                    {tips.length > 0 && (
+                    {preTipsMerged.length > 0 && (
                       <div className="space-y-1 mt-2">
-                        {tips.slice(0, 3).map((tip, i) => (
+                        {preTipsMerged.slice(0, 6).map((tip, i) => (
                           <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                             <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
                             <span>{tip}</span>
@@ -487,7 +704,7 @@ export function ActiveExerciseBanner() {
                   <div className="space-y-2">
                     {showMidCheck && (
                       <Card className="border-amber-300 dark:border-amber-700">
-                        <CardContent className="p-3">
+                        <CardContent className="p-3 space-y-3">
                           <div className="flex items-start gap-2">
                             <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
@@ -495,7 +712,19 @@ export function ActiveExerciseBanner() {
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 {typeConfig?.midCheckMessage ?? "How are you feeling? Any signs of low blood sugar?"}
                               </p>
-                              <div className="flex gap-2 mt-2 flex-wrap">
+                            </div>
+                          </div>
+                          <ExerciseReadingPrompt
+                            bgUnits={bgUnits}
+                            title="Log BG (optional)"
+                            description="CGM trend or your best guess — refines tips for the rest of this session."
+                            onSave={handleSaveMidReading}
+                            onSkip={handleDismissMidCheck}
+                            saveTestId="button-save-mid-reading"
+                            skipTestId="button-skip-mid-reading"
+                            skipLabel="Not now"
+                          />
+                          <div className="flex gap-2 flex-wrap">
                                 <Button size="sm" variant="outline" onClick={handleDismissMidCheck} data-testid="button-midcheck-ok">
                                   Feeling fine
                                 </Button>
@@ -505,18 +734,35 @@ export function ActiveExerciseBanner() {
                                     Help Now
                                   </Button>
                                 </Link>
-                                <Link href="/adviser?tab=tools">
+                                <Link href="/tools/hypo-help">
                                   <Button size="sm" variant="outline" data-testid="button-midcheck-hypo-calc">
                                     <Calculator className="h-3 w-3 mr-1" />
                                     Hypo Calc
                                   </Button>
                                 </Link>
-                              </div>
-                            </div>
                           </div>
                         </CardContent>
                       </Card>
                     )}
+
+                    {activeGuidance.length > 0 && (
+                      <div className="space-y-1">
+                        {activeGuidance.map((line, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                            <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
+                            <span>{line}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <Link
+                      href={plannerHref(session)}
+                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex"
+                      data-testid="link-full-exercise-planner-active"
+                    >
+                      Open full planner — food and insulin
+                    </Link>
 
                     {typeConfig?.activeReminder && (
                       <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -536,7 +782,7 @@ export function ActiveExerciseBanner() {
                           Help Now
                         </Button>
                       </Link>
-                      <Link href="/adviser?tab=tools">
+                      <Link href="/tools/hypo-help">
                         <Button size="sm" variant="outline" data-testid="button-hypo-calc-during-exercise">
                           <Calculator className="h-3.5 w-3.5 mr-1.5" />
                           Hypo Calc
@@ -548,6 +794,37 @@ export function ActiveExerciseBanner() {
 
                 {session.phase === "recovery" && (
                   <div className="space-y-2">
+                    <Link
+                      href={plannerHref(session)}
+                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex"
+                      data-testid="link-full-exercise-planner-recovery"
+                    >
+                      Open full planner — food and insulin
+                    </Link>
+
+                    {session.recoveryBg == null && !session.recoveryBgSkipped ? (
+                      <ExerciseReadingPrompt
+                        bgUnits={bgUnits}
+                        title="Recovery check-in"
+                        description="Optional BG now — delayed lows are common after exercise."
+                        onSave={handleSaveRecoveryReading}
+                        onSkip={handleSkipRecoveryReading}
+                        saveTestId="button-save-recovery-reading"
+                        skipTestId="button-skip-recovery-reading"
+                      />
+                    ) : null}
+
+                    {recoveryGuidance.length > 0 ? (
+                      <div className="space-y-1">
+                        {recoveryGuidance.map((line, i) => (
+                          <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                            <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
+                            <span>{line}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
                     <div className="space-y-1">
                       <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 shrink-0 mt-0.5" />
@@ -564,7 +841,11 @@ export function ActiveExerciseBanner() {
                       {isEvening && (
                         <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
                           <Heart className="h-3 w-3 shrink-0 mt-0.5 text-indigo-500" />
-                          <span>Evening exercise — consider a bedtime snack to prevent overnight lows</span>
+                          <span>
+                            {session.intensity === "intense"
+                              ? "Evening hard session — overnight delayed lows are more likely for some people; consider extra checks or a snack if your team agrees."
+                              : "Evening exercise — consider a bedtime snack to prevent overnight lows"}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -583,7 +864,7 @@ export function ActiveExerciseBanner() {
                           Help Now
                         </Button>
                       </Link>
-                      <Link href="/adviser?tab=tools">
+                      <Link href="/tools/hypo-help">
                         <Button size="sm" variant="ghost" data-testid="button-hypo-calc-recovery">
                           <Calculator className="h-3.5 w-3.5 mr-1" />
                           Hypo Calc
@@ -667,6 +948,13 @@ function ExerciseOutcomeDialog({
           <DialogDescription>
             Quick feedback on {session.exerciseName} helps build your exercise patterns. This is optional.
           </DialogDescription>
+          {session.preBg != null && (
+            <p className="text-sm text-muted-foreground" data-testid="text-outcome-pre-bg">
+              Pre-exercise BG logged: {session.preBg}{" "}
+              {storage.getProfile()?.bgUnits ?? "mmol/L"}
+              {session.preTrend && session.preTrend !== "not_sure" ? ` (${session.preTrend})` : ""}
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4 py-2">

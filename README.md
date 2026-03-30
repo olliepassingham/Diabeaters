@@ -19,11 +19,11 @@ The above disclaimer appears in:
 
 | Environment | Host           | Branch   | Notes                                      |
 |-------------|----------------|----------|--------------------------------------------|
-| Development | localhost:5173 | local    | `.env` with `VITE_APP_ENV=development`     |
+| Development | localhost:5173 | local    | `.env.local` with `VITE_APP_ENV=development`     |
 | Staging     | Vercel Preview | `develop`| `.env.staging`, staging Supabase, no-index |
 | Production  | Vercel Prod    | `main`   | Production Supabase, indexing allowed      |
 
-**Required env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_ENV` (optional; defaults to `development` when `DEV`, `production` when `PROD`). Vite exposes `VITE_*` to the client via `import.meta.env`. Copy `.env.example` or `.env.staging.example` as needed. Restart dev server after changing `.env`.
+**Required env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_ENV` (optional; defaults to `development` when `DEV`, `production` when `PROD`). Vite exposes `VITE_*` to the client via `import.meta.env`. Prefer `.env.local` / `.env.staging.local` over `.env` / `.env.staging`. Restart dev server after env changes.
 
 **How `VITE_APP_ENV` controls the app:**
 - **Banners:** Staging shows a top ribbon “Staging — not for real use” and a “Preview: this feature is in staging” chip on the dashboard. Production shows neither.
@@ -41,12 +41,12 @@ if (isStaging) {
 ## Local Env
 
 - **Supabase credentials**: In your Supabase project, go to **Project Settings → API** and copy the **project URL** and **public anon key**.
-- **.env variables**: Put them in **app/.env** (Vite app folder) as:
+- **.env variables**: Put them in **app/.env.local** (Vite app folder; preferred over `app/.env`) as:
   - `VITE_SUPABASE_URL=...`
   - `VITE_SUPABASE_ANON_KEY=...`
   - `VITE_APP_ENV=development` (optional; see `.env.example`)
 - **Vite prefix**: The `VITE_` prefix is required for Vite to expose these values to the client (`import.meta.env.VITE_SUPABASE_URL`, etc.).
-- **Restart dev server**: After changing `.env`, stop and restart `npm run dev` (from inside **app/**) so Vite picks up the new values.
+- **Restart dev server**: After changing env files, stop and restart `npm run dev` (from inside **app/**) so Vite picks up the new values.
 
 ## Local Development
 
@@ -61,7 +61,7 @@ if (isStaging) {
 - **Backend**  
   From repo root: `npm run dev:server` (or your existing server command).
 - **Env**
-  - `VITE_*` variables live in **app/.env** (same folder as the Vite app).
+  - `VITE_*` variables live in **app/.env.local** (preferred) or **app/.env**.
   - Server-only env (if any) in **root/.env.server**.
 - **Pitfall**: Running `vite` or `npm run dev` from the repo root will not start the frontend; the frontend runs from **app/** (or via `npm run web:dev`).
 
@@ -253,7 +253,7 @@ Export the App Store icon as a 1024×1024 PNG **without transparency** and place
 - **Privacy**: [/privacy](privacy) – Data collected (email, profile name, supplies), purpose, retention, deletion, cookies, third parties.
 - **Support**: [/support](support) – Contact email and FAQ (login, password reset, data deletion).
 
-Footer links appear on onboarding and the dashboard. **Replace placeholder URLs** with your full domain after deploy (e.g. `https://diabeaters.vercel.app/privacy`).
+Footer links appear on onboarding and the dashboard. **Replace example URLs** with your full domain after deploy (e.g. `https://diabeaters.vercel.app/privacy`).
 
 ## Account page
 

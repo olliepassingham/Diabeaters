@@ -5,6 +5,17 @@ export function isOnline(): boolean {
 
 const QUEUE_KEY = "offline_queue_v1";
 
+/** Payload for mirroring the local Supply Tracker row to `public.supplies`. */
+export type LocalSupplySyncPayload = {
+  cloudId: string | null;
+  name: string;
+  quantity: number;
+  unit: string | null;
+  category: string | null;
+  notes: string | null;
+  updated_at: string;
+};
+
 export type OfflineSupplyOp =
   | {
       kind: "supplies:add";
@@ -22,6 +33,18 @@ export type OfflineSupplyOp =
       kind: "supplies:delete";
       payload: { id: string };
       baseUpdatedAt?: string | null;
+      clientTs: string;
+    }
+  | {
+      kind: "supplies:local-sync";
+      localId: string;
+      payload: LocalSupplySyncPayload;
+      clientTs: string;
+    }
+  | {
+      kind: "supplies:local-delete";
+      localId: string;
+      cloudId: string | null;
       clientTs: string;
     };
 
@@ -65,6 +88,27 @@ export function getQueueLength(): number {
 export function enqueue(entry: OfflineQueueEntry): void {
   const next = [...getQueue(), entry];
   setQueue(next);
+}
+
+/**
+ * Enqueue a local tracker → cloud upsert, replacing any pending `supplies:local-sync`
+ * for the same `localId` so rapid edits coalesce.
+ */
+export function enqueueLocalSupplySync(entry: Extract<OfflineQueueEntry, { kind: "supplies:local-sync" }>): void {
+  const filtered = getQueue().filter((e) => !(e.kind === "supplies:local-sync" && e.localId === entry.localId));
+  setQueue([...filtered, entry]);
+}
+
+/**
+ * Enqueue cloud delete for a removed local row; drops pending `supplies:local-sync`
+ * for that `localId` and replaces any prior `supplies:local-delete` for the same id.
+ */
+export function enqueueLocalSupplyDelete(
+  entry: Extract<OfflineQueueEntry, { kind: "supplies:local-delete" }>,
+): void {
+  let next = getQueue().filter((e) => !(e.kind === "supplies:local-sync" && e.localId === entry.localId));
+  next = next.filter((e) => !(e.kind === "supplies:local-delete" && e.localId === entry.localId));
+  setQueue([...next, entry]);
 }
 
 export type FlushResult =

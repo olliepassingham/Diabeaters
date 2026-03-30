@@ -4,6 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "dev": "npm run web:dev",
     "web:dev": "npm --prefix app run dev",
     "web:build": "npm --prefix app run build",
     "web:preview": "npm --prefix app run preview",

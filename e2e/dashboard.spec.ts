@@ -12,10 +12,7 @@ test.describe("Dashboard page", () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
   });
 
-  test("renders dashboard with section headers when authenticated", async ({
-    page,
-    context,
-  }) => {
+  test("renders dashboard when authenticated", async ({ page, context }) => {
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
@@ -51,14 +48,7 @@ test.describe("Dashboard page", () => {
     );
     await expect(page.getByTestId("card-header")).toBeVisible();
     await expect(page.getByTestId("card-hero")).toBeVisible();
-    await expect(page.getByTestId("dashboard-supplies")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Cloud supplies" })
-    ).toBeVisible();
     await expect(page.getByTestId("dashboard-widgets")).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Your widgets" })
-    ).toBeVisible();
   });
 
   test("customise button opens widget library", async ({ page, context }) => {

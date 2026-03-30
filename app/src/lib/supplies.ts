@@ -1,13 +1,27 @@
 import type { AuthError, PostgrestError } from "@supabase/supabase-js";
+import { getSupplyIncrement, storage, type Supply as LocalSupply } from "./storage";
 import { getSupabase } from "./supabase";
-import { enqueue, flushQueue, getQueue, isOnline, type OfflineQueueEntry } from "./offline";
+import {
+  enqueue,
+  enqueueLocalSupplyDelete,
+  enqueueLocalSupplySync,
+  flushQueue,
+  getQueue,
+  isOnline,
+  type LocalSupplySyncPayload,
+  type OfflineQueueEntry,
+} from "./offline";
 
+/** Row shape for `public.supplies` (cloud). */
 export type Supply = {
   id: string;
   user_id: string;
   name: string;
   quantity: number;
   updated_at: string;
+  unit?: string | null;
+  category?: string | null;
+  notes?: string | null;
   _pending?: boolean;
 };
 
@@ -27,6 +41,22 @@ const NOT_CONFIGURED = new Error(
 );
 
 const CACHE_KEY = "supplies_cache_v1";
+
+function emitSupplySyncToast(kind: "queued" | "retry"): void {
+  try {
+    window.dispatchEvent(new CustomEvent("diabeater:supply-sync-toast", { detail: { kind } }));
+  } catch {
+    // Ignore
+  }
+}
+
+function isRlsOrAuthError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; message?: string };
+  if (e.code === "PGRST301") return true;
+  const m = (e.message || "").toLowerCase();
+  return m.includes("jwt") || m.includes("permission") || m.includes("row-level security");
+}
 
 function readCache(): Supply[] | null {
   try {
@@ -164,6 +194,283 @@ export async function listSuppliesForUser(
   }
 }
 
+/** Map a local tracker row to a cloud payload (quantity = current stock). */
+export function localSupplyToSyncPayload(local: LocalSupply, cloudId: string | null): LocalSupplySyncPayload {
+  const unitLabel = getSupplyIncrement(local.type).label;
+  return {
+    cloudId,
+    name: local.name,
+    quantity: Math.max(0, Math.round(local.currentQuantity)),
+    unit: unitLabel,
+    category: local.type,
+    notes: local.notes ?? null,
+    updated_at: local.updated_at || new Date().toISOString(),
+  };
+}
+
+/**
+ * Upsert a local Supply Tracker row to `public.supplies`.
+ * No-ops when there is no Supabase session. Offline: enqueues with per-local dedupe.
+ */
+export async function syncToCloud(local: LocalSupply): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+
+  const cloudId = local.cloud_id ?? null;
+  const payload = localSupplyToSyncPayload({ ...local, cloud_id: cloudId }, cloudId);
+  const clientTs = payload.updated_at;
+
+  if (!isOnline()) {
+    enqueueLocalSupplySync({
+      kind: "supplies:local-sync",
+      localId: local.id,
+      payload,
+      clientTs,
+    });
+    emitSupplySyncToast("queued");
+    return;
+  }
+
+  try {
+    if (cloudId) {
+      const row = {
+        name: payload.name,
+        quantity: payload.quantity,
+        unit: payload.unit,
+        category: payload.category,
+        notes: payload.notes,
+        updated_at: clientTs,
+      };
+      const { data, error } = await supabase
+        .from("supplies")
+        .update(row)
+        .eq("id", cloudId)
+        .eq("user_id", userId)
+        .select("id, updated_at")
+        .single();
+
+      if (error) {
+        if (isRlsOrAuthError(error)) {
+          emitSupplySyncToast("retry");
+          return;
+        }
+        emitSupplySyncToast("retry");
+        return;
+      }
+
+      storage.updateSupply(
+        local.id,
+        {
+          updated_at: (data?.updated_at as string) || clientTs,
+        },
+        { skipCloudSync: true },
+      );
+    } else {
+      const insertRow = {
+        user_id: userId,
+        name: payload.name,
+        quantity: payload.quantity,
+        unit: payload.unit,
+        category: payload.category,
+        notes: payload.notes,
+        updated_at: clientTs,
+      };
+      const { data, error } = await supabase.from("supplies").insert(insertRow).select("id, updated_at").single();
+
+      if (error) {
+        if (isRlsOrAuthError(error)) {
+          emitSupplySyncToast("retry");
+          return;
+        }
+        emitSupplySyncToast("retry");
+        return;
+      }
+
+      storage.updateSupply(
+        local.id,
+        {
+          cloud_id: data.id as string,
+          updated_at: (data.updated_at as string) || clientTs,
+        },
+        { skipCloudSync: true },
+      );
+    }
+  } catch {
+    emitSupplySyncToast("retry");
+  }
+}
+
+/**
+ * Delete the linked cloud row when the local row is removed. Ignores errors.
+ */
+export async function deleteFromCloud(
+  local: Pick<LocalSupply, "cloud_id" | "id">,
+): Promise<void> {
+  const cloudId = local.cloud_id ?? null;
+  if (!cloudId) return;
+
+  if (!isOnline()) {
+    enqueueLocalSupplyDelete({
+      kind: "supplies:local-delete",
+      localId: local.id,
+      cloudId,
+      clientTs: new Date().toISOString(),
+    });
+    emitSupplySyncToast("queued");
+    return;
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  try {
+    await supabase.from("supplies").delete().eq("id", cloudId);
+  } catch {
+    // Ignore
+  }
+}
+
+type CloudSupplyRow = {
+  id: string;
+  name: string;
+  quantity: number;
+  updated_at: string;
+  unit?: string | null;
+  category?: string | null;
+  notes?: string | null;
+};
+
+/** Compare ISO timestamps; ties favour local to avoid churn. */
+export function compareUpdatedAtForSync(
+  localIso: string,
+  cloudIso: string,
+): "local" | "cloud" | "tie" {
+  const a = new Date(localIso).getTime();
+  const b = new Date(cloudIso).getTime();
+  if (a > b) return "local";
+  if (b > a) return "cloud";
+  return "tie";
+}
+
+/** @internal Vitest — single pair LWW used during reconciliation. */
+export function reconcilePairWinnerForTest(
+  local: { updated_at?: string; lastPickupDate?: string },
+  cloud: { updated_at: string },
+): "local" | "cloud" {
+  const lt = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
+  const d = compareUpdatedAtForSync(lt, cloud.updated_at);
+  return d === "cloud" ? "cloud" : "local";
+}
+
+function namesMatch(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+const CLOUD_CATEGORY_TYPES: readonly LocalSupply["type"][] = [
+  "needle",
+  "insulin",
+  "insulin_short",
+  "insulin_long",
+  "insulin_vial",
+  "cgm",
+  "infusion_set",
+  "reservoir",
+  "other",
+] as const;
+
+function categoryToLocalType(raw: string | null | undefined): LocalSupply["type"] {
+  if (raw && (CLOUD_CATEGORY_TYPES as readonly string[]).includes(raw)) {
+    return raw as LocalSupply["type"];
+  }
+  return "other";
+}
+
+function cloudRowToLocalUpdates(row: CloudSupplyRow): Partial<LocalSupply> {
+  return {
+    name: row.name,
+    type: categoryToLocalType(row.category),
+    currentQuantity: Math.max(0, Math.round(Number(row.quantity))),
+    quantityAtPickup: Math.max(0, Math.round(Number(row.quantity))),
+    notes: row.notes ?? undefined,
+    updated_at: row.updated_at,
+    cloud_id: row.id,
+  };
+}
+
+/**
+ * Fetch cloud rows and merge with the local tracker (last-write-wins on `updated_at`).
+ * No-ops when offline or unauthenticated.
+ */
+export async function reconcileSupplies(): Promise<void> {
+  if (!isOnline()) return;
+
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+
+  const { data, error } = await supabase.from("supplies").select("*").eq("user_id", userId);
+
+  if (error || !data) return;
+
+  const cloudRows = data as CloudSupplyRow[];
+
+  let locals = storage.getSupplies();
+  const cloudById = new Map(cloudRows.map((r) => [r.id, r]));
+  const matchedCloudIds = new Set<string>();
+
+  for (const local of [...locals]) {
+    if (!local.cloud_id) continue;
+    const c = cloudById.get(local.cloud_id);
+    if (!c) {
+      storage.updateSupply(local.id, { cloud_id: null }, { skipCloudSync: true });
+      continue;
+    }
+    matchedCloudIds.add(c.id);
+    const localTs = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
+    const decision = compareUpdatedAtForSync(localTs, c.updated_at);
+    if (decision === "local" || decision === "tie") {
+      await syncToCloud({ ...local, cloud_id: c.id });
+    } else {
+      storage.updateSupply(local.id, cloudRowToLocalUpdates(c), { skipCloudSync: true });
+    }
+  }
+
+  locals = storage.getSupplies();
+  const unmatchedCloud = cloudRows.filter((r) => !matchedCloudIds.has(r.id));
+
+  for (const local of locals.filter((l) => !l.cloud_id)) {
+    const idx = unmatchedCloud.findIndex(
+      (c) => namesMatch(c.name, local.name) && (c.category || "") === (local.type || ""),
+    );
+    if (idx === -1) continue;
+    const c = unmatchedCloud[idx];
+    unmatchedCloud.splice(idx, 1);
+    matchedCloudIds.add(c.id);
+
+    const localTs = local.updated_at || local.lastPickupDate || new Date(0).toISOString();
+    const decision = compareUpdatedAtForSync(localTs, c.updated_at);
+    if (decision === "local" || decision === "tie") {
+      storage.updateSupply(local.id, { cloud_id: c.id }, { skipCloudSync: true });
+      await syncToCloud({ ...local, cloud_id: c.id });
+    } else {
+      storage.updateSupply(local.id, cloudRowToLocalUpdates(c), { skipCloudSync: true });
+    }
+  }
+
+  for (const c of unmatchedCloud) {
+    if (matchedCloudIds.has(c.id)) continue;
+    matchedCloudIds.add(c.id);
+    storage.importSupplyFromCloudReconcile(c);
+  }
+}
+
 async function addSupplyOnline(args: { name: string; quantity: number }): Promise<SuppliesResult<Supply>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
@@ -189,8 +496,7 @@ async function addSupplyOnline(args: { name: string; quantity: number }): Promis
 }
 
 /**
- * Add a new supply for the current authenticated user.
- * user_id is attached from supabase.auth.getUser().
+ * @deprecated Legacy dashboard direct-add; prefer local tracker + {@link syncToCloud}.
  */
 export async function addSupply(args: {
   name: string;
@@ -258,8 +564,7 @@ async function updateSupplyOnline(
 }
 
 /**
- * Update an existing supply by id. RLS ensures only the
- * owning user (auth.uid()) can modify the row.
+ * @deprecated Legacy direct cloud update.
  */
 export async function updateSupply(
   id: string,
@@ -312,7 +617,7 @@ async function deleteSupplyOnline(id: string): Promise<SuppliesResult<Supply>> {
 }
 
 /**
- * Delete a supply by id. RLS ensures only the owner can delete.
+ * @deprecated Legacy direct cloud delete.
  */
 export async function deleteSupply(
   id: string,
@@ -338,6 +643,83 @@ export async function deleteSupply(
   return res;
 }
 
+async function flushLocalSyncEntry(
+  entry: Extract<OfflineQueueEntry, { kind: "supplies:local-sync" }>,
+): Promise<{ status: "ok" } | { status: "failed"; error: Error }> {
+  const supabase = getSupabase();
+  if (!supabase) return { status: "failed", error: NOT_CONFIGURED };
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return { status: "failed", error: new Error("Not authenticated") };
+
+  const p = entry.payload;
+
+  try {
+    if (p.cloudId) {
+      const { error } = await supabase
+        .from("supplies")
+        .update({
+          name: p.name,
+          quantity: p.quantity,
+          unit: p.unit,
+          category: p.category,
+          notes: p.notes,
+          updated_at: p.updated_at,
+        })
+        .eq("id", p.cloudId)
+        .eq("user_id", userId);
+
+      if (error) {
+        if (isRlsOrAuthError(error)) return { status: "failed", error: new Error(String(error.message)) };
+        return { status: "failed", error: new Error(String(error.message)) };
+      }
+      storage.updateSupply(entry.localId, { updated_at: p.updated_at }, { skipCloudSync: true });
+    } else {
+      const { data, error } = await supabase
+        .from("supplies")
+        .insert({
+          user_id: userId,
+          name: p.name,
+          quantity: p.quantity,
+          unit: p.unit,
+          category: p.category,
+          notes: p.notes,
+          updated_at: p.updated_at,
+        })
+        .select("id, updated_at")
+        .single();
+
+      if (error) {
+        if (isRlsOrAuthError(error)) return { status: "failed", error: new Error(String(error.message)) };
+        return { status: "failed", error: new Error(String(error.message)) };
+      }
+      storage.updateSupply(
+        entry.localId,
+        { cloud_id: data.id as string, updated_at: (data.updated_at as string) || p.updated_at },
+        { skipCloudSync: true },
+      );
+    }
+    return { status: "ok" };
+  } catch (e) {
+    return { status: "failed", error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
+async function flushLocalDeleteEntry(
+  entry: Extract<OfflineQueueEntry, { kind: "supplies:local-delete" }>,
+): Promise<{ status: "ok" } | { status: "failed"; error: Error }> {
+  if (!entry.cloudId) return { status: "ok" };
+  const supabase = getSupabase();
+  if (!supabase) return { status: "failed", error: NOT_CONFIGURED };
+  try {
+    await supabase.from("supplies").delete().eq("id", entry.cloudId);
+  } catch {
+    // Ignore — same as deleteFromCloud online
+  }
+  return { status: "ok" };
+}
+
 export async function flushSuppliesOfflineQueue(): Promise<{
   flushed: number;
   skippedNewer: number;
@@ -348,6 +730,18 @@ export async function flushSuppliesOfflineQueue(): Promise<{
   if (!isOnline()) return { flushed: 0, skippedNewer: 0, failed: 0 };
 
   const result = await flushQueue(async (entry) => {
+    if (entry.kind === "supplies:local-sync") {
+      const res = await flushLocalSyncEntry(entry);
+      if (res.status === "failed") return { status: "failed", error: res.error };
+      return { status: "ok" };
+    }
+
+    if (entry.kind === "supplies:local-delete") {
+      const res = await flushLocalDeleteEntry(entry);
+      if (res.status === "failed") return { status: "failed", error: res.error };
+      return { status: "ok" };
+    }
+
     if (entry.kind === "supplies:add") {
       const res = await addSupplyOnline(entry.payload);
       if (res.error || !res.data) return { status: "failed", error: res.error ?? new Error("Add failed") };

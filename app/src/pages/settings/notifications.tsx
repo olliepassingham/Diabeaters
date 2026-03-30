@@ -1,0 +1,212 @@
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import type { NotificationSettings } from "@/lib/storage";
+import { Bell } from "lucide-react";
+import { FaceLogoWatermark } from "@/components/face-logo";
+import { PageHeader, PageShell } from "@/components/layout";
+import { SettingsBackLink } from "./shared";
+
+export function NotificationsTab({
+  notifSettings,
+  onToggle,
+  onThreshold,
+  onEnableBrowser,
+  embedded = false,
+}: {
+  notifSettings: NotificationSettings;
+  onToggle: (key: keyof NotificationSettings, value: boolean) => void;
+  onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
+  onEnableBrowser: () => void;
+  embedded?: boolean;
+}) {
+  const hypoOn = notifSettings.hypoAlerts !== false;
+  const scenarioOn = notifSettings.scenarioAlerts !== false;
+
+  const inner = (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Enable notifications</Label>
+          <p className="text-small text-muted-foreground">Master switch for in-app alerts</p>
+        </div>
+        <Switch
+          checked={notifSettings.enabled}
+          onCheckedChange={(checked) => onToggle("enabled", checked)}
+          data-testid="switch-notifications-enabled"
+        />
+      </div>
+
+      <div id="notif-hypo" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Hypo alerts</Label>
+          <p className="text-small text-muted-foreground">Reminders related to low glucose and hypo treatment</p>
+        </div>
+        <Switch
+          checked={hypoOn}
+          onCheckedChange={(checked) => onToggle("hypoAlerts", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-hypo-alerts"
+        />
+      </div>
+
+      <div id="notif-trends" className="scroll-mt-28 space-y-4 border-b border-border pb-6">
+        <div className="flex items-center justify-between py-3">
+          <div className="space-y-0.5 pr-4">
+            <Label className="text-small text-muted-foreground">Trend alerts</Label>
+            <p className="text-small text-muted-foreground">Supply levels and depletion forecasts</p>
+          </div>
+          <Switch
+            checked={notifSettings.supplyAlerts}
+            onCheckedChange={(checked) => onToggle("supplyAlerts", checked)}
+            disabled={!notifSettings.enabled}
+            data-testid="switch-supply-alerts"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="critical-days" className="text-small text-muted-foreground">
+              Critical alert (days)
+            </Label>
+            <Select
+              value={notifSettings.criticalThresholdDays.toString()}
+              onValueChange={(v) => onThreshold("criticalThresholdDays", v)}
+              disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+            >
+              <SelectTrigger id="critical-days" data-testid="select-critical-days">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1 day</SelectItem>
+                <SelectItem value="2">2 days</SelectItem>
+                <SelectItem value="3">3 days</SelectItem>
+                <SelectItem value="5">5 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-small text-muted-foreground">Urgent when supply estimate falls below this</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="low-days" className="text-small text-muted-foreground">
+              Low alert (days)
+            </Label>
+            <Select
+              value={notifSettings.lowThresholdDays.toString()}
+              onValueChange={(v) => onThreshold("lowThresholdDays", v)}
+              disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+            >
+              <SelectTrigger id="low-days" data-testid="select-low-days">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5 days</SelectItem>
+                <SelectItem value="7">7 days</SelectItem>
+                <SelectItem value="10">10 days</SelectItem>
+                <SelectItem value="14">14 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-small text-muted-foreground">Reminder to reorder</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="notif-scenario" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Scenario alerts</Label>
+          <p className="text-small text-muted-foreground">Sick day, travel, and similar prompts</p>
+        </div>
+        <Switch
+          checked={scenarioOn}
+          onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-scenario-alerts"
+        />
+      </div>
+
+      <div className="flex items-center justify-between py-3">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Browser notifications</Label>
+          <p className="text-small text-muted-foreground">Alerts when the app is in the background</p>
+        </div>
+        {notifSettings.browserNotifications ? (
+          <Switch
+            checked
+            onCheckedChange={(checked) => onToggle("browserNotifications", checked)}
+            disabled={!notifSettings.enabled}
+            data-testid="switch-browser-notifications"
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEnableBrowser}
+            disabled={!notifSettings.enabled}
+            data-testid="button-enable-browser-notifications"
+          >
+            Enable
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return <div data-testid="card-notification-settings">{inner}</div>;
+  }
+
+  return (
+    <Card data-testid="card-notification-settings">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Bell className="h-5 w-5 text-primary" aria-hidden />
+          <CardTitle className="text-h3 font-semibold">Notifications</CardTitle>
+        </div>
+        <CardDescription className="text-body text-muted-foreground">Control alerts for hypos, supplies, and scenarios.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">{inner}</CardContent>
+    </Card>
+  );
+}
+
+type SettingsNotificationsRouteProps = {
+  settingsInfoDialog: ReactNode;
+  notifSettings: NotificationSettings;
+  onToggle: (key: keyof NotificationSettings, value: boolean) => void;
+  onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
+  onEnableBrowser: () => void;
+};
+
+export function SettingsNotificationsRoute({
+  settingsInfoDialog,
+  notifSettings,
+  onToggle,
+  onThreshold,
+  onEnableBrowser,
+}: SettingsNotificationsRouteProps) {
+  return (
+    <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
+      <FaceLogoWatermark />
+      <SettingsBackLink />
+      <PageHeader
+        className="mb-2"
+        title="Notifications"
+        description="Hypo alerts, trend alerts, and scenario alerts."
+        actions={settingsInfoDialog}
+      />
+      <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
+        <CardContent className="pt-6 pb-6">
+          <NotificationsTab
+            notifSettings={notifSettings}
+            onToggle={onToggle}
+            onThreshold={onThreshold}
+            onEnableBrowser={onEnableBrowser}
+            embedded
+          />
+        </CardContent>
+      </Card>
+    </PageShell>
+  );
+}

@@ -31,7 +31,7 @@ export default function ResetRequest() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-xl">Check your email</CardTitle>
@@ -64,7 +64,7 @@ export default function ResetRequest() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-xl">Reset your password</CardTitle>

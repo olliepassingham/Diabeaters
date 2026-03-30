@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { PageShell } from "@/components/layout";
 
 export default function Signup() {
   const { toast } = useToast();
@@ -43,12 +45,23 @@ export default function Signup() {
       return;
     }
 
-    setLocation(`/check-email?email=${encodeURIComponent(email)}`);
+    if (hasCarerIntent() || hasPendingCarer()) {
+      try {
+        sessionStorage.setItem("diabeater_post_verify_next", "/carer-setup");
+      } catch {
+        // Ignore
+      }
+    }
+
+    const next = new URLSearchParams(window.location.search).get("next");
+    const nextQ = next?.startsWith("/") && !next.startsWith("//") ? `&next=${encodeURIComponent(next)}` : "";
+    setLocation(`/check-email?email=${encodeURIComponent(email)}${nextQ}`);
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
+      <PageShell variant="narrow" className="w-full max-w-md">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-xl">Create your Diabeaters account</CardTitle>
         </CardHeader>
@@ -140,8 +153,16 @@ export default function Signup() {
               </span>
             </Link>
           </p>
+          <p className="text-xs text-center pt-2">
+            <Link href="/welcome">
+              <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
+                Choose Family Member / Carer on the welcome screen
+              </span>
+            </Link>
+          </p>
         </CardContent>
       </Card>
+      </PageShell>
     </div>
   );
 }

@@ -1,122 +1,141 @@
-import { Home, Package, Bot, AlertTriangle, MoreHorizontal } from "lucide-react";
+import { Home, Shapes, Wrench, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { useReleaseMode } from "@/lib/release-mode";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Calendar, Users, Heart, ShoppingBag, Settings, Phone, MessageCircle, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
 
-const primaryTabs = [
-  { title: "Home", url: "/", icon: Home },
-  { title: "Supplies", url: "/supplies", icon: Package },
-  { title: "Adviser", url: "/adviser", icon: Bot },
-  { title: "Scenarios", url: "/scenarios", icon: AlertTriangle },
-];
+const iconClass = "h-[23px] w-[23px]";
 
-const moreItems = [
-  { title: "Account", url: "/account", icon: User },
-  { title: "Appointments", url: "/appointments", icon: Calendar },
-  { title: "AI Coach", url: "/ai-coach", icon: MessageCircle, beta: true },
-  { title: "Community", url: "/community", icon: Users, beta: true },
-  { title: "Family & Carers", url: "/family-carers", icon: Heart, beta: true },
-  { title: "Shop", url: "/shop", icon: ShoppingBag, beta: true },
-  { title: "Settings", url: "/settings", icon: Settings },
-] as const;
+type TabDef = {
+  title: string;
+  href: string;
+  icon: typeof Home;
+  testId: string;
+  isActive: (pathname: string, hash: string) => boolean;
+};
+
+function patientTabs(): TabDef[] {
+  return [
+    {
+      title: "Home",
+      href: "/",
+      icon: Home,
+      testId: "bottomnav-home",
+      isActive: (pathname) => pathname === "/",
+    },
+    {
+      title: "Scenarios",
+      href: "/scenarios",
+      icon: Shapes,
+      testId: "bottomnav-scenarios",
+      isActive: (pathname) => pathname === "/scenarios" || pathname.startsWith("/scenarios/"),
+    },
+    {
+      title: "Tools",
+      href: "/tools",
+      icon: Wrench,
+      testId: "bottomnav-tools",
+      isActive: (pathname) =>
+        pathname === "/tools" ||
+        pathname.startsWith("/tools/") ||
+        pathname === "/education" ||
+        pathname.startsWith("/education/"),
+    },
+    {
+      title: "Account",
+      href: "/account",
+      icon: User,
+      testId: "bottomnav-account",
+      isActive: (pathname) => pathname === "/account",
+    },
+  ];
+}
+
+function carerTabs(): TabDef[] {
+  return [
+    {
+      title: "Home",
+      href: "/carer-view",
+      icon: Home,
+      testId: "bottomnav-home",
+      isActive: (pathname, hash) => pathname === "/carer-view" && hash !== "carer-scenarios",
+    },
+    {
+      title: "Scenarios",
+      href: "/carer-view#carer-scenarios",
+      icon: Shapes,
+      testId: "bottomnav-scenarios",
+      isActive: (pathname, hash) => pathname === "/carer-view" && hash === "carer-scenarios",
+    },
+    {
+      title: "Tools",
+      href: "/tools",
+      icon: Wrench,
+      testId: "bottomnav-tools",
+      isActive: (pathname) =>
+        pathname === "/tools" ||
+        pathname.startsWith("/tools/") ||
+        pathname === "/education" ||
+        pathname.startsWith("/education/"),
+    },
+    {
+      title: "Account",
+      href: "/account",
+      icon: User,
+      testId: "bottomnav-account",
+      isActive: (pathname) => pathname === "/account",
+    },
+  ];
+}
 
 export function BottomNav() {
   const [location] = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const { isBetaVisible } = useReleaseMode();
+  const pathname = location.split("?")[0] ?? location;
+  const [hash, setHash] = useState(() =>
+    typeof window !== "undefined" ? window.location.hash.slice(1) : "",
+  );
+  const { isCarer } = useLinkedCarer();
 
-  const visibleMoreItems = moreItems.filter(item => !("beta" in item && item.beta) || isBetaVisible);
-  const isMoreActive = visibleMoreItems.some(item => location === item.url);
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash.slice(1));
+    window.addEventListener("hashchange", onHash);
+    onHash();
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [location]);
 
+  const tabs = isCarer ? carerTabs() : patientTabs();
+
+  const cols = tabs.length;
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t safe-area-bottom" data-testid="nav-bottom">
-      <div className="flex items-stretch justify-around px-1">
-        {primaryTabs.map((tab) => {
-          const isActive = location === tab.url;
-          return (
-            <Link key={tab.url} href={tab.url}>
-              <button
-                className={`flex flex-col items-center justify-center gap-1 py-3 px-4 min-w-[72px] transition-colors ${
-                  isActive
-                    ? "text-primary"
-                    : "text-muted-foreground"
-                }`}
-                data-testid={`bottomnav-${tab.title.toLowerCase()}`}
-              >
-                <tab.icon className={`h-7 w-7 ${isActive ? "stroke-[2.5]" : ""}`} />
-                <span className="text-xs font-medium">{tab.title}</span>
-              </button>
-            </Link>
-          );
-        })}
-
-        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-          <SheetTrigger asChild>
+    <nav
+      className="fixed bottom-0 inset-x-0 z-50 bg-card/95 backdrop-blur border-t border-border shadow-sm grid place-items-center px-1 pb-[env(safe-area-inset-bottom)]"
+      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      data-testid="nav-bottom"
+    >
+      {tabs.map((tab) => {
+        const active = tab.isActive(pathname, hash);
+        return (
+          <Link key={tab.testId} href={tab.href} className="flex w-full justify-center min-w-0">
             <button
-              className={`flex flex-col items-center justify-center gap-1 py-3 px-4 min-w-[72px] transition-colors ${
-                isMoreActive
-                  ? "text-primary"
-                  : "text-muted-foreground"
+              type="button"
+              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 max-w-[4.5rem] px-2 py-2 rounded-t-xl transition-colors ${
+                active ? "text-primary" : "text-muted-foreground"
               }`}
-              data-testid="bottomnav-more"
+              data-testid={tab.testId}
             >
-              <MoreHorizontal className={`h-7 w-7 ${isMoreActive ? "stroke-[2.5]" : ""}`} />
-              <span className="text-xs font-medium">More</span>
-            </button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-            <SheetHeader className="pb-2">
-              <SheetTitle className="text-left">More</SheetTitle>
-            </SheetHeader>
-            <div className="grid grid-cols-3 gap-3 pt-2">
-              {visibleMoreItems.map((item) => {
-                const isActive = location === item.url;
-                return (
-                  <Link key={item.url} href={item.url}>
-                    <button
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl w-full transition-colors ${
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover-elevate"
-                      }`}
-                      onClick={() => setMoreOpen(false)}
-                      data-testid={`bottomnav-more-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <item.icon className="h-6 w-6" />
-                      <span className="text-xs font-medium text-center leading-tight">{item.title}</span>
-                      {"beta" in item && item.beta && (
-                        <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 font-normal no-default-hover-elevate no-default-active-elevate">
-                          Beta
-                        </Badge>
-                      )}
-                    </button>
-                  </Link>
-                );
-              })}
-            </div>
-
-            <Link href="/help-now">
-              <button
-                className="mt-4 w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 font-medium"
-                onClick={() => setMoreOpen(false)}
-                data-testid="bottomnav-help-now"
+              <tab.icon
+                className={`${iconClass} shrink-0 ${active ? "stroke-[2]" : "stroke-[1.5] opacity-90"}`}
+              />
+              <span
+                className={`text-tiny font-medium leading-tight text-center line-clamp-2 ${
+                  active ? "text-primary" : "text-muted-foreground"
+                }`}
               >
-                <Phone className="h-5 w-5" />
-                Help Now
-              </button>
-            </Link>
-          </SheetContent>
-        </Sheet>
-      </div>
+                {tab.title}
+              </span>
+            </button>
+          </Link>
+        );
+      })}
     </nav>
   );
 }

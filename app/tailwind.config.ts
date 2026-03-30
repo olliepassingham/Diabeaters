@@ -11,24 +11,28 @@ export default {
         sm: ".375rem",
       },
       colors: {
-        background: "hsl(var(--background) / <alpha-value>)",
-        foreground: "hsl(var(--foreground) / <alpha-value>)",
-        border: "hsl(var(--border) / <alpha-value>)",
-        input: "hsl(var(--input) / <alpha-value>)",
+        bg: "rgb(var(--app-background) / <alpha-value>)",
+        text: "rgb(var(--app-foreground) / <alpha-value>)",
+        background: "rgb(var(--app-background) / <alpha-value>)",
+        foreground: "rgb(var(--app-foreground) / <alpha-value>)",
+        border: "rgb(var(--color-border) / <alpha-value>)",
+        input: "rgb(var(--color-input) / <alpha-value>)",
         card: {
-          DEFAULT: "hsl(var(--card) / <alpha-value>)",
-          foreground: "hsl(var(--card-foreground) / <alpha-value>)",
-          border: "hsl(var(--card-border) / <alpha-value>)",
+          DEFAULT: "rgb(var(--color-bg-card) / <alpha-value>)",
+          foreground: "rgb(var(--color-text) / <alpha-value>)",
+          border: "rgb(var(--color-border) / <alpha-value>)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover) / <alpha-value>)",
-          foreground: "hsl(var(--popover-foreground) / <alpha-value>)",
-          border: "hsl(var(--popover-border) / <alpha-value>)",
+          DEFAULT: "rgb(var(--color-bg-popover) / <alpha-value>)",
+          foreground: "rgb(var(--color-text) / <alpha-value>)",
+          border: "rgb(var(--color-border) / <alpha-value>)",
         },
         primary: {
-          DEFAULT: "hsl(var(--primary) / <alpha-value>)",
-          foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
-          border: "var(--primary-border)",
+          DEFAULT: "rgb(var(--primary) / <alpha-value>)",
+          foreground: "rgb(var(--color-primary-foreground) / <alpha-value>)",
+          light: "rgb(var(--color-primary-light) / <alpha-value>)",
+          dark: "rgb(var(--color-primary-dark) / <alpha-value>)",
+          border: "rgb(var(--color-primary-border) / <alpha-value>)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
@@ -36,9 +40,9 @@ export default {
           border: "var(--secondary-border)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted) / <alpha-value>)",
-          foreground: "hsl(var(--muted-foreground) / <alpha-value>)",
-          border: "var(--muted-border)",
+          DEFAULT: "rgb(var(--color-bg-muted) / <alpha-value>)",
+          foreground: "rgb(var(--color-text-muted) / <alpha-value>)",
+          border: "rgb(var(--color-border) / <alpha-value>)",
         },
         accent: {
           DEFAULT: "hsl(var(--accent) / <alpha-value>)",
@@ -82,9 +86,17 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
+        sans: ['"Inter Variable"', "Inter", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+      },
+      fontSize: {
+        h1: ["1.875rem", { lineHeight: "2.25rem", fontWeight: "600" }],
+        h2: ["1.5rem", { lineHeight: "2rem", fontWeight: "600" }],
+        h3: ["1.25rem", { lineHeight: "1.75rem", fontWeight: "600" }],
+        body: ["1rem", { lineHeight: "1.5rem" }],
+        small: ["0.875rem", { lineHeight: "1.25rem" }],
+        tiny: ["0.75rem", { lineHeight: "1rem" }],
       },
       keyframes: {
         "accordion-down": {

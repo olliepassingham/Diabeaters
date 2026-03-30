@@ -1,0 +1,36 @@
+-- Expected shape for Supply Tracker ↔ cloud sync (reference only; run in Supabase SQL editor if needed).
+-- RLS: tie rows to auth.uid() via user_id.
+
+-- create table if not exists public.supplies (
+--   id uuid primary key default gen_random_uuid(),
+--   user_id uuid not null references auth.users (id) on delete cascade,
+--   name text not null,
+--   quantity integer not null default 0,
+--   unit text,
+--   category text,
+--   notes text,
+--   updated_at timestamptz not null default now()
+-- );
+
+-- Suggested indexes
+-- create index if not exists supplies_user_id_idx on public.supplies (user_id);
+-- create index if not exists supplies_updated_at_idx on public.supplies (user_id, updated_at desc);
+
+-- Example policy sketch (adjust to your project):
+-- alter table public.supplies enable row level security;
+--
+-- create policy "supplies_select_own"
+--   on public.supplies for select
+--   using (auth.uid() = user_id);
+--
+-- create policy "supplies_insert_own"
+--   on public.supplies for insert
+--   with check (auth.uid() = user_id);
+--
+-- create policy "supplies_update_own"
+--   on public.supplies for update
+--   using (auth.uid() = user_id);
+--
+-- create policy "supplies_delete_own"
+--   on public.supplies for delete
+--   using (auth.uid() = user_id);

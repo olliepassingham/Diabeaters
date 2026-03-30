@@ -12,6 +12,7 @@ import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage"
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
@@ -403,7 +404,8 @@ export default function Bedtime() {
   const patternInsight = getPatternInsight();
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <PageShell variant="standard">
+      <PageHeader leading={<PageBackButton />} title="Bedtime" />
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (
@@ -829,6 +831,6 @@ export default function Bedtime() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
-    </div>
+    </PageShell>
   );
 }

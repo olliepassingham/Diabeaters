@@ -7,16 +7,32 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, ArrowRight, ArrowLeft, Check, Package, Utensils, Dumbbell, LayoutDashboard, Heart, Shield, Sparkles, Clock, TrendingDown } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  Package,
+  Utensils,
+  Dumbbell,
+  LayoutDashboard,
+  Heart,
+  Shield,
+  Sparkles,
+  Clock,
+  TrendingDown,
+  ClipboardList,
+} from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
 import { storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
-import { useReleaseMode } from "@/lib/release-mode";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
 import { Link } from "wouter";
+import { useAuth } from "@/lib/auth-context";
+import { upsertProfile } from "@/lib/profile";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -87,6 +103,7 @@ interface OnboardingProps {
 }
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [data, setData] = useState<OnboardingData>({
@@ -180,8 +197,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     localStorage.setItem("diabeater_onboarding_completed", "true");
+    if (user?.id) {
+      const { error } = await upsertProfile({ id: user.id, onboarding_complete: true });
+      if (error) {
+        toast({
+          title: "Could not sync profile",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
     toast({
       title: `Welcome to Diabeaters${data.name ? `, ${data.name}` : ""}!`,
       description: "Let's get started.",
@@ -273,8 +300,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
         <p className="text-center text-xs text-muted-foreground pt-4">
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
-          · <Link href="/privacy"><span className="underline cursor-pointer">Privacy</span></Link>{" "}
-          · <Link href="/support"><span className="underline cursor-pointer">Support</span></Link>
+          ·{" "}
+          <Link href="/privacy">
+            <button type="button" className="min-h-11 px-2 -mx-2 underline">
+              Privacy
+            </button>
+          </Link>{" "}
+          ·{" "}
+          <Link href="/support">
+            <button type="button" className="min-h-11 px-2 -mx-2 underline">
+              Support
+            </button>
+          </Link>
         </p>
       </div>
     </div>
@@ -282,7 +319,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 }
 
 function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
-  const { isBetaVisible } = useReleaseMode();
   return (
     <div className="text-center space-y-8">
       <div className="space-y-4">
@@ -318,46 +354,23 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
           </div>
 
           <div className="space-y-2">
-            <Label className="text-base">What type of diabetes do you have?</Label>
-            <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={() => updateData("diabetesType", "type1")}
-                className={`flex items-center justify-between p-3 rounded-md border text-left transition-colors ${
-                  data.diabetesType === "type1"
-                    ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "border-border hover-elevate"
-                }`}
-                data-testid="button-diabetes-type1"
-              >
-                <span className="font-medium text-sm">Type 1</span>
-                {data.diabetesType === "type1" && (
-                  <Check className="h-4 w-4 text-primary" />
-                )}
-              </button>
-              {isBetaVisible && (
-                <>
-                  <button
-                    type="button"
-                    disabled
-                    className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
-                    data-testid="button-diabetes-type2"
-                  >
-                    <span className="font-medium text-sm text-muted-foreground">Type 2</span>
-                    <span className="text-xs text-muted-foreground">Coming soon</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled
-                    className="flex items-center justify-between p-3 rounded-md border border-border text-left opacity-50 cursor-not-allowed"
-                    data-testid="button-diabetes-gestational"
-                  >
-                    <span className="font-medium text-sm text-muted-foreground">Gestational</span>
-                    <span className="text-xs text-muted-foreground">Coming soon</span>
-                  </button>
-                </>
-              )}
-            </div>
+            <Label className="text-base">Diabetes type</Label>
+            <button
+              type="button"
+              onClick={() => updateData("diabetesType", "type1")}
+              className={`flex w-full items-center justify-between rounded-md border p-3 text-left transition-colors ${
+                data.diabetesType === "type1"
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-border hover-elevate"
+              }`}
+              data-testid="button-diabetes-type1"
+            >
+              <span className="font-medium text-sm">Type 1</span>
+              {data.diabetesType === "type1" && <Check className="h-4 w-4 text-primary" />}
+            </button>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Diabeaters is built for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -844,7 +857,13 @@ function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData
   );
 }
 
-function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () => void }) {
+function FirstWinStep({
+  data,
+  onFinish,
+}: {
+  data: OnboardingData;
+  onFinish: () => void | Promise<void>;
+}) {
   const struggle = data.struggle;
 
   const getContent = () => {
@@ -858,7 +877,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
         features: [
           { icon: TrendingDown, text: "See exactly when each supply will run out", highlight: true },
           { icon: Clock, text: "Get reminded before you run low" },
-          { icon: Sparkles, text: "Smart prescription suggestions — skip what you don't need yet" },
+          { icon: ClipboardList, text: "Log usage so forecasts match how you treat day to day" },
         ],
         ctaText: "Go to Supply Tracker",
         ctaPath: "/supplies",
@@ -910,7 +929,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
           { icon: TrendingDown, text: "Recovery recommendations to avoid late lows" },
         ],
         ctaText: "Plan an Activity",
-        ctaPath: "/adviser?tab=exercise",
+        ctaPath: "/scenarios/exercise",
       };
     }
     return {
@@ -922,7 +941,7 @@ function FirstWinStep({ data, onFinish }: { data: OnboardingData; onFinish: () =
       features: [
         { icon: Package, text: "Supply tracking with depletion forecasts", highlight: true },
         { icon: Utensils, text: "Meal and exercise planning with dose suggestions" },
-        { icon: Sparkles, text: "AI-powered activity recommendations" },
+        { icon: Dumbbell, text: "Exercise planning with carb and insulin guidance" },
       ],
       ctaText: "Go to Dashboard",
       ctaPath: "/",
