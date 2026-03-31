@@ -13,6 +13,7 @@ import { storage, Appointment, AppointmentType } from "@/lib/storage";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { syncAppointments } from "@/lib/appointments-supabase";
 
 const APPOINTMENT_TYPES: { value: AppointmentType; label: string; icon: typeof Calendar }[] = [
   { value: "clinic", label: "Diabetes Clinic", icon: Stethoscope },
@@ -46,9 +47,10 @@ export default function Appointments() {
   useEffect(() => {
     setAppointments(storage.getAppointments());
     trackFeatureEngagement("appointments");
+    void syncAppointments({ throttleMs: 0 });
   }, []);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!title || !date) return;
     
     storage.addAppointment({
@@ -64,6 +66,7 @@ export default function Appointments() {
     setAppointments(storage.getAppointments());
     setIsAddOpen(false);
     resetForm();
+    await syncAppointments();
   };
 
   const resetForm = () => {
@@ -75,14 +78,16 @@ export default function Appointments() {
     setNotes("");
   };
 
-  const handleComplete = (id: string) => {
+  const handleComplete = async (id: string) => {
     storage.updateAppointment(id, { isCompleted: true });
     setAppointments(storage.getAppointments());
+    await syncAppointments();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     storage.deleteAppointment(id);
     setAppointments(storage.getAppointments());
+    await syncAppointments();
   };
 
   const today = new Date();

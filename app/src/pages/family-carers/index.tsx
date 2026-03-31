@@ -19,7 +19,6 @@ import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { getSupabase } from "@/lib/supabase";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { Link } from "wouter";
-import { CarerNotifySection } from "@/components/family/CarerNotifySection";
 import { PageHeader, PageShell } from "@/components/layout";
 
 function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
@@ -29,6 +28,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
       supplies: acc.supplies && l.scopes.supplies,
       appointments: acc.appointments && l.scopes.appointments,
       scenarios: acc.scenarios && l.scopes.scenarios,
+      hypo_alerts: acc.hypo_alerts && l.scopes.hypo_alerts,
       emergency_info: acc.emergency_info && l.scopes.emergency_info,
     }),
     { ...DEFAULT_CARER_SCOPES },
@@ -162,73 +162,6 @@ export default function FamilyCarersPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      {/* Read-only snapshot of the same emergency record edited under Account / Settings (no duplicate form). */}
-      <Card className="surface-card transition-shadow duration-500" key={syncGeneration}>
-        <CardHeader>
-          <CardTitle className="text-lg">Your emergency details</CardTitle>
-          <CardDescription>
-            Carers only see this when &quot;Emergency details&quot; is on below. Edits are shared everywhere in the app.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {emergency.contactName || emergency.phone ? (
-            <dl className="space-y-2">
-              {emergency.contactName ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</dt>
-                  <dd className="font-medium text-foreground">{emergency.contactName}</dd>
-                </div>
-              ) : null}
-              {emergency.relation ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relationship</dt>
-                  <dd>{emergency.relation}</dd>
-                </div>
-              ) : null}
-              {emergency.phone ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary phone</dt>
-                  <dd>
-                    <a className="text-primary font-medium" href={`tel:${emergency.phone.replace(/\s+/g, "")}`}>
-                      {emergency.phone}
-                    </a>
-                  </dd>
-                </div>
-              ) : null}
-              {emergency.phoneSecondary ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Secondary phone</dt>
-                  <dd>
-                    <a className="text-primary font-medium" href={`tel:${emergency.phoneSecondary.replace(/\s+/g, "")}`}>
-                      {emergency.phoneSecondary}
-                    </a>
-                  </dd>
-                </div>
-              ) : null}
-              {emergency.medicalInstructions ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Medical instructions</dt>
-                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.medicalInstructions}</dd>
-                </div>
-              ) : null}
-              {emergency.notes ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</dt>
-                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.notes}</dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : (
-            <p className="text-muted-foreground">You have not added emergency contact details yet.</p>
-          )}
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/account#account-emergency">Edit in Account</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <CarerNotifySection />
 
       {/* A) Linked accounts (invite flow) */}
       <Card>
@@ -381,6 +314,12 @@ export default function FamilyCarersPage() {
               testId: "privacy-toggle-supplies",
             },
             {
+              key: "hypo_alerts" as const,
+              label: "Hypo logs",
+              description: "Recent low blood sugar logs (if your Supabase policies allow linked carers to read them).",
+              testId: "privacy-toggle-hypo-alerts",
+            },
+            {
               key: "appointments" as const,
               label: "Appointments",
               description: "Shared diary-style visits when cloud appointment sharing is enabled on your project.",
@@ -416,6 +355,71 @@ export default function FamilyCarersPage() {
               />
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Read-only snapshot of the same emergency record edited under Account / Settings (no duplicate form). */}
+      <Card className="surface-card transition-shadow duration-500" key={syncGeneration}>
+        <CardHeader>
+          <CardTitle className="text-lg">Your emergency details</CardTitle>
+          <CardDescription>
+            Carers only see this when &quot;Emergency details&quot; is on above. Edits are shared everywhere in the app.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          {emergency.contactName || emergency.phone ? (
+            <dl className="space-y-2">
+              {emergency.contactName ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</dt>
+                  <dd className="font-medium text-foreground">{emergency.contactName}</dd>
+                </div>
+              ) : null}
+              {emergency.relation ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relationship</dt>
+                  <dd>{emergency.relation}</dd>
+                </div>
+              ) : null}
+              {emergency.phone ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary phone</dt>
+                  <dd>
+                    <a className="text-primary font-medium" href={`tel:${emergency.phone.replace(/\s+/g, "")}`}>
+                      {emergency.phone}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {emergency.phoneSecondary ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Secondary phone</dt>
+                  <dd>
+                    <a className="text-primary font-medium" href={`tel:${emergency.phoneSecondary.replace(/\s+/g, "")}`}>
+                      {emergency.phoneSecondary}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {emergency.medicalInstructions ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Medical instructions</dt>
+                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.medicalInstructions}</dd>
+                </div>
+              ) : null}
+              {emergency.notes ? (
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</dt>
+                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.notes}</dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : (
+            <p className="text-muted-foreground">You have not added emergency contact details yet.</p>
+          )}
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/account#account-emergency">Edit in Account</Link>
+          </Button>
         </CardContent>
       </Card>
     </PageShell>

@@ -2,6 +2,7 @@ import { Home, Shapes, Wrench, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { getActiveAppMode } from "@/lib/carer-session";
 
 const iconClass = "h-[23px] w-[23px]";
 
@@ -53,18 +54,11 @@ function patientTabs(): TabDef[] {
 function carerTabs(): TabDef[] {
   return [
     {
-      title: "Home",
+      title: "Carer View",
       href: "/carer-view",
       icon: Home,
       testId: "bottomnav-home",
-      isActive: (pathname, hash) => pathname === "/carer-view" && hash !== "carer-scenarios",
-    },
-    {
-      title: "Scenarios",
-      href: "/carer-view#carer-scenarios",
-      icon: Shapes,
-      testId: "bottomnav-scenarios",
-      isActive: (pathname, hash) => pathname === "/carer-view" && hash === "carer-scenarios",
+      isActive: (pathname) => pathname === "/carer-view" || pathname.startsWith("/carer-view/"),
     },
     {
       title: "Tools",
@@ -93,7 +87,9 @@ export function BottomNav() {
   const [hash, setHash] = useState(() =>
     typeof window !== "undefined" ? window.location.hash.slice(1) : "",
   );
-  const { isCarer } = useLinkedCarer();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
 
   useEffect(() => {
     const onHash = () => setHash(window.location.hash.slice(1));
@@ -102,7 +98,16 @@ export function BottomNav() {
     return () => window.removeEventListener("hashchange", onHash);
   }, [location]);
 
-  const tabs = isCarer ? carerTabs() : patientTabs();
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  const tabs = isCarerMode ? carerTabs() : patientTabs();
 
   const cols = tabs.length;
   return (
@@ -117,7 +122,7 @@ export function BottomNav() {
           <Link key={tab.testId} href={tab.href} className="flex w-full justify-center min-w-0">
             <button
               type="button"
-              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 max-w-[4.5rem] px-2 py-2 rounded-t-xl transition-colors ${
+              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 max-w-[6.5rem] px-2 py-2 rounded-t-xl transition-colors ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
               data-testid={tab.testId}
@@ -126,7 +131,7 @@ export function BottomNav() {
                 className={`${iconClass} shrink-0 ${active ? "stroke-[2]" : "stroke-[1.5] opacity-90"}`}
               />
               <span
-                className={`text-tiny font-medium leading-tight text-center line-clamp-2 ${
+                className={`text-[11px] font-medium leading-none text-center whitespace-nowrap ${
                   active ? "text-primary" : "text-muted-foreground"
                 }`}
               >

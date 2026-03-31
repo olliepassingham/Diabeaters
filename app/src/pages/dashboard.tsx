@@ -432,7 +432,7 @@ function HeroCard({
               <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
               <p className="text-sm text-muted-foreground">
                 Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your
-                account and notify contacts listed under Family &amp; Carers → Hypo alert contacts (push / in-app).
+                account and notify any linked carers (push / in-app).
               </p>
             </div>
             <Button

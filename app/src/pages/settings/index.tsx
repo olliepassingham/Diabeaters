@@ -975,9 +975,16 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        <SettingsHubGroup title="Family">
-          <SettingsHubNavLink href="/family-carers" label="Family & carers" description="Linked carers and sharing" icon={Users} />
-        </SettingsHubGroup>
+        {!isCarer && (
+          <SettingsHubGroup title="Family">
+            <SettingsHubNavLink
+              href="/family-carers"
+              label="Family & carers"
+              description="Linked carers and sharing"
+              icon={Users}
+            />
+          </SettingsHubGroup>
+        )}
 
         <SettingsHubGroup title="Appearance">
           <SettingsHubNavLink

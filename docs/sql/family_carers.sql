@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.carer_links (
     'supplies', true,
     'appointments', true,
     'scenarios', true,
+    'hypo_alerts', true,
     'emergency_info', true
   ),
   linked_at timestamptz NOT NULL DEFAULT now(),
@@ -115,7 +116,7 @@ CREATE POLICY carer_links_carer_select
 --
 -- Replace:
 --   T.user_id with the column that identifies the patient owner (e.g. profiles.id = auth.uid() for profile row).
---   scopes->>'supplies' with 'appointments', 'scenarios', or 'emergency_info' as appropriate.
+--   scopes->>'supplies' with 'appointments', 'scenarios', 'hypo_alerts', or 'emergency_info' as appropriate.
 --
 -- For profiles emergency fields only, you may prefer a dedicated policy that allows SELECT of a subset when
 -- (id = auth.uid()) OR EXISTS (... emergency_info scope ...).
@@ -157,10 +158,6 @@ BEGIN
     RAISE EXCEPTION 'expired';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM public.carer_links WHERE carer_id = uid LIMIT 1) THEN
-    RAISE EXCEPTION 'already linked as a carer';
-  END IF;
-
   INSERT INTO public.carer_links (patient_id, carer_id, role, scopes)
   VALUES (
     inv.patient_id,
@@ -170,6 +167,7 @@ BEGIN
       'supplies', true,
       'appointments', true,
       'scenarios', true,
+      'hypo_alerts', true,
       'emergency_info', true
     )
   )
@@ -184,3 +182,84 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.redeem_carer_invite(text) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RLS examples for shared reads (APPLY PER TABLE you want carers to view)
+-- ---------------------------------------------------------------------------
+-- These policies assume each table has a `user_id uuid` owner column, except `profiles` which uses `id`.
+-- Carers are granted SELECT only, scoped via `carer_links.scopes`.
+--
+-- Supplies (public.supplies, owner column user_id, scope key supplies)
+-- ALTER TABLE public.supplies ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS supplies_owner_or_linked_carer_select ON public.supplies;
+-- CREATE POLICY supplies_owner_or_linked_carer_select
+--   ON public.supplies FOR SELECT
+--   USING (
+--     user_id = auth.uid()
+--     OR EXISTS (
+--       SELECT 1 FROM public.carer_links cl
+--       WHERE cl.patient_id = public.supplies.user_id
+--         AND cl.carer_id = auth.uid()
+--         AND coalesce((cl.scopes->>'supplies')::boolean, false) = true
+--     )
+--   );
+--
+-- Appointments (public.appointments, owner column user_id, scope key appointments)
+-- ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS appointments_owner_or_linked_carer_select ON public.appointments;
+-- CREATE POLICY appointments_owner_or_linked_carer_select
+--   ON public.appointments FOR SELECT
+--   USING (
+--     user_id = auth.uid()
+--     OR EXISTS (
+--       SELECT 1 FROM public.carer_links cl
+--       WHERE cl.patient_id = public.appointments.user_id
+--         AND cl.carer_id = auth.uid()
+--         AND coalesce((cl.scopes->>'appointments')::boolean, false) = true
+--     )
+--   );
+--
+-- Scenarios (public.scenarios, owner column user_id, scope key scenarios)
+-- ALTER TABLE public.scenarios ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS scenarios_owner_or_linked_carer_select ON public.scenarios;
+-- CREATE POLICY scenarios_owner_or_linked_carer_select
+--   ON public.scenarios FOR SELECT
+--   USING (
+--     user_id = auth.uid()
+--     OR EXISTS (
+--       SELECT 1 FROM public.carer_links cl
+--       WHERE cl.patient_id = public.scenarios.user_id
+--         AND cl.carer_id = auth.uid()
+--         AND coalesce((cl.scopes->>'scenarios')::boolean, false) = true
+--     )
+--   );
+--
+-- Hypo logs (public.hypo_logs, owner column user_id, scope key hypo_alerts)
+-- ALTER TABLE public.hypo_logs ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS hypo_logs_owner_or_linked_carer_select ON public.hypo_logs;
+-- CREATE POLICY hypo_logs_owner_or_linked_carer_select
+--   ON public.hypo_logs FOR SELECT
+--   USING (
+--     user_id = auth.uid()
+--     OR EXISTS (
+--       SELECT 1 FROM public.carer_links cl
+--       WHERE cl.patient_id = public.hypo_logs.user_id
+--         AND cl.carer_id = auth.uid()
+--         AND coalesce((cl.scopes->>'hypo_alerts')::boolean, false) = true
+--     )
+--   );
+--
+-- Profiles (public.profiles, owner column id, scope key emergency_info)
+-- ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS profiles_owner_or_linked_carer_emergency_select ON public.profiles;
+-- CREATE POLICY profiles_owner_or_linked_carer_emergency_select
+--   ON public.profiles FOR SELECT
+--   USING (
+--     id = auth.uid()
+--     OR EXISTS (
+--       SELECT 1 FROM public.carer_links cl
+--       WHERE cl.patient_id = public.profiles.id
+--         AND cl.carer_id = auth.uid()
+--         AND coalesce((cl.scopes->>'emergency_info')::boolean, false) = true
+--     )
+--   );

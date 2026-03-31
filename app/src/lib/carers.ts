@@ -8,8 +8,10 @@ import type {
   CarerLinkRow,
   CarerLinkWithProfile,
   CarerScopes,
+  CloudHypoLogRow,
   CloudSupplyRow,
   LinkedPatientInfo,
+  LinkedPatientWithProfile,
 } from "./carers.types";
 import { DEFAULT_CARER_SCOPES } from "./carers.types";
 
@@ -211,6 +213,7 @@ export function normaliseScopes(raw: unknown): CarerScopes {
     supplies: Boolean(o.supplies),
     appointments: Boolean(o.appointments),
     scenarios: Boolean(o.scenarios),
+    hypo_alerts: Boolean(o.hypo_alerts),
     emergency_info: Boolean(o.emergency_info),
   };
 }
@@ -474,7 +477,7 @@ type CarerLinkRowForCarer = {
 const DEV_CARER_LINKS_SOFT_MSG =
   "Development: could not load carer link. Ensure public.carer_links exists and refresh the PostgREST schema cache if the table was added recently.";
 
-/** Carer: first linked patient + scopes (MVP single-patient). */
+/** Carer: first linked patient + scopes (legacy helper; prefer listLinkedPatientsForCarer). */
 export async function getLinkedPatientForCarer(): Promise<{
   data: LinkedPatientInfo | null;
   error: Error | null;
@@ -512,6 +515,66 @@ export async function getLinkedPatientForCarer(): Promise<{
   return { data: mapped, error: null };
 }
 
+/** Carer: all linked patients + scopes, enriched with profile display fields. */
+export async function listLinkedPatientsForCarer(): Promise<{
+  data: LinkedPatientWithProfile[] | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  const uid = await getSessionUserId();
+  if ("error" in uid) return { data: null, error: uid.error };
+
+  const { data, error } = await supabase
+    .from("carer_links")
+    .select("id, patient_id, carer_id, scopes, linked_at")
+    .eq("carer_id", uid.id)
+    .order("linked_at", { ascending: false });
+
+  if (error) {
+    const restish = error as RestishError;
+    if (import.meta.env.DEV && isCarerLinksInfrastructureError(restish)) {
+      console.warn("[DEV] listLinkedPatientsForCarer: carer_links query failed (schema / 404)", error);
+      return { data: null, error: new Error(DEV_CARER_LINKS_SOFT_MSG) };
+    }
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  if (rows.length === 0) return { data: [], error: null };
+
+  const patientIds = [...new Set(rows.map((r) => String(r.patient_id)))].filter(Boolean);
+  const { data: profs, error: profErr } = await supabase
+    .from("profiles")
+    .select("id, full_name, avatar_url")
+    .in("id", patientIds);
+
+  if (profErr) return { data: null, error: new Error(profErr.message) };
+
+  const profileById = new Map(
+    ((profs ?? []) as { id: string; full_name?: string | null; avatar_url?: string | null }[]).map((p) => [
+      p.id,
+      { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null },
+    ]),
+  );
+
+  const out: LinkedPatientWithProfile[] = rows.map((r) => {
+    const patientId = String(r.patient_id);
+    const p = profileById.get(patientId);
+    return {
+      linkId: String(r.id),
+      patientId,
+      carerId: String(r.carer_id),
+      scopes: normaliseScopes(r.scopes ?? {}),
+      patient_full_name: p?.full_name ?? null,
+      patient_avatar_url: p?.avatar_url ?? null,
+    };
+  });
+
+  return { data: out, error: null };
+}
+
 /**
  * Carer: fetch cloud supplies for the linked patient (RLS must allow SELECT).
  * Does not use the Supply Tracker cache helpers — read-only, avoids mixing carer/patient cache.
@@ -532,6 +595,34 @@ export async function fetchSuppliesForLinkedPatient(
   return { data: (data ?? []) as CloudSupplyRow[], error: null };
 }
 
+/** Carer: hypo log rows for linked patient (RLS + scope). */
+export async function fetchHypoLogsForLinkedPatient(
+  patientId: string,
+): Promise<{ data: CloudHypoLogRow[] | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  const { data, error } = await supabase
+    .from("hypo_logs")
+    .select("id, user_id, blood_glucose, treatment, notes, created_at")
+    .eq("user_id", patientId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) return { data: null, error: new Error(error.message) };
+
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    user_id: String(row.user_id),
+    blood_glucose: row.blood_glucose == null ? null : Number(row.blood_glucose),
+    treatment: row.treatment == null ? null : String(row.treatment),
+    notes: row.notes == null ? null : String(row.notes),
+    created_at: String(row.created_at),
+  }));
+
+  return { data: rows, error: null };
+}
+
 /** Carer: appointment rows for linked patient (RLS + scope). */
 export async function fetchAppointmentsForLinkedPatient(
   patientId: string,
@@ -541,8 +632,11 @@ export async function fetchAppointmentsForLinkedPatient(
 
   const { data, error } = await supabase
     .from("appointments")
-    .select("*")
+    .select(
+      "id,user_id,client_id,title,type,date,time,scheduled_at,location,notes,is_completed,created_at,updated_at,deleted_at",
+    )
     .eq("user_id", patientId)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false });
 
   if (error) return { data: null, error: new Error(error.message) };

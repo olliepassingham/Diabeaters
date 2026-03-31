@@ -3,6 +3,7 @@ export type CarerScopes = {
   supplies: boolean;
   appointments: boolean;
   scenarios: boolean;
+  hypo_alerts: boolean;
   emergency_info: boolean;
 };
 
@@ -10,6 +11,7 @@ export const DEFAULT_CARER_SCOPES: CarerScopes = {
   supplies: true,
   appointments: true,
   scenarios: true,
+  hypo_alerts: true,
   emergency_info: true,
 };
 
@@ -39,6 +41,12 @@ export type LinkedPatientInfo = {
   scopes: CarerScopes;
 };
 
+/** Carer can be linked to multiple patients; include display fields for selection UI. */
+export type LinkedPatientWithProfile = LinkedPatientInfo & {
+  patient_full_name: string | null;
+  patient_avatar_url: string | null;
+};
+
 export type CarerLinkWithProfile = CarerLinkRow & {
   carer_full_name: string | null;
   carer_avatar_url: string | null;
@@ -53,4 +61,13 @@ export type CloudSupplyRow = {
   unit?: string | null;
   category?: string | null;
   notes?: string | null;
+};
+
+export type CloudHypoLogRow = {
+  id: string;
+  user_id: string;
+  blood_glucose: number | null;
+  treatment: string | null;
+  notes: string | null;
+  created_at: string;
 };

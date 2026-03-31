@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Calculator, TrendingUp, Repeat, Droplet, Package, BookOpen, Calendar } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { cn } from "@/lib/utils";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
@@ -20,7 +20,7 @@ type ToolDef = {
  * Single hub for patient tools — six tiles in a balanced grid (2×3 on large screens).
  * No redundant shortcuts to Home or Settings; each link goes to a dedicated feature.
  */
-const TOOLS: ToolDef[] = [
+const PATIENT_TOOLS: ToolDef[] = [
   {
     id: "insulin-calculator",
     href: "/adviser?tab=meal",
@@ -72,6 +72,23 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
+const CARER_TOOLS: ToolDef[] = [
+  {
+    id: "hypo-help",
+    href: "/tools/hypo-help",
+    icon: Droplet,
+    title: "Hypo help",
+    description: "Fast-acting carbs guidance from current and target BG. Educational only.",
+  },
+  {
+    id: "education",
+    href: "/education",
+    icon: BookOpen,
+    title: "Education",
+    description: "A–Z glossary of type 1 diabetes and app terms.",
+  },
+];
+
 function ToolCard({ href, icon: Icon, title, description }: Omit<ToolDef, "id">) {
   return (
     <Link href={href} className="group block h-full min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-[1.25rem]">
@@ -112,7 +129,7 @@ function ToolCard({ href, icon: Icon, title, description }: Omit<ToolDef, "id">)
   );
 }
 
-export function ToolsHubPage() {
+export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-8">
       <PageHeader
@@ -126,7 +143,7 @@ export function ToolsHubPage() {
         className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7"
         aria-label="Tools"
       >
-        {TOOLS.map((t) => (
+        {tools.map((t) => (
           <li key={t.id} className="min-h-0">
             <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
           </li>
@@ -142,8 +159,8 @@ export function CarerToolsPlaceholder() {
       <PageHeader title="Tools" leading={<PageBackButton />} />
       <Alert className="rounded-2xl border-border/60 shadow-sm">
         <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
-          Patient-only tools are not shown here. Use <strong>Home</strong> and <strong>Scenarios</strong> for read-only
-          information about the person you support.{" "}
+          Only general tools are shown here. Use <strong>Carer View</strong> for read-only information about the person
+          you support.{" "}
           <Link href="/education" className="font-medium text-foreground underline underline-offset-4">
             Education
           </Link>{" "}
@@ -156,20 +173,31 @@ export function CarerToolsPlaceholder() {
 
 /** Patients see the hub; carers see read-only messaging; carer-signup flows redirect away. */
 export default function ToolsPage() {
-  const { isCarer, loading } = useLinkedCarer();
+  const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
 
   useEffect(() => {
     if (loading) return;
-    if (!isCarer && (hasCarerIntent() || hasPendingCarer())) {
+    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarer, setLocation]);
+  }, [loading, isCarerMode, setLocation]);
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   if (loading) {
     return <div className="flex justify-center py-16 text-sm text-muted-foreground">Loading…</div>;
   }
-  if (!isCarer && (hasCarerIntent() || hasPendingCarer())) return null;
-  if (isCarer) return <CarerToolsPlaceholder />;
-  return <ToolsHubPage />;
+  if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
+  if (isCarerMode) return <ToolsHubPage tools={CARER_TOOLS} />;
+  return <ToolsHubPage tools={PATIENT_TOOLS} />;
 }

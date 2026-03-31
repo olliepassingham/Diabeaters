@@ -449,6 +449,8 @@ export interface Appointment {
   reminderDays?: number;
   isCompleted: boolean;
   createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 export interface DiabetesEvent {
@@ -2193,15 +2195,19 @@ export const storage = {
     const data = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
     if (!data) return [];
     const appointments: Appointment[] = JSON.parse(data);
-    return appointments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return appointments
+      .filter((a) => !a.deletedAt)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
 
   addAppointment(appointment: Omit<Appointment, "id" | "createdAt">): Appointment {
     const appointments = this.getAppointments();
+    const now = new Date().toISOString();
     const newAppointment: Appointment = {
       ...appointment,
       id: generateId(),
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     appointments.push(newAppointment);
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
@@ -2212,16 +2218,19 @@ export const storage = {
     const appointments = this.getAppointments();
     const index = appointments.findIndex(a => a.id === id);
     if (index === -1) return null;
-    appointments[index] = { ...appointments[index], ...updates };
+    appointments[index] = { ...appointments[index], ...updates, updatedAt: new Date().toISOString() };
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
     return appointments[index];
   },
 
   deleteAppointment(id: string): boolean {
     const appointments = this.getAppointments();
-    const filtered = appointments.filter(a => a.id !== id);
-    if (filtered.length === appointments.length) return false;
-    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(filtered));
+    const index = appointments.findIndex((a) => a.id === id);
+    if (index === -1) return false;
+    const now = new Date().toISOString();
+    const next = [...appointments];
+    next[index] = { ...next[index], deletedAt: now, updatedAt: now };
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(next));
     return true;
   },
 
@@ -2230,6 +2239,29 @@ export const storage = {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return appointments.filter(a => !a.isCompleted && new Date(a.date) >= today);
+  },
+
+  /** Merge cloud rows into local storage (local-first, last-write-wins by updatedAt). */
+  mergeAppointments(incoming: Appointment[]): Appointment[] {
+    const localRaw = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+    const local: Appointment[] = localRaw ? JSON.parse(localRaw) : [];
+
+    const byId = new Map<string, Appointment>();
+    for (const a of local) byId.set(a.id, a);
+    for (const a of incoming) {
+      const prev = byId.get(a.id);
+      if (!prev) {
+        byId.set(a.id, a);
+        continue;
+      }
+      const prevT = prev.updatedAt ? new Date(prev.updatedAt).getTime() : new Date(prev.createdAt).getTime();
+      const nextT = a.updatedAt ? new Date(a.updatedAt).getTime() : new Date(a.createdAt).getTime();
+      byId.set(a.id, nextT >= prevT ? { ...prev, ...a } : prev);
+    }
+
+    const merged = Array.from(byId.values());
+    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(merged));
+    return merged.filter((a) => !a.deletedAt).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
 
   // Events

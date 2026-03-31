@@ -9,6 +9,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { syncAppointments } from "@/lib/appointments-supabase";
 
 function parseAppointmentDate(dateStr: string | undefined): Date | null {
   if (!dateStr) return null;
@@ -68,12 +69,18 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
 
   useEffect(() => {
     loadUpcoming();
-    const onFocus = () => loadUpcoming();
+    const onFocus = () => {
+      void syncAppointments();
+      loadUpcoming();
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === "diabeater_appointments") loadUpcoming();
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible") loadUpcoming();
+      if (document.visibilityState === "visible") {
+        void syncAppointments();
+        loadUpcoming();
+      }
     };
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);

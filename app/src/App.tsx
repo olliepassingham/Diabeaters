@@ -41,10 +41,12 @@ import Welcome from "@/pages/welcome";
 import FamilyCarers from "@/pages/family-carers";
 import CarerView from "@/pages/carer-view";
 import CarerSetup from "@/pages/carer-setup";
+import ModeChooser from "@/pages/mode";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
 import {
   clearCarerClientSessionKeys,
+  getActiveAppMode,
   hasCarerIntent,
   hasPendingCarer,
 } from "@/lib/carer-session";
@@ -221,27 +223,52 @@ function bypassesOnboardingGate(path: string): boolean {
 }
 
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
-  const { isCarer, loading } = useLinkedCarer();
+  const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
-    if (isCarer) {
+    if (isCarerMode) {
       setLocation("/carer-view");
       return;
     }
     if (hasCarerIntent() || hasPendingCarer()) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarer, setLocation]);
+  }, [loading, isCarerMode, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCarer || hasCarerIntent() || hasPendingCarer()) return null;
+  if (isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
   return <>{children}</>;
+}
+
+function isCarerAllowedPath(pathOnly: string): boolean {
+  const p = (pathOnly || "/").split("?")[0] ?? "/";
+  if (p === "/carer-view" || p.startsWith("/carer-view/")) return true;
+  if (p === "/tools" || p.startsWith("/tools/")) return true;
+  if (p === "/education" || p.startsWith("/education/")) return true;
+  if (p === "/account") return true;
+  if (p === "/settings") return true;
+  if (p === "/settings/appearance") return true;
+  if (p === "/settings/notifications") return true;
+  if (p === "/settings/about") return true;
+  if (p === "/privacy" || p === "/support") return true;
+  return false;
 }
 
 /** Allows linked carers and patients; redirects pending carer signup to /carer-setup. */
@@ -267,26 +294,37 @@ function CarerSetupIntentGuard({ children }: { children: React.ReactNode }) {
 }
 
 function FamilyCarersGate() {
-  const { isCarer, loading } = useLinkedCarer();
+  const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
-    if (isCarer) {
+    if (isCarerMode) {
       setLocation("/carer-view");
       return;
     }
     if (hasCarerIntent() || hasPendingCarer()) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarer, setLocation]);
+  }, [loading, isCarerMode, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCarer || hasCarerIntent() || hasPendingCarer()) return null;
+  if (isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
   return <FamilyCarers />;
 }
 
@@ -298,6 +336,8 @@ function FamilyCarersGate() {
 function InnerRouter() {
   return (
     <Switch>
+      <Route path="/mode" component={ModeChooser} />
+      <Route path="/carer-view/:section" component={CarerView} />
       <Route path="/carer-view" component={CarerView} />
       <Route path="/family-carers" component={FamilyCarersGate} />
       <Route path="/">
@@ -369,11 +409,9 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/tools/hypo-help">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <HypoHelpPage />
-          </Suspense>
-        </PatientRouteGuard>
+        <Suspense fallback={<RouteFallback />}>
+          <HypoHelpPage />
+        </Suspense>
       </Route>
       <Route path="/tools/routines">
         <PatientRouteGuard>
@@ -426,25 +464,19 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/settings/about">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <SettingsPage />
-          </Suspense>
-        </PatientRouteGuard>
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
       </Route>
       <Route path="/settings/notifications">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <SettingsPage />
-          </Suspense>
-        </PatientRouteGuard>
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
       </Route>
       <Route path="/settings/appearance">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <SettingsPage />
-          </Suspense>
-        </PatientRouteGuard>
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
       </Route>
       <Route path="/settings/ratios">
         <PatientRouteGuard>
@@ -466,11 +498,9 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/settings">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <SettingsPage />
-          </Suspense>
-        </PatientRouteGuard>
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
       </Route>
       <Route path="/help-now">
         <PatientRouteGuard>
@@ -501,7 +531,10 @@ function InnerRouter() {
 function AuthenticatedShell() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isCarer } = useLinkedCarer();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const pathOnly = location.split("?")[0] ?? location;
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -510,12 +543,40 @@ function AuthenticatedShell() {
   };
 
   const goBrandHome = () => {
-    if (isCarer) {
+    if (isCarerMode) {
       if (location.split("?")[0] !== "/carer-view") setLocation("/carer-view");
       return;
     }
     if (location.split("?")[0] !== "/") setLocation("/");
   };
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  useEffect(() => {
+    if (!hasCarerLink) return;
+    if (!activeMode && pathOnly !== "/mode") {
+      setLocation("/mode");
+    }
+  }, [hasCarerLink, activeMode, pathOnly, setLocation]);
+
+  useEffect(() => {
+    if (!hasCarerLink) return;
+    if (!activeMode) return;
+    if (activeMode === "carer") {
+      if (!isCarerAllowedPath(pathOnly) && pathOnly !== "/mode") setLocation("/carer-view");
+      return;
+    }
+    if (pathOnly === "/carer-view" || pathOnly.startsWith("/carer-view/")) {
+      setLocation("/");
+    }
+  }, [hasCarerLink, activeMode, pathOnly, setLocation]);
 
   useEffect(() => {
     const onSupplySyncToast = (ev: Event) => {
@@ -573,7 +634,7 @@ function AuthenticatedShell() {
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <OfflineBanner />
-      {!isCarer && (
+      {!isCarerMode && (
         <>
           <SickDayBanner />
           <TravelBanner />
@@ -581,7 +642,7 @@ function AuthenticatedShell() {
         </>
       )}
       <AppTopBar
-        isCarer={isCarer}
+        isCarer={isCarerMode}
         pathOnly={location.split("?")[0] ?? location}
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
@@ -604,7 +665,18 @@ function AuthenticatedShell() {
 
 function AccountShell() {
   const [, setLocation] = useLocation();
-  const { isCarer } = useLinkedCarer();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -615,9 +687,9 @@ function AccountShell() {
   return (
     <div className="flex flex-col h-screen w-full bg-background text-foreground">
       <AppTopBar
-        isCarer={isCarer}
+        isCarer={isCarerMode}
         pathOnly="/account"
-        onBrandClick={() => setLocation(isCarer ? "/carer-view" : "/")}
+        onBrandClick={() => setLocation(isCarerMode ? "/carer-view" : "/")}
         onLogout={handleLogout}
       />
       <main className="flex-1 overflow-auto p-4 md:p-6 pb-24 max-w-[100vw]">

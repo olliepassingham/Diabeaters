@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "npm run web:dev",
-    "build": "npm run web:build",
+    "build": "npm --prefix app ci && npm run web:build",
     "web:dev": "npm --prefix app run dev",
     "web:build": "npm --prefix app run build",
     "web:preview": "npm --prefix app run preview",

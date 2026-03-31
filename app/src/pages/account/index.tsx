@@ -1,21 +1,36 @@
-import { FormEvent, useState, useEffect, useRef, useCallback } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { isUserVerified } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
-import { redeemInvite, useLinkedPatient } from "@/lib/carers";
-import { getSupabase } from "@/lib/supabase";
+import {
+  fetchPatientProfileForCarer,
+  listLinkedPatientsForCarer,
+  normaliseScopes,
+  useLinkedPatient,
+} from "@/lib/carers";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { storage } from "@/lib/storage";
+import type { LinkedPatientWithProfile } from "@/lib/carers.types";
+import { getActiveCarerPatientId, setActiveCarerPatientId } from "@/lib/carer-session";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Eye, Phone } from "lucide-react";
 
 const SUPPORT_EMAIL = "support@yourdomain.com";
 
@@ -26,6 +41,7 @@ function getInitial(email: string): string {
 
 export default function Account() {
   const { user } = useAuth();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
   const { data: linkedPatient } = useLinkedPatient();
   const isCarer = !!linkedPatient;
   const { profile, loading: profileLoading, refresh } = useProfile();
@@ -44,9 +60,11 @@ export default function Account() {
     avatarLoadErrorToastShown.current = false;
   }, [avatarPath]);
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
-  const [devInviteCode, setDevInviteCode] = useState("");
-  const [devRedeeming, setDevRedeeming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [linkedPatients, setLinkedPatients] = useState<LinkedPatientWithProfile[]>([]);
+  const [activePatientId, setActivePatientIdState] = useState<string | null>(null);
+  const [patientProfile, setPatientProfile] = useState<Awaited<ReturnType<typeof fetchPatientProfileForCarer>>["data"]>(null);
+  const [patientLoadError, setPatientLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.id || profileLoading) return;
@@ -160,36 +178,101 @@ export default function Account() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function handleDevRedeem(e: FormEvent) {
-    e.preventDefault();
-    if (!import.meta.env.DEV) return;
-    setDevRedeeming(true);
-    const { data, error } = await redeemInvite(devInviteCode);
-    setDevRedeeming(false);
-    if (error || !data) {
-      toast({
-        title: "Could not redeem",
-        description: error?.message ?? "Unknown error",
-        variant: "destructive",
-      });
-      return;
-    }
-    setDevInviteCode("");
-    toast({ title: "Linked", description: "Opening Carer View." });
-    setLocation("/carer-view");
-  }
-
   const settingsName = storage.getProfile()?.name?.trim() ?? "";
   const displayName = profile?.full_name?.trim() || settingsName || "Your account";
   const nameForInitials = profile?.full_name?.trim() || settingsName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
+
+  const activeLink = useMemo(
+    () => linkedPatients.find((p) => p.patientId === activePatientId) ?? null,
+    [linkedPatients, activePatientId],
+  );
+
+  const patientOptions = useMemo(
+    () =>
+      linkedPatients.map((p) => ({
+        id: p.patientId,
+        label: p.patient_full_name?.trim() || "Supported person",
+      })),
+    [linkedPatients],
+  );
+
+  const canSeePatientEmergency = useMemo(() => {
+    if (!activeLink) return false;
+    const scopes = normaliseScopes(activeLink.scopes);
+    return Boolean(scopes.emergency_info);
+  }, [activeLink]);
+
+  useEffect(() => {
+    if (!isCarer) return;
+    let active = true;
+    (async () => {
+      setPatientLoadError(null);
+      const { data, error } = await listLinkedPatientsForCarer();
+      if (!active) return;
+      if (error) {
+        setLinkedPatients([]);
+        setActivePatientIdState(null);
+        setPatientProfile(null);
+        setPatientLoadError(error.message);
+        return;
+      }
+      const rows = data ?? [];
+      setLinkedPatients(rows);
+      if (rows.length === 0) {
+        setActivePatientIdState(null);
+        setPatientProfile(null);
+        return;
+      }
+      const remembered = getActiveCarerPatientId();
+      const picked =
+        (remembered && rows.some((r) => r.patientId === remembered) && remembered) ||
+        rows[0]!.patientId;
+      setActiveCarerPatientId(picked);
+      setActivePatientIdState(picked);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isCarer]);
+
+  useEffect(() => {
+    if (!isCarer) return;
+    if (!activeLink) return;
+    let active = true;
+    (async () => {
+      setPatientLoadError(null);
+      setPatientProfile(null);
+      if (!canSeePatientEmergency) return;
+      const res = await fetchPatientProfileForCarer(activeLink.patientId);
+      if (!active) return;
+      if (res.error) {
+        setPatientLoadError(res.error.message);
+        setPatientProfile(null);
+        return;
+      }
+      setPatientProfile(res.data);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isCarer, activeLink, canSeePatientEmergency]);
+
+  const onPatientChange = (patientId: string) => {
+    setActiveCarerPatientId(patientId);
+    setActivePatientIdState(patientId);
+  };
 
   return (
     <PageShell variant="narrow" className="md:max-w-2xl space-y-6 py-4 md:py-8">
       <PageHeader
         leading={<PageBackButton />}
         title="Account"
-        description="Your profile, emergency details, and sign-in options."
+        description={
+          isCarer
+            ? "Your account, plus a read-only snapshot of the person you support."
+            : "Your profile, emergency details, and sign-in options."
+        }
         className="max-w-xl"
       />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
@@ -240,6 +323,20 @@ export default function Account() {
                 </span>
               </div>
               <div className="flex flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-0.5 pt-2 [-webkit-overflow-scrolling:touch] sm:justify-start [&_a]:shrink-0 [&_button]:shrink-0">
+                {hasCarerLink && (
+                  <Button variant="outline" size="sm" className="min-h-11" asChild>
+                    <Link href="/mode" data-testid="link-switch-mode">
+                      Switch mode
+                    </Link>
+                  </Button>
+                )}
+                {isCarer && (
+                  <Button variant="outline" size="sm" className="min-h-11" asChild>
+                    <Link href="/carer-view" data-testid="link-back-to-carer-view">
+                      Back to Carer View
+                    </Link>
+                  </Button>
+                )}
                 {!isCarer && (
                   <>
                     <input
@@ -301,10 +398,134 @@ export default function Account() {
         id="account-emergency"
         className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
       >
-        <CardContent className="p-6">
+        <CardContent className="p-6 space-y-4">
+          {isCarer ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <p className="font-medium">Your emergency details</p>
+                </div>
+                <Badge variant="outline">Carer account</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This is your own emergency info. The person you support is shown below.
+              </p>
+            </div>
+          ) : null}
           <SettingsEmergencySection variant="embedded" />
         </CardContent>
       </Card>
+
+      {isCarer && (
+        <Card
+          className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden"
+          data-testid="carer-account-supported-person"
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-semibold flex items-center gap-2">
+              <Eye className="h-5 w-5 text-primary" />
+              Supported person
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {patientLoadError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{patientLoadError}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {patientOptions.length > 1 && (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">You’re viewing</p>
+                  <p className="text-xs text-muted-foreground">Switch which person you’re supporting.</p>
+                </div>
+                <div className="w-56 shrink-0">
+                  <Select value={activePatientId ?? undefined} onValueChange={onPatientChange}>
+                    <SelectTrigger aria-label="Select supported person">
+                      <SelectValue placeholder="Select…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patientOptions.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {activeLink && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">
+                  Viewing:{" "}
+                  <span className="ml-1 font-medium">
+                    {activeLink.patient_full_name?.trim() || "Supported person"}
+                  </span>
+                </Badge>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/carer-view">Open full Carer View</Link>
+                </Button>
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-primary" />
+                  <p className="font-medium">Emergency details</p>
+                </div>
+                <Badge variant="secondary">Read only</Badge>
+              </div>
+
+              {!activeLink ? (
+                <p className="text-sm text-muted-foreground">No supported person selected.</p>
+              ) : !canSeePatientEmergency ? (
+                <p className="text-sm text-muted-foreground">
+                  Emergency details are not shared for this person.
+                </p>
+              ) : patientLoadError ? (
+                <p className="text-sm text-muted-foreground">Could not load emergency details.</p>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  {patientProfile?.emergency_contact_name ? (
+                    <p>
+                      <span className="text-muted-foreground">Name: </span>
+                      {patientProfile.emergency_contact_name}
+                    </p>
+                  ) : null}
+                  {patientProfile?.emergency_contact_phone ? (
+                    <p>
+                      <a
+                        href={`tel:${patientProfile.emergency_contact_phone.replace(/\s+/g, "")}`}
+                        className="font-medium text-primary underline-offset-4 hover:underline"
+                        aria-label={`Call ${patientProfile.emergency_contact_phone}`}
+                      >
+                        {patientProfile.emergency_contact_phone}
+                      </a>
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">No phone number saved.</p>
+                  )}
+                  {patientProfile?.emergency_notes ? (
+                    <p className="text-muted-foreground whitespace-pre-wrap">{patientProfile.emergency_notes}</p>
+                  ) : null}
+                  {!patientProfile?.emergency_contact_name &&
+                    !patientProfile?.emergency_contact_phone &&
+                    !patientProfile?.emergency_notes && (
+                      <p className="text-muted-foreground">They have not added emergency details yet.</p>
+                    )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm">
         <CardHeader className="pb-2">
@@ -341,43 +562,6 @@ export default function Account() {
           </Button>
         </CardContent>
       </Card>
-
-      {import.meta.env.DEV && !isCarer && (
-        <Card className="animate-fade-in-up shadow-md border-0 bg-amber-50/90 dark:bg-amber-950/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl font-semibold text-amber-900 dark:text-amber-100">
-              Dev: link as carer
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!getSupabase() ? (
-              <p className="text-sm text-muted-foreground">
-                Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to use this.
-              </p>
-            ) : (
-              <form onSubmit={handleDevRedeem} className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Paste a patient invite code to redeem the link (available in staging).
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="dev-invite-code">Invite code</Label>
-                  <Input
-                    id="dev-invite-code"
-                    value={devInviteCode}
-                    onChange={(e) => setDevInviteCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. AB12CD34"
-                    autoComplete="off"
-                    className="font-mono tracking-wider"
-                  />
-                </div>
-                <Button type="submit" disabled={devRedeeming || !devInviteCode.trim()} variant="secondary" size="sm">
-                  {devRedeeming ? "Linking…" : "Redeem invite"}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-      )}
     </PageShell>
   );
 }

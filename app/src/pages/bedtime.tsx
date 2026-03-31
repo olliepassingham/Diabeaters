@@ -13,6 +13,7 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { upsertScenario } from "@/lib/scenarios-supabase";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
@@ -298,6 +299,18 @@ export default function Bedtime() {
 
     setResult({ level, title, message, tips, factors, correction });
     setSaved(false);
+
+    const bedtimeReady = level === "steady";
+    void upsertScenario({
+      scenarioKey: "bedtime",
+      title: "Bedtime",
+      label: bedtimeReady ? "Bedtime: Ready" : "Bedtime: Needs attention",
+      state: {
+        bedtime_ready: bedtimeReady,
+        readiness_level: level,
+        checked_at: new Date().toISOString(),
+      },
+    });
   };
 
   const getLevelColors = (level: ReadinessLevel) => {

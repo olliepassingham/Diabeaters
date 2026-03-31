@@ -15,6 +15,7 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { upsertScenario } from "@/lib/scenarios-supabase";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -382,6 +383,18 @@ export default function SickDay() {
     if (!severity) return;
     storage.activateSickDay(severity);
     setIsSickDayActive(true);
+    const startedAt = new Date().toISOString();
+    void upsertScenario({
+      scenarioKey: "sick_day",
+      title: "Sick day",
+      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+      state: {
+        sick_day_active: true,
+        severity,
+        started_at: startedAt,
+        ended_at: null,
+      },
+    });
     toast({
       title: "Sick Day Mode Activated",
       description: `Your dashboard will now show sick day status (${severity} severity).`,
@@ -395,6 +408,18 @@ export default function SickDay() {
     setResults(null);
     setBgLevel("");
     setKetoneLevel("");
+    const endedAt = new Date().toISOString();
+    const startedAt = sickDayActivatedAt || null;
+    void upsertScenario({
+      scenarioKey: "sick_day",
+      title: "Sick day",
+      label: "Sick day mode (off)",
+      state: {
+        sick_day_active: false,
+        started_at: startedAt,
+        ended_at: endedAt,
+      },
+    });
     toast({
       title: "Sick Day Mode Deactivated",
       description: "Glad you're feeling better! Status removed from dashboard.",

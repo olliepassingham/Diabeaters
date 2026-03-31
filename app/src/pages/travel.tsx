@@ -41,6 +41,7 @@ import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/s
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { upsertScenario } from "@/lib/scenarios-supabase";
 
 interface TravelPlan {
   duration: number;
@@ -738,6 +739,28 @@ export default function Travel() {
     storage.saveTravelPlan(plan);
     storage.saveTravelPackingList(packingList);
     setIsTravelModeActive(true);
+    const startedAt = new Date().toISOString();
+    const tz =
+      plan.timezoneDirection === "none" || !plan.timezoneHours
+        ? "TZ 0h"
+        : `TZ ${plan.timezoneDirection === "west" ? "-" : "+"}${plan.timezoneHours}h`;
+    const summary = `${plan.destination}${plan.startDate && plan.endDate ? ` · ${plan.startDate}–${plan.endDate}` : ""} · ${tz}`;
+    void upsertScenario({
+      scenarioKey: "travel",
+      title: "Travel",
+      label: `Travel mode: ${summary}`,
+      state: {
+        travel_active: true,
+        travel_start: plan.startDate || null,
+        travel_end: plan.endDate || null,
+        destination: plan.destination || null,
+        timezone_hours: plan.timezoneHours ?? null,
+        timezone_direction: plan.timezoneDirection ?? null,
+        summary,
+        started_at: startedAt,
+        ended_at: null,
+      },
+    });
     toast({
       title: "Travel Mode Activated",
       description: `You'll see travel reminders until ${new Date(plan.endDate).toLocaleDateString()}`,
@@ -749,6 +772,19 @@ export default function Travel() {
     localStorage.removeItem("diabeater_travel_session");
     setIsTravelModeActive(false);
     setStep("entry");
+    const endedAt = new Date().toISOString();
+    void upsertScenario({
+      scenarioKey: "travel",
+      title: "Travel",
+      label: "Travel mode (off)",
+      state: {
+        travel_active: false,
+        travel_start: plan.startDate || null,
+        travel_end: plan.endDate || null,
+        destination: plan.destination || null,
+        ended_at: endedAt,
+      },
+    });
     toast({
       title: "Travel Mode Deactivated",
       description: "Welcome back home!",
@@ -803,6 +839,27 @@ export default function Travel() {
       activityType: "travel_plan",
       activityDetails: `${plan.duration} days to ${plan.destination} (${plan.travelType})`,
       recommendation: `Generated packing list with ${list.length} items`,
+    });
+
+    const tz =
+      plan.timezoneDirection === "none" || !plan.timezoneHours
+        ? "TZ 0h"
+        : `TZ ${plan.timezoneDirection === "west" ? "-" : "+"}${plan.timezoneHours}h`;
+    const summary = `${plan.destination}${plan.startDate && plan.endDate ? ` · ${plan.startDate}–${plan.endDate}` : ""} · ${tz}`;
+    void upsertScenario({
+      scenarioKey: "travel",
+      title: "Travel",
+      label: `Travel plan: ${summary}`,
+      state: {
+        travel_active: false,
+        travel_start: plan.startDate || null,
+        travel_end: plan.endDate || null,
+        destination: plan.destination || null,
+        timezone_hours: plan.timezoneHours ?? null,
+        timezone_direction: plan.timezoneDirection ?? null,
+        summary,
+        planned_at: new Date().toISOString(),
+      },
     });
   };
 

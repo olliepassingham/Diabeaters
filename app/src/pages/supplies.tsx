@@ -2120,9 +2120,17 @@ export default function Supplies() {
   };
 
   const handleSave = (data: Omit<Supply, "id">) => {
+    const queueCloudUpsert = (localId: string) => {
+      void import("@/lib/supplies").then((m) => {
+        const local = storage.getSupplies().find((s) => s.id === localId);
+        if (local) void m.syncToCloud(local);
+      });
+    };
+
     if (editingSupply) {
-      storage.updateSupply(editingSupply.id, data);
+      const updated = storage.updateSupply(editingSupply.id, data);
       toast({ title: "Supply updated", description: `${data.name} has been updated.` });
+      if (updated) queueCloudUpsert(updated.id);
     } else {
       const result = storage.addSupply(data);
       storage.saveLastPrescription({
@@ -2138,6 +2146,7 @@ export default function Supplies() {
       } else {
         toast({ title: "Supply added", description: `${data.name} has been added to your inventory.` });
       }
+      queueCloudUpsert(result.supply.id);
     }
     refreshSupplies();
   };
@@ -2146,6 +2155,9 @@ export default function Supplies() {
     saveStateForUndo();
     const supply = supplies.find(s => s.id === id);
     storage.deleteSupply(id);
+    if (supply) {
+      void import("@/lib/supplies").then((m) => void m.deleteFromCloud(supply));
+    }
     toast({ title: "Supply deleted", description: supply ? `${supply.name} has been removed.` : "Supply removed." });
     refreshSupplies();
   };
@@ -2160,7 +2172,10 @@ export default function Supplies() {
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
-    storage.updateSupply(id, { currentQuantity: quantity });
+    const updated = storage.updateSupply(id, { currentQuantity: quantity });
+    if (updated) {
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+    }
     refreshSupplies();
   };
 
@@ -2183,7 +2198,10 @@ export default function Supplies() {
         updates.typicalRefillQuantity = quantity;
       }
       
-      storage.updateSupply(pickupSupply.id, updates);
+      const updated = storage.updateSupply(pickupSupply.id, updates);
+      if (updated) {
+        void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+      }
       storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
       toast({ 
         title: "Refill recorded", 
@@ -2194,8 +2212,11 @@ export default function Supplies() {
   };
 
   const handleMarkOrdered = (id: string) => {
-    storage.markSupplyOrdered(id);
+    const updated = storage.markSupplyOrdered(id);
     const supply = supplies.find(s => s.id === id);
+    if (updated) {
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+    }
     toast({
       title: "Marked as ordered",
       description: supply ? `${supply.name} marked as on order. We'll remind you when to collect.` : "Supply marked as on order.",
@@ -2204,7 +2225,10 @@ export default function Supplies() {
   };
 
   const handleClearOrder = (id: string) => {
-    storage.clearSupplyOrder(id);
+    const updated = storage.clearSupplyOrder(id);
+    if (updated) {
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+    }
     toast({ title: "Order cleared" });
     refreshSupplies();
   };

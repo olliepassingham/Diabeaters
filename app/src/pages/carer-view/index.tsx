@@ -6,28 +6,69 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
-  getLinkedPatientForCarer,
   normaliseScopes,
   fetchSuppliesForLinkedPatient,
   fetchPatientProfileForCarer,
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
+  fetchHypoLogsForLinkedPatient,
+  listLinkedPatientsForCarer,
 } from "@/lib/carers";
-import type { CloudSupplyRow, LinkedPatientInfo } from "@/lib/carers.types";
+import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
 import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { getSupabase } from "@/lib/supabase";
-import { consumeCarerLinkedBannerMessage } from "@/lib/carer-session";
+import {
+  consumeCarerLinkedBannerMessage,
+  getActiveCarerPatientId,
+  setActiveCarerPatientId,
+} from "@/lib/carer-session";
 import { DevNote } from "@/components/dev/DevNote";
 import { PageShell } from "@/components/layout";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { formatDistanceToNowStrict } from "date-fns";
+
+function parseLocalDateTime(date: unknown, time: unknown): Date | null {
+  if (typeof date !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+
+  let hh = 12;
+  let mm = 0;
+  if (typeof time === "string" && time.trim()) {
+    const tm = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
+    if (tm) {
+      hh = Number(tm[1]);
+      mm = Number(tm[2]);
+    }
+  }
+
+  const d = new Date(year, month - 1, day, hh, mm, 0, 0);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
 
 function appointmentSortTime(row: Record<string, unknown>): number {
-  const keys = ["scheduled_at", "appointment_at", "starts_at", "date", "start_time", "datetime"];
-  for (const k of keys) {
+  // Prefer canonical instant from the DB.
+  for (const k of ["scheduled_at", "appointment_at", "starts_at", "datetime"]) {
     const v = row[k];
     if (v == null) continue;
     const t = new Date(String(v)).getTime();
     if (!Number.isNaN(t)) return t;
   }
+  // Fall back to local date+time to avoid UTC parsing of YYYY-MM-DD.
+  const local = parseLocalDateTime(row.date, row.time ?? row.start_time);
+  if (local) return local.getTime();
   const u = row.updated_at;
   if (u) return new Date(String(u)).getTime();
   return 0;
@@ -54,8 +95,8 @@ function appointmentTitle(row: Record<string, unknown>): string {
 }
 
 function formatAppointmentWhen(row: Record<string, unknown>): string | null {
-  const keys = ["scheduled_at", "appointment_at", "starts_at", "date", "start_time", "datetime"];
-  for (const k of keys) {
+  // Prefer canonical instant from the DB.
+  for (const k of ["scheduled_at", "appointment_at", "starts_at", "datetime"]) {
     const v = row[k];
     if (v == null) continue;
     const d = new Date(String(v));
@@ -63,45 +104,124 @@ function formatAppointmentWhen(row: Record<string, unknown>): string | null {
       return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     }
   }
+  const local = parseLocalDateTime(row.date, row.time ?? row.start_time);
+  if (local) return local.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   return null;
+}
+
+function toIsoString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  const t = new Date(s).getTime();
+  return Number.isNaN(t) ? null : s;
+}
+
+function durationLabel(ms: number): string {
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const days = Math.floor(totalMin / (60 * 24));
+  const hours = Math.floor((totalMin - days * 60 * 24) / 60);
+  const mins = totalMin - days * 60 * 24 - hours * 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
 }
 
 function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
   const lines: string[] = [];
+  const now = Date.now();
+  const recentlyEndedWindowMs = 24 * 60 * 60 * 1000;
+
   for (const row of rows.slice(0, 8)) {
+    const scenarioKey =
+      typeof row.scenario_key === "string" && row.scenario_key.trim()
+        ? row.scenario_key.trim()
+        : typeof row.scenarioKey === "string" && row.scenarioKey.trim()
+          ? row.scenarioKey.trim()
+          : null;
+
+    const rawState =
+      (row.state && typeof row.state === "object" ? (row.state as Record<string, unknown>) : null) ??
+      (row.payload && typeof row.payload === "object" ? (row.payload as Record<string, unknown>) : null) ??
+      (row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null);
+
+    const startedAt = toIsoString(rawState?.started_at) ?? toIsoString(rawState?.activated_at);
+    const endedAt = toIsoString(rawState?.ended_at) ?? toIsoString(rawState?.deactivated_at);
+    const checkedAt = toIsoString(rawState?.checked_at);
+
+    if (scenarioKey === "sick_day") {
+      const active = rawState?.sick_day_active === true || rawState?.sickDayActive === true;
+      const severity = typeof rawState?.severity === "string" ? rawState?.severity.trim() : null;
+      const sevLabel = severity ? ` (${severity})` : "";
+      if (active) {
+        const startT = startedAt ? new Date(startedAt).getTime() : NaN;
+        const dur = Number.isNaN(startT) ? null : durationLabel(now - startT);
+        const startLabel = startedAt ? `Started ${new Date(startedAt).toLocaleString(undefined, { timeStyle: "short" })}` : "Started";
+        lines.push(`Sick day${sevLabel} — ${startLabel}${dur ? ` · ${dur}` : ""}`);
+        continue;
+      }
+      if (endedAt) {
+        const endT = new Date(endedAt).getTime();
+        if (!Number.isNaN(endT) && now - endT <= recentlyEndedWindowMs) {
+          const endedText = formatDistanceToNowStrict(new Date(endedAt), { addSuffix: true });
+          const dur =
+            startedAt && !Number.isNaN(new Date(startedAt).getTime())
+              ? durationLabel(endT - new Date(startedAt).getTime())
+              : null;
+          lines.push(`Sick day${sevLabel} — Ended ${endedText}${dur ? ` · ${dur}` : ""}`);
+          continue;
+        }
+      }
+      continue;
+    }
+
+    if (scenarioKey === "travel") {
+      const active = rawState?.travel_active === true || rawState?.travelActive === true;
+      const destination = typeof rawState?.destination === "string" ? rawState?.destination.trim() : null;
+      const start = typeof rawState?.travel_start === "string" ? rawState?.travel_start.trim() : null;
+      const end = typeof rawState?.travel_end === "string" ? rawState?.travel_end.trim() : null;
+      const dates = start && end ? `${start}–${end}` : start ? `${start}` : null;
+      const tripDays =
+        start && end && !Number.isNaN(new Date(start).getTime()) && !Number.isNaN(new Date(end).getTime())
+          ? Math.max(
+              1,
+              Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1,
+            )
+          : null;
+      const core = `Travel — ${destination || "Trip"}${dates ? ` · ${dates}` : ""}${tripDays ? ` (${tripDays} days)` : ""}`;
+      if (active) {
+        lines.push(core);
+        continue;
+      }
+      if (endedAt) {
+        const endT = new Date(endedAt).getTime();
+        if (!Number.isNaN(endT) && now - endT <= recentlyEndedWindowMs) {
+          const endedText = formatDistanceToNowStrict(new Date(endedAt), { addSuffix: true });
+          lines.push(`${core} — Ended ${endedText}`);
+          continue;
+        }
+      }
+      continue;
+    }
+
+    if (scenarioKey === "bedtime") {
+      const ready = rawState?.bedtime_ready === true;
+      if (!checkedAt) continue;
+      const checkT = new Date(checkedAt).getTime();
+      if (Number.isNaN(checkT) || now - checkT > recentlyEndedWindowMs) continue;
+      const when = formatDistanceToNowStrict(new Date(checkedAt), { addSuffix: true });
+      lines.push(`Bedtime — ${ready ? "Ready" : "Needs attention"} · Checked ${when}`);
+      continue;
+    }
+
+    // Fallback: keep existing label if present.
     if (typeof row.label === "string" && row.label.trim()) {
       lines.push(row.label.trim());
-      continue;
-    }
-    if (typeof row.title === "string" && row.title.trim()) {
+    } else if (typeof row.title === "string" && row.title.trim()) {
       lines.push(row.title.trim());
-      continue;
+    } else if (scenarioKey) {
+      lines.push(scenarioKey);
     }
-    if (typeof row.scenario_key === "string" && row.scenario_key.trim()) {
-      lines.push(row.scenario_key.trim());
-      continue;
-    }
-    const p = row.payload ?? row.state ?? row.data;
-    if (p && typeof p === "object") {
-      const o = p as Record<string, unknown>;
-      const bits: string[] = [];
-      if (o.sick_day_active === true || o.sickDayActive === true) bits.push("Sick day mode");
-      if (o.travel_active === true || o.travelActive === true) bits.push("Travel mode");
-      if (o.bedtime_active === true) bits.push("Bedtime scenario");
-      if (bits.length) {
-        lines.push(bits.join(" · "));
-        continue;
-      }
-    }
-    const u = row.updated_at;
-    if (u) {
-      const d = new Date(String(u));
-      if (!Number.isNaN(d.getTime())) {
-        lines.push(`Updated ${d.toLocaleDateString()}`);
-        continue;
-      }
-    }
-    lines.push("Scenario record");
   }
   return lines;
 }
@@ -118,12 +238,18 @@ type CarerViewPhase = "loading_link" | "unlinked" | "loading_patient" | "ready";
 export default function CarerViewPage() {
   const [location, setLocation] = useLocation();
   const [phase, setPhase] = useState<CarerViewPhase>("loading_link");
-  const [link, setLink] = useState<LinkedPatientInfo | null>(null);
+  const [linkedPatients, setLinkedPatients] = useState<LinkedPatientWithProfile[]>([]);
+  const [activePatientId, setActivePatientIdState] = useState<string | null>(null);
+  const activeLink = useMemo(
+    () => linkedPatients.find((p) => p.patientId === activePatientId) ?? null,
+    [linkedPatients, activePatientId],
+  );
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchPatientProfileForCarer>>["data"]>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [supplies, setSupplies] = useState<CloudSupplyRow[]>([]);
   const [appointmentRows, setAppointmentRows] = useState<Record<string, unknown>[]>([]);
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
+  const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -148,22 +274,24 @@ export default function CarerViewPage() {
   }, []);
 
   const scopes = useMemo(() => {
-    if (!link) {
+    if (!activeLink) {
       return {
         supplies: false,
         appointments: false,
         scenarios: false,
+        hypo_alerts: false,
         emergency_info: false,
       };
     }
-    const n = normaliseScopes(link.scopes);
+    const n = normaliseScopes(activeLink.scopes);
     return {
       supplies: !!n.supplies,
       appointments: !!n.appointments,
       scenarios: !!n.scenarios,
+      hypo_alerts: !!n.hypo_alerts,
       emergency_info: !!n.emergency_info,
     };
-  }, [link]);
+  }, [activeLink]);
 
   useEffect(() => {
     if (phase !== "ready") return;
@@ -178,29 +306,39 @@ export default function CarerViewPage() {
     let active = true;
     (async () => {
       try {
-        const { data, error: linkErr } = await getLinkedPatientForCarer();
+        const { data, error: linkErr } = await listLinkedPatientsForCarer();
         if (!active) return;
         if (linkErr) {
           console.error("carer-view: link error", linkErr);
-          setLink(null);
+          setLinkedPatients([]);
+          setActivePatientIdState(null);
           setError("unlinked or load error");
           setPhase("unlinked");
           return;
         }
-        if (!data?.patientId?.trim()) {
-          console.warn("carer-view: missing patientId on link");
-          setLink(null);
+        const rows = data ?? [];
+        if (rows.length === 0) {
+          console.warn("carer-view: no linked patients");
+          setLinkedPatients([]);
+          setActivePatientIdState(null);
           setError("unlinked or load error");
           setPhase("unlinked");
           return;
         }
         setError(null);
-        setLink(data);
+        setLinkedPatients(rows);
+        const remembered = getActiveCarerPatientId();
+        const picked =
+          (remembered && rows.some((r) => r.patientId === remembered) && remembered) ||
+          rows[0]!.patientId;
+        setActiveCarerPatientId(picked);
+        setActivePatientIdState(picked);
         setPhase("loading_patient");
       } catch (e) {
         console.error("carer-view: link error", e);
         if (!active) return;
-        setLink(null);
+        setLinkedPatients([]);
+        setActivePatientIdState(null);
         setError("unlinked or load error");
         setPhase("unlinked");
       }
@@ -211,16 +349,17 @@ export default function CarerViewPage() {
   }, []);
 
   useEffect(() => {
-    if (phase !== "loading_patient" || !link) return;
+    if (phase !== "loading_patient" || !activeLink) return;
     let active = true;
     setLoadError(null);
     setAppointmentRows([]);
     setScenarioRows([]);
+    setHypoLogs([]);
     (async () => {
       try {
-        const patientId = link.patientId;
-        const rawScopes = normaliseScopes(link.scopes);
-        const [prof, sup, ap, sc] = await Promise.all([
+        const patientId = activeLink.patientId;
+        const rawScopes = normaliseScopes(activeLink.scopes);
+        const [prof, sup, ap, sc, hl] = await Promise.all([
           fetchPatientProfileForCarer(patientId),
           rawScopes.supplies
             ? fetchSuppliesForLinkedPatient(patientId)
@@ -230,6 +369,9 @@ export default function CarerViewPage() {
             : Promise.resolve({ data: [], error: null }),
           rawScopes.scenarios
             ? fetchScenariosForLinkedPatient(patientId)
+            : Promise.resolve({ data: [], error: null }),
+          rawScopes.hypo_alerts
+            ? fetchHypoLogsForLinkedPatient(patientId)
             : Promise.resolve({ data: [], error: null }),
         ]);
 
@@ -252,6 +394,9 @@ export default function CarerViewPage() {
 
           if (sc.error) setLoadError(sc.error.message);
           setScenarioRows(sc.data ?? []);
+
+          if (hl.error) setLoadError(hl.error.message);
+          setHypoLogs(hl.data ?? []);
         }
       } catch (e) {
         console.error("carer-view: patient data error", e);
@@ -260,6 +405,7 @@ export default function CarerViewPage() {
           setSupplies([]);
           setAppointmentRows([]);
           setScenarioRows([]);
+          setHypoLogs([]);
         }
       } finally {
         if (active) {
@@ -270,7 +416,7 @@ export default function CarerViewPage() {
     return () => {
       active = false;
     };
-  }, [phase, link]);
+  }, [phase, activeLink]);
 
   useEffect(() => {
     if (phase === "unlinked") {
@@ -279,14 +425,29 @@ export default function CarerViewPage() {
   }, [phase, setLocation]);
 
   useEffect(() => {
-    if (phase !== "ready" || !link) return;
+    if (phase !== "ready" || !activeLink) return;
     const msg = consumeCarerLinkedBannerMessage();
     if (msg) setLinkedBanner(msg);
-  }, [phase, link]);
+  }, [phase, activeLink]);
 
   const displayName = profile?.full_name?.trim() || "Linked person";
-  const nextAppointment = pickNextAppointment(appointmentRows);
+  const upcomingAppointments = useMemo(() => {
+    const now = Date.now();
+    return (appointmentRows ?? [])
+      .map((row) => ({ row, t: appointmentSortTime(row) }))
+      .filter((x) => x.t > 0 && x.t >= now)
+      .sort((a, b) => a.t - b.t)
+      .map((x) => x.row);
+  }, [appointmentRows]);
   const scenarioLines = scenarioBannerLines(scenarioRows);
+  const patientOptions = useMemo(
+    () =>
+      linkedPatients.map((p) => ({
+        id: p.patientId,
+        label: p.patient_full_name?.trim() || "Linked person",
+      })),
+    [linkedPatients],
+  );
 
   if (!getSupabase()) {
     return (
@@ -336,7 +497,7 @@ export default function CarerViewPage() {
     );
   }
 
-  if (phase === "loading_patient" || !link) {
+  if (phase === "loading_patient" || !activeLink) {
     return (
       <>
         {devOverlay}
@@ -350,9 +511,15 @@ export default function CarerViewPage() {
     );
   }
 
-  if (phase !== "ready" || !link) {
+  if (phase !== "ready" || !activeLink) {
     return <>{devOverlay}</>;
   }
+
+  const onPatientChange = (patientId: string) => {
+    setActiveCarerPatientId(patientId);
+    setActivePatientIdState(patientId);
+    setPhase("loading_patient");
+  };
 
   return (
     <>
@@ -370,6 +537,20 @@ export default function CarerViewPage() {
             Carer View
           </h1>
           <p className="text-body text-muted-foreground mt-1">Read-only — you cannot change their records from here.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="shrink-0" aria-label={`Viewing ${displayName}`}>
+              Viewing: <span className="ml-1 font-medium">{displayName}</span>
+            </Badge>
+            {(scopes.emergency_info ?? false) && (
+              <a
+                href="#carer-emergency"
+                className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4"
+                aria-label="Jump to emergency details"
+              >
+                Emergency details
+              </a>
+            )}
+          </div>
         </div>
         <Badge variant="secondary" className="gap-1 shrink-0" aria-label="Read only">
           <Eye className="h-3 w-3" />
@@ -415,7 +596,76 @@ export default function CarerViewPage() {
             <p className="text-sm text-muted-foreground">You are viewing with their permission.</p>
           </div>
         </CardContent>
+        {patientOptions.length > 1 && (
+          <>
+            <Separator />
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Viewing</p>
+                  <p className="text-xs text-muted-foreground">Switch the linked person you’re viewing.</p>
+                </div>
+                <div className="w-56 shrink-0">
+                  <Select value={activePatientId ?? undefined} onValueChange={onPatientChange}>
+                    <SelectTrigger aria-label="Select linked person">
+                      <SelectValue placeholder="Select…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patientOptions.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </>
+        )}
       </Card>
+
+      {(scopes.hypo_alerts ?? false) && (
+        <Card className="shadow-md" data-testid="carer-view-hypos">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-primary" />
+              Recent hypos
+            </CardTitle>
+            <CardDescription>Recent hypo logs they have chosen to share.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {hypoLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No hypo logs visible yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {hypoLogs.slice(0, 8).map((h) => {
+                  const when = new Date(h.created_at);
+                  const whenText = Number.isNaN(when.getTime())
+                    ? "Unknown time"
+                    : `${formatDistanceToNowStrict(when, { addSuffix: true })}`;
+                  const bg =
+                    h.blood_glucose == null || Number.isNaN(h.blood_glucose)
+                      ? null
+                      : Math.round(h.blood_glucose * 10) / 10;
+                  return (
+                    <li key={h.id} className="rounded-md border border-border px-3 py-2 text-sm space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">
+                          {bg == null ? "Hypo logged" : `BG ${bg}`}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
+                      </div>
+                      {h.treatment ? <p className="text-muted-foreground">Treatment: {h.treatment}</p> : null}
+                      {h.notes ? <p className="text-muted-foreground whitespace-pre-wrap">{h.notes}</p> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(scopes.supplies ?? false) && (
         <Card className="shadow-md" data-testid="carer-view-supplies">
@@ -466,21 +716,34 @@ export default function CarerViewPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-primary" />
-              Next appointment
+              Upcoming appointments
             </CardTitle>
             <CardDescription>Read-only — from their cloud appointments when columns are present.</CardDescription>
           </CardHeader>
           <CardContent>
-            {!nextAppointment ? (
-              <p className="text-sm text-muted-foreground py-2">No appointments visible yet.</p>
+            {upcomingAppointments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No upcoming appointments visible yet.</p>
             ) : (
-              <div className="rounded-md border border-border px-3 py-3 text-sm space-y-1">
-                <p className="font-medium">{appointmentTitle(nextAppointment)}</p>
-                {formatAppointmentWhen(nextAppointment) ? (
-                  <p className="text-muted-foreground">{formatAppointmentWhen(nextAppointment)}</p>
-                ) : (
-                  <p className="text-muted-foreground text-xs">No scheduled time field on this row.</p>
-                )}
+              <div className="space-y-2">
+                {upcomingAppointments.map((appt) => (
+                  <div
+                    key={String((appt as Record<string, unknown>).client_id ?? (appt as Record<string, unknown>).id ?? appointmentSortTime(appt))}
+                    className="rounded-md border border-border px-3 py-3 text-sm space-y-1"
+                  >
+                    <p className="font-medium">{appointmentTitle(appt)}</p>
+                    {formatAppointmentWhen(appt) ? (
+                      <p className="text-muted-foreground">{formatAppointmentWhen(appt)}</p>
+                    ) : (
+                      <p className="text-muted-foreground text-xs">No scheduled time field on this row.</p>
+                    )}
+                    {typeof (appt as Record<string, unknown>).location === "string" &&
+                    ((appt as Record<string, unknown>).location as string).trim() ? (
+                      <p className="text-muted-foreground text-xs">
+                        {(appt as Record<string, unknown>).location as string}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
@@ -521,7 +784,7 @@ export default function CarerViewPage() {
       )}
 
       {(scopes.emergency_info ?? false) && (
-        <Card className="shadow-md" data-testid="carer-view-emergency">
+        <Card id="carer-emergency" className="shadow-md scroll-mt-24" data-testid="carer-view-emergency">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
               <Phone className="h-5 w-5 text-primary" />
