@@ -18,8 +18,29 @@ import type { CarerInviteRow, CarerLinkWithProfile, CarerScopes } from "@/lib/ca
 import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { getSupabase } from "@/lib/supabase";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
+import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { Link } from "wouter";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+
+function AvatarBubble({
+  label,
+  initials,
+  avatarUrl,
+}: {
+  label: string;
+  initials: string;
+  avatarUrl: string | null;
+}) {
+  const { displayUrl } = useResolvedProfileImageUrl(avatarUrl);
+  return (
+    <div
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary overflow-hidden"
+      aria-label={`${label} avatar`}
+    >
+      {displayUrl ? <img src={displayUrl} alt="" className="h-full w-full object-cover" /> : initials}
+    </div>
+  );
+}
 
 function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
   if (links.length === 0) return { ...DEFAULT_CARER_SCOPES };
@@ -199,12 +220,7 @@ export default function FamilyCarersPage() {
                     data-testid={`carer-row-${link.id}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary"
-                        aria-hidden
-                      >
-                        {initials}
-                      </div>
+                      <AvatarBubble label={label} initials={initials} avatarUrl={link.carer_avatar_url ?? null} />
                       <div className="min-w-0">
                         <p className="truncate font-medium">{label}</p>
                         <p className="text-xs text-muted-foreground">
