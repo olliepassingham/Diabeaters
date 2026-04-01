@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Package, AlertTriangle, ShoppingCart, ArrowRight, Syringe, Activity, Plug, Cylinder } from "lucide-react";
 import { Link } from "wouter";
-import { storage, Supply } from "@/lib/storage";
+import { getUnitsPerPen, storage, Supply } from "@/lib/storage";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
@@ -28,14 +28,20 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const list = storage.getSupplies?.() ?? [];
-      setSupplies(Array.isArray(list) ? list : []);
-      setError(null);
-    } catch {
-      setError("Could not load supplies.");
-      setSupplies([]);
-    }
+    const refresh = () => {
+      try {
+        const list = storage.getSupplies?.() ?? [];
+        setSupplies(Array.isArray(list) ? list : []);
+        setError(null);
+      } catch {
+        setError("Could not load supplies.");
+        setSupplies([]);
+      }
+    };
+
+    refresh();
+    const id = window.setInterval(refresh, 15000);
+    return () => window.clearInterval(id);
   }, []);
 
   if (error) {
@@ -126,6 +132,10 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
             {preview.map((s) => {
               const status = storage.getSupplyStatus(s);
               const Icon = typeIcons[s.type] || Package;
+              const stockNow = Math.floor(storage.getAdjustedQuantity(s));
+              const showPens = s.type === "insulin" || s.type === "insulin_short" || s.type === "insulin_long";
+              const unitsPerPen = showPens ? getUnitsPerPen(storage.getSettings()) : null;
+              const pens = showPens && unitsPerPen ? Math.floor(stockNow / unitsPerPen) : null;
               return (
                 <div
                   key={s.id}
@@ -148,7 +158,16 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
                       status === "ok" && "text-foreground"
                     )}
                   >
-                    ×{typeof s.currentQuantity === "number" ? s.currentQuantity : "—"}
+                    ×
+                    {showPens ? (
+                      <>
+                        {pens ?? 0} {pens === 1 ? "pen" : "pens"}
+                      </>
+                    ) : Number.isFinite(stockNow) ? (
+                      stockNow
+                    ) : (
+                      "—"
+                    )}
                   </span>
                 </div>
               );
