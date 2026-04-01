@@ -14,6 +14,7 @@ import { format, isAfter, isBefore, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { syncAppointments } from "@/lib/appointments-supabase";
+import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
 
 const APPOINTMENT_TYPES: { value: AppointmentType; label: string; icon: typeof Calendar }[] = [
   { value: "clinic", label: "Diabetes Clinic", icon: Stethoscope },
@@ -48,6 +49,7 @@ export default function Appointments() {
     setAppointments(storage.getAppointments());
     trackFeatureEngagement("appointments");
     void syncAppointments({ throttleMs: 0 });
+    void rescheduleAppointmentReminders(storage.getAppointments());
   }, []);
 
   const handleAdd = async () => {
@@ -67,6 +69,7 @@ export default function Appointments() {
     setIsAddOpen(false);
     resetForm();
     await syncAppointments();
+    await rescheduleAppointmentReminders(storage.getAppointments());
   };
 
   const resetForm = () => {
@@ -82,12 +85,14 @@ export default function Appointments() {
     storage.updateAppointment(id, { isCompleted: true });
     setAppointments(storage.getAppointments());
     await syncAppointments();
+    await rescheduleAppointmentReminders(storage.getAppointments());
   };
 
   const handleDelete = async (id: string) => {
     storage.deleteAppointment(id);
     setAppointments(storage.getAppointments());
     await syncAppointments();
+    await rescheduleAppointmentReminders(storage.getAppointments());
   };
 
   const today = new Date();

@@ -42,6 +42,7 @@ import FamilyCarers from "@/pages/family-carers";
 import CarerView from "@/pages/carer-view";
 import CarerSetup from "@/pages/carer-setup";
 import ModeChooser from "@/pages/mode";
+import NotificationsPage from "@/pages/notifications";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
 import {
@@ -262,6 +263,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/carer-view" || p.startsWith("/carer-view/")) return true;
   if (p === "/tools" || p.startsWith("/tools/")) return true;
   if (p === "/education" || p.startsWith("/education/")) return true;
+  if (p === "/notifications") return true;
   if (p === "/account") return true;
   if (p === "/settings") return true;
   if (p === "/settings/appearance") return true;
@@ -340,6 +342,7 @@ function InnerRouter() {
       <Route path="/carer-view/:section" component={CarerView} />
       <Route path="/carer-view" component={CarerView} />
       <Route path="/family-carers" component={FamilyCarersGate} />
+      <Route path="/notifications" component={NotificationsPage} />
       <Route path="/">
         <PatientRouteGuard>
           <Dashboard />

@@ -595,6 +595,48 @@ export async function fetchSuppliesForLinkedPatient(
   return { data: (data ?? []) as CloudSupplyRow[], error: null };
 }
 
+export type CloudSupplyEventRow = {
+  id: string;
+  user_id: string;
+  supply_id: string;
+  kind: string;
+  delta: number | null;
+  stock_now: number | null;
+  meta: Record<string, unknown>;
+  created_at: string;
+};
+
+/** Carer: supply event rows for linked patient (RLS + scope via supply_events policy). */
+export async function fetchSupplyEventsForLinkedPatient(
+  patientId: string,
+): Promise<{ data: CloudSupplyEventRow[] | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  const { data, error } = await supabase
+    .from("supply_events")
+    .select("id,user_id,supply_id,kind,delta,stock_now,meta,created_at")
+    .eq("user_id", patientId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) return { data: null, error: new Error(error.message) };
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    user_id: String(row.user_id),
+    supply_id: String(row.supply_id),
+    kind: String(row.kind),
+    delta: row.delta == null ? null : Number(row.delta),
+    stock_now: row.stock_now == null ? null : Number(row.stock_now),
+    meta: (row.meta && typeof row.meta === "object" ? (row.meta as Record<string, unknown>) : {}) as Record<
+      string,
+      unknown
+    >,
+    created_at: String(row.created_at),
+  }));
+  return { data: rows, error: null };
+}
+
 /** Carer: hypo log rows for linked patient (RLS + scope). */
 export async function fetchHypoLogsForLinkedPatient(
   patientId: string,

@@ -1,10 +1,18 @@
 /**
- * Supabase Edge Function: after a hypo is logged, notify all patient carers with receive_hypo_alerts.
+ * Supabase Edge Function: after a hypo is logged, notify linked carers.
+ *
+ * This implementation uses:
+ * - `public.carer_links` as the relationship (scoped access)
+ * - `public.notifications` for the in-app inbox
+ * - `public.push_tokens` for iOS push delivery
+ * - `public.notification_preferences` to honor user toggles
  *
  * Secrets (Dashboard → Edge Functions → Secrets):
  * - SUPABASE_URL (often auto)
+ * - SUPABASE_ANON_KEY
  * - SUPABASE_SERVICE_ROLE_KEY
- * Optional:
+ *
+ * Optional push relay:
  * - PUSH_NOTIFICATION_API_URL — POST JSON { to, title, body, data }
  * - PUSH_NOTIFICATION_API_KEY — Bearer token for that API
  *
@@ -119,27 +127,26 @@ Deno.serve(async (req: Request) => {
     const patientLabel =
       (profile as { full_name?: string } | null)?.full_name?.trim() || "Your contact";
 
-    const { data: carerRows, error: carersErr } = await admin
-      .from("carers")
-      .select("id, carer_name, contact_method, contact_value, receive_hypo_alerts")
-      .eq("user_id", hypo.user_id)
-      .eq("receive_hypo_alerts", true);
+    const { data: linkRows, error: linkErr } = await admin
+      .from("carer_links")
+      .select("carer_id, scopes")
+      .eq("patient_id", hypo.user_id);
 
-    if (carersErr) {
-      console.error("[notify_carers_on_hypo] carers query", carersErr);
+    if (linkErr) {
+      console.error("[notify_carers_on_hypo] carer_links query", linkErr);
       return new Response(
-        JSON.stringify({ success: false, error: "carers_fetch_failed", detail: carersErr.message }),
+        JSON.stringify({ success: false, error: "carer_links_fetch_failed", detail: linkErr.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const carers = (carerRows ?? []) as {
-      id: string;
-      carer_name: string;
-      contact_method: string;
-      contact_value: string;
-      receive_hypo_alerts: boolean;
-    }[];
+    const carers = (linkRows ?? [])
+      .map((r) => ({ carer_id: String((r as any).carer_id), scopes: (r as any).scopes }))
+      .filter((r) => isUuid(r.carer_id))
+      .filter((r) => {
+        const scopes = (r.scopes && typeof r.scopes === "object" ? r.scopes : {}) as Record<string, unknown>;
+        return scopes.hypo_alerts === true || scopes.hypo_alerts === "true";
+      });
 
     const hypoPayload = {
       hypo_id: hypo.id,
@@ -150,17 +157,63 @@ Deno.serve(async (req: Request) => {
       created_at: hypo.created_at,
     };
 
-    const title = "Hypo Treated";
+    const title = "Hypo treated";
     const bodyText = `${patientLabel} has treated a hypo`;
 
-    let pushDelivered = 0;
-    let inappDelivered = 0;
+    const recipients = carers.map((c) => c.carer_id);
+
+    const { data: prefsRows } = await admin
+      .from("notification_preferences")
+      .select("user_id,prefs")
+      .in("user_id", recipients);
+    const prefsById = new Map<string, unknown>(
+      (prefsRows ?? []).map((r: any) => [String(r.user_id), r.prefs]),
+    );
+
     const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
     const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
 
-    for (const c of carers) {
-      if (c.contact_method === "push" && c.contact_value.trim()) {
-        if (pushUrl) {
+    let pushDelivered = 0;
+    let inappDelivered = 0;
+
+    for (const rid of recipients) {
+      const prefsRaw = prefsById.get(rid);
+      const prefs = (prefsRaw && typeof prefsRaw === "object" ? (prefsRaw as Record<string, unknown>) : {}) as Record<
+        string,
+        unknown
+      >;
+      const enabled = prefs.enabled !== false;
+      const hypoOn = prefs.hypo_alerts !== false;
+      const inappOn = prefs.inapp !== false;
+      const pushOn = prefs.push === true;
+      if (!enabled || !hypoOn) continue;
+
+      const payload = {
+        kind: "hypo_logged",
+        deep_link: "/carer-view",
+        ...hypoPayload,
+      };
+
+      if (inappOn) {
+        const { error: insErr } = await admin.from("notifications").insert({
+          user_id: rid,
+          title,
+          body: bodyText,
+          data: payload,
+          read: false,
+        });
+        if (!insErr) inappDelivered += 1;
+        else console.error("[notify_carers_on_hypo] notification insert", insErr);
+      }
+
+      if (pushOn && pushUrl) {
+        const { data: tokenRows } = await admin
+          .from("push_tokens")
+          .select("token")
+          .eq("user_id", rid)
+          .eq("platform", "ios");
+        const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
+        for (const t of tokens) {
           try {
             const headers: Record<string, string> = { "Content-Type": "application/json" };
             if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
@@ -168,10 +221,10 @@ Deno.serve(async (req: Request) => {
               method: "POST",
               headers,
               body: JSON.stringify({
-                to: c.contact_value.trim(),
+                to: t,
                 title,
                 body: bodyText,
-                data: hypoPayload,
+                data: payload,
               }),
             });
             if (res.ok) pushDelivered += 1;
@@ -179,33 +232,14 @@ Deno.serve(async (req: Request) => {
           } catch (e) {
             console.error("[notify_carers_on_hypo] push fetch", e);
           }
-        } else {
-          console.info("[notify_carers_on_hypo] PUSH_NOTIFICATION_API_URL not set; skip push for carer", c.id);
         }
-      }
-
-      if (c.contact_method === "inapp") {
-        const targetUser = c.contact_value.trim();
-        if (!isUuid(targetUser)) {
-          console.warn("[notify_carers_on_hypo] inapp contact_value not a uuid", c.id);
-          continue;
-        }
-        const { error: insErr } = await admin.from("notifications").insert({
-          user_id: targetUser,
-          title,
-          body: bodyText,
-          data: { ...hypoPayload, carer_row_id: c.id, carer_name: c.carer_name },
-          read: false,
-        });
-        if (insErr) console.error("[notify_carers_on_hypo] notification insert", insErr);
-        else inappDelivered += 1;
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        eligible_carers: carers.length,
+        eligible_carers: recipients.length,
         delivered_push: pushDelivered,
         delivered_inapp: inappDelivered,
       }),

@@ -29,7 +29,7 @@ export default function ModeChooserPage() {
 
   const currentLabel = useMemo(() => {
     if (mode === "carer") return "Carer mode";
-    if (mode === "patient") return "Patient mode";
+    if (mode === "patient") return "User mode";
     return "Not set";
   }, [mode]);
 
@@ -52,7 +52,7 @@ export default function ModeChooserPage() {
     <PageShell variant="narrow" className="space-y-6 py-4 md:py-8">
       <PageHeader
         title="Choose your mode"
-        description="If you support someone as a carer, you can switch between your own patient tools and their read-only view."
+        description="If you support someone as a carer, you can switch between your own tools and their read-only view."
       />
 
       <Card className="shadow-sm border-border/60 rounded-2xl">
@@ -62,7 +62,7 @@ export default function ModeChooserPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Button className="w-full min-h-11" onClick={() => pick("patient")} data-testid="button-mode-patient">
-            Patient mode
+            User mode
           </Button>
           <Button
             className="w-full min-h-11"

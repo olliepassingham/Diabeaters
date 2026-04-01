@@ -11,6 +11,7 @@ import {
   type LocalSupplySyncPayload,
   type OfflineQueueEntry,
 } from "./offline";
+import { flushSupplyEventsOfflineQueue } from "./supply-events";
 
 /** Row shape for `public.supplies` (cloud). */
 export type Supply = {
@@ -721,6 +722,12 @@ export async function flushSuppliesOfflineQueue(): Promise<{
   if (!isOnline()) return { flushed: 0, skippedNewer: 0, failed: 0 };
 
   const result = await flushQueue(async (entry) => {
+    if (entry.kind === "supply_events:add") {
+      const res = await flushSupplyEventsOfflineQueue([entry]);
+      if (res.failed > 0) return { status: "failed", error: new Error("Supply event flush failed") };
+      return { status: "ok" };
+    }
+
     if (entry.kind === "supplies:local-sync") {
       const res = await flushLocalSyncEntry(entry);
       if (res.status === "failed") return { status: "failed", error: res.error };

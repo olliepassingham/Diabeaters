@@ -184,52 +184,6 @@ function StatusPill({ status }: { status: HealthStatus }) {
   );
 }
 
-function HeaderCard({
-  profile,
-  cloudFullName,
-  status,
-}: {
-  profile: UserProfile | null;
-  cloudFullName: string | null;
-  status: HealthStatus;
-}) {
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
-  const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
-  const firstName = displayName.split(" ")[0] || "";
-
-  return (
-    <Card
-      className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50"
-      data-testid="card-header"
-    >
-      <CardContent className="p-4 md:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 space-y-0.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className="text-lg font-semibold tracking-tight text-foreground"
-                data-testid="text-greeting"
-              >
-                {greeting()}
-                {firstName ? `, ${firstName}` : ""}
-              </span>
-              <StagingChip />
-            </div>
-            <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
-          </div>
-          <StatusPill status={status} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function DashboardInfoDialog() {
   return (
     <PageInfoDialog
@@ -258,10 +212,12 @@ function DashboardInfoDialog() {
 function HeroCard({
   status,
   profile,
+  cloudFullName,
   onEditWidgets,
 }: {
   status: HealthStatus;
   profile: UserProfile | null;
+  cloudFullName: string | null;
   onEditWidgets: () => void;
 }) {
   const { user } = useAuth();
@@ -333,48 +289,72 @@ function HeroCard({
     })();
   };
 
+  const greeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
+  const firstName = displayName.split(" ")[0] || "";
+
   return (
     <>
       <Card
         className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50"
         data-testid="card-hero"
       >
-        <CardContent className="px-3 py-3 md:px-4 md:py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href="/help-now" className="min-w-0 flex-1 basis-[min(100%,12rem)]">
-          <Button 
-            variant="destructive" 
-            size="sm"
-            className={`min-h-11 w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
-            data-testid="button-help-now"
-          >
-            <Phone className="h-4 w-4 mr-1" />
-            Help Now
-          </Button>
-        </Link>
-        <Button
-          size="sm"
-          className="min-h-11 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0 px-4"
-          onClick={() => setHypoDialogOpen(true)}
-          data-testid="button-dashboard-treated-hypo"
-        >
-          <CheckCircle2 className="h-4 w-4" />
-          Treated a Hypo
-        </Button>
-        <div className="flex items-center gap-2 shrink-0">
-          <DashboardInfoDialog />
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={onEditWidgets}
-            className="min-h-11 min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-            data-testid="button-customize"
-            aria-label="Edit dashboard widgets"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+        <CardContent className="p-4 md:p-5 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-lg font-semibold tracking-tight text-foreground" data-testid="text-greeting">
+                  {greeting()}
+                  {firstName ? `, ${firstName}` : ""}
+                </span>
+                <StagingChip />
+              </div>
+              <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
+            </div>
+            <StatusPill status={status} />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link href="/help-now" className="min-w-0 flex-1 basis-[min(100%,12rem)]">
+              <Button
+                variant="destructive"
+                size="sm"
+                className={`min-h-11 w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
+                data-testid="button-help-now"
+              >
+                <Phone className="h-4 w-4 mr-1" />
+                Help Now
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              className="min-h-11 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0 px-4"
+              onClick={() => setHypoDialogOpen(true)}
+              data-testid="button-dashboard-treated-hypo"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Treated a Hypo
+            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <DashboardInfoDialog />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onEditWidgets}
+                className="min-h-11 min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                data-testid="button-customize"
+                aria-label="Edit dashboard widgets"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -662,66 +642,59 @@ export default function Dashboard() {
         title={<span data-testid="dashboard-title">Dashboard</span>}
         description={<span data-testid="dashboard-subtitle">Your daily overview</span>}
       />
-      {/* Single vertical rhythm: PageShell `density="compact"` replaces per-section mt-* stacking */}
-      <div className="animate-fade-in-down">
-        <HeaderCard
-          profile={profile}
-          cloudFullName={cloudProfile?.full_name ?? null}
-          status={healthStatus}
-        />
-      </div>
+      {/* Today: high-signal cluster (reads as one section) */}
+      <section className="space-y-4" data-testid="dashboard-today">
+        {showVerifiedWelcome && (
+          <Alert
+            className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
+            data-testid="banner-verified-welcome"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <AlertDescription className="text-sm">Welcome! Your email is verified.</AlertDescription>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 -mt-1 -mr-1 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                aria-label="Dismiss verification welcome banner"
+                onClick={() => {
+                  try {
+                    localStorage.setItem(VERIFIED_WELCOME_DISMISSED_AT_KEY, new Date().toISOString());
+                  } catch {
+                    // Ignore
+                  }
+                  setShowVerifiedWelcome(false);
+                }}
+                data-testid="button-dismiss-verified-welcome"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </Alert>
+        )}
 
-      {showVerifiedWelcome && (
-        <Alert
-          className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
-          data-testid="banner-verified-welcome"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <AlertDescription className="text-sm">
-              Welcome! Your email is verified.
-            </AlertDescription>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 -mt-1 -mr-1 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-              aria-label="Dismiss verification welcome banner"
-              onClick={() => {
-                try {
-                  localStorage.setItem(VERIFIED_WELCOME_DISMISSED_AT_KEY, new Date().toISOString());
-                } catch {
-                  // Ignore
-                }
-                setShowVerifiedWelcome(false);
-              }}
-              data-testid="button-dismiss-verified-welcome"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </Alert>
-      )}
-      
-      <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
-        <HeroCard
-          status={healthStatus}
-          profile={profile}
-          onEditWidgets={() => setWidgetsDialogOpen(true)}
-        />
-      </div>
+        <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
+          <HeroCard
+            status={healthStatus}
+            profile={profile}
+            cloudFullName={cloudProfile?.full_name ?? null}
+            onEditWidgets={() => setWidgetsDialogOpen(true)}
+          />
+        </div>
 
-      <SupplyTrackerTodaySection />
+        <SupplyTrackerTodaySection />
 
-      {!isSettingsComplete && (
-        <section className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
-          <SetupPromptCard completion={settingsCompletion} />
+        {!isSettingsComplete && (
+          <section className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
+            <SetupPromptCard completion={settingsCompletion} />
+          </section>
+        )}
+
+        <section className="animate-fade-in-up" style={{ animationDelay: "90ms" }}>
+          <WelcomeWidget />
         </section>
-      )}
-
-      <section className="animate-fade-in-up" style={{ animationDelay: "90ms" }}>
-        <WelcomeWidget />
       </section>
 
       <DashboardWidgetSettings
@@ -734,7 +707,12 @@ export default function Dashboard() {
         resetWidgets={resetWidgets}
       />
 
-      <section className="animate-stagger mt-6" data-testid="dashboard-widgets">
+      <section className="animate-stagger pt-2" data-testid="dashboard-widgets">
+        {widgetsToRender.length > 0 && (
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-muted-foreground">Widgets</h2>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;

@@ -129,7 +129,7 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
   const homeActive = isCarer ? pathOnly === "/carer-view" : pathOnly === "/";
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center bg-card/85 px-4 shadow-sm backdrop-blur border-b border-border/60">
+    <header className="sticky top-0 z-50 flex h-14 items-center bg-card/90 px-4 backdrop-blur border-b border-border/70">
       <div className="relative flex w-full items-center">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <HeaderProfileDropdown onLogout={onLogout} />
@@ -151,7 +151,7 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
           </button>
         </div>
 
-        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-4">
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
           <NotificationBell />
         </div>
       </div>

@@ -40,6 +40,19 @@ export function NotificationsTab({
         />
       </div>
 
+      <div className="flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Push notifications (iOS)</Label>
+          <p className="text-small text-muted-foreground">Receive alerts when the app is in the background</p>
+        </div>
+        <Switch
+          checked={notifSettings.pushNotifications}
+          onCheckedChange={(checked) => onToggle("pushNotifications", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-push-notifications"
+        />
+      </div>
+
       <div id="notif-hypo" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Hypo alerts</Label>
@@ -123,6 +136,19 @@ export function NotificationsTab({
           onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
           disabled={!notifSettings.enabled}
           data-testid="switch-scenario-alerts"
+        />
+      </div>
+
+      <div className="flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Appointment reminders</Label>
+          <p className="text-small text-muted-foreground">Reminders before upcoming appointments</p>
+        </div>
+        <Switch
+          checked={notifSettings.appointmentReminders}
+          onCheckedChange={(checked) => onToggle("appointmentReminders", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-appointment-reminders"
         />
       </div>
 

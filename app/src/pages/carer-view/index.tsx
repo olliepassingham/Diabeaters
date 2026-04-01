@@ -8,12 +8,14 @@ import { Link, useLocation } from "wouter";
 import {
   normaliseScopes,
   fetchSuppliesForLinkedPatient,
+  fetchSupplyEventsForLinkedPatient,
   fetchPatientProfileForCarer,
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
   fetchHypoLogsForLinkedPatient,
   listLinkedPatientsForCarer,
 } from "@/lib/carers";
+import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
 import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { getSupabase } from "@/lib/supabase";
@@ -33,6 +35,23 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNowStrict } from "date-fns";
+
+function SectionHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        {subtitle ? <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 function parseLocalDateTime(date: unknown, time: unknown): Date | null {
   if (typeof date !== "string") return null;
@@ -226,10 +245,36 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
   return lines;
 }
 
-function supplyTone(qty: number): "ok" | "low" | "critical" {
-  if (qty <= 2) return "critical";
-  if (qty <= 6) return "low";
-  return "ok";
+function supplyTone(row: CloudSupplyRow): "ok" | "low" | "critical" {
+  const qty = Number(row.quantity);
+  if (!Number.isFinite(qty)) return "ok";
+
+  const name = (row.name || "").toLowerCase();
+  const unit = (row.unit || "").toLowerCase();
+  const category = (row.category || "").toLowerCase();
+
+  // Glycogen is emergency/manual stock: 1 is enough; only flag if empty.
+  if (name.includes("glycogen") || name.includes("glucagon")) {
+    return qty <= 0 ? "critical" : "ok";
+  }
+
+  // CGM sensors: treat "out" as critical, 1 left as low.
+  // (Carer View doesn't have forecast/days-remaining, so avoid over-alerting.)
+  const isCgm =
+    category.includes("cgm") ||
+    category.includes("monitor") ||
+    name.includes("dexcom") ||
+    name.includes("libre") ||
+    name.includes("cgm");
+  const isSensor = unit.includes("sensor") || name.includes("sensor");
+  if (isCgm || isSensor) {
+    if (qty <= 0) return "critical";
+    if (qty <= 1) return "low";
+    return "ok";
+  }
+
+  // Default: only flag when empty (avoid false lows when we don't know usage/duration).
+  return qty <= 0 ? "critical" : "ok";
 }
 
 /** Wouter + `LinkedPatientInfo`: load link → optionally load patient bundle → ready. */
@@ -247,6 +292,7 @@ export default function CarerViewPage() {
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchPatientProfileForCarer>>["data"]>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [supplies, setSupplies] = useState<CloudSupplyRow[]>([]);
+  const [supplyEvents, setSupplyEvents] = useState<CloudSupplyEventRow[]>([]);
   const [appointmentRows, setAppointmentRows] = useState<Record<string, unknown>[]>([]);
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
@@ -359,10 +405,13 @@ export default function CarerViewPage() {
       try {
         const patientId = activeLink.patientId;
         const rawScopes = normaliseScopes(activeLink.scopes);
-        const [prof, sup, ap, sc, hl] = await Promise.all([
+        const [prof, sup, se, ap, sc, hl] = await Promise.all([
           fetchPatientProfileForCarer(patientId),
           rawScopes.supplies
             ? fetchSuppliesForLinkedPatient(patientId)
+            : Promise.resolve({ data: [], error: null }),
+          rawScopes.supplies
+            ? fetchSupplyEventsForLinkedPatient(patientId)
             : Promise.resolve({ data: [], error: null }),
           rawScopes.appointments
             ? fetchAppointmentsForLinkedPatient(patientId)
@@ -388,6 +437,9 @@ export default function CarerViewPage() {
 
           if (sup.error) setLoadError(sup.error.message);
           setSupplies(sup.data ?? []);
+
+          if (se.error) setLoadError(se.error.message);
+          setSupplyEvents(se.data ?? []);
 
           if (ap.error) setLoadError(ap.error.message);
           setAppointmentRows(ap.data ?? []);
@@ -524,39 +576,85 @@ export default function CarerViewPage() {
   return (
     <>
       {devOverlay}
-      <PageShell variant="standard" className="max-w-2xl space-y-6 py-4">
-      <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-        <Link href="/account">
-          <Button variant="ghost" size="icon" aria-label="Back" data-testid="button-back-from-carer-view" className="self-start">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-h1 text-foreground flex items-center gap-2 flex-wrap" data-testid="heading-carer-view">
-            <Eye className="h-7 w-7 text-primary shrink-0" />
-            Carer View
-          </h1>
-          <p className="text-body text-muted-foreground mt-1">Read-only — you cannot change their records from here.</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="shrink-0" aria-label={`Viewing ${displayName}`}>
-              Viewing: <span className="ml-1 font-medium">{displayName}</span>
+      <PageShell variant="standard" className="max-w-3xl space-y-6 py-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="min-w-0">
+                <h1 className="text-h1 text-foreground flex items-center gap-2 flex-wrap" data-testid="heading-carer-view">
+                  <Eye className="h-6 w-6 text-primary shrink-0" />
+                  Carer View
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Read-only — you can view shared information and coordinate support.
+                </p>
+              </div>
+            </div>
+
+            <Badge variant="secondary" className="gap-1 shrink-0" aria-label="Read only">
+              <Eye className="h-3 w-3" />
+              Read only
             </Badge>
-            {(scopes.emergency_info ?? false) && (
-              <a
-                href="#carer-emergency"
-                className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4"
-                aria-label="Jump to emergency details"
-              >
-                Emergency details
-              </a>
-            )}
           </div>
+
+          <Card className="border-border/60 shadow-sm" data-testid="carer-view-header">
+            <CardContent className="p-4 md:p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden"
+                    aria-hidden={!avatarUrl}
+                  >
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Heart className="h-6 w-6 text-primary" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Viewing</p>
+                    <p className="text-lg font-semibold text-foreground truncate" data-testid="text-carer-view-name">
+                      {displayName}
+                    </p>
+                  </div>
+                </div>
+
+                {(scopes.emergency_info ?? false) && (
+                  <a
+                    href="#carer-emergency"
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 shrink-0"
+                    aria-label="Jump to emergency details"
+                  >
+                    Emergency
+                  </a>
+                )}
+              </div>
+
+              {patientOptions.length > 1 && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Switch person</p>
+                    <p className="text-xs text-muted-foreground">Choose who you’re viewing in this session.</p>
+                  </div>
+                  <div className="w-60 shrink-0">
+                    <Select value={activePatientId ?? undefined} onValueChange={onPatientChange}>
+                      <SelectTrigger aria-label="Select linked person">
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {patientOptions.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-        <Badge variant="secondary" className="gap-1 shrink-0" aria-label="Read only">
-          <Eye className="h-3 w-3" />
-          Read only
-        </Badge>
-      </div>
 
       {linkedBanner && (
         <Alert className="border-primary/30 bg-primary/5">
@@ -577,257 +675,273 @@ export default function CarerViewPage() {
         </Alert>
       )}
 
-      <Card className="shadow-md" data-testid="carer-view-header">
-        <CardContent className="pt-6 flex items-center gap-4">
-          <div
-            className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden"
-            aria-hidden={!avatarUrl}
-          >
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <Heart className="h-7 w-7 text-primary" />
-            )}
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold" data-testid="text-carer-view-name">
-              {displayName}
-            </h2>
-            <p className="text-sm text-muted-foreground">You are viewing with their permission.</p>
-          </div>
-        </CardContent>
-        {patientOptions.length > 1 && (
-          <>
-            <Separator />
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Viewing</p>
-                  <p className="text-xs text-muted-foreground">Switch the linked person you’re viewing.</p>
-                </div>
-                <div className="w-56 shrink-0">
-                  <Select value={activePatientId ?? undefined} onValueChange={onPatientChange}>
-                    <SelectTrigger aria-label="Select linked person">
-                      <SelectValue placeholder="Select…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {patientOptions.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </>
-        )}
-      </Card>
+        <div className="space-y-4">
+          <SectionHeading
+            title="Now"
+            subtitle="High-signal items that might need attention."
+          />
+          {(scopes.hypo_alerts ?? false) && (
+            <Card className="border-border/60 shadow-sm" data-testid="carer-view-hypos">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="h-5 w-5 text-primary" />
+                  Recent hypos
+                </CardTitle>
+                <CardDescription>Recent hypo logs they have chosen to share.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {hypoLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No hypo logs visible yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {hypoLogs.slice(0, 8).map((h) => {
+                      const when = new Date(h.created_at);
+                      const whenText = Number.isNaN(when.getTime())
+                        ? "Unknown time"
+                        : `${formatDistanceToNowStrict(when, { addSuffix: true })}`;
+                      const bg =
+                        h.blood_glucose == null || Number.isNaN(h.blood_glucose)
+                          ? null
+                          : Math.round(h.blood_glucose * 10) / 10;
+                      return (
+                        <li key={h.id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{bg == null ? "Hypo logged" : `BG ${bg}`}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
+                          </div>
+                          {h.treatment ? <p className="text-muted-foreground">Treatment: {h.treatment}</p> : null}
+                          {h.notes ? (
+                            <p className="text-muted-foreground whitespace-pre-wrap">{h.notes}</p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-      {(scopes.hypo_alerts ?? false) && (
-        <Card className="shadow-md" data-testid="carer-view-hypos">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Heart className="h-5 w-5 text-primary" />
-              Recent hypos
-            </CardTitle>
-            <CardDescription>Recent hypo logs they have chosen to share.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {hypoLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No hypo logs visible yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {hypoLogs.slice(0, 8).map((h) => {
-                  const when = new Date(h.created_at);
-                  const whenText = Number.isNaN(when.getTime())
-                    ? "Unknown time"
-                    : `${formatDistanceToNowStrict(when, { addSuffix: true })}`;
-                  const bg =
-                    h.blood_glucose == null || Number.isNaN(h.blood_glucose)
-                      ? null
-                      : Math.round(h.blood_glucose * 10) / 10;
-                  return (
-                    <li key={h.id} className="rounded-md border border-border px-3 py-2 text-sm space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">
-                          {bg == null ? "Hypo logged" : `BG ${bg}`}
-                        </span>
-                        <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
-                      </div>
-                      {h.treatment ? <p className="text-muted-foreground">Treatment: {h.treatment}</p> : null}
-                      {h.notes ? <p className="text-muted-foreground whitespace-pre-wrap">{h.notes}</p> : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {(scopes.supplies ?? false) && (
-        <Card className="shadow-md" data-testid="carer-view-supplies">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Supplies summary
-            </CardTitle>
-            <CardDescription>Cloud stock figures they have chosen to share.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {supplies.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No supply rows visible yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {supplies.map((s) => {
-                  const tone = supplyTone(s.quantity);
-                  return (
-                    <li
-                      key={s.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium truncate">{s.name}</span>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-muted-foreground tabular-nums">{s.quantity}</span>
-                        {tone === "critical" && (
-                          <Badge variant="destructive" className="text-xs">
-                            Low
-                          </Badge>
-                        )}
-                        {tone === "low" && (
-                          <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
-                            Getting low
-                          </Badge>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {(scopes.appointments ?? false) && (
-        <Card className="shadow-md" data-testid="carer-view-appointments">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Upcoming appointments
-            </CardTitle>
-            <CardDescription>Read-only — from their cloud appointments when columns are present.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {upcomingAppointments.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">No upcoming appointments visible yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {upcomingAppointments.map((appt) => (
-                  <div
-                    key={String((appt as Record<string, unknown>).client_id ?? (appt as Record<string, unknown>).id ?? appointmentSortTime(appt))}
-                    className="rounded-md border border-border px-3 py-3 text-sm space-y-1"
-                  >
-                    <p className="font-medium">{appointmentTitle(appt)}</p>
-                    {formatAppointmentWhen(appt) ? (
-                      <p className="text-muted-foreground">{formatAppointmentWhen(appt)}</p>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">No scheduled time field on this row.</p>
-                    )}
-                    {typeof (appt as Record<string, unknown>).location === "string" &&
-                    ((appt as Record<string, unknown>).location as string).trim() ? (
-                      <p className="text-muted-foreground text-xs">
-                        {(appt as Record<string, unknown>).location as string}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {(scopes.scenarios ?? false) && (
-        <Card id="carer-scenarios" className="shadow-md scroll-mt-24" data-testid="carer-view-scenarios">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Plane className="h-5 w-5 text-primary" />
-              Scenario status
-            </CardTitle>
-            <CardDescription>High-level flags from synced scenario rows.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {scenarioLines.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No scenario data visible yet.</p>
-            ) : (
-              scenarioLines.map((line, i) => (
-                <div
-                  key={`${line}-${i}`}
-                  className="flex items-start gap-2 text-sm rounded-md border border-border px-3 py-2 bg-muted/30"
-                >
-                  {line.toLowerCase().includes("sick") ? (
-                    <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
-                  ) : line.toLowerCase().includes("travel") ? (
-                    <Plane className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
+          <div className="grid gap-4 md:grid-cols-2">
+            {(scopes.scenarios ?? false) && (
+              <Card id="carer-scenarios" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-scenarios">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Plane className="h-5 w-5 text-primary" />
+                    Scenario status
+                  </CardTitle>
+                  <CardDescription>Shared scenario flags (Sick day, Travel, Bedtime).</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {scenarioLines.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No scenario data visible yet.</p>
                   ) : (
-                    <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+                    scenarioLines.map((line, i) => (
+                      <div
+                        key={`${line}-${i}`}
+                        className="flex items-start gap-2 text-sm rounded-lg border border-border/60 px-3 py-2 bg-muted/20"
+                      >
+                        {line.toLowerCase().includes("sick") ? (
+                          <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                        ) : line.toLowerCase().includes("travel") ? (
+                          <Plane className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
+                        ) : (
+                          <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+                        )}
+                        <span>{line}</span>
+                      </div>
+                    ))
                   )}
-                  <span>{line}</span>
-                </div>
-              ))
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
-      )}
 
-      {(scopes.emergency_info ?? false) && (
-        <Card id="carer-emergency" className="shadow-md scroll-mt-24" data-testid="carer-view-emergency">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Phone className="h-5 w-5 text-primary" />
-              Emergency details
-            </CardTitle>
-            <CardDescription>
-              They entered this under Account or Settings. Use only as they intend — this is not emergency services.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {profile?.emergency_contact_name ? (
-              <p>
-                <span className="text-muted-foreground">Name: </span>
-                {profile.emergency_contact_name}
-              </p>
-            ) : null}
-            {profile?.emergency_contact_phone ? (
-              <p>
-                <a
-                  href={`tel:${profile.emergency_contact_phone.replace(/\s+/g, "")}`}
-                  className="font-medium text-primary underline-offset-4 hover:underline"
-                  aria-label={`Call ${profile.emergency_contact_phone}`}
-                >
-                  {profile.emergency_contact_phone}
-                </a>
-              </p>
-            ) : (
-              <p className="text-muted-foreground">No phone number saved.</p>
+            {(scopes.supplies ?? false) && (
+              <Card className="border-border/60 shadow-sm" data-testid="carer-view-supplies">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    Supplies
+                  </CardTitle>
+                  <CardDescription>Cloud stock figures they have chosen to share.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {supplies.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">No supply rows visible yet.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {supplies.map((s) => {
+                        const tone = supplyTone(s);
+                        return (
+                          <li
+                            key={s.id}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                          >
+                            <span className="font-medium truncate">{s.name}</span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-muted-foreground tabular-nums">{s.quantity}</span>
+                              {tone === "critical" && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Out
+                                </Badge>
+                              )}
+                              {tone === "low" && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                                >
+                                  Low
+                                </Badge>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  {supplyEvents.length > 0 && (
+                    <details className="mt-4">
+                      <summary className="text-sm text-muted-foreground cursor-pointer select-none">
+                        Recent changes
+                      </summary>
+                      <div className="mt-3 space-y-2">
+                        {supplyEvents.slice(0, 8).map((e) => {
+                          const when = new Date(e.created_at);
+                          const whenText = Number.isNaN(when.getTime())
+                            ? "Unknown time"
+                            : formatDistanceToNowStrict(when, { addSuffix: true });
+                          const delta =
+                            e.delta == null || Number.isNaN(e.delta) ? null : Math.round(e.delta * 10) / 10;
+                          return (
+                            <div key={e.id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">
+                                  {e.kind}
+                                  {delta != null && delta !== 0 ? (
+                                    <span
+                                      className={
+                                        delta < 0
+                                          ? "text-amber-700 dark:text-amber-400"
+                                          : "text-emerald-700 dark:text-emerald-400"
+                                      }
+                                    >
+                                      {" "}
+                                      {delta > 0 ? `+${delta}` : `${delta}`}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
+                              </div>
+                              {typeof e.supply_id === "string" ? (
+                                <p className="text-xs text-muted-foreground">Item: {e.supply_id}</p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </CardContent>
+              </Card>
             )}
-            {profile?.emergency_notes ? (
-              <p className="text-muted-foreground whitespace-pre-wrap">{profile.emergency_notes}</p>
-            ) : null}
-            {!profile?.emergency_contact_name && !profile?.emergency_contact_phone && !profile?.emergency_notes && (
-              <p className="text-muted-foreground">They have not added emergency details yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
+
+        {(scopes.appointments ?? false) && (
+          <div className="space-y-4">
+            <SectionHeading title="Upcoming" subtitle="Appointments coming up next." />
+            <Card className="border-border/60 shadow-sm" data-testid="carer-view-appointments">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-primary" />
+                  Appointments
+                </CardTitle>
+                <CardDescription>Read-only — from their cloud appointments.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {upcomingAppointments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">No upcoming appointments visible yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {upcomingAppointments.map((appt) => (
+                      <div
+                        key={String(
+                          (appt as Record<string, unknown>).client_id ??
+                            (appt as Record<string, unknown>).id ??
+                            appointmentSortTime(appt),
+                        )}
+                        className="rounded-lg border border-border/60 px-3 py-3 text-sm space-y-1"
+                      >
+                        <p className="font-medium">{appointmentTitle(appt)}</p>
+                        {formatAppointmentWhen(appt) ? (
+                          <p className="text-muted-foreground">{formatAppointmentWhen(appt)}</p>
+                        ) : (
+                          <p className="text-muted-foreground text-xs">No scheduled time field on this row.</p>
+                        )}
+                        {typeof (appt as Record<string, unknown>).location === "string" &&
+                        ((appt as Record<string, unknown>).location as string).trim() ? (
+                          <p className="text-muted-foreground text-xs">
+                            {(appt as Record<string, unknown>).location as string}
+                          </p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {(scopes.emergency_info ?? false) && (
+          <div className="space-y-4">
+            <SectionHeading title="Reference" subtitle="Details for coordination and emergencies." />
+            <Card id="carer-emergency" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-emergency">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-primary" />
+                  Emergency details
+                </CardTitle>
+                <CardDescription>
+                  They entered this under Account or Settings. Use only as they intend — this is not emergency services.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {profile?.emergency_contact_name ? (
+                  <p>
+                    <span className="text-muted-foreground">Name: </span>
+                    {profile.emergency_contact_name}
+                  </p>
+                ) : null}
+                {profile?.emergency_contact_phone ? (
+                  <p>
+                    <a
+                      href={`tel:${profile.emergency_contact_phone.replace(/\s+/g, "")}`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                      aria-label={`Call ${profile.emergency_contact_phone}`}
+                    >
+                      {profile.emergency_contact_phone}
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-muted-foreground">No phone number saved.</p>
+                )}
+                {profile?.emergency_notes ? (
+                  <p className="text-muted-foreground whitespace-pre-wrap">{profile.emergency_notes}</p>
+                ) : null}
+                {!profile?.emergency_contact_name &&
+                  !profile?.emergency_contact_phone &&
+                  !profile?.emergency_notes && <p className="text-muted-foreground">They have not added emergency details yet.</p>}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
       <p className="text-xs text-center text-muted-foreground px-2">
         This screen is for peace of mind and coordination. It does not give medical advice or replace their care team.
       </p>
-    </PageShell>
+      </PageShell>
     </>
   );
 }

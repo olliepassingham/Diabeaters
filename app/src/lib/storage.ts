@@ -86,6 +86,7 @@ export interface UserSettings {
   insulinCartridgeUnits?: number;
   basalInjectionTime?: string;
   primingUnitsPerInjection?: number;
+  suppliesSmarterForecastEnabled?: boolean;
 }
 
 export interface Supply {
@@ -428,10 +429,14 @@ export interface AppNotification {
 
 export interface NotificationSettings {
   enabled: boolean;
+  /** iOS push notifications (Capacitor). */
+  pushNotifications: boolean;
   supplyAlerts: boolean;
   criticalThresholdDays: number;
   lowThresholdDays: number;
   browserNotifications: boolean;
+  /** Appointment reminder notifications (in-app + push where available). */
+  appointmentReminders: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
 }
@@ -736,6 +741,70 @@ export const storage = {
       this.syncSupplyUsageToSettings(supplyType, updates.dailyUsage);
     }
     return supplies[index];
+  },
+
+  /**
+   * Set the *displayed* remaining stock "as of today", while keeping the
+   * pickup-based auto-deduction model consistent.
+   *
+   * When a supply has `lastPickupDate` + `quantityAtPickup`, the UI displays
+   * `getAdjustedQuantity()` (derived from pickup baseline and usage). If we only
+   * update `currentQuantity`, the displayed value can appear to jump back.
+   *
+   * This helper updates `quantityAtPickup` (baseline) so that `getAdjustedQuantity()`
+   * evaluates to `desiredRemainingNow` on the current date.
+   */
+  setSupplyRemainingNow(id: string, desiredRemainingNow: number): Supply | null {
+    const supplies = this.getSupplies();
+    const index = supplies.findIndex((s) => s.id === id);
+    if (index === -1) return null;
+
+    const current = supplies[index];
+    const desired = Math.max(0, Math.floor(desiredRemainingNow));
+
+    // If we don't have a pickup baseline, fall back to a simple quantity update.
+    if (!current.lastPickupDate || current.quantityAtPickup == null) {
+      return this.updateSupply(id, { currentQuantity: desired });
+    }
+
+    const today = new Date();
+    const pickupDate = new Date(current.lastPickupDate);
+    pickupDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const daysElapsed = Math.max(
+      0,
+      Math.floor((today.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+
+    // Duration-based supplies are depleted in whole items.
+    if (current.type === "cgm" || current.type === "infusion_set" || current.type === "reservoir") {
+      const itemDuration = this.getItemDuration(current.type);
+      if (itemDuration <= 0) {
+        return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: desired });
+      }
+
+      if (current.activeItemStartDate) {
+        const info = this.getActiveItemInfo(current);
+        // While an item is active (not expired), adjusted quantity stays at quantityAtPickup.
+        if (info && !info.isExpired) {
+          return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: desired });
+        }
+      }
+
+      const itemsUsed = Math.floor(daysElapsed / itemDuration);
+      const nextPickupBaseline = Math.max(0, desired + itemsUsed);
+      return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: nextPickupBaseline });
+    }
+
+    const settings = this.getSettings();
+    const effectiveDailyUsage = this.getEffectiveDailyUsage(current, settings);
+    if (effectiveDailyUsage <= 0) {
+      return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: desired });
+    }
+
+    const usedAmount = daysElapsed * effectiveDailyUsage;
+    const nextPickupBaseline = Math.max(0, desired + usedAmount);
+    return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: nextPickupBaseline });
   },
 
   deleteSupply(id: string): boolean {
@@ -1458,6 +1527,22 @@ export const storage = {
   },
 
   getSupplyStatus(supply: Supply): "critical" | "low" | "ok" {
+    const adjustedQty = this.getAdjustedQuantity(supply);
+
+    // Emergency/manual-use items (e.g. Glycogen) can be tracked as "stock on hand"
+    // without forecast depletion. When daily usage is 0, don't flag low unless empty.
+    const usage = this.getEffectiveDailyUsage(supply);
+    if (usage <= 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir") {
+      if (adjustedQty <= 0) return "critical";
+      return "ok";
+    }
+
+    // Explicitly treat Glycogen as manual/emergency stock: 1 is enough; only flag when empty.
+    if (/glycogen/i.test(supply.name || "")) {
+      if (adjustedQty <= 0) return "critical";
+      return "ok";
+    }
+
     const days = this.getDaysRemaining(supply);
     if (days <= 3) return "critical";
     if (days <= 7) return "low";
@@ -1945,10 +2030,12 @@ export const storage = {
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
     return data ? JSON.parse(data) : {
       enabled: true,
+      pushNotifications: true,
       supplyAlerts: true,
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
       browserNotifications: false,
+      appointmentReminders: true,
       hypoAlerts: true,
       scenarioAlerts: true,
     };

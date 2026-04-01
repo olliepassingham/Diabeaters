@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
+import { ensureIosPushRegistered } from "@/lib/push-tokens";
 
 type AuthContextValue = {
   user: User | null;
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || !user?.id) return;
+    void ensureIosPushRegistered();
     const timer = window.setTimeout(() => {
       void import("@/lib/supplies").then((m) => m.reconcileSupplies());
     }, 800);

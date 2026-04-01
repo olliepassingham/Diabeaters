@@ -7,7 +7,7 @@ export function WidgetCard({ className, ...props }: React.ComponentProps<typeof 
   return (
     <Card
       className={cn(
-        "h-full flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm",
+        "dashboard-card-hover h-full flex flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm transition-shadow hover:shadow-md dark:border-border/50",
         className
       )}
       {...props}

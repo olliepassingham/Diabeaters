@@ -46,6 +46,19 @@ export type OfflineSupplyOp =
       localId: string;
       cloudId: string | null;
       clientTs: string;
+    }
+  | {
+      kind: "supply_events:add";
+      clientId: string;
+      payload: {
+        supply_id: string;
+        kind: string;
+        delta: number | null;
+        stock_now: number | null;
+        meta: Record<string, unknown>;
+        created_at: string;
+      };
+      clientTs: string;
     };
 
 export type OfflineQueueEntry = OfflineSupplyOp;
@@ -109,6 +122,14 @@ export function enqueueLocalSupplyDelete(
   let next = getQueue().filter((e) => !(e.kind === "supplies:local-sync" && e.localId === entry.localId));
   next = next.filter((e) => !(e.kind === "supplies:local-delete" && e.localId === entry.localId));
   setQueue([...next, entry]);
+}
+
+/** Enqueue a supply event write (deduped by clientId). */
+export function enqueueSupplyEventAdd(
+  entry: Extract<OfflineQueueEntry, { kind: "supply_events:add" }>,
+): void {
+  const filtered = getQueue().filter((e) => !(e.kind === "supply_events:add" && e.clientId === entry.clientId));
+  setQueue([...filtered, entry]);
 }
 
 export type FlushResult =

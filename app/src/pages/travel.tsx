@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { upsertScenario } from "@/lib/scenarios-supabase";
+import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 
 interface TravelPlan {
   duration: number;
@@ -764,6 +765,11 @@ export default function Travel() {
     toast({
       title: "Travel Mode Activated",
       description: `You'll see travel reminders until ${new Date(plan.endDate).toLocaleDateString()}`,
+    });
+    void invokeNotifyScenarioStarted({
+      scenarioKey: "travel",
+      title: "Travel started",
+      summary,
     });
   };
   

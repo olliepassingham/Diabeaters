@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dumbbell,
   AlertCircle,
@@ -13,10 +14,12 @@ import {
   Clock,
   X,
   ArrowRight,
+  ArrowLeft,
   Apple,
   Repeat,
   ChevronDown,
   Utensils,
+  Calculator,
 } from "lucide-react";
 import { storage, type UserProfile, type ExerciseRoutine } from "@/lib/storage";
 import {
@@ -48,6 +51,14 @@ const exerciseLabelsMap: Record<string, string> = {
   swimming: "Swimming",
 };
 
+type ExerciseVerdict = "ready" | "caution" | "not_recommended";
+
+function parseNumericMaybe(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  const n = parseFloat(String(value).trim().replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
 export function ExercisePlanner() {
   const search = useSearch();
   const { toast } = useToast();
@@ -68,6 +79,7 @@ export function ExercisePlanner() {
   const [approxCarbs, setApproxCarbs] = useState("");
   const [lastInsulinTiming, setLastInsulinTiming] = useState<LastInsulinTiming | "">("");
   const [currentBgInput, setCurrentBgInput] = useState("");
+  const [resultTab, setResultTab] = useState("before");
 
   const bgUnits = profile.bgUnits || "mmol/L";
 
@@ -152,6 +164,7 @@ export function ExercisePlanner() {
 
     const result = calculateExercisePlan(ctx, freshSettings);
     setExerciseResult(result);
+    setResultTab("before");
     const message = `${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes`;
     const ctxLog = {
       nutrition: nutritionContext || undefined,
@@ -171,6 +184,67 @@ export function ExercisePlanner() {
     } catch {
       /* ignore */
     }
+  };
+
+  const minutesUntilStartParsed = parseInt(sessionTimingFromNow, 10);
+  const minutesUntilStart = Number.isNaN(minutesUntilStartParsed) ? 60 : Math.max(0, minutesUntilStartParsed);
+  const hoursUntilStart = Math.max(1, Math.ceil(minutesUntilStart / 60));
+
+  const adviserHref = (timing: "before" | "after" | "during") => {
+    const params = new URLSearchParams();
+    params.set("tab", "meal");
+    params.set("exercise", "1");
+    params.set("exerciseTiming", timing);
+    params.set("exerciseWithin", String(hoursUntilStart));
+    return `/adviser?${params.toString()}`;
+  };
+
+  const verdictForResult = (): {
+    verdict: ExerciseVerdict;
+    title: string;
+    detail: string;
+  } => {
+    if (!exerciseResult) {
+      return { verdict: "caution", title: "Caution", detail: "Plan a workout to see guidance." };
+    }
+
+    if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
+      return {
+        verdict: "not_recommended",
+        title: "Not recommended",
+        detail: "Severe illness increases risk. Focus on rest and monitoring.",
+      };
+    }
+
+    const lowThreshold = parseNumericMaybe(exerciseResult.pre.lowThreshold);
+    const bg = parseNumericMaybe(currentBgInput);
+    if (bg == null || lowThreshold == null) {
+      return {
+        verdict: "caution",
+        title: "Caution",
+        detail: "Add your current BG for a clearer go/no‑go decision.",
+      };
+    }
+
+    const highThreshold = bgUnits === "mmol/L" ? 13.9 : 250;
+    if (bg < lowThreshold) {
+      const grams = exerciseResult.pre.carbsIfLow;
+      return {
+        verdict: "not_recommended",
+        title: "Not recommended (low BG)",
+        detail: grams > 0 ? `Treat first (about ${grams}g fast carbs), then re-check.` : "Treat first, then re-check.",
+      };
+    }
+
+    if (bg > highThreshold) {
+      return {
+        verdict: "caution",
+        title: "Caution (high BG)",
+        detail: "Consider ketone checks and a correction plan per your care team before intense activity.",
+      };
+    }
+
+    return { verdict: "ready", title: "Ready", detail: "You look in range to start—still monitor closely." };
   };
 
   return (
@@ -415,10 +489,7 @@ export function ExercisePlanner() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-                  <Dumbbell className="h-6 w-6 text-primary" />
-                  Your workout plan
-                </CardTitle>
+                <CardTitle className="text-h3 flex items-center gap-2 text-foreground">Your workout plan</CardTitle>
                 <CardDescription className="mt-1">{exerciseResult.summary}</CardDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setExerciseResult(null)} data-testid="button-clear-exercise-result">
@@ -426,119 +497,211 @@ export function ExercisePlanner() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="p-2 bg-primary/5 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{exerciseResult.duration}</p>
-                <p className="text-tiny text-muted-foreground">minutes</p>
-              </div>
-              <div className="p-2 bg-primary/5 rounded-lg">
-                <p className="text-2xl font-bold text-primary capitalize">{exerciseResult.intensity}</p>
-                <p className="text-tiny text-muted-foreground">intensity</p>
-              </div>
-              <div className="p-2 bg-primary/5 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{exerciseResult.pre.bolusReduction}</p>
-                <p className="text-tiny text-muted-foreground">reduce bolus</p>
-              </div>
-            </div>
+          <CardContent className="space-y-5">
+            {(() => {
+              const v = verdictForResult();
+              const tone =
+                v.verdict === "ready"
+                  ? "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/25"
+                  : v.verdict === "not_recommended"
+                    ? "border-red-200/80 bg-red-50/60 dark:border-red-800/50 dark:bg-red-950/25"
+                    : "border-amber-200/80 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25";
 
-            <div className="space-y-4">
-              <PhaseBlock title="Before" kicker={exerciseResult.pre.timing} tone="blue">
+              return (
+                <div className={`rounded-xl border p-4 ${tone}`} data-testid="exercise-verdict">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Dumbbell className="h-5 w-5 text-primary shrink-0" />
+                        <p className="text-sm font-semibold text-foreground">{v.title}</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{v.detail}</p>
+                      <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
+                        <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
+                          {exerciseResult.duration} min
+                        </span>
+                        <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60 capitalize">
+                          {exerciseResult.intensity}
+                        </span>
+                        <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
+                          Reduce bolus {exerciseResult.pre.bolusReduction}
+                        </span>
+                        {currentBgInput.trim() !== "" ? (
+                          <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
+                            BG {currentBgInput} {bgUnits}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 shrink-0">
+                      <Button variant="outline" size="sm" className="min-h-11" asChild data-testid="button-exercise-open-adviser">
+                        <Link href={adviserHref("before")}>
+                          <Calculator className="h-4 w-4 mr-2" />
+                          Use in insulin calculator
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <Tabs value={resultTab} onValueChange={setResultTab} className="w-full" data-testid="exercise-result-tabs">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="before" data-testid="tab-exercise-before">Before</TabsTrigger>
+                <TabsTrigger value="during" data-testid="tab-exercise-during">During</TabsTrigger>
+                <TabsTrigger value="after" data-testid="tab-exercise-after">After</TabsTrigger>
+                <TabsTrigger value="recovery" data-testid="tab-exercise-recovery">Next</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="before" className="mt-4 space-y-3">
                 {exerciseResult.pre.contextualNotes && exerciseResult.pre.contextualNotes.length > 0 && (
-                  <div className="space-y-2 rounded-lg border border-blue-200/80 bg-blue-100/40 p-3 dark:border-blue-800/60 dark:bg-blue-950/30">
+                  <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3 space-y-2" data-testid="exercise-context-notes">
                     {exerciseResult.pre.contextualNotes.map((note, i) => (
-                      <TipRow key={`ctx-${i}`}>
-                        <span>{note}</span>
-                      </TipRow>
+                      <TipRow key={`ctx-${i}`}>{note}</TipRow>
                     ))}
                   </div>
                 )}
+
                 <div className="space-y-2">
                   <TipRow>
-                    <strong>Target BG:</strong> {exerciseResult.pre.targetBg} {bgUnits} before you start
+                    <strong>Target BG:</strong> {exerciseResult.pre.targetBg} {bgUnits}
                   </TipRow>
                   {exerciseResult.pre.carbsIfLow > 0 && (
                     <TipRow>
-                      <strong>If BG is below {exerciseResult.pre.lowThreshold}:</strong> eat {exerciseResult.pre.carbsIfLow}g carbs first
+                      <strong>If below {exerciseResult.pre.lowThreshold}:</strong> eat {exerciseResult.pre.carbsIfLow}g fast carbs first
                     </TipRow>
                   )}
                   <TipRow>
-                    <strong>Reduce meal bolus</strong> by {exerciseResult.pre.bolusReduction} if eating before
+                    <strong>Meal bolus:</strong> reduce by {exerciseResult.pre.bolusReduction} if eating before
                   </TipRow>
                 </div>
-                <p className="text-tiny text-blue-600 dark:text-blue-400 flex items-center gap-1 pt-2 border-t border-blue-200 dark:border-blue-700">
-                  <Apple className="h-3 w-3" />
-                  Snack ideas: {exerciseResult.pre.snackIdeas.join(", ")}
-                </p>
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
-                  <PumpTipBlock tips={exerciseResult.pumpTips.pre} data-testid="pump-tip-before" />
-                )}
-              </PhaseBlock>
 
-              <PhaseBlock title="During your workout" kicker="In session" tone="amber">
+                <div className="rounded-xl border border-border/60 bg-card px-3 py-3">
+                  <p className="text-xs font-medium text-muted-foreground">Snack ideas</p>
+                  <p className="text-sm text-foreground">{exerciseResult.pre.snackIdeas.join(", ")}</p>
+                </div>
+
+                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
+                    <div className="mt-3">
+                      <PumpTipBlock tips={exerciseResult.pumpTips.pre} data-testid="pump-tip-before" />
+                    </div>
+                  </details>
+                )}
+              </TabsContent>
+
+              <TabsContent value="during" className="mt-4 space-y-3">
                 {exerciseResult.during.needsCarbs && (
-                  <div className="p-3 bg-card rounded-lg text-center mb-3 border border-amber-200/60 dark:border-amber-800/50">
-                    <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">{exerciseResult.during.carbsNeeded}g</p>
-                    <p className="text-tiny text-amber-600 dark:text-amber-400">fast-acting carbs to have ready</p>
+                  <div className="rounded-xl border border-border/60 bg-card px-3 py-3 text-center" data-testid="exercise-during-carbs">
+                    <p className="text-3xl font-bold text-foreground">{exerciseResult.during.carbsNeeded}g</p>
+                    <p className="text-xs text-muted-foreground">fast-acting carbs to have ready</p>
                   </div>
                 )}
+
                 <div className="space-y-2">
                   {exerciseResult.during.tips.map((tip, i) => (
                     <TipRow key={i}>{tip}</TipRow>
                   ))}
                 </div>
-                {exerciseResult.during.checkBg && (
-                  <p className="text-tiny text-amber-600 dark:text-amber-400 flex items-center gap-1 pt-2 border-t border-amber-200 dark:border-amber-700">
-                    <Clock className="h-3 w-3" />
-                    Check BG at the halfway mark
-                  </p>
-                )}
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.during.length > 0 && (
-                  <PumpTipBlock tips={exerciseResult.pumpTips.during} data-testid="pump-tip-during" />
-                )}
-              </PhaseBlock>
 
-              <PhaseBlock title="After" kicker={exerciseResult.post.timing} tone="green">
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="p-3 bg-card rounded-lg text-center border border-green-200/60 dark:border-green-800/50">
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{exerciseResult.post.carbs}g</p>
-                    <p className="text-tiny text-green-600 dark:text-green-400">carbs for recovery</p>
+                {exerciseResult.during.checkBg && (
+                  <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 flex items-center gap-2" data-testid="exercise-during-check">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-foreground">Check BG at the halfway mark</p>
                   </div>
-                  <div className="p-3 bg-card rounded-lg text-center border border-green-200/60 dark:border-green-800/50">
-                    <p className="text-2xl font-bold text-green-700 dark:text-green-300">{exerciseResult.post.protein}</p>
-                    <p className="text-tiny text-green-600 dark:text-green-400">protein for muscles</p>
+                )}
+
+                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.during.length > 0 && (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
+                    <div className="mt-3">
+                      <PumpTipBlock tips={exerciseResult.pumpTips.during} data-testid="pump-tip-during" />
+                    </div>
+                  </details>
+                )}
+              </TabsContent>
+
+              <TabsContent value="after" className="mt-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border/60 bg-card p-3 text-center" data-testid="exercise-after-carbs">
+                    <p className="text-2xl font-bold text-foreground">{exerciseResult.post.carbs}g</p>
+                    <p className="text-xs text-muted-foreground">carbs</p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-card p-3 text-center" data-testid="exercise-after-protein">
+                    <p className="text-2xl font-bold text-foreground">{exerciseResult.post.protein}</p>
+                    <p className="text-xs text-muted-foreground">protein</p>
                   </div>
                 </div>
-                <TipRow>
-                  <strong>Reduce recovery meal bolus</strong> by {exerciseResult.post.bolusReduction}
-                </TipRow>
-                <p className="text-tiny text-green-600 dark:text-green-400 flex items-center gap-1 pt-2 border-t border-green-200 dark:border-green-700">
-                  <Apple className="h-3 w-3" />
-                  Good options: {exerciseResult.post.snackIdeas.join(", ")}
-                </p>
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
-                  <PumpTipBlock tips={exerciseResult.pumpTips.post} data-testid="pump-tip-after" />
-                )}
-              </PhaseBlock>
 
-              <PhaseBlock title={`Next ${exerciseResult.recovery.monitorHours} hours`} kicker="Recovery" tone="purple">
+                <TipRow>
+                  <strong>Recovery meal bolus:</strong> reduce by {exerciseResult.post.bolusReduction}
+                </TipRow>
+
+                <div className="rounded-xl border border-border/60 bg-card px-3 py-3">
+                  <p className="text-xs font-medium text-muted-foreground">Good options</p>
+                  <p className="text-sm text-foreground">{exerciseResult.post.snackIdeas.join(", ")}</p>
+                </div>
+
+                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
+                    <div className="mt-3">
+                      <PumpTipBlock tips={exerciseResult.pumpTips.post} data-testid="pump-tip-after" />
+                    </div>
+                  </details>
+                )}
+              </TabsContent>
+
+              <TabsContent value="recovery" className="mt-4 space-y-3">
+                <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3" data-testid="exercise-recovery-header">
+                  <p className="text-sm font-medium text-foreground">Next {exerciseResult.recovery.monitorHours} hours</p>
+                  <p className="text-xs text-muted-foreground">Recovery & delayed low awareness</p>
+                </div>
+
                 <div className="space-y-2">
                   {exerciseResult.recovery.tips.map((tip, i) => (
                     <TipRow key={i}>{tip}</TipRow>
                   ))}
                 </div>
-                <div className="p-2 bg-purple-100 dark:bg-purple-900/40 rounded text-tiny text-purple-700 dark:text-purple-300 mt-2">
-                  <strong>Why delayed lows happen:</strong> Your muscles keep absorbing glucose for hours after exercise to replenish their stores.
-                </div>
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.recovery.length > 0 && (
-                  <PumpTipBlock tips={exerciseResult.pumpTips.recovery} data-testid="pump-tip-recovery" />
-                )}
-              </PhaseBlock>
-            </div>
 
-            <p className="text-tiny text-muted-foreground">
-              Not medical advice. Individual responses to exercise vary — track your patterns with your care team.
-            </p>
+                <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                  <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+                    Why delayed lows happen
+                  </summary>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Your muscles can keep absorbing glucose for hours after exercise to replenish their stores.
+                  </p>
+                </details>
+
+                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.recovery.length > 0 && (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
+                    <div className="mt-3">
+                      <PumpTipBlock tips={exerciseResult.pumpTips.recovery} data-testid="pump-tip-recovery" />
+                    </div>
+                  </details>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-tiny text-muted-foreground">
+                Not medical advice. Individual responses vary — track your patterns with your care team.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="min-h-11"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                data-testid="button-exercise-back-to-planner"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Adjust inputs
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -598,42 +761,6 @@ function TipRow({ children }: { children: React.ReactNode }) {
       <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-70" />
       <p className="text-small text-foreground">{children}</p>
     </div>
-  );
-}
-
-const toneMap = {
-  blue: "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30",
-  amber: "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30",
-  green: "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30",
-  purple: "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30",
-};
-
-const kickerMap = {
-  blue: "text-blue-600 dark:text-blue-400",
-  amber: "text-amber-600 dark:text-amber-400",
-  green: "text-green-600 dark:text-green-400",
-  purple: "text-purple-600 dark:text-purple-400",
-};
-
-function PhaseBlock({
-  title,
-  kicker,
-  tone,
-  children,
-}: {
-  title: string;
-  kicker: string;
-  tone: keyof typeof toneMap;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={`p-4 rounded-xl border space-y-3 ${toneMap[tone]}`}>
-      <div>
-        <p className={`text-tiny font-medium uppercase ${kickerMap[tone]}`}>{kicker}</p>
-        <h4 className="text-h3 font-semibold text-foreground mt-0.5">{title}</h4>
-      </div>
-      {children}
-    </section>
   );
 }
 

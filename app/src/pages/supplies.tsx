@@ -17,6 +17,9 @@ import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
+import { ToastAction } from "@/components/ui/toast";
+import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 
 const typeIcons: Record<string, any> = {
   needle: Syringe,
@@ -43,6 +46,27 @@ const typeLabels: Record<string, string> = {
 
 function isInsulinType(type: string): boolean {
   return type === "insulin" || type === "insulin_short" || type === "insulin_long" || type === "insulin_vial";
+}
+
+const SUPPLY_ALERT_STATE_KEY = "diabeater_supply_alert_state_v1";
+type SupplyAlertLevel = "ok" | "low" | "critical";
+
+function getSupplyAlertState(): Record<string, SupplyAlertLevel> {
+  try {
+    const raw = localStorage.getItem(SUPPLY_ALERT_STATE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Record<string, SupplyAlertLevel>) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function setSupplyAlertState(state: Record<string, SupplyAlertLevel>) {
+  try {
+    localStorage.setItem(SUPPLY_ALERT_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
 }
 
 function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; onSupplyClick?: (id: string) => void }) {
@@ -922,7 +946,7 @@ function SupplyCard({
   supply, 
   onEdit, 
   onDelete, 
-  onUpdateQuantity,
+  onAdjustQuantity,
   onLogPickup,
   onMarkOrdered,
   onClearOrder,
@@ -931,7 +955,13 @@ function SupplyCard({
   supply: Supply; 
   onEdit: (supply: Supply) => void;
   onDelete: (id: string) => void;
-  onUpdateQuantity: (id: string, quantity: number) => void;
+  onAdjustQuantity: (args: {
+    id: string;
+    nextQuantity: number;
+    delta: number;
+    unitLabel: string;
+    unitAmount: number;
+  }) => void;
   onLogPickup: (supply: Supply) => void;
   onMarkOrdered: (id: string) => void;
   onClearOrder: (id: string) => void;
@@ -943,6 +973,18 @@ function SupplyCard({
   const status = storage.getSupplyStatus(supply);
   const daysSincePickup = storage.getDaysSincePickup(supply);
   const Icon = typeIcons[supply.type] || Package;
+  const effectiveUsage = storage.getEffectiveDailyUsage(supply);
+  const history = listLocalSupplyEvents(supply.id, 5);
+  const smarterEnabled = !!storage.getSettings().suppliesSmarterForecastEnabled;
+  const inferred = smarterEnabled ? inferDailyUsageFromLocalEvents(supply.id, 7) : null;
+  const forecastUsage =
+    inferred?.usagePerDay && inferred.usagePerDay > 0 ? Math.round(inferred.usagePerDay) : effectiveUsage;
+  const forecastConfidence =
+    inferred?.usagePerDay && inferred.usagePerDay > 0 ? inferred.confidence : effectiveUsage > 0 ? "high" : "low";
+  const activeItemInfo =
+    supply.type === "cgm" || supply.type === "infusion_set" || supply.type === "reservoir"
+      ? storage.getActiveItemInfo(supply)
+      : null;
 
   const getLastPickupText = () => {
     if (!supply.lastPickupDate) return null;
@@ -1012,7 +1054,7 @@ function SupplyCard({
         }`}>
           <div className="flex items-baseline justify-between gap-2">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Estimated Remaining</p>
+              <p className="text-xs text-muted-foreground mb-1">Stock now</p>
               {isInsulinType(supply.type) ? (
                 <div data-testid={`text-remaining-${supply.id}`}>
                   {(() => {
@@ -1064,6 +1106,20 @@ function SupplyCard({
                   ~{Math.floor(adjustedQuantity)}{supply.type === "needle" ? " needles" : ""}
                 </p>
               )}
+              {forecastUsage > 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Forecast assumes {forecastUsage}/day{isInsulinType(supply.type) ? " units" : supply.type === "needle" ? " needles" : ""}{" "}
+                  {smarterEnabled && (
+                    <span className="ml-1">
+                      • Smarter: {forecastConfidence}
+                    </span>
+                  )}{" "}
+                  •{" "}
+                  <Link href="/settings/usage#settings-usage" className="underline underline-offset-2">
+                    Edit habits
+                  </Link>
+                </p>
+              )}
             </div>
             <div className="text-right">
               <Badge 
@@ -1083,7 +1139,17 @@ function SupplyCard({
           </div>
         </div>
 
-        <div className="space-y-2 text-sm">
+        {activeItemInfo && (
+          <p className="text-xs text-muted-foreground -mt-1 mb-2">
+            {activeItemInfo.daysLeft <= 1 ? "Active sensor: change due today" : `Active sensor: ${activeItemInfo.daysLeft} days left`}
+          </p>
+        )}
+
+        <details className="mt-1">
+          <summary className="text-xs text-muted-foreground cursor-pointer select-none">
+            Details
+          </summary>
+          <div className="mt-3 space-y-2 text-sm">
           {supply.type === "cgm" ? (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-muted-foreground">
@@ -1232,7 +1298,8 @@ function SupplyCard({
               Started with {supply.quantityAtPickup} reservoir{supply.quantityAtPickup !== 1 ? 's' : ''}
             </div>
           )}
-        </div>
+          </div>
+        </details>
 
         {supply.isOnOrder && (
           <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 mt-3" data-testid={`order-status-${supply.id}`}>
@@ -1287,15 +1354,25 @@ function SupplyCard({
           </div>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
+            const currentNow = Math.floor(adjustedQuantity);
             return (
               <div className="flex items-center justify-between gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => onUpdateQuantity(supply.id, Math.max(0, Math.floor(adjustedQuantity) - inc.amount))}
+                  onClick={() => {
+                    const nextQuantity = Math.max(0, currentNow - inc.amount);
+                    onAdjustQuantity({
+                      id: supply.id,
+                      nextQuantity,
+                      delta: nextQuantity - currentNow,
+                      unitLabel: inc.label,
+                      unitAmount: inc.amount,
+                    });
+                  }}
                   data-testid={`button-decrease-${supply.id}`}
                 >
-                  -{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
+                  −1 {inc.label}
                 </Button>
                 <span className="text-center text-sm font-medium" data-testid={`text-quantity-${supply.id}`}>
                   {Math.floor(adjustedQuantity)} {isInsulinType(supply.type) ? "units" : ""}
@@ -1303,15 +1380,56 @@ function SupplyCard({
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => onUpdateQuantity(supply.id, Math.floor(adjustedQuantity) + inc.amount)}
+                  onClick={() => {
+                    const nextQuantity = currentNow + inc.amount;
+                    onAdjustQuantity({
+                      id: supply.id,
+                      nextQuantity,
+                      delta: nextQuantity - currentNow,
+                      unitLabel: inc.label,
+                      unitAmount: inc.amount,
+                    });
+                  }}
                   data-testid={`button-increase-${supply.id}`}
                 >
-                  +{inc.amount > 1 ? ` 1 ${inc.label}` : "1"}
+                  +1 {inc.label}
                 </Button>
               </div>
             );
           })()}
         </div>
+
+        {history.length > 0 && (
+          <details className="mt-2 opacity-90">
+            <summary className="text-xs text-muted-foreground cursor-pointer select-none">
+              History
+            </summary>
+            <div className="mt-2 space-y-1">
+              {history.map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">
+                    {e.kind === "adjust" ? "Adjusted" : e.kind}
+                    {typeof e.delta === "number" && e.delta !== 0 && (
+                      <span
+                        className={
+                          e.delta < 0
+                            ? "text-amber-700 dark:text-amber-400"
+                            : "text-emerald-700 dark:text-emerald-400"
+                        }
+                      >
+                        {" "}
+                        {e.delta > 0 ? `+${e.delta}` : `${e.delta}`}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0">
+                    {new Date(e.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
       </CardContent>
     </Card>
   );
@@ -2034,6 +2152,25 @@ export default function Supplies() {
   const [activeTab, setActiveTab] = useState("all");
   const [highlightedSupplyId, setHighlightedSupplyId] = useState<string | null>(null);
   const [usualDialogOpen, setUsualDialogOpen] = useState(false);
+  const [planningOpen, setPlanningOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("diabeater_supply_planning_open_v1");
+      if (raw === "true") setPlanningOpen(true);
+      if (raw === "false") setPlanningOpen(false);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("diabeater_supply_planning_open_v1", planningOpen ? "true" : "false");
+    } catch {
+      // ignore
+    }
+  }, [planningOpen]);
 
   useEffect(() => {
     setSupplies(storage.getSupplies());
@@ -2047,6 +2184,54 @@ export default function Supplies() {
   const refreshSupplies = () => {
     setSupplies(storage.getSupplies());
     setUsualPrescription(storage.getUsualPrescription());
+  };
+
+  const maybeNotifyLowSupplies = async () => {
+    const s = storage.getNotificationSettings();
+    if (!s.enabled || !s.supplyAlerts) return;
+
+    const criticalDays = Math.max(0, Number(s.criticalThresholdDays || 0));
+    const lowDays = Math.max(criticalDays, Number(s.lowThresholdDays || 0));
+    if (lowDays <= 0) return;
+
+    const state = getSupplyAlertState();
+    const nextState: Record<string, SupplyAlertLevel> = { ...state };
+
+    const all = storage.getSupplies();
+    for (const item of all) {
+      // Manual/emergency items (e.g. Glycogen) with no daily usage should not generate
+      // forecast-based low-supply notifications unless they are empty.
+      const adjustedQty = storage.getAdjustedQuantity(item);
+      const effectiveUsage = storage.getEffectiveDailyUsage(item);
+      const isIntervalType = item.type === "cgm" || item.type === "infusion_set" || item.type === "reservoir";
+      const isManualOnly = effectiveUsage <= 0 && !isIntervalType;
+      const isGlycogen = /glycogen/i.test(item.name || "");
+      if ((isManualOnly || isGlycogen) && adjustedQty > 0) {
+        continue;
+      }
+
+      const days = storage.getDaysRemaining(item);
+      const rounded = !Number.isFinite(days) ? 999 : Math.round(days);
+      const level: SupplyAlertLevel =
+        rounded <= criticalDays ? "critical" : rounded <= lowDays ? "low" : "ok";
+
+      const prev = state[item.id] ?? "ok";
+      nextState[item.id] = level;
+
+      const shouldSend =
+        (prev === "ok" && (level === "low" || level === "critical")) ||
+        (prev === "low" && level === "critical");
+      if (!shouldSend) continue;
+
+      await invokeNotifySupplyLow({
+        supplyId: item.id,
+        supplyName: item.name,
+        level: level === "critical" ? "critical" : "low",
+        daysRemaining: rounded,
+      });
+    }
+
+    setSupplyAlertState(nextState);
   };
 
   const saveStateForUndo = () => {
@@ -2123,7 +2308,10 @@ export default function Supplies() {
     const queueCloudUpsert = (localId: string) => {
       void import("@/lib/supplies").then((m) => {
         const local = storage.getSupplies().find((s) => s.id === localId);
-        if (local) void m.syncToCloud(local);
+        if (!local) return;
+        void m.syncToCloud(local).then(() => {
+          void maybeNotifyLowSupplies();
+        });
       });
     };
 
@@ -2171,10 +2359,63 @@ export default function Supplies() {
     }
   };
 
-  const handleUpdateQuantity = (id: string, quantity: number) => {
-    const updated = storage.updateSupply(id, { currentQuantity: quantity });
+  const handleAdjustQuantity = (args: {
+    id: string;
+    nextQuantity: number;
+    delta: number;
+    unitLabel: string;
+    unitAmount: number;
+  }) => {
+    const updated = storage.setSupplyRemainingNow(args.id, args.nextQuantity);
     if (updated) {
-      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+      void import("@/lib/supplies").then((m) =>
+        void m.syncToCloud(updated).then(() => {
+          void maybeNotifyLowSupplies();
+        }),
+      );
+
+      const evt = addLocalSupplyEvent({
+        supplyId: args.id,
+        kind: "adjust",
+        delta: args.delta,
+        stockNow: args.nextQuantity,
+        createdAt: new Date().toISOString(),
+        meta: { source: "stepper", unitLabel: args.unitLabel, unitAmount: args.unitAmount },
+      });
+      enqueueSupplyEventForCloud(evt);
+
+      const prevQuantity = args.nextQuantity - args.delta;
+      toast({
+        title: "Stock updated",
+        description: `${args.delta > 0 ? "+" : ""}${args.delta} (${args.unitLabel})`,
+        action: (
+          <ToastAction
+            altText="Undo"
+            onClick={() => {
+              const undoUpdated = storage.setSupplyRemainingNow(args.id, prevQuantity);
+              if (undoUpdated) {
+                void import("@/lib/supplies").then((m) =>
+                  void m.syncToCloud(undoUpdated).then(() => {
+                    void maybeNotifyLowSupplies();
+                  }),
+                );
+                const undoEvt = addLocalSupplyEvent({
+                  supplyId: args.id,
+                  kind: "adjust",
+                  delta: -args.delta,
+                  stockNow: prevQuantity,
+                  createdAt: new Date().toISOString(),
+                  meta: { source: "undo", unitLabel: args.unitLabel, unitAmount: args.unitAmount },
+                });
+                enqueueSupplyEventForCloud(undoEvt);
+              }
+              refreshSupplies();
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
+      });
     }
     refreshSupplies();
   };
@@ -2200,7 +2441,11 @@ export default function Supplies() {
       
       const updated = storage.updateSupply(pickupSupply.id, updates);
       if (updated) {
-        void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+        void import("@/lib/supplies").then((m) =>
+          void m.syncToCloud(updated).then(() => {
+            void maybeNotifyLowSupplies();
+          }),
+        );
       }
       storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
       toast({ 
@@ -2215,7 +2460,11 @@ export default function Supplies() {
     const updated = storage.markSupplyOrdered(id);
     const supply = supplies.find(s => s.id === id);
     if (updated) {
-      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+      void import("@/lib/supplies").then((m) =>
+        void m.syncToCloud(updated).then(() => {
+          void maybeNotifyLowSupplies();
+        }),
+      );
     }
     toast({
       title: "Marked as ordered",
@@ -2227,7 +2476,11 @@ export default function Supplies() {
   const handleClearOrder = (id: string) => {
     const updated = storage.clearSupplyOrder(id);
     if (updated) {
-      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
+      void import("@/lib/supplies").then((m) =>
+        void m.syncToCloud(updated).then(() => {
+          void maybeNotifyLowSupplies();
+        }),
+      );
     }
     toast({ title: "Order cleared" });
     refreshSupplies();
@@ -2240,6 +2493,8 @@ export default function Supplies() {
   };
 
   const lowStockCount = supplies.filter(s => storage.getSupplyStatus(s) !== "ok").length;
+  const criticalSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "critical");
+  const lowSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "low");
 
   const handleTimelineClick = (supplyId: string) => {
     setActiveTab("all");
@@ -2299,59 +2554,144 @@ export default function Supplies() {
         }
       />
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={handleAddNew} data-testid="button-add-new-supply">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Supply
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setUsualDialogOpen(true)} data-testid="button-edit-usual-prescription">
-              <Pencil className="h-4 w-4 mr-1" />
-              {usualPrescription && usualPrescription.items.length > 0 ? "Edit Usual" : "Set Usual"}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleUndo} 
-              disabled={!previousSupplies}
-              data-testid="button-undo"
+        <div className="w-full">
+          <div className="-mx-2 px-2 flex items-center gap-2 flex-nowrap md:flex-wrap">
+            <Button
+              size="sm"
+              onClick={handleAddNew}
+              className="shrink min-w-0 px-3 md:px-4"
+              data-testid="button-add-new-supply"
             >
-              <Undo2 className="h-4 w-4 mr-1" />
-              Undo
+              <Plus className="h-4 w-4 md:mr-1" />
+              <span className="hidden md:inline">Add Supply</span>
+              <span className="md:hidden ml-1">Add</span>
             </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {usualPrescription && usualPrescription.items.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleAddUsualPrescription} data-testid="button-add-usual-prescription">
-                <ClipboardList className="h-4 w-4 mr-1" />
-                Add Usual
-              </Button>
-            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUsualDialogOpen(true)}
+              className="shrink min-w-0 px-3 md:px-4"
+              data-testid="button-edit-usual-prescription"
+            >
+              <Pencil className="h-4 w-4 md:mr-1" />
+              <span className="hidden md:inline">
+                {usualPrescription && usualPrescription.items.length > 0 ? "Edit Usual" : "Set Usual"}
+              </span>
+              <span className="md:hidden ml-1">Usual</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUndo}
+              disabled={!previousSupplies}
+              className="shrink-0 px-3 md:px-4"
+              data-testid="button-undo"
+              aria-label="Undo"
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4 md:mr-1" />
+              <span className="hidden md:inline">Undo</span>
+            </Button>
+
             <Link href="/settings/usage#settings-usage">
-              <Button variant="outline" size="sm" data-testid="button-usage-settings">
-                <Settings className="h-4 w-4 mr-1" />
-                Habits
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 px-3 md:px-4"
+                data-testid="button-usage-settings"
+                aria-label="Habits"
+                title="Habits"
+              >
+                <Settings className="h-4 w-4 md:mr-1" />
+                <span className="hidden md:inline">Habits</span>
               </Button>
             </Link>
           </div>
+
+          {usualPrescription && usualPrescription.items.length > 0 && (
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddUsualPrescription}
+                data-testid="button-add-usual-prescription"
+              >
+                <ClipboardList className="h-4 w-4 mr-1" />
+                Add Usual
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
-      {supplies.length > 0 && (
-        <DepletionTimeline supplies={supplies} onSupplyClick={handleTimelineClick} />
+      {(criticalSupplies.length > 0 || lowSupplies.length > 0) && (
+        <Card className="border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
+          <CardContent className="py-3 flex items-center justify-between gap-3">
+            <div className="text-sm">
+              <span className="font-medium">Warnings</span>{" "}
+              <span className="text-muted-foreground">
+                {criticalSupplies.length > 0 ? `${criticalSupplies.length} critical` : null}
+                {criticalSupplies.length > 0 && lowSupplies.length > 0 ? " • " : null}
+                {lowSupplies.length > 0 ? `${lowSupplies.length} low` : null}
+              </span>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {criticalSupplies.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  onClick={() => handleTimelineClick(criticalSupplies[0].id)}
+                >
+                  Jump
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={() => setPlanningOpen(true)}
+              >
+                Planning
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PrescriptionCyclePanel 
-          cycle={prescriptionCycle} 
-          onSave={handleSavePrescriptionCycle} 
-          supplies={supplies}
-          scenarioState={scenarioState}
-        />
-        <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
-        <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
-        <CombinedScenarioImpactPanel supplies={supplies} scenarioState={scenarioState} />
-      </div>
+      <details
+        className="rounded-xl border bg-card/60 px-4 py-3"
+        open={planningOpen}
+        onToggle={(e) => setPlanningOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer select-none flex items-center justify-between gap-3">
+          <span className="font-medium">Planning</span>
+          <span className="text-xs text-muted-foreground">
+            Timeline, prescription cycle, travel & sick day impact
+          </span>
+        </summary>
+        {planningOpen && (
+          <div className="mt-4 space-y-6">
+            {supplies.length > 0 && (
+              <DepletionTimeline supplies={supplies} onSupplyClick={handleTimelineClick} />
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PrescriptionCyclePanel 
+                cycle={prescriptionCycle} 
+                onSave={handleSavePrescriptionCycle} 
+                supplies={supplies}
+                scenarioState={scenarioState}
+              />
+              <TravelImpactPanel supplies={supplies} scenarioState={scenarioState} />
+              <SickDayImpactPanel supplies={supplies} scenarioState={scenarioState} />
+              <CombinedScenarioImpactPanel supplies={supplies} scenarioState={scenarioState} />
+            </div>
+          </div>
+        )}
+      </details>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex-wrap h-auto gap-1">
@@ -2406,7 +2746,7 @@ export default function Supplies() {
                       supply={supply}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
-                      onUpdateQuantity={handleUpdateQuantity}
+                      onAdjustQuantity={handleAdjustQuantity}
                       onLogPickup={handleLogPickup}
                       onMarkOrdered={handleMarkOrdered}
                       onClearOrder={handleClearOrder}

@@ -19,7 +19,7 @@ import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { getSupabase } from "@/lib/supabase";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { Link } from "wouter";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 
 function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
   if (links.length === 0) return { ...DEFAULT_CARER_SCOPES };
@@ -143,6 +143,9 @@ export default function FamilyCarersPage() {
 
   return (
     <PageShell variant="standard" className="max-w-2xl space-y-6">
+      <div className="flex items-center">
+        <PageBackButton />
+      </div>
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2" data-testid="heading-family-carers">

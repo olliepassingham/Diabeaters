@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Eye, Phone } from "lucide-react";
+import heic2any from "heic2any";
 
 const SUPPORT_EMAIL = "support@yourdomain.com";
 
@@ -142,7 +143,39 @@ export default function Account() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadSubmitting(true);
-    const uploadResult = await uploadProfileAvatar(file);
+    let toUpload: File = file;
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif");
+    if (isHeic) {
+      try {
+        const converted = (await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        })) as Blob | Blob[];
+        const blob = Array.isArray(converted) ? converted[0] : converted;
+        if (!blob) throw new Error("No image data returned");
+
+        const base = file.name.replace(/\.(heic|heif)$/i, "") || "avatar";
+        toUpload = new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+      } catch (err) {
+        setUploadSubmitting(false);
+        toast({
+          title: "Upload failed",
+          description:
+            err instanceof Error
+              ? `Could not convert HEIC photo to JPEG. ${err.message}`
+              : "Could not convert HEIC photo to JPEG.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const uploadResult = await uploadProfileAvatar(toUpload);
     if (uploadResult.error) {
       setUploadSubmitting(false);
       toast({

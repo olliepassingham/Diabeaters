@@ -16,6 +16,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { upsertScenario } from "@/lib/scenarios-supabase";
+import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -398,6 +399,11 @@ export default function SickDay() {
     toast({
       title: "Sick Day Mode Activated",
       description: `Your dashboard will now show sick day status (${severity} severity).`,
+    });
+    void invokeNotifyScenarioStarted({
+      scenarioKey: "sick_day",
+      title: "Sick day started",
+      summary: severity ? `Severity: ${severity}` : null,
     });
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,6 +168,7 @@ export default function Adviser() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [cameFromRatios, setCameFromRatios] = useState(false);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const didPrefillFromExerciseLink = useRef(false);
 
   useEffect(() => {
     const path = location.split("?")[0] ?? location;
@@ -203,6 +204,36 @@ export default function Adviser() {
   const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
   const [exerciseWithin, setExerciseWithin] = useState("2");
+
+  useEffect(() => {
+    // Deep-link prefill from Exercise planner:
+    // /adviser?tab=meal&exercise=1&exerciseTiming=before|after|during&exerciseWithin=<hours>
+    // Only apply once per mount to avoid overriding user edits.
+    if (didPrefillFromExerciseLink.current) return;
+    try {
+      const params = new URLSearchParams(
+        typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : "",
+      );
+      const exercise = params.get("exercise");
+      if (exercise !== "1" && exercise !== "true") return;
+
+      const timingRaw = params.get("exerciseTiming");
+      const withinRaw = params.get("exerciseWithin");
+      const timing =
+        timingRaw === "after" || timingRaw === "during" || timingRaw === "before" ? timingRaw : "before";
+      const withinNum = withinRaw != null ? parseInt(withinRaw, 10) : NaN;
+      const within =
+        Number.isFinite(withinNum) && withinNum >= 0 ? String(Math.min(24, Math.max(0, withinNum))) : "2";
+
+      setActiveTab("meal");
+      setPlanningAroundExercise(true);
+      setExerciseTiming(timing);
+      setExerciseWithin(within);
+      didPrefillFromExerciseLink.current = true;
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Split Bolus Calculator state
   const [splitCarbs, setSplitCarbs] = useState("");
@@ -511,14 +542,14 @@ export default function Adviser() {
               {planningAroundExercise && (
                 <div className="grid gap-4 md:grid-cols-2 p-3 bg-muted/50 rounded-lg">
                   <div className="space-y-2">
-                    <Label>When is exercise?</Label>
+                    <Label>Meal timing vs exercise</Label>
                     <Select value={exerciseTiming} onValueChange={(v: "before" | "after" | "during") => setExerciseTiming(v)}>
                       <SelectTrigger data-testid="select-exercise-timing">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="before">Before this meal</SelectItem>
-                        <SelectItem value="after">After this meal</SelectItem>
+                        <SelectItem value="before">Meal before exercise</SelectItem>
+                        <SelectItem value="after">Meal after exercise</SelectItem>
                         <SelectItem value="during">During exercise</SelectItem>
                       </SelectContent>
                     </Select>
@@ -596,10 +627,19 @@ export default function Adviser() {
                   </div>
                 ) : mealResult.exerciseContext === "during" ? (
                   <div className="space-y-3">
-                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">DURING EXERCISE</p>
-                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">Usually no insulin</p>
-                      <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">{mealResult.carbs}g carbs - standard dose would be {mealResult.standardDose}u</p>
+                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 dark:border-blue-800/50 dark:bg-blue-950/25">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
+                            During exercise
+                          </p>
+                          <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">Usually no insulin</p>
+                          <p className="text-sm text-blue-700/80 dark:text-blue-200/80">
+                            {mealResult.carbs}g carbs
+                            {mealResult.standardDose != null ? ` • Standard would be ${mealResult.standardDose}u` : ""}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     {mealResult.tips && (
                       <ul className="text-sm text-muted-foreground space-y-1">
@@ -611,25 +651,34 @@ export default function Adviser() {
                   <div className="space-y-3">
                     {mealResult.exerciseContext && mealResult.standardDose !== undefined && (
                       <div className="grid gap-3 md:grid-cols-2">
-                        <div className="p-3 bg-muted/50 rounded-lg text-center">
-                          <p className="text-xs text-muted-foreground font-medium">STANDARD DOSE</p>
-                          <p className="text-xl font-bold line-through text-muted-foreground">{mealResult.standardDose} units</p>
-                          <p className="text-xs text-muted-foreground">{mealResult.carbs}g carbs at {mealResult.mealType}</p>
-                        </div>
-                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800 text-center">
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            {mealResult.exerciseContext === "before" ? "PRE-EXERCISE" : "POST-EXERCISE"} (-{mealResult.exerciseReduction}%)
+                        <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
+                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Standard</p>
+                          <p className="text-xl font-bold line-through text-muted-foreground">
+                            {mealResult.standardDose}u
                           </p>
-                          <p className="text-3xl font-bold text-green-700 dark:text-green-300" data-testid="text-meal-dose">{mealResult.dose} units</p>
-                          <p className="text-xs text-green-600 dark:text-green-400">suggested dose</p>
+                          <p className="text-xs text-muted-foreground">{mealResult.carbs}g • {mealResult.mealType}</p>
+                        </div>
+                        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
+                          <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">
+                            {mealResult.exerciseContext === "before" ? "Pre‑exercise" : "Post‑exercise"}
+                            {typeof mealResult.exerciseReduction === "number" ? ` • −${mealResult.exerciseReduction}%` : ""}
+                          </p>
+                          <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
+                            {mealResult.dose}u
+                          </p>
+                          <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">Adjusted dose</p>
                         </div>
                       </div>
                     )}
                     {!mealResult.exerciseContext && (
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">SUGGESTED DOSE</p>
-                        <p className="text-4xl font-bold text-green-700 dark:text-green-300" data-testid="text-meal-dose">{mealResult.dose} units</p>
-                        <p className="text-sm text-green-600 dark:text-green-400">for {mealResult.carbs}g carbs at {mealResult.mealType}</p>
+                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">Suggested</p>
+                        <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
+                          {mealResult.dose}u
+                        </p>
+                        <p className="text-sm text-emerald-700/80 dark:text-emerald-200/80">
+                          {mealResult.carbs}g • {mealResult.mealType}
+                        </p>
                       </div>
                     )}
                     {mealResult.roundingAdvice && (

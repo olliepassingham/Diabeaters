@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserProfile, UserSettings, NotificationSettings } from "@/lib/storage";
 import {
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
+import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { Link, useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -302,6 +304,7 @@ function UsageTab({
   infusionSetsPerBox, setInfusionSetsPerBox,
   reservoirsPerBox, setReservoirsPerBox,
   insulinCartridgeUnits, setInsulinCartridgeUnits,
+  suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled,
   onSave
 }: {
   isPumpUser: boolean; tdd: string;
@@ -320,6 +323,7 @@ function UsageTab({
   infusionSetsPerBox: string; setInfusionSetsPerBox: (v: string) => void;
   reservoirsPerBox: string; setReservoirsPerBox: (v: string) => void;
   insulinCartridgeUnits: string; setInsulinCartridgeUnits: (v: string) => void;
+  suppliesSmarterForecastEnabled: boolean; setSuppliesSmarterForecastEnabled: (v: boolean) => void;
   onSave: () => void;
 }) {
   return (
@@ -335,6 +339,20 @@ function UsageTab({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">Smarter supply forecast</p>
+            <p className="text-xs text-muted-foreground">
+              Optional: use recent adjustments/refills to estimate burn rate (last 7 days).
+            </p>
+          </div>
+          <Switch
+            checked={suppliesSmarterForecastEnabled}
+            onCheckedChange={(v) => setSuppliesSmarterForecastEnabled(v)}
+            data-testid="switch-smarter-supplies-forecast"
+          />
+        </div>
+
         {isPumpUser ? (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -529,6 +547,7 @@ export default function Settings() {
   const [infusionSetsPerBox, setInfusionSetsPerBox] = useState("");
   const [reservoirsPerBox, setReservoirsPerBox] = useState("");
   const [insulinCartridgeUnits, setInsulinCartridgeUnits] = useState("");
+  const [suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled] = useState(false);
   
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -611,6 +630,7 @@ export default function Settings() {
       setInfusionSetsPerBox(storedSettings.infusionSetsPerBox?.toString() || "");
       setReservoirsPerBox(storedSettings.reservoirsPerBox?.toString() || "");
       setInsulinCartridgeUnits(storedSettings.insulinCartridgeUnits?.toString() || "");
+      setSuppliesSmarterForecastEnabled(!!storedSettings.suppliesSmarterForecastEnabled);
     } else {
       setSiteChangeDays("3");
       setReservoirChangeDays("3");
@@ -798,6 +818,7 @@ export default function Settings() {
       infusionSetsPerBox: infusionSetsPerBox ? Math.max(1, parseInt(infusionSetsPerBox)) : undefined,
       reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
+      suppliesSmarterForecastEnabled,
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
@@ -817,6 +838,7 @@ export default function Settings() {
     const updated = { ...notifSettings, [key]: value };
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
+    void syncNotificationPreferences(updated);
   };
 
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
@@ -824,6 +846,7 @@ export default function Settings() {
     const updated = { ...notifSettings, [key]: numValue };
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
+    void syncNotificationPreferences(updated);
   };
 
   const handleEnableBrowserNotifications = async () => {
@@ -907,6 +930,8 @@ export default function Settings() {
           setReservoirsPerBox={setReservoirsPerBox}
           insulinCartridgeUnits={insulinCartridgeUnits}
           setInsulinCartridgeUnits={setInsulinCartridgeUnits}
+          suppliesSmarterForecastEnabled={suppliesSmarterForecastEnabled}
+          setSuppliesSmarterForecastEnabled={setSuppliesSmarterForecastEnabled}
           onSave={handleSaveUsage}
         />
       </div>
