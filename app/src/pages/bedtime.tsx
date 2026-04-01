@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -38,16 +38,20 @@ interface ReadinessResult {
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string }[];
   correction: CorrectionSuggestion | null;
+  snack: { grams: number; reason: string } | null;
 }
 
 export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
+  const [bgTrend, setBgTrend] = useState<"rising" | "steady" | "falling">("steady");
   const [hoursSinceFood, setHoursSinceFood] = useState("");
+  const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
   const [hoursUntilSleep, setHoursUntilSleep] = useState("");
   const [exercisedToday, setExercisedToday] = useState(false);
   const [hadAlcohol, setHadAlcohol] = useState(false);
+  const [recentHypos, setRecentHypos] = useState(false);
   const [result, setResult] = useState<ReadinessResult | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
@@ -55,6 +59,8 @@ export default function Bedtime() {
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [alarmPlanned, setAlarmPlanned] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -152,6 +158,7 @@ export default function Bedtime() {
     const foodHours = hoursSinceFood ? parseFloat(hoursSinceFood) : 999;
     const insulinHours = hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : 999;
     const sleepHours = hoursUntilSleep ? parseFloat(hoursUntilSleep) : null;
+    const carbs = mealCarbs ? parseFloat(mealCarbs) : null;
     
     if (isNaN(bg)) return;
 
@@ -180,6 +187,15 @@ export default function Bedtime() {
       factors.push({ label: "Blood glucose", status: "good", note: "In a comfortable range" });
     }
 
+    if (bgTrend === "falling") {
+      factors.push({ label: "Trend", status: "caution", note: "Falling - increased risk of dropping overnight" });
+      cautionCount++;
+    } else if (bgTrend === "rising") {
+      factors.push({ label: "Trend", status: "good", note: "Rising - recheck before sleep" });
+    } else {
+      factors.push({ label: "Trend", status: "good", note: "Stable" });
+    }
+
     if (foodHours < 2) {
       factors.push({ label: "Last food", status: "caution", note: "Still digesting - glucose may rise" });
       cautionCount++;
@@ -187,6 +203,15 @@ export default function Bedtime() {
       factors.push({ label: "Last food", status: "good", note: "Mostly digested" });
     } else {
       factors.push({ label: "Last food", status: "good", note: "Fully digested" });
+    }
+
+    if (carbs != null && Number.isFinite(carbs) && carbs > 0) {
+      if (foodHours < 2 && carbs >= 40) {
+        factors.push({ label: "Meal carbs", status: "caution", note: "Larger meal recently - consider rechecking before sleep" });
+        cautionCount++;
+      } else {
+        factors.push({ label: "Meal carbs", status: "good", note: "Noted" });
+      }
     }
 
     if (insulinHours < 2) {
@@ -205,6 +230,11 @@ export default function Bedtime() {
 
     if (hadAlcohol) {
       factors.push({ label: "Alcohol", status: "concern", note: "Can cause delayed lows - set an alarm" });
+      concernCount++;
+    }
+
+    if (recentHypos) {
+      factors.push({ label: "Recent hypos", status: "concern", note: "Higher overnight risk - consider an alarm and snack if needed" });
       concernCount++;
     }
 
@@ -297,8 +327,23 @@ export default function Bedtime() {
 
     const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHours);
 
-    setResult({ level, title, message, tips, factors, correction });
+    const snack: ReadinessResult["snack"] =
+      bgMmol < targetLowMmol || bgTrend === "falling" || recentHypos
+        ? {
+            grams: bgMmol < targetLowMmol ? 10 : 5,
+            reason:
+              bgMmol < targetLowMmol
+                ? "Below or near your target range"
+                : recentHypos
+                  ? "Recent hypos increase overnight risk"
+                  : "Falling trend can drop overnight",
+          }
+        : null;
+
+    setResult({ level, title, message, tips, factors, correction, snack });
     setSaved(false);
+    setDetailsOpen(false);
+    setAlarmPlanned(false);
 
     const bedtimeReady = level === "steady";
     void upsertScenario({
@@ -309,6 +354,18 @@ export default function Bedtime() {
         bedtime_ready: bedtimeReady,
         readiness_level: level,
         checked_at: new Date().toISOString(),
+        inputs_summary: {
+          bg: bgUnits === "mg/dL" ? Math.round(bgMmol * 18) : Math.round(bgMmol * 10) / 10,
+          bg_units: bgUnits,
+          trend: bgTrend,
+          recent_hypos: recentHypos,
+          exercised_today: exercisedToday,
+          had_alcohol: hadAlcohol,
+          hours_since_food: Number.isFinite(foodHours) ? foodHours : null,
+          meal_carbs: carbs != null && Number.isFinite(carbs) ? carbs : null,
+          hours_since_insulin: Number.isFinite(insulinHours) ? insulinHours : null,
+          hours_until_sleep: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
+        },
       },
     });
   };
@@ -352,6 +409,9 @@ export default function Bedtime() {
 
   const canCalculate = currentBg && !isNaN(parseFloat(currentBg));
 
+  const verdictLabel = (level: ReadinessLevel) =>
+    level === "steady" ? "Ready" : level === "monitor" ? "Caution" : "Needs attention";
+
   const handleSaveCheck = () => {
     if (!result || saved) return;
     const log: BedtimeLog = {
@@ -362,6 +422,11 @@ export default function Bedtime() {
       readinessLevel: result.level,
       hoursSinceFood: hoursSinceFood ? parseFloat(hoursSinceFood) : null,
       hoursSinceInsulin: hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : null,
+      hoursUntilSleep: hoursUntilSleep ? parseFloat(hoursUntilSleep) : null,
+      bgTrend,
+      mealCarbs: mealCarbs ? parseFloat(mealCarbs) : null,
+      recentHypos,
+      alarmPlanned,
       exercisedToday,
       hadAlcohol,
       sickDayActive: scenarioState.sickDayActive,
@@ -417,8 +482,12 @@ export default function Bedtime() {
   const patternInsight = getPatternInsight();
 
   return (
-    <PageShell variant="standard">
-      <PageHeader leading={<PageBackButton />} title="Bedtime" />
+    <PageShell variant="standard" className="space-y-6">
+      <PageHeader
+        leading={<PageBackButton />}
+        title="Bedtime"
+        description="A quick check to reduce overnight surprises. Not medical advice."
+      />
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (
@@ -440,19 +509,50 @@ export default function Bedtime() {
         </div>
       )}
 
-      <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border-indigo-100 dark:border-indigo-900">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-indigo-100 dark:bg-indigo-900">
-              <Moon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+      {result && (
+        <Card className={`${getLevelColors(result.level).bg} ${getLevelColors(result.level).border} border shadow-sm`} data-testid="card-bedtime-result-hero">
+          <CardContent className="p-5 md:p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="mt-0.5">
+                  {result.level === "steady" ? (
+                    <CheckCircle2 className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                  ) : result.level === "monitor" ? (
+                    <AlertCircle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                  ) : (
+                    <AlertTriangle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className={`text-xl font-semibold ${getLevelColors(result.level).title}`} data-testid="text-bedtime-verdict">
+                      {verdictLabel(result.level)}
+                    </h2>
+                    <Badge variant="secondary" className="text-xs">
+                      {result.title}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{result.message}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl">Bedtime Readiness Check</CardTitle>
-              <CardDescription>
-                A calm check to see if you're set for a steady night
-              </CardDescription>
-            </div>
-          </div>
+
+            {result.snack && (
+              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                <p className="text-sm">
+                  <span className="font-medium">Snack idea:</span> {result.snack.grams}g fast carbs{" "}
+                  <span className="text-muted-foreground">({result.snack.reason})</span>
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-inputs">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Quick check</CardTitle>
+          <CardDescription>30 seconds. Save the result to track patterns.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
@@ -477,6 +577,23 @@ export default function Bedtime() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="bg-trend" className="flex items-center gap-2">
+                {bgTrend === "falling" ? <TrendingDown className="h-4 w-4" /> : bgTrend === "rising" ? <TrendingUp className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
+                Trend
+              </Label>
+              <Select value={bgTrend} onValueChange={(v) => setBgTrend(v as "rising" | "steady" | "falling")}>
+                <SelectTrigger id="bg-trend" data-testid="select-bg-trend">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rising">Rising</SelectItem>
+                  <SelectItem value="steady">Steady</SelectItem>
+                  <SelectItem value="falling">Falling</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="hours-food" className="flex items-center gap-2">
                 <Utensils className="h-4 w-4" />
                 Hours since last food
@@ -493,6 +610,22 @@ export default function Bedtime() {
                   <SelectItem value="4">4+ hours</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="meal-carbs" className="flex items-center gap-2">
+                <Utensils className="h-4 w-4" />
+                Meal carbs (optional)
+              </Label>
+              <Input
+                id="meal-carbs"
+                type="number"
+                inputMode="numeric"
+                placeholder="e.g., 45"
+                value={mealCarbs}
+                onChange={(e) => setMealCarbs(e.target.value)}
+                data-testid="input-meal-carbs"
+              />
             </div>
 
             <div className="space-y-2">
@@ -560,6 +693,18 @@ export default function Bedtime() {
                   data-testid="switch-alcohol"
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="recent-hypos" className="flex items-center gap-2 cursor-pointer">
+                  <AlertTriangle className="h-4 w-4" />
+                  Any recent hypos?
+                </Label>
+                <Switch
+                  id="recent-hypos"
+                  checked={recentHypos}
+                  onCheckedChange={setRecentHypos}
+                  data-testid="switch-recent-hypos"
+                />
+              </div>
             </div>
           </div>
 
@@ -570,46 +715,87 @@ export default function Bedtime() {
             data-testid="button-check-bedtime"
           >
             <Moon className="h-4 w-4 mr-2" />
-            Check Bedtime Readiness
+            Check bedtime
           </Button>
         </CardContent>
       </Card>
 
       {result && (
-        <Card className={`${getLevelColors(result.level).bg} ${getLevelColors(result.level).border} border`} data-testid="card-bedtime-result">
+        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-result">
           <CardContent className="pt-6 space-y-4">
-            <div className="flex items-start gap-3">
-              {result.level === "steady" && (
-                <CheckCircle2 className={`h-8 w-8 ${getLevelColors(result.level).icon}`} />
-              )}
-              {result.level === "monitor" && (
-                <AlertCircle className={`h-8 w-8 ${getLevelColors(result.level).icon}`} />
-              )}
-              {result.level === "alert" && (
-                <AlertTriangle className={`h-8 w-8 ${getLevelColors(result.level).icon}`} />
-              )}
-              <div>
-                <h3 className={`text-xl font-semibold ${getLevelColors(result.level).title}`} data-testid="text-bedtime-result-title">
-                  {result.title}
-                </h3>
-                <p className="text-muted-foreground mt-1" data-testid="text-bedtime-result-message">{result.message}</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={result.level === "steady" ? "outline" : result.level === "monitor" ? "secondary" : "destructive"}
+                  className="text-xs"
+                >
+                  {verdictLabel(result.level)}
+                </Badge>
+                <span className="text-sm text-muted-foreground">{result.title}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link href="/help-now">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Info className="h-4 w-4" />
+                    Hypo help
+                  </Button>
+                </Link>
+                <Link href="/adviser">
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Calculator
+                  </Button>
+                </Link>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-muted-foreground">Your factors:</h4>
-              <div className="grid gap-2 md:grid-cols-2" data-testid="container-bedtime-factors">
-                {result.factors.map((factor, i) => (
-                  <div key={i} className="flex items-start gap-2 p-2 bg-background/50 rounded-lg" data-testid={`card-factor-${i}`}>
-                    {getStatusIcon(factor.status)}
-                    <div>
-                      <p className="text-sm font-medium" data-testid={`text-factor-label-${i}`}>{factor.label}</p>
-                      <p className="text-xs text-muted-foreground" data-testid={`text-factor-note-${i}`}>{factor.note}</p>
+            {(result.level !== "steady" || result.snack) && (
+              <div className="grid gap-2 md:grid-cols-2">
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => {
+                    setAlarmPlanned(true);
+                    toast({ title: "Alarm planned", description: "Set an alarm for 2–3am to check your glucose." });
+                  }}
+                  data-testid="button-plan-alarm"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Set an overnight alarm
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setDetailsOpen(true)}
+                  data-testid="button-open-details"
+                >
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Show details
+                </Button>
+              </div>
+            )}
+
+            <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+              <CollapsibleContent>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-muted-foreground">Factors</h4>
+                    <div className="grid gap-2 md:grid-cols-2" data-testid="container-bedtime-factors">
+                      {result.factors.map((factor, i) => (
+                        <div key={i} className="flex items-start gap-2 p-2 bg-muted/30 rounded-lg border border-border/50" data-testid={`card-factor-${i}`}>
+                          {getStatusIcon(factor.status)}
+                          <div>
+                            <p className="text-sm font-medium" data-testid={`text-factor-label-${i}`}>{factor.label}</p>
+                            <p className="text-xs text-muted-foreground" data-testid={`text-factor-note-${i}`}>{factor.note}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
             {result.correction && (
               <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20" data-testid="card-correction-suggestion">
@@ -740,16 +926,23 @@ export default function Bedtime() {
               </div>
             )}
 
-            <Button
-              onClick={handleSaveCheck}
-              disabled={saved}
-              variant="outline"
-              className="w-full"
-              data-testid="button-save-bedtime-check"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              {saved ? "Saved" : "Save this check"}
-            </Button>
+            <div className="grid gap-2 md:grid-cols-2">
+              <Button
+                onClick={handleSaveCheck}
+                disabled={saved}
+                className="w-full"
+                data-testid="button-save-bedtime-check"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {saved ? "Saved" : "Save check"}
+              </Button>
+              <Link href="/supplies">
+                <Button variant="outline" className="w-full">
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Open supplies
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       )}

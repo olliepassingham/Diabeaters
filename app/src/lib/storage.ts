@@ -314,6 +314,15 @@ export interface BedtimeLog {
   readinessLevel: "steady" | "monitor" | "alert";
   hoursSinceFood: number | null;
   hoursSinceInsulin: number | null;
+  hoursUntilSleep?: number | null;
+  /** rising/steady/falling, if user provided */
+  bgTrend?: "rising" | "steady" | "falling";
+  /** optional meal carbs estimate, if user provided */
+  mealCarbs?: number | null;
+  /** true if user reported any recent hypos today / overnight risk */
+  recentHypos?: boolean;
+  /** user intent only (we can't reliably schedule across platforms) */
+  alarmPlanned?: boolean;
   exercisedToday: boolean;
   hadAlcohol: boolean;
   sickDayActive: boolean;
