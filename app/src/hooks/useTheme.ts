@@ -309,14 +309,18 @@ export function applyBackgroundTintToDocument(
 ): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
+  // User preference: keep tint for light mode only.
+  if (mode === "dark") {
+    root.style.removeProperty("--app-background");
+    return;
+  }
   if (!enabled) {
     root.style.removeProperty("--app-background");
     return;
   }
-  const pack = mode === "dark" ? DARK[primary] : LIGHT[primary];
-  const base = mode === "dark" ? DARK_BG_BASE : LIGHT_BG_BASE;
-  const accentWeight = mode === "dark" ? 0.12 : 0.28;
-  const blended = mixRgbTriples(pack.colorPrimaryLight, base, accentWeight);
+  const pack = LIGHT[primary];
+  const base = LIGHT_BG_BASE;
+  const blended = mixRgbTriples(pack.colorPrimaryLight, base, 0.28);
   root.style.setProperty("--app-background", blended);
 }
 
