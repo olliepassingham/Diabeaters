@@ -45,11 +45,13 @@ export function SettingsHubNavLink({
   label,
   description,
   icon: Icon,
+  dataTestId,
 }: {
   href: string;
   label: string;
   description?: string;
   icon?: LucideIcon;
+  dataTestId?: string;
 }) {
   const className =
     "group flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/50";
@@ -71,13 +73,13 @@ export function SettingsHubNavLink({
   );
   if (href.startsWith("#")) {
     return (
-      <a href={href} className={className}>
+      <a href={href} className={className} data-testid={dataTestId}>
         {body}
       </a>
     );
   }
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} data-testid={dataTestId}>
       {body}
     </Link>
   );

@@ -177,6 +177,23 @@ export default function FamilyCarersPage() {
         description="Invite someone you trust to follow along. They only see what you allow — nothing here replaces professional care."
       />
 
+      <Card className="rounded-2xl border-border/60 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Support someone else?</CardTitle>
+          <CardDescription>
+            If you have an invite code from someone you support (their own Diabeaters account), open Carer setup to
+            enter it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Button variant="outline" className="w-full min-h-11 sm:w-auto" asChild>
+            <Link href="/carer-setup" data-testid="link-carer-setup">
+              Carer setup
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       {!configured && (
         <Alert>
           <Info className="h-4 w-4" />

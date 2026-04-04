@@ -51,6 +51,7 @@ import {
   hasCarerIntent,
   hasPendingCarer,
 } from "@/lib/carer-session";
+import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
 import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
@@ -83,6 +84,13 @@ const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
 const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
 const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
 const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
+
+const CommunityHome = lazy(() => import("@/pages/community/index"));
+const CommunityMessages = lazy(() => import("@/pages/community/messages"));
+const CommunityThread = lazy(() => import("@/pages/community/thread"));
+const CommunityProfile = lazy(() => import("@/pages/community/profile"));
+const CommunitySettings = lazy(() => import("@/pages/community/settings"));
+const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
 function RouteFallback() {
   return (
@@ -345,6 +353,60 @@ function InnerRouter() {
       <Route path="/carer-view" component={CarerView} />
       <Route path="/family-carers" component={FamilyCarersGate} />
       <Route path="/notifications" component={NotificationsPage} />
+      <Route path="/community/messages/:threadId">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityThread />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community/messages">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityMessages />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community/settings">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunitySettings />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community/u/:handle">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityHandleResolve />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community/profile/:userId">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityProfile />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityHome />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
       <Route path="/">
         <PatientRouteGuard>
           <Dashboard />

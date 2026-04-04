@@ -9,6 +9,7 @@ import {
   useLinkedPatient,
 } from "@/lib/carers";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
+import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

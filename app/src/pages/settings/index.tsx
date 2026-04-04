@@ -18,7 +18,9 @@ import {
   Bell,
   Info,
   Users,
+  UserPlus,
   Phone,
+  AtSign,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -1003,12 +1005,30 @@ export default function Settings() {
         )}
 
         {!isCarer && (
+          <SettingsHubGroup title="Community">
+            <SettingsHubNavLink
+              href="/community/settings"
+              label="Community profile"
+              description="Handle, bio, and visibility for the community"
+              icon={AtSign}
+            />
+          </SettingsHubGroup>
+        )}
+
+        {!isCarer && (
           <SettingsHubGroup title="Family">
             <SettingsHubNavLink
               href="/family-carers"
               label="Family & carers"
               description="Linked carers and sharing"
               icon={Users}
+            />
+            <SettingsHubNavLink
+              href="/carer-setup"
+              label="Carer setup"
+              description="Enter an invite code to support someone with their own account"
+              icon={UserPlus}
+              dataTestId="settings-link-carer-setup"
             />
           </SettingsHubGroup>
         )}

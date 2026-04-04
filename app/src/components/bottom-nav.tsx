@@ -1,4 +1,5 @@
-import { Home, Shapes, Wrench, User } from "lucide-react";
+import { Home, Shapes, Users, Wrench, User } from "lucide-react";
+import { isCommunityEnabled } from "@/lib/flags";
 import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
@@ -15,7 +16,7 @@ type TabDef = {
 };
 
 function patientTabs(): TabDef[] {
-  return [
+  const tabs: TabDef[] = [
     {
       title: "Home",
       href: "/",
@@ -30,6 +31,17 @@ function patientTabs(): TabDef[] {
       testId: "bottomnav-scenarios",
       isActive: (pathname) => pathname === "/scenarios" || pathname.startsWith("/scenarios/"),
     },
+  ];
+  if (isCommunityEnabled) {
+    tabs.push({
+      title: "Community",
+      href: "/community",
+      icon: Users,
+      testId: "bottomnav-community",
+      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+    });
+  }
+  tabs.push(
     {
       title: "Tools",
       href: "/tools",
@@ -48,7 +60,8 @@ function patientTabs(): TabDef[] {
       testId: "bottomnav-account",
       isActive: (pathname) => pathname === "/account",
     },
-  ];
+  );
+  return tabs;
 }
 
 function carerTabs(): TabDef[] {

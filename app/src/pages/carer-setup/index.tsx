@@ -15,9 +15,10 @@ import { getSupabase } from "@/lib/supabase";
 import {
   clearCarerIntent,
   clearPendingCarer,
-  setCarerIntent,
+  hasPendingCarer,
   setCarerLinkedBannerMessage,
 } from "@/lib/carer-session";
+import { PageBackButton } from "@/components/layout";
 import { Info } from "lucide-react";
 
 export default function CarerSetupPage() {
@@ -28,9 +29,12 @@ export default function CarerSetupPage() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
 
+  /** Drop stale carer intent from older builds that set it on every visit; keep Welcome "carer" signup (pending) intact. */
   useEffect(() => {
-    setCarerIntent();
-  }, []);
+    if (!user) return;
+    if (hasPendingCarer()) return;
+    clearCarerIntent();
+  }, [user]);
 
   async function handleRedeem(e: FormEvent) {
     e.preventDefault();
@@ -111,42 +115,47 @@ export default function CarerSetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-background text-foreground">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-xl">Family &amp; Carer Access</CardTitle>
-          <CardDescription>
-            If you are supporting someone using Diabeaters, enter the invite code they shared with you.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!configured && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>Cloud linking is not configured in this build.</AlertDescription>
-            </Alert>
-          )}
-          <form onSubmit={handleRedeem} className="space-y-4" data-testid="carer-setup-redeem-form">
-            <div className="space-y-2">
-              <Label htmlFor="carer-setup-code">Invite code</Label>
-              <Input
-                id="carer-setup-code"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. AB12CD34"
-                autoComplete="off"
-                className="font-mono tracking-wider"
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={busy || !code.trim() || !configured}>
-              {busy ? "Redeeming…" : "Redeem invite"}
-            </Button>
-          </form>
-          <p className="text-xs text-center text-muted-foreground">
-            After redeeming you will open the read-only Carer View for that person.
-          </p>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-background text-foreground">
+      <div className="w-full max-w-md space-y-4">
+        <div className="flex items-center -ml-2">
+          <PageBackButton />
+        </div>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-xl">Family &amp; Carer Access</CardTitle>
+            <CardDescription>
+              If you are supporting someone using Diabeaters, enter the invite code they shared with you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!configured && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>Cloud linking is not configured in this build.</AlertDescription>
+              </Alert>
+            )}
+            <form onSubmit={handleRedeem} className="space-y-4" data-testid="carer-setup-redeem-form">
+              <div className="space-y-2">
+                <Label htmlFor="carer-setup-code">Invite code</Label>
+                <Input
+                  id="carer-setup-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. AB12CD34"
+                  autoComplete="off"
+                  className="font-mono tracking-wider"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={busy || !code.trim() || !configured}>
+                {busy ? "Redeeming…" : "Redeem invite"}
+              </Button>
+            </form>
+            <p className="text-xs text-center text-muted-foreground">
+              After redeeming you will open the read-only Carer View for that person.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

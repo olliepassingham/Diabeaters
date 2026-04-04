@@ -329,6 +329,18 @@ export async function revokeInvite(code: string): Promise<{ error: Error | null 
   return { error: null };
 }
 
+/** Friendly message when DB is not yet migrated for idempotent redeem (duplicate carer_links row). */
+function mapRedeemCarerInviteError(message: string): string {
+  const m = message.toLowerCase();
+  if (
+    m.includes("carer_links_patient_id_carer_id_key") ||
+    (m.includes("duplicate key") && m.includes("carer_links"))
+  ) {
+    return "You are already linked as a carer for this person. Open Carer View from Account or switch mode.";
+  }
+  return message;
+}
+
 /**
  * Carer: redeem a code. Uses RPC `redeem_carer_invite` (see docs/sql/family_carers.sql).
  */
@@ -347,7 +359,7 @@ export async function redeemInvite(code: string): Promise<{
   });
 
   if (error) {
-    return { data: null, error: new Error(error.message) };
+    return { data: null, error: new Error(mapRedeemCarerInviteError(error.message)) };
   }
 
   const payload = data as Record<string, unknown> | null;

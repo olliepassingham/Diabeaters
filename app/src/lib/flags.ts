@@ -9,3 +9,11 @@ export const APP_ENV =
 export const isStaging = APP_ENV === "staging";
 export const isProd = APP_ENV === "production";
 export const isDev = APP_ENV === "development";
+
+/**
+ * Community (timeline + DMs). Production: set `VITE_FEATURE_COMMUNITY=true`.
+ * Development: on unless `VITE_FEATURE_COMMUNITY=false`.
+ */
+export const isCommunityEnabled =
+  import.meta.env.VITE_FEATURE_COMMUNITY === "true" ||
+  (import.meta.env.DEV && import.meta.env.VITE_FEATURE_COMMUNITY !== "false");

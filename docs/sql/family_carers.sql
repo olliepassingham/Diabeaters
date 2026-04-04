@@ -158,6 +158,18 @@ BEGIN
     RAISE EXCEPTION 'expired';
   END IF;
 
+  -- Already linked (e.g. patient issued a new invite after an earlier redeem): consume invite and return existing row.
+  SELECT * INTO link
+  FROM public.carer_links
+  WHERE patient_id = inv.patient_id AND carer_id = uid;
+
+  IF FOUND THEN
+    UPDATE public.carer_invites
+    SET used_at = now()
+    WHERE code = invite_code;
+    RETURN link;
+  END IF;
+
   INSERT INTO public.carer_links (patient_id, carer_id, role, scopes)
   VALUES (
     inv.patient_id,
