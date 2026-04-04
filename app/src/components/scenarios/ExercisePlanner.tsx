@@ -21,7 +21,7 @@ import {
   Utensils,
   Calculator,
 } from "lucide-react";
-import { storage, type UserProfile, type ExerciseRoutine } from "@/lib/storage";
+import { storage, type UserProfile, type ExerciseRoutine, type ExerciseIntensity } from "@/lib/storage";
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
@@ -29,7 +29,14 @@ import {
   type LastInsulinTiming,
   type ExercisePlanContext,
 } from "@/lib/exercise-plan";
+import {
+  activeSessionMatchesPlannerQuery,
+  adviserMealExerciseHref,
+  bgForPlannerFromActiveSession,
+  resultTabForExercisePhase,
+} from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
+import { getExerciseReadinessVerdict, type ExerciseReadinessResult } from "@/lib/exercise-readiness";
 
 const ALLOWED_EXERCISE_TYPES = new Set([
   "cardio",
@@ -50,14 +57,6 @@ const exerciseLabelsMap: Record<string, string> = {
   sports: "Team Sports",
   swimming: "Swimming",
 };
-
-type ExerciseVerdict = "ready" | "caution" | "not_recommended";
-
-function parseNumericMaybe(value: string | null | undefined): number | null {
-  if (value == null) return null;
-  const n = parseFloat(String(value).trim().replace(",", "."));
-  return Number.isFinite(n) ? n : null;
-}
 
 export function ExercisePlanner() {
   const search = useSearch();
@@ -96,6 +95,10 @@ export function ExercisePlanner() {
     const type = params.get("type");
     const duration = params.get("duration");
     const intensity = params.get("intensity");
+    const sync = params.get("sync");
+    const phaseParam = params.get("phase");
+    const routineId = params.get("routineId");
+
     if (type && ALLOWED_EXERCISE_TYPES.has(type)) setExerciseType(type);
     if (duration && /^\d{1,3}$/.test(duration)) {
       const d = parseInt(duration, 10);
@@ -103,6 +106,22 @@ export function ExercisePlanner() {
     }
     if (intensity === "light" || intensity === "moderate" || intensity === "intense") {
       setExerciseIntensity(intensity);
+    }
+
+    const tab = resultTabForExercisePhase(phaseParam);
+    if (tab) setResultTab(tab);
+
+    if (sync === "active" && type && duration && intensity) {
+      const active = storage.getActiveExercise();
+      if (
+        active &&
+        activeSessionMatchesPlannerQuery(active, type, duration, intensity, routineId)
+      ) {
+        const bg = bgForPlannerFromActiveSession(active);
+        if (bg != null) {
+          setCurrentBgInput(String(bg));
+        }
+      }
     }
   }, [search]);
 
@@ -190,62 +209,20 @@ export function ExercisePlanner() {
   const minutesUntilStart = Number.isNaN(minutesUntilStartParsed) ? 60 : Math.max(0, minutesUntilStartParsed);
   const hoursUntilStart = Math.max(1, Math.ceil(minutesUntilStart / 60));
 
-  const adviserHref = (timing: "before" | "after" | "during") => {
-    const params = new URLSearchParams();
-    params.set("tab", "meal");
-    params.set("exercise", "1");
-    params.set("exerciseTiming", timing);
-    params.set("exerciseWithin", String(hoursUntilStart));
-    return `/adviser?${params.toString()}`;
-  };
+  const adviserHref = (timing: "before" | "after" | "during") =>
+    adviserMealExerciseHref(timing, hoursUntilStart);
 
-  const verdictForResult = (): {
-    verdict: ExerciseVerdict;
-    title: string;
-    detail: string;
-  } => {
-    if (!exerciseResult) {
-      return { verdict: "caution", title: "Caution", detail: "Plan a workout to see guidance." };
-    }
-
-    if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
-      return {
-        verdict: "not_recommended",
-        title: "Not recommended",
-        detail: "Severe illness increases risk. Focus on rest and monitoring.",
-      };
-    }
-
-    const lowThreshold = parseNumericMaybe(exerciseResult.pre.lowThreshold);
-    const bg = parseNumericMaybe(currentBgInput);
-    if (bg == null || lowThreshold == null) {
-      return {
-        verdict: "caution",
-        title: "Caution",
-        detail: "Add your current BG for a clearer go/no‑go decision.",
-      };
-    }
-
-    const highThreshold = bgUnits === "mmol/L" ? 13.9 : 250;
-    if (bg < lowThreshold) {
-      const grams = exerciseResult.pre.carbsIfLow;
-      return {
-        verdict: "not_recommended",
-        title: "Not recommended (low BG)",
-        detail: grams > 0 ? `Treat first (about ${grams}g fast carbs), then re-check.` : "Treat first, then re-check.",
-      };
-    }
-
-    if (bg > highThreshold) {
-      return {
-        verdict: "caution",
-        title: "Caution (high BG)",
-        detail: "Consider ketone checks and a correction plan per your care team before intense activity.",
-      };
-    }
-
-    return { verdict: "ready", title: "Ready", detail: "You look in range to start—still monitor closely." };
-  };
+  const verdictForResult = (): ExerciseReadinessResult =>
+    getExerciseReadinessVerdict({
+      exercisePlanResult: exerciseResult,
+      currentBgInput,
+      bgUnits,
+      sickDayActive: scenarioState.sickDayActive,
+      sickDaySeverity: scenarioState.sickDaySeverity,
+      exerciseType,
+      intensity: exerciseIntensity as ExerciseIntensity,
+      phase: "pre",
+    });
 
   return (
     <div className="space-y-4">

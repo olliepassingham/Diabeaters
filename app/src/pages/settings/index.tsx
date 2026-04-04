@@ -18,6 +18,7 @@ import {
   Bell,
   Info,
   Users,
+  Phone,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -658,12 +659,13 @@ export default function Settings() {
 
     const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
     const tab = new URLSearchParams(qs).get("tab");
+    const emergencyEdit = isCarer ? "/settings/emergency" : "/account#account-emergency";
     const tabRoutes: Record<string, string> = {
       profile: "/settings/usage#settings-personal",
       insulin: "/settings/ratios",
       usage: "/settings/usage#settings-usage",
       notifications: "/settings/notifications",
-      contacts: "/account#account-emergency",
+      contacts: emergencyEdit,
       data: "/settings/about",
       appearance: "/settings/appearance",
       sources: "/settings/about#settings-sources",
@@ -684,9 +686,9 @@ export default function Settings() {
       "settings-notifications": "/settings/notifications",
       "settings-appearance": "/settings/appearance",
       "settings-about": "/settings/about",
-      "settings-emergency": "/account#account-emergency",
+      "settings-emergency": emergencyEdit,
       notifications: "/settings/notifications",
-      "emergency-contacts": "/account#account-emergency",
+      "emergency-contacts": emergencyEdit,
       "usual-habits": "/settings/usage#settings-usage",
       data: "/settings/about",
       sources: "/settings/about#settings-sources",
@@ -694,7 +696,7 @@ export default function Settings() {
     };
     const target = hashRoutes[raw];
     if (target) setLocation(target);
-  }, [location, pathOnly, setLocation]);
+  }, [location, pathOnly, setLocation, isCarer]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1007,6 +1009,17 @@ export default function Settings() {
               label="Family & carers"
               description="Linked carers and sharing"
               icon={Users}
+            />
+          </SettingsHubGroup>
+        )}
+
+        {isCarer && (
+          <SettingsHubGroup title="Your account">
+            <SettingsHubNavLink
+              href="/settings/emergency"
+              label="Emergency details"
+              description="Your contact info for Help now"
+              icon={Phone}
             />
           </SettingsHubGroup>
         )}

@@ -18,6 +18,7 @@ import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
+import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
 import { ToastAction } from "@/components/ui/toast";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 
@@ -773,7 +774,7 @@ function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; s
           </p>
         </div>
 
-        <Link href="/scenarios?tab=sickday">
+        <Link href="/scenarios?tab=sick-day">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-view-sick-day">
             View Sick Day Guidance
             <ArrowRight className="h-4 w-4 ml-1" />
@@ -2198,6 +2199,7 @@ export default function Supplies() {
     const nextState: Record<string, SupplyAlertLevel> = { ...state };
 
     const all = storage.getSupplies();
+    let notifyInvokeFailed = false;
     for (const item of all) {
       // Manual/emergency items (e.g. Glycogen) with no daily usage should not generate
       // forecast-based low-supply notifications unless they are empty.
@@ -2223,12 +2225,20 @@ export default function Supplies() {
         (prev === "low" && level === "critical");
       if (!shouldSend) continue;
 
-      await invokeNotifySupplyLow({
+      const res = await invokeNotifySupplyLow({
         supplyId: item.id,
         supplyName: item.name,
         level: level === "critical" ? "critical" : "low",
         daysRemaining: rounded,
       });
+      if (!res.success && !notifyInvokeFailed) {
+        notifyInvokeFailed = true;
+        toast({
+          title: NOTIFY_EDGE_FAILURE_TITLE,
+          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          variant: "destructive",
+        });
+      }
     }
 
     setSupplyAlertState(nextState);
@@ -2306,12 +2316,11 @@ export default function Supplies() {
 
   const handleSave = (data: Omit<Supply, "id">) => {
     const queueCloudUpsert = (localId: string) => {
+      void maybeNotifyLowSupplies();
       void import("@/lib/supplies").then((m) => {
         const local = storage.getSupplies().find((s) => s.id === localId);
         if (!local) return;
-        void m.syncToCloud(local).then(() => {
-          void maybeNotifyLowSupplies();
-        });
+        void m.syncToCloud(local);
       });
     };
 
@@ -2368,11 +2377,8 @@ export default function Supplies() {
   }) => {
     const updated = storage.setSupplyRemainingNow(args.id, args.nextQuantity);
     if (updated) {
-      void import("@/lib/supplies").then((m) =>
-        void m.syncToCloud(updated).then(() => {
-          void maybeNotifyLowSupplies();
-        }),
-      );
+      void maybeNotifyLowSupplies();
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
 
       const evt = addLocalSupplyEvent({
         supplyId: args.id,
@@ -2394,11 +2400,8 @@ export default function Supplies() {
             onClick={() => {
               const undoUpdated = storage.setSupplyRemainingNow(args.id, prevQuantity);
               if (undoUpdated) {
-                void import("@/lib/supplies").then((m) =>
-                  void m.syncToCloud(undoUpdated).then(() => {
-                    void maybeNotifyLowSupplies();
-                  }),
-                );
+                void maybeNotifyLowSupplies();
+                void import("@/lib/supplies").then((m) => void m.syncToCloud(undoUpdated));
                 const undoEvt = addLocalSupplyEvent({
                   supplyId: args.id,
                   kind: "adjust",
@@ -2441,11 +2444,8 @@ export default function Supplies() {
       
       const updated = storage.updateSupply(pickupSupply.id, updates);
       if (updated) {
-        void import("@/lib/supplies").then((m) =>
-          void m.syncToCloud(updated).then(() => {
-            void maybeNotifyLowSupplies();
-          }),
-        );
+        void maybeNotifyLowSupplies();
+        void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
       }
       storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
       toast({ 
@@ -2460,11 +2460,8 @@ export default function Supplies() {
     const updated = storage.markSupplyOrdered(id);
     const supply = supplies.find(s => s.id === id);
     if (updated) {
-      void import("@/lib/supplies").then((m) =>
-        void m.syncToCloud(updated).then(() => {
-          void maybeNotifyLowSupplies();
-        }),
-      );
+      void maybeNotifyLowSupplies();
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
     }
     toast({
       title: "Marked as ordered",
@@ -2476,11 +2473,8 @@ export default function Supplies() {
   const handleClearOrder = (id: string) => {
     const updated = storage.clearSupplyOrder(id);
     if (updated) {
-      void import("@/lib/supplies").then((m) =>
-        void m.syncToCloud(updated).then(() => {
-          void maybeNotifyLowSupplies();
-        }),
-      );
+      void maybeNotifyLowSupplies();
+      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
     }
     toast({ title: "Order cleared" });
     refreshSupplies();

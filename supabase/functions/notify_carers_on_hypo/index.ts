@@ -236,6 +236,37 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Patient in-app row (self): mirrors carer inbox so the patient sees a confirmation in Notifications.
+    const { data: patientPrefsRow } = await admin
+      .from("notification_preferences")
+      .select("prefs")
+      .eq("user_id", hypo.user_id)
+      .maybeSingle();
+    const patientPrefsRaw = (patientPrefsRow as { prefs?: unknown } | null)?.prefs;
+    const patientPrefs = (patientPrefsRaw && typeof patientPrefsRaw === "object"
+      ? (patientPrefsRaw as Record<string, unknown>)
+      : {}) as Record<string, unknown>;
+    const patientEnabled = patientPrefs.enabled !== false;
+    const patientHypoOn = patientPrefs.hypo_alerts !== false;
+    const patientInappOn = patientPrefs.inapp !== false;
+
+    if (patientEnabled && patientHypoOn && patientInappOn) {
+      const patientPayload = {
+        kind: "hypo_logged_self",
+        deep_link: "/dashboard",
+        ...hypoPayload,
+      };
+      const { error: patientInsErr } = await admin.from("notifications").insert({
+        user_id: hypo.user_id,
+        title: "Hypo treatment logged",
+        body: "Your hypo treatment was saved to your record.",
+        data: patientPayload,
+        read: false,
+      });
+      if (!patientInsErr) inappDelivered += 1;
+      else console.error("[notify_carers_on_hypo] patient notification insert", patientInsErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

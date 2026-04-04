@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
+import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
@@ -82,7 +83,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
       toast({
         title: "Exercise mode started",
-        description: `${exercise.name} — check the banner above for your pre-exercise checklist`,
+        description: `${exercise.name} — use the banner for BG, readiness, and tips.`,
       });
 
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -120,6 +121,24 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       </WidgetCard>
     );
   }
+
+  const plannerCtaHref = activeSession
+    ? buildExerciseScenarioPlannerHrefFromSession(activeSession, { syncActive: true, from: "widget" })
+    : exercises[0]
+      ? buildExerciseScenarioPlannerHref({
+          exerciseType: exercises[0].exerciseType,
+          durationMinutes: exercises[0].durationMinutes,
+          intensity: exercises[0].intensity,
+          routineId: exercises[0].id,
+          from: "widget",
+        })
+      : "/routines?section=exercise";
+
+  const plannerCtaLabel = activeSession
+    ? "Open planner (current session)"
+    : exercises.length > 0
+      ? "Plan workout"
+      : "Add exercises";
 
   return (
     <WidgetCard className="overflow-visible" data-testid="widget-quick-exercise">
@@ -200,11 +219,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
           </div>
         )}
 
-        <Link href={exercises.length > 0 ? "/scenarios/exercise" : "/routines?section=exercise"}>
+        <Link href={plannerCtaHref}>
           <Button variant="outline" size="sm" className="w-full gap-1" data-testid="button-exercise-action">
-            {exercises.length > 0 ? (
+            {exercises.length > 0 || activeSession ? (
               <>
-                Plan workout
+                {plannerCtaLabel}
                 <ArrowRight className="h-3.5 w-3.5" />
               </>
             ) : (

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "wouter";
 import { 
   Dumbbell, Play, Square, Heart, ChevronDown, ChevronUp, 
   Check, Clock, AlertTriangle, TrendingDown, TrendingUp, 
-  Minus, Droplet, Zap, Shield, Calculator
+  Minus, Droplet, Zap, Calculator, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,9 +18,16 @@ import {
   type ExerciseBgTrend,
 } from "@/lib/storage";
 import { getExerciseGuidanceForReading } from "@/lib/exercise-reading-guidance";
+import { calculateExercisePlan } from "@/lib/exercise-plan";
+import {
+  getExerciseReadinessVerdict,
+  getReadinessToneClasses,
+  getExerciseCarbPlanHintLine,
+} from "@/lib/exercise-readiness";
+import { buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogDescription, DialogFooter, DialogClose
+  DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -211,12 +218,7 @@ function formatRemaining(ms: number): string {
 }
 
 function plannerHref(session: ActiveExerciseSession): string {
-  const q = new URLSearchParams({
-    type: session.exerciseType,
-    duration: String(session.durationMinutes),
-    intensity: session.intensity,
-  });
-  return `/scenarios/exercise?${q.toString()}`;
+  return buildExerciseScenarioPlannerHrefFromSession(session, { syncActive: true });
 }
 
 function ExerciseReadingPrompt({
@@ -302,6 +304,181 @@ function ExerciseReadingPrompt({
   );
 }
 
+function PlannerOpenButton({ session }: { session: ActiveExerciseSession }) {
+  const planner = plannerHref(session);
+  return (
+    <Button variant="outline" size="sm" className="min-h-9" asChild data-testid="button-full-exercise-planner">
+      <Link href={planner}>Open full planner</Link>
+    </Button>
+  );
+}
+
+function ExerciseEducationDialog({
+  open,
+  onOpenChange,
+  session,
+  isPump,
+  bgUnits,
+  patterns,
+  isEvening,
+  onChecklistToggle,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  session: ActiveExerciseSession;
+  isPump: boolean;
+  bgUnits: string;
+  patterns: ReturnType<typeof storage.getExercisePatterns> | null;
+  isEvening: boolean;
+  onChecklistToggle: (key: "bgChecked" | "carbsConsidered" | "basalAdjusted") => void;
+}) {
+  const typeConfig = getTypeConfig(session.exerciseType);
+  const baseTips = getPreExerciseTips(session, isPump);
+  const guidance =
+    session.phase === "pre" && session.preBg != null
+      ? getExerciseGuidanceForReading({
+          bg: session.preBg,
+          trend: session.preTrend,
+          bgUnits,
+          exerciseType: session.exerciseType,
+          intensity: session.intensity,
+          phase: "pre",
+          isEvening,
+        })
+      : session.phase === "active" && session.midBg != null
+        ? getExerciseGuidanceForReading({
+            bg: session.midBg,
+            trend: session.midTrend,
+            bgUnits,
+            exerciseType: session.exerciseType,
+            intensity: session.intensity,
+            phase: "active",
+            isEvening,
+          })
+        : session.phase === "recovery" && session.recoveryBg != null
+          ? getExerciseGuidanceForReading({
+              bg: session.recoveryBg,
+              trend: session.recoveryTrend,
+              bgUnits,
+              exerciseType: session.exerciseType,
+              intensity: session.intensity,
+              phase: "recovery",
+              isEvening,
+            })
+          : [];
+  const tips = [...guidance, ...baseTips];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto" data-testid="dialog-exercise-education">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Exercise tips
+          </DialogTitle>
+          <DialogDescription>
+            {EXERCISE_LABELS[session.exerciseType]} — educational only; confirm with your care team.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          {tips.length > 0 ? (
+            <div className="space-y-2">
+              {tips.map((tip, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Droplet className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500" />
+                  <span>{tip}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Log a BG reading in the banner for more tailored lines.</p>
+          )}
+
+          {session.phase === "pre" && (
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-xs font-medium text-foreground">Optional checklist</p>
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => onChecklistToggle("bgChecked")}
+                  className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
+                  data-testid="button-checklist-bg"
+                >
+                  <div
+                    className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                      session.preChecklist.bgChecked
+                        ? "bg-green-600 border-green-600 text-white"
+                        : "border-muted-foreground/40"
+                    }`}
+                  >
+                    {session.preChecklist.bgChecked && <Check className="h-3 w-3" />}
+                  </div>
+                  <span>{typeConfig.checklistLabels.bg}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChecklistToggle("carbsConsidered")}
+                  className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
+                  data-testid="button-checklist-carbs"
+                >
+                  <div
+                    className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                      session.preChecklist.carbsConsidered
+                        ? "bg-green-600 border-green-600 text-white"
+                        : "border-muted-foreground/40"
+                    }`}
+                  >
+                    {session.preChecklist.carbsConsidered && <Check className="h-3 w-3" />}
+                  </div>
+                  <span>{typeConfig.checklistLabels.carbs}</span>
+                </button>
+                {isPump && (
+                  <button
+                    type="button"
+                    onClick={() => onChecklistToggle("basalAdjusted")}
+                    className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
+                    data-testid="button-checklist-basal"
+                  >
+                    <div
+                      className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                        session.preChecklist.basalAdjusted
+                          ? "bg-green-600 border-green-600 text-white"
+                          : "border-muted-foreground/40"
+                      }`}
+                    >
+                      {session.preChecklist.basalAdjusted && <Check className="h-3 w-3" />}
+                    </div>
+                    <span>{typeConfig.checklistLabels.basal}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {patterns && patterns.totalSessions > 0 && (
+            <div className="flex items-start gap-2 p-2 rounded-md bg-muted/40 text-xs border-t" data-testid="text-exercise-pattern">
+              {patterns.droppedCount > patterns.stableCount ? (
+                <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              ) : patterns.roseCount > patterns.stableCount ? (
+                <TrendingUp className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+              ) : (
+                <Minus className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className="font-medium">{patterns.avgPattern}</p>
+                <p className="text-muted-foreground mt-0.5">
+                  Based on {patterns.totalSessions} session{patterns.totalSessions !== 1 ? "s" : ""}
+                  {patterns.hypoCount > 0 && ` · ${patterns.hypoCount} hypo${patterns.hypoCount !== 1 ? "s" : ""} recorded`}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean): string[] {
   const config = EXERCISE_TYPE_CONFIG[session.exerciseType];
   return config.preTips(isPump, session.durationMinutes);
@@ -322,6 +499,57 @@ export function ActiveExerciseBanner() {
   const [isPump, setIsPump] = useState(false);
   const [patterns, setPatterns] = useState<ReturnType<typeof storage.getExercisePatterns> | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
+  const [showExerciseTips, setShowExerciseTips] = useState(false);
+
+  const { readinessResult, carbPlanHint } = useMemo(() => {
+    if (!session) return { readinessResult: null, carbPlanHint: null };
+    const scenarioState = storage.getScenarioState();
+    const bg =
+      session.phase === "pre" && session.preBg != null
+        ? session.preBg
+        : session.phase === "active" && session.midBg != null
+          ? session.midBg
+          : session.phase === "recovery" && session.recoveryBg != null
+            ? session.recoveryBg
+            : null;
+    const trend =
+      session.phase === "pre"
+        ? session.preTrend
+        : session.phase === "active"
+          ? session.midTrend
+          : session.recoveryTrend;
+    const minutesUntilStart = session.phase === "pre" ? 60 : session.phase === "active" ? 30 : 0;
+    let planResult = null;
+    try {
+      planResult = calculateExercisePlan(
+        {
+          exerciseType: session.exerciseType,
+          durationMinutes: session.durationMinutes,
+          intensity: session.intensity,
+          minutesUntilStart,
+          bgUnits,
+          currentBg: bg ?? undefined,
+          hourOfDay: new Date().getHours(),
+        },
+        storage.getSettings(),
+      );
+    } catch {
+      return { readinessResult: null, carbPlanHint: null };
+    }
+    const readinessResult = getExerciseReadinessVerdict({
+      exercisePlanResult: planResult,
+      currentBg: bg,
+      bgUnits,
+      sickDayActive: scenarioState.sickDayActive,
+      sickDaySeverity: scenarioState.sickDaySeverity,
+      exerciseType: session.exerciseType,
+      intensity: session.intensity,
+      bgTrend: trend ?? null,
+      phase: session.phase,
+    });
+    const carbPlanHint = getExerciseCarbPlanHintLine(planResult, readinessResult.verdict);
+    return { readinessResult, carbPlanHint };
+  }, [session, bgUnits]);
 
   const loadSession = useCallback(() => {
     const profile = storage.getProfile();
@@ -480,21 +708,6 @@ export function ActiveExerciseBanner() {
 
   if (!session && !showOutcomeDialog) return null;
 
-  const basePreTips = session ? getPreExerciseTips(session, isPump) : [];
-  const preGuidance =
-    session && session.phase === "pre" && session.preBg != null
-      ? getExerciseGuidanceForReading({
-          bg: session.preBg,
-          trend: session.preTrend,
-          bgUnits,
-          exerciseType: session.exerciseType,
-          intensity: session.intensity,
-          phase: "pre",
-          isEvening,
-        })
-      : [];
-  const preTipsMerged = session ? [...preGuidance, ...basePreTips] : [];
-
   const activeGuidance =
     session && session.phase === "active" && session.midBg != null
       ? getExerciseGuidanceForReading({
@@ -585,40 +798,31 @@ export function ActiveExerciseBanner() {
                   </Badge>
                 </div>
 
-                {patterns && patterns.totalSessions > 0 && (
-                  <div className="flex items-start gap-2 p-2 rounded-md bg-background/50 text-xs" data-testid="text-exercise-pattern">
-                    {patterns.droppedCount > patterns.stableCount ? (
-                      <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                    ) : patterns.roseCount > patterns.stableCount ? (
-                      <TrendingUp className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <Minus className="h-3.5 w-3.5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <p className="font-medium">{patterns.avgPattern}</p>
-                      <p className="text-muted-foreground mt-0.5">
-                        Based on {patterns.totalSessions} session{patterns.totalSessions !== 1 ? "s" : ""}
-                        {patterns.hypoCount > 0 && ` · ${patterns.hypoCount} hypo${patterns.hypoCount !== 1 ? "s" : ""} recorded`}
+                {readinessResult && (
+                  <div
+                    className={`rounded-md border px-2.5 py-2 text-xs ${getReadinessToneClasses(readinessResult.verdict)}`}
+                    data-testid="exercise-readiness-verdict"
+                  >
+                    <p className="font-semibold text-foreground">{readinessResult.title}</p>
+                    <p className="text-muted-foreground leading-snug mt-0.5">{readinessResult.detail}</p>
+                    {carbPlanHint ? (
+                      <p
+                        className="text-[10px] text-muted-foreground leading-snug mt-1.5 pt-1.5 border-t border-border/50"
+                        data-testid="exercise-carb-plan-hint"
+                      >
+                        {carbPlanHint}
                       </p>
-                    </div>
+                    ) : null}
                   </div>
                 )}
 
                 {session.phase === "pre" && (
                   <div className="space-y-2">
-                    <Link
-                      href={plannerHref(session)}
-                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex items-center gap-1"
-                      data-testid="link-full-exercise-planner"
-                    >
-                      Open full planner — food and insulin
-                    </Link>
-
                     {session.preBg == null && !session.preBgSkipped ? (
                       <ExerciseReadingPrompt
                         bgUnits={bgUnits}
                         title="Current BG and direction"
-                        description="Optional — helps tailor the tips below. Confirm any changes with your care team."
+                        description="Optional — helps tailor readiness. Confirm any changes with your care team."
                         onSave={handleSavePreReading}
                         onSkip={handleSkipPreReading}
                         saveTestId="button-save-pre-reading"
@@ -626,69 +830,22 @@ export function ActiveExerciseBanner() {
                       />
                     ) : null}
 
-                    <p className="text-xs font-medium flex items-center gap-1.5">
-                      <Shield className="h-3.5 w-3.5" />
-                      Pre-exercise checklist
-                    </p>
-                    <div className="space-y-1.5">
-                      <button
-                        onClick={() => handleChecklistToggle("bgChecked")}
-                        className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
-                        data-testid="button-checklist-bg"
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-9 w-full sm:w-auto"
+                        onClick={() => setShowExerciseTips(true)}
+                        data-testid="button-exercise-tips"
                       >
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-                          session.preChecklist.bgChecked 
-                            ? "bg-green-600 border-green-600 text-white" 
-                            : "border-muted-foreground/40"
-                        }`}>
-                          {session.preChecklist.bgChecked && <Check className="h-3 w-3" />}
-                        </div>
-                        <span>{typeConfig?.checklistLabels.bg ?? "Checked blood glucose"}</span>
-                      </button>
-                      <button
-                        onClick={() => handleChecklistToggle("carbsConsidered")}
-                        className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
-                        data-testid="button-checklist-carbs"
-                      >
-                        <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-                          session.preChecklist.carbsConsidered 
-                            ? "bg-green-600 border-green-600 text-white" 
-                            : "border-muted-foreground/40"
-                        }`}>
-                          {session.preChecklist.carbsConsidered && <Check className="h-3 w-3" />}
-                        </div>
-                        <span>{typeConfig?.checklistLabels.carbs ?? "Considered carb loading"}</span>
-                      </button>
-                      {isPump && (
-                        <button
-                          onClick={() => handleChecklistToggle("basalAdjusted")}
-                          className="w-full flex items-center gap-2 text-xs p-1.5 rounded hover-elevate text-left"
-                          data-testid="button-checklist-basal"
-                        >
-                          <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
-                            session.preChecklist.basalAdjusted 
-                              ? "bg-green-600 border-green-600 text-white" 
-                              : "border-muted-foreground/40"
-                          }`}>
-                            {session.preChecklist.basalAdjusted && <Check className="h-3 w-3" />}
-                          </div>
-                          <span>{typeConfig?.checklistLabels.basal ?? "Adjusted basal rate"}</span>
-                        </button>
-                      )}
+                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                        Exercise tips
+                      </Button>
+                      <PlannerOpenButton session={session} />
                     </div>
 
-                    {preTipsMerged.length > 0 && (
-                      <div className="space-y-1 mt-2">
-                        {preTipsMerged.slice(0, 6).map((tip, i) => (
-                          <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
-                            <span>{tip}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
                       <Button size="sm" onClick={handleStartExercise} data-testid="button-start-exercise">
                         <Play className="h-3.5 w-3.5 mr-1.5" />
                         Start Exercise
@@ -756,13 +913,20 @@ export function ActiveExerciseBanner() {
                       </div>
                     )}
 
-                    <Link
-                      href={plannerHref(session)}
-                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex"
-                      data-testid="link-full-exercise-planner-active"
-                    >
-                      Open full planner — food and insulin
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-9 w-full sm:w-auto"
+                        onClick={() => setShowExerciseTips(true)}
+                        data-testid="button-exercise-tips-active"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                        Exercise tips
+                      </Button>
+                      <PlannerOpenButton session={session} />
+                    </div>
 
                     {typeConfig?.activeReminder && (
                       <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -794,14 +958,6 @@ export function ActiveExerciseBanner() {
 
                 {session.phase === "recovery" && (
                   <div className="space-y-2">
-                    <Link
-                      href={plannerHref(session)}
-                      className="text-xs font-medium text-primary underline-offset-2 hover:underline inline-flex"
-                      data-testid="link-full-exercise-planner-recovery"
-                    >
-                      Open full planner — food and insulin
-                    </Link>
-
                     {session.recoveryBg == null && !session.recoveryBgSkipped ? (
                       <ExerciseReadingPrompt
                         bgUnits={bgUnits}
@@ -850,6 +1006,21 @@ export function ActiveExerciseBanner() {
                       )}
                     </div>
 
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-9 w-full sm:w-auto"
+                        onClick={() => setShowExerciseTips(true)}
+                        data-testid="button-exercise-tips-recovery"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                        Exercise tips
+                      </Button>
+                      <PlannerOpenButton session={session} />
+                    </div>
+
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button size="sm" onClick={handleEndSession} data-testid="button-end-recovery">
                         <Check className="h-3.5 w-3.5 mr-1.5" />
@@ -882,6 +1053,19 @@ export function ActiveExerciseBanner() {
             )}
           </div>
         </div>
+      )}
+
+      {session && (
+        <ExerciseEducationDialog
+          open={showExerciseTips}
+          onOpenChange={setShowExerciseTips}
+          session={session}
+          isPump={isPump}
+          bgUnits={bgUnits}
+          patterns={patterns}
+          isEvening={isEvening}
+          onChecklistToggle={handleChecklistToggle}
+        />
       )}
 
       <ExerciseOutcomeDialog
@@ -1047,7 +1231,7 @@ function ExerciseOutcomeDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex justify-end">
           <Button variant="ghost" onClick={handleSkip} data-testid="button-skip-outcome">
             Skip
           </Button>

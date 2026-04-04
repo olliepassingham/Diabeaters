@@ -5,6 +5,11 @@ const supabaseKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
 const hasSupabaseEnv = Boolean(supabaseUrl && supabaseKey);
 
+/** True when both URL and anon key are set (same condition as {@link getSupabase} returning non-null). */
+export function isSupabaseConfigured(): boolean {
+  return hasSupabaseEnv;
+}
+
 if (!hasSupabaseEnv) {
   if (import.meta.env.DEV) {
     // eslint-disable-next-line no-console

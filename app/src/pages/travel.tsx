@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plane, 
   MapPin, 
@@ -40,9 +41,10 @@ import { Progress } from "@/components/ui/progress";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageBackButton, PageShell } from "@/components/layout";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
+import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
 
 interface TravelPlan {
   duration: number;
@@ -494,6 +496,7 @@ export default function Travel() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
   const { toast } = useToast();
+  const [activeTravelTab, setActiveTravelTab] = useState<"overview" | "plan" | "checklist">("overview");
 
   const [holidayPrep, setHolidayPrep] = useState<HolidayPrep | null>(null);
   const [showPrepForm, setShowPrepForm] = useState(false);
@@ -766,11 +769,20 @@ export default function Travel() {
       title: "Travel Mode Activated",
       description: `You'll see travel reminders until ${new Date(plan.endDate).toLocaleDateString()}`,
     });
-    void invokeNotifyScenarioStarted({
-      scenarioKey: "travel",
-      title: "Travel started",
-      summary,
-    });
+    void (async () => {
+      const res = await invokeNotifyScenarioStarted({
+        scenarioKey: "travel",
+        title: "Travel started",
+        summary,
+      });
+      if (!res.success) {
+        toast({
+          title: NOTIFY_EDGE_FAILURE_TITLE,
+          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          variant: "destructive",
+        });
+      }
+    })();
   };
   
   const handleDeactivateTravelMode = () => {
@@ -934,14 +946,10 @@ export default function Travel() {
 
     return (
       <PageShell variant="standard">
-        <PageHeader
-        leading={<PageBackButton />}
-        title="Travel"
-        description="Trip planning, packing lists, and travel mode — educational guidance only."
-      />
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
           <CardHeader>
             <div className="flex items-center gap-3 flex-wrap">
+              <PageBackButton />
               <div className="p-2 rounded-full bg-green-100 dark:bg-green-900">
                 <Plane className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
@@ -976,283 +984,284 @@ export default function Travel() {
           </CardContent>
         </Card>
 
-        {isSickDayAlsoActive && (
-          <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20" data-testid="card-sick-day-also-active">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-full bg-orange-100 dark:bg-orange-900 shrink-0">
-                  <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Sick Day Mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Link href="/scenarios/sick-day">
-                      <Button variant="outline" size="sm" className="min-h-11" data-testid="button-view-sick-day-from-travel">
-                        <Thermometer className="h-3 w-3 mr-1" />
-                        View Sick Day Dashboard
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-travel-overview">Overview</TabsTrigger>
+            <TabsTrigger value="plan" className="text-xs sm:text-sm" data-testid="tab-travel-plan">Plan</TabsTrigger>
+            <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-travel-checklist">Checklist</TabsTrigger>
+          </TabsList>
 
-        {todayScheduleEntry && !isPumpUser && hasStarted && !hasEnded && (
-          <Card className="border-purple-200 dark:border-purple-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                Today's Insulin Timing
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Long-acting injection today</p>
-                    <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid="text-today-injection-time">
-                      {todayScheduleEntry.localTime} <span className="text-sm font-normal">local time</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      ({todayScheduleEntry.homeTime} home time)
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant="outline" className="text-purple-700 dark:text-purple-300">
-                      {todayScheduleEntry.label}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">{todayScheduleEntry.note}</p>
-                  </div>
-                </div>
-                {plan.timezoneChange === "major" && (
-                  <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
-                    Shifting by up to 2 hours per day until adjusted to local time ({plan.timezoneHours}h {plan.timezoneDirection}).
-                    Monitor blood glucose extra closely during adjustment.
-                  </p>
-                )}
-              </div>
-              {basalSchedule.length > 1 && (
-                <details className="mt-3">
-                  <summary className="text-sm text-purple-600 dark:text-purple-400 cursor-pointer hover:opacity-70">
-                    View full adjustment schedule
-                  </summary>
-                  <div className="mt-2 bg-muted/50 rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-purple-100 dark:bg-purple-900/50 text-purple-900 dark:text-purple-100">
-                          <th className="px-3 py-2 text-left font-medium">Day</th>
-                          <th className="px-3 py-2 text-left font-medium">Home</th>
-                          <th className="px-3 py-2 text-left font-medium">Local</th>
-                          <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {basalSchedule.map((row, idx) => (
-                          <tr key={idx} className={row.day === daysElapsed ? "bg-purple-100/50 dark:bg-purple-900/30 font-medium" : idx % 2 === 0 ? "bg-muted/30" : ""}>
-                            <td className="px-3 py-1.5 text-sm">{row.label}</td>
-                            <td className="px-3 py-1.5 text-sm font-mono">{row.homeTime}</td>
-                            <td className="px-3 py-1.5 text-sm font-mono">{row.localTime}</td>
-                            <td className="px-3 py-1.5 text-xs text-muted-foreground hidden sm:table-cell">{row.note}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
-          <Card className="border-purple-200 dark:border-purple-800">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                Timezone Reminder
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-2">
-                <p className="text-sm">
-                  You're {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {daysElapsed < 2 
-                    ? "Consider keeping your pump on home time for the first day, then update the clock."
-                    : "Your pump clock should now be set to local time. Check basal rates are appropriate."}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Packing Checklist
-              </CardTitle>
-              <Badge variant={checkedCount === packingList.length ? "default" : "secondary"} data-testid="badge-packing-progress">
-                {checkedCount}/{packingList.length} packed
-              </Badge>
-            </div>
-            <CardDescription>
-              Tap items to mark them as packed
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map(category => {
-              const items = groupedItems[category];
-              if (!items || items.length === 0) return null;
-              const { label, icon: Icon, color } = categoryLabels[category];
-              
-              return (
-                <div key={category} className="space-y-2">
-                  <h3 className={`font-semibold flex items-center gap-2 text-sm ${color}`}>
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </h3>
-                  <div className="space-y-1.5">
-                    {items.map((item) => {
-                      const globalIndex = packingList.findIndex(i => i === item);
-                      return (
-                        <div 
-                          key={globalIndex}
-                          onClick={() => updatePackingItem(globalIndex)}
-                          className={`flex min-h-[3rem] items-center gap-3 rounded-xl border border-border/50 p-3 cursor-pointer transition-colors hover-elevate ${
-                            item.checked
-                              ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-                              : "bg-muted/50"
-                          }`}
-                          data-testid={`active-packing-item-${globalIndex}`}
-                        >
-                          <Checkbox 
-                            checked={item.checked} 
-                            onClick={(e) => e.stopPropagation()}
-                            onCheckedChange={() => updatePackingItem(globalIndex)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm ${item.checked ? "line-through text-muted-foreground" : ""}`}>
-                              {item.name}
-                            </span>
-                          </div>
-                          <Badge variant="outline" className="shrink-0 text-xs">
-                            {item.estimatedAmount} {item.unit}
-                          </Badge>
-                          {item.checked && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 dark:border-red-800">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Heart className="h-5 w-5 text-red-600 dark:text-red-400" />
-              Emergency Quick Access
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Link href="/emergency-card">
-              <Button variant="outline" className="w-full" data-testid="button-active-emergency-card">
-                <Globe className="h-4 w-4 mr-2 text-red-600" />
-                View Full Emergency Card
-                <ChevronRight className="h-4 w-4 ml-auto" />
-              </Button>
-            </Link>
-
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="font-medium text-sm flex items-center gap-2">
-                  <Languages className="h-4 w-4" />
-                  Key Phrases
-                </h4>
-                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <SelectTrigger className="w-40" data-testid="select-phrase-language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(EMERGENCY_PHRASES).map(lang => (
-                      <SelectItem key={lang} value={lang}>{lang}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedPhrases && (
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">"I am diabetic"</p>
-                    <p className="text-lg font-medium" data-testid="text-phrase-diabetic">{selectedPhrases.iAmDiabetic}</p>
-                  </div>
-                  <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">"I need sugar"</p>
-                    <p className="text-lg font-medium" data-testid="text-phrase-sugar">{selectedPhrases.needSugar}</p>
-                  </div>
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                    <p className="text-xs text-muted-foreground mb-1">"I need medical help"</p>
-                    <p className="text-lg font-medium" data-testid="text-phrase-help">{selectedPhrases.needHelp}</p>
-                  </div>
-                  <div className="p-3 bg-muted/50 rounded-lg flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Emergency Number ({selectedLanguage})</p>
-                      <p className="text-lg font-bold font-mono" data-testid="text-emergency-number">{selectedPhrases.emergencyNumber}</p>
+          <TabsContent value="overview" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-overview">
+            {isSickDayAlsoActive && (
+              <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20" data-testid="card-sick-day-also-active">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-full bg-orange-100 dark:bg-orange-900 shrink-0">
+                      <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     </div>
-                    <Phone className="h-5 w-5 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">Sick Day Mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Link href="/scenarios/sick-day">
+                          <Button variant="outline" size="sm" className="min-h-11" data-testid="button-view-sick-day-from-travel">
+                            <Thermometer className="h-3 w-3 mr-1" />
+                            View Sick Day Dashboard
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                </CardContent>
+              </Card>
+            )}
 
-            <Link href="/help">
-              <Button variant="outline" className="w-full mt-2" data-testid="button-help-now-link">
-                <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
-                Help Now Page
-                <ChevronRight className="h-4 w-4 ml-auto" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+            {todayScheduleEntry && !isPumpUser && hasStarted && !hasEnded && (
+              <Card className="border-purple-200 dark:border-purple-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    Today's Insulin Timing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Long-acting injection today</p>
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid="text-today-injection-time">
+                          {todayScheduleEntry.localTime} <span className="text-sm font-normal">local time</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ({todayScheduleEntry.homeTime} home time)
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline" className="text-purple-700 dark:text-purple-300">
+                          {todayScheduleEntry.label}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">{todayScheduleEntry.note}</p>
+                      </div>
+                    </div>
+                    {plan.timezoneChange === "major" && (
+                      <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
+                        Shifting by up to 2 hours per day until adjusted to local time ({plan.timezoneHours}h {plan.timezoneDirection}).
+                        Monitor blood glucose extra closely during adjustment.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-        {riskWarnings.length > 0 && (
-          <Card className="border-orange-500/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ShieldAlert className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                Trip Reminders
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {riskWarnings.map((warning, index) => (
-                <div 
-                  key={index} 
-                  className={`p-3 rounded-lg ${
-                    warning.severity === "high" 
-                      ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
-                      : warning.severity === "medium"
-                      ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
-                      : "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"
-                  }`}
-                >
-                  <h4 className="font-medium text-sm">{warning.title}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{warning.description}</p>
+            {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
+              <Card className="border-purple-200 dark:border-purple-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    Timezone Reminder
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-2">
+                    <p className="text-sm">
+                      You're {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {daysElapsed < 2 
+                        ? "Consider keeping your pump on home time for the first day, then update the clock."
+                        : "Your pump clock should now be set to local time. Check basal rates are appropriate."}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="plan" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-plan">
+            <Card className="border-red-200 dark:border-red-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Heart className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  Emergency Quick Access
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Link href="/emergency-card">
+                  <Button variant="outline" className="w-full" data-testid="button-active-emergency-card">
+                    <Globe className="h-4 w-4 mr-2 text-red-600" />
+                    View Full Emergency Card
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  </Button>
+                </Link>
+
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <Languages className="h-4 w-4" />
+                      Key Phrases
+                    </h4>
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger className="w-40" data-testid="select-phrase-language">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(EMERGENCY_PHRASES).map(lang => (
+                          <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedPhrases && (
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">"I am diabetic"</p>
+                        <p className="text-lg font-medium" data-testid="text-phrase-diabetic">{selectedPhrases.iAmDiabetic}</p>
+                      </div>
+                      <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">"I need sugar"</p>
+                        <p className="text-lg font-medium" data-testid="text-phrase-sugar">{selectedPhrases.needSugar}</p>
+                      </div>
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">"I need medical help"</p>
+                        <p className="text-lg font-medium" data-testid="text-phrase-help">{selectedPhrases.needHelp}</p>
+                      </div>
+                      <div className="p-3 bg-muted/50 rounded-lg flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Emergency Number ({selectedLanguage})</p>
+                          <p className="text-lg font-bold font-mono" data-testid="text-emergency-number">{selectedPhrases.emergencyNumber}</p>
+                        </div>
+                        <Phone className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+
+                <Link href="/help">
+                  <Button variant="outline" className="w-full mt-2" data-testid="button-help-now-link">
+                    <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                    Help Now Page
+                    <ChevronRight className="h-4 w-4 ml-auto" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {riskWarnings.length > 0 && (
+              <Card className="border-orange-500/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <ShieldAlert className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    Trip Reminders
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {riskWarnings.map((warning, index) => (
+                    <div 
+                      key={index} 
+                      className={`p-3 rounded-lg ${
+                        warning.severity === "high" 
+                          ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+                          : warning.severity === "medium"
+                          ? "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800"
+                          : "bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800"
+                      }`}
+                    >
+                      <h4 className="font-medium text-sm">{warning.title}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{warning.description}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        {hasEnded ? "Your trip has ended" : `Until ${new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
+                    End Travel Mode
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Packing Checklist
+                  </CardTitle>
+                  <Badge variant={checkedCount === packingList.length ? "default" : "secondary"} data-testid="badge-packing-progress">
+                    {checkedCount}/{packingList.length} packed
+                  </Badge>
+                </div>
+                <CardDescription>Tap items to mark them as packed</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map(category => {
+                  const items = groupedItems[category];
+                  if (!items || items.length === 0) return null;
+                  const { label, icon: Icon, color } = categoryLabels[category];
+                  return (
+                    <div key={category} className="space-y-2">
+                      <h3 className={`font-semibold flex items-center gap-2 text-sm ${color}`}>
+                        <Icon className="h-4 w-4" />
+                        {label}
+                      </h3>
+                      <div className="space-y-1.5">
+                        {items.map((item) => {
+                          const globalIndex = packingList.findIndex(i => i === item);
+                          return (
+                            <div 
+                              key={globalIndex}
+                              onClick={() => updatePackingItem(globalIndex)}
+                              className={`flex min-h-[3rem] items-center gap-3 rounded-xl border border-border/50 p-3 cursor-pointer transition-colors hover-elevate ${
+                                item.checked
+                                  ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+                                  : "bg-muted/50"
+                              }`}
+                              data-testid={`active-packing-item-${globalIndex}`}
+                            >
+                              <Checkbox 
+                                checked={item.checked} 
+                                onClick={(e) => e.stopPropagation()}
+                                onCheckedChange={() => updatePackingItem(globalIndex)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-sm ${item.checked ? "line-through text-muted-foreground" : ""}`}>
+                                  {item.name}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="shrink-0 text-xs">
+                                {item.estimatedAmount} {item.unit}
+                              </Badge>
+                              {item.checked && <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
           <CardContent className="p-4">
@@ -1288,21 +1297,17 @@ export default function Travel() {
   if (step === "entry") {
     return (
       <PageShell variant="standard">
-        <PageHeader
-        leading={<PageBackButton />}
-        title="Travel"
-        description="Trip planning, packing lists, and travel mode — educational guidance only."
-      />
         <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
           <CardHeader>
             <div className="flex items-center gap-3">
+              <PageBackButton />
               <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900">
                 <Plane className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <div>
-                <CardTitle className="text-xl">Travel Mode</CardTitle>
-                <CardDescription>Prepare for your trip with confidence</CardDescription>
-              </div>
+              <CardTitle className="text-xl">
+                Travel{" "}
+                <span className="text-sm font-normal text-muted-foreground">— Prepare for your trip with confidence</span>
+              </CardTitle>
             </div>
           </CardHeader>
         </Card>
@@ -1666,28 +1671,24 @@ export default function Travel() {
   if (step === "inputs") {
     return (
       <PageShell variant="standard">
-        <PageHeader
-        leading={<PageBackButton />}
-        title="Travel"
-        description="Trip planning, packing lists, and travel mode — educational guidance only."
-      />
         <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
           <CardHeader>
             <div className="flex items-center gap-3">
+              <PageBackButton />
               <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-back">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <CardTitle className="text-xl">Trip Details</CardTitle>
-                <CardDescription>Tell us about your upcoming travel</CardDescription>
-              </div>
+              <CardTitle className="text-xl">
+                Travel{" "}
+                <span className="text-sm font-normal text-muted-foreground">— Tell us about your upcoming travel</span>
+              </CardTitle>
             </div>
           </CardHeader>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Travel Information</CardTitle>
+            <CardTitle>Trip information</CardTitle>
             <CardDescription>
               We'll use this to calculate your supply needs with appropriate safety buffers.
             </CardDescription>
@@ -1979,23 +1980,19 @@ export default function Travel() {
 
   return (
     <PageShell variant="standard">
-      <PageHeader
-        leading={<PageBackButton />}
-        title="Travel"
-        description="Trip planning, packing lists, and travel mode — educational guidance only."
-      />
       <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
         <CardHeader>
           <div className="flex items-center gap-3 flex-wrap">
+            <PageBackButton />
             <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-new-plan">
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex-1">
-              <CardTitle className="text-xl">Your Travel Plan</CardTitle>
-              <CardDescription>
-                {plan.duration} days to {plan.destination}
-              </CardDescription>
-            </div>
+            <CardTitle className="text-xl flex-1">
+              Travel{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                — {plan.duration} days to {plan.destination}
+              </span>
+            </CardTitle>
             <Badge variant="outline">
               {plan.travelType === "international" ? "International" : "Domestic"}
             </Badge>

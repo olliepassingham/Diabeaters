@@ -1,103 +1,454 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Car, AlertTriangle, Gauge, IdCard, Phone } from "lucide-react";
+import {
+  Car,
+  AlertTriangle,
+  Droplet,
+  Phone,
+  RotateCcw,
+  ArrowLeft,
+  ArrowRight,
+  IdCard,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { trackFeatureEngagement } from "@/components/discovery-prompts";
+import { storage, type UserProfile } from "@/lib/storage";
+import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import {
+  buildDrivingReadinessOutcome,
+  type DrivingReadinessOutcome,
+  type DrivingTrend,
+} from "@/lib/driving-readiness-tool";
+import { cn } from "@/lib/utils";
 
-const SECTIONS = [
-  {
-    title: "Before you drive",
-    body: "Use the checks your care team recommends — often a fingerstick blood test, especially if you use insulin or have had a recent low. If you are low, treat with fast-acting carbohydrate and only drive again when you are safely back in range and feeling well enough to concentrate, as your team describes.",
-  },
-  {
-    title: "Longer journeys",
-    body: "Keep glucose tablets or juice within reach (not only in the boot). Plan breaks for food, insulin, and checks if your team advises. Heat, delays, and missed meals can all affect glucose while you are on the road.",
-  },
-  {
-    title: "If you feel hypo while driving",
-    body: "Pull over and stop as soon as it is safe — do not try to reach home first. Turn the engine off, treat the hypo, and wait until you have recovered fully before driving again. If you are not safe to continue, arrange another way home.",
-  },
-  {
-    title: "CGM and driving",
-    body: "Some people use CGM for awareness, but many regions still expect a confirmatory blood test before driving after certain readings or alerts. Follow local rules and what your team has written for you.",
-  },
-];
+const FROM_SCENARIOS = "from=/scenarios";
+
+function linkWithFrom(path: string): string {
+  return path.includes("?") ? `${path}&${FROM_SCENARIOS}` : `${path}?${FROM_SCENARIOS}`;
+}
+
+type Phase = "form" | "result";
+
+type YesNo = "yes" | "no" | "";
+
+type ChoiceProps<T extends string> = {
+  label: string;
+  value: T | "";
+  onChange: (v: T) => void;
+  options: { value: T; title: string; description?: string }[];
+  name: string;
+};
+
+function ChoiceGroup<T extends string>({ label, value, onChange, options, name }: ChoiceProps<T>) {
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-medium">{label}</Label>
+      <RadioGroup
+        value={value === "" ? undefined : value}
+        onValueChange={(v) => onChange(v as T)}
+        className="space-y-2"
+      >
+        {options.map((opt) => {
+          const id = `${name}-${opt.value}`;
+          return (
+            <div
+              key={opt.value}
+              className={cn(
+                "flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer",
+                (value === "" ? undefined : value) === opt.value && "border-primary bg-primary/5",
+              )}
+              onClick={() => onChange(opt.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onChange(opt.value);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <RadioGroupItem value={opt.value} id={id} className="mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <Label htmlFor={id} className="font-normal cursor-pointer leading-snug">
+                  {opt.title}
+                </Label>
+                {opt.description ? (
+                  <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </RadioGroup>
+    </div>
+  );
+}
+
+function OutcomeBadge({ outcome }: { outcome: DrivingReadinessOutcome }) {
+  if (outcome.kind === "not_ready") {
+    return <Badge variant="destructive">Not ready</Badge>;
+  }
+  if (outcome.kind === "caution") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-500/70 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+      >
+        Caution
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="font-medium border-emerald-600/40 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100">
+      Likely OK
+    </Badge>
+  );
+}
 
 export default function DrivingScenarioPage() {
+  const [profile, setProfile] = useState<Partial<UserProfile>>({});
+  const [phase, setPhase] = useState<Phase>("form");
+  const [outcome, setOutcome] = useState<DrivingReadinessOutcome | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [bgSkipped, setBgSkipped] = useState(false);
+  const [bgInput, setBgInput] = useState("");
+  const [bgTrend, setBgTrend] = useState<DrivingTrend>("unknown");
+  const [recentHypo, setRecentHypo] = useState<YesNo>("");
+  const [alertEnough, setAlertEnough] = useState<YesNo>("");
+  const [treatmentInReach, setTreatmentInReach] = useState<YesNo>("");
+  const [longJourney, setLongJourney] = useState(false);
+
+  const formTopRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    trackFeatureEngagement("scenarios-driving");
+    const p = storage.getProfile();
+    if (p) setProfile(p);
+  }, []);
+
+  const bgUnits = normalizeBgUnits(profile.bgUnits);
+  const stepIndex = phase === "form" ? 0 : 1;
+  const progressPct = ((stepIndex + 1) / 2) * 100;
+
+  const runCheck = () => {
+    setFormError(null);
+    if (recentHypo === "" || alertEnough === "" || treatmentInReach === "") {
+      setFormError("Answer each question to get a recommendation.");
+      return;
+    }
+    if (!bgSkipped) {
+      const t = bgInput.trim().replace(",", ".");
+      if (!t) {
+        setFormError("Enter a blood glucose number or choose to skip.");
+        return;
+      }
+      const n = Number(t);
+      if (Number.isNaN(n) || n <= 0) {
+        setFormError("Enter a valid blood glucose number.");
+        return;
+      }
+    }
+
+    const bgValue = bgSkipped
+      ? null
+      : (() => {
+          const t = bgInput.trim().replace(",", ".");
+          const n = Number(t);
+          return Number.isNaN(n) ? null : n;
+        })();
+
+    const o = buildDrivingReadinessOutcome(
+      {
+        bgSkipped,
+        bgValue,
+        bgTrend: bgSkipped ? null : bgTrend,
+        recentHypoOrSymptoms: recentHypo === "yes",
+        alertEnough: alertEnough === "yes",
+        treatmentInReach: treatmentInReach === "yes",
+        longJourney,
+      },
+      profile.bgUnits,
+    );
+    setOutcome(o);
+    setPhase("result");
+  };
+
+  const reset = () => {
+    setPhase("form");
+    setOutcome(null);
+    setFormError(null);
+    setBgSkipped(false);
+    setBgInput("");
+    setBgTrend("unknown");
+    setRecentHypo("");
+    setAlertEnough("");
+    setTreatmentInReach("");
+    setLongJourney(false);
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  useEffect(() => {
+    if (phase === "result" && outcome) {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [phase, outcome]);
+
+  const showSticky = phase === "form";
+
   return (
-    <PageShell variant="standard" className="space-y-6">
-      <PageHeader
-        leading={<PageBackButton />}
-        title="Driving"
-        description="Principles for safer decisions about glucose and driving. Not legal advice — rules differ by country and your medical team."
-      />
+    <div className="min-h-[50vh]">
+      <PageShell variant="standard" className={cn("space-y-6", showSticky && "pb-28 sm:pb-6")}>
+        <div ref={formTopRef}>
+          <PageHeader
+            leading={<PageBackButton />}
+            title="Driving"
+            description="Quick readiness check from your answers — not legal or medical advice."
+          />
+        </div>
 
-      <Alert className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
-        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-        <AlertTitle className="text-amber-900 dark:text-amber-100">Important</AlertTitle>
-        <AlertDescription className="text-small text-amber-900/90 dark:text-amber-100/90">
-          This app does not state legal blood-glucose limits for driving. Check your local licensing and medical guidance, and follow your clinic&apos;s written advice.
-        </AlertDescription>
-      </Alert>
+        <Alert className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20 py-3">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100 text-sm">Before you start</AlertTitle>
+          <AlertDescription className="text-small text-amber-900/90 dark:text-amber-100/90">
+            This app does not state legal blood-glucose limits for driving. Follow local rules and your clinic.
+          </AlertDescription>
+        </Alert>
 
-      <Card className="rounded-xl border-border/80">
-        <CardHeader>
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Car className="h-6 w-6 text-primary" />
-            On the road
-          </CardTitle>
-          <CardDescription>Simple habits that support safer driving with type 1</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {SECTIONS.map((s) => (
-            <div key={s.title} className="rounded-xl border border-border/60 bg-card p-4">
-              <h2 className="text-h3 font-semibold text-foreground">{s.title}</h2>
-              <p className="text-small text-muted-foreground mt-1 leading-relaxed">{s.body}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="font-medium uppercase tracking-wide">Step {stepIndex + 1} of 2</span>
+          </div>
+          <Progress value={progressPct} className="h-1.5" data-testid="driving-progress" />
+        </div>
 
-      <Card className="rounded-xl border-border/80">
-        <CardHeader>
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Gauge className="h-6 w-6 text-primary" />
-            Plan ahead
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc list-inside text-small text-muted-foreground space-y-2">
-            <li>Know where your hypo treatment is before you set off</li>
-            <li>Avoid driving if you are severely sleep-deprived or unwell unless your team has cleared you</li>
-            <li>After a serious hypo, your team may advise a period before driving again — follow that plan</li>
-          </ul>
-        </CardContent>
-      </Card>
+        {phase === "form" ? (
+          <Card className="surface-card">
+            <CardHeader>
+              <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
+                <Car className="h-6 w-6 text-primary shrink-0" />
+                Checklist
+              </CardTitle>
+              <CardDescription>Takes under a minute.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Current blood glucose</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="driving-bg-skip"
+                      checked={bgSkipped}
+                      onCheckedChange={(c) => {
+                        const on = c === true;
+                        setBgSkipped(on);
+                        if (on) setBgTrend("unknown");
+                      }}
+                    />
+                    <Label htmlFor="driving-bg-skip" className="text-sm font-normal cursor-pointer">
+                      Skip
+                    </Label>
+                  </div>
+                </div>
+                {!bgSkipped ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2 max-w-xs">
+                      <Label htmlFor="driving-bg">Reading ({bgUnits})</Label>
+                      <Input
+                        id="driving-bg"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                        value={bgInput}
+                        onChange={(e) => setBgInput(e.target.value)}
+                        autoComplete="off"
+                        data-testid="input-driving-bg"
+                      />
+                    </div>
+                    <ChoiceGroup
+                      name="driving-trend"
+                      label="Trend (if you know it)"
+                      value={bgTrend}
+                      onChange={setBgTrend}
+                      options={[
+                        { value: "rising", title: "Rising" },
+                        { value: "flat", title: "Flat / stable" },
+                        { value: "falling", title: "Falling" },
+                        { value: "unknown", title: "Unknown" },
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Button variant="outline" asChild>
-          <Link href="/tools/hypo-help">
-            Hypo help
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/emergency-card">
-            <IdCard className="h-4 w-4 mr-2" />
-            Emergency card
-          </Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <Link href="/help-now">
-            Help now
-          </Link>
-        </Button>
-      </div>
+              <ChoiceGroup
+                name="driving-recent-hypo"
+                label="Any hypo or hypo-like symptoms in the last few hours?"
+                value={recentHypo}
+                onChange={setRecentHypo}
+                options={[
+                  { value: "no", title: "No" },
+                  { value: "yes", title: "Yes" },
+                ]}
+              />
 
-      <p className="text-tiny text-muted-foreground flex items-center gap-2">
-        <Phone className="h-3.5 w-3.5 shrink-0" />
-        If in doubt, do not drive — contact your team or someone who can take over.
-      </p>
-    </PageShell>
+              <ChoiceGroup
+                name="driving-alert"
+                label="Do you feel alert enough to concentrate safely?"
+                value={alertEnough}
+                onChange={setAlertEnough}
+                options={[
+                  { value: "yes", title: "Yes" },
+                  { value: "no", title: "No" },
+                ]}
+              />
+
+              <ChoiceGroup
+                name="driving-treatment"
+                label="Is fast-acting carbohydrate within reach (e.g. in the car with you)?"
+                value={treatmentInReach}
+                onChange={setTreatmentInReach}
+                options={[
+                  { value: "yes", title: "Yes" },
+                  { value: "no", title: "No" },
+                ]}
+              />
+
+              <div className="flex items-start gap-3 rounded-lg border border-border/80 p-4">
+                <Checkbox
+                  id="driving-long"
+                  checked={longJourney}
+                  onCheckedChange={(c) => setLongJourney(c === true)}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="driving-long" className="text-sm font-medium cursor-pointer leading-snug">
+                    Longer journey (adds one planning tip)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Optional — does not change the main recommendation.</p>
+                </div>
+              </div>
+
+              {formError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {phase === "result" && outcome ? (
+          <div ref={resultsRef} className="space-y-4">
+            <Card
+              className={cn(
+                "surface-card border-2 overflow-hidden",
+                outcome.kind === "not_ready" && "border-destructive/60",
+                outcome.kind === "caution" && "border-amber-500/50",
+                outcome.kind === "likely_ok" && "border-emerald-600/35",
+              )}
+              data-testid="driving-result-card"
+            >
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-2 min-w-0">
+                    <OutcomeBadge outcome={outcome} />
+                    <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
+                    <CardDescription className="text-base text-foreground/90">{outcome.lead}</CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 shrink-0 self-start"
+                    onClick={reset}
+                    data-testid="button-driving-start-over"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Start over
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {outcome.bullets.length > 0 ? (
+                  <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                    {outcome.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {outcome.kind === "likely_ok" ? (
+                  <Alert>
+                    <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
+                  </Alert>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {outcome.links.hypoHelp ? (
+                    <Button variant="secondary" size="sm" asChild>
+                      <Link href={linkWithFrom("/tools/hypo-help")}>
+                        <Droplet className="h-4 w-4 mr-1.5" />
+                        Hypo help
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {outcome.links.emergencyCard ? (
+                    <Button variant="secondary" size="sm" asChild>
+                      <Link href={linkWithFrom("/emergency-card")}>
+                        <IdCard className="h-4 w-4 mr-1.5" />
+                        Emergency card
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {outcome.links.helpNow ? (
+                    <Button variant="secondary" size="sm" asChild>
+                      <Link href={linkWithFrom("/help-now")}>
+                        <Phone className="h-4 w-4 mr-1.5" />
+                        Help now
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
+      </PageShell>
+
+      {showSticky ? (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
+          data-testid="driving-sticky-actions"
+        >
+          <PageShell variant="standard" className="flex justify-end">
+            <Button
+              type="button"
+              className="gap-1.5 min-w-[10rem] w-full sm:w-auto"
+              onClick={runCheck}
+              data-testid="button-driving-check"
+            >
+              Check readiness
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </PageShell>
+        </div>
+      ) : (
+        <PageShell variant="standard" className="flex justify-start">
+          <Button type="button" variant="outline" className="gap-1.5" onClick={() => setPhase("form")}>
+            <ArrowLeft className="h-4 w-4" />
+            Edit answers
+          </Button>
+        </PageShell>
+      )}
+    </div>
   );
 }

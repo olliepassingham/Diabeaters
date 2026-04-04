@@ -7,9 +7,13 @@ import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
+import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 
 export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
+  const { data: linkedPatient } = useLinkedPatient();
+  const emergencyEditHref = emergencyDetailsEditHref(!!linkedPatient);
   const { data: emergency, syncGeneration } = useEmergencyProfile();
   const primaryContact = toLegacyPrimaryContact(emergency);
 
@@ -52,7 +56,7 @@ export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
               Help now
             </Button>
           </Link>
-          <Link href="/account#account-emergency">
+          <Link href={emergencyEditHref}>
             <Button variant="outline" size="sm" className="w-full border-gray-900/20 dark:border-border" data-testid="button-edit-contacts">
               {compact ? "Edit" : "Edit details"}
               <ArrowRight className="h-4 w-4 ml-1 hidden sm:inline" />

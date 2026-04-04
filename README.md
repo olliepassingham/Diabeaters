@@ -217,6 +217,20 @@ create policy "Supplies: delete own" on public.supplies
 
 - **RLS note**: RLS is enabled; all access is restricted so each user can only read/write rows where `user_id = auth.uid()`.
 
+### Notifications & Edge Functions (ops)
+
+In-app and carer alerts are driven by **Supabase Edge Functions**. Deploy these (from the repo’s `supabase/functions/` or your CI) so invokes from the app succeed:
+
+- `notify_supply_low` — low/critical supply transitions
+- `notify_carers_on_hypo` — carers (+ optional patient inbox row) after a hypo log
+- `notify_scenario_started` — sick day / travel mode started
+
+**Secrets** (Dashboard → Edge Functions → Secrets): at minimum `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Optional push relay: `PUSH_NOTIFICATION_API_URL`, `PUSH_NOTIFICATION_API_KEY`.
+
+**Database:** apply SQL for `hypo_logs`, `notifications`, `carer_links`, and related RLS as in [`docs/sql/notifications.sql`](docs/sql/notifications.sql) and [`docs/sql/family_carers.sql`](docs/sql/family_carers.sql).
+
+**Testing tips:** To re-test supply ok→low transitions, clear local `diabeater_supply_alert_state_v1` (or adjust thresholds). In DevTools → Network, confirm `functions/v1/notify_*` requests return 200 when online.
+
 ## E2E tests (Playwright)
 
 Smoke and auth tests run against a running app (local preview or deployed).

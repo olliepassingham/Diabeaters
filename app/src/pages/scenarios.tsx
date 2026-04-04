@@ -44,13 +44,13 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     href: "/scenarios/alcohol",
     icon: Wine,
     title: "Alcohol",
-    description: "Delayed lows, overnight risk, and when to get help — educational only.",
+    description: "Carb coverage estimates (same as Meal Adviser), prep checklists, and urgent safety gates.",
   },
   {
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
-    description: "Checks before you drive, longer trips, and what to do if you feel low.",
+    description: "A short readiness check and clear recommendation before you drive.",
   },
 ];
 
@@ -88,7 +88,7 @@ export default function Scenarios() {
     if (location !== "/scenarios") return;
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "bedtime") setLocation("/scenarios/bedtime");
-    else if (tab === "sick-day") setLocation("/scenarios/sick-day");
+    else if (tab === "sick-day" || tab === "sickday") setLocation("/scenarios/sick-day");
     else if (tab === "travel") setLocation("/scenarios/travel");
   }, [location, search, setLocation]);
 
@@ -113,10 +113,17 @@ export default function Scenarios() {
               <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
             </InfoSection>
             <InfoSection title="Alcohol">
-              <p>Reminders about food, fast carbs, delayed hypos overnight, and when illness might be more than alcohol alone.</p>
+              <p>
+                Pick a situation for meal carb estimates using your saved ratios (same math as Meal Adviser), short prep
+                checklists, and red-flag routing to help. This is not medical advice — alcohol changes overnight risk;
+                always follow your clinic&apos;s plan.
+              </p>
             </InfoSection>
             <InfoSection title="Driving">
-              <p>General principles for glucose checks and safe decisions on the road — not a substitute for local driving rules or your team&apos;s advice.</p>
+              <p>
+                Answer a few quick questions for a readiness recommendation. This is not legal or medical advice and
+                does not replace local licensing rules or your clinic&apos;s plan.
+              </p>
             </InfoSection>
           </PageInfoDialog>
         }

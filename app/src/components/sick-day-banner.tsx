@@ -83,7 +83,7 @@ export function SickDayBanner() {
       </div>
       
       <div className="flex items-center gap-2 flex-shrink-0">
-        <Link href="/scenarios">
+        <Link href="/scenarios/sick-day#sickday-checklist">
           <Button 
             variant="secondary" 
             size="sm" 

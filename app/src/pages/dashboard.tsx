@@ -40,6 +40,7 @@ import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
+import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 
@@ -253,6 +254,7 @@ function HeroCard({
       setHypoHistory(storage.getHypoTreatments());
 
       let description = "Your hypo treatment has been recorded.";
+      let notifyInvokeFailed = false;
 
       if (user?.id && getSupabase()) {
         const cloud = await insertHypoLog({
@@ -268,16 +270,20 @@ function HeroCard({
             userId: user.id,
           });
 
-          const eligible = notify.eligible_carers ?? 0;
-          const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
+          if (!notify.success) {
+            notifyInvokeFailed = true;
+          } else {
+            const eligible = notify.eligible_carers ?? 0;
+            const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
 
-          if (eligible > 0 && notify.success && delivered > 0) {
-            storage.updateHypoTreatmentCarerNotified(created.id, true);
-            description =
-              eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
-          } else if (eligible > 0 && notify.success && delivered === 0) {
-            description =
-              "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
+            if (eligible > 0 && delivered > 0) {
+              storage.updateHypoTreatmentCarerNotified(created.id, true);
+              description =
+                eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
+            } else if (eligible > 0 && delivered === 0) {
+              description =
+                "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
+            }
           }
         }
       }
@@ -286,6 +292,13 @@ function HeroCard({
         title: "Hypo treatment logged",
         description,
       });
+      if (notifyInvokeFailed) {
+        toast({
+          title: NOTIFY_EDGE_FAILURE_TITLE,
+          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          variant: "destructive",
+        });
+      }
     })();
   };
 

@@ -5,11 +5,16 @@ import { AlertCircle, Phone, User, Heart, BookOpen } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserProfile } from "@/lib/storage";
 import { useProfile } from "@/lib/profile";
+import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageShell } from "@/components/layout";
 
 export default function HelpNow() {
+  const { data: linkedPatient } = useLinkedPatient();
+  const isCarer = !!linkedPatient;
+  const emergencyEditHref = emergencyDetailsEditHref(isCarer);
   const { profile: cloudProfile } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>("awake");
@@ -73,7 +78,7 @@ export default function HelpNow() {
             </Button>
           ) : (
             <Button size="lg" variant="outline" className="text-lg" asChild data-testid="button-call-contact">
-              <Link href="/account#account-emergency" className="flex flex-col items-center justify-center gap-1 py-3">
+              <Link href={emergencyEditHref} className="flex flex-col items-center justify-center gap-1 py-3">
                 <User className="h-6 w-6" />
                 <span className="text-sm">Add contact</span>
               </Link>
@@ -295,7 +300,7 @@ export default function HelpNow() {
               <p className="text-sm text-muted-foreground">No contact on file yet.</p>
             )}
             <Button variant="secondary" size="sm" className="w-full" asChild>
-              <Link href="/account#account-emergency">Edit emergency details</Link>
+              <Link href={emergencyEditHref}>Edit emergency details</Link>
             </Button>
           </CardContent>
         </Card>

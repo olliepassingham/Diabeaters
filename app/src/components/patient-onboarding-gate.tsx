@@ -5,6 +5,7 @@ import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getProfile } from "@/lib/profile";
 import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
+import { getPostOnboardingPath } from "@/lib/onboarding-routes";
 
 const ONBOARDING_LS = "diabeater_onboarding_completed";
 
@@ -59,16 +60,10 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
 
   return (
     <Onboarding
-      onComplete={() => {
+      onComplete={(pathOverride) => {
         onPatientComplete();
         const struggle = localStorage.getItem("diabeater_onboarding_struggle");
-        const routes: Record<string, string> = {
-          supplies: "/supplies",
-          meals: "/adviser?tab=meal",
-          exercise: "/scenarios/exercise",
-          overview: "/",
-        };
-        setLocation(struggle && routes[struggle] ? routes[struggle] : "/");
+        setLocation(pathOverride ?? getPostOnboardingPath(struggle));
       }}
     />
   );

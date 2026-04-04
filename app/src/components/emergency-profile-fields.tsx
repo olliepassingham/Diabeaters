@@ -3,6 +3,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useMemo, useState } from "react";
 
 type FieldKey =
   | "contactName"
@@ -32,6 +36,9 @@ export function EmergencyProfileFields({
   syncGeneration: number;
 }) {
   const { data, updateField, isFieldPrefilled } = useEmergencyProfile();
+  const hasOptional = (data.medicalInstructions || "").trim() || (data.notes || "").trim();
+  const [optionalOpen, setOptionalOpen] = useState(false);
+  const effectiveOptionalOpen = useMemo(() => optionalOpen || Boolean(hasOptional), [optionalOpen, hasOptional]);
 
   const shell = (key: FieldKey) => fieldShellClass(isFieldPrefilled(key));
 
@@ -57,18 +64,6 @@ export function EmergencyProfileFields({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="ep-relation">Relationship (optional)</Label>
-        <Input
-          id="ep-relation"
-          placeholder="e.g. Mother, partner, friend"
-          value={data.relation}
-          onChange={(e) => updateField("relation", e.target.value)}
-          className={shell("relation")}
-          data-testid="emergency-relation"
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="ep-phone">Primary phone</Label>
@@ -84,7 +79,7 @@ export function EmergencyProfileFields({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="ep-phone-2">Secondary phone (optional)</Label>
+          <Label htmlFor="ep-phone-2">Secondary phone</Label>
           <Input
             id="ep-phone-2"
             type="tel"
@@ -99,30 +94,60 @@ export function EmergencyProfileFields({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="ep-medical">Medical instructions (optional)</Label>
-        <Textarea
-          id="ep-medical"
-          placeholder="e.g. Allergies, glucagon location, pump/CGM notes"
-          value={data.medicalInstructions}
-          onChange={(e) => updateField("medicalInstructions", e.target.value)}
-          rows={3}
-          className={cn("min-h-[80px] resize-y", shell("medicalInstructions"))}
-          data-testid="emergency-medical-instructions"
+        <Label htmlFor="ep-relation">Relationship</Label>
+        <Input
+          id="ep-relation"
+          placeholder="e.g. Mother, partner, friend"
+          value={data.relation}
+          onChange={(e) => updateField("relation", e.target.value)}
+          className={shell("relation")}
+          data-testid="emergency-relation"
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="ep-notes">Other notes (optional)</Label>
-        <Textarea
-          id="ep-notes"
-          placeholder="e.g. Campus accommodation, door codes"
-          value={data.notes}
-          onChange={(e) => updateField("notes", e.target.value)}
-          rows={3}
-          className={cn("min-h-[80px] resize-y", shell("notes"))}
-          data-testid="emergency-notes"
-        />
-      </div>
+      <Collapsible open={effectiveOptionalOpen} onOpenChange={setOptionalOpen}>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">More emergency info</p>
+            <p className="text-xs text-muted-foreground">
+              Optional details for context. {hasOptional ? "Filled" : "Not set"}
+            </p>
+          </div>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" size="sm" className="shrink-0 gap-2">
+              {effectiveOptionalOpen ? "Hide" : "Show"}
+              {effectiveOptionalOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent className="pt-3 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="ep-medical">Medical instructions</Label>
+            <Textarea
+              id="ep-medical"
+              placeholder="e.g. Allergies, glucagon location, pump/CGM notes"
+              value={data.medicalInstructions}
+              onChange={(e) => updateField("medicalInstructions", e.target.value)}
+              rows={3}
+              className={cn("min-h-[80px] resize-y", shell("medicalInstructions"))}
+              data-testid="emergency-medical-instructions"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ep-notes">Other notes</Label>
+            <Textarea
+              id="ep-notes"
+              placeholder="e.g. Campus accommodation, door codes"
+              value={data.notes}
+              onChange={(e) => updateField("notes", e.target.value)}
+              rows={3}
+              className={cn("min-h-[80px] resize-y", shell("notes"))}
+              data-testid="emergency-notes"
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <p className="text-xs text-muted-foreground">
         Highlighted fields were restored from your saved profile. Editing clears the highlight.

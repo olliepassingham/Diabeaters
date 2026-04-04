@@ -1,28 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Wine, AlertTriangle, Droplet, Phone, RotateCcw } from "lucide-react";
+import {
+  Wine,
+  AlertTriangle,
+  Droplet,
+  Phone,
+  RotateCcw,
+  ArrowLeft,
+  ArrowRight,
+  Utensils,
+  Moon,
+  Calculator,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { storage, type UserProfile } from "@/lib/storage";
+import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
 import {
-  buildAlcoholNightPlan,
   normalizeBgUnits,
-  type AlcoholActivity,
-  type AlcoholCgm,
-  type AlcoholCompanions,
-  type AlcoholFood,
-  type AlcoholInsulin,
   type AlcoholIntensity,
-  type AlcoholNightInputs,
   type AlcoholRedFlags,
-  type AlcoholTiming,
   type AlcoholTrend,
 } from "@/lib/alcohol-night-tool";
+import {
+  adviserLinkFromAlcohol,
+  buildAlcoholSituationOutcome,
+  type AlcoholSituationKind,
+  type AlcoholSituationOutcome,
+} from "@/lib/alcohol-situation-tool";
 import { cn } from "@/lib/utils";
 
 const FROM_SCENARIOS = "from=/scenarios";
@@ -30,6 +43,35 @@ const FROM_SCENARIOS = "from=/scenarios";
 function linkWithFrom(path: string): string {
   return path.includes("?") ? `${path}&${FROM_SCENARIOS}` : `${path}?${FROM_SCENARIOS}`;
 }
+
+type Phase = "situation" | "inputs" | "result";
+
+const SITUATION_CARDS: {
+  id: AlcoholSituationKind;
+  title: string;
+  description: string;
+}[] = [
+  {
+    id: "meal_with_drinks",
+    title: "Meal or snacks with drinks",
+    description: "Estimate carb coverage using your ratios — same math as Meal Adviser.",
+  },
+  {
+    id: "late_snack",
+    title: "Eating after drinking / late snack",
+    description: "Carb estimate plus reminders about delayed lows.",
+  },
+  {
+    id: "before_out",
+    title: "Before I go out",
+    description: "Short prep checklist — no dose without food entered.",
+  },
+  {
+    id: "feels_wrong",
+    title: "Something feels wrong",
+    description: "Red flags and urgent links if you need help now.",
+  },
+];
 
 type ChoiceProps<T extends string> = {
   label: string;
@@ -43,11 +85,7 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   return (
     <div className="space-y-3">
       <Label className="text-sm font-medium">{label}</Label>
-      <RadioGroup
-        value={value}
-        onValueChange={(v) => onChange(v as T)}
-        className="space-y-2"
-      >
+      <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} className="space-y-2">
         {options.map((opt) => {
           const id = `${name}-${opt.value}`;
           return (
@@ -84,22 +122,66 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   );
 }
 
+function OutcomeBadge({ outcome }: { outcome: AlcoholSituationOutcome }) {
+  if (outcome.kind === "urgent") {
+    return <Badge variant="destructive">Urgent — seek help</Badge>;
+  }
+  if (outcome.kind === "hypo_first") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-500/70 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+      >
+        Treat glucose first
+      </Badge>
+    );
+  }
+  if (outcome.kind === "estimate") {
+    return (
+      <Badge variant="secondary" className="font-medium">
+        Carb coverage estimate
+      </Badge>
+    );
+  }
+  if (outcome.kind === "prep_only") {
+    return (
+      <Badge variant="outline" className="font-medium">
+        Planning
+      </Badge>
+    );
+  }
+  if (outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") {
+    return <Badge variant="outline">More info needed</Badge>;
+  }
+  return (
+    <Badge variant="outline" className="font-medium">
+      Safety
+    </Badge>
+  );
+}
+
+const RED_FLAG_ROWS: [keyof AlcoholRedFlags, string][] = [
+  ["vomiting", "Repeated vomiting"],
+  ["severeAbdominalPain", "Severe abdominal pain"],
+  ["confusion", "Confusion or very drowsy"],
+  ["veryHighBgOrKetones", "Very high glucose or ketones concern"],
+  ["cantKeepFluids", "Cannot keep fluids down"],
+];
+
 export default function AlcoholScenarioPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
-  const [showPlan, setShowPlan] = useState(false);
-  const [checklistDone, setChecklistDone] = useState<Record<string, boolean>>({});
-  const formTopRef = useRef<HTMLDivElement>(null);
+  const [settings, setSettings] = useState<UserSettings>({});
+  const [phase, setPhase] = useState<Phase>("situation");
+  const [situation, setSituation] = useState<AlcoholSituationKind | null>(null);
+  const [outcome, setOutcome] = useState<AlcoholSituationOutcome | null>(null);
+  const [carbsError, setCarbsError] = useState<string | null>(null);
 
-  const [timing, setTiming] = useState<AlcoholTiming>("tonight");
-  const [food, setFood] = useState<AlcoholFood>("unsure");
-  const [activityToday, setActivityToday] = useState<AlcoholActivity>("light");
-  const [companions, setCompanions] = useState<AlcoholCompanions>("with_others");
-  const [cgm, setCgm] = useState<AlcoholCgm>("unsure");
-  const [insulin, setInsulin] = useState<AlcoholInsulin>("unsure");
   const [bgSkipped, setBgSkipped] = useState(false);
   const [bgInput, setBgInput] = useState("");
   const [bgTrend, setBgTrend] = useState<AlcoholTrend>("unknown");
   const [intensity, setIntensity] = useState<AlcoholIntensity>("light");
+  const [carbsInput, setCarbsInput] = useState("");
+  const [mealType, setMealType] = useState<string>("lunch");
   const [redFlags, setRedFlags] = useState<AlcoholRedFlags>({
     vomiting: false,
     severeAbdominalPain: false,
@@ -108,382 +190,596 @@ export default function AlcoholScenarioPage() {
     cantKeepFluids: false,
   });
 
-  useEffect(() => {
+  const formTopRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  const refreshFromStorage = () => {
     const p = storage.getProfile();
     if (p) setProfile(p);
+    setSettings(storage.getSettings());
+  };
+
+  useEffect(() => {
+    refreshFromStorage();
   }, []);
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
+  const carbUnit: "grams" | "cp" = profile.carbUnits === "cp" ? "cp" : "grams";
 
-  const resolvedInput = useMemo((): AlcoholNightInputs | null => {
-    let bgValue: number | null = null;
-    if (!bgSkipped) {
-      const t = bgInput.trim().replace(",", ".");
-      if (!t) return null;
-      const n = Number(t);
-      if (Number.isNaN(n) || n <= 0) return null;
-      bgValue = n;
+  const stepIndex = phase === "situation" ? 0 : phase === "inputs" ? 1 : 2;
+  const progressPct = ((stepIndex + 1) / 3) * 100;
+
+  const parseBgValue = (): { ok: true; value: number | null; skipped: boolean } | { ok: false } => {
+    if (bgSkipped) return { ok: true, value: null, skipped: true };
+    const t = bgInput.trim().replace(",", ".");
+    if (!t) return { ok: false };
+    const n = Number(t);
+    if (Number.isNaN(n) || n <= 0) return { ok: false };
+    return { ok: true, value: n, skipped: false };
+  };
+
+  const parseCarbsGrams = (): number | null => {
+    const t = carbsInput.trim().replace(",", ".");
+    if (!t) return null;
+    const n = carbUnit === "cp" ? parseInt(t, 10) * 10 : parseInt(t, 10);
+    if (Number.isNaN(n) || n <= 0) return null;
+    return n;
+  };
+
+  const buildInput = (): { ok: false; message: string } | { ok: true; payload: Parameters<typeof buildAlcoholSituationOutcome>[0] } => {
+    if (situation == null) return { ok: false, message: "Choose a situation." };
+    const bg = parseBgValue();
+    if (!bg.ok) {
+      return { ok: false, message: "Enter a valid blood glucose number, or choose to skip for now." };
+    }
+    const carbsG =
+      situation === "meal_with_drinks" || situation === "late_snack" ? parseCarbsGrams() : null;
+    if ((situation === "meal_with_drinks" || situation === "late_snack") && (carbsG == null || carbsG <= 0)) {
+      return { ok: false, message: `Enter carbs (${carbUnit === "cp" ? "CP" : "grams"}) for this food or snack.` };
     }
     return {
-      timing,
-      food,
-      activityToday,
-      companions,
-      cgm,
-      insulin,
-      bgSkipped,
-      bgValue,
-      bgTrend: bgSkipped ? null : bgTrend,
-      intensity,
-      redFlags,
+      ok: true,
+      payload: {
+        situation,
+        redFlags,
+        bgSkipped: bg.skipped,
+        bgValue: bg.value,
+        bgTrend: bg.skipped ? null : bgTrend,
+        drinkingIntensity: intensity,
+        carbsG,
+        mealType,
+      },
     };
-  }, [
-    timing,
-    food,
-    activityToday,
-    companions,
-    cgm,
-    insulin,
-    bgSkipped,
-    bgInput,
-    bgTrend,
-    intensity,
-    redFlags,
-  ]);
+  };
 
-  const plan = useMemo(() => {
-    if (!showPlan || !resolvedInput) return null;
-    return buildAlcoholNightPlan(resolvedInput, bgUnits);
-  }, [showPlan, resolvedInput, bgUnits]);
+  const runGuidance = () => {
+    setCarbsError(null);
+    const built = buildInput();
+    if (!built.ok) {
+      setCarbsError(built.message);
+      return;
+    }
+    const o = buildAlcoholSituationOutcome(built.payload, settings, profile.bgUnits);
+    setOutcome(o);
+    setPhase("result");
+  };
 
-  const bgRequiredError =
-    showPlan && !resolvedInput && !bgSkipped ? "Enter a valid blood glucose number, or choose to skip for now." : null;
+  const resetFlow = () => {
+    setPhase("situation");
+    setSituation(null);
+    setOutcome(null);
+    setCarbsError(null);
+    setBgSkipped(false);
+    setBgInput("");
+    setBgTrend("unknown");
+    setIntensity("light");
+    setCarbsInput("");
+    setMealType("lunch");
+    setRedFlags({
+      vomiting: false,
+      severeAbdominalPain: false,
+      confusion: false,
+      veryHighBgOrKetones: false,
+      cantKeepFluids: false,
+    });
+    refreshFromStorage();
+    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const pickSituation = (id: AlcoholSituationKind) => {
+    setSituation(id);
+    setPhase("inputs");
+    setCarbsError(null);
+    setOutcome(null);
+  };
+
+  const backToSituation = () => {
+    setPhase("situation");
+    setSituation(null);
+    setCarbsError(null);
+  };
+
+  const backToInputs = () => {
+    setPhase("inputs");
+    setOutcome(null);
+  };
+
+  useEffect(() => {
+    if (phase === "result" && outcome) {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [phase, outcome]);
 
   const toggleRedFlag = (key: keyof AlcoholRedFlags) => {
     setRedFlags((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const resetFlow = () => {
-    setShowPlan(false);
-    setChecklistDone({});
-    formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  const estimateCarbsG = useMemo(() => {
+    if (outcome?.kind !== "estimate") return null;
+    return outcome.meal.carbs;
+  }, [outcome]);
+
+  const showSticky = phase !== "result";
 
   return (
-    <PageShell variant="standard" className="space-y-6">
-      <div ref={formTopRef}>
-        <PageHeader
-          leading={<PageBackButton />}
-          title="Alcohol"
-          description="Answer a few questions for a personalised checklist and reminders. This does not tell you how much to drink or how to change insulin — only your care team should."
-        />
-      </div>
+    <div className="min-h-[50vh]">
+      <PageShell
+        variant="standard"
+        className={cn("space-y-6", showSticky && "pb-28 sm:pb-6")}
+      >
+        <div ref={formTopRef}>
+          <PageHeader
+            leading={<PageBackButton />}
+            title="Alcohol"
+            description="Situation-first help: carb coverage from your settings (same as Meal Adviser), plus safety gates. Not medical advice — confirm with your team."
+          />
+        </div>
 
-      <Card className="surface-card">
-        <CardHeader>
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Wine className="h-6 w-6 text-amber-600" />
-            Evening and overnight planning
-          </CardTitle>
-          <CardDescription>
-            Be honest about how you feel — red flags below can change the advice to urgent care.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/25 p-3 text-sm text-amber-950 dark:text-amber-100">
-            Alcohol increases delayed hypo risk for many hours after you stop drinking. Never treat a low with more
-            alcohol.
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="font-medium uppercase tracking-wide">
+              Step {stepIndex + 1} of 3
+            </span>
           </div>
+          <Progress value={progressPct} className="h-1.5" data-testid="alcohol-question-progress" />
+        </div>
 
-          <ChoiceGroup
-            name="timing"
-            label="When are you thinking about this?"
-            value={timing}
-            onChange={setTiming}
-            options={[
-              { value: "tonight", title: "Tonight or very soon" },
-              { value: "planning", title: "Planning ahead for another day" },
-            ]}
-          />
-
-          <ChoiceGroup
-            name="food"
-            label="Food with alcohol"
-            value={food}
-            onChange={setFood}
-            options={[
-              { value: "with_meal", title: "With a proper meal" },
-              { value: "snacks_only", title: "Snacks only" },
-              { value: "unsure", title: "Not sure yet" },
-            ]}
-          />
-
-          <ChoiceGroup
-            name="activity"
-            label="Activity today"
-            value={activityToday}
-            onChange={setActivityToday}
-            options={[
-              { value: "light", title: "Light / usual day" },
-              { value: "moderate", title: "Moderately active" },
-              { value: "heavy", title: "Heavy training or very demanding day" },
-            ]}
-          />
-
-          <ChoiceGroup
-            name="companions"
-            label="Who are you with?"
-            value={companions}
-            onChange={setCompanions}
-            options={[
-              { value: "alone", title: "On my own this evening / overnight" },
-              { value: "with_others", title: "With others (not specifically trained)" },
-              { value: "someone_trained", title: "Someone who knows hypos and glucagon" },
-            ]}
-          />
-
-          <ChoiceGroup
-            name="cgm"
-            label="CGM or flash glucose?"
-            value={cgm}
-            onChange={setCgm}
-            options={[
-              { value: "yes", title: "Yes" },
-              { value: "no", title: "No" },
-              { value: "unsure", title: "Not sure" },
-            ]}
-          />
-
-          <ChoiceGroup
-            name="insulin"
-            label="Insulin delivery"
-            value={insulin}
-            onChange={setInsulin}
-            options={[
-              { value: "pump", title: "Pump" },
-              { value: "mdi", title: "Injections (MDI)" },
-              { value: "unsure", title: "Not sure" },
-            ]}
-          />
-
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Label className="text-sm font-medium">Current glucose (optional but helpful)</Label>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="bg-skip"
-                  checked={bgSkipped}
-                  onCheckedChange={(c) => {
-                    const on = c === true;
-                    setBgSkipped(on);
-                    if (on) setBgTrend("unknown");
-                  }}
-                />
-                <Label htmlFor="bg-skip" className="text-sm font-normal cursor-pointer">
-                  Skip — I do not have a reading
-                </Label>
+        {phase === "situation" ? (
+          <Card className="surface-card">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
+                <Wine className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                What&apos;s going on?
+              </CardTitle>
+              <CardDescription>Pick the closest situation. You can change it anytime.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Alert className="mb-6 border-amber-300/80 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/30">
+                <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                <AlertTitle className="text-amber-950 dark:text-amber-100">Delayed lows</AlertTitle>
+                <AlertDescription className="text-amber-950/90 dark:text-amber-100/90">
+                  Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
+                </AlertDescription>
+              </Alert>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {SITUATION_CARDS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => pickSituation(c.id)}
+                    className={cn(
+                      "text-left rounded-xl border p-4 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      situation === c.id && "border-primary bg-primary/5",
+                    )}
+                    data-testid={`alcohol-situation-${c.id}`}
+                  >
+                    <p className="font-semibold text-foreground">{c.title}</p>
+                    <p className="text-sm text-muted-foreground mt-1.5 leading-snug">{c.description}</p>
+                  </button>
+                ))}
               </div>
-            </div>
-            {!bgSkipped ? (
-              <div className="space-y-4">
-                <div className="space-y-2 max-w-xs">
-                  <Label htmlFor="alcohol-bg">Blood glucose ({bgUnits})</Label>
-                  <Input
-                    id="alcohol-bg"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
-                    value={bgInput}
-                    onChange={(e) => setBgInput(e.target.value)}
-                    autoComplete="off"
-                  />
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {phase === "inputs" && situation ? (
+          <Card className="surface-card">
+            <CardHeader>
+              <CardTitle className="text-h3">A few details</CardTitle>
+              <CardDescription>
+                {SITUATION_CARDS.find((s) => s.id === situation)?.title}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              {situation === "feels_wrong" ? (
+                <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">Red flags — tick anything that applies now</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        If any apply, we will point you to urgent help rather than drinking guidance.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {RED_FLAG_ROWS.map(([key, text]) => (
+                      <div key={key} className="flex items-start gap-2">
+                        <Checkbox
+                          id={`rf-${key}`}
+                          checked={redFlags[key]}
+                          onCheckedChange={() => toggleRedFlag(key)}
+                        />
+                        <Label htmlFor={`rf-${key}`} className="text-sm font-normal cursor-pointer leading-snug">
+                          {text}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              ) : null}
+
+              {(situation === "meal_with_drinks" || situation === "late_snack") && (
+                <div className="space-y-4">
+                  <div className="space-y-2 max-w-xs">
+                    <Label htmlFor="alcohol-carbs">Carbs ({carbUnit === "cp" ? "CP" : "grams"})</Label>
+                    <Input
+                      id="alcohol-carbs"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={carbUnit === "cp" ? "e.g. 6" : "e.g. 60"}
+                      value={carbsInput}
+                      onChange={(e) => setCarbsInput(e.target.value)}
+                      autoComplete="off"
+                      data-testid="input-alcohol-carbs"
+                    />
+                  </div>
+                  <div className="space-y-2 max-w-xs">
+                    <Label>Meal period</Label>
+                    <Select value={mealType} onValueChange={setMealType}>
+                      <SelectTrigger data-testid="select-alcohol-meal-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="breakfast">Breakfast</SelectItem>
+                        <SelectItem value="lunch">Lunch</SelectItem>
+                        <SelectItem value="dinner">Dinner</SelectItem>
+                        <SelectItem value="snack">Snack</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {situation === "before_out" ? (
                 <ChoiceGroup
-                  name="trend"
-                  label="Trend (if you know it)"
-                  value={bgTrend}
-                  onChange={setBgTrend}
+                  name="intensity-before"
+                  label="How heavy do you expect drinking to be?"
+                  value={intensity}
+                  onChange={setIntensity}
                   options={[
-                    { value: "rising", title: "Rising" },
-                    { value: "flat", title: "Flat / stable" },
-                    { value: "falling", title: "Falling" },
-                    { value: "unknown", title: "Unknown / not using CGM" },
+                    { value: "light", title: "Light / one drink with food" },
+                    { value: "moderate", title: "Moderate social drinking" },
+                    {
+                      value: "long_or_heavy",
+                      title: "Longer night or heavier drinking",
+                      description: "Still not a recommendation to drink — only helps tailor reminders.",
+                    },
                   ]}
                 />
-              </div>
-            ) : null}
-          </div>
+              ) : situation !== "feels_wrong" ? (
+                <ChoiceGroup
+                  name="intensity-meal"
+                  label="How heavy do you expect drinking to be?"
+                  value={intensity}
+                  onChange={setIntensity}
+                  options={[
+                    { value: "light", title: "Light / one drink with food" },
+                    { value: "moderate", title: "Moderate social drinking" },
+                    {
+                      value: "long_or_heavy",
+                      title: "Longer night or heavier drinking",
+                      description: "Used with trend to flag possible delayed-low risk.",
+                    },
+                  ]}
+                />
+              ) : (
+                <ChoiceGroup
+                  name="intensity-feels"
+                  label="If you add a glucose reading, how heavy was or will drinking be?"
+                  value={intensity}
+                  onChange={setIntensity}
+                  options={[
+                    { value: "light", title: "Light / one drink" },
+                    { value: "moderate", title: "Moderate" },
+                    { value: "long_or_heavy", title: "Longer or heavier" },
+                  ]}
+                />
+              )}
 
-          <ChoiceGroup
-            name="intensity"
-            label="What kind of evening do you expect?"
-            value={intensity}
-            onChange={setIntensity}
-            options={[
-              { value: "light", title: "Light / one drink with food" },
-              { value: "moderate", title: "Moderate social drinking" },
-              {
-                value: "long_or_heavy",
-                title: "Longer night or heavier drinking",
-                description: "Still not a recommendation to drink — only helps tailor overnight reminders.",
-              },
-            ]}
-          />
-
-          <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-sm">Red flags — tick anything that applies now</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  If any apply, we will point you to urgent help rather than drinking guidance.
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {(
-                [
-                  ["vomiting", "Repeated vomiting"],
-                  ["severeAbdominalPain", "Severe abdominal pain"],
-                  ["confusion", "Confusion or very drowsy"],
-                  ["veryHighBgOrKetones", "Very high glucose or ketones concern"],
-                  ["cantKeepFluids", "Cannot keep fluids down"],
-                ] as const
-              ).map(([key, text]) => (
-                <div key={key} className="flex items-start gap-2">
-                  <Checkbox
-                    id={`rf-${key}`}
-                    checked={redFlags[key]}
-                    onCheckedChange={() => toggleRedFlag(key)}
-                  />
-                  <Label htmlFor={`rf-${key}`} className="text-sm font-normal cursor-pointer leading-snug">
-                    {text}
-                  </Label>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Current glucose (optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="bg-skip"
+                      checked={bgSkipped}
+                      onCheckedChange={(c) => {
+                        const on = c === true;
+                        setBgSkipped(on);
+                        if (on) setBgTrend("unknown");
+                      }}
+                    />
+                    <Label htmlFor="bg-skip" className="text-sm font-normal cursor-pointer">
+                      Skip — no reading
+                    </Label>
+                  </div>
                 </div>
-              ))}
-            </div>
+                {!bgSkipped ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2 max-w-xs">
+                      <Label htmlFor="alcohol-bg">Blood glucose ({bgUnits})</Label>
+                      <Input
+                        id="alcohol-bg"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                        value={bgInput}
+                        onChange={(e) => setBgInput(e.target.value)}
+                        autoComplete="off"
+                        data-testid="input-alcohol-bg"
+                      />
+                    </div>
+                    <ChoiceGroup
+                      name="trend"
+                      label="Trend (if you know it)"
+                      value={bgTrend}
+                      onChange={setBgTrend}
+                      options={[
+                        { value: "rising", title: "Rising" },
+                        { value: "flat", title: "Flat / stable" },
+                        { value: "falling", title: "Falling" },
+                        { value: "unknown", title: "Unknown / not using CGM" },
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {carbsError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {carbsError}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {phase === "result" && outcome ? (
+          <div ref={resultsRef} className="space-y-4">
+            <Card
+              className={cn(
+                "surface-card border-2 overflow-hidden",
+                outcome.kind === "urgent" && "border-destructive/60",
+                outcome.kind === "hypo_first" && "border-amber-500/50",
+                outcome.kind === "estimate" && "border-primary/30",
+              )}
+              data-testid="alcohol-plan-card"
+            >
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-2 min-w-0">
+                    <OutcomeBadge outcome={outcome} />
+                    {outcome.kind === "estimate" ? (
+                      <>
+                        <CardTitle className="text-h3 leading-tight flex items-center gap-2">
+                          <Utensils className="h-6 w-6 text-primary shrink-0" />
+                          About {outcome.meal.dose} units
+                        </CardTitle>
+                        <CardDescription className="text-base text-foreground/90">
+                          For ~{outcome.meal.carbs}g carbs at {outcome.meal.mealType} using your saved ratios
+                          {outcome.meal.exactDose ? ` (exact ${outcome.meal.exactDose}u)` : ""}.
+                        </CardDescription>
+                        {outcome.meal.roundingAdvice ? (
+                          <p className="text-sm text-muted-foreground">{outcome.meal.roundingAdvice}</p>
+                        ) : null}
+                      </>
+                    ) : outcome.kind === "prep_only" ? (
+                      <>
+                        <CardTitle className="text-h3 leading-tight flex items-center gap-2">
+                          <Moon className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                          {outcome.headline}
+                        </CardTitle>
+                      </>
+                    ) : outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs" ? (
+                      <>
+                        <CardTitle className="text-h3 leading-tight">{outcome.message}</CardTitle>
+                      </>
+                    ) : outcome.kind === "feels_ok" ? (
+                      <>
+                        <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
+                        <CardDescription className="text-base text-foreground/90">{outcome.body}</CardDescription>
+                      </>
+                    ) : (
+                      <>
+                        <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
+                        <CardDescription className="text-base text-foreground/90">{outcome.lead}</CardDescription>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 shrink-0 self-start"
+                    onClick={resetFlow}
+                    data-testid="button-alcohol-edit-answers"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Start over
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {(outcome.kind === "urgent" || outcome.kind === "hypo_first") && (
+                  <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                    {outcome.bullets.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+
+                {outcome.kind === "estimate" && (
+                  <>
+                    <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                      {outcome.tips.map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                    <Alert>
+                      <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
+                    </Alert>
+                    <div className="flex flex-wrap gap-2">
+                      {estimateCarbsG != null ? (
+                        <Button asChild className="gap-2">
+                          <Link href={linkWithFrom(adviserLinkFromAlcohol(estimateCarbsG, mealType))}>
+                            <Calculator className="h-4 w-4" />
+                            Open in Meal Adviser
+                          </Link>
+                        </Button>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+
+                {outcome.kind === "prep_only" && (
+                  <>
+                    <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                      {outcome.tips.map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
+                    </ul>
+                    {outcome.checklist.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Quick checklist</p>
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                          {outcome.checklist.map((c) => (
+                            <li key={c}>{c}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
+                {(outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" asChild>
+                      <Link href={linkWithFrom("/adviser?tab=ratios")}>Ratio Adviser</Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link href="/settings">Settings</Link>
+                    </Button>
+                  </div>
+                )}
+
+                {outcome.kind === "feels_ok" && (
+                  <div className="flex flex-wrap gap-2">
+                    {outcome.links.helpNow ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/help-now")}>
+                          <Phone className="h-4 w-4 mr-1.5" />
+                          Help now
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {outcome.links.hypoHelp ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/tools/hypo-help")}>
+                          <Droplet className="h-4 w-4 mr-1.5" />
+                          Hypo help
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {outcome.links.sickDay ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
+
+                {(outcome.kind === "urgent" || outcome.kind === "hypo_first") && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {outcome.links.hypoHelp ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/tools/hypo-help")}>
+                          <Droplet className="h-4 w-4 mr-1.5" />
+                          Hypo help
+                        </Link>
+                      </Button>
+                    ) : null}
+                    {outcome.links.sickDay ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
+                      </Button>
+                    ) : null}
+                    {outcome.links.helpNow ? (
+                      <Button variant="secondary" size="sm" asChild>
+                        <Link href={linkWithFrom("/help-now")}>
+                          <Phone className="h-4 w-4 mr-1.5" />
+                          Help now
+                        </Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
+        ) : null}
+      </PageShell>
 
-          {bgRequiredError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {bgRequiredError}
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
+      {showSticky ? (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
+          data-testid="alcohol-sticky-actions"
+        >
+          <PageShell variant="standard" className="flex gap-2 items-center justify-between">
             <Button
               type="button"
-              onClick={() => {
-                if (!resolvedInput) {
-                  setShowPlan(true);
-                  return;
-                }
-                setChecklistDone({});
-                setShowPlan(true);
-              }}
+              variant="outline"
+              className="gap-1.5 shrink-0"
+              onClick={phase === "inputs" ? backToSituation : undefined}
+              disabled={phase === "situation"}
+              data-testid="button-alcohol-back-step"
             >
-              Show my plan
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </Button>
-            {showPlan ? (
-              <Button type="button" variant="outline" className="gap-2" onClick={resetFlow}>
-                <RotateCcw className="h-4 w-4" />
-                Edit answers
+            {phase === "inputs" ? (
+              <Button
+                type="button"
+                className="gap-1.5 min-w-[8.5rem]"
+                onClick={runGuidance}
+                data-testid="button-alcohol-show-plan"
+              >
+                Show guidance
+                <ArrowRight className="h-4 w-4" />
               </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      {plan ? (
-        <Card
-          className={cn(
-            "surface-card border-2",
-            plan.urgency === "urgent" && "border-destructive/60",
-            plan.urgency === "caution" && "border-amber-500/50",
-            plan.urgency === "plan" && "border-primary/30",
-          )}
-        >
-          <CardHeader>
-            <CardTitle className="text-h3">{plan.headline}</CardTitle>
-            <CardDescription className="text-base text-foreground/90">{plan.lead}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {plan.bullets.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Guidance</p>
-                <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
-                  {plan.bullets.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {plan.checklist.length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Checklist</p>
-                <ul className="space-y-2">
-                  {plan.checklist.map((item) => (
-                    <li key={item.id} className="flex items-start gap-3">
-                      <Checkbox
-                        id={item.id}
-                        checked={!!checklistDone[item.id]}
-                        onCheckedChange={(c) =>
-                          setChecklistDone((prev) => ({ ...prev, [item.id]: c === true }))
-                        }
-                      />
-                      <Label htmlFor={item.id} className="text-sm font-normal cursor-pointer leading-snug">
-                        {item.label}
-                      </Label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {plan.overnightBullets.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Overnight</p>
-                <ul className="list-disc pl-5 space-y-1.5 text-sm text-muted-foreground">
-                  {plan.overnightBullets.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            {(plan.links.hypoHelp || plan.links.sickDay || plan.links.helpNow) && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Quick links</p>
-                <div className="flex flex-wrap gap-2">
-                  {plan.links.hypoHelp ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/tools/hypo-help")}>
-                        <Droplet className="h-4 w-4 mr-1.5" />
-                        Hypo help
-                      </Link>
-                    </Button>
-                  ) : null}
-                  {plan.links.sickDay ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
-                    </Button>
-                  ) : null}
-                  {plan.links.helpNow ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/help-now")}>
-                        <Phone className="h-4 w-4 mr-1.5" />
-                        Help now
-                      </Link>
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground sm:ml-auto">Choose a situation to continue</span>
             )}
-          </CardContent>
-        </Card>
-      ) : null}
-    </PageShell>
+          </PageShell>
+        </div>
+      ) : (
+        <PageShell variant="standard" className="flex justify-start">
+          <Button type="button" variant="outline" className="gap-1.5" onClick={backToInputs}>
+            <ArrowLeft className="h-4 w-4" />
+            Edit details
+          </Button>
+        </PageShell>
+      )}
+    </div>
   );
 }
-

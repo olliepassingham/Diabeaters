@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -12,35 +12,54 @@ import {
   markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { Bell, Check } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [loading, setLoading] = useState(true);
+  const configured = isSupabaseConfigured();
+
+  const [loading, setLoading] = useState(configured);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [rows, setRows] = useState<InAppNotificationRow[]>([]);
 
   const unread = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
+    if (!configured) {
+      setLoading(false);
+      setFetchError(null);
+      setRows([]);
+      return;
+    }
     setLoading(true);
+    setFetchError(null);
     const res = await fetchInAppNotificationsForUser();
     setLoading(false);
     if (res.error) {
+      setFetchError(res.error.message);
       toast({ title: "Could not load notifications", description: res.error.message, variant: "destructive" });
       setRows([]);
       return;
     }
+    setFetchError(null);
     setRows(res.data ?? []);
-  };
+  }, [configured, toast]);
 
   useEffect(() => {
+    if (!configured) {
+      setLoading(false);
+      setFetchError(null);
+      setRows([]);
+      return;
+    }
     void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [configured, refresh]);
 
   const handleMarkAllRead = async () => {
+    if (!configured) return;
     const res = await markAllInAppNotificationsRead();
     if (res.error) {
       toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
@@ -67,6 +86,10 @@ export default function NotificationsPage() {
       setLocation("/supplies");
       return;
     }
+    if (kind === "hypo_logged_self") {
+      setLocation("/dashboard");
+      return;
+    }
     if (kind === "hypo_logged" || kind === "scenario_started") {
       setLocation("/carer-view");
       return;
@@ -87,7 +110,7 @@ export default function NotificationsPage() {
         }
         description="In-app alerts and updates."
         actions={
-          <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={unread === 0}>
+          <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0}>
             <Check className="h-4 w-4 mr-2" />
             Mark all read
           </Button>
@@ -101,8 +124,36 @@ export default function NotificationsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          {loading ? (
+          {!configured ? (
+            <div className="py-10 text-center text-muted-foreground px-2">
+              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm font-medium text-foreground">Notifications aren&apos;t configured</p>
+              <p className="text-xs mt-2 max-w-md mx-auto">
+                Set <span className="font-mono">VITE_SUPABASE_URL</span> and{" "}
+                <span className="font-mono">VITE_SUPABASE_ANON_KEY</span> in{" "}
+                <span className="font-mono">app/.env.local</span>, then restart the dev server. For hosted builds,
+                add the same variables in your deployment settings (see project README).
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                type="button"
+                onClick={() => setLocation("/settings/notifications")}
+              >
+                Open notification settings
+              </Button>
+            </div>
+          ) : loading ? (
             <p className="text-sm text-muted-foreground py-4">Loading…</p>
+          ) : fetchError ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <p className="text-sm text-destructive">Could not load notifications</p>
+              <p className="text-xs mt-1 break-words max-w-md mx-auto">{fetchError}</p>
+              <Button variant="outline" size="sm" className="mt-4" type="button" onClick={() => void refresh()}>
+                Try again
+              </Button>
+            </div>
           ) : rows.length === 0 ? (
             <div className="py-10 text-center text-muted-foreground">
               <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -143,4 +194,3 @@ export default function NotificationsPage() {
     </PageShell>
   );
 }
-

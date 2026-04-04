@@ -1,3 +1,4 @@
+import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
 import { getSupabase } from "@/lib/supabase";
 
 export async function invokeNotifySupplyLow(params: {
@@ -9,6 +10,11 @@ export async function invokeNotifySupplyLow(params: {
   const supabase = getSupabase();
   if (!supabase) return { success: false, error: "supabase_not_configured" };
 
+  const headers = await getBearerAuthHeadersForEdgeFunctions(supabase);
+  if (!headers) {
+    return { success: false, error: "no_session", detail: "Sign in to send alerts." };
+  }
+
   const { data, error } = await supabase.functions.invoke("notify_supply_low", {
     body: {
       supply_id: params.supplyId,
@@ -16,6 +22,7 @@ export async function invokeNotifySupplyLow(params: {
       level: params.level,
       days_remaining: params.daysRemaining,
     },
+    headers,
   });
 
   if (error) {

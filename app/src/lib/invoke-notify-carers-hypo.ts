@@ -1,6 +1,7 @@
 /**
  * Calls Edge Function `notify_carers_on_hypo` with the active session.
  */
+import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
 import { getSupabase } from "./supabase";
 import type { NotifyCarersOnHypoResult } from "./carer-notify-types";
 
@@ -13,8 +14,14 @@ export async function invokeNotifyCarersOnHypo(params: {
     return { success: false, error: "supabase_not_configured" };
   }
 
+  const headers = await getBearerAuthHeadersForEdgeFunctions(supabase);
+  if (!headers) {
+    return { success: false, error: "no_session", detail: "Sign in to send alerts." };
+  }
+
   const { data, error } = await supabase.functions.invoke("notify_carers_on_hypo", {
     body: { hypo_id: params.hypoId, user_id: params.userId },
+    headers,
   });
 
   if (error) {

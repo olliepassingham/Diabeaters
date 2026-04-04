@@ -76,6 +76,7 @@ const SickDay = lazy(() => import("@/pages/sick-day"));
 const Travel = lazy(() => import("@/pages/travel"));
 
 const SettingsPage = lazy(() => import("@/pages/settings"));
+const SettingsEmergencyPage = lazy(() => import("@/pages/settings/emergency"));
 
 const Scenarios = lazy(() => import("@/pages/scenarios"));
 const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
@@ -269,6 +270,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/appearance") return true;
   if (p === "/settings/notifications") return true;
   if (p === "/settings/about") return true;
+  if (p === "/settings/emergency") return true;
   if (p === "/privacy" || p === "/support") return true;
   return false;
 }
@@ -469,6 +471,11 @@ function InnerRouter() {
       <Route path="/settings/about">
         <Suspense fallback={<RouteFallback />}>
           <SettingsPage />
+        </Suspense>
+      </Route>
+      <Route path="/settings/emergency">
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsEmergencyPage />
         </Suspense>
       </Route>
       <Route path="/settings/notifications">

@@ -1,5 +1,8 @@
 /** Payload embedded in push / in-app notification data. */
 export type HypoNotificationPayload = {
+  /** Carer-facing hypo alert vs patient self-confirmation in inbox. */
+  kind?: "hypo_logged" | "hypo_logged_self" | string;
+  deep_link?: string;
   hypo_id: string;
   patient_user_id: string;
   blood_glucose: number | string | null;

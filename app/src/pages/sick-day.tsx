@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertCircle, Activity, Info, Plane, ChevronRight, Power, Check, Clock, ShieldAlert, Heart, Package, Syringe, Droplets, AlertTriangle, ArrowLeft, Thermometer, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,7 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
+import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -294,6 +296,26 @@ function calculateSickDayRecommendations(
 }
 
 const SICK_DAY_STORAGE_KEY = "diabeater_sick_day_session";
+const SICK_DAY_CHECKLIST_KEY = "diabeater_sick_day_checklist_v1";
+
+type SickDayChecklistItemId =
+  | "fluids"
+  | "bg_check"
+  | "ketones_check"
+  | "correction_given"
+  | "carbs_tolerated"
+  | "contact_team";
+
+type SickDayChecklistState = Record<SickDayChecklistItemId, boolean>;
+
+const DEFAULT_CHECKLIST: SickDayChecklistState = {
+  fluids: false,
+  bg_check: false,
+  ketones_check: false,
+  correction_given: false,
+  carbs_tolerated: false,
+  contact_team: false,
+};
 
 interface SickDaySession {
   bgLevel: string;
@@ -325,6 +347,20 @@ export default function SickDay() {
   const [journalFluids, setJournalFluids] = useState("");
   const [journalSymptoms, setJournalSymptoms] = useState("");
   const [journalNotes, setJournalNotes] = useState("");
+  const [checklist, setChecklist] = useState<SickDayChecklistState>(DEFAULT_CHECKLIST);
+  const [activeModeTab, setActiveModeTab] = useState<"now" | "checklist" | "log">(() => {
+    if (typeof window === "undefined") return "now";
+    const hash = window.location.hash;
+    if (hash === "#sickday-checklist") return "checklist";
+    if (hash === "#sickday-log") return "log";
+    return "now";
+  });
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const saveSession = (newResults: SickDayResults | null) => {
     const session: SickDaySession = {
@@ -359,6 +395,15 @@ export default function SickDay() {
     setTravelDestination(scenarioState.travelDestination);
 
     setJournalEntries(storage.getSickDayJournal());
+    const savedChecklist = localStorage.getItem(SICK_DAY_CHECKLIST_KEY);
+    if (savedChecklist) {
+      try {
+        const parsed = JSON.parse(savedChecklist) as Partial<SickDayChecklistState>;
+        setChecklist({ ...DEFAULT_CHECKLIST, ...parsed });
+      } catch {
+        // ignore
+      }
+    }
 
     if (scenarioState.sickDayActive) {
       const savedSession = localStorage.getItem(SICK_DAY_STORAGE_KEY);
@@ -380,6 +425,73 @@ export default function SickDay() {
     }
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem(SICK_DAY_CHECKLIST_KEY, JSON.stringify(checklist));
+  }, [checklist]);
+
+  useEffect(() => {
+    if (!isSickDayActive) return;
+    const hash = window.location.hash;
+    if (hash === "#sickday-checklist") setActiveModeTab("checklist");
+    else if (hash === "#sickday-log") setActiveModeTab("log");
+  }, [isSickDayActive]);
+
+  const scrollToId = (id: string) => {
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const lastCheckAtIso = journalEntries[0]?.timestamp ?? null;
+
+  const recommendedCheckIntervalMs = useMemo(() => {
+    // Conservative defaults based on severity + ketone escalation.
+    // minor: ~4h, moderate: ~3h, severe: ~2h.
+    const baseHours = severity === "severe" ? 2 : severity === "moderate" ? 3 : 4;
+    const escalation =
+      results?.ketoneActionRequired === "urgent" || results?.ketoneActionRequired === "emergency" ? 2 : baseHours;
+    return escalation * 60 * 60 * 1000;
+  }, [severity, results?.ketoneActionRequired]);
+
+  const nextCheckDueAtIso = useMemo(() => {
+    const anchor = lastCheckAtIso ?? sickDayActivatedAt ?? null;
+    if (!anchor) return null;
+    const dueMs = new Date(anchor).getTime() + recommendedCheckIntervalMs;
+    return new Date(dueMs).toISOString();
+  }, [lastCheckAtIso, sickDayActivatedAt, recommendedCheckIntervalMs]);
+
+  const nextCheckCountdown = useMemo(() => {
+    if (!nextCheckDueAtIso) return null;
+    const dueMs = new Date(nextCheckDueAtIso).getTime();
+    const diffMs = dueMs - nowTick;
+    const overdue = diffMs <= 0;
+    const abs = Math.abs(diffMs);
+    const mins = Math.round(abs / 60000);
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return { overdue, label };
+  }, [nextCheckDueAtIso, nowTick]);
+
+  const verdict = useMemo(() => {
+    if (!results) return null;
+    const urgent = results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency";
+    const caution = results.ketoneActionRequired === "monitor" || severity === "severe";
+    const label = urgent ? "Needs attention" : caution ? "Caution" : "Ready";
+    const tone = urgent ? "critical" : caution ? "caution" : "ok";
+    const title = urgent
+      ? "Act now"
+      : caution
+        ? "Proceed carefully"
+        : "You’re in a safer zone";
+    const message = urgent
+      ? "Follow the urgent steps below and contact your diabetes team / urgent care."
+      : caution
+        ? "Monitor more often and follow the checklist to avoid complications."
+        : "Keep monitoring and stay hydrated.";
+    return { label, tone, title, message };
+  }, [results, severity]);
+
   const handleActivateSickDay = () => {
     if (!severity) return;
     storage.activateSickDay(severity);
@@ -394,17 +506,31 @@ export default function SickDay() {
         severity,
         started_at: startedAt,
         ended_at: null,
+        inputs_summary: {
+          bg_level: bgLevel ? Number(bgLevel) : null,
+          bg_units: bgUnits,
+          ketone_level: ketoneLevel || null,
+        },
       },
     });
     toast({
       title: "Sick Day Mode Activated",
       description: `Your dashboard will now show sick day status (${severity} severity).`,
     });
-    void invokeNotifyScenarioStarted({
-      scenarioKey: "sick_day",
-      title: "Sick day started",
-      summary: severity ? `Severity: ${severity}` : null,
-    });
+    void (async () => {
+      const res = await invokeNotifyScenarioStarted({
+        scenarioKey: "sick_day",
+        title: "Sick day started",
+        summary: severity ? `Severity: ${severity}` : null,
+      });
+      if (!res.success) {
+        toast({
+          title: NOTIFY_EDGE_FAILURE_TITLE,
+          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          variant: "destructive",
+        });
+      }
+    })();
   };
 
   const handleDeactivateSickDay = () => {
@@ -424,6 +550,8 @@ export default function SickDay() {
         sick_day_active: false,
         started_at: startedAt,
         ended_at: endedAt,
+        inputs_summary: null,
+        last_check_at: lastCheckAtIso,
       },
     });
     toast({
@@ -478,6 +606,24 @@ export default function SickDay() {
     
     setResults(recommendations);
     saveSession(recommendations);
+    void upsertScenario({
+      scenarioKey: "sick_day",
+      title: "Sick day",
+      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+      state: {
+        sick_day_active: isSickDayActive,
+        severity,
+        started_at: sickDayActivatedAt ?? null,
+        ended_at: null,
+        inputs_summary: {
+          bg_level: bgNum,
+          bg_units: bgUnits,
+          ketone_level: ketoneLevel,
+          correction_dose_units: recommendations.correctionDose,
+        },
+        last_check_at: lastCheckAtIso,
+      },
+    });
 
     if (isSickDayActive) {
       storage.activateSickDay(severity);
@@ -569,6 +715,24 @@ export default function SickDay() {
     };
     storage.addSickDayJournalEntry(entry);
     setJournalEntries(storage.getSickDayJournal());
+    void upsertScenario({
+      scenarioKey: "sick_day",
+      title: "Sick day",
+      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+      state: {
+        sick_day_active: isSickDayActive,
+        severity,
+        started_at: sickDayActivatedAt ?? null,
+        ended_at: null,
+        inputs_summary: {
+          bg: bgNum,
+          bg_units: bgUnits,
+          ketone_level: journalKetone,
+          correction_dose_units: journalCorrection ? parseFloat(journalCorrection) : null,
+        },
+        last_check_at: entry.timestamp,
+      },
+    });
     setJournalBg("");
     setJournalKetone("");
     setJournalCorrection("");
@@ -654,6 +818,20 @@ export default function SickDay() {
                 </CardTitle>
                 <CardDescription className="capitalize">{severity} severity</CardDescription>
               </div>
+              {verdict ? (
+                <Badge
+                  variant="secondary"
+                  className={
+                    verdict.tone === "critical"
+                      ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
+                      : verdict.tone === "caution"
+                        ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
+                        : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                  }
+                >
+                  {verdict.label}
+                </Badge>
+              ) : null}
               <Badge variant="secondary" className={`${
                 severity === "severe" ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300" 
                 : severity === "moderate" ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
@@ -711,92 +889,621 @@ export default function SickDay() {
           </CardContent>
         </Card>
 
-        {isTravelAlsoActive && (
-          <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-travel-also-active">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900 shrink-0">
-                  <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Travel Mode is also active{travelDestination ? ` — ${travelDestination}` : ""}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Being unwell while travelling increases your supply needs. Your supply forecasts on the Supplies page now show the combined impact of both scenarios.
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Link href="/scenarios?tab=travel">
-                      <Button variant="outline" size="sm" data-testid="button-view-travel-from-sick">
-                        <Plane className="h-3 w-3 mr-1" />
-                        View Travel Dashboard
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ShieldAlert className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              Sick Day Rules
-            </CardTitle>
-            <CardDescription>Key principles to follow when unwell</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 gap-2">
-              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
-                <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Never stop taking insulin</p>
-                  <p className="text-xs text-muted-foreground">
-                    {isPumpUser 
-                      ? "Even if you're not eating, your body needs insulin. Keep your pump running and do not disconnect. If your pump fails, switch to backup injections immediately."
-                      : "Even if you're not eating, your body needs insulin. Your long-acting (basal) insulin must continue."}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
-                <Droplets className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Test blood glucose more frequently</p>
-                  <p className="text-xs text-muted-foreground">{results.monitoringFrequency}. Illness often causes blood glucose to rise unpredictably.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Check for ketones if BG is high</p>
-                  <p className="text-xs text-muted-foreground">
-                    Test ketones if blood glucose stays above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}. Rising ketones need urgent attention.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg">
-                <Heart className="h-5 w-5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Stay hydrated</p>
-                  <p className="text-xs text-muted-foreground">{results.hydrationNote}</p>
-                </div>
-              </div>
-              {isPumpUser && (
-                <div className="flex items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg">
-                  <Syringe className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Check your pump site</p>
-                    <p className="text-xs text-muted-foreground">
-                      Illness can affect infusion site absorption. If blood glucose stays high despite corrections, 
-                      change your infusion set and site. A blocked or kinked cannula could be making things worse.
-                    </p>
-                  </div>
-                </div>
-              )}
+        <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 shadow-sm ring-1 ring-border/40" data-testid="sickday-status-strip">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Sick Day Mode status</p>
+              <p className="text-xs text-muted-foreground">
+                Started{" "}
+                {sickDayActivatedAt
+                  ? new Date(sickDayActivatedAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "recently"}{" "}
+                · {duration.label}
+              </p>
             </div>
-          </CardContent>
-        </Card>
 
+            <div className="flex flex-wrap items-center gap-2">
+              {nextCheckCountdown ? (
+                <Badge
+                  variant="secondary"
+                  className={nextCheckCountdown.overdue ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300" : ""}
+                  data-testid="badge-next-check"
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  {nextCheckCountdown.overdue ? "Check due" : "Next check in"} {nextCheckCountdown.label}
+                </Badge>
+              ) : null}
+
+              <Badge variant="secondary" className="capitalize" data-testid="badge-ketones-strip">
+                Ketones: {ketoneLevel || "—"}
+              </Badge>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setActiveModeTab("log");
+                  scrollToId("sickday-log");
+                }}
+                data-testid="button-strip-log-check"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Log a check
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <Tabs value={activeModeTab} onValueChange={(v) => setActiveModeTab(v as "now" | "checklist" | "log")} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="now" className="text-xs sm:text-sm" data-testid="tab-sickday-now">Now</TabsTrigger>
+            <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-sickday-checklist">Checklist</TabsTrigger>
+            <TabsTrigger value="log" className="text-xs sm:text-sm" data-testid="tab-sickday-update">Update</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="now" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-now">
+            {results.correctionDose > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Current Recommendations</CardTitle>
+                  <CardDescription>Based on your latest readings</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {results.ketoneActionRequired === "emergency" && (
+                    <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500 animate-pulse">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold text-base text-white">EMERGENCY - Seek Medical Help Now</p>
+                          <p className="text-sm text-red-100 mt-1">{results.ketoneWarning}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {results.ketoneActionRequired === "urgent" && (
+                    <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent - Contact Diabetes Team</p>
+                          <p className="text-xs text-red-800 dark:text-red-200 mt-1">{results.ketoneWarning}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-4 bg-primary/5 rounded-lg space-y-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm text-muted-foreground">Suggested Correction Dose:</span>
+                      <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
+                        {results.correctionDose} units
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{results.correctionExplanation}</p>
+                  </div>
+
+                  {results.stackingWarning && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Stacking Warning</p>
+                          <p className="text-xs text-orange-800 dark:text-orange-200">{results.stackingWarning}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                        x{results.ratioMultiplier} adjustment
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio },
+                        { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio },
+                        { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio },
+                        { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio },
+                      ].map(r => (
+                        <div key={r.label} className="p-3 bg-muted rounded-lg">
+                          <p className="text-xs text-muted-foreground">{r.label}</p>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <p className="font-semibold">{r.ratio}</p>
+                            <span className="text-xs text-muted-foreground line-through">{r.original}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {isTravelAlsoActive && (
+              <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-travel-also-active">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900 shrink-0">
+                      <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">Travel Mode is also active{travelDestination ? ` — ${travelDestination}` : ""}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Being unwell while travelling increases your supply needs. Your supply forecasts on the Supplies page now show the combined impact of both scenarios.
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Link href="/scenarios?tab=travel">
+                          <Button variant="outline" size="sm" data-testid="button-view-travel-from-sick">
+                            <Plane className="h-3 w-3 mr-1" />
+                            View Travel Dashboard
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ShieldAlert className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  Sick Day Rules
+                </CardTitle>
+                <CardDescription>Key principles to follow when unwell</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                    <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Never stop taking insulin</p>
+                      <p className="text-xs text-muted-foreground">
+                        {isPumpUser 
+                          ? "Even if you're not eating, your body needs insulin. Keep your pump running and do not disconnect. If your pump fails, switch to backup injections immediately."
+                          : "Even if you're not eating, your body needs insulin. Your long-acting (basal) insulin must continue."}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                    <Droplets className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Test blood glucose more frequently</p>
+                      <p className="text-xs text-muted-foreground">{results.monitoringFrequency}. Illness often causes blood glucose to rise unpredictably.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
+                    <Activity className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Check for ketones if BG is high</p>
+                      <p className="text-xs text-muted-foreground">
+                        Test ketones if blood glucose stays above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}. Rising ketones need urgent attention.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-cyan-50 dark:bg-cyan-950/30 rounded-lg">
+                    <Heart className="h-5 w-5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Stay hydrated</p>
+                      <p className="text-xs text-muted-foreground">{results.hydrationNote}</p>
+                    </div>
+                  </div>
+                  {isPumpUser && (
+                    <div className="flex items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg">
+                      <Syringe className="h-5 w-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">Check your pump site</p>
+                        <p className="text-xs text-muted-foreground">
+                          Illness can affect infusion site absorption. If blood glucose stays high despite corrections, 
+                          change your infusion set and site. A blocked or kinked cannula could be making things worse.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-checklist">
+            <Card className="rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Checklist</CardTitle>
+                <CardDescription>Tap items as you complete them.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div id="sickday-checklist" className="space-y-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {([
+                      { id: "fluids", label: "Take fluids (small amounts often)" },
+                      { id: "bg_check", label: "Check blood glucose" },
+                      { id: "ketones_check", label: "Check ketones (if BG high / feeling worse)" },
+                      { id: "correction_given", label: "Give correction if needed" },
+                      { id: "carbs_tolerated", label: "Carbs kept down (if eating)" },
+                      {
+                        id: "contact_team",
+                        label:
+                          results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
+                            ? "Contact diabetes team / urgent care now"
+                            : "Contact diabetes team if not improving",
+                        tone:
+                          results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
+                            ? "urgent"
+                            : "normal",
+                      },
+                    ] as const).map((item) => {
+                      const checked = checklist[item.id as SickDayChecklistItemId];
+                      const urgent = (item as any).tone === "urgent";
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() =>
+                            setChecklist((prev) => ({ ...prev, [item.id]: !prev[item.id as SickDayChecklistItemId] }))
+                          }
+                          className={[
+                            "flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
+                            checked ? "border-primary/40 bg-primary/5" : "border-border/60 hover:bg-muted/30",
+                            urgent && !checked ? "border-red-300 dark:border-red-800 bg-red-50/40 dark:bg-red-950/20" : "",
+                          ].join(" ")}
+                          data-testid={`checklist-${item.id}`}
+                        >
+                          <span
+                            className={[
+                              "mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full border",
+                              checked ? "border-primary bg-primary text-primary-foreground" : "border-border/70",
+                            ].join(" ")}
+                            aria-hidden
+                          >
+                            {checked ? <Check className="h-4 w-4" /> : null}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">{item.label}</span>
+                            {item.id === "ketones_check" ? (
+                              <span className="block text-xs text-muted-foreground">
+                                {results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
+                                  ? "Recommended now."
+                                  : "Recommended if BG stays above 250 mg/dL (13.9 mmol/L)."}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={() => {
+                      setActiveModeTab("log");
+                      scrollToId("sickday-log");
+                    }}
+                    data-testid="button-log-check-from-checklist"
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    Log a check
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setChecklist(DEFAULT_CHECKLIST)}
+                    data-testid="button-reset-checklist"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Reset checklist
+                  </Button>
+                  <Button variant="outline" asChild data-testid="button-open-help-now">
+                    <Link href="/help-now">Open Help now</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="log" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-update">
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Update Your Readings
+                </CardTitle>
+                <CardDescription>Update your glucose, ketones, or severity and recalculate</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="update-severity-active" className="text-sm">Illness Severity</Label>
+                  <Select value={severity} onValueChange={setSeverity}>
+                    <SelectTrigger id="update-severity-active" data-testid="select-update-severity-active">
+                      <SelectValue placeholder="Select severity level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
+                      <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
+                      <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="update-bg-active" className="text-sm">Blood Glucose ({bgUnits})</Label>
+                    <Input
+                      id="update-bg-active"
+                      type="number"
+                      placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
+                      value={bgLevel}
+                      onChange={(e) => setBgLevel(e.target.value)}
+                      data-testid="input-update-bg-active"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="update-ketones-active" className="text-sm flex items-center">
+                      Ketone Level
+                      <InfoTooltip {...DIABETES_TERMS.ketones} />
+                    </Label>
+                    <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
+                      <SelectTrigger id="update-ketones-active" data-testid="select-update-ketone-active">
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None (negative)</SelectItem>
+                        <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
+                        <SelectItem value="small">Small (0.6-1.5)</SelectItem>
+                        <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
+                        <SelectItem value="large">Large (3.0+)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleCalculate} 
+                  className="w-full"
+                  data-testid="button-update-readings-active"
+                >
+                  Update Recommendations
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Sick Day Journal Summary */}
+            {journalEntries.length > 0 && (
+              <Card data-testid="card-journal-summary">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    Journal Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <p className="text-xs text-muted-foreground">Duration</p>
+                      <p className="text-sm font-semibold mt-1" data-testid="text-journal-duration">{duration.label}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <p className="text-xs text-muted-foreground">Entries</p>
+                      <p className="text-sm font-semibold mt-1" data-testid="text-journal-count">{journalEntries.length}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <p className="text-xs text-muted-foreground">BG Trend</p>
+                      {(() => {
+                        const trend = getJournalBgTrend();
+                        if (!trend) return <p className="text-sm font-semibold mt-1 text-muted-foreground" data-testid="text-journal-trend">--</p>;
+                        if (trend === "down") return (
+                          <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
+                            <TrendingDown className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            <span className="text-sm font-semibold text-green-600 dark:text-green-400">Down</span>
+                          </div>
+                        );
+                        if (trend === "up") return (
+                          <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
+                            <TrendingUp className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            <span className="text-sm font-semibold text-red-600 dark:text-red-400">Up</span>
+                          </div>
+                        );
+                        return (
+                          <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
+                            <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                            <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">Stable</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Log a Check */}
+            <Card id="sickday-log" data-testid="card-log-check">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  Log a Check
+                </CardTitle>
+                <CardDescription>Record your current readings and symptoms</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="journal-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
+                    <Input
+                      id="journal-bg"
+                      type="number"
+                      placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
+                      value={journalBg}
+                      onChange={(e) => setJournalBg(e.target.value)}
+                      data-testid="input-journal-bg"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="journal-ketone" className="text-sm">Ketone Level</Label>
+                    <Select value={journalKetone} onValueChange={setJournalKetone}>
+                      <SelectTrigger id="journal-ketone" data-testid="select-journal-ketone">
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="trace">Trace</SelectItem>
+                        <SelectItem value="small">Small</SelectItem>
+                        <SelectItem value="moderate">Moderate</SelectItem>
+                        <SelectItem value="large">Large</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="journal-correction" className="text-sm">Correction Dose (units)</Label>
+                    <Input
+                      id="journal-correction"
+                      type="number"
+                      placeholder="Optional"
+                      value={journalCorrection}
+                      onChange={(e) => setJournalCorrection(e.target.value)}
+                      data-testid="input-journal-correction"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="journal-fluids" className="text-sm">Fluids (ml)</Label>
+                    <Input
+                      id="journal-fluids"
+                      type="number"
+                      placeholder="Optional"
+                      value={journalFluids}
+                      onChange={(e) => setJournalFluids(e.target.value)}
+                      data-testid="input-journal-fluids"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="journal-symptoms" className="text-sm">Symptoms</Label>
+                  <Input
+                    id="journal-symptoms"
+                    type="text"
+                    placeholder="e.g., headache, nausea, fever"
+                    value={journalSymptoms}
+                    onChange={(e) => setJournalSymptoms(e.target.value)}
+                    data-testid="input-journal-symptoms"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="journal-notes" className="text-sm">Notes</Label>
+                  <Textarea
+                    id="journal-notes"
+                    placeholder="Any additional notes..."
+                    value={journalNotes}
+                    onChange={(e) => setJournalNotes(e.target.value)}
+                    className="resize-none"
+                    rows={2}
+                    data-testid="textarea-journal-notes"
+                  />
+                </div>
+                <Button
+                  onClick={handleLogJournalEntry}
+                  className="w-full"
+                  data-testid="button-log-journal-entry"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Log Entry
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Sick Day Timeline */}
+            {journalEntries.length > 0 && (
+              <Card data-testid="card-journal-timeline">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    Sick Day Timeline
+                  </CardTitle>
+                  <CardDescription>{journalEntries.length} {journalEntries.length === 1 ? "entry" : "entries"} logged</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-0">
+                    {journalEntries.map((entry, idx) => (
+                      <div
+                        key={entry.id}
+                        className="relative flex gap-3 pb-4"
+                        data-testid={`journal-entry-${entry.id}`}
+                      >
+                        <div className="flex flex-col items-center">
+                          <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
+                            idx === 0 ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"
+                          }`} />
+                          {idx < journalEntries.length - 1 && (
+                            <div className="w-0.5 flex-1 bg-muted-foreground/20 mt-1" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 -mt-0.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`text-lg font-bold ${getBgColor(entry.bg, entry.bgUnits)}`} data-testid={`text-journal-bg-${entry.id}`}>
+                                {entry.bg} {entry.bgUnits}
+                              </span>
+                              <Badge variant="secondary" className={`text-xs ${getKetoneBadgeVariant(entry.ketoneLevel)}`} data-testid={`badge-journal-ketone-${entry.id}`}>
+                                {entry.ketoneLevel}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground" data-testid={`text-journal-time-${entry.id}`}>
+                                {getTimeAgo(entry.timestamp)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteJournalEntry(entry.id)}
+                                data-testid={`button-delete-journal-${entry.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+                            {entry.correctionDose !== null && entry.correctionDose > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Syringe className="h-3 w-3" />
+                                {entry.correctionDose}u correction
+                              </span>
+                            )}
+                            {entry.fluidsml !== null && entry.fluidsml > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Droplets className="h-3 w-3" />
+                                {entry.fluidsml}ml fluids
+                              </span>
+                            )}
+                          </div>
+                          {entry.symptoms && (
+                            <p className="text-xs text-muted-foreground mt-1">{entry.symptoms}</p>
+                          )}
+                          {entry.notes && (
+                            <p className="text-xs text-muted-foreground/70 mt-0.5 italic">{entry.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {activeModeTab === "now" ? (
+          <>
         {impactedSupplies.length > 0 && (
           <Card className="border-orange-200 dark:border-orange-800">
             <CardHeader className="pb-3">
@@ -933,150 +1640,6 @@ export default function SickDay() {
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Update Your Readings
-            </CardTitle>
-            <CardDescription>Update your glucose, ketones, or severity and recalculate</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="update-severity-active" className="text-sm">Illness Severity</Label>
-              <Select value={severity} onValueChange={setSeverity}>
-                <SelectTrigger id="update-severity-active" data-testid="select-update-severity-active">
-                  <SelectValue placeholder="Select severity level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                  <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                  <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="update-bg-active" className="text-sm">Blood Glucose ({bgUnits})</Label>
-                <Input
-                  id="update-bg-active"
-                  type="number"
-                  placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                  value={bgLevel}
-                  onChange={(e) => setBgLevel(e.target.value)}
-                  data-testid="input-update-bg-active"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="update-ketones-active" className="text-sm flex items-center">
-                  Ketone Level
-                  <InfoTooltip {...DIABETES_TERMS.ketones} />
-                </Label>
-                <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
-                  <SelectTrigger id="update-ketones-active" data-testid="select-update-ketone-active">
-                    <SelectValue placeholder="Select level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None (negative)</SelectItem>
-                    <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
-                    <SelectItem value="small">Small (0.6-1.5)</SelectItem>
-                    <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
-                    <SelectItem value="large">Large (3.0+)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button 
-              onClick={handleCalculate} 
-              className="w-full"
-              data-testid="button-update-readings-active"
-            >
-              Update Recommendations
-            </Button>
-          </CardContent>
-        </Card>
-
-        {results.correctionDose > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Current Recommendations</CardTitle>
-              <CardDescription>Based on your latest readings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {results.ketoneActionRequired === "emergency" && (
-                <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500 animate-pulse">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-base text-white">EMERGENCY - Seek Medical Help Now</p>
-                      <p className="text-sm text-red-100 mt-1">{results.ketoneWarning}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {results.ketoneActionRequired === "urgent" && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent - Contact Diabetes Team</p>
-                      <p className="text-xs text-red-800 dark:text-red-200 mt-1">{results.ketoneWarning}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="p-4 bg-primary/5 rounded-lg space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-sm text-muted-foreground">Suggested Correction Dose:</span>
-                  <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
-                    {results.correctionDose} units
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">{results.correctionExplanation}</p>
-              </div>
-
-              {results.stackingWarning && (
-                <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Stacking Warning</p>
-                      <p className="text-xs text-orange-800 dark:text-orange-200">{results.stackingWarning}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    x{results.ratioMultiplier} adjustment
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio },
-                    { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio },
-                    { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio },
-                    { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio },
-                  ].map(r => (
-                    <div key={r.label} className="p-3 bg-muted rounded-lg">
-                      <p className="text-xs text-muted-foreground">{r.label}</p>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <p className="font-semibold">{r.ratio}</p>
-                        <span className="text-xs text-muted-foreground line-through">{r.original}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <Card className={`${
           severity === "severe"
             ? "border-red-500/50 bg-red-50/30 dark:bg-red-950/20"
@@ -1104,228 +1667,8 @@ export default function SickDay() {
           </CardContent>
         </Card>
 
-        {/* Sick Day Journal Summary */}
-        {journalEntries.length > 0 && (
-          <Card data-testid="card-journal-summary">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                Journal Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 bg-muted rounded-lg text-center">
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="text-sm font-semibold mt-1" data-testid="text-journal-duration">{duration.label}</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg text-center">
-                  <p className="text-xs text-muted-foreground">Entries</p>
-                  <p className="text-sm font-semibold mt-1" data-testid="text-journal-count">{journalEntries.length}</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg text-center">
-                  <p className="text-xs text-muted-foreground">BG Trend</p>
-                  {(() => {
-                    const trend = getJournalBgTrend();
-                    if (!trend) return <p className="text-sm font-semibold mt-1 text-muted-foreground" data-testid="text-journal-trend">--</p>;
-                    if (trend === "down") return (
-                      <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
-                        <TrendingDown className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <span className="text-sm font-semibold text-green-600 dark:text-green-400">Down</span>
-                      </div>
-                    );
-                    if (trend === "up") return (
-                      <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
-                        <TrendingUp className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        <span className="text-sm font-semibold text-red-600 dark:text-red-400">Up</span>
-                      </div>
-                    );
-                    return (
-                      <div className="flex items-center justify-center gap-1 mt-1" data-testid="text-journal-trend">
-                        <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">Stable</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Log a Check */}
-        <Card data-testid="card-log-check">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
-              Log a Check
-            </CardTitle>
-            <CardDescription>Record your current readings and symptoms</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="journal-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
-                <Input
-                  id="journal-bg"
-                  type="number"
-                  placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
-                  value={journalBg}
-                  onChange={(e) => setJournalBg(e.target.value)}
-                  data-testid="input-journal-bg"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="journal-ketone" className="text-sm">Ketone Level</Label>
-                <Select value={journalKetone} onValueChange={setJournalKetone}>
-                  <SelectTrigger id="journal-ketone" data-testid="select-journal-ketone">
-                    <SelectValue placeholder="Select level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="trace">Trace</SelectItem>
-                    <SelectItem value="small">Small</SelectItem>
-                    <SelectItem value="moderate">Moderate</SelectItem>
-                    <SelectItem value="large">Large</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="journal-correction" className="text-sm">Correction Dose (units)</Label>
-                <Input
-                  id="journal-correction"
-                  type="number"
-                  placeholder="Optional"
-                  value={journalCorrection}
-                  onChange={(e) => setJournalCorrection(e.target.value)}
-                  data-testid="input-journal-correction"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="journal-fluids" className="text-sm">Fluids (ml)</Label>
-                <Input
-                  id="journal-fluids"
-                  type="number"
-                  placeholder="Optional"
-                  value={journalFluids}
-                  onChange={(e) => setJournalFluids(e.target.value)}
-                  data-testid="input-journal-fluids"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="journal-symptoms" className="text-sm">Symptoms</Label>
-              <Input
-                id="journal-symptoms"
-                type="text"
-                placeholder="e.g., headache, nausea, fever"
-                value={journalSymptoms}
-                onChange={(e) => setJournalSymptoms(e.target.value)}
-                data-testid="input-journal-symptoms"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="journal-notes" className="text-sm">Notes</Label>
-              <Textarea
-                id="journal-notes"
-                placeholder="Any additional notes..."
-                value={journalNotes}
-                onChange={(e) => setJournalNotes(e.target.value)}
-                className="resize-none"
-                rows={2}
-                data-testid="textarea-journal-notes"
-              />
-            </div>
-            <Button
-              onClick={handleLogJournalEntry}
-              className="w-full"
-              data-testid="button-log-journal-entry"
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Log Entry
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Sick Day Timeline */}
-        {journalEntries.length > 0 && (
-          <Card data-testid="card-journal-timeline">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                Sick Day Timeline
-              </CardTitle>
-              <CardDescription>{journalEntries.length} {journalEntries.length === 1 ? "entry" : "entries"} logged</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-0">
-                {journalEntries.map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    className="relative flex gap-3 pb-4"
-                    data-testid={`journal-entry-${entry.id}`}
-                  >
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
-                        idx === 0 ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"
-                      }`} />
-                      {idx < journalEntries.length - 1 && (
-                        <div className="w-0.5 flex-1 bg-muted-foreground/20 mt-1" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 -mt-0.5">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className={`text-lg font-bold ${getBgColor(entry.bg, entry.bgUnits)}`} data-testid={`text-journal-bg-${entry.id}`}>
-                            {entry.bg} {entry.bgUnits}
-                          </span>
-                          <Badge variant="secondary" className={`text-xs ${getKetoneBadgeVariant(entry.ketoneLevel)}`} data-testid={`badge-journal-ketone-${entry.id}`}>
-                            {entry.ketoneLevel}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground" data-testid={`text-journal-time-${entry.id}`}>
-                            {getTimeAgo(entry.timestamp)}
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteJournalEntry(entry.id)}
-                            data-testid={`button-delete-journal-${entry.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
-                        {entry.correctionDose !== null && entry.correctionDose > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Syringe className="h-3 w-3" />
-                            {entry.correctionDose}u correction
-                          </span>
-                        )}
-                        {entry.fluidsml !== null && entry.fluidsml > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Droplets className="h-3 w-3" />
-                            {entry.fluidsml}ml fluids
-                          </span>
-                        )}
-                      </div>
-                      {entry.symptoms && (
-                        <p className="text-xs text-muted-foreground mt-1">{entry.symptoms}</p>
-                      )}
-                      {entry.notes && (
-                        <p className="text-xs text-muted-foreground/70 mt-0.5 italic">{entry.notes}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          </>
+        ) : null}
 
         <div className="flex justify-center">
           <Link href="/">
@@ -1341,17 +1684,19 @@ export default function SickDay() {
 
   return (
     <PageShell variant="standard">
-      <PageHeader leading={<PageBackButton />} title="Sick Day" />
       <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-100 dark:border-orange-900">
         <CardHeader>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <PageBackButton />
             <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900">
               <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
             </div>
-            <div>
-              <CardTitle className="text-xl">Sick Day Adviser</CardTitle>
-              <CardDescription>Calculate insulin adjustments when you're feeling unwell</CardDescription>
-            </div>
+            <CardTitle className="text-xl">
+              Sick Day{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                — Calculate insulin adjustments when you're feeling unwell
+              </span>
+            </CardTitle>
           </div>
         </CardHeader>
       </Card>
@@ -1482,6 +1827,30 @@ export default function SickDay() {
           </Card>
         ) : (
           <>
+          {verdict ? (
+            <Card className="rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40" data-testid="card-sickday-verdict">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg">{verdict.title}</CardTitle>
+                    <CardDescription>{verdict.message}</CardDescription>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={
+                      verdict.tone === "critical"
+                        ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
+                        : verdict.tone === "caution"
+                          ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
+                          : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                    }
+                  >
+                    {verdict.label}
+                  </Badge>
+                </div>
+              </CardHeader>
+            </Card>
+          ) : null}
           <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">

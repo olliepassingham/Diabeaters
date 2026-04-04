@@ -1,3 +1,4 @@
+import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
 import { getSupabase } from "@/lib/supabase";
 
 export async function invokeNotifyScenarioStarted(params: {
@@ -8,12 +9,18 @@ export async function invokeNotifyScenarioStarted(params: {
   const supabase = getSupabase();
   if (!supabase) return { success: false, error: "supabase_not_configured" };
 
+  const headers = await getBearerAuthHeadersForEdgeFunctions(supabase);
+  if (!headers) {
+    return { success: false, error: "no_session", detail: "Sign in to send alerts." };
+  }
+
   const { data, error } = await supabase.functions.invoke("notify_scenario_started", {
     body: {
       scenario_key: params.scenarioKey,
       title: params.title,
       summary: params.summary ?? null,
     },
+    headers,
   });
 
   if (error) {

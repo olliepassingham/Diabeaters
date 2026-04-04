@@ -114,6 +114,14 @@ export default function Account() {
     showAvatarLoadErrorToast,
   ]);
 
+  useEffect(() => {
+    if (!user) return;
+    if (!isCarer) return;
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#account-emergency") return;
+    setLocation("/settings/emergency");
+  }, [user, isCarer, setLocation]);
+
   if (!user) return null;
 
   const verified = isUserVerified(user);
@@ -427,28 +435,16 @@ export default function Account() {
         </Alert>
       )}
 
-      <Card
-        id="account-emergency"
-        className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
-      >
-        <CardContent className="p-6 space-y-4">
-          {isCarer ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-primary" />
-                  <p className="font-medium">Your emergency details</p>
-                </div>
-                <Badge variant="outline">Carer account</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                This is your own emergency info. The person you support is shown below.
-              </p>
-            </div>
-          ) : null}
-          <SettingsEmergencySection variant="embedded" />
-        </CardContent>
-      </Card>
+      {!isCarer && (
+        <Card
+          id="account-emergency"
+          className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
+        >
+          <CardContent className="p-6 space-y-4">
+            <SettingsEmergencySection variant="embedded" />
+          </CardContent>
+        </Card>
+      )}
 
       {isCarer && (
         <Card
