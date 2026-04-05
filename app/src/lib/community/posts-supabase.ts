@@ -16,14 +16,71 @@ export type FeedCursor = { created_at: string; id: string };
 const PAGE_LIMIT_CAP = 100;
 
 function mapPost(r: Record<string, unknown>): CommunityPostRow {
+  const cc = Number(r.comment_count ?? 0);
+  const lc = Number(r.like_count ?? 0);
   return {
     id: String(r.id),
     author_id: String(r.author_id),
     body: String(r.body ?? ""),
     image_urls: parseImageUrls(r.image_urls),
     is_reported: Boolean(r.is_reported),
+    comment_count: Number.isFinite(cc) ? Math.max(0, Math.floor(cc)) : 0,
+    like_count: Number.isFinite(lc) ? Math.max(0, Math.floor(lc)) : 0,
+    liked_by_me: Boolean(r.liked_by_me),
     created_at: String(r.created_at ?? ""),
   };
+}
+
+/** Which of these post IDs the current user has liked (for merging into feed rows). */
+export async function fetchMyLikesForPostIds(postIds: string[]): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const supabase = getSupabase();
+  if (!supabase) return new Set();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return new Set();
+
+  const { data, error } = await supabase
+    .from("community_post_reactions")
+    .select("post_id")
+    .eq("user_id", uid)
+    .in("post_id", postIds);
+
+  if (error) return new Set();
+  return new Set((data ?? []).map((row: { post_id: string }) => String(row.post_id)));
+}
+
+function mergeLikedIntoPosts(posts: CommunityPostRow[], likedIds: Set<string>): CommunityPostRow[] {
+  return posts.map((p) => ({ ...p, liked_by_me: likedIds.has(p.id) }));
+}
+
+export async function togglePostLike(
+  postId: string,
+  currentlyLiked: boolean,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("community_post_reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", uid);
+    if (error) return { error: new Error(error.message) };
+    return { error: null };
+  }
+
+  const { error } = await supabase.from("community_post_reactions").insert({
+    post_id: postId,
+    user_id: uid,
+  });
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
 }
 
 function parseImageUrls(raw: unknown): string[] {
@@ -101,8 +158,10 @@ export async function fetchCommunityPostsPage(
   });
 
   if (error) return { data: null, error: new Error(error.message) };
+  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
+  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
   return {
-    data: (data ?? []).map((row: Record<string, unknown>) => mapPost(row)),
+    data: mergeLikedIntoPosts(rows, liked),
     error: null,
   };
 }
@@ -136,8 +195,10 @@ export async function fetchCommunityPostsFromFollowingPage(
   });
 
   if (error) return { data: null, error: new Error(error.message) };
+  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
+  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
   return {
-    data: (data ?? []).map((row: Record<string, unknown>) => mapPost(row)),
+    data: mergeLikedIntoPosts(rows, liked),
     error: null,
   };
 }

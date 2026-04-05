@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Flag, ImagePlus, Loader2, MessageCircle, Send, Settings, X } from "lucide-react";
+import { Flag, Heart, ImagePlus, Loader2, MessageCircle, MessageSquare, Reply, Send, Settings, X } from "lucide-react";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -25,10 +25,12 @@ import {
   insertCommunityPost,
   MAX_POST_IMAGES,
   submitContentReport,
+  togglePostLike,
   type CommunityPostCommentRow,
   type CommunityPostRow,
 } from "@/lib/community";
 import { getProfilesByIds } from "@/lib/profile";
+import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,6 +76,7 @@ export default function CommunityHomePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   useEffect(() => {
     const urls = composerFiles.map((f) => URL.createObjectURL(f));
@@ -224,9 +227,8 @@ export default function CommunityHomePage() {
     toast({ title: "Posted" });
   }
 
-  async function toggleComments(postId: string) {
-    setExpanded((prev) => ({ ...prev, [postId]: !prev[postId] }));
-    if (commentsByPost[postId] || loadingComments[postId]) return;
+  async function loadCommentsIfNeeded(postId: string) {
+    if (postId in commentsByPost || loadingComments[postId]) return;
     setLoadingComments((prev) => ({ ...prev, [postId]: true }));
     const res = await fetchCommentsForPost(postId);
     setLoadingComments((prev) => ({ ...prev, [postId]: false }));
@@ -235,6 +237,50 @@ export default function CommunityHomePage() {
       return;
     }
     setCommentsByPost((prev) => ({ ...prev, [postId]: res.data ?? [] }));
+  }
+
+  async function toggleComments(postId: string) {
+    const willOpen = !expanded[postId];
+    setExpanded((prev) => ({ ...prev, [postId]: !prev[postId] }));
+    if (willOpen) await loadCommentsIfNeeded(postId);
+  }
+
+  async function replyToPost(postId: string) {
+    setExpanded((prev) => ({ ...prev, [postId]: true }));
+    await loadCommentsIfNeeded(postId);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        commentInputRefs.current[postId]?.focus();
+      });
+    });
+  }
+
+  async function handleToggleLike(postId: string, currentlyLiked: boolean) {
+    if (!user) return;
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        return {
+          ...p,
+          liked_by_me: !currentlyLiked,
+          like_count: Math.max(0, p.like_count + (currentlyLiked ? -1 : 1)),
+        };
+      }),
+    );
+    const res = await togglePostLike(postId, currentlyLiked);
+    if (res.error) {
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          return {
+            ...p,
+            liked_by_me: currentlyLiked,
+            like_count: Math.max(0, p.like_count + (currentlyLiked ? 1 : -1)),
+          };
+        }),
+      );
+      toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
+    }
   }
 
   async function submitComment(postId: string) {
@@ -251,6 +297,11 @@ export default function CommunityHomePage() {
         ...prev,
         [postId]: [...(prev[postId] ?? []), res.data!],
       }));
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p,
+        ),
+      );
     }
   }
 
@@ -442,15 +493,65 @@ export default function CommunityHomePage() {
                           <p className="text-sm whitespace-pre-wrap">{p.body}</p>
                         ) : null}
                         <CommunityPostImageGrid paths={p.image_urls} />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => void toggleComments(p.id)}
+                        <div
+                          className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
+                          data-testid="post-engagement-row"
                         >
-                          {expanded[p.id] ? "Hide comments" : "Comments"}
-                        </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            disabled={!user}
+                            aria-pressed={p.liked_by_me}
+                            aria-label={p.liked_by_me ? "Unlike" : "Like"}
+                            onClick={() => void handleToggleLike(p.id, p.liked_by_me)}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                p.liked_by_me && "fill-primary text-primary",
+                              )}
+                            />
+                            <span className="text-xs tabular-nums text-foreground">{p.like_count}</span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            aria-expanded={Boolean(expanded[p.id])}
+                            aria-label={
+                              expanded[p.id]
+                                ? "Hide comments"
+                                : p.comment_count === 0
+                                  ? "Comment"
+                                  : `${p.comment_count} comment${p.comment_count === 1 ? "" : "s"}`
+                            }
+                            onClick={() => void toggleComments(p.id)}
+                          >
+                            <MessageSquare className="h-4 w-4 shrink-0" />
+                            <span className="text-xs text-foreground">
+                              {expanded[p.id]
+                                ? "Hide comments"
+                                : p.comment_count === 0
+                                  ? "Comment"
+                                  : `${p.comment_count} comment${p.comment_count === 1 ? "" : "s"}`}
+                            </span>
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            disabled={!user}
+                            aria-label="Reply"
+                            onClick={() => void replyToPost(p.id)}
+                          >
+                            <Reply className="h-4 w-4 shrink-0" />
+                            <span className="text-xs text-foreground">Reply</span>
+                          </Button>
+                        </div>
                         {expanded[p.id] && (
                           <div className="border-t border-border/60 pt-3 space-y-2">
                             {loadingComments[p.id] ? (
@@ -498,6 +599,9 @@ export default function CommunityHomePage() {
                             )}
                             <div className="flex gap-2">
                               <Textarea
+                                ref={(el) => {
+                                  commentInputRefs.current[p.id] = el;
+                                }}
                                 rows={2}
                                 placeholder="Write a comment…"
                                 value={commentDrafts[p.id] ?? ""}

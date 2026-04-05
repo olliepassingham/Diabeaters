@@ -5,6 +5,10 @@ export type CommunityPostRow = {
   body: string;
   image_urls: string[];
   is_reported: boolean;
+  comment_count: number;
+  like_count: number;
+  /** Whether the current user has liked this post (client merges from reactions). */
+  liked_by_me: boolean;
   created_at: string;
 };
 
