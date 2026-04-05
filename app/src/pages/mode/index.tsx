@@ -28,8 +28,8 @@ export default function ModeChooserPage() {
   }, []);
 
   const currentLabel = useMemo(() => {
-    if (mode === "carer") return "Carer mode";
-    if (mode === "patient") return "User mode";
+    if (mode === "carer") return "Supporter Mode";
+    if (mode === "patient") return "User Mode";
     return "Not set";
   }, [mode]);
 
@@ -52,17 +52,17 @@ export default function ModeChooserPage() {
     <PageShell variant="narrow" className="space-y-6 py-4 md:py-8">
       <PageHeader
         title="Choose your mode"
-        description="If you support someone as a carer, you can switch between your own tools and their read-only view."
+        description="User Mode is for your own diabetes tools. Supporter Mode is read-only information about someone you support. You can change this later from Account."
       />
 
       <Card className="shadow-sm border-border/60 rounded-2xl">
         <CardHeader>
           <CardTitle className="text-xl">Current: {currentLabel}</CardTitle>
-          <CardDescription>Pick one for this session. You can switch later from Account.</CardDescription>
+          <CardDescription>Pick one for this session.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button className="w-full min-h-11" onClick={() => pick("patient")} data-testid="button-mode-patient">
-            User mode
+            User Mode
           </Button>
           <Button
             className="w-full min-h-11"
@@ -71,12 +71,12 @@ export default function ModeChooserPage() {
             onClick={() => pick("carer")}
             data-testid="button-mode-carer"
           >
-            Carer mode
+            Supporter Mode
           </Button>
           {!canChooseCarer && (
             <Alert>
               <AlertDescription>
-                This account is not linked as a carer yet. If you have an invite code, go to{" "}
+                This account isn’t linked to support someone yet. If you have an invite code, go to{" "}
                 <Link href="/carer-setup" className="font-medium underline underline-offset-4">
                   Carer setup
                 </Link>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { cn } from "@/lib/utils";
 import {
   GLOSSARY_TERMS,
@@ -16,7 +16,7 @@ export default function GlossaryIndex() {
 
   return (
     <PageShell variant="standard" className="bg-background text-foreground">
-      <PageHeader title="Glossary" />
+      <PageHeader leading={<PageBackButton />} title="Glossary" />
 
       <div className="mt-6 space-y-2">
         <label htmlFor="glossary-search" className="sr-only">

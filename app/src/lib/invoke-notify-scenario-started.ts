@@ -1,5 +1,8 @@
-import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
-import { getSupabase } from "@/lib/supabase";
+import {
+  getBearerAuthHeadersForEdgeFunctions,
+  invokeEdgeFunctionPost,
+} from "@/lib/edge-function-invoke-auth";
+import { getSupabase, getSupabaseUrlAndAnonKey } from "@/lib/supabase";
 
 export async function invokeNotifyScenarioStarted(params: {
   scenarioKey: "sick_day" | "travel";
@@ -7,21 +10,28 @@ export async function invokeNotifyScenarioStarted(params: {
   summary?: string | null;
 }): Promise<{ success: boolean; error?: string; detail?: string }> {
   const supabase = getSupabase();
-  if (!supabase) return { success: false, error: "supabase_not_configured" };
+  const env = getSupabaseUrlAndAnonKey();
+  if (!supabase || !env) return { success: false, error: "supabase_not_configured" };
 
   const headers = await getBearerAuthHeadersForEdgeFunctions(supabase);
   if (!headers) {
     return { success: false, error: "no_session", detail: "Sign in to send alerts." };
   }
 
-  const { data, error } = await supabase.functions.invoke("notify_scenario_started", {
-    body: {
+  const { data, error } = await invokeEdgeFunctionPost<{
+    success?: boolean;
+    error?: string;
+    detail?: string;
+  }>(
+    "notify_scenario_started",
+    {
       scenario_key: params.scenarioKey,
       title: params.title,
       summary: params.summary ?? null,
     },
+    env,
     headers,
-  });
+  );
 
   if (error) {
     console.warn("[invokeNotifyScenarioStarted]", error.message);

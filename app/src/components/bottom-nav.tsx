@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
+import { useProfile } from "@/lib/profile";
 
 const iconClass = "h-[23px] w-[23px]";
 
@@ -15,7 +16,7 @@ type TabDef = {
   isActive: (pathname: string, hash: string) => boolean;
 };
 
-function patientTabs(): TabDef[] {
+function patientTabs(showCommunityTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
       title: "Home",
@@ -32,9 +33,9 @@ function patientTabs(): TabDef[] {
       isActive: (pathname) => pathname === "/scenarios" || pathname.startsWith("/scenarios/"),
     },
   ];
-  if (isCommunityEnabled) {
+  if (isCommunityEnabled && showCommunityTab) {
     tabs.push({
-      title: "Community",
+      title: "Feed",
       href: "/community",
       icon: Users,
       testId: "bottomnav-community",
@@ -64,15 +65,26 @@ function patientTabs(): TabDef[] {
   return tabs;
 }
 
-function carerTabs(): TabDef[] {
-  return [
+function carerTabs(showCommunityTab: boolean): TabDef[] {
+  const tabs: TabDef[] = [
     {
-      title: "Carer View",
+      title: "Supporter",
       href: "/carer-view",
       icon: Home,
       testId: "bottomnav-home",
       isActive: (pathname) => pathname === "/carer-view" || pathname.startsWith("/carer-view/"),
     },
+  ];
+  if (isCommunityEnabled && showCommunityTab) {
+    tabs.push({
+      title: "Feed",
+      href: "/community",
+      icon: Users,
+      testId: "bottomnav-community",
+      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+    });
+  }
+  tabs.push(
     {
       title: "Tools",
       href: "/tools",
@@ -91,7 +103,8 @@ function carerTabs(): TabDef[] {
       testId: "bottomnav-account",
       isActive: (pathname) => pathname === "/account",
     },
-  ];
+  );
+  return tabs;
 }
 
 export function BottomNav() {
@@ -101,8 +114,11 @@ export function BottomNav() {
     typeof window !== "undefined" ? window.location.hash.slice(1) : "",
   );
   const { isCarer: hasCarerLink } = useLinkedCarer();
+  const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const showCommunityTab =
+    isCommunityEnabled && !profileLoading && profile?.is_public === true;
 
   useEffect(() => {
     const onHash = () => setHash(window.location.hash.slice(1));
@@ -120,7 +136,7 @@ export function BottomNav() {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
-  const tabs = isCarerMode ? carerTabs() : patientTabs();
+  const tabs = isCarerMode ? carerTabs(showCommunityTab) : patientTabs(showCommunityTab);
 
   const cols = tabs.length;
   return (

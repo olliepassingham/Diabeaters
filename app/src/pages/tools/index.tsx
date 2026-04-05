@@ -159,7 +159,7 @@ export function CarerToolsPlaceholder() {
       <PageHeader title="Tools" leading={<PageBackButton />} />
       <Alert className="rounded-2xl border-border/60 shadow-sm">
         <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
-          Only general tools are shown here. Use <strong>Carer View</strong> for read-only information about the person
+          Only general tools are shown here. Use <strong>Supporter Mode</strong> for read-only information about the person
           you support.{" "}
           <Link href="/education" className="font-medium text-foreground underline underline-offset-4">
             Education
@@ -171,7 +171,7 @@ export function CarerToolsPlaceholder() {
   );
 }
 
-/** Patients see the hub; carers see read-only messaging; carer-signup flows redirect away. */
+/** Patients see the hub; Supporter Mode sessions see read-only messaging; carer-signup flows redirect away. */
 export default function ToolsPage() {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();

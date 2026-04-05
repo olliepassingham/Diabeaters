@@ -5,8 +5,8 @@ import { getLinkedPatientForCarer } from "@/lib/carers";
 import { getActiveAppMode } from "@/lib/carer-session";
 
 /**
- * Source-of-truth mode detection from backend (`public.carer_links`).
- * `data !== null` means the current user is in carer mode.
+ * Source-of-truth link detection from backend (`public.carer_links`).
+ * `data !== null` means this account can open Supporter Mode for a linked patient (when that mode is selected).
  */
 export function useLinkedPatient(): {
   data: LinkedPatientInfo | null;

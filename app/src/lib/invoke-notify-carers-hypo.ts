@@ -1,8 +1,12 @@
 /**
  * Calls Edge Function `notify_carers_on_hypo` with the active session.
+ * Uses explicit fetch + apikey + Authorization so the gateway accepts the request (avoids 401 with execution_id null).
  */
-import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
-import { getSupabase } from "./supabase";
+import {
+  getBearerAuthHeadersForEdgeFunctions,
+  invokeEdgeFunctionPost,
+} from "@/lib/edge-function-invoke-auth";
+import { getSupabase, getSupabaseUrlAndAnonKey } from "./supabase";
 import type { NotifyCarersOnHypoResult } from "./carer-notify-types";
 
 export async function invokeNotifyCarersOnHypo(params: {
@@ -10,7 +14,8 @@ export async function invokeNotifyCarersOnHypo(params: {
   userId: string;
 }): Promise<NotifyCarersOnHypoResult> {
   const supabase = getSupabase();
-  if (!supabase) {
+  const env = getSupabaseUrlAndAnonKey();
+  if (!supabase || !env) {
     return { success: false, error: "supabase_not_configured" };
   }
 
@@ -19,10 +24,12 @@ export async function invokeNotifyCarersOnHypo(params: {
     return { success: false, error: "no_session", detail: "Sign in to send alerts." };
   }
 
-  const { data, error } = await supabase.functions.invoke("notify_carers_on_hypo", {
-    body: { hypo_id: params.hypoId, user_id: params.userId },
+  const { data, error } = await invokeEdgeFunctionPost<NotifyCarersOnHypoResult>(
+    "notify_carers_on_hypo",
+    { hypo_id: params.hypoId, user_id: params.userId },
+    env,
     headers,
-  });
+  );
 
   if (error) {
     console.warn("[invokeNotifyCarersOnHypo]", error.message);

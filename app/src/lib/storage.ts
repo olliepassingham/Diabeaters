@@ -448,6 +448,8 @@ export interface NotificationSettings {
   appointmentReminders: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
+  /** When true, dashboard "Treated a Hypo" logs and notifies without opening the detail dialog first. */
+  hypoDashboardQuickNotify?: boolean;
 }
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
@@ -2036,8 +2038,7 @@ export const storage = {
   },
 
   getNotificationSettings(): NotificationSettings {
-    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
-    return data ? JSON.parse(data) : {
+    const defaults: NotificationSettings = {
       enabled: true,
       pushNotifications: true,
       supplyAlerts: true,
@@ -2047,6 +2048,15 @@ export const storage = {
       appointmentReminders: true,
       hypoAlerts: true,
       scenarioAlerts: true,
+      hypoDashboardQuickNotify: false,
+    };
+    const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
+    if (!data) return defaults;
+    const parsed = JSON.parse(data) as Partial<NotificationSettings>;
+    return {
+      ...defaults,
+      ...parsed,
+      hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify === true,
     };
   },
 

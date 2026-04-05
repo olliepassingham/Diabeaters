@@ -124,7 +124,7 @@ test.describe("Family & Carers MVP", () => {
     await expect(page.getByTestId("privacy-toggle-emergency")).toBeVisible();
   });
 
-  test("carer: redeem code then sees patient header on Carer View", async ({ page, context }) => {
+  test("carer: redeem code then sees patient header on Supporter Mode", async ({ page, context }) => {
     let hasLink = false;
 
     await context.route("**/auth/v1/user**", async (route) => {
@@ -206,7 +206,7 @@ test.describe("Family & Carers MVP", () => {
     });
 
     await page.goto("/carer-view");
-    await expect(page.getByRole("heading", { name: "Carer View" })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("heading", { name: "Supporter Mode" })).toBeVisible({ timeout: 10000 });
 
     await page.getByLabel("Invite code").fill("MOCKCODE");
     await page.getByRole("button", { name: "Submit invite code" }).click();

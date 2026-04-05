@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   fetchCommentsForPost,
   fetchCommunityPosts,
+  fetchCommunityPostsFromFollowing,
   insertCommunityComment,
   insertCommunityPost,
   type CommunityPostCommentRow,
@@ -150,8 +151,8 @@ export default function CommunityHomePage() {
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
-        <PageHeader leading={<PageBackButton />} title="Community" />
-        <p className="text-sm text-muted-foreground">Connect Supabase in your environment to use Community.</p>
+        <PageHeader leading={<PageBackButton />} title="Feed" />
+        <p className="text-sm text-muted-foreground">Connect Supabase in your environment to use Feed.</p>
       </PageShell>
     );
   }
@@ -160,12 +161,12 @@ export default function CommunityHomePage() {
     <PageShell variant="standard" className="max-w-lg mx-auto space-y-4 pb-24">
       <PageHeader
         leading={<PageBackButton />}
-        title="Community"
+        title="Feed"
         description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
         actions={
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/community/settings" aria-label="Community profile settings">
+              <Link href="/account#community" aria-label="Feed profile settings">
                 <Settings className="h-4 w-4" />
               </Link>
             </Button>
@@ -195,7 +196,7 @@ export default function CommunityHomePage() {
             <Textarea
               value={composer}
               onChange={(e) => setComposer(e.target.value)}
-              placeholder="Share something with the community…"
+              placeholder="Share something on the feed…"
               rows={3}
               maxLength={8000}
               disabled={submitting || !user}

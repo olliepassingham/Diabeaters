@@ -50,7 +50,7 @@ export default function VerifiedSuccess() {
       if (cancelled) return;
       if (link.data) {
         setPrimaryHref("/carer-view");
-        setPrimaryLabel("Open Carer View");
+        setPrimaryLabel("Open Supporter Mode");
         return;
       }
       if (hasCarerIntent() || hasPendingCarer()) {

@@ -72,7 +72,7 @@ export default function CarerSetupPage() {
     setCode("");
     toast({
       title: "Linked successfully",
-      description: `You are now linked as a carer for ${name}.`,
+      description: `You're now linked to ${name}. Open Supporter Mode to see their read-only information.`,
     });
     setLocation("/carer-view");
   }
@@ -151,7 +151,7 @@ export default function CarerSetupPage() {
               </Button>
             </form>
             <p className="text-xs text-center text-muted-foreground">
-              After redeeming you will open the read-only Carer View for that person.
+              After redeeming you will open read-only Supporter Mode for that person.
             </p>
           </CardContent>
         </Card>

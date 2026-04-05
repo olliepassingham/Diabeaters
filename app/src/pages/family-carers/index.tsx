@@ -215,8 +215,8 @@ export default function FamilyCarersPage() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : links.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="carers-list-empty">
-              No one is linked yet. Generate an invite code below and ask them to enter it under Carer View on their
-              device.
+              No one is linked yet. Generate an invite code below and ask them to enter it in Carer setup (Account →
+              Carer setup) on their device.
             </p>
           ) : (
             <ul className="space-y-3" data-testid="carers-list">
@@ -311,7 +311,7 @@ export default function FamilyCarersPage() {
             <p className="font-medium text-foreground">How it works</p>
             <ol className="list-decimal list-inside space-y-1">
               <li>You generate a code and share it privately with one person.</li>
-              <li>They sign in to Diabeaters (or create an account) and enter the code under Carer View.</li>
+              <li>They sign in to Diabeaters (or create an account) and enter the code in Carer setup (Account → Carer setup).</li>
               <li>You stay in control: use the toggles below to limit what they can see.</li>
             </ol>
           </div>

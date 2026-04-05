@@ -16,8 +16,8 @@ export function SettingsUsageRoute({ settingsInfoDialog, usageToolsInner }: Sett
       <SettingsBackLink />
       <PageHeader
         className="mb-2"
-        title="Usage & tools"
-        description="Profile, typical insulin use, and supply pack sizes."
+        title="Profile and usage"
+        description="Name, units, typical insulin use, and supply pack sizes."
         actions={settingsInfoDialog}
       />
       <Card

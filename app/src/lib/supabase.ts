@@ -35,5 +35,11 @@ export function getSupabase(): SupabaseClient | null {
   return createSupabaseClient();
 }
 
+/** URL + anon key for direct Edge Function `fetch` (must send both with user JWT). */
+export function getSupabaseUrlAndAnonKey(): { url: string; anonKey: string } | null {
+  if (!hasSupabaseEnv) return null;
+  return { url: supabaseUrl.replace(/\/$/, ""), anonKey: supabaseKey };
+}
+
 /** @deprecated Prefer getSupabase() and null-check. Kept for backward compat; may be null if env missing. */
 export const supabase = createSupabaseClient();

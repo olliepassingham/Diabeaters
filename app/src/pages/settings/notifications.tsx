@@ -66,6 +66,21 @@ export function NotificationsTab({
         />
       </div>
 
+      <div className="flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Quick hypo log</Label>
+          <p className="text-small text-muted-foreground">
+            When on, the dashboard &quot;Treated a Hypo&quot; button logs a hypo and notifies linked carers without
+            asking for glucose or treatment first. Turn off to enter details each time.
+          </p>
+        </div>
+        <Switch
+          checked={notifSettings.hypoDashboardQuickNotify === true}
+          onCheckedChange={(checked) => onToggle("hypoDashboardQuickNotify", checked)}
+          data-testid="switch-hypo-dashboard-quick"
+        />
+      </div>
+
       <div id="notif-trends" className="scroll-mt-28 space-y-4 border-b border-border pb-6">
         <div className="flex items-center justify-between py-3">
           <div className="space-y-0.5 pr-4">

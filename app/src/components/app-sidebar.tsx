@@ -1,7 +1,11 @@
-import { Home, Package, Bot, Settings, Phone, Calendar, AlertTriangle, Heart, Eye, User } from "lucide-react";
+import { Home, Package, Bot, Settings, Phone, Calendar, AlertTriangle, Heart, Eye, User, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
 import { FaceLogo } from "@/components/face-logo";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { getActiveAppMode } from "@/lib/carer-session";
+import { isCommunityEnabled } from "@/lib/flags";
+import { useProfile } from "@/lib/profile";
 import {
   Sidebar,
   SidebarContent,
@@ -26,15 +30,45 @@ const patientItems = [
 ] as const;
 
 const carerItems = [
-  { title: "Carer View", url: "/carer-view", icon: Eye },
+  { title: "Supporter", url: "/carer-view", icon: Eye },
   { title: "Account", url: "/account", icon: User },
   { title: "Settings", url: "/settings", icon: Settings },
 ] as const;
 
+function sidebarLinkActive(location: string, url: string): boolean {
+  if (url === "/community") return location === "/community" || location.startsWith("/community/");
+  if (url === "/carer-view") return location === "/carer-view" || location.startsWith("/carer-view/");
+  return location === url;
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { isCarer } = useLinkedCarer();
-  const navItems = isCarer ? carerItems : patientItems;
+  const { profile, loading: profileLoading } = useProfile();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(isCarer && activeMode === "carer");
+  const showCommunity =
+    isCommunityEnabled && !profileLoading && profile?.is_public === true;
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  const navItems = useMemo(() => {
+    if (!isCarer) return patientItems;
+    if (!isCarerMode || !showCommunity) return carerItems;
+    return [
+      { title: "Supporter", url: "/carer-view", icon: Eye },
+      { title: "Feed", url: "/community", icon: Users },
+      { title: "Account", url: "/account", icon: User },
+      { title: "Settings", url: "/settings", icon: Settings },
+    ] as const;
+  }, [isCarer, isCarerMode, showCommunity]);
 
   const homeHref = isCarer ? "/carer-view" : "/";
 
@@ -59,7 +93,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location === item.url}
+                    isActive={sidebarLinkActive(location, item.url)}
                     data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <Link href={item.url}>

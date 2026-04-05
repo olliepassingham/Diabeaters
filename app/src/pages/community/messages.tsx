@@ -132,7 +132,7 @@ export default function CommunityMessagesPage() {
     if (!raw) {
       toast({
         title: "Enter a handle",
-        description: "Use their community handle (e.g. olliepass).",
+        description: "Use their public handle (e.g. olliepass).",
         variant: "destructive",
       });
       return;
@@ -144,7 +144,7 @@ export default function CommunityMessagesPage() {
       if (!n) {
         toast({
           title: "Enter a handle",
-          description: "Use their community handle (e.g. olliepass).",
+          description: "Use their public handle (e.g. olliepass).",
           variant: "destructive",
         });
         return;
@@ -211,7 +211,7 @@ export default function CommunityMessagesPage() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/community">
               <MessageCircle className="h-4 w-4 mr-1.5" />
-              Timeline
+              Feed
             </Link>
           </Button>
         }
@@ -220,7 +220,7 @@ export default function CommunityMessagesPage() {
       <Card>
         <CardContent className="pt-6 space-y-3">
           <form onSubmit={handleStartChat} className="space-y-2">
-            <Label htmlFor="community-handle">Community handle</Label>
+            <Label htmlFor="community-handle">Public handle</Label>
             <Input
               id="community-handle"
               value={handleInput}
@@ -236,8 +236,8 @@ export default function CommunityMessagesPage() {
               Open or start chat
             </Button>
             <p className="text-xs text-muted-foreground">
-              Enter the person&apos;s public @handle from their community profile. They must have saved a handle in
-              Community profile settings.
+              Enter the person&apos;s public @handle from their feed profile. They must have saved a handle in Feed
+              profile settings.
             </p>
           </form>
         </CardContent>

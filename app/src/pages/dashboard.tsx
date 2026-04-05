@@ -50,6 +50,78 @@ const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
 const VERIFIED_WELCOME_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
+type ToastLike = ReturnType<typeof useToast>["toast"];
+
+async function runHypoTreatmentPipeline(
+  fields: { glucoseInput: string; treatment: string; notes: string },
+  ctx: {
+    userId: string | undefined;
+    toast: ToastLike;
+    onAfterLocalSave?: () => void;
+  },
+): Promise<void> {
+  const glucoseLevel = fields.glucoseInput.trim() ? parseFloat(fields.glucoseInput) : undefined;
+  const treatment = fields.treatment.trim() || undefined;
+  const notes = fields.notes.trim() || undefined;
+
+  const created = storage.addHypoTreatment({
+    timestamp: new Date().toISOString(),
+    glucoseLevel,
+    treatment,
+    notes,
+    carerNotified: false,
+  });
+
+  ctx.onAfterLocalSave?.();
+
+  let description = "Your hypo treatment has been recorded.";
+  let notifyInvokeFailed = false;
+
+  if (ctx.userId && getSupabase()) {
+    const cloud = await insertHypoLog({
+      blood_glucose: created.glucoseLevel ?? null,
+      treatment: created.treatment ?? null,
+      notes: created.notes ?? null,
+    });
+
+    if (cloud.data) {
+      storage.patchHypoTreatment(created.id, { supabaseHypoLogId: cloud.data.id });
+      const notify = await invokeNotifyCarersOnHypo({
+        hypoId: cloud.data.id,
+        userId: ctx.userId,
+      });
+
+      if (!notify.success) {
+        notifyInvokeFailed = true;
+      } else {
+        const eligible = notify.eligible_carers ?? 0;
+        const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
+
+        if (eligible > 0 && delivered > 0) {
+          storage.updateHypoTreatmentCarerNotified(created.id, true);
+          description =
+            eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
+        } else if (eligible > 0 && delivered === 0) {
+          description =
+            "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
+        }
+      }
+    }
+  }
+
+  ctx.toast({
+    title: "Hypo treatment logged",
+    description,
+  });
+  if (notifyInvokeFailed) {
+    ctx.toast({
+      title: NOTIFY_EDGE_FAILURE_TITLE,
+      description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+      variant: "destructive",
+    });
+  }
+}
+
 function getHealthStatus(supplies: LocalSupply[], scenarioState: ScenarioState): HealthStatus {
   const supplyStatuses = supplies.map(s => storage.getSupplyStatus(s));
   const hasCritical = supplyStatuses.includes("critical");
@@ -239,67 +311,31 @@ function HeroCard({
   }, [hypoDialogOpen]);
 
   const handleLogHypo = () => {
-    void (async () => {
-      const created = storage.addHypoTreatment({
-        timestamp: new Date().toISOString(),
-        glucoseLevel: hypoGlucose ? parseFloat(hypoGlucose) : undefined,
-        treatment: hypoTreatment || undefined,
-        notes: hypoNotes || undefined,
-        carerNotified: false,
-      });
-      setHypoDialogOpen(false);
-      setHypoGlucose("");
-      setHypoTreatment("");
-      setHypoNotes("");
-      setHypoHistory(storage.getHypoTreatments());
+    void runHypoTreatmentPipeline(
+      { glucoseInput: hypoGlucose, treatment: hypoTreatment, notes: hypoNotes },
+      {
+        userId: user?.id,
+        toast,
+        onAfterLocalSave: () => {
+          setHypoDialogOpen(false);
+          setHypoGlucose("");
+          setHypoTreatment("");
+          setHypoNotes("");
+          setHypoHistory(storage.getHypoTreatments());
+        },
+      },
+    );
+  };
 
-      let description = "Your hypo treatment has been recorded.";
-      let notifyInvokeFailed = false;
-
-      if (user?.id && getSupabase()) {
-        const cloud = await insertHypoLog({
-          blood_glucose: created.glucoseLevel ?? null,
-          treatment: created.treatment ?? null,
-          notes: created.notes ?? null,
-        });
-
-        if (cloud.data) {
-          storage.patchHypoTreatment(created.id, { supabaseHypoLogId: cloud.data.id });
-          const notify = await invokeNotifyCarersOnHypo({
-            hypoId: cloud.data.id,
-            userId: user.id,
-          });
-
-          if (!notify.success) {
-            notifyInvokeFailed = true;
-          } else {
-            const eligible = notify.eligible_carers ?? 0;
-            const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
-
-            if (eligible > 0 && delivered > 0) {
-              storage.updateHypoTreatmentCarerNotified(created.id, true);
-              description =
-                eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
-            } else if (eligible > 0 && delivered === 0) {
-              description =
-                "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
-            }
-          }
-        }
-      }
-
-      toast({
-        title: "Hypo treatment logged",
-        description,
-      });
-      if (notifyInvokeFailed) {
-        toast({
-          title: NOTIFY_EDGE_FAILURE_TITLE,
-          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
-          variant: "destructive",
-        });
-      }
-    })();
+  const handleTreatedHypoClick = () => {
+    if (storage.getNotificationSettings().hypoDashboardQuickNotify === true) {
+      void runHypoTreatmentPipeline(
+        { glucoseInput: "", treatment: "", notes: "" },
+        { userId: user?.id, toast },
+      );
+      return;
+    }
+    setHypoDialogOpen(true);
   };
 
   const greeting = () => {
@@ -348,7 +384,7 @@ function HeroCard({
             <Button
               size="sm"
               className="min-h-11 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0 px-4"
-              onClick={() => setHypoDialogOpen(true)}
+              onClick={handleTreatedHypoClick}
               data-testid="button-dashboard-treated-hypo"
             >
               <CheckCircle2 className="h-4 w-4" />

@@ -232,9 +232,16 @@ function bypassesOnboardingGate(path: string): boolean {
   return prefixes.some((x) => p === x || p.startsWith(`${x}/`));
 }
 
+/** Community routes work in Supporter Mode (signed-in user’s own profile/DMs). */
+function isCommunityPath(pathOnly: string): boolean {
+  const p = (pathOnly || "/").split("?")[0] ?? "/";
+  return p === "/community" || p.startsWith("/community/");
+}
+
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
 
@@ -249,21 +256,22 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (isCarerMode) {
+    if (isCarerMode && !isCommunityPath(pathOnly)) {
       setLocation("/carer-view");
       return;
     }
-    if (hasCarerIntent() || hasPendingCarer()) {
+    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, setLocation]);
+  }, [loading, isCarerMode, pathOnly, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
+  if (isCarerMode && !isCommunityPath(pathOnly)) return null;
+  if (hasCarerIntent() || hasPendingCarer()) return null;
   return <>{children}</>;
 }
 
@@ -280,6 +288,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/about") return true;
   if (p === "/settings/emergency") return true;
   if (p === "/privacy" || p === "/support") return true;
+  if (isCommunityPath(p)) return true;
   return false;
 }
 
@@ -373,7 +382,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/settings">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunitySettings />
             </Suspense>
@@ -382,7 +391,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/u/:handle">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityHandleResolve />
             </Suspense>
@@ -391,7 +400,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/profile/:userId">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityProfile />
             </Suspense>

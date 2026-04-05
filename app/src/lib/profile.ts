@@ -18,12 +18,14 @@ export type ProfileRow = {
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   emergency_notes?: string | null;
+  /** ISO date YYYY-MM-DD; optional community-only. */
+  diabetes_onset_date?: string | null;
 };
 
 /** Safe fields for community public profile pages (never include emergency_*). */
 export type PublicCommunityProfile = Pick<
   ProfileRow,
-  "id" | "full_name" | "avatar_url" | "bio" | "public_handle" | "is_public"
+  "id" | "full_name" | "avatar_url" | "bio" | "public_handle" | "is_public" | "diabetes_onset_date"
 >;
 
 export const profileQueryKey = (userId: string | undefined) => ["profile", userId] as const;
@@ -41,6 +43,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     emergency_contact_name: (data.emergency_contact_name as string | null) ?? null,
     emergency_contact_phone: (data.emergency_contact_phone as string | null) ?? null,
     emergency_notes: (data.emergency_notes as string | null) ?? null,
+    diabetes_onset_date: (data.diabetes_onset_date as string | null) ?? null,
   };
 }
 
@@ -84,6 +87,37 @@ export async function getProfilesByIds(userIds: string[]): Promise<Map<string, P
   }
 }
 
+/** Public line for community profile from ISO date YYYY-MM-DD (local calendar). */
+export function formatLivingWithDiabetesLine(isoDate: string | null | undefined): string | null {
+  if (!isoDate?.trim()) return null;
+  const parts = isoDate.trim().split("-").map((p) => Number.parseInt(p, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [y, m, d] = parts;
+  const start = new Date(y, m - 1, d);
+  if (Number.isNaN(start.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+  if (start > today) return null;
+
+  let years = today.getFullYear() - start.getFullYear();
+  const md = today.getMonth() - start.getMonth();
+  const dd = today.getDate() - start.getDate();
+  if (md < 0 || (md === 0 && dd < 0)) years -= 1;
+
+  if (years >= 1) {
+    return `Living with diabetes for ~${years} ${years === 1 ? "year" : "years"}`;
+  }
+
+  let months = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+  if (today.getDate() < start.getDate()) months -= 1;
+  if (months >= 1) {
+    return `Living with diabetes for ~${months} ${months === 1 ? "month" : "months"}`;
+  }
+
+  return "Living with diabetes";
+}
+
 /** Normalize and validate public handle: 3–30 chars, [a-z0-9_]. Returns null if empty clear, throws if invalid. */
 export function normalizePublicHandleInput(raw: string): string | null {
   const t = raw.trim().toLowerCase();
@@ -105,7 +139,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, bio, public_handle, is_public")
+      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date")
       .eq("id", userId)
       .maybeSingle();
 
@@ -119,6 +153,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       bio: (r.bio as string | null) ?? null,
       public_handle: (r.public_handle as string | null) ?? null,
       is_public: typeof r.is_public === "boolean" ? r.is_public : true,
+      diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
     };
     if (!profile.is_public) return { profile: null, error: null };
     return { profile, error: null };
@@ -136,7 +171,9 @@ export async function getProfileIdByPublicHandle(handle: string): Promise<{
 
   let normalized: string;
   try {
-    normalized = normalizePublicHandleInput(handle.replace(/^@/, ""));
+    const n = normalizePublicHandleInput(handle.replace(/^@/, ""));
+    if (n === null) return { userId: null, error: null };
+    normalized = n;
   } catch {
     return { userId: null, error: null };
   }
@@ -158,7 +195,12 @@ export async function getProfileIdByPublicHandle(handle: string): Promise<{
 
 export type ProfileUpdatePayload = {
   id: string;
-} & Partial<Pick<ProfileRow, "full_name" | "avatar_url" | "bio" | "is_public" | "public_handle">>;
+} & Partial<
+  Pick<
+    ProfileRow,
+    "full_name" | "avatar_url" | "bio" | "is_public" | "public_handle" | "diabetes_onset_date"
+  >
+>;
 
 export async function updateProfile(
   payload: ProfileUpdatePayload,
@@ -166,7 +208,7 @@ export async function updateProfile(
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
-  const { id, full_name, avatar_url, bio, is_public, public_handle } = payload;
+  const { id, full_name, avatar_url, bio, is_public, public_handle, diabetes_onset_date } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
   if (avatar_url !== undefined) update.avatar_url = avatar_url ?? null;
@@ -178,6 +220,9 @@ export async function updateProfile(
     } else {
       update.public_handle = normalizePublicHandleInput(public_handle);
     }
+  }
+  if (diabetes_onset_date !== undefined) {
+    update.diabetes_onset_date = diabetes_onset_date?.trim() ? diabetes_onset_date.trim() : null;
   }
 
   try {

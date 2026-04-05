@@ -23,6 +23,7 @@ import { storage } from "@/lib/storage";
 import type { LinkedPatientWithProfile } from "@/lib/carers.types";
 import { getActiveCarerPatientId, setActiveCarerPatientId } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { isCommunityEnabled } from "@/lib/flags";
 import {
   Select,
   SelectContent,
@@ -31,6 +32,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
 import { Eye, Phone } from "lucide-react";
 import heic2any from "heic2any";
 
@@ -43,7 +46,7 @@ function getInitial(email: string): string {
 
 export default function Account() {
   const { user } = useAuth();
-  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const { isCarer: hasCarerLink, loading: carerLinkLoading } = useLinkedCarer();
   const { data: linkedPatient } = useLinkedPatient();
   const isCarer = !!linkedPatient;
   const { profile, loading: profileLoading, refresh } = useProfile();
@@ -318,7 +321,7 @@ export default function Account() {
         className="max-w-xl"
       />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
-        <CardContent className="p-4 sm:p-5">
+        <CardContent className="p-4 sm:p-5 space-y-0">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
             <div
               className="mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:mx-0 sm:h-24 sm:w-24"
@@ -365,17 +368,26 @@ export default function Account() {
                 </span>
               </div>
               <div className="flex flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-0.5 pt-2 [-webkit-overflow-scrolling:touch] sm:justify-start [&_a]:shrink-0 [&_button]:shrink-0">
-                {hasCarerLink && (
-                  <Button variant="outline" size="sm" className="min-h-11" asChild>
-                    <Link href="/mode" data-testid="link-switch-mode">
-                      Switch mode
-                    </Link>
-                  </Button>
+                {carerLinkLoading ? (
+                  <Skeleton
+                    className="h-11 min-w-[7.25rem] shrink-0 rounded-md"
+                    data-testid="account-carer-link-loading"
+                    aria-label="Loading supporter options"
+                    role="status"
+                  />
+                ) : (
+                  hasCarerLink && (
+                    <Button variant="outline" size="sm" className="min-h-11" asChild>
+                      <Link href="/mode" data-testid="link-change-view">
+                        Change mode
+                      </Link>
+                    </Button>
+                  )
                 )}
                 {isCarer && (
                   <Button variant="outline" size="sm" className="min-h-11" asChild>
                     <Link href="/carer-view" data-testid="link-back-to-carer-view">
-                      Back to Carer View
+                      Back to Supporter Mode
                     </Link>
                   </Button>
                 )}
@@ -421,6 +433,10 @@ export default function Account() {
           </div>
         </CardContent>
       </Card>
+
+      {!isCarer && isCommunityEnabled && (
+        <AccountCommunityProfileFields variant="standalone" cardId="community" idPrefix="account" />
+      )}
 
       {!verified && (
         <Alert
@@ -497,7 +513,7 @@ export default function Account() {
                   </span>
                 </Badge>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/carer-view">Open full Carer View</Link>
+                  <Link href="/carer-view">Open Supporter Mode</Link>
                 </Button>
               </div>
             )}

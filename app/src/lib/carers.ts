@@ -336,7 +336,7 @@ function mapRedeemCarerInviteError(message: string): string {
     m.includes("carer_links_patient_id_carer_id_key") ||
     (m.includes("duplicate key") && m.includes("carer_links"))
   ) {
-    return "You are already linked as a carer for this person. Open Carer View from Account or switch mode.";
+    return "You're already linked to this person. Open Supporter Mode from Account, or tap Change mode on Account to switch.";
   }
   return message;
 }

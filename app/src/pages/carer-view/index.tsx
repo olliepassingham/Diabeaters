@@ -259,7 +259,7 @@ function supplyTone(row: CloudSupplyRow): "ok" | "low" | "critical" {
   }
 
   // CGM sensors: treat "out" as critical, 1 left as low.
-  // (Carer View doesn't have forecast/days-remaining, so avoid over-alerting.)
+  // (Supporter Mode doesn't have forecast/days-remaining, so avoid over-alerting.)
   const isCgm =
     category.includes("cgm") ||
     category.includes("monitor") ||
@@ -514,7 +514,7 @@ export default function CarerViewPage() {
           </Link>
           <Alert>
             <Info className="h-4 w-4" />
-            <AlertDescription>Carer View needs Supabase to be configured for this environment.</AlertDescription>
+            <AlertDescription>Supporter Mode needs Supabase to be configured for this environment.</AlertDescription>
           </Alert>
         </div>
       </>
@@ -583,7 +583,7 @@ export default function CarerViewPage() {
               <div className="min-w-0">
                 <h1 className="text-h1 text-foreground flex items-center gap-2 flex-wrap" data-testid="heading-carer-view">
                   <Eye className="h-6 w-6 text-primary shrink-0" />
-                  Carer View
+                  Supporter Mode
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Read-only — you can view shared information and coordinate support.
@@ -660,7 +660,7 @@ export default function CarerViewPage() {
         <Alert className="border-primary/30 bg-primary/5">
           <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              You are now linked as a carer for <strong className="font-medium">{linkedBanner}</strong>.
+              You’re now linked to <strong className="font-medium">{linkedBanner}</strong>. Welcome to Supporter Mode.
             </span>
             <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setLinkedBanner(null)}>
               Dismiss

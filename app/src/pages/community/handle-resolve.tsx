@@ -37,7 +37,7 @@ export default function CommunityHandleResolvePage() {
     return (
       <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
         <PageHeader title="Profile" />
-        <p className="text-sm text-muted-foreground">Connect Supabase to open community profiles.</p>
+        <p className="text-sm text-muted-foreground">Connect Supabase to open public profiles.</p>
       </PageShell>
     );
   }

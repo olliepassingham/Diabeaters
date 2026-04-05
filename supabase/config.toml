@@ -1,8 +1,11 @@
 # Minimal Supabase CLI config. Run migrations and deploy functions from repo root:
 #   supabase link
 #   supabase db push
-#   supabase functions deploy notify_carers_on_hypo --no-verify-jwt
-# Use --no-verify-jwt only if you validate JWT inside the function (this project does).
+#   supabase functions deploy notify_carers_on_hypo
+#
+# Gateway JWT verification is off for this function; the handler validates the JWT with
+# auth.getUser(jwt). That avoids 401 at the edge (execution_id null) when the platform
+# gateway and in-function checks disagree. Redeploy after changing verify_jwt.
 
 project_id = ""
 
@@ -10,4 +13,4 @@ project_id = ""
 enabled = true
 
 [functions.notify_carers_on_hypo]
-verify_jwt = true
+verify_jwt = false

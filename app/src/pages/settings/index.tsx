@@ -554,12 +554,15 @@ export default function Settings() {
   
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
+    pushNotifications: true,
     supplyAlerts: true,
     criticalThresholdDays: 3,
     lowThresholdDays: 7,
     browserNotifications: false,
+    appointmentReminders: true,
     hypoAlerts: true,
     scenarioAlerts: true,
+    hypoDashboardQuickNotify: false,
   });
   
   useEffect(() => {
@@ -865,8 +868,8 @@ export default function Settings() {
 
   const settingsInfoDialog = (
     <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
-      <InfoSection title="Usage &amp; tools">
-        <p>Clinical profile on the Usage page, insulin habits, and supply pack sizes for forecasts.</p>
+      <InfoSection title="Profile and usage">
+        <p>Your clinical profile, insulin habits, and supply pack sizes for forecasts.</p>
       </InfoSection>
       <InfoSection title="Appearance">
         <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
@@ -988,11 +991,11 @@ export default function Settings() {
         />
 
         {!isCarer && (
-          <SettingsHubGroup title="Usage & tools">
+          <SettingsHubGroup title="Profile and usage">
             <SettingsHubNavLink
               href="/settings/usage"
-              label="Usage"
-              description="Profile, habits, and supply pack sizes"
+              label="Profile and usage"
+              description="Name, habits, and supply pack sizes"
               icon={Activity}
             />
             <SettingsHubNavLink
@@ -1005,11 +1008,11 @@ export default function Settings() {
         )}
 
         {!isCarer && (
-          <SettingsHubGroup title="Community">
+          <SettingsHubGroup title="Feed">
             <SettingsHubNavLink
-              href="/community/settings"
-              label="Community profile"
-              description="Handle, bio, and visibility for the community"
+              href="/account#community"
+              label="Feed profile"
+              description="Handle, bio, and visibility on the feed"
               icon={AtSign}
             />
           </SettingsHubGroup>

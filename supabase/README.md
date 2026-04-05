@@ -11,5 +11,6 @@
    ```bash
    supabase functions deploy notify_carers_on_hypo
    ```
+   **`config.toml` and JWT at the edge** — `[functions.notify_carers_on_hypo] verify_jwt` controls whether Supabase validates the JWT *before* your Deno code runs. This project sets `verify_jwt = false` and validates the user JWT inside the function instead. **After you change `verify_jwt` (or anything in `config.toml` for this function), redeploy** so the hosted project picks it up; otherwise you can see gateway `401` responses with `execution_id: null` in Invocations.
 
-4. **App** — ensure `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set; the client calls `supabase.functions.invoke("notify_carers_on_hypo", …)` after inserting `hypo_logs`.
+4. **App** — ensure `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set; the client POSTs to `functions/v1/notify_carers_on_hypo` (with anon `apikey` + user `Authorization`) after inserting `hypo_logs`.

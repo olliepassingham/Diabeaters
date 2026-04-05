@@ -62,7 +62,7 @@ Preferred communication style: Simple, everyday language.
 - **Scenarios**: Bedtime Readiness Check (first tab - calm evening check for stable sleep with save-to-history and 14-day log with pattern insights), Sick Day Mode (with journal/timeline for logging BG, ketones, corrections, fluids, symptoms and BG trend analysis), and Travel Mode (with pre-travel GP appointment reminder) with tabbed interface. Scenario history auto-records past sick days and trips on deactivation. Activity Adviser shows scenario-aware banners and contextual notes when sick day or travel mode is active.
 - **Appointments**: Healthcare appointment tracking
 - **Community**: Posts, News (diabetes articles from trusted sources), Events, Reels, and Messages tabs
-- **Family & Carers** (Prototype): Link parents/partners/carers to account with invite codes, permission levels (View Only, Manage, Full Access), privacy controls, activity log, and Carer View dashboard showing user's status at a glance. Includes "I've Treated a Hypo" button on Help Now page for quick carer notification.
+- **Family & Carers** (Prototype): Link parents/partners/carers to account with invite codes, permission levels (View Only, Manage, Full Access), privacy controls, activity log, and Supporter Mode dashboard showing user's status at a glance. Includes "I've Treated a Hypo" button on Help Now page for quick carer notification.
 - **Settings**: User profile and app configuration
 
 ### Build System
@@ -94,7 +94,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Future Ideas
 
-### Family/Carer Mode
+### User Mode & Supporter Mode
 Allow parents, partners, or carers to help manage diabetes for someone they look after:
 - **Linked Accounts**: Primary user invites carers via code/link, multiple carers supported
 - **Permission Levels**: View Only, Manage (add supplies/appointments), Full Access (change settings)

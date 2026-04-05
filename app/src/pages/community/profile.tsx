@@ -39,6 +39,7 @@ import {
   unblockUser,
 } from "@/lib/community";
 import {
+  formatLivingWithDiabetesLine,
   getProfile,
   getPublicCommunityProfile,
   getProfilesByIds,
@@ -105,6 +106,7 @@ export default function CommunityProfilePage() {
             bio: full.bio,
             public_handle: full.public_handle,
             is_public: full.is_public,
+            diabetes_onset_date: full.diabetes_onset_date ?? null,
           });
         }
       } else {
@@ -247,7 +249,7 @@ export default function CommunityProfilePage() {
     return (
       <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
         <PageHeader leading={<PageBackButton />} title="Profile" />
-        <p className="text-sm text-muted-foreground">Connect Supabase to view community profiles.</p>
+        <p className="text-sm text-muted-foreground">Connect Supabase to view public profiles.</p>
       </PageShell>
     );
   }
@@ -269,7 +271,7 @@ export default function CommunityProfilePage() {
         actions={
           isSelf ? (
             <Button variant="outline" size="sm" asChild>
-              <Link href="/community/settings">Edit</Link>
+              <Link href="/account#community">Edit</Link>
             </Button>
           ) : !isSelf && user && profile ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -345,6 +347,12 @@ export default function CommunityProfilePage() {
             ) : (
               <p className="text-sm text-muted-foreground italic">No bio yet.</p>
             )}
+
+            {profile.diabetes_onset_date && formatLivingWithDiabetesLine(profile.diabetes_onset_date) ? (
+              <p className="text-sm text-muted-foreground">
+                {formatLivingWithDiabetesLine(profile.diabetes_onset_date)}
+              </p>
+            ) : null}
 
             <div className="flex flex-wrap gap-3 text-sm">
               <button
