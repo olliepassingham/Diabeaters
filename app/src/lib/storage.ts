@@ -540,7 +540,18 @@ export interface Routine {
   updatedAt: string;
 }
 
-export type ExerciseType = "cardio" | "strength" | "hiit" | "yoga" | "walking" | "sports" | "swimming";
+export type ExerciseType = "cardio" | "strength" | "hiit" | "yoga" | "walking" | "court" | "field" | "swimming";
+
+/** Legacy stored value; migrated to `field` on read. */
+const LEGACY_EXERCISE_TYPE_SPORTS = "sports";
+
+/** Map old persisted `sports` to `field`; pass through valid types. */
+export function migrateExerciseType(raw: string): ExerciseType {
+  if (raw === LEGACY_EXERCISE_TYPE_SPORTS) return "field";
+  const allowed: ExerciseType[] = ["cardio", "strength", "hiit", "yoga", "walking", "court", "field", "swimming"];
+  if (allowed.includes(raw as ExerciseType)) return raw as ExerciseType;
+  return "cardio";
+}
 export type ExerciseIntensity = "light" | "moderate" | "intense";
 
 export interface ExerciseRoutine {
@@ -2569,7 +2580,21 @@ export const storage = {
 
   getExerciseRoutines(): ExerciseRoutine[] {
     const data = localStorage.getItem(STORAGE_KEYS.EXERCISE_ROUTINES);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed: ExerciseRoutine[] = JSON.parse(data);
+    let dirty = false;
+    const migrated = parsed.map((r) => {
+      const m = migrateExerciseType(r.exerciseType as string);
+      if (m !== r.exerciseType) {
+        dirty = true;
+        return { ...r, exerciseType: m };
+      }
+      return r;
+    });
+    if (dirty) {
+      localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(migrated));
+    }
+    return migrated;
   },
 
   getExerciseRoutine(id: string): ExerciseRoutine | null {
@@ -2636,7 +2661,15 @@ export const storage = {
 
   getActiveExercise(): ActiveExerciseSession | null {
     const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EXERCISE);
-    return data ? JSON.parse(data) : null;
+    if (!data) return null;
+    const session: ActiveExerciseSession = JSON.parse(data);
+    const m = migrateExerciseType(session.exerciseType as string);
+    if (m !== session.exerciseType) {
+      const updated = { ...session, exerciseType: m };
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(updated));
+      return updated;
+    }
+    return session;
   },
 
   startExerciseSession(params: {
@@ -2676,7 +2709,8 @@ export const storage = {
       yoga: () => 30,
       walking: () => 30,
       swimming: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
-      sports: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+      court: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
+      field: (i) => i === "intense" ? 120 : i === "moderate" ? 90 : 60,
     };
     return typeDefaults[exerciseType](intensity);
   },
@@ -2716,7 +2750,21 @@ export const storage = {
 
   getExerciseOutcomes(): ExerciseOutcome[] {
     const data = localStorage.getItem(STORAGE_KEYS.EXERCISE_OUTCOMES);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+    const parsed: ExerciseOutcome[] = JSON.parse(data);
+    let dirty = false;
+    const migrated = parsed.map((o) => {
+      const m = migrateExerciseType(o.exerciseType as string);
+      if (m !== o.exerciseType) {
+        dirty = true;
+        return { ...o, exerciseType: m };
+      }
+      return o;
+    });
+    if (dirty) {
+      localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(migrated));
+    }
+    return migrated;
   },
 
   addExerciseOutcome(outcome: Omit<ExerciseOutcome, "id" | "completedAt">): ExerciseOutcome {

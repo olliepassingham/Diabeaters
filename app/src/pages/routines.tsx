@@ -63,7 +63,8 @@ const EXERCISE_TYPES: { value: ExerciseType; label: string }[] = [
   { value: "hiit", label: "HIIT" },
   { value: "yoga", label: "Yoga" },
   { value: "walking", label: "Walking" },
-  { value: "sports", label: "Sports" },
+  { value: "court", label: "Court & racket sports" },
+  { value: "field", label: "Field & team sports" },
   { value: "swimming", label: "Swimming" },
 ];
 

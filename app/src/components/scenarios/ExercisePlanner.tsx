@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,6 @@ import { storage, type UserProfile, type ExerciseRoutine, type ExerciseIntensity
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
-  type ExerciseNutritionContext,
   type LastInsulinTiming,
   type ExercisePlanContext,
 } from "@/lib/exercise-plan";
@@ -33,10 +32,22 @@ import {
   activeSessionMatchesPlannerQuery,
   adviserMealExerciseHref,
   bgForPlannerFromActiveSession,
+  normalizePlannerExerciseTypeQueryParam,
   resultTabForExercisePhase,
 } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
 import { getExerciseReadinessVerdict, type ExerciseReadinessResult } from "@/lib/exercise-readiness";
+import {
+  comparePlannedBolusToPreview,
+  getExerciseMealBolusPreview,
+  parseOptionalBolusUnits,
+  plannedBolusCompareMessage,
+  type MealDoseResult,
+} from "@/lib/meal-dose";
+import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { cn } from "@/lib/utils";
+
+type MealTypeForBolus = "snack" | "breakfast" | "lunch" | "dinner";
 
 const ALLOWED_EXERCISE_TYPES = new Set([
   "cardio",
@@ -44,7 +55,8 @@ const ALLOWED_EXERCISE_TYPES = new Set([
   "hiit",
   "yoga",
   "walking",
-  "sports",
+  "court",
+  "field",
   "swimming",
 ]);
 
@@ -54,9 +66,21 @@ const exerciseLabelsMap: Record<string, string> = {
   hiit: "HIIT",
   yoga: "Yoga/Pilates",
   walking: "Walking",
-  sports: "Team Sports",
+  court: "Court & racket sports",
+  field: "Field & team sports",
   swimming: "Swimming",
 };
+
+function formatSessionStartingLabel(sessionTimingFromNow: string): string {
+  const m = parseInt(sessionTimingFromNow, 10);
+  if (Number.isNaN(m)) return "starting soon";
+  if (m < 60) return `starts in ${m} min`;
+  if (m === 60) return "starts in 1 h";
+  if (m === 90) return "starts in 1.5 h";
+  if (m === 120) return "starts in 2 h";
+  if (m === 180) return "starts in 3 h";
+  return `starts in ${Math.round(m / 60)} h`;
+}
 
 export function ExercisePlanner() {
   const search = useSearch();
@@ -72,15 +96,28 @@ export function ExercisePlanner() {
   const [exerciseResult, setExerciseResult] = useState<ExercisePlanResult | null>(null);
   const [savedExerciseRoutines, setSavedExerciseRoutines] = useState<ExerciseRoutine[]>([]);
 
-  const [nutritionContext, setNutritionContext] = useState<ExerciseNutritionContext | "">("");
-  const [minutesSinceLastMeal, setMinutesSinceLastMeal] = useState("");
-  const [minutesUntilNextMeal, setMinutesUntilNextMeal] = useState("");
   const [approxCarbs, setApproxCarbs] = useState("");
   const [lastInsulinTiming, setLastInsulinTiming] = useState<LastInsulinTiming | "">("");
   const [currentBgInput, setCurrentBgInput] = useState("");
+  const [mealTypeForBolus, setMealTypeForBolus] = useState<MealTypeForBolus>("snack");
+  const [mealBolusPreview, setMealBolusPreview] = useState<MealDoseResult | null>(null);
+  const [mealBolusNoRatios, setMealBolusNoRatios] = useState(false);
+  const [plannedBolusUnitsInput, setPlannedBolusUnitsInput] = useState("");
+  const [lastBolusUnitsInput, setLastBolusUnitsInput] = useState("");
   const [resultTab, setResultTab] = useState("before");
+  /** When false and a plan exists, planner form is collapsed to a summary row. */
+  const [plannerInputsOpen, setPlannerInputsOpen] = useState(true);
+
+  const exerciseResultCardRef = useRef<HTMLDivElement>(null);
+  const plannerCardRef = useRef<HTMLDivElement>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
+
+  useEffect(() => {
+    if (lastInsulinTiming === "" || lastInsulinTiming === "none") {
+      setLastBolusUnitsInput("");
+    }
+  }, [lastInsulinTiming]);
 
   useEffect(() => {
     setSavedExerciseRoutines(storage.getExerciseRoutines());
@@ -99,7 +136,8 @@ export function ExercisePlanner() {
     const phaseParam = params.get("phase");
     const routineId = params.get("routineId");
 
-    if (type && ALLOWED_EXERCISE_TYPES.has(type)) setExerciseType(type);
+    const normalizedType = normalizePlannerExerciseTypeQueryParam(type);
+    if (normalizedType && ALLOWED_EXERCISE_TYPES.has(normalizedType)) setExerciseType(normalizedType);
     if (duration && /^\d{1,3}$/.test(duration)) {
       const d = parseInt(duration, 10);
       if (d >= 1 && d <= 300) setExerciseDuration(duration);
@@ -162,7 +200,6 @@ export function ExercisePlanner() {
       bgUnits,
       hourOfDay: new Date().getHours(),
     };
-    if (nutritionContext) ctx.nutritionContext = nutritionContext;
     if (lastInsulinTiming) ctx.lastInsulinTiming = lastInsulinTiming;
     const carbsParsed = parseInt(approxCarbs, 10);
     if (approxCarbs.trim() !== "" && !Number.isNaN(carbsParsed) && carbsParsed >= 0) {
@@ -172,27 +209,35 @@ export function ExercisePlanner() {
     if (currentBgInput.trim() !== "" && !Number.isNaN(bgParsed)) {
       ctx.currentBg = bgParsed;
     }
-    if ((nutritionContext === "ate_recently" || nutritionContext === "snack_only") && minutesSinceLastMeal.trim() !== "") {
-      const m = parseInt(minutesSinceLastMeal, 10);
-      if (!Number.isNaN(m) && m >= 0) ctx.minutesSinceLastMeal = m;
-    }
-    if (nutritionContext === "about_to_eat" && minutesUntilNextMeal.trim() !== "") {
-      const m = parseInt(minutesUntilNextMeal, 10);
-      if (!Number.isNaN(m) && m >= 0) ctx.minutesUntilNextMeal = m;
-    }
-
     const result = calculateExercisePlan(ctx, freshSettings);
     setExerciseResult(result);
     setResultTab("before");
+
+    const carbN = parseInt(approxCarbs, 10);
+    if (approxCarbs.trim() !== "" && !Number.isNaN(carbN) && carbN > 0) {
+      const preview = getExerciseMealBolusPreview(carbN, mealTypeForBolus, freshSettings, bgUnits, ctx.minutesUntilStart);
+      if (preview.error === "no_ratios") {
+        setMealBolusPreview(null);
+        setMealBolusNoRatios(true);
+      } else {
+        setMealBolusPreview(preview);
+        setMealBolusNoRatios(false);
+      }
+    } else {
+      setMealBolusPreview(null);
+      setMealBolusNoRatios(false);
+    }
     const message = `${exerciseIntensity} ${exerciseType} for ${exerciseDuration} minutes`;
+    const plannedParsed = parseOptionalBolusUnits(plannedBolusUnitsInput);
+    const lastParsed = parseOptionalBolusUnits(lastBolusUnitsInput);
     const ctxLog = {
-      nutrition: nutritionContext || undefined,
       lastInsulin: lastInsulinTiming || undefined,
       carbs: ctx.approximateCarbsGrams,
       bg: ctx.currentBg,
-      minutesSinceLastMeal: ctx.minutesSinceLastMeal,
-      minutesUntilNextMeal: ctx.minutesUntilNextMeal,
       minutesUntilStart: ctx.minutesUntilStart,
+      mealTypeForBolus,
+      plannedBolusUnits: plannedParsed ?? undefined,
+      lastBolusUnits: lastParsed ?? undefined,
     };
     try {
       storage.addActivityLog({
@@ -203,14 +248,37 @@ export function ExercisePlanner() {
     } catch {
       /* ignore */
     }
+    setPlannerInputsOpen(false);
   };
+
+  useEffect(() => {
+    if (!exerciseResult) return;
+    const id = requestAnimationFrame(() => {
+      exerciseResultCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [exerciseResult]);
 
   const minutesUntilStartParsed = parseInt(sessionTimingFromNow, 10);
   const minutesUntilStart = Number.isNaN(minutesUntilStartParsed) ? 60 : Math.max(0, minutesUntilStartParsed);
   const hoursUntilStart = Math.max(1, Math.ceil(minutesUntilStart / 60));
 
+  const mealBolusPreviewPersonalized =
+    mealBolusPreview &&
+    mealBolusPreview.exerciseContext === "before" &&
+    typeof mealBolusPreview.exerciseReduction === "number" &&
+    mealBolusPreview.standardDose !== undefined;
+
+  const plannedBolusCompare =
+    mealBolusPreviewPersonalized && mealBolusPreview
+      ? comparePlannedBolusToPreview(plannedBolusUnitsInput, mealBolusPreview.dose)
+      : null;
+  const lastBolusUnitsParsed = parseOptionalBolusUnits(lastBolusUnitsInput);
+
   const adviserHref = (timing: "before" | "after" | "during") =>
     adviserMealExerciseHref(timing, hoursUntilStart);
+
+  const plannerSummaryLine = `${exerciseLabelsMap[exerciseType] ?? exerciseType} · ${exerciseDuration || "—"} min · ${exerciseIntensity} · ${formatSessionStartingLabel(sessionTimingFromNow)}`;
 
   const verdictForResult = (): ExerciseReadinessResult =>
     getExerciseReadinessVerdict({
@@ -246,7 +314,7 @@ export function ExercisePlanner() {
         </div>
       )}
 
-      <Card className="rounded-xl shadow-sm border-border/80">
+      <Card ref={plannerCardRef} className="rounded-xl shadow-sm border-border/80">
         <CardHeader className="pb-3">
           <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
             <Dumbbell className="h-6 w-6 text-primary" />
@@ -255,6 +323,25 @@ export function ExercisePlanner() {
           <CardDescription>Plan your workout with before, during, and after recommendations</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {exerciseResult && !plannerInputsOpen ? (
+            <div
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
+              data-testid="planner-inputs-summary"
+            >
+              <p className="text-sm text-foreground">{plannerSummaryLine}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11 shrink-0"
+                onClick={() => setPlannerInputsOpen(true)}
+                data-testid="button-edit-exercise-inputs"
+              >
+                Edit exercise inputs
+              </Button>
+            </div>
+          ) : (
+            <>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="exercise-type">Type of exercise</Label>
@@ -268,7 +355,8 @@ export function ExercisePlanner() {
                   <SelectItem value="hiit">HIIT</SelectItem>
                   <SelectItem value="yoga">Yoga / stretching</SelectItem>
                   <SelectItem value="walking">Walking</SelectItem>
-                  <SelectItem value="sports">Team sports</SelectItem>
+                  <SelectItem value="court">Court & racket (e.g. tennis)</SelectItem>
+                  <SelectItem value="field">Field & team (e.g. football)</SelectItem>
                   <SelectItem value="swimming">Swimming</SelectItem>
                 </SelectContent>
               </Select>
@@ -332,104 +420,43 @@ export function ExercisePlanner() {
             </div>
           </div>
 
-          <Collapsible className="group rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-3 text-left font-medium text-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
-                data-testid="collapsible-food-insulin-trigger"
-              >
-                <span className="flex items-center gap-2">
+          <Collapsible defaultOpen className="group rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10">
+            <div className="flex items-center gap-0.5">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-3 text-left font-medium text-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid="collapsible-food-insulin-trigger"
+                >
                   <Utensils className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  Food & insulin (optional)
-                </span>
-                <ChevronDown
-                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
-                  aria-hidden
-                />
-              </button>
-            </CollapsibleTrigger>
+                  Food & insulin
+                </button>
+              </CollapsibleTrigger>
+              <InlineInfoHint
+                ariaLabel="What this section covers"
+                className="shrink-0"
+                content="BG, carbs, meal type for ratios, optional planned bolus units, then recent rapid-acting insulin — enough for preview and tips."
+              />
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Expand or collapse Food and insulin"
+                >
+                  <ChevronDown
+                    className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                    aria-hidden
+                  />
+                </button>
+              </CollapsibleTrigger>
+            </div>
             <CollapsibleContent className="space-y-4 border-t border-border/60 px-3 pb-4 pt-3">
-              <div className="space-y-2">
-                <Label htmlFor="nutrition-context">Food relative to this session</Label>
-                <Select
-                  value={nutritionContext || "unset"}
-                  onValueChange={(v) => setNutritionContext(v === "unset" ? "" : (v as ExerciseNutritionContext))}
-                >
-                  <SelectTrigger id="nutrition-context" data-testid="select-nutrition-context">
-                    <SelectValue placeholder="Choose if you can" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unset">Prefer not to say</SelectItem>
-                    <SelectItem value="fasted">Fasted</SelectItem>
-                    <SelectItem value="ate_recently">Ate recently</SelectItem>
-                    <SelectItem value="about_to_eat">About to eat a meal</SelectItem>
-                    <SelectItem value="snack_only">Snack only (small)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {(nutritionContext === "ate_recently" || nutritionContext === "snack_only") && (
-                <div className="space-y-2">
-                  <Label htmlFor="minutes-since-meal">Minutes since that meal/snack</Label>
-                  <Input
-                    id="minutes-since-meal"
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 90"
-                    value={minutesSinceLastMeal}
-                    onChange={(e) => setMinutesSinceLastMeal(e.target.value)}
-                    data-testid="input-minutes-since-meal"
-                  />
-                </div>
-              )}
-
-              {nutritionContext === "about_to_eat" && (
-                <div className="space-y-2">
-                  <Label htmlFor="minutes-until-meal">Minutes until your meal</Label>
-                  <Input
-                    id="minutes-until-meal"
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 45"
-                    value={minutesUntilNextMeal}
-                    onChange={(e) => setMinutesUntilNextMeal(e.target.value)}
-                    data-testid="input-minutes-until-meal"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="approx-carbs">Approx. carbs (g) for last or next meal</Label>
-                <Input
-                  id="approx-carbs"
-                  type="number"
-                  min={0}
-                  placeholder="Optional"
-                  value={approxCarbs}
-                  onChange={(e) => setApproxCarbs(e.target.value)}
-                  data-testid="input-approx-carbs"
+              <div className="flex items-center gap-2">
+                <InlineInfoHint
+                  ariaLabel="Tips for filling this section"
+                  content="Start with BG and carbs if you can — skip anything you do not know yet."
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="last-insulin">Last meal or correction bolus</Label>
-                <Select
-                  value={lastInsulinTiming || "unset"}
-                  onValueChange={(v) => setLastInsulinTiming(v === "unset" ? "" : (v as LastInsulinTiming))}
-                >
-                  <SelectTrigger id="last-insulin" data-testid="select-last-insulin">
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unset">Prefer not to say</SelectItem>
-                    <SelectItem value="none">None / not sure</SelectItem>
-                    <SelectItem value="lt_1h">Under 1 hour ago</SelectItem>
-                    <SelectItem value="h1_2">1–2 hours ago</SelectItem>
-                    <SelectItem value="h2_4">2–4 hours ago</SelectItem>
-                    <SelectItem value="gt_4h">More than 4 hours ago</SelectItem>
-                  </SelectContent>
-                </Select>
+                <span className="text-tiny text-muted-foreground">Quick tips</span>
               </div>
 
               <div className="space-y-2">
@@ -438,18 +465,130 @@ export function ExercisePlanner() {
                   id="current-bg"
                   type="text"
                   inputMode="decimal"
-                  placeholder="Optional"
+                  placeholder="For readiness"
                   value={currentBgInput}
                   onChange={(e) => setCurrentBgInput(e.target.value)}
                   data-testid="input-current-bg-exercise"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="approx-carbs">Carbs you will eat or already had (g)</Label>
+                <Input
+                  id="approx-carbs"
+                  type="number"
+                  min={0}
+                  placeholder="e.g. 30 — needed for bolus preview"
+                  value={approxCarbs}
+                  onChange={(e) => setApproxCarbs(e.target.value)}
+                  data-testid="input-approx-carbs"
+                />
+              </div>
+
+              {(() => {
+                const c = parseInt(approxCarbs, 10);
+                const showMealType = approxCarbs.trim() !== "" && !Number.isNaN(c) && c > 0;
+                return showMealType ? (
+                  <div className="space-y-2">
+                    <FieldLabelWithInfo
+                      htmlFor="meal-type-bolus"
+                      info="Uses your saved insulin:carb ratio for that meal."
+                    >
+                      Which meal is this for?
+                    </FieldLabelWithInfo>
+                    <Select
+                      value={mealTypeForBolus}
+                      onValueChange={(v) => setMealTypeForBolus(v as MealTypeForBolus)}
+                    >
+                      <SelectTrigger id="meal-type-bolus" data-testid="select-meal-type-bolus">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="snack">Snack</SelectItem>
+                        <SelectItem value="breakfast">Breakfast</SelectItem>
+                        <SelectItem value="lunch">Lunch</SelectItem>
+                        <SelectItem value="dinner">Dinner</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null;
+              })()}
+
+              <div className="space-y-2">
+                <FieldLabelWithInfo
+                  htmlFor="planned-bolus-units"
+                  info="If you already know how many units you plan for this food, enter it — results compare to the carb-based estimate (does not replace your care team's plan)."
+                >
+                  Planned bolus for this food (units, optional)
+                </FieldLabelWithInfo>
+                <Input
+                  id="planned-bolus-units"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="e.g. 4 — compared to preview after you plan"
+                  value={plannedBolusUnitsInput}
+                  onChange={(e) => setPlannedBolusUnitsInput(e.target.value)}
+                  data-testid="input-planned-bolus-units"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabelWithInfo
+                  htmlFor="last-insulin"
+                  info="Meal bolus or correction — whichever was most recent. Not basal insulin."
+                >
+                  Last rapid-acting insulin (meal or correction)
+                </FieldLabelWithInfo>
+                <Select
+                  value={lastInsulinTiming || "unset"}
+                  onValueChange={(v) => setLastInsulinTiming(v === "unset" ? "" : (v as LastInsulinTiming))}
+                >
+                  <SelectTrigger id="last-insulin" data-testid="select-last-insulin">
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unset">Skip</SelectItem>
+                    <SelectItem value="none">No recent bolus / not sure</SelectItem>
+                    <SelectItem value="lt_1h">Under 1 hour ago</SelectItem>
+                    <SelectItem value="h1_2">1–2 hours ago</SelectItem>
+                    <SelectItem value="h2_4">2–4 hours ago</SelectItem>
+                    <SelectItem value="gt_4h">More than 4 hours ago</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(lastInsulinTiming === "lt_1h" ||
+                lastInsulinTiming === "h1_2" ||
+                lastInsulinTiming === "h2_4" ||
+                lastInsulinTiming === "gt_4h") && (
+                <div className="space-y-2">
+                  <FieldLabelWithInfo
+                    htmlFor="last-bolus-units"
+                    info="Optional — how many units were in that bolus. Shown for context only; the time you chose above still drives general insulin-on-board tips."
+                  >
+                    Last rapid bolus amount (units, optional)
+                  </FieldLabelWithInfo>
+                  <Input
+                    id="last-bolus-units"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="e.g. 6 — meal or correction"
+                    value={lastBolusUnitsInput}
+                    onChange={(e) => setLastBolusUnitsInput(e.target.value)}
+                    data-testid="input-last-bolus-units"
+                  />
+                </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
 
-          <p className="text-center text-tiny text-muted-foreground">
-            Adding meal and bolus timing improves this plan.
-          </p>
+          <div className="flex items-center justify-center gap-2">
+            <InlineInfoHint
+              ariaLabel="How tips use your inputs"
+              content="Tips use your workout, timing, BG, carbs, and insulin entries above — add what you know; skip the rest."
+            />
+            <span className="text-tiny text-muted-foreground">How tips use your answers</span>
+          </div>
           <Button
             onClick={handleQuickExercisePlan}
             disabled={!exerciseDuration}
@@ -458,18 +597,38 @@ export function ExercisePlanner() {
           >
             Plan my workout
           </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
       {exerciseResult && (
-        <Card className="rounded-xl shadow-sm border-border/80" data-testid="card-exercise-result">
+        <Card ref={exerciseResultCardRef} className="rounded-xl shadow-sm border-border/80" data-testid="card-exercise-result">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <CardTitle className="text-h3 flex items-center gap-2 text-foreground">Your workout plan</CardTitle>
-                <CardDescription className="mt-1">{exerciseResult.summary}</CardDescription>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <CardDescription className="text-muted-foreground">
+                    {exerciseResult.duration} min · {exerciseResult.intensity} · {exerciseResult.exerciseType}
+                  </CardDescription>
+                  <InlineInfoHint
+                    ariaLabel="Full session summary"
+                    content={exerciseResult.summary}
+                  />
+                </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setExerciseResult(null)} data-testid="button-clear-exercise-result">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setExerciseResult(null);
+                  setMealBolusPreview(null);
+                  setMealBolusNoRatios(false);
+                  setPlannerInputsOpen(true);
+                }}
+                data-testid="button-clear-exercise-result"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -500,9 +659,15 @@ export function ExercisePlanner() {
                         <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60 capitalize">
                           {exerciseResult.intensity}
                         </span>
-                        <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
-                          Reduce bolus {exerciseResult.pre.bolusReduction}
-                        </span>
+                        {mealBolusPreviewPersonalized && mealBolusPreview ? (
+                          <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
+                            ~{mealBolusPreview.dose}u bolus (−{mealBolusPreview.exerciseReduction}%)
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
+                            Bolus guide {exerciseResult.pre.bolusReduction}
+                          </span>
+                        )}
                         {currentBgInput.trim() !== "" ? (
                           <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
                             BG {currentBgInput} {bgUnits}
@@ -534,31 +699,146 @@ export function ExercisePlanner() {
 
               <TabsContent value="before" className="mt-4 space-y-3">
                 {exerciseResult.pre.contextualNotes && exerciseResult.pre.contextualNotes.length > 0 && (
-                  <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-3 space-y-2" data-testid="exercise-context-notes">
-                    {exerciseResult.pre.contextualNotes.map((note, i) => (
-                      <TipRow key={`ctx-${i}`}>{note}</TipRow>
-                    ))}
+                  <details
+                    className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2"
+                    data-testid="exercise-context-notes"
+                  >
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground py-1">
+                      More tips ({exerciseResult.pre.contextualNotes.length})
+                    </summary>
+                    <div className="space-y-2 pt-2 pb-1">
+                      {exerciseResult.pre.contextualNotes.map((note, i) => (
+                        <TipRow key={`ctx-${i}`}>{note}</TipRow>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {mealBolusNoRatios && parseInt(approxCarbs, 10) > 0 && !Number.isNaN(parseInt(approxCarbs, 10)) && (
+                  <div
+                    className="rounded-xl border border-amber-200/80 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 text-sm text-foreground"
+                    data-testid="exercise-meal-bolus-no-ratios"
+                  >
+                    <p className="font-medium">Add carb ratios to see a bolus preview</p>
+                    <p className="text-tiny text-muted-foreground mt-1">
+                      Enter your insulin:carb ratios (or TDD) in settings so we can estimate units from the carbs you
+                      entered.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-2 min-h-9" asChild>
+                      <Link href="/ratios">Open ratio settings</Link>
+                    </Button>
+                  </div>
+                )}
+
+                {mealBolusPreviewPersonalized && mealBolusPreview && (
+                  <div
+                    className="rounded-xl border border-primary/25 bg-primary/5 px-3 py-3 space-y-3"
+                    data-testid="exercise-meal-bolus-preview"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">Meal bolus preview</p>
+                      <InlineInfoHint
+                        ariaLabel="About this bolus preview"
+                        content="Educational only — same time-to-exercise logic as the insulin calculator. Confirm with your care team."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-lg bg-background/80 border border-border/60 p-2">
+                        <p className="text-tiny text-muted-foreground">Usual for {mealBolusPreview.carbs}g</p>
+                        <p className="text-lg font-bold text-foreground">{mealBolusPreview.standardDose}u</p>
+                      </div>
+                      <div className="rounded-lg bg-background/80 border border-border/60 p-2">
+                        <p className="text-tiny text-muted-foreground">
+                          Suggested (−{mealBolusPreview.exerciseReduction}%, ~{hoursUntilStart}h to start)
+                        </p>
+                        <p className="text-lg font-bold text-foreground">{mealBolusPreview.dose}u</p>
+                      </div>
+                    </div>
+                    {plannedBolusCompare ? (
+                      <div
+                        className={cn(
+                          "rounded-lg border px-3 py-2 space-y-1",
+                          plannedBolusCompare.kind === "large"
+                            ? "border-amber-200/90 bg-amber-50/50 dark:border-amber-800/60 dark:bg-amber-950/25"
+                            : "border-border/60 bg-background/60",
+                        )}
+                        data-testid="exercise-planned-bolus-compare"
+                      >
+                        <p className="text-sm text-foreground">
+                          <span className="font-medium">Your planned bolus:</span> {plannedBolusCompare.userUnits}u ·{" "}
+                          <span className="font-medium">Carb-based preview:</span> {plannedBolusCompare.previewDose}u (Δ{" "}
+                          {plannedBolusCompare.deltaAbs.toFixed(1)}u)
+                        </p>
+                        <p
+                          className={cn(
+                            "text-tiny",
+                            plannedBolusCompare.kind === "large"
+                              ? "text-amber-900 dark:text-amber-100/90"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {plannedBolusCompareMessage(plannedBolusCompare)}
+                        </p>
+                      </div>
+                    ) : null}
+                    {(lastBolusUnitsParsed !== null ||
+                      mealBolusPreview.roundingAdvice ||
+                      (mealBolusPreview.tips && mealBolusPreview.tips.length > 0)) && (
+                      <details className="rounded-lg border border-border/60 bg-background/50 px-3 py-2">
+                        <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+                          Rounding and extra detail
+                        </summary>
+                        <div className="space-y-2 pt-2 text-tiny text-muted-foreground">
+                          {lastBolusUnitsParsed !== null ? (
+                            <p data-testid="exercise-last-bolus-note">
+                              You noted {lastBolusUnitsParsed}u for your most recent rapid bolus — context only; timing
+                              above still drives IOB tips.
+                            </p>
+                          ) : null}
+                          {mealBolusPreview.roundingAdvice ? <p>{mealBolusPreview.roundingAdvice}</p> : null}
+                          {mealBolusPreview.tips && mealBolusPreview.tips.length > 0 ? (
+                            <ul className="list-disc pl-4 space-y-1">
+                              {mealBolusPreview.tips.map((t, i) => (
+                                <li key={i}>{t}</li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 )}
 
                 <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">BG and fuel</p>
+                    {mealBolusPreviewPersonalized && mealBolusPreview ? (
+                      <InlineInfoHint
+                        ariaLabel="How general workout bolus bands relate to your preview"
+                        content={`General intensity band from this workout plan: ${exerciseResult.pre.bolusReduction} — your team may use different rules; the preview above uses time-to-exercise like the calculator.`}
+                      />
+                    ) : null}
+                  </div>
                   <TipRow>
                     <strong>Target BG:</strong> {exerciseResult.pre.targetBg} {bgUnits}
                   </TipRow>
                   {exerciseResult.pre.carbsIfLow > 0 && (
                     <TipRow>
-                      <strong>If below {exerciseResult.pre.lowThreshold}:</strong> eat {exerciseResult.pre.carbsIfLow}g fast carbs first
+                      <strong>If below {exerciseResult.pre.lowThreshold}:</strong> eat {exerciseResult.pre.carbsIfLow}g fast
+                      carbs first
                     </TipRow>
                   )}
-                  <TipRow>
-                    <strong>Meal bolus:</strong> reduce by {exerciseResult.pre.bolusReduction} if eating before
-                  </TipRow>
+                  {!mealBolusPreviewPersonalized || !mealBolusPreview ? (
+                    <TipRow>
+                      <strong>Meal bolus:</strong> reduce by {exerciseResult.pre.bolusReduction} if eating before
+                    </TipRow>
+                  ) : null}
                 </div>
 
-                <div className="rounded-xl border border-border/60 bg-card px-3 py-3">
-                  <p className="text-xs font-medium text-muted-foreground">Snack ideas</p>
-                  <p className="text-sm text-foreground">{exerciseResult.pre.snackIdeas.join(", ")}</p>
-                </div>
+                <details className="rounded-xl border border-border/60 bg-card px-3 py-2">
+                  <summary className="cursor-pointer select-none text-sm font-medium text-foreground py-1">Snack ideas</summary>
+                  <p className="text-sm text-foreground pt-2 pb-1">{exerciseResult.pre.snackIdeas.join(", ")}</p>
+                </details>
 
                 {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
@@ -579,10 +859,22 @@ export function ExercisePlanner() {
                 )}
 
                 <div className="space-y-2">
-                  {exerciseResult.during.tips.map((tip, i) => (
+                  {exerciseResult.during.tips.slice(0, 3).map((tip, i) => (
                     <TipRow key={i}>{tip}</TipRow>
                   ))}
                 </div>
+                {exerciseResult.during.tips.length > 3 ? (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+                      More during tips ({exerciseResult.during.tips.length - 3})
+                    </summary>
+                    <div className="space-y-2 pt-2">
+                      {exerciseResult.during.tips.slice(3).map((tip, i) => (
+                        <TipRow key={`more-during-${i}`}>{tip}</TipRow>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
 
                 {exerciseResult.during.checkBg && (
                   <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 flex items-center gap-2" data-testid="exercise-during-check">
@@ -617,10 +909,12 @@ export function ExercisePlanner() {
                   <strong>Recovery meal bolus:</strong> reduce by {exerciseResult.post.bolusReduction}
                 </TipRow>
 
-                <div className="rounded-xl border border-border/60 bg-card px-3 py-3">
-                  <p className="text-xs font-medium text-muted-foreground">Good options</p>
-                  <p className="text-sm text-foreground">{exerciseResult.post.snackIdeas.join(", ")}</p>
-                </div>
+                <details className="rounded-xl border border-border/60 bg-card px-3 py-2">
+                  <summary className="cursor-pointer select-none text-sm font-medium text-foreground py-1">
+                    Good options
+                  </summary>
+                  <p className="text-sm text-foreground pt-2 pb-1">{exerciseResult.post.snackIdeas.join(", ")}</p>
+                </details>
 
                 {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
@@ -639,10 +933,22 @@ export function ExercisePlanner() {
                 </div>
 
                 <div className="space-y-2">
-                  {exerciseResult.recovery.tips.map((tip, i) => (
+                  {exerciseResult.recovery.tips.slice(0, 3).map((tip, i) => (
                     <TipRow key={i}>{tip}</TipRow>
                   ))}
                 </div>
+                {exerciseResult.recovery.tips.length > 3 ? (
+                  <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
+                    <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
+                      More recovery tips ({exerciseResult.recovery.tips.length - 3})
+                    </summary>
+                    <div className="space-y-2 pt-2">
+                      {exerciseResult.recovery.tips.slice(3).map((tip, i) => (
+                        <TipRow key={`more-rec-${i}`}>{tip}</TipRow>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
 
                 <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                   <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
@@ -664,15 +970,24 @@ export function ExercisePlanner() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-tiny text-muted-foreground">
-                Not medical advice. Individual responses vary — track your patterns with your care team.
-              </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-tiny text-muted-foreground">
+                <InlineInfoHint
+                  ariaLabel="Disclaimer about this plan"
+                  content="Not medical advice. Individual responses vary — track your patterns with your care team."
+                />
+                <span>Not medical advice</span>
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="min-h-11"
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                onClick={() => {
+                  setPlannerInputsOpen(true);
+                  requestAnimationFrame(() =>
+                    plannerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }}
                 data-testid="button-exercise-back-to-planner"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />

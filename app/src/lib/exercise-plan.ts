@@ -50,8 +50,11 @@ export type ExerciseNutritionContext = "fasted" | "ate_recently" | "about_to_eat
 /** Time since last bolus or meal insulin (optional). */
 export type LastInsulinTiming = "none" | "lt_1h" | "h1_2" | "h2_4" | "gt_4h";
 
+/** Planned snack/meal with bolus before the session starts (optional). */
+export type PlannedPreExerciseFuel = "none" | "snack_bolus" | "meal_bolus";
+
 export interface ExercisePlanContext {
-  /** Planner keys: cardio, strength, hiit, yoga, walking, sports, swimming */
+  /** Planner keys: cardio, strength, hiit, yoga, walking, court, field, swimming */
   exerciseType: string;
   durationMinutes: number;
   intensity: "light" | "moderate" | "intense";
@@ -61,10 +64,14 @@ export interface ExercisePlanContext {
   nutritionContext?: ExerciseNutritionContext;
   /** When ate_recently / snack_only: minutes since last meal or snack. */
   minutesSinceLastMeal?: number;
-  /** When about_to_eat: minutes until planned meal. */
+  /** Legacy/API: when nutritionContext is about_to_eat without planned pre-exercise fuel; prefer minutesUntilPreExerciseFuel for upcoming bolus+food. */
   minutesUntilNextMeal?: number;
   approximateCarbsGrams?: number;
   lastInsulinTiming?: LastInsulinTiming;
+  /** Planned snack or meal with bolus before exercise; pair with minutesUntilPreExerciseFuel. */
+  plannedPreExerciseFuel?: PlannedPreExerciseFuel;
+  /** Minutes until that snack/meal (when snack_bolus or meal_bolus). */
+  minutesUntilPreExerciseFuel?: number;
   /** Current BG if user entered it. */
   currentBg?: number;
   /** Local hour 0–23 for evening / overnight recovery copy. */
@@ -78,7 +85,8 @@ const EXERCISE_LABELS: Record<string, string> = {
   yoga: "Yoga",
   walking: "Walking",
   swimming: "Swimming",
-  sports: "Sports",
+  court: "Court sports",
+  field: "Field sports",
   exercise: "Exercise",
 };
 
@@ -109,6 +117,87 @@ function hasRecentInsulin(timing: LastInsulinTiming | undefined): boolean {
 
 function hasModerateInsulin(timing: LastInsulinTiming | undefined): boolean {
   return timing === "h2_4";
+}
+
+/** Round gram targets to 5g steps; bias down when reducing, up when increasing, so type nudges are visible. */
+function roundCarbsGrams(raw: number, mult: number): number {
+  if (raw <= 0) return 0;
+  if (mult < 1) return Math.floor(raw / 5) * 5;
+  if (mult > 1) return Math.ceil(raw / 5) * 5;
+  return Math.round(raw / 5) * 5;
+}
+
+/**
+ * Conservative type-based nudges to pre/during/post carb heuristics (same intensity + duration
+ * can differ slightly by activity pattern). Not a substitute for care-team guidance.
+ */
+function applyExerciseTypeCarbAdjustments(
+  typeKey: string,
+  intensity: "light" | "moderate" | "intense",
+  pre: number,
+  during: number,
+  post: number,
+): { pre: number; during: number; post: number } {
+  const k = typeKey.toLowerCase();
+  let preM = 1;
+  let duringM = 1;
+  let postM = 1;
+
+  switch (k) {
+    case "cardio":
+      duringM = 1.08;
+      postM = 1.05;
+      break;
+    case "strength":
+      preM = 0.92;
+      duringM = 0.82;
+      postM = 1.12;
+      break;
+    case "hiit":
+      duringM = 1.1;
+      postM = 1.12;
+      break;
+    case "yoga":
+      preM = 0.88;
+      duringM = 0.88;
+      postM = 0.88;
+      break;
+    case "walking":
+      duringM = 1.05;
+      break;
+    case "swimming":
+      duringM = 1.08;
+      postM = 1.05;
+      break;
+    case "court":
+      duringM = 1.1;
+      postM = 1.06;
+      break;
+    case "field":
+      duringM = 1.08;
+      postM = 1.05;
+      break;
+    default:
+      break;
+  }
+
+  // Light sessions: smaller nudges so yoga/walking do not over-correct.
+  if (intensity === "light") {
+    preM = 1 + (preM - 1) * 0.5;
+    duringM = 1 + (duringM - 1) * 0.5;
+    postM = 1 + (postM - 1) * 0.5;
+  }
+
+  let outPre = roundCarbsGrams(pre * preM, preM);
+  let outDuring = roundCarbsGrams(during * duringM, duringM);
+  let outPost = roundCarbsGrams(post * postM, postM);
+
+  // HIIT at moderate+: small extra during buffer when base during was 0 but session is glycolytic.
+  if (k === "hiit" && (intensity === "moderate" || intensity === "intense") && outDuring === 0 && during === 0) {
+    outDuring = intensity === "intense" ? 10 : 5;
+  }
+
+  return { pre: outPre, during: outDuring, post: outPost };
 }
 
 function baseCarbsAndBolus(
@@ -198,6 +287,11 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     duringCarbs = Math.max(duringCarbs, 15);
   }
 
+  const typeAdjusted = applyExerciseTypeCarbAdjustments(typeKey, intensity, preExerciseCarbs, duringCarbs, postExerciseCarbs);
+  preExerciseCarbs = typeAdjusted.pre;
+  duringCarbs = typeAdjusted.during;
+  postExerciseCarbs = typeAdjusted.post;
+
   const idealStart = bgUnits === "mmol/L" ? "7-10" : "126-180";
   const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
 
@@ -230,7 +324,7 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
 
   if (hasRecentInsulin(context.lastInsulinTiming) && (intensity === "moderate" || intensity === "intense")) {
     preTips.push(
-      "Recent meal or correction insulin may still be active — activity can drop BG faster. Avoid stacking aggressive bolus changes unless your team has taught you how.",
+      "Recent rapid-acting insulin (meal or correction) may still be active — activity can drop BG faster. Avoid stacking aggressive bolus changes unless your team has taught you how.",
     );
   } else if (hasModerateInsulin(context.lastInsulinTiming) && intensity === "intense") {
     preTips.push("Some insulin may still be on board — keep extra fast carbs within reach.");
@@ -246,7 +340,36 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     );
   }
 
-  if (context.nutritionContext === "about_to_eat" && context.minutesUntilNextMeal != null) {
+  const plannedFuel =
+    context.plannedPreExerciseFuel === "snack_bolus" || context.plannedPreExerciseFuel === "meal_bolus";
+  const plannedMinutes = context.minutesUntilPreExerciseFuel;
+  const hasPlannedFuelDetails = plannedFuel && plannedMinutes != null && !Number.isNaN(plannedMinutes) && plannedMinutes >= 0;
+
+  if (hasPlannedFuelDetails) {
+    const label = context.plannedPreExerciseFuel === "snack_bolus" ? "snack" : "meal";
+    preTips.push(
+      `Pre-exercise ${label} with bolus in ~${plannedMinutes} min — align bolus, food, and session start with your care team so insulin and activity don't clash.`,
+    );
+    if (plannedMinutes > context.minutesUntilStart) {
+      preTips.push(
+        "Your planned fuel is after your session was due to start — adjust the clock above or your fuel timing, then plan again.",
+      );
+    } else if (plannedMinutes <= Math.min(45, context.minutesUntilStart)) {
+      preTips.push(
+        "Bolusing close to the start can mean more insulin on board early in the session — keep fast carbs within reach and follow your team's activity bolus rules.",
+      );
+    }
+    preTips.push(
+      "After you take that bolus, treat it like other recent insulin: avoid extra correction stacking unless your team has a clear plan.",
+    );
+  }
+
+  // Legacy/API-only: "about to eat" + minutes without planned pre-exercise fuel — avoid duplicating the planned-fuel tip.
+  if (
+    !hasPlannedFuelDetails &&
+    context.nutritionContext === "about_to_eat" &&
+    context.minutesUntilNextMeal != null
+  ) {
     preTips.push(
       `Meal in ~${context.minutesUntilNextMeal} min — coordinate bolus and exercise timing with your team so fuel and insulin line up safely.`,
     );
@@ -258,6 +381,12 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
 
   if (context.minutesUntilStart >= 75 && intensity !== "light") {
     preTips.push("Extra lead time: good window to set temp basal or snack plan if your team uses those strategies.");
+  }
+
+  if (typeKey !== "exercise") {
+    preTips.push(
+      "Carb targets factor in your activity type as well as intensity and duration—confirm details with your care team.",
+    );
   }
 
   const duringTips: string[] = [];
@@ -274,9 +403,18 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     duringTips.push("Insulin on board can make drops feel faster — check earlier than usual if something feels off.");
   }
 
+  if (hasPlannedFuelDetails) {
+    duringTips.push(
+      "If you bolus for a pre-exercise snack or meal, watch for drops during the first part of the session once that insulin is active.",
+    );
+  }
+
   let postTiming = "Within 30-60 min after";
   let postSnack = ["Chocolate milk", "Greek yoghurt", "Sandwich"];
-  if (context.nutritionContext === "about_to_eat") {
+  if (
+    context.nutritionContext === "about_to_eat" ||
+    (hasPlannedFuelDetails && context.plannedPreExerciseFuel === "meal_bolus")
+  ) {
     postTiming = "Line up recovery fuel with your next meal — your team can help you balance bolus for both exercise and food.";
     postSnack = ["Meal with carbs and protein", "Sandwich", "Balanced plate"];
   }
@@ -309,6 +447,8 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
   if (context.nutritionContext) {
     const n = { fasted: "fasted", ate_recently: "after recent food", about_to_eat: "before a meal", snack_only: "light snack context" }[context.nutritionContext];
     summaryParts.push(`(${n})`);
+  } else if (hasPlannedFuelDetails && context.plannedPreExerciseFuel === "meal_bolus") {
+    summaryParts.push("(before a meal)");
   }
 
   return {
@@ -365,7 +505,15 @@ export function calculateExercisePlanFromMessage(message: string, bgUnits: strin
   else if (lower.includes("yoga") || lower.includes("stretch")) exerciseType = "yoga";
   else if (lower.includes("walk")) exerciseType = "walking";
   else if (lower.includes("swim")) exerciseType = "swimming";
-  else if (lower.includes("sport")) exerciseType = "sports";
+  else if (
+    lower.includes("tennis") ||
+    lower.includes("badminton") ||
+    lower.includes("squash") ||
+    lower.includes("pickleball") ||
+    lower.includes("racket")
+  ) {
+    exerciseType = "court";
+  } else if (lower.includes("sport")) exerciseType = "field";
 
   return calculateExercisePlan(
     {

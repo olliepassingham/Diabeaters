@@ -3,6 +3,8 @@ export type CommunityPostRow = {
   id: string;
   author_id: string;
   body: string;
+  image_urls: string[];
+  is_reported: boolean;
   created_at: string;
 };
 
@@ -11,6 +13,7 @@ export type CommunityPostCommentRow = {
   post_id: string;
   author_id: string;
   body: string;
+  is_reported: boolean;
   created_at: string;
 };
 

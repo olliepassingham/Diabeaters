@@ -102,7 +102,13 @@ function refineWithExerciseTypeAndTrend(
   const phase = input.phase ?? "pre";
   const { intensity } = input;
 
-  const cardioLike = t === "cardio" || t === "hiit" || t === "walking" || t === "swimming" || t === "sports";
+  const cardioLike =
+    t === "cardio" ||
+    t === "hiit" ||
+    t === "walking" ||
+    t === "swimming" ||
+    t === "court" ||
+    t === "field";
   const strengthLike = t === "strength";
 
   if (base.verdict === "caution" && base.title.startsWith("Caution (high BG)")) {

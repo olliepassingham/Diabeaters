@@ -58,7 +58,13 @@ export function getExerciseGuidanceForReading(ctx: ExerciseReadingContext): stri
     tips.push(`Around ${bgUnits === "mmol/L" ? "target" : "a common"} pre-exercise band for many — still watch how you feel and your trend.`);
   }
 
-  const cardioLike = exerciseType === "cardio" || exerciseType === "hiit" || exerciseType === "walking" || exerciseType === "swimming";
+  const cardioLike =
+    exerciseType === "cardio" ||
+    exerciseType === "hiit" ||
+    exerciseType === "walking" ||
+    exerciseType === "swimming" ||
+    exerciseType === "court" ||
+    exerciseType === "field";
 
   if (trend === "falling" && cardioLike && (intensity === "moderate" || intensity === "intense")) {
     tips.push("Trend is down — have fast carbs within reach; drops can accelerate during cardio-style work.");

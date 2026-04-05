@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
   cardio: "Cardio", strength: "Strength", hiit: "HIIT",
-  yoga: "Yoga", walking: "Walking", sports: "Sports", swimming: "Swimming",
+  yoga: "Yoga", walking: "Walking", court: "Court sports", field: "Field sports", swimming: "Swimming",
 };
 
 const INTENSITY_COLORS: Record<ExerciseIntensity, string> = {
@@ -178,10 +178,27 @@ const EXERCISE_TYPE_CONFIG: Record<ExerciseType, ExerciseTypeConfig> = {
     delayedWarning: "Cold water swimming especially can cause delayed hypos for hours afterwards",
     activeReminder: "If anything feels off, get out of the water first — then check BG",
   },
-  sports: {
+  court: {
     preTips: (isPump, _dur) => {
       const tips: string[] = [];
-      tips.push("Team sports have unpredictable intensity — BG can swing either way");
+      tips.push("Court and racket sports are stop-start — BG can swing with bursts and between points");
+      tips.push("Competition or tight games can raise BG briefly from adrenaline");
+      if (isPump) tips.push("Basal changes are easy to overshoot — discuss a modest temp plan with your team");
+      else tips.push("Keep fast glucose at the court side, not only in the clubhouse");
+      tips.push("Hydrate on changeovers — dehydration skews how BG feels");
+      return tips;
+    },
+    checklistLabels: { bg: "Checked blood glucose", carbs: "Glucose at court side", basal: "Reviewed basal plan" },
+    midCheckMessage: "Changeover check — bursts can mask lows. How's your energy and focus?",
+    midCheckTiming: 0.5,
+    recoveryMessage: "After court sessions, delayed lows can show up once effort and adrenaline ease off",
+    delayedWarning: "Interval-style court play can cause delayed hypos — keep snacks handy for hours after",
+    activeReminder: "Between games, a quick BG check beats guessing if something feels off",
+  },
+  field: {
+    preTips: (isPump, _dur) => {
+      const tips: string[] = [];
+      tips.push("Field and team sports have unpredictable intensity — BG can swing either way");
       tips.push("Adrenaline from competition can temporarily raise BG");
       if (isPump) tips.push("Consider a moderate basal reduction — but the adrenaline may offset it");
       else tips.push("Keep glucose and snacks on the sideline, easily accessible");
@@ -192,7 +209,7 @@ const EXERCISE_TYPE_CONFIG: Record<ExerciseType, ExerciseTypeConfig> = {
     midCheckMessage: "Half-time check — how's your energy? Competition adrenaline can mask low BG signs.",
     midCheckTiming: 0.5,
     recoveryMessage: "Post-match BG drops are common once the adrenaline wears off",
-    delayedWarning: "Competitive sports can cause delayed hypos as adrenaline fades — stay alert",
+    delayedWarning: "Competitive field sports can cause delayed hypos as adrenaline fades — stay alert",
     activeReminder: "Let someone nearby know where your hypo treatment is",
   },
 };

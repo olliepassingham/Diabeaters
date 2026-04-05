@@ -1,5 +1,12 @@
 import type { ActiveExerciseSession, ExercisePhase } from "@/lib/storage";
 
+/** Legacy `type=sports` links map to `field` after court/field split. */
+export function normalizePlannerExerciseTypeQueryParam(type: string | null): string | null {
+  if (type == null) return null;
+  if (type === "sports") return "field";
+  return type;
+}
+
 /** Match URL params to the current active exercise session (for planner hydration). */
 export function activeSessionMatchesPlannerQuery(
   active: ActiveExerciseSession,
@@ -9,8 +16,9 @@ export function activeSessionMatchesPlannerQuery(
   routineId: string | null,
 ): boolean {
   if (routineId && active.routineId && active.routineId === routineId) return true;
+  const normalizedType = normalizePlannerExerciseTypeQueryParam(type) ?? type;
   return (
-    active.exerciseType === type &&
+    active.exerciseType === normalizedType &&
     String(active.durationMinutes) === duration &&
     active.intensity === intensity
   );

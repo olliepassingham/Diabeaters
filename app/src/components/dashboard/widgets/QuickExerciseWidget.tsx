@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play } from "lucide-react";
+import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play, CircleDot } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
@@ -17,7 +17,8 @@ const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
   hiit: Zap,
   yoga: Wind,
   walking: Footprints,
-  sports: Users,
+  court: CircleDot,
+  field: Users,
   swimming: Waves,
 };
 

@@ -142,3 +142,85 @@ export function calculateMealDose(
     tips,
   };
 }
+
+/** Aligns with ExercisePlanner and Meal Adviser deep links: hours until session start. */
+export function mealDoseHoursFromPlannerMinutes(minutesUntilStart: number): number {
+  const m = Math.max(0, minutesUntilStart);
+  return Math.max(1, Math.ceil(m / 60));
+}
+
+/**
+ * Personalized pre-exercise meal bolus preview using the same rules as the Meal Adviser
+ * when "Planning around exercise" is on for a meal before activity.
+ */
+export function getExerciseMealBolusPreview(
+  carbs: number,
+  mealType: string,
+  settings: UserSettings,
+  bgUnits: string,
+  minutesUntilStart: number,
+): MealDoseResult {
+  const hours = mealDoseHoursFromPlannerMinutes(minutesUntilStart);
+  return calculateMealDose(carbs, mealType, settings, bgUnits, "before", hours);
+}
+
+/** Bands for comparing optional user-entered planned units to the exercise-adjusted preview dose. */
+export type PlannedBolusCompareKind = "close" | "moderate" | "large";
+
+export type PlannedBolusCompareResult = {
+  userUnits: number;
+  previewDose: number;
+  deltaAbs: number;
+  kind: PlannedBolusCompareKind;
+};
+
+/**
+ * Compares optional user-entered planned bolus units to the carb-based exercise-adjusted preview.
+ * Returns null if input is empty/invalid or preview dose is not positive.
+ */
+export function comparePlannedBolusToPreview(
+  userUnitsInput: string,
+  previewDose: number,
+): PlannedBolusCompareResult | null {
+  const trimmed = userUnitsInput.trim();
+  if (trimmed === "") return null;
+  const userUnits = parseFloat(trimmed.replace(",", "."));
+  if (Number.isNaN(userUnits) || userUnits < 0) return null;
+  if (!Number.isFinite(previewDose) || previewDose <= 0) return null;
+
+  const deltaAbs = Math.abs(userUnits - previewDose);
+  const rel = deltaAbs / previewDose;
+
+  let kind: PlannedBolusCompareKind;
+  if (deltaAbs <= 0.5 || rel <= 0.08) {
+    kind = "close";
+  } else if (deltaAbs <= 1.5 && rel <= 0.25) {
+    kind = "moderate";
+  } else {
+    kind = "large";
+  }
+
+  return { userUnits, previewDose, deltaAbs, kind };
+}
+
+export function plannedBolusCompareMessage(result: PlannedBolusCompareResult): string {
+  switch (result.kind) {
+    case "close":
+      return "Your planned dose is close to the carb-based estimate above — still confirm with your care team.";
+    case "moderate":
+      return "Your planned dose differs somewhat from the carb-based estimate — discuss what fits your plan with your care team.";
+    case "large":
+      return "Your planned dose differs from the carb-based estimate by more than a small rounding amount — confirm a safe plan with your care team before changing insulin.";
+    default:
+      return "";
+  }
+}
+
+/** Parse optional positive bolus units from a text field; returns null if empty or invalid. */
+export function parseOptionalBolusUnits(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed === "") return null;
+  const n = parseFloat(trimmed.replace(",", "."));
+  if (Number.isNaN(n) || n < 0) return null;
+  return n;
+}

@@ -5,10 +5,13 @@ import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-u
 
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { User as UserIcon, LogOut } from "lucide-react";
+import { MessageCircle, User as UserIcon, LogOut } from "lucide-react";
+import { Link } from "wouter";
 
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
+import { Button } from "@/components/ui/button";
+import { isCommunityEnabled } from "@/lib/flags";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -151,7 +154,14 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
           </button>
         </div>
 
-        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
+        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
+          {isCommunityEnabled && (
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/community/messages" aria-label="Messages" data-testid="button-messages">
+                <MessageCircle className="h-5 w-5" />
+              </Link>
+            </Button>
+          )}
           <NotificationBell />
         </div>
       </div>
