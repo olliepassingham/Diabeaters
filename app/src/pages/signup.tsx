@@ -1,6 +1,13 @@
 import { FormEvent, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { signup, signInWithProvider } from "@/lib/auth";
+import {
+  describeAuthErrorForDisplay,
+  describeAuthNetworkError,
+  isUserVerified,
+  signup,
+  signInWithProvider,
+} from "@/lib/auth";
+import { navigateAfterLoginSuccess } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -17,9 +24,10 @@ export default function Signup() {
   async function handleOAuth(provider: "apple" | "google" | "azure") {
     const { data, error } = await signInWithProvider(provider);
     if (error) {
+      const description = describeAuthNetworkError(error.message);
       toast({
         title: "Sign up failed",
-        description: error.message,
+        description,
         variant: "destructive",
       });
       return;
@@ -36,12 +44,31 @@ export default function Signup() {
     setSubmitting(true);
     setError(null);
 
-    const { error } = await signup(email, password);
+    const { data, error } = await signup(email, password);
     setSubmitting(false);
 
     if (error) {
-      setError(error.message);
-      toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
+      const styled = describeAuthErrorForDisplay(error);
+      if (styled.suggestCheckEmail) {
+        setLocation(
+          `/check-email?email=${encodeURIComponent(email)}&message=${encodeURIComponent("Please verify your email to continue.")}`,
+        );
+        return;
+      }
+      const description = describeAuthNetworkError(styled.message);
+      setError(description);
+      toast({ title: "Sign up failed", description, variant: "destructive" });
+      return;
+    }
+
+    if (data?.session && data.user) {
+      if (!isUserVerified(data.user)) {
+        const next = new URLSearchParams(window.location.search).get("next");
+        const nextQ = next?.startsWith("/") && !next.startsWith("//") ? `&next=${encodeURIComponent(next)}` : "";
+        setLocation(`/check-email?email=${encodeURIComponent(email)}${nextQ}`);
+        return;
+      }
+      await navigateAfterLoginSuccess(setLocation);
       return;
     }
 

@@ -25,7 +25,12 @@ function createSupabaseClient(): SupabaseClient | null {
   if (!hasSupabaseEnv) return null;
   if (_client) return _client;
   _client = createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      flowType: "pkce",
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
   });
   return _client;
 }

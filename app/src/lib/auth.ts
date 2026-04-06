@@ -15,6 +15,55 @@ type AuthResult<T> = {
 
 export type OAuthProvider = "apple" | "google" | "azure";
 
+/** Maps Supabase auth errors to friendly copy; use for login and signup. */
+export function describeAuthErrorForDisplay(error: AuthError | Error): {
+  message: string;
+  suggestCheckEmail?: boolean;
+} {
+  const raw = error.message ?? "";
+  const msg = raw.toLowerCase();
+  const code =
+    "code" in error && typeof (error as AuthError).code === "string"
+      ? ((error as AuthError).code ?? "")
+      : "";
+
+  if (
+    code === "email_not_confirmed" ||
+    msg.includes("email not confirmed") ||
+    msg.includes("confirm your email") ||
+    (msg.includes("email") && msg.includes("not confirmed"))
+  ) {
+    return {
+      message:
+        "Check your email to verify your account, then try again. You can resend the link from the check-email page.",
+      suggestCheckEmail: true,
+    };
+  }
+  if (
+    msg.includes("invalid login") ||
+    msg.includes("invalid credentials") ||
+    code === "invalid_credentials" ||
+    msg.includes("wrong password")
+  ) {
+    return { message: "Wrong email or password." };
+  }
+  return { message: raw || "Something went wrong." };
+}
+
+/** Browser-specific messages when fetch to Supabase never completes. */
+export function describeAuthNetworkError(message: string): string {
+  const m = message.toLowerCase();
+  if (
+    m === "failed to fetch" ||
+    m === "load failed" ||
+    m.includes("networkerror") ||
+    m.includes("network request failed")
+  ) {
+    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in .env/.env.local, restart the dev server after env changes, and ensure your Supabase project is active.";
+  }
+  return message;
+}
+
 export async function signup(
   email: string,
   password: string,

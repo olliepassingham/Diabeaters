@@ -94,6 +94,11 @@ export default function NotificationsPage() {
       setLocation("/carer-view");
       return;
     }
+    if (kind === "feed_post_like" || kind === "feed_post_comment") {
+      const postId = typeof data.post_id === "string" ? data.post_id : "";
+      setLocation(postId ? `/community/post/${postId}` : "/community");
+      return;
+    }
   };
 
   return (

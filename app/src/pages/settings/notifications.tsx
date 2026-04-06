@@ -25,6 +25,7 @@ export function NotificationsTab({
 }) {
   const hypoOn = notifSettings.hypoAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
+  const communityFeedOn = notifSettings.communityFeedAlerts !== false;
 
   const inner = (
     <div className="space-y-6">
@@ -154,6 +155,19 @@ export function NotificationsTab({
         />
       </div>
 
+      <div id="notif-community" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Community feed</Label>
+          <p className="text-small text-muted-foreground">When someone likes or comments on your posts</p>
+        </div>
+        <Switch
+          checked={communityFeedOn}
+          onCheckedChange={(checked) => onToggle("communityFeedAlerts", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-community-feed-alerts"
+        />
+      </div>
+
       <div className="flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Appointment reminders</Label>
@@ -205,7 +219,9 @@ export function NotificationsTab({
           <Bell className="h-5 w-5 text-primary" aria-hidden />
           <CardTitle className="text-h3 font-semibold">Notifications</CardTitle>
         </div>
-        <CardDescription className="text-body text-muted-foreground">Control alerts for hypos, supplies, and scenarios.</CardDescription>
+        <CardDescription className="text-body text-muted-foreground">
+          Control alerts for hypos, supplies, scenarios, and the community feed.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">{inner}</CardContent>
     </Card>
@@ -234,7 +250,7 @@ export function SettingsNotificationsRoute({
       <PageHeader
         className="mb-2"
         title="Notifications"
-        description="Hypo alerts, trend alerts, and scenario alerts."
+        description="Hypo alerts, trend alerts, scenario alerts, and community feed."
         actions={settingsInfoDialog}
       />
       <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">

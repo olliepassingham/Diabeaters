@@ -563,6 +563,7 @@ export default function Settings() {
     hypoAlerts: true,
     scenarioAlerts: true,
     hypoDashboardQuickNotify: false,
+    communityFeedAlerts: true,
   });
   
   useEffect(() => {
@@ -875,7 +876,10 @@ export default function Settings() {
         <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
       </InfoSection>
       <InfoSection title="Notifications">
-        <p>Hypo alerts, supply trend alerts, scenario alerts, and optional browser notifications.</p>
+        <p>
+          Hypo alerts, supply trend alerts, scenario alerts, community feed likes and comments, and optional browser
+          notifications.
+        </p>
       </InfoSection>
       <InfoSection title="About">
         <p>Version, privacy, terms, support, backup, sources, and references.</p>

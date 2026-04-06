@@ -1,8 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { login, signInWithProvider, isUserVerified } from "@/lib/auth";
-import { getLinkedPatientForCarer } from "@/lib/carers";
-import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import {
+  describeAuthErrorForDisplay,
+  describeAuthNetworkError,
+  isUserVerified,
+  login,
+  signInWithProvider,
+} from "@/lib/auth";
+import { navigateAfterLoginSuccess } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,20 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PageShell } from "@/components/layout";
-
-/** Browser-specific messages when fetch to Supabase never completes. */
-function describeAuthNetworkError(message: string): string {
-  const m = message.toLowerCase();
-  if (
-    m === "failed to fetch" ||
-    m === "load failed" ||
-    m.includes("networkerror") ||
-    m.includes("network request failed")
-  ) {
-    return "Could not connect to Supabase. Check your network and VPN, confirm VITE_SUPABASE_URL in .env/.env.local, restart the dev server after env changes, and ensure your Supabase project is active.";
-  }
-  return message;
-}
 
 export default function Login() {
   const { toast } = useToast();
@@ -77,7 +68,14 @@ export default function Login() {
     setSubmitting(false);
 
     if (error) {
-      const description = describeAuthNetworkError(error.message);
+      const styled = describeAuthErrorForDisplay(error);
+      if (styled.suggestCheckEmail) {
+        setLocation(
+          `/check-email?email=${encodeURIComponent(email)}&message=${encodeURIComponent("Please verify your email to continue.")}`,
+        );
+        return;
+      }
+      const description = describeAuthNetworkError(styled.message);
       setError(description);
       toast({ title: "Login failed", description, variant: "destructive" });
       return;
@@ -88,22 +86,7 @@ export default function Login() {
       return;
     }
 
-    const link = await getLinkedPatientForCarer();
-    if (link.data) {
-      setLocation("/carer-view");
-      return;
-    }
-    if (hasCarerIntent() || hasPendingCarer()) {
-      setLocation("/carer-setup");
-      return;
-    }
-    const next = new URLSearchParams(window.location.search).get("next");
-    if (next?.startsWith("/") && !next.startsWith("//")) {
-      setLocation(next);
-      return;
-    }
-
-    setLocation("/");
+    await navigateAfterLoginSuccess(setLocation);
   }
 
   return (

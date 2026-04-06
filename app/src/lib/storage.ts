@@ -450,6 +450,8 @@ export interface NotificationSettings {
   scenarioAlerts?: boolean;
   /** When true, dashboard "Treated a Hypo" logs and notifies without opening the detail dialog first. */
   hypoDashboardQuickNotify?: boolean;
+  /** Likes and comments on your community posts (in-app inbox; synced as feed_alerts). */
+  communityFeedAlerts?: boolean;
 }
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
@@ -2060,6 +2062,7 @@ export const storage = {
       hypoAlerts: true,
       scenarioAlerts: true,
       hypoDashboardQuickNotify: false,
+      communityFeedAlerts: true,
     };
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
     if (!data) return defaults;
@@ -2068,6 +2071,7 @@ export const storage = {
       ...defaults,
       ...parsed,
       hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify === true,
+      communityFeedAlerts: parsed.communityFeedAlerts !== false,
     };
   },
 

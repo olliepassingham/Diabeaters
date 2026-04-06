@@ -184,6 +184,7 @@ The email link opens in the system browser to your domain. After resetting, the 
 
 ## Supabase Setup
 
+- **Self-serve signup / login**: See [`docs/supabase_auth_self_serve.md`](docs/supabase_auth_self_serve.md) for env vars, redirect URLs, email confirmation, and OAuth.
 - **Project keys**: In Supabase, go to **Project Settings → API**, then copy the **project URL** and **anon public key** into your `.env`.
 - **Create `supplies` table**: In the Supabase SQL editor, run:
 
