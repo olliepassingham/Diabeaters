@@ -459,30 +459,31 @@ export function ExercisePlanner() {
                 <span className="text-tiny text-muted-foreground">Quick tips</span>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="current-bg">Current BG ({bgUnits})</Label>
-                <Input
-                  id="current-bg"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="For readiness"
-                  value={currentBgInput}
-                  onChange={(e) => setCurrentBgInput(e.target.value)}
-                  data-testid="input-current-bg-exercise"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="approx-carbs">Carbs you will eat or already had (g)</Label>
-                <Input
-                  id="approx-carbs"
-                  type="number"
-                  min={0}
-                  placeholder="e.g. 30 — needed for bolus preview"
-                  value={approxCarbs}
-                  onChange={(e) => setApproxCarbs(e.target.value)}
-                  data-testid="input-approx-carbs"
-                />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="current-bg">Current BG ({bgUnits})</Label>
+                  <Input
+                    id="current-bg"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="For readiness"
+                    value={currentBgInput}
+                    onChange={(e) => setCurrentBgInput(e.target.value)}
+                    data-testid="input-current-bg-exercise"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="approx-carbs">Carbs you will eat or already had (g)</Label>
+                  <Input
+                    id="approx-carbs"
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 30 — needed for bolus preview"
+                    value={approxCarbs}
+                    onChange={(e) => setApproxCarbs(e.target.value)}
+                    data-testid="input-approx-carbs"
+                  />
+                </div>
               </div>
 
               {(() => {
@@ -514,47 +515,48 @@ export function ExercisePlanner() {
                 ) : null;
               })()}
 
-              <div className="space-y-2">
-                <FieldLabelWithInfo
-                  htmlFor="planned-bolus-units"
-                  info="If you already know how many units you plan for this food, enter it — results compare to the carb-based estimate (does not replace your care team's plan)."
-                >
-                  Planned bolus for this food (units, optional)
-                </FieldLabelWithInfo>
-                <Input
-                  id="planned-bolus-units"
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="e.g. 4 — compared to preview after you plan"
-                  value={plannedBolusUnitsInput}
-                  onChange={(e) => setPlannedBolusUnitsInput(e.target.value)}
-                  data-testid="input-planned-bolus-units"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <FieldLabelWithInfo
-                  htmlFor="last-insulin"
-                  info="Meal bolus or correction — whichever was most recent. Not basal insulin."
-                >
-                  Last rapid-acting insulin (meal or correction)
-                </FieldLabelWithInfo>
-                <Select
-                  value={lastInsulinTiming || "unset"}
-                  onValueChange={(v) => setLastInsulinTiming(v === "unset" ? "" : (v as LastInsulinTiming))}
-                >
-                  <SelectTrigger id="last-insulin" data-testid="select-last-insulin">
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unset">Skip</SelectItem>
-                    <SelectItem value="none">No recent bolus / not sure</SelectItem>
-                    <SelectItem value="lt_1h">Under 1 hour ago</SelectItem>
-                    <SelectItem value="h1_2">1–2 hours ago</SelectItem>
-                    <SelectItem value="h2_4">2–4 hours ago</SelectItem>
-                    <SelectItem value="gt_4h">More than 4 hours ago</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <FieldLabelWithInfo
+                    htmlFor="planned-bolus-units"
+                    info="If you already know how many units you plan for this food, enter it — results compare to the carb-based estimate (does not replace your care team's plan)."
+                  >
+                    Planned bolus for this food (units, optional)
+                  </FieldLabelWithInfo>
+                  <Input
+                    id="planned-bolus-units"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="e.g. 4 — compared to preview after you plan"
+                    value={plannedBolusUnitsInput}
+                    onChange={(e) => setPlannedBolusUnitsInput(e.target.value)}
+                    data-testid="input-planned-bolus-units"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FieldLabelWithInfo
+                    htmlFor="last-insulin"
+                    info="Meal bolus or correction — whichever was most recent. Not basal insulin."
+                  >
+                    Last rapid-acting insulin (meal or correction)
+                  </FieldLabelWithInfo>
+                  <Select
+                    value={lastInsulinTiming || "unset"}
+                    onValueChange={(v) => setLastInsulinTiming(v === "unset" ? "" : (v as LastInsulinTiming))}
+                  >
+                    <SelectTrigger id="last-insulin" data-testid="select-last-insulin">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unset">Skip</SelectItem>
+                      <SelectItem value="none">No recent bolus / not sure</SelectItem>
+                      <SelectItem value="lt_1h">Under 1 hour ago</SelectItem>
+                      <SelectItem value="h1_2">1–2 hours ago</SelectItem>
+                      <SelectItem value="h2_4">2–4 hours ago</SelectItem>
+                      <SelectItem value="gt_4h">More than 4 hours ago</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {(lastInsulinTiming === "lt_1h" ||

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -176,21 +177,26 @@ export function AccountCommunityProfileFields({
   const formBody = (
     <>
       <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
-        <div className="space-y-0.5">
-          <Label htmlFor={pubId}>Public profile</Label>
-          <p className="text-xs text-muted-foreground">
-            {showAccountLinkInCopy ? (
-              <>
-                Let signed-in members see your community card. Photo and display name are on{" "}
-                <Link href="/account" className="text-primary underline-offset-4 hover:underline">
-                  Account
-                </Link>
-                .
-              </>
-            ) : (
-              "When on, you can use the Feed and set your handle and bio below. Photo and display name use this account above."
-            )}
-          </p>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-1">
+            <Label htmlFor={pubId}>Public profile</Label>
+            <InlineInfoHint
+              ariaLabel="About public profile"
+              content={
+                showAccountLinkInCopy ? (
+                  <>
+                    Let signed-in members see your community card. Photo and display name are on{" "}
+                    <Link href="/account" className="text-primary underline-offset-4 hover:underline">
+                      Account
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  "When on, you can use the Feed and set your handle and bio below. Photo and display name use this account above."
+                )
+              }
+            />
+          </div>
         </div>
         <Switch id={pubId} checked={isPublic} onCheckedChange={onPublicChange} disabled={loading} />
       </div>
@@ -200,7 +206,26 @@ export function AccountCommunityProfileFields({
           {editing ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor={handleId}>Feed handle</Label>
+                <FieldLabelWithInfo
+                  htmlFor={handleId}
+                  info={
+                    <>
+                      3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
+                      {handleInput.trim() ? (
+                        <Link
+                          href={`/community/u/${encodeURIComponent(handleSlug)}`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          /community/u/{handleSlug}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">set a handle for a link</span>
+                      )}
+                    </>
+                  }
+                >
+                  Feed handle
+                </FieldLabelWithInfo>
                 <div className="flex items-center gap-1">
                   <span className="text-sm text-muted-foreground select-none" aria-hidden>
                     @
@@ -218,19 +243,6 @@ export function AccountCommunityProfileFields({
                     data-testid="account-community-handle-input"
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
-                  {handleInput.trim() ? (
-                    <Link
-                      href={`/community/u/${encodeURIComponent(handleSlug)}`}
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      /community/u/{handleSlug}
-                    </Link>
-                  ) : (
-                    <span className="text-muted-foreground">set a handle for a link</span>
-                  )}
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -271,7 +283,12 @@ export function AccountCommunityProfileFields({
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 pt-1">
                   <div className="space-y-2 rounded-lg border border-border/50 px-3 py-3">
-                    <Label htmlFor={onsetId}>Living with diabetes since (optional)</Label>
+                    <FieldLabelWithInfo
+                      htmlFor={onsetId}
+                      info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
+                    >
+                      Living with diabetes since (optional)
+                    </FieldLabelWithInfo>
                     <Input
                       id={onsetId}
                       type="date"
@@ -282,10 +299,6 @@ export function AccountCommunityProfileFields({
                       disabled={loading || saving}
                       data-testid="account-community-onset-input"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Shown on your public feed profile when Public profile is on. You can remove
-                      this anytime.
-                    </p>
                     {onsetDateInput.trim() ? (
                       <Button
                         type="button"
@@ -353,9 +366,15 @@ export function AccountCommunityProfileFields({
           )}
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          Turn on Public profile to open Feed in the app and edit your handle and bio.
-        </p>
+        <div className="flex items-start gap-2">
+          <p className="text-sm text-muted-foreground flex-1 min-w-0">
+            Turn on Public profile to use the Feed and edit your handle and bio.
+          </p>
+          <InlineInfoHint
+            ariaLabel="More about community profile"
+            content="Turn on Public profile to open Feed in the app and edit your handle and bio."
+          />
+        </div>
       )}
     </>
   );
@@ -395,8 +414,12 @@ export function AccountCommunityProfileFields({
           <div className="flex flex-row items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
               <CardTitle className="text-[0.9375rem] font-semibold">Feed</CardTitle>
-              <CardDescription>
-                Turn on Public profile to use the Feed tab, then set your handle and bio.
+              <CardDescription className="flex flex-wrap items-center gap-1.5">
+                <span>Turn on Public profile to use the Feed tab.</span>
+                <InlineInfoHint
+                  ariaLabel="More about Feed profile"
+                  content="Then set your handle and bio below, or on Account."
+                />
               </CardDescription>
             </div>
             {isPublic && !editing ? (

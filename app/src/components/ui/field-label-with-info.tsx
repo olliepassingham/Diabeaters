@@ -9,7 +9,7 @@ const popoverTextClass = "w-full max-w-[min(18rem,calc(100vw-2rem))] text-sm tex
 type FieldLabelWithInfoProps = {
   htmlFor: string;
   children: React.ReactNode;
-  info: string;
+  info: React.ReactNode;
   className?: string;
 };
 
@@ -37,7 +37,7 @@ export function FieldLabelWithInfo({ htmlFor, children, info, className }: Field
 }
 
 type InlineInfoHintProps = {
-  content: string;
+  content: React.ReactNode;
   ariaLabel: string;
   className?: string;
 };

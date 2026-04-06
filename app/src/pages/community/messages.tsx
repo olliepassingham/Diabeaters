@@ -5,7 +5,7 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -220,7 +220,12 @@ export default function CommunityMessagesPage() {
       <Card>
         <CardContent className="pt-6 space-y-3">
           <form onSubmit={handleStartChat} className="space-y-2">
-            <Label htmlFor="community-handle">Public handle</Label>
+            <FieldLabelWithInfo
+              htmlFor="community-handle"
+              info="Enter the person's public @handle from their feed profile. They must have saved a handle in Feed profile settings."
+            >
+              Public handle
+            </FieldLabelWithInfo>
             <Input
               id="community-handle"
               value={handleInput}
@@ -235,10 +240,6 @@ export default function CommunityMessagesPage() {
             <Button type="submit" size="sm" disabled={starting || !handleInput.trim() || !user}>
               Open or start chat
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Enter the person&apos;s public @handle from their feed profile. They must have saved a handle in Feed
-              profile settings.
-            </p>
           </form>
         </CardContent>
       </Card>

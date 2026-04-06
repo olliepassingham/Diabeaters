@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Flag, Heart, ImagePlus, Loader2, MessageCircle, MessageSquare, Reply, Send, Settings, X } from "lucide-react";
-import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { ImagePlus, Loader2, MessageCircle, RefreshCw, Send, Settings, X } from "lucide-react";
+import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +27,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
+  deleteCommunityComment,
+  deleteCommunityPost,
   fetchCommentsForPost,
   fetchCommunityPostsFromFollowingPage,
   fetchCommunityPostsPage,
@@ -26,20 +37,21 @@ import {
   MAX_POST_IMAGES,
   submitContentReport,
   togglePostLike,
+  updateCommunityPost,
   type CommunityPostCommentRow,
   type CommunityPostRow,
 } from "@/lib/community";
 import { getProfilesByIds } from "@/lib/profile";
 import { cn } from "@/lib/utils";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { formatDistanceToNow } from "date-fns";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
-type AuthorMeta = { name: string; avatar_url: string | null };
+type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null };
 
 type FeedTab = "everyone" | "following";
 
@@ -74,6 +86,13 @@ export default function CommunityHomePage() {
   const [reportReason, setReportReason] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [deletePostBusy, setDeletePostBusy] = useState(false);
+  const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
+  const [editBody, setEditBody] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -84,7 +103,7 @@ export default function CommunityHomePage() {
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [composerFiles]);
 
-  const refresh = useCallback(async () => {
+  const loadFirstPage = useCallback(async () => {
     const res =
       feedTab === "everyone"
         ? await fetchCommunityPostsPage(PAGE_SIZE, null)
@@ -102,8 +121,18 @@ export default function CommunityHomePage() {
       setPosts(list);
       setHasMore(list.length >= PAGE_SIZE);
     }
-    setLoading(false);
   }, [toast, feedTab]);
+
+  const refresh = useCallback(async () => {
+    await loadFirstPage();
+    setLoading(false);
+  }, [loadFirstPage]);
+
+  const runRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFirstPage();
+    setRefreshing(false);
+  }, [loadFirstPage]);
 
   useEffect(() => {
     setLoading(true);
@@ -179,6 +208,7 @@ export default function CommunityHomePage() {
         next[id] = {
           name: prof?.full_name?.trim() || shortId(id),
           avatar_url: prof?.avatar_url ?? null,
+          public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
         };
       }
       setAuthorMeta(next);
@@ -189,7 +219,7 @@ export default function CommunityHomePage() {
   }, [posts, commentsByPost]);
 
   function metaFor(authorId: string): AuthorMeta {
-    return authorMeta[authorId] ?? { name: shortId(authorId), avatar_url: null };
+    return authorMeta[authorId] ?? { name: shortId(authorId), avatar_url: null, public_handle: null };
   }
 
   function onPickImages(files: FileList | null) {
@@ -329,6 +359,64 @@ export default function CommunityHomePage() {
     toast({ title: "Thanks — we’ve received your report." });
   }
 
+  async function confirmDeletePost() {
+    if (!deletePostId) return;
+    setDeletePostBusy(true);
+    const id = deletePostId;
+    const res = await deleteCommunityPost(id);
+    setDeletePostBusy(false);
+    if (res.error) {
+      toast({ title: "Could not delete post", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setPosts((prev) => prev.filter((p) => p.id !== id));
+    setCommentsByPost((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setExpanded((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setDeletePostId(null);
+    toast({ title: "Post deleted" });
+  }
+
+  async function saveEditPost() {
+    if (!editPost) return;
+    setEditBusy(true);
+    const res = await updateCommunityPost(editPost.id, editBody);
+    setEditBusy(false);
+    if (res.error) {
+      toast({ title: "Could not save", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    if (res.data) {
+      setPosts((prev) => prev.map((p) => (p.id === res.data!.id ? res.data! : p)));
+    }
+    setEditPost(null);
+    toast({ title: "Post updated" });
+  }
+
+  async function handleDeleteComment(postId: string, commentId: string) {
+    const res = await deleteCommunityComment(commentId);
+    if (res.error) {
+      toast({ title: "Could not delete comment", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setCommentsByPost((prev) => ({
+      ...prev,
+      [postId]: (prev[postId] ?? []).filter((c) => c.id !== commentId),
+    }));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p,
+      ),
+    );
+  }
+
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
@@ -343,7 +431,15 @@ export default function CommunityHomePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Feed"
-        description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
+        description={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span>Everyone signed in can see posts.</span>
+            <InlineInfoHint
+              ariaLabel="About profile photos on the feed"
+              content="Profile photos use each person’s account picture when their profile is visible."
+            />
+          </span>
+        }
         actions={
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" asChild>
@@ -361,12 +457,26 @@ export default function CommunityHomePage() {
         }
       />
 
-      <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="following">Following</TabsTrigger>
-          <TabsTrigger value="everyone">Everyone</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="following">Following</TabsTrigger>
+            <TabsTrigger value="everyone">Everyone</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 min-h-11"
+          disabled={refreshing || loading}
+          onClick={() => void runRefresh()}
+          aria-label="Refresh feed"
+        >
+          <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
+          Refresh
+        </Button>
+      </div>
 
       <Card>
         <CardHeader className="pb-2">
@@ -421,9 +531,10 @@ export default function CommunityHomePage() {
                 <ImagePlus className="h-4 w-4 mr-1.5" />
                 Photo
               </Button>
-              <span className="text-xs text-muted-foreground">
-                Up to {MAX_POST_IMAGES} photos, 5MB each
-              </span>
+              <InlineInfoHint
+                ariaLabel="Photo limits for posts"
+                content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`}
+              />
               <Button
                 type="submit"
                 size="sm"
@@ -454,172 +565,47 @@ export default function CommunityHomePage() {
         <ul className="space-y-3">
           {posts.map((p) => {
             const m = metaFor(p.author_id);
-            const canReportPost = user && user.id !== p.author_id;
             return (
               <li key={p.id}>
-                <Card>
-                  <CardContent className="pt-4 space-y-2">
-                    <div className="flex gap-3">
-                      <CommunityAuthorAvatar
-                        displayName={m.name}
-                        avatarPath={m.avatar_url}
-                        profileHref={`/community/profile/${p.author_id}`}
-                      />
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-                          <Link
-                            href={`/community/profile/${p.author_id}`}
-                            className="font-medium text-foreground truncate hover:underline underline-offset-2"
-                          >
-                            {m.name}
-                          </Link>
-                          <span className="flex shrink-0 items-center gap-1.5">
-                            {canReportPost && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-1.5 text-muted-foreground"
-                                onClick={() => openReport("post", p.id)}
-                                aria-label="Report post"
-                              >
-                                <Flag className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            <span title={p.created_at}>{formatDistanceToNow(new Date(p.created_at), { addSuffix: true })}</span>
-                          </span>
-                        </div>
-                        {p.body.trim().length > 0 ? (
-                          <p className="text-sm whitespace-pre-wrap">{p.body}</p>
-                        ) : null}
-                        <CommunityPostImageGrid paths={p.image_urls} />
-                        <div
-                          className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
-                          data-testid="post-engagement-row"
-                        >
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                            disabled={!user}
-                            aria-pressed={p.liked_by_me}
-                            aria-label={p.liked_by_me ? "Unlike" : "Like"}
-                            onClick={() => void handleToggleLike(p.id, p.liked_by_me)}
-                          >
-                            <Heart
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                p.liked_by_me && "fill-primary text-primary",
-                              )}
-                            />
-                            <span className="text-xs tabular-nums text-foreground">{p.like_count}</span>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                            aria-expanded={Boolean(expanded[p.id])}
-                            aria-label={
-                              expanded[p.id]
-                                ? "Hide comments"
-                                : p.comment_count === 0
-                                  ? "Comment"
-                                  : `${p.comment_count} comment${p.comment_count === 1 ? "" : "s"}`
-                            }
-                            onClick={() => void toggleComments(p.id)}
-                          >
-                            <MessageSquare className="h-4 w-4 shrink-0" />
-                            <span className="text-xs text-foreground">
-                              {expanded[p.id]
-                                ? "Hide comments"
-                                : p.comment_count === 0
-                                  ? "Comment"
-                                  : `${p.comment_count} comment${p.comment_count === 1 ? "" : "s"}`}
-                            </span>
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                            disabled={!user}
-                            aria-label="Reply"
-                            onClick={() => void replyToPost(p.id)}
-                          >
-                            <Reply className="h-4 w-4 shrink-0" />
-                            <span className="text-xs text-foreground">Reply</span>
-                          </Button>
-                        </div>
-                        {expanded[p.id] && (
-                          <div className="border-t border-border/60 pt-3 space-y-2">
-                            {loadingComments[p.id] ? (
-                              <p className="text-xs text-muted-foreground">Loading comments…</p>
-                            ) : (
-                              <ul className="space-y-2">
-                                {(commentsByPost[p.id] ?? []).map((c) => {
-                                  const cm = metaFor(c.author_id);
-                                  const canReportComment = user && user.id !== c.author_id;
-                                  return (
-                                    <li key={c.id} className="flex gap-2 rounded-md bg-muted/40 px-2 py-2">
-                                      <CommunityAuthorAvatar
-                                        size="sm"
-                                        displayName={cm.name}
-                                        avatarPath={cm.avatar_url}
-                                        profileHref={`/community/profile/${c.author_id}`}
-                                      />
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-start justify-between gap-1">
-                                          <Link
-                                            href={`/community/profile/${c.author_id}`}
-                                            className="text-xs font-medium text-foreground hover:underline underline-offset-2"
-                                          >
-                                            {cm.name}
-                                          </Link>
-                                          {canReportComment && (
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-6 shrink-0 px-1 text-muted-foreground"
-                                              onClick={() => openReport("comment", c.id)}
-                                              aria-label="Report comment"
-                                            >
-                                              <Flag className="h-3 w-3" />
-                                            </Button>
-                                          )}
-                                        </div>
-                                        <p className="text-sm whitespace-pre-wrap">{c.body}</p>
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            )}
-                            <div className="flex gap-2">
-                              <Textarea
-                                ref={(el) => {
-                                  commentInputRefs.current[p.id] = el;
-                                }}
-                                rows={2}
-                                placeholder="Write a comment…"
-                                value={commentDrafts[p.id] ?? ""}
-                                onChange={(e) =>
-                                  setCommentDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
-                                }
-                                maxLength={4000}
-                              />
-                              <Button type="button" size="sm" onClick={() => void submitComment(p.id)}>
-                                Reply
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <FeedPostCard
+                  post={p}
+                  viewerId={user?.id}
+                  authorDisplayName={m.name}
+                  authorPublicHandle={m.public_handle}
+                  authorAvatarPath={m.avatar_url}
+                  expanded={Boolean(expanded[p.id])}
+                  loadingComments={Boolean(loadingComments[p.id])}
+                  comments={commentsByPost[p.id] ?? []}
+                  commentDraft={commentDrafts[p.id] ?? ""}
+                  onCommentDraftChange={(v) => setCommentDrafts((prev) => ({ ...prev, [p.id]: v }))}
+                  commentInputRef={(el) => {
+                    commentInputRefs.current[p.id] = el;
+                  }}
+                  onToggleComments={() => void toggleComments(p.id)}
+                  onReplyFocus={() => void replyToPost(p.id)}
+                  onLike={() => void handleToggleLike(p.id, p.liked_by_me)}
+                  onSubmitComment={() => void submitComment(p.id)}
+                  onReportPost={() => openReport("post", p.id)}
+                  onReportComment={(cid) => openReport("comment", cid)}
+                  commentMeta={metaFor}
+                  isAuthor={Boolean(user?.id && user.id === p.author_id)}
+                  onMenuEdit={() => {
+                    setEditPost(p);
+                    setEditBody(p.body);
+                  }}
+                  onMenuDelete={() => setDeletePostId(p.id)}
+                  onDeleteComment={(cid) => void handleDeleteComment(p.id, cid)}
+                  showPermalink
+                  onLikersLoaded={({ visibleCount }) => {
+                    setPosts((prev) =>
+                      prev.map((x) =>
+                        x.id === p.id
+                          ? { ...x, like_count: Math.max(x.like_count, visibleCount) }
+                          : x,
+                      ),
+                    );
+                  }}
+                />
               </li>
             );
           })}
@@ -657,6 +643,54 @@ export default function CommunityHomePage() {
             </Button>
             <Button type="button" onClick={() => void confirmReport()} disabled={reportSubmitting}>
               {reportSubmitting ? "Sending…" : "Submit report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deletePostId != null} onOpenChange={(o) => !o && !deletePostBusy && setDeletePostId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. Comments will be removed with the post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePostBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDeletePost();
+              }}
+              disabled={deletePostBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletePostBusy ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={editPost != null} onOpenChange={(o) => !o && !editBusy && setEditPost(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit post</DialogTitle>
+            <DialogDescription>Update your text. Photos stay the same.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            rows={6}
+            maxLength={8000}
+            disabled={editBusy}
+          />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setEditPost(null)} disabled={editBusy}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void saveEditPost()} disabled={editBusy}>
+              {editBusy ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

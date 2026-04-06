@@ -4,6 +4,7 @@
  * Pagination: RPC fetch_community_posts_page (see supabase migration).
  */
 import { getSupabase } from "@/lib/supabase";
+import { getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import type { CommunityPostCommentRow, CommunityPostRow } from "./types";
 
@@ -351,4 +352,177 @@ export async function insertCommunityComment(postId: string, body: string): Prom
   if (error) return { data: null, error: new Error(error.message) };
   if (!data) return { data: null, error: new Error("No row returned") };
   return { data: mapComment(data as Record<string, unknown>), error: null };
+}
+
+/** Single post for permalink page (RLS applies). */
+export async function fetchCommunityPostById(postId: string): Promise<{
+  data: CommunityPostRow | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const { data, error } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (error) return { data: null, error: new Error(error.message) };
+  if (!data) return { data: null, error: null };
+
+  const row = mapPost(data as Record<string, unknown>);
+  const liked = await fetchMyLikesForPostIds([row.id]);
+  return { data: mergeLikedIntoPosts([row], liked)[0]!, error: null };
+}
+
+/** Remove post row and storage objects for the author. */
+export async function deleteCommunityPost(postId: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const { data: row, error: selErr } = await supabase
+    .from("community_posts")
+    .select("id, image_urls, author_id")
+    .eq("id", postId)
+    .eq("author_id", uid)
+    .maybeSingle();
+
+  if (selErr) return { error: new Error(selErr.message) };
+  if (!row) return { error: new Error("Post not found or you cannot delete it.") };
+
+  const paths = parseImageUrls((row as Record<string, unknown>).image_urls);
+  if (paths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(paths);
+    if (rmErr) return { error: new Error(rmErr.message) };
+  }
+
+  const { error } = await supabase.from("community_posts").delete().eq("id", postId);
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
+/** Update body only; images unchanged. Must still satisfy body + images constraint. */
+export async function updateCommunityPost(
+  postId: string,
+  body: string,
+): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { data: null, error: new Error("Not signed in") };
+
+  const trimmed = body.trim();
+
+  const { data: existing, error: selErr } = await supabase
+    .from("community_posts")
+    .select("*")
+    .eq("id", postId)
+    .eq("author_id", uid)
+    .maybeSingle();
+
+  if (selErr) return { data: null, error: new Error(selErr.message) };
+  if (!existing) return { data: null, error: new Error("Post not found or you cannot edit it.") };
+
+  const imgs = parseImageUrls((existing as Record<string, unknown>).image_urls);
+  if (trimmed.length === 0 && imgs.length === 0) {
+    return { data: null, error: new Error("Add text or keep at least one photo.") };
+  }
+
+  const { data, error } = await supabase
+    .from("community_posts")
+    .update({ body: trimmed })
+    .eq("id", postId)
+    .select("*")
+    .single();
+
+  if (error) return { data: null, error: new Error(error.message) };
+  if (!data) return { data: null, error: new Error("No row returned") };
+  return { data: mapPost(data as Record<string, unknown>), error: null };
+}
+
+export async function deleteCommunityComment(commentId: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const { error } = await supabase
+    .from("community_post_comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("author_id", uid);
+
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
+/**
+ * Max rows returned for “who liked” (UI shows a truncation note above this).
+ * RLS on `community_post_reactions` hides rows where the viewer is blocked with the
+ * post author or with the liker — manual QA: two accounts + block (see docs/sql/community_feed_engagement.sql).
+ */
+export const POST_LIKERS_QUERY_LIMIT = 100;
+
+export type PostLikerDisplay = {
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+};
+
+function shortLikerId(id: string) {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+/** User IDs who liked the post, oldest first (RLS applies). */
+export async function fetchLikerUserIdsForPost(postId: string): Promise<{
+  data: string[];
+  error: Error | null;
+  truncated: boolean;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured"), truncated: false };
+
+  const { data, error } = await supabase
+    .from("community_post_reactions")
+    .select("user_id")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true })
+    .limit(POST_LIKERS_QUERY_LIMIT);
+
+  if (error) return { data: [], error: new Error(error.message), truncated: false };
+  const rows = data ?? [];
+  const truncated = rows.length >= POST_LIKERS_QUERY_LIMIT;
+  const ids = rows.map((r: { user_id: string }) => String(r.user_id));
+  return { data: ids, error: null, truncated };
+}
+
+/** Likers with display names from profiles (same order as fetchLikerUserIdsForPost). */
+export async function fetchPostLikersWithProfiles(postId: string): Promise<{
+  data: PostLikerDisplay[];
+  error: Error | null;
+  truncated: boolean;
+}> {
+  const { data: ids, error, truncated } = await fetchLikerUserIdsForPost(postId);
+  if (error) return { data: [], error, truncated: false };
+  if (ids.length === 0) return { data: [], error: null, truncated };
+
+  const profiles = await getProfilesByIds(ids);
+  const data: PostLikerDisplay[] = ids.map((uid) => {
+    const p = profiles.get(uid);
+    return {
+      user_id: uid,
+      name: p?.full_name?.trim() || shortLikerId(uid),
+      avatar_url: p?.avatar_url ?? null,
+    };
+  });
+  return { data, error: null, truncated };
 }

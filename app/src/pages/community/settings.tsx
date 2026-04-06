@@ -1,6 +1,7 @@
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 
 export default function CommunitySettingsPage() {
   if (!isSupabaseConfigured()) {
@@ -17,7 +18,15 @@ export default function CommunitySettingsPage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Feed profile"
-        description="Public name and photo come from your account. The same options are on Account."
+        description={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <span>Public name and photo come from your account.</span>
+            <InlineInfoHint
+              ariaLabel="Where to edit feed profile"
+              content="The same options are on Account."
+            />
+          </span>
+        }
       />
 
       <AccountCommunityProfileFields variant="standalone" idPrefix="cs" showAccountLinkInCopy />

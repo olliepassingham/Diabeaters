@@ -86,6 +86,7 @@ const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
 const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
 
 const CommunityHome = lazy(() => import("@/pages/community/index"));
+const CommunityPost = lazy(() => import("@/pages/community/post"));
 const CommunityMessages = lazy(() => import("@/pages/community/messages"));
 const CommunityThread = lazy(() => import("@/pages/community/thread"));
 const CommunityProfile = lazy(() => import("@/pages/community/profile"));
@@ -403,6 +404,15 @@ function InnerRouter() {
           <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityProfile />
+            </Suspense>
+          </CommunityFeatureGate>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/community/post/:postId">
+        <PatientRouteGuard>
+          <CommunityFeatureGate>
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityPost />
             </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>

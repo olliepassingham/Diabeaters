@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { ChevronLeft, Send } from "lucide-react";
+import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +12,7 @@ import {
   fetchDmThreadsForCurrentUser,
   insertDmMessage,
   otherMemberUserId,
+  parseSharedFeedPostMessage,
   type DmMessageRow,
   type ThreadWithMembers,
 } from "@/lib/community";
@@ -138,14 +140,26 @@ export default function CommunityThreadPage() {
         ) : (
           messages.map((m) => {
             const mine = user?.id === m.sender_id;
+            const shared = parseSharedFeedPostMessage(m.body);
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
-                    mine ? "bg-primary text-primary-foreground" : "bg-muted"
-                  }`}
+                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    shared ? "" : "whitespace-pre-wrap"
+                  } ${mine ? "bg-primary text-primary-foreground" : "bg-muted"}`}
                 >
-                  {m.body}
+                  {shared ? (
+                    <>
+                      {shared.note ? (
+                        <div className="whitespace-pre-wrap">{shared.note}</div>
+                      ) : null}
+                      <div className={shared.note ? "mt-2" : ""}>
+                        <DmSharedPostPreview postId={shared.postId} />
+                      </div>
+                    </>
+                  ) : (
+                    m.body
+                  )}
                   <div className={`text-[10px] mt-1 opacity-80 ${mine ? "text-primary-foreground/80" : ""}`}>
                     {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
                   </div>
