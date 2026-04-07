@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 const ROOT = process.cwd();
 const PUBLIC = join(ROOT, "app", "public");
-const DIST = join(ROOT, "app", "dist");
+const DIST = join(ROOT, "dist");
 
 const env = String(process.env.VITE_APP_ENV ?? "production")
   .trim()

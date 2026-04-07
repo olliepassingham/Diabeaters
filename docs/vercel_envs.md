@@ -4,7 +4,7 @@ Configure environment variables per environment in Vercel so builds and runtime 
 
 **GitHub Actions deploy:** If you use `.github/workflows/deploy-vercel.yml`, the workflow verifies `npm run build` with secrets, then runs `vercel deploy --prod` (remote build). The **live** bundle is built on Vercel using the variables below—keep them in sync with your GitHub secrets.
 
-**Repo settings:** [`vercel.json`](../vercel.json) sets `installCommand` (`npm ci`), `buildCommand` (`npm run build`), and `outputDirectory` (`app/dist`). Root directory in the Vercel project should stay the **repository root** (not `app/`).
+**Repo settings:** [`vercel.json`](../vercel.json) sets `installCommand` (`npm ci`), `buildCommand` (`npm run build`), and `outputDirectory` (`dist` at repo root). Root directory in the Vercel project should stay the **repository root** (not `app/`).
 
 ---
 
@@ -25,6 +25,7 @@ Set these for **Production** (deploys from `main`):
 | `VITE_SUPABASE_URL`     | Your production Supabase URL | From Supabase → API      |
 | `VITE_SUPABASE_ANON_KEY`| Production anon key         | From Supabase → API      |
 | `VITE_APP_ENV`          | `production`                | Enables prod robots, no staging banner |
+| `VITE_FEATURE_COMMUNITY`| `true`                      | **Required** for Feed + community DMs in production builds (see [`flags.ts`](../app/src/lib/flags.ts)). Omitting it hides Feed entirely. |
 
 ---
 
@@ -37,6 +38,7 @@ Set these for **Preview** (and optionally **Development**):
 | `VITE_SUPABASE_URL`     | Staging Supabase URL       | From staging project     |
 | `VITE_SUPABASE_ANON_KEY`| Staging anon key           | From staging project     |
 | `VITE_APP_ENV`          | `staging`                  | Enables staging banner, robots no-index |
+| `VITE_FEATURE_COMMUNITY`| `true`                     | Same as production if you want Feed on preview builds. |
 
 CI deploys from `develop` inject these via GitHub Actions secrets. Vercel Preview deploys (e.g. from PRs) will use whatever you set in **Preview** here, or you can leave Preview to rely on CI for `develop` pushes.
 

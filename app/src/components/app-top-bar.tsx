@@ -132,17 +132,17 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
   const homeActive = isCarer ? pathOnly === "/carer-view" : pathOnly === "/";
 
   return (
-    <header className="sticky top-0 z-50 flex h-14 items-center bg-card/90 px-4 backdrop-blur border-b border-border/70">
-      <div className="relative flex w-full items-center">
+    <header className="sticky top-0 z-50 flex min-h-14 items-center bg-card/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur border-b border-border/70 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+      <div className="relative flex w-full min-w-0 items-center">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <HeaderProfileDropdown onLogout={onLogout} />
         </div>
 
-        <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 text-h2 font-semibold text-foreground">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
           <button
             type="button"
             onClick={onBrandClick}
-            className={`flex items-center gap-2 rounded-lg px-1 py-1 transition-all ${
+            className={`pointer-events-auto flex min-w-0 max-w-full items-center gap-1.5 rounded-lg px-0.5 py-1 transition-all sm:gap-2 sm:px-1 ${
               homeActive
                 ? "cursor-default"
                 : "cursor-pointer hover:opacity-80 active:opacity-60 active:scale-[0.98]"
@@ -150,7 +150,7 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
             data-testid="button-home-brand"
           >
             <FaceLogo size={32} />
-            <span>Diabeaters</span>
+            <span className="truncate">Diabeaters</span>
           </button>
         </div>
 

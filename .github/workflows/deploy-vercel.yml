@@ -12,7 +12,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies
@@ -37,7 +37,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
 
-      # Remote build on Vercel (uses Project env vars for VITE_*). --prebuilt is not used: it requires `vercel build` output in .vercel/output, not app/dist from npm alone.
+      # Remote build on Vercel (uses Project env vars for VITE_*). --prebuilt is not used: it requires `vercel build` output in .vercel/output, not ./dist from npm alone.
       - name: Deploy to Vercel
         run: vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:

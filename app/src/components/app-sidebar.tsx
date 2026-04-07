@@ -60,7 +60,14 @@ export function AppSidebar() {
   }, []);
 
   const navItems = useMemo(() => {
-    if (!isCarer) return patientItems;
+    if (!isCarer) {
+      if (!showCommunity) return patientItems;
+      return [
+        ...patientItems.slice(0, 4),
+        { title: "Feed", url: "/community", icon: Users },
+        ...patientItems.slice(4),
+      ] as const;
+    }
     if (!isCarerMode || !showCommunity) return carerItems;
     return [
       { title: "Supporter", url: "/carer-view", icon: Eye },

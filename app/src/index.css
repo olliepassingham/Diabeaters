@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Stable text sizing on orientation change; avoid iOS inflating small text in landscape */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* Full-height root for mobile browsers (address bar) + flex shells that scroll */
+  #root {
+    min-height: 100%;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  body {
+    overflow-x: clip;
+    min-width: 0;
+  }
+}

@@ -45,8 +45,10 @@ export default defineConfig(({ mode }) => {
 
     publicDir: "public",
 
+    // Repo root `dist/` — matches Vercel’s default Output Directory (`dist`) and avoids
+    // dashboard overrides that ignore `vercel.json` `outputDirectory` (e.g. `app/dist`).
     build: {
-      outDir: "dist",
+      outDir: path.resolve(repoRoot, "dist"),
       assetsDir: "assets",
       emptyOutDir: true,
     },

@@ -723,7 +723,7 @@ function AuthenticatedShell() {
   }, [toast]);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background text-foreground">
+    <div className="flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
       <OfflineBanner />
       {!isCarerMode && (
         <>
@@ -738,10 +738,10 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24 max-w-[100vw]">
+      <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
         <InnerRouter />
       </main>
-      <footer className="border-0 py-3 px-6 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground">
+      <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
         <p>
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
           · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
@@ -776,17 +776,17 @@ function AccountShell() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background text-foreground">
+    <div className="flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
       <AppTopBar
         isCarer={isCarerMode}
         pathOnly="/account"
         onBrandClick={() => setLocation(isCarerMode ? "/carer-view" : "/")}
         onLogout={handleLogout}
       />
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-24 max-w-[100vw]">
+      <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
         <Account />
       </main>
-      <footer className="border-0 py-3 px-6 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground">
+      <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
         <p>
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
           · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}

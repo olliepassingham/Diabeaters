@@ -50,7 +50,7 @@ if (isStaging) {
 
 ## Local Development
 
-- **Node**: Node 18+ recommended.
+- **Node**: Node 20+ recommended (matches CI and Vercel).
 - **Frontend (Vite)**  
   From repo root:
   ```bash
@@ -330,7 +330,7 @@ Production builds use env vars from Vercel only (not `.env`). Add them before de
    vercel deploy --prod
    ```
 
-The [`vercel.json`](vercel.json) in the repo sets install/build commands, **output dir `app/dist`**, and SPA rewrites. Production env comes from **Vercel project variables** (not a committed `.env`).
+The [`vercel.json`](vercel.json) in the repo sets install/build commands, **output dir `dist`** (repo root; matches Vercel’s default), and SPA rewrites. Production env comes from **Vercel project variables** (not a committed `.env`).
 
 **After the first production deploy:** In **Supabase → Authentication → URL Configuration**, set **Site URL** to your live origin (e.g. `https://your-app.vercel.app`) and add **`https://YOUR_DOMAIN/auth/callback`** and **`https://YOUR_DOMAIN/reset-password`** to **Redirect URLs** so OAuth and email links return to the deployed app (see [Supabase URL Configuration](#supabase-url-configuration-copypaste) below).
 
@@ -465,10 +465,10 @@ Step-by-step guide to wrap the deployed web app in a native iOS shell using WKWe
 npm run build
 ```
 
-Output is in **`app/dist/`** (Vite `vite build`). Choose one of:
+Output is in **`dist/`** at the repo root (Vite `vite build`). Choose one of:
 
 - **Option A – Remote URL**: Deploy to Vercel/Netlify and use the live URL (e.g. `https://your-app.vercel.app`). No file copying.
-- **Option B – Bundled**: Add the built web folder (`app/dist`) to the Xcode project so the app loads files from the bundle. Drag `app/dist` into Xcode and check "Copy items if needed" and your app target.
+- **Option B – Bundled**: Add the built web folder (`dist`) to the Xcode project so the app loads files from the bundle. Drag `dist` into Xcode and check "Copy items if needed" and your app target.
 
 ### 2. Create the project
 
@@ -532,7 +532,7 @@ final class WebViewController: UIViewController {
             if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "public") {
                 webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
             } else {
-                fatalError("Bundled index.html not found. Add the built web folder (app/dist) to the project.")
+                fatalError("Bundled index.html not found. Add the built web folder (dist) to the project.")
             }
         }
     }
@@ -583,10 +583,10 @@ Add or merge:
 
 Or in the Xcode plist editor: **App Transport Security Settings** → **Allow Arbitrary Loads** = NO. This restricts the app to HTTPS.
 
-### 6. Bundle `app/dist` (Option B only)
+### 6. Bundle `dist` (Option B only)
 
-1. Build with `npm run build` (output: `app/dist`).
-2. Drag the `app/dist` folder into the Xcode project navigator.
+1. Build with `npm run build` (output: `dist/` at repo root).
+2. Drag the `dist` folder into the Xcode project navigator.
 3. Check **Copy items if needed** and your app target.
 4. In **Build Phases → Copy Bundle Resources**, confirm `index.html` and assets are included.
 5. In `WebViewController`, set `remoteURL = nil` and rely on `loadFileURL` for bundled loading.

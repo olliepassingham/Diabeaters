@@ -8,7 +8,7 @@ import { join } from "path";
 
 const ROOT = process.cwd();
 const PUBLIC = join(ROOT, "app", "public");
-const DIST = join(ROOT, "dist", "public");
+const DIST = join(ROOT, "dist");
 const env = (process.env.VITE_APP_ENV ?? "production").trim().toLowerCase();
 const isStaging = env === "staging";
 const source = join(PUBLIC, isStaging ? "robots.staging.txt" : "robots.prod.txt");

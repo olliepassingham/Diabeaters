@@ -3,7 +3,7 @@
   // This repo is deployed to Vercel as a static Vite SPA from /app.
   // Keep TypeScript checks focused on the client code that ships.
   "include": ["app/src/**/*"],
-  "exclude": ["node_modules", "build", "dist", "app/dist", "**/*.spec.*", "**/*.test.*", "server/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "build", "dist", "**/*.spec.*", "**/*.test.*", "server/**/*", "shared/**/*"],
   "compilerOptions": {
     // Build / emit behavior
     "noEmit": true,
@@ -11,7 +11,7 @@
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
 
     // Language / module settings
-    "target": "ES2020",               // good match for modern browsers + Node 18/20
+    "target": "ES2020",               // good match for modern browsers + Node 20+
     "module": "ESNext",
     "moduleResolution": "Bundler",    // best match for Vite
 
