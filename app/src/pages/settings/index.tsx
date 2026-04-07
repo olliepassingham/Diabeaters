@@ -304,7 +304,6 @@ function UsageTab({
   reservoirCapacity, setReservoirCapacity,
   unitsPerInsulinPen, setUnitsPerInsulinPen,
   needlesPerBox, setNeedlesPerBox,
-  sensorsPerBox, setSensorsPerBox,
   infusionSetsPerBox, setInfusionSetsPerBox,
   reservoirsPerBox, setReservoirsPerBox,
   insulinCartridgeUnits, setInsulinCartridgeUnits,
@@ -324,7 +323,6 @@ function UsageTab({
   reservoirCapacity: string; setReservoirCapacity: (v: string) => void;
   unitsPerInsulinPen: string; setUnitsPerInsulinPen: (v: string) => void;
   needlesPerBox: string; setNeedlesPerBox: (v: string) => void;
-  sensorsPerBox: string; setSensorsPerBox: (v: string) => void;
   infusionSetsPerBox: string; setInfusionSetsPerBox: (v: string) => void;
   reservoirsPerBox: string; setReservoirsPerBox: (v: string) => void;
   insulinCartridgeUnits: string; setInsulinCartridgeUnits: (v: string) => void;
@@ -482,11 +480,6 @@ function UsageTab({
                   <Input id="reservoirs-per-box" type="number" min="1" placeholder="e.g., 10" value={reservoirsPerBox} onChange={(e) => setReservoirsPerBox(e.target.value)} data-testid="input-reservoirs-per-box" />
                   <p className="text-xs text-muted-foreground">Reservoirs in one box</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sensors-per-box">CGM Sensors per Box</Label>
-                  <Input id="sensors-per-box" type="number" min="1" placeholder="e.g., 1" value={sensorsPerBox} onChange={(e) => setSensorsPerBox(e.target.value)} data-testid="input-sensors-per-box" />
-                  <p className="text-xs text-muted-foreground">Sensors in one box</p>
-                </div>
               </>
             ) : (
               <>
@@ -499,11 +492,6 @@ function UsageTab({
                   <Label htmlFor="needles-per-box">Needles per Box</Label>
                   <Input id="needles-per-box" type="number" min="1" placeholder="e.g., 100" value={needlesPerBox} onChange={(e) => setNeedlesPerBox(e.target.value)} data-testid="input-needles-per-box" />
                   <p className="text-xs text-muted-foreground">Needles/lancets in one box</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sensors-per-box">CGM Sensors per Box</Label>
-                  <Input id="sensors-per-box" type="number" min="1" placeholder="e.g., 1" value={sensorsPerBox} onChange={(e) => setSensorsPerBox(e.target.value)} data-testid="input-sensors-per-box" />
-                  <p className="text-xs text-muted-foreground">Sensors in one box</p>
                 </div>
               </>
             )}
@@ -563,7 +551,6 @@ export default function Settings() {
   const [reservoirCapacity, setReservoirCapacity] = useState("");
   const [unitsPerInsulinPen, setUnitsPerInsulinPen] = useState("");
   const [needlesPerBox, setNeedlesPerBox] = useState("");
-  const [sensorsPerBox, setSensorsPerBox] = useState("");
   const [infusionSetsPerBox, setInfusionSetsPerBox] = useState("");
   const [reservoirsPerBox, setReservoirsPerBox] = useState("");
   const [insulinCartridgeUnits, setInsulinCartridgeUnits] = useState("");
@@ -651,7 +638,6 @@ export default function Settings() {
       setReservoirCapacity(storedSettings.reservoirCapacity?.toString() || "300");
       setUnitsPerInsulinPen(storedSettings.unitsPerInsulinPen?.toString() || "");
       setNeedlesPerBox(storedSettings.needlesPerBox?.toString() || "");
-      setSensorsPerBox(storedSettings.sensorsPerBox?.toString() || "");
       setInfusionSetsPerBox(storedSettings.infusionSetsPerBox?.toString() || "");
       setReservoirsPerBox(storedSettings.reservoirsPerBox?.toString() || "");
       setInsulinCartridgeUnits(storedSettings.insulinCartridgeUnits?.toString() || "");
@@ -841,7 +827,6 @@ export default function Settings() {
       reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity) : undefined,
       unitsPerInsulinPen: unitsPerInsulinPen ? Math.max(1, parseInt(unitsPerInsulinPen)) : undefined,
       needlesPerBox: needlesPerBox ? Math.max(1, parseInt(needlesPerBox)) : undefined,
-      sensorsPerBox: sensorsPerBox ? Math.max(1, parseInt(sensorsPerBox)) : undefined,
       infusionSetsPerBox: infusionSetsPerBox ? Math.max(1, parseInt(infusionSetsPerBox)) : undefined,
       reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
@@ -954,8 +939,6 @@ export default function Settings() {
           setUnitsPerInsulinPen={setUnitsPerInsulinPen}
           needlesPerBox={needlesPerBox}
           setNeedlesPerBox={setNeedlesPerBox}
-          sensorsPerBox={sensorsPerBox}
-          setSensorsPerBox={setSensorsPerBox}
           infusionSetsPerBox={infusionSetsPerBox}
           setInfusionSetsPerBox={setInfusionSetsPerBox}
           reservoirsPerBox={reservoirsPerBox}

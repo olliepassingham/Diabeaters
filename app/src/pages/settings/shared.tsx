@@ -99,7 +99,14 @@ export function SettingsBackLink() {
   );
 }
 
-export function SettingsEmergencySection({ variant = "standalone" }: { variant?: "standalone" | "embedded" }) {
+export function SettingsEmergencySection({
+  variant = "standalone",
+  showSyncButton = true,
+}: {
+  variant?: "standalone" | "embedded";
+  /** Hide manual cloud sync (e.g. on Account — auto-sync still runs). */
+  showSyncButton?: boolean;
+}) {
   const { toast } = useToast();
   const { syncGeneration, saveNow, isLoading } = useEmergencyProfile();
   const [saving, setSaving] = useState(false);
@@ -152,21 +159,23 @@ export function SettingsEmergencySection({ variant = "standalone" }: { variant?:
       </div>
       {intro}
       <EmergencyProfileFields syncGeneration={syncGeneration} />
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={isLoading || saving}
-          onClick={() => void handleSyncNow()}
-          data-testid="button-emergency-sync-now"
-        >
-          {saving ? "Syncing…" : "Sync to cloud now"}
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          Local changes apply immediately; cloud sync usually follows within a second.
-        </span>
-      </div>
+      {showSyncButton ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isLoading || saving}
+            onClick={() => void handleSyncNow()}
+            data-testid="button-emergency-sync-now"
+          >
+            {saving ? "Syncing…" : "Sync to cloud now"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Local changes apply immediately; cloud sync usually follows within a second.
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }

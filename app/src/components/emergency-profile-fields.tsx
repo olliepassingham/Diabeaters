@@ -70,6 +70,7 @@ export function EmergencyProfileFields({
           <Input
             id="ep-phone"
             type="tel"
+            inputMode="tel"
             autoComplete="tel"
             placeholder="e.g. 07123 456789"
             value={data.phone}
@@ -83,6 +84,7 @@ export function EmergencyProfileFields({
           <Input
             id="ep-phone-2"
             type="tel"
+            inputMode="tel"
             autoComplete="tel"
             placeholder="Backup number"
             value={data.phoneSecondary}

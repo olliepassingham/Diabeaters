@@ -147,7 +147,8 @@ export function EmergencyProfileProvider({ children }: { children: ReactNode }) 
           return n;
         });
         scheduleCloudWrite(next);
-        setSyncGeneration((g) => g + 1);
+        // Do not bump syncGeneration here: EmergencyProfileFields uses it as `key` and remounting
+        // on every keystroke breaks phone/text inputs (one character at a time).
         return next;
       });
     },

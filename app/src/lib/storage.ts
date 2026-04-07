@@ -176,7 +176,6 @@ export interface UserSettings {
   reservoirCapacity?: number;
   unitsPerInsulinPen?: number;
   needlesPerBox?: number;
-  sensorsPerBox?: number;
   infusionSetsPerBox?: number;
   reservoirsPerBox?: number;
   insulinCartridgeUnits?: number;
@@ -258,13 +257,16 @@ export interface HypoTreatment {
   followUpTime?: string;
 }
 
-export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, { increment: number; label: string; settingsKey: keyof UserSettings }> = {
+/** `settingsKey` omitted when pack size is fixed (e.g. CGM: one sensor per dispensing unit). */
+type SupplyPackDefaultDef = { increment: number; label: string; settingsKey?: keyof UserSettings };
+
+export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, SupplyPackDefaultDef> = {
   insulin: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
   insulin_short: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
   insulin_long: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
   insulin_vial: { increment: 1000, label: "vial", settingsKey: "unitsPerInsulinPen" },
   needle: { increment: 100, label: "box", settingsKey: "needlesPerBox" },
-  cgm: { increment: 1, label: "sensor", settingsKey: "sensorsPerBox" },
+  cgm: { increment: 1, label: "sensor" },
   infusion_set: { increment: 10, label: "box", settingsKey: "infusionSetsPerBox" },
   reservoir: { increment: 10, label: "box", settingsKey: "reservoirsPerBox" },
   other: { increment: 1, label: "unit", settingsKey: "needlesPerBox" },
@@ -273,7 +275,7 @@ export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, { increment: number; label
 export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): { amount: number; label: string } {
   const s = settings || storage.getSettings();
   const packInfo = SUPPLY_PACK_DEFAULTS[type];
-  const customValue = s[packInfo.settingsKey] as number | undefined;
+  const customValue = packInfo.settingsKey ? (s[packInfo.settingsKey] as number | undefined) : undefined;
 
   if (type === "other") {
     return { amount: 1, label: "unit" };
@@ -289,17 +291,19 @@ export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): {
     return { amount, label: amount === 1 ? "unit" : "pen" };
   }
 
-  const amount = Math.max(1, customValue || packInfo.increment);
   if (type === "needle") {
+    const amount = Math.max(1, customValue || packInfo.increment);
     return { amount, label: amount === 1 ? "needle" : "box" };
   }
   if (type === "cgm") {
-    return { amount, label: "sensor" };
+    return { amount: 1, label: "sensor" };
   }
   if (type === "infusion_set") {
+    const amount = Math.max(1, customValue || packInfo.increment);
     return { amount, label: amount === 1 ? "set" : "box" };
   }
   if (type === "reservoir") {
+    const amount = Math.max(1, customValue || packInfo.increment);
     return { amount, label: amount === 1 ? "reservoir" : "box" };
   }
 
@@ -787,7 +791,10 @@ export const storage = {
   },
 
   saveSettings(settings: UserSettings): void {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    const { sensorsPerBox: _legacySensorsPerBox, ...rest } = settings as UserSettings & {
+      sensorsPerBox?: number;
+    };
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(rest));
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
     }

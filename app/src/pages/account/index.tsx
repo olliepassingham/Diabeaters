@@ -413,7 +413,17 @@ export default function Account() {
         className="max-w-xl"
       />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
-        <CardContent className="p-4 sm:p-5 space-y-0">
+        <CardContent className="relative p-4 sm:p-5 space-y-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute right-4 top-4 z-10 min-h-11 sm:right-5 sm:top-5"
+            asChild
+          >
+            <Link href="/settings" data-testid="link-account-settings">
+              Settings
+            </Link>
+          </Button>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
             <div
               className="mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:mx-0 sm:h-24 sm:w-24"
@@ -444,7 +454,7 @@ export default function Account() {
                 </span>
               )}
             </div>
-            <div className="min-w-0 flex-1 text-center sm:text-left space-y-1">
+            <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-center sm:pr-24 sm:text-left">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
               <p className="text-sm text-muted-foreground break-all">{email}</p>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
@@ -515,11 +525,6 @@ export default function Account() {
                     </Link>
                   </Button>
                 )}
-                <Button variant="outline" size="sm" className="min-h-11" asChild>
-                  <Link href="/settings" data-testid="link-account-settings">
-                    Settings
-                  </Link>
-                </Button>
               </div>
             </div>
           </div>
@@ -550,7 +555,7 @@ export default function Account() {
           className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
         >
           <CardContent className="p-6 space-y-4">
-            <SettingsEmergencySection variant="embedded" />
+            <SettingsEmergencySection variant="embedded" showSyncButton={false} />
           </CardContent>
         </Card>
       )}
