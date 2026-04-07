@@ -67,6 +67,7 @@ export function AccountCommunityProfileFields({
   const [onsetOpen, setOnsetOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingPublic, setSavingPublic] = useState(false);
   const [editing, setEditing] = useState(false);
   const profileIdRef = useRef<string | undefined>(undefined);
   const bioRef = useRef<HTMLTextAreaElement>(null);
@@ -103,12 +104,38 @@ export function AccountCommunityProfileFields({
     return () => cancelAnimationFrame(id);
   }, [isPublic, adjustBioHeight]);
 
-  function onPublicChange(next: boolean) {
+  async function persistPublicChange(next: boolean) {
+    if (!profile?.id) return;
+    const previous = profile.is_public;
+    if (next === previous) return;
+
     setIsPublic(next);
     if (next) {
-      const saved = hasSavedCommunityDetails(profile ?? null);
+      const saved = hasSavedCommunityDetails(profile);
       setEditing(!saved);
     }
+
+    setSavingPublic(true);
+    const { error } = await updateProfile({ id: profile.id, is_public: next });
+    setSavingPublic(false);
+
+    if (error) {
+      setIsPublic(previous);
+      toast({
+        title: "Could not update visibility",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    void refresh();
+    toast({
+      title: "Saved",
+      description: next
+        ? "Public profile is on. You can use the Feed and edit your details below."
+        : "Public profile is off. The Feed is hidden until you turn this on again.",
+    });
   }
 
   const todayIso = useMemo(() => {
@@ -176,29 +203,42 @@ export function AccountCommunityProfileFields({
 
   const formBody = (
     <>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2">
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <div className="flex flex-wrap items-center gap-1">
-            <Label htmlFor={pubId}>Public profile</Label>
-            <InlineInfoHint
-              ariaLabel="About public profile"
-              content={
-                showAccountLinkInCopy ? (
-                  <>
-                    Let signed-in members see your community card. Photo and display name are on{" "}
-                    <Link href="/account" className="text-primary underline-offset-4 hover:underline">
-                      Account
-                    </Link>
-                    .
-                  </>
-                ) : (
-                  "When on, you can use the Feed and set your handle and bio below. Photo and display name use this account above."
-                )
-              }
-            />
+      <div className="rounded-lg border border-border/60">
+        <div className="flex items-center justify-between gap-3 px-3 py-2">
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-1">
+              <Label htmlFor={pubId}>Public profile</Label>
+              <InlineInfoHint
+                ariaLabel="About public profile"
+                content={
+                  showAccountLinkInCopy ? (
+                    <>
+                      Let signed-in members see your community card. Photo and display name are on{" "}
+                      <Link href="/account" className="text-primary underline-offset-4 hover:underline">
+                        Account
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    "When on, you can use the Feed and set your handle and bio below. Photo and display name use this account above."
+                  )
+                }
+              />
+            </div>
           </div>
+          <Switch
+            id={pubId}
+            checked={isPublic}
+            onCheckedChange={(checked) => void persistPublicChange(checked)}
+            disabled={loading || saving || savingPublic}
+            data-testid="account-community-public-switch"
+          />
         </div>
-        <Switch id={pubId} checked={isPublic} onCheckedChange={onPublicChange} disabled={loading} />
+        {savingPublic ? (
+          <p className="px-3 pb-2 text-xs text-muted-foreground" aria-live="polite">
+            Saving…
+          </p>
+        ) : null}
       </div>
 
       {isPublic ? (
@@ -239,7 +279,7 @@ export function AccountCommunityProfileFields({
                     autoCorrect="off"
                     spellCheck={false}
                     maxLength={30}
-                    disabled={loading}
+                    disabled={loading || savingPublic}
                     data-testid="account-community-handle-input"
                   />
                 </div>
@@ -255,7 +295,7 @@ export function AccountCommunityProfileFields({
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="A short intro for the feed (not medical advice)."
-                  disabled={loading}
+                  disabled={loading || savingPublic}
                   data-testid="account-community-bio-input"
                   className="min-h-[2.75rem] max-h-[200px] resize-none overflow-y-auto py-2"
                 />
@@ -296,7 +336,7 @@ export function AccountCommunityProfileFields({
                       max={todayIso}
                       value={onsetDateInput}
                       onChange={(e) => setOnsetDateInput(e.target.value)}
-                      disabled={loading || saving}
+                      disabled={loading || saving || savingPublic}
                       data-testid="account-community-onset-input"
                     />
                     {onsetDateInput.trim() ? (
@@ -306,7 +346,7 @@ export function AccountCommunityProfileFields({
                         size="sm"
                         className="h-8 px-2"
                         onClick={() => void clearOnsetDate()}
-                        disabled={saving || loading}
+                        disabled={saving || loading || savingPublic}
                         data-testid="account-community-onset-remove"
                       >
                         Remove
@@ -316,7 +356,7 @@ export function AccountCommunityProfileFields({
                 </CollapsibleContent>
               </Collapsible>
 
-              <Button type="submit" disabled={saving || loading} data-testid="account-community-save">
+              <Button type="submit" disabled={saving || loading || savingPublic} data-testid="account-community-save">
                 {saving ? "Saving…" : "Save"}
               </Button>
             </>
@@ -387,6 +427,7 @@ export function AccountCommunityProfileFields({
           variant="outline"
           size="sm"
           onClick={() => setEditing(true)}
+          disabled={savingPublic}
           data-testid="account-community-edit"
         >
           Edit
@@ -429,6 +470,7 @@ export function AccountCommunityProfileFields({
                 size="sm"
                 className="shrink-0"
                 onClick={() => setEditing(true)}
+                disabled={savingPublic}
                 data-testid="account-community-edit"
               >
                 Edit
