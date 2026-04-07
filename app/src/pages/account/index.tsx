@@ -427,7 +427,7 @@ export default function Account() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               <div
-                className="mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:mx-0 sm:h-24 sm:w-24"
+                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
                 data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
                 {...(!showAvatarImage && {
                   role: "img" as const,
@@ -455,10 +455,10 @@ export default function Account() {
                   </span>
                 )}
               </div>
-              <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-center sm:pr-24 sm:text-left">
+              <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-left sm:pr-24">
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
                 <p className="text-sm text-muted-foreground break-all">{email}</p>
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                <div className="flex flex-wrap items-center justify-start gap-2 pt-1">
                   <span
                     data-testid={verified ? "status-verified" : "status-unverified"}
                     className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
@@ -472,7 +472,7 @@ export default function Account() {
                 </div>
               </div>
             </div>
-            <div className="flex w-full flex-wrap items-center justify-center gap-2 pt-2 pb-0.5 sm:justify-start [&_a]:shrink-0 [&_button]:shrink-0">
+            <div className="flex w-full flex-wrap items-center justify-start gap-2 pt-2 pb-0.5 [&_a]:shrink-0 [&_button]:shrink-0">
               {carerLinkLoading ? (
                 <Skeleton
                   className="h-11 min-w-[7.25rem] shrink-0 rounded-md"

@@ -346,13 +346,13 @@ export default function FamilyCarersPage() {
             {
               key: "supplies" as const,
               label: "Supplies",
-              description: "Stock levels from your cloud supply list (where your plan allows carers to read them).",
+              description: "Stock levels from your cloud supply list.",
               testId: "privacy-toggle-supplies",
             },
             {
               key: "hypo_alerts" as const,
               label: "Hypo logs",
-              description: "Recent low blood sugar logs (if your Supabase policies allow linked carers to read them).",
+              description: "Recent low blood sugar logs.",
               testId: "privacy-toggle-hypo-alerts",
             },
             {

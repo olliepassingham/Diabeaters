@@ -359,55 +359,55 @@ function HeroCard({
       >
         <CardContent className="p-4 md:p-5 space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 space-y-0.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-lg font-semibold tracking-tight text-foreground" data-testid="text-greeting">
-                  {greeting()}
-                  {firstName ? `, ${firstName}` : ""}
-                </span>
-                <StagingChip />
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="text-lg font-semibold tracking-tight text-foreground" data-testid="text-greeting">
+                    {greeting()}
+                    {firstName ? `, ${firstName}` : ""}
+                  </span>
+                  <StagingChip />
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <DashboardInfoDialog />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onEditWidgets}
+                    className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                    data-testid="button-customize"
+                    aria-label="Edit dashboard widgets"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
             </div>
             <StatusPill status={status} />
           </div>
 
-          <div className="flex flex-nowrap items-center justify-between gap-2 min-w-0">
-            <div className="flex min-w-0 flex-1 flex-nowrap items-stretch gap-2">
-              <Link href="/help-now" className="min-w-0 flex-1">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className={`min-h-11 w-full min-w-0 rounded-full px-2.5 text-xs sm:px-3 sm:text-sm bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
-                  data-testid="button-help-now"
-                >
-                  <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1 shrink-0" />
-                  <span className="truncate">Help Now</span>
-                </Button>
-              </Link>
+          <div className="flex min-w-0 flex-nowrap items-stretch gap-2">
+            <Link href="/help-now" className="min-w-0 flex-1">
               <Button
+                variant="destructive"
                 size="sm"
-                className="min-h-11 min-w-0 flex-1 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 px-2.5 text-xs sm:px-3 sm:text-sm"
-                onClick={handleTreatedHypoClick}
-                data-testid="button-dashboard-treated-hypo"
+                className={`min-h-11 w-full min-w-0 rounded-full px-3 text-sm bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
+                data-testid="button-help-now"
               >
-                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                <span className="truncate">Treated a Hypo</span>
+                <Phone className="h-4 w-4 mr-1 shrink-0" />
+                Help Now
               </Button>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <DashboardInfoDialog />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onEditWidgets}
-                className="min-h-11 min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-                data-testid="button-customize"
-                aria-label="Edit dashboard widgets"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
+            </Link>
+            <Button
+              size="sm"
+              className="min-h-11 min-w-0 flex-1 rounded-full bg-green-600 dark:bg-green-700 px-3 text-sm text-white gap-1"
+              onClick={handleTreatedHypoClick}
+              data-testid="button-dashboard-treated-hypo"
+            >
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Treated a Hypo
+            </Button>
           </div>
         </CardContent>
       </Card>
