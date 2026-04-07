@@ -3,13 +3,20 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Plus, Clock, MapPin } from "lucide-react";
 import { Link } from "wouter";
-import { storage, Appointment } from "@/lib/storage";
+import {
+  DIABEATER_ACTIVE_USER_CHANGED_EVENT,
+  DIABEATER_APPOINTMENTS_CHANGED_EVENT,
+  isAppointmentsStorageKey,
+  storage,
+  Appointment,
+} from "@/lib/storage";
 import { format } from "date-fns";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
 import { syncAppointments } from "@/lib/appointments-supabase";
+import { useAuth } from "@/lib/auth-context";
 
 function parseAppointmentDate(dateStr: string | undefined): Date | null {
   if (!dateStr) return null;
@@ -52,42 +59,57 @@ function statusPill(appointment: Appointment) {
 }
 
 export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
+  const { user } = useAuth();
   const compact = isCompactLayout(props);
   const [appointments, setAppointments] = useState<Appointment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadUpcoming = useCallback(() => {
     try {
-      const upcoming = storage.getUpcomingAppointments?.() ?? [];
+      const uid = user?.id;
+      if (!uid) {
+        setAppointments([]);
+        setError(null);
+        return;
+      }
+      const upcoming = storage.getUpcomingAppointmentsForUser(uid);
       setAppointments(Array.isArray(upcoming) ? upcoming.slice(0, 3) : []);
       setError(null);
     } catch {
       setError("Could not load appointments.");
       setAppointments([]);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadUpcoming();
+    void syncAppointments({ throttleMs: 0 }).then(() => loadUpcoming());
+
     const onFocus = () => {
-      void syncAppointments();
-      loadUpcoming();
+      void syncAppointments().then(() => loadUpcoming());
     };
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "diabeater_appointments") loadUpcoming();
+      if (isAppointmentsStorageKey(e.key)) loadUpcoming();
     };
+    const onActiveUser = () => {
+      void syncAppointments({ throttleMs: 0 }).then(() => loadUpcoming());
+    };
+    const onAppointmentsChanged = () => loadUpcoming();
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        void syncAppointments();
-        loadUpcoming();
+        void syncAppointments().then(() => loadUpcoming());
       }
     };
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUser);
+    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppointmentsChanged);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUser);
+      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppointmentsChanged);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [loadUpcoming]);
@@ -155,7 +177,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
                 >
                   <div
                     className={cn(
-                      "flex flex-col items-center justify-center rounded-lg bg-card shadow-sm min-w-[3.25rem] px-2 py-2 border border-border"
+                      "flex flex-col items-center justify-center rounded-lg bg-card shadow-sm min-w-[3.25rem] px-2 py-2 border border-border",
                     )}
                   >
                     {d ? (

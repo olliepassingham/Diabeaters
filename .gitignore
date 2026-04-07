@@ -13,3 +13,4 @@ test-results
 playwright-report
 playwright/.cache
 app/public/robots.txt
+supabase/.temp/

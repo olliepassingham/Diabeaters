@@ -297,6 +297,7 @@ function UsageTab({
   shortActingInjectionsPerDay, setShortActingInjectionsPerDay,
   longActingInjectionsPerDay, setLongActingInjectionsPerDay,
   primingUnits, setPrimingUnits,
+  basalInjectionTime, setBasalInjectionTime,
   cgmDays, setCgmDays,
   siteChangeDays, setSiteChangeDays,
   reservoirChangeDays, setReservoirChangeDays,
@@ -316,6 +317,7 @@ function UsageTab({
   shortActingInjectionsPerDay: string; setShortActingInjectionsPerDay: (v: string) => void;
   longActingInjectionsPerDay: string; setLongActingInjectionsPerDay: (v: string) => void;
   primingUnits: string; setPrimingUnits: (v: string) => void;
+  basalInjectionTime: string; setBasalInjectionTime: (v: string) => void;
   cgmDays: string; setCgmDays: (v: string) => void;
   siteChangeDays: string; setSiteChangeDays: (v: string) => void;
   reservoirChangeDays: string; setReservoirChangeDays: (v: string) => void;
@@ -424,6 +426,20 @@ function UsageTab({
               <Label htmlFor="long-acting-injections">Long-Acting Injections/Day</Label>
               <Input id="long-acting-injections" type="number" placeholder="e.g., 1" value={longActingInjectionsPerDay} onChange={(e) => setLongActingInjectionsPerDay(e.target.value)} data-testid="input-long-acting-injections" />
               <p className="text-xs text-muted-foreground">Basal doses (usually 1 or 2)</p>
+            </div>
+            <div className="space-y-2 col-span-2">
+              <Label htmlFor="settings-basal-time">Usual long-acting injection time</Label>
+              <Input
+                id="settings-basal-time"
+                type="time"
+                value={basalInjectionTime}
+                onChange={(e) => setBasalInjectionTime(e.target.value)}
+                className="w-full max-w-[12rem]"
+                data-testid="input-settings-basal-time"
+              />
+              <p className="text-xs text-muted-foreground">
+                Home clock time; used for travel insulin timing (MDI) when you cross time zones.
+              </p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center">
@@ -540,6 +556,7 @@ export default function Settings() {
   const [shortActingInjectionsPerDay, setShortActingInjectionsPerDay] = useState("");
   const [longActingInjectionsPerDay, setLongActingInjectionsPerDay] = useState("");
   const [primingUnits, setPrimingUnits] = useState("");
+  const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
   const [cgmDays, setCgmDays] = useState("");
   const [siteChangeDays, setSiteChangeDays] = useState("");
   const [reservoirChangeDays, setReservoirChangeDays] = useState("");
@@ -627,6 +644,7 @@ export default function Settings() {
         setLongActingInjectionsPerDay(storedSettings.longActingInjectionsPerDay?.toString() || "");
       }
       setPrimingUnits(storedSettings.primingUnitsPerInjection?.toString() || "");
+      setBasalInjectionTime(storedSettings.basalInjectionTime || "22:00");
       setCgmDays(storedSettings.cgmDays?.toString() || "");
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
       setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
@@ -816,6 +834,7 @@ export default function Settings() {
         return total > 0 ? total : (injectionsPerDay ? parseInt(injectionsPerDay) : undefined);
       })(),
       primingUnitsPerInjection: primingUnits ? parseFloat(primingUnits) : undefined,
+      basalInjectionTime: basalInjectionTime.trim() || undefined,
       cgmDays: cgmDays ? parseInt(cgmDays) : undefined,
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
       reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
@@ -921,6 +940,8 @@ export default function Settings() {
           setLongActingInjectionsPerDay={setLongActingInjectionsPerDay}
           primingUnits={primingUnits}
           setPrimingUnits={setPrimingUnits}
+          basalInjectionTime={basalInjectionTime}
+          setBasalInjectionTime={setBasalInjectionTime}
           cgmDays={cgmDays}
           setCgmDays={setCgmDays}
           siteChangeDays={siteChangeDays}

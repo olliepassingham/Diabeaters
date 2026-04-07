@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Activity, Info, Plane, ChevronRight, Power, Check, Clock, ShieldAlert, Heart, Package, Syringe, Droplets, AlertTriangle, ArrowLeft, Thermometer, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { AlertCircle, Activity, Info, Plane, ChevronRight, ChevronDown, Power, Check, Clock, ShieldAlert, Heart, Package, Syringe, Droplets, AlertTriangle, ArrowLeft, Thermometer, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +18,8 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
-import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
+import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -42,12 +43,19 @@ interface SickDayResults {
   originalSnackRatio: string;
   ratioMultiplier: number;
   basalAdjustment: string;
+  /** Short line for summary UI; optional on older saved sessions */
+  basalAdjustmentBrief?: string;
   hydrationNote: string;
+  hydrationBrief?: string;
   monitoringFrequency: string;
+  monitoringBrief?: string;
   ketoneWarning: string;
+  ketoneWarningBrief?: string;
   ketoneGuidance: string;
+  ketoneGuidanceBrief?: string;
   ketoneActionRequired: "none" | "monitor" | "urgent" | "emergency";
   stackingWarning: string;
+  stackingWarningBrief?: string;
 }
 
 // Blood glucose zones for tiered correction approach
@@ -182,33 +190,50 @@ function calculateSickDayRecommendations(
 
   let ratioMultiplier = 1;
   let basalAdjustment = "No change recommended";
+  let basalAdjustmentBrief = "No change unless your team advises";
   let hydrationNote = "Drink plenty of sugar-free fluids";
+  let hydrationBrief = "Sugar-free fluids often";
   let monitoringFrequency = "Check blood glucose every 4 hours";
+  let monitoringBrief = "Check BG about every 4 hours";
   let ketoneWarning = "";
+  let ketoneWarningBrief = "";
   let ketoneGuidance = "";
+  let ketoneGuidanceBrief = "";
   let ketoneActionRequired: "none" | "monitor" | "urgent" | "emergency" = "none";
   let stackingWarning = "";
+  let stackingWarningBrief = "";
 
   switch (severity) {
     case "minor":
       ratioMultiplier = 1.1; // 10% more insulin
       basalAdjustment = "Consider 10% increase if blood glucose runs high";
+      basalAdjustmentBrief = "Consider up to ~10% more basal if BG runs high";
       monitoringFrequency = "Check blood glucose every 4-6 hours";
+      monitoringBrief = "Check BG every 4–6 hours";
       stackingWarning = "Wait at least 3 hours between corrections to assess effectiveness";
+      stackingWarningBrief = "Wait at least 3 hours between corrections";
       break;
     case "moderate":
       ratioMultiplier = 1.2; // 20% more insulin
       basalAdjustment = "Consider 10-20% increase if blood glucose remains elevated";
+      basalAdjustmentBrief = "Consider ~10–20% more basal if BG stays up";
       hydrationNote = "Stay well hydrated with sugar-free fluids. Consider electrolyte drinks.";
+      hydrationBrief = "Water + sugar-free fluids; electrolytes if advised";
       monitoringFrequency = "Check blood glucose every 2-4 hours";
+      monitoringBrief = "Check BG every 2–4 hours";
       stackingWarning = "Wait at least 4 hours between corrections - absorption may be delayed";
+      stackingWarningBrief = "Wait at least 4 hours between corrections";
       break;
     case "severe":
       ratioMultiplier = 1.3; // 30% more insulin
       basalAdjustment = "Consider 20% increase, but monitor closely for lows if unable to eat";
+      basalAdjustmentBrief = "Consider ~20% more basal; watch for hypos if not eating";
       hydrationNote = "Critical: Stay hydrated. If vomiting, seek medical attention immediately.";
+      hydrationBrief = "Keep drinking; vomiting needs urgent care";
       monitoringFrequency = "Check blood glucose and ketones every 2 hours";
+      monitoringBrief = "Check BG and ketones about every 2 hours";
       stackingWarning = "Do NOT give additional corrections for at least 4-5 hours. Insulin absorption is unpredictable during severe illness.";
+      stackingWarningBrief = "No extra corrections for 4–5 hours";
       break;
   }
 
@@ -222,41 +247,53 @@ function calculateSickDayRecommendations(
     case "none":
       if (isHighBg) {
         ketoneGuidance = "No ketones detected - good sign. Continue monitoring blood glucose and recheck ketones in 2-4 hours if glucose stays high.";
+        ketoneGuidanceBrief = "Recheck ketones if glucose stays high.";
         ketoneActionRequired = "monitor";
       } else {
         ketoneGuidance = "No ketones detected. Continue regular sick day monitoring.";
+        ketoneGuidanceBrief = "No ketones—keep your usual sick-day checks.";
         ketoneActionRequired = "none";
       }
       break;
     case "trace":
       ketoneGuidance = "Trace ketones can appear during illness or if you haven't eaten. Drink extra fluids (250ml water per hour) and recheck in 2 hours.";
+      ketoneGuidanceBrief = "Extra fluids; recheck ketones in 2 hours.";
       ketoneActionRequired = "monitor";
       if (isHighBg) {
         ketoneWarning = "Trace ketones with elevated glucose - take correction dose and increase fluids.";
+        ketoneWarningBrief = "Take correction and drink more fluids.";
       }
       break;
     case "small":
       ketoneGuidance = "Small ketones indicate your body needs more insulin. Drink 250-500ml fluids per hour. Take correction dose if not already given. Recheck ketones every 2 hours.";
+      ketoneGuidanceBrief = "More fluids + insulin as needed; recheck ketones every 2 hours.";
       ketoneActionRequired = "monitor";
       ketoneWarning = "Small ketones present - ensure you're getting enough insulin and fluids.";
+      ketoneWarningBrief = "Ensure enough insulin and fluids.";
       if (isVeryHighBg) {
         ketoneActionRequired = "urgent";
         ketoneWarning = "Small ketones with high glucose - contact your diabetes team for guidance if ketones don't improve in 2 hours.";
+        ketoneWarningBrief = "Call your team if not improving in 2 hours.";
       }
       break;
     case "moderate":
       ketoneGuidance = "Moderate ketones are a warning sign of developing DKA (diabetic ketoacidosis). You need extra insulin NOW. Drink 500ml fluids per hour. Contact your diabetes team immediately.";
+      ketoneGuidanceBrief = "Extra insulin and fluids now—contact your diabetes team.";
       ketoneActionRequired = "urgent";
       ketoneWarning = "URGENT: Moderate ketones detected. This requires immediate attention. Contact your diabetes team now.";
+      ketoneWarningBrief = "Urgent: contact your diabetes team now.";
       if (isVeryHighBg || severity === "severe") {
         ketoneActionRequired = "emergency";
         ketoneWarning = "EMERGENCY: Moderate ketones with high glucose or severe illness. Go to A&E or call 999 if you cannot reach your diabetes team.";
+        ketoneWarningBrief = "Emergency: go to A&E or call 999 if you cannot reach your team.";
       }
       break;
     case "large":
       ketoneGuidance = "Large ketones are a medical emergency. You are at high risk of DKA (diabetic ketoacidosis). Do NOT wait - seek emergency medical care immediately.";
+      ketoneGuidanceBrief = "Medical emergency—seek care now.";
       ketoneActionRequired = "emergency";
       ketoneWarning = "EMERGENCY: Large ketones detected. Go to A&E immediately or call 999. This is a medical emergency.";
+      ketoneWarningBrief = "Go to A&E or call 999 now.";
       break;
   }
 
@@ -265,6 +302,7 @@ function calculateSickDayRecommendations(
     ketoneWarning = "URGENT: Blood glucose is critically high. " + (ketoneLevel === "none" 
       ? "Check ketones immediately and contact your healthcare team."
       : ketoneWarning);
+    ketoneWarningBrief = "Critically high glucose—get urgent medical advice.";
     if (ketoneLevel !== "large") {
       ketoneActionRequired = ketoneActionRequired === "emergency" ? "emergency" : "urgent";
     }
@@ -286,12 +324,18 @@ function calculateSickDayRecommendations(
     originalSnackRatio: getOriginalRatio(settings.snackRatio),
     ratioMultiplier,
     basalAdjustment,
+    basalAdjustmentBrief,
     hydrationNote,
+    hydrationBrief,
     monitoringFrequency,
+    monitoringBrief,
     ketoneWarning,
+    ketoneWarningBrief,
     ketoneGuidance,
+    ketoneGuidanceBrief,
     ketoneActionRequired,
     stackingWarning,
+    stackingWarningBrief,
   };
 }
 
@@ -526,7 +570,7 @@ export default function SickDay() {
       if (!res.success) {
         toast({
           title: NOTIFY_EDGE_FAILURE_TITLE,
-          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          description: notifyEdgeFailureDescription(res),
           variant: "destructive",
         });
       }
@@ -955,12 +999,12 @@ export default function SickDay() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {results.ketoneActionRequired === "emergency" && (
-                    <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500 animate-pulse">
+                    <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500">
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-bold text-base text-white">EMERGENCY - Seek Medical Help Now</p>
-                          <p className="text-sm text-red-100 mt-1">{results.ketoneWarning}</p>
+                          <p className="font-bold text-base text-white">Emergency — get medical help now</p>
+                          <p className="text-sm text-red-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
                         </div>
                       </div>
                     </div>
@@ -971,21 +1015,29 @@ export default function SickDay() {
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent - Contact Diabetes Team</p>
-                          <p className="text-xs text-red-800 dark:text-red-200 mt-1">{results.ketoneWarning}</p>
+                          <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent — contact your diabetes team</p>
+                          <p className="text-sm text-red-800 dark:text-red-200 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <div className="p-4 bg-primary/5 rounded-lg space-y-3">
+                  <div className="p-4 bg-primary/5 rounded-lg space-y-2">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-sm text-muted-foreground">Suggested Correction Dose:</span>
+                      <span className="text-sm text-muted-foreground">Suggested correction</span>
                       <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
                         {results.correctionDose} units
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{results.correctionExplanation}</p>
+                    <Collapsible className="group">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
+                        How this was calculated
+                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="text-xs text-muted-foreground pt-1">
+                        <p>{results.correctionExplanation}</p>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
 
                   {results.stackingWarning && (
@@ -993,8 +1045,8 @@ export default function SickDay() {
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Stacking Warning</p>
-                          <p className="text-xs text-orange-800 dark:text-orange-200">{results.stackingWarning}</p>
+                          <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Spacing corrections</p>
+                          <p className="text-sm text-orange-800 dark:text-orange-200">{results.stackingWarningBrief || results.stackingWarning}</p>
                         </div>
                       </div>
                     </div>
@@ -1079,7 +1131,9 @@ export default function SickDay() {
                     <Droplets className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Test blood glucose more frequently</p>
-                      <p className="text-xs text-muted-foreground">{results.monitoringFrequency}. Illness often causes blood glucose to rise unpredictably.</p>
+                      <p className="text-xs text-muted-foreground">
+                        {results.monitoringBrief || results.monitoringFrequency}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
@@ -1095,7 +1149,7 @@ export default function SickDay() {
                     <Heart className="h-5 w-5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Stay hydrated</p>
-                      <p className="text-xs text-muted-foreground">{results.hydrationNote}</p>
+                      <p className="text-xs text-muted-foreground">{results.hydrationBrief || results.hydrationNote}</p>
                     </div>
                   </div>
                   {isPumpUser && (
@@ -1709,9 +1763,7 @@ export default function SickDay() {
               <div className="text-sm">
                 <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
                 <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-                  This tool provides educational estimates only based on general guidelines. 
-                  Always consult your healthcare provider when sick, especially if blood glucose 
-                  is consistently high, you have ketones, or symptoms worsen.
+                  Educational estimates only. Contact your healthcare team if you are unwell, especially with high glucose, ketones, or worsening symptoms.
                 </p>
               </div>
             </div>
@@ -1827,6 +1879,43 @@ export default function SickDay() {
           </Card>
         ) : (
           <>
+          <Card className={isSickDayActive ? "border-orange-500/50 bg-orange-50/30 dark:bg-orange-950/20" : "border-primary/50"}>
+            <CardContent className="p-4">
+              {isSickDayActive ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
+                    <Check className="h-5 w-5 text-orange-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Sick Day Mode Active</p>
+                      <p className="text-xs text-orange-700 dark:text-orange-300 capitalize">{severity} severity</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleDeactivateSickDay}
+                    data-testid="button-deactivate-sick-day"
+                  >
+                    <Power className="h-4 w-4 mr-2" />
+                    Deactivate Sick Day Mode
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    When you feel better, deactivate to clear dashboard status.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Button className="w-full" onClick={handleActivateSickDay} data-testid="button-activate-sick-day">
+                    <Power className="h-4 w-4 mr-2" />
+                    Activate Sick Day Mode
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Shows sick day status on your dashboard and adjusted ratios.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {verdict ? (
             <Card className="rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40" data-testid="card-sickday-verdict">
               <CardHeader className="pb-3">
@@ -1917,17 +2006,27 @@ export default function SickDay() {
           <Card className="border-primary/50">
             <CardHeader>
               <CardTitle>Sick Day Recommendations</CardTitle>
-              <CardDescription>Based on your current condition</CardDescription>
+              <CardDescription>Key numbers first; open sections below if you want detail.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {results.ketoneActionRequired === "emergency" && (
-                <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500 animate-pulse">
+                <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-base text-white">EMERGENCY - Seek Medical Help Now</p>
-                      <p className="text-sm text-red-100 mt-1">{results.ketoneWarning}</p>
-                      <p className="text-sm text-white mt-2 font-medium">{results.ketoneGuidance}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-base text-white">Emergency — get medical help now</p>
+                      <p className="text-sm text-red-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
+                      <p className="text-sm text-white mt-2 font-medium">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
+                      <Collapsible className="group mt-3 border-t border-white/25 pt-2">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-sm text-white/95 py-1 hover:underline">
+                          Read full guidance
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 text-sm text-red-50 pt-2">
+                          <p>{results.ketoneWarning}</p>
+                          <p>{results.ketoneGuidance}</p>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </div>
                 </div>
@@ -1937,10 +2036,20 @@ export default function SickDay() {
                 <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent - Contact Diabetes Team</p>
-                      <p className="text-xs text-red-800 dark:text-red-200 mt-1">{results.ketoneWarning}</p>
-                      <p className="text-xs text-red-700 dark:text-red-300 mt-2">{results.ketoneGuidance}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent — contact your diabetes team</p>
+                      <p className="text-sm text-red-800 dark:text-red-200 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
+                      <Collapsible className="group mt-2 border-t border-red-200/80 dark:border-red-800/80 pt-2">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-red-900 dark:text-red-100 py-1">
+                          Read full guidance
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 text-xs text-red-800 dark:text-red-200 pt-1">
+                          <p>{results.ketoneWarning}</p>
+                          <p>{results.ketoneGuidance}</p>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </div>
                 </div>
@@ -1950,12 +2059,22 @@ export default function SickDay() {
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm text-amber-900 dark:text-amber-100">Ketone Monitoring</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-amber-900 dark:text-amber-100">Ketones — keep monitoring</p>
                       {results.ketoneWarning && (
-                        <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">{results.ketoneWarning}</p>
+                        <p className="text-sm text-amber-900 dark:text-amber-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
                       )}
-                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">{results.ketoneGuidance}</p>
+                      <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
+                      <Collapsible className="group mt-2 border-t border-amber-200 dark:border-amber-800 pt-2">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-amber-900 dark:text-amber-100 py-1">
+                          Read full guidance
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 text-xs text-amber-800 dark:text-amber-200 pt-1">
+                          {results.ketoneWarning && <p>{results.ketoneWarning}</p>}
+                          <p>{results.ketoneGuidance}</p>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </div>
                 </div>
@@ -1965,39 +2084,56 @@ export default function SickDay() {
                 <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="flex items-start gap-2">
                     <Info className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-green-800 dark:text-green-200">{results.ketoneGuidance}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-green-900 dark:text-green-100 font-medium">Ketones</p>
+                      <p className="text-sm text-green-800 dark:text-green-200 mt-0.5">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
+                      {(results.ketoneGuidanceBrief && results.ketoneGuidance !== results.ketoneGuidanceBrief) && (
+                        <Collapsible className="group mt-2 border-t border-green-200 dark:border-green-800 pt-2">
+                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-green-900 dark:text-green-100 py-1">
+                            More detail
+                            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="text-xs text-green-800 dark:text-green-200 pt-1">
+                            <p>{results.ketoneGuidance}</p>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
 
               {results.correctionDose > 0 && (
-                <div className="p-4 bg-primary/5 rounded-lg space-y-3">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm text-muted-foreground">Suggested Correction Dose:</span>
+                <div className="p-4 bg-primary/5 rounded-lg space-y-2">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-sm text-muted-foreground">Suggested correction</span>
                     <span className="text-2xl font-semibold" data-testid="text-correction-dose">
                       {results.correctionDose} units
                     </span>
                   </div>
-                  
-                  <div className="text-xs text-muted-foreground space-y-2 border-t border-primary/10 pt-3">
-                    <p className="font-medium text-foreground">How this was calculated:</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="p-2 bg-background rounded text-center">
-                        <p className="text-[10px] uppercase tracking-wide opacity-70">Base Dose</p>
-                        <p className="font-semibold text-sm">{results.baseCorrectionDose}u</p>
+                  <Collapsible className="group">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium text-foreground py-1">
+                      How we calculated this
+                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="text-xs text-muted-foreground space-y-2 border-t border-primary/10 pt-3">
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="p-2 bg-background rounded text-center">
+                          <p className="text-[10px] uppercase tracking-wide opacity-70">Base</p>
+                          <p className="font-semibold text-sm">{results.baseCorrectionDose}u</p>
+                        </div>
+                        <div className="p-2 bg-background rounded text-center">
+                          <p className="text-[10px] uppercase tracking-wide opacity-70">Safety</p>
+                          <p className="font-semibold text-sm">×{results.severityModifier}</p>
+                        </div>
+                        <div className="p-2 bg-background rounded text-center">
+                          <p className="text-[10px] uppercase tracking-wide opacity-70">BG zone</p>
+                          <p className="font-semibold text-sm">×{results.bgZoneModifier}</p>
+                        </div>
                       </div>
-                      <div className="p-2 bg-background rounded text-center">
-                        <p className="text-[10px] uppercase tracking-wide opacity-70">Safety Factor</p>
-                        <p className="font-semibold text-sm">×{results.severityModifier}</p>
-                        <p className="text-[9px] opacity-60">(lower = more caution)</p>
-                      </div>
-                      <div className="p-2 bg-background rounded text-center">
-                        <p className="text-[10px] uppercase tracking-wide opacity-70">BG Zone Factor</p>
-                        <p className="font-semibold text-sm">×{results.bgZoneModifier}</p>
-                      </div>
-                    </div>
-                    <p className="text-[11px] italic">{results.correctionExplanation}</p>
-                  </div>
+                      <p className="text-[11px] italic">{results.correctionExplanation}</p>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               )}
 
@@ -2005,9 +2141,20 @@ export default function SickDay() {
                 <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Stacking Warning</p>
-                      <p className="text-xs text-orange-800 dark:text-orange-200">{results.stackingWarning}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Spacing corrections</p>
+                      <p className="text-sm text-orange-800 dark:text-orange-200">{results.stackingWarningBrief || results.stackingWarning}</p>
+                      {results.stackingWarningBrief && results.stackingWarning !== results.stackingWarningBrief && (
+                        <Collapsible className="group mt-2 border-t border-orange-200 dark:border-orange-800 pt-2">
+                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-orange-900 dark:text-orange-100 py-1">
+                            Full wording
+                            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="text-xs text-orange-800 dark:text-orange-200 pt-1">
+                            <p>{results.stackingWarning}</p>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2015,10 +2162,8 @@ export default function SickDay() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                    ×{results.ratioMultiplier} adjustment
-                  </span>
+                  <h3 className="font-semibold text-sm">Mealtime ratios</h3>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">×{results.ratioMultiplier}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-muted rounded-lg">
@@ -2050,111 +2195,80 @@ export default function SickDay() {
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Higher units:10g = more insulin to overcome illness-related insulin resistance
-                </p>
+                <Collapsible className="group">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs text-muted-foreground py-1">
+                    Why ratios change
+                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="text-xs text-muted-foreground pt-1">
+                    Higher units per 10g means more meal insulin to offset illness-related resistance (your team may adjust differently).
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
-              <div className="space-y-3">
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Info className="h-4 w-4 text-primary mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">{isPumpUser ? "Basal Rate Adjustment" : "Basal (Long-Acting) Insulin"}</p>
-                      <p className="text-xs text-muted-foreground">{results.basalAdjustment}</p>
-                      {isPumpUser && (
-                        <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">
-                          Adjust your temporary basal rate on your pump rather than changing your programmed profile.
-                        </p>
-                      )}
-                    </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                <p className="text-sm font-medium">Basal, fluids, checks</p>
+                <div className="flex gap-3 text-sm">
+                  <Syringe className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-xs text-muted-foreground">{isPumpUser ? "Basal / pump" : "Long-acting"}</p>
+                    <p className="text-foreground">{results.basalAdjustmentBrief || results.basalAdjustment}</p>
+                    {isPumpUser && (
+                      <p className="text-xs text-muted-foreground mt-0.5">Use temp basal if your team agrees—not a full profile rewrite.</p>
+                    )}
                   </div>
                 </div>
-
-                {isPumpUser && (
-                  <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800 space-y-2" data-testid="pump-tip-sick-day">
-                    <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase">Pump Users</p>
-                    <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
-                      <p>Change your infusion set and site if blood glucose remains high after 2 corrections.</p>
-                      <p>Use your pump's correction bolus calculator, but verify it accounts for active insulin (IOB).</p>
-                      {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
-                        <p className="font-medium">With moderate/large ketones: consider switching to pen injections. Pump site absorption may be compromised. Contact your diabetes team.</p>
-                      )}
-                      <p>If you suspect pump failure, switch to backup pen injections and contact your pump supplier.</p>
-                    </div>
+                <div className="flex gap-3 text-sm">
+                  <Droplets className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-xs text-muted-foreground">Fluids</p>
+                    <p className="text-foreground">{results.hydrationBrief || results.hydrationNote}</p>
                   </div>
-                )}
-
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <p className="font-medium text-sm text-blue-900 dark:text-blue-100">Hydration</p>
-                  <p className="text-xs text-blue-800 dark:text-blue-200">{results.hydrationNote}</p>
                 </div>
-
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="font-medium text-sm">Monitoring</p>
-                  <p className="text-xs text-muted-foreground">{results.monitoringFrequency}</p>
+                <div className="flex gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-xs text-muted-foreground">Checks</p>
+                    <p className="text-foreground">{results.monitoringBrief || results.monitoringFrequency}</p>
+                  </div>
                 </div>
+                <Collapsible>
+                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium py-1">
+                    Full wording for basal, fluids, and monitoring
+                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 text-xs text-muted-foreground border-t pt-2 mt-1">
+                    <p>{results.basalAdjustment}</p>
+                    <p>{results.hydrationNote}</p>
+                    <p>{results.monitoringFrequency}</p>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
+
+              {isPumpUser && (
+                <Collapsible className="group rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20" data-testid="pump-tip-sick-day">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-3 text-left text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                    Pump tips
+                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="px-3 pb-3 space-y-2 text-sm text-indigo-800 dark:text-indigo-200">
+                    <p>Change infusion set and site if glucose stays high after two corrections.</p>
+                    <p>Use your pump calculator; mind IOB.</p>
+                    {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
+                      <p className="font-medium">Moderate/large ketones: pens may be safer than pump—ask your team.</p>
+                    )}
+                    <p>If you suspect pump failure, use backup pens and contact your supplier.</p>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
 
               <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
-                <p className="font-medium">Important Reminders:</p>
+                <p className="font-medium">Quick reminders</p>
                 <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-                  <li>Never skip basal insulin, even if not eating</li>
-                  <li>Check for ketones if BG remains above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}</li>
-                  <li>Seek medical help if you have moderate/large ketones</li>
-                  <li>Contact your healthcare team if symptoms worsen</li>
+                  <li>Do not skip basal insulin</li>
+                  <li>Recheck ketones if BG stays above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}</li>
+                  <li>Moderate/large ketones or worsening symptoms: get medical help</li>
                 </ul>
-              </div>
-
-              <Card className="border-yellow-500/30 bg-yellow-50/30 dark:bg-yellow-950/10">
-                <CardContent className="p-3">
-                  <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                    <strong>Disclaimer:</strong> These recommendations are educational estimates based on 
-                    general sick day guidelines. Individual insulin needs vary significantly. Always follow 
-                    your healthcare provider's specific instructions for sick day management.
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Sick Day Mode Activation */}
-              <div className="pt-2 border-t">
-                {isSickDayActive ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-                      <Check className="h-5 w-5 text-orange-600" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Sick Day Mode Active</p>
-                        <p className="text-xs text-orange-700 dark:text-orange-300 capitalize">{severity} severity</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      onClick={handleDeactivateSickDay}
-                      data-testid="button-deactivate-sick-day"
-                    >
-                      <Power className="h-4 w-4 mr-2" />
-                      Deactivate Sick Day Mode
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Click when you're feeling better to remove the status from your dashboard
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <Button 
-                      className="w-full" 
-                      onClick={handleActivateSickDay}
-                      data-testid="button-activate-sick-day"
-                    >
-                      <Power className="h-4 w-4 mr-2" />
-                      Activate Sick Day Mode
-                    </Button>
-                    <p className="text-xs text-muted-foreground text-center">
-                      This will show a sick day status on your dashboard and remind you of adjusted ratios
-                    </p>
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>

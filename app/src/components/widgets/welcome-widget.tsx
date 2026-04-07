@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Package, Utensils, Dumbbell, LayoutDashboard, ArrowRight } from "lucide-react";
-import { Link } from "wouter";
-
-const DISMISSED_KEY = "diabeater_welcome_dismissed";
+import { useLocation } from "wouter";
+import { DIABEATER_ACTIVE_USER_CHANGED_EVENT, isWelcomeStruggleCardDismissed, setWelcomeStruggleCardDismissed } from "@/lib/storage";
 
 interface StruggleConfig {
   icon: typeof Package;
@@ -55,19 +54,31 @@ const STRUGGLE_CONFIGS: Record<string, StruggleConfig> = {
   },
 };
 
+function readShouldShow(): { struggle: string | null } {
+  if (isWelcomeStruggleCardDismissed()) return { struggle: null };
+  const s = localStorage.getItem("diabeater_onboarding_struggle");
+  return { struggle: s };
+}
+
 export function WelcomeWidget() {
+  const [, setLocation] = useLocation();
   const [visible, setVisible] = useState(false);
   const [struggle, setStruggle] = useState<string | null>(null);
 
   useEffect(() => {
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
-    if (dismissed) return;
-
-    const s = localStorage.getItem("diabeater_onboarding_struggle");
-    if (s) {
+    const apply = () => {
+      const { struggle: s } = readShouldShow();
+      if (!s || !STRUGGLE_CONFIGS[s]) {
+        setStruggle(null);
+        setVisible(false);
+        return;
+      }
       setStruggle(s);
       setVisible(true);
-    }
+    };
+    apply();
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, apply);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, apply);
   }, []);
 
   if (!visible || !struggle) return null;
@@ -78,8 +89,14 @@ export function WelcomeWidget() {
   const Icon = config.icon;
 
   const handleDismiss = () => {
-    localStorage.setItem(DISMISSED_KEY, "true");
+    setWelcomeStruggleCardDismissed();
     setVisible(false);
+  };
+
+  const handleCta = () => {
+    setWelcomeStruggleCardDismissed();
+    setVisible(false);
+    setLocation(config.link);
   };
 
   return (
@@ -104,12 +121,10 @@ export function WelcomeWidget() {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">{config.message}</p>
-            <Link href={config.link}>
-              <Button size="sm" variant="outline" data-testid="button-welcome-cta">
-                {config.cta}
-                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Button>
-            </Link>
+            <Button size="sm" variant="outline" data-testid="button-welcome-cta" type="button" onClick={handleCta}>
+              {config.cta}
+              <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+            </Button>
           </div>
         </div>
       </CardContent>

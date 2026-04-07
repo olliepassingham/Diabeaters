@@ -2,6 +2,10 @@
 
 Configure environment variables per environment in Vercel so builds and runtime use the correct values.
 
+**GitHub Actions deploy:** If you use `.github/workflows/deploy-vercel.yml`, the workflow verifies `npm run build` with secrets, then runs `vercel deploy --prod` (remote build). The **live** bundle is built on Vercel using the variables below—keep them in sync with your GitHub secrets.
+
+**Repo settings:** [`vercel.json`](../vercel.json) sets `installCommand` (`npm ci`), `buildCommand` (`npm run build`), and `outputDirectory` (`app/dist`). Root directory in the Vercel project should stay the **repository root** (not `app/`).
+
 ---
 
 ## 1. Project Settings → Environment Variables

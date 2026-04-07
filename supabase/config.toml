@@ -1,16 +1,25 @@
 # Minimal Supabase CLI config. Run migrations and deploy functions from repo root:
 #   supabase link
 #   supabase db push
-#   supabase functions deploy notify_carers_on_hypo
+#   supabase functions deploy notify_carers_on_hypo --no-verify-jwt
+#   supabase functions deploy notify_scenario_started --no-verify-jwt
+#   supabase functions deploy notify_supply_low --no-verify-jwt
 #
-# Gateway JWT verification is off for this function; the handler validates the JWT with
-# auth.getUser(jwt). That avoids 401 at the edge (execution_id null) when the platform
-# gateway and in-function checks disagree. Redeploy after changing verify_jwt.
+# Gateway JWT verification is off for these functions; each handler validates the JWT with
+# auth.getUser(jwt). That avoids 401 at the edge ("Invalid JWT" from the gateway) when the
+# platform gateway and in-function checks disagree. Redeploy after changing verify_jwt.
 
-project_id = ""
+# Set by `supabase link` or paste your Project ref (Dashboard → Settings → General).
+project_id = "ffgcivxvbtdlmfnttwjm"
 
 [api]
 enabled = true
 
 [functions.notify_carers_on_hypo]
+verify_jwt = false
+
+[functions.notify_scenario_started]
+verify_jwt = false
+
+[functions.notify_supply_low]
 verify_jwt = false

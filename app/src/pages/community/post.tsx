@@ -21,10 +21,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
+  COMMUNITY_TOPICS,
+  DEFAULT_COMMUNITY_TOPIC,
   deleteCommunityComment,
   deleteCommunityPost,
   fetchCommentsForPost,
@@ -35,6 +45,7 @@ import {
   updateCommunityPost,
   type CommunityPostCommentRow,
   type CommunityPostRow,
+  type CommunityTopicId,
 } from "@/lib/community";
 import { getProfilesByIds } from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -74,6 +85,7 @@ export default function CommunityPostPage() {
   const [deletePostBusy, setDeletePostBusy] = useState(false);
   const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
   const [editBody, setEditBody] = useState("");
+  const [editTopic, setEditTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
   const [editBusy, setEditBusy] = useState(false);
 
   const loadPost = useCallback(async () => {
@@ -230,7 +242,7 @@ export default function CommunityPostPage() {
   async function saveEditPost() {
     if (!editPost || !post) return;
     setEditBusy(true);
-    const res = await updateCommunityPost(editPost.id, editBody);
+    const res = await updateCommunityPost(editPost.id, editBody, editTopic);
     setEditBusy(false);
     if (res.error) {
       toast({ title: "Could not save", description: res.error.message, variant: "destructive" });
@@ -338,6 +350,7 @@ export default function CommunityPostPage() {
         onMenuEdit={() => {
           setEditPost(post);
           setEditBody(post.body);
+          setEditTopic(post.topic);
         }}
         onMenuDelete={() => setDeletePostId(post.id)}
         onDeleteComment={(cid) => void handleDeleteComment(cid)}
@@ -402,8 +415,29 @@ export default function CommunityPostPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit post</DialogTitle>
-            <DialogDescription>Update your text. Photos stay the same.</DialogDescription>
+            <DialogDescription>Update topic or text. Photos stay the same.</DialogDescription>
           </DialogHeader>
+          <div className="space-y-1.5">
+            <Label htmlFor="post-edit-topic" className="text-sm">
+              Topic
+            </Label>
+            <Select
+              value={editTopic}
+              onValueChange={(v) => setEditTopic(v as CommunityTopicId)}
+              disabled={editBusy}
+            >
+              <SelectTrigger id="post-edit-topic" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMUNITY_TOPICS.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Textarea
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}

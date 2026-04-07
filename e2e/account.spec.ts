@@ -272,10 +272,36 @@ test.describe("Account page", () => {
         body: JSON.stringify([{ id: "test-user-1", full_name: null, avatar_url: null }]),
       });
     });
+    await context.route("**/rest/v1/account_deletion_requests**", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify([
+            {
+              id: "00000000-0000-0000-0000-000000000001",
+              user_id: "test-user-1",
+              email: "test@example.com",
+              requested_at: new Date().toISOString(),
+            },
+          ]),
+        });
+        return;
+      }
+      await route.continue();
+    });
 
     await page.goto("/account");
+    await page.getByTestId("account-delete-trigger").click();
+    await expect(page.getByTestId("account-delete-copy-request")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("account-delete-submit")).toBeVisible();
+    const gmailLink = page.getByTestId("account-delete-gmail");
+    if ((await gmailLink.count()) > 0) {
+      await expect(gmailLink).toHaveAttribute("href", /mail\.google\.com\/mail\//);
+    }
     const deleteLink = page.getByTestId("account-delete-link");
-    await expect(deleteLink).toBeVisible({ timeout: 5000 });
-    await expect(deleteLink).toHaveAttribute("href", /mailto:.*subject=Account%20deletion%20request/);
+    if ((await deleteLink.count()) > 0) {
+      await expect(deleteLink).toHaveAttribute("href", /mailto:.*subject=/);
+    }
   });
 });

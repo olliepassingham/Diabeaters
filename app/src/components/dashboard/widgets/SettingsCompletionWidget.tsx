@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
-import { storage, UserSettings, UserProfile } from "@/lib/storage";
+import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, UserSettings, UserProfile } from "@/lib/storage";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
@@ -24,7 +24,7 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
   const [error, setError] = useState<string | null>(null);
   const { data: emergency } = useEmergencyProfile();
 
-  useEffect(() => {
+  const load = () => {
     try {
       setSettings(storage.getSettings?.() ?? {});
       setProfile(storage.getProfile?.() ?? null);
@@ -34,6 +34,12 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
       setSettings({});
       setProfile(null);
     }
+  };
+
+  useEffect(() => {
+    load();
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, load);
+    return () => window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, load);
   }, []);
 
   if (error) {

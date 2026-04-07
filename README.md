@@ -73,7 +73,14 @@ if (isStaging) {
 |----------------|--------|
 | Frontend dev   | `cd app && npm run dev` or `npm run web:dev` |
 | Frontend build | `cd app && npm run build` or `npm run web:build` |
+| iOS (store build sync) | `npm run ios:release:sync` then Archive in Xcode |
 | Backend dev    | `npm run dev:server` |
+
+---
+
+## App Store release (iOS)
+
+The native shell loads the web app from `server.url` in `capacitor.config.ts`. Before TestFlight or App Store submission, follow **[docs/app_store_release.md](docs/app_store_release.md)** (App Store Connect, `npm run ios:release:sync`, production Supabase and OAuth, privacy manifest, device QA).
 
 ---
 
@@ -230,6 +237,8 @@ In-app and carer alerts are driven by **Supabase Edge Functions**. Deploy these 
 
 **Database:** apply SQL for `hypo_logs`, `notifications`, `carer_links`, and related RLS as in [`docs/sql/notifications.sql`](docs/sql/notifications.sql) and [`docs/sql/family_carers.sql`](docs/sql/family_carers.sql).
 
+**If the app shows `Could not send alerts` with `401` / `Invalid JWT`:** that is **not** fixed by SQL — redeploy the notify Edge Functions with **`--no-verify-jwt`** (see [`supabase/README.md`](supabase/README.md)).
+
 **Testing tips:** To re-test supply ok→low transitions, clear local `diabeater_supply_alert_state_v1` (or adjust thresholds). In DevTools → Network, confirm `functions/v1/notify_*` requests return 200 when online.
 
 ## E2E tests (Playwright)
@@ -321,7 +330,9 @@ Production builds use env vars from Vercel only (not `.env`). Add them before de
    vercel deploy --prod
    ```
 
-The `vercel.json` in the repo configures build, output dir (`dist/public`), and SPA rewrites. No `.env` is used in production.
+The [`vercel.json`](vercel.json) in the repo sets install/build commands, **output dir `app/dist`**, and SPA rewrites. Production env comes from **Vercel project variables** (not a committed `.env`).
+
+**After the first production deploy:** In **Supabase → Authentication → URL Configuration**, set **Site URL** to your live origin (e.g. `https://your-app.vercel.app`) and add **`https://YOUR_DOMAIN/auth/callback`** and **`https://YOUR_DOMAIN/reset-password`** to **Redirect URLs** so OAuth and email links return to the deployed app (see [Supabase URL Configuration](#supabase-url-configuration-copypaste) below).
 
 ## iOS (Capacitor)
 
@@ -454,10 +465,10 @@ Step-by-step guide to wrap the deployed web app in a native iOS shell using WKWe
 npm run build
 ```
 
-Output is in `dist/public/`. Choose one of:
+Output is in **`app/dist/`** (Vite `vite build`). Choose one of:
 
 - **Option A – Remote URL**: Deploy to Vercel/Netlify and use the live URL (e.g. `https://your-app.vercel.app`). No file copying.
-- **Option B – Bundled**: Add `dist/public/` to the Xcode project so the app loads files from the bundle. Drag the `dist/public` folder into Xcode and check "Copy items if needed" and your app target.
+- **Option B – Bundled**: Add the built web folder (`app/dist`) to the Xcode project so the app loads files from the bundle. Drag `app/dist` into Xcode and check "Copy items if needed" and your app target.
 
 ### 2. Create the project
 
@@ -521,7 +532,7 @@ final class WebViewController: UIViewController {
             if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "public") {
                 webView.loadFileURL(indexURL, allowingReadAccessTo: indexURL.deletingLastPathComponent())
             } else {
-                fatalError("Bundled index.html not found. Add dist/public to the project.")
+                fatalError("Bundled index.html not found. Add the built web folder (app/dist) to the project.")
             }
         }
     }
@@ -572,12 +583,12 @@ Add or merge:
 
 Or in the Xcode plist editor: **App Transport Security Settings** → **Allow Arbitrary Loads** = NO. This restricts the app to HTTPS.
 
-### 6. Bundle `dist/public` (Option B only)
+### 6. Bundle `app/dist` (Option B only)
 
-1. Build with `npm run build`.
-2. Drag the `dist/public` folder into the Xcode project navigator.
+1. Build with `npm run build` (output: `app/dist`).
+2. Drag the `app/dist` folder into the Xcode project navigator.
 3. Check **Copy items if needed** and your app target.
-4. In **Build Phases → Copy Bundle Resources**, confirm `public/index.html` and assets are included.
+4. In **Build Phases → Copy Bundle Resources**, confirm `index.html` and assets are included.
 5. In `WebViewController`, set `remoteURL = nil` and rely on `loadFileURL` for bundled loading.
 
 ### 7. App Store Review – disclaimers and no medical claims

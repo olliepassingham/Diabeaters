@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { isUserVerified } from "@/lib/auth";
+import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import {
   fetchPatientProfileForCarer,
@@ -21,7 +21,11 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { storage } from "@/lib/storage";
 import type { LinkedPatientWithProfile } from "@/lib/carers.types";
-import { getActiveCarerPatientId, setActiveCarerPatientId } from "@/lib/carer-session";
+import {
+  clearCarerClientSessionKeys,
+  getActiveCarerPatientId,
+  setActiveCarerPatientId,
+} from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
 import {
@@ -36,8 +40,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
 import { Eye, Phone } from "lucide-react";
 import heic2any from "heic2any";
-
-const SUPPORT_EMAIL = "support@yourdomain.com";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  accountDeletionSubmitUnavailableDescription,
+  buildAccountDeletionMailtoHref,
+  buildAccountDeletionRequestText,
+  buildGmailWebComposeUrl,
+  getSupportEmail,
+  isAccountDeletionTableUnavailableMessage,
+} from "@/lib/support";
 
 function getInitial(email: string): string {
   const first = email.trim().charAt(0).toUpperCase();
@@ -70,6 +89,8 @@ export default function Account() {
   const [activePatientId, setActivePatientIdState] = useState<string | null>(null);
   const [patientProfile, setPatientProfile] = useState<Awaited<ReturnType<typeof fetchPatientProfileForCarer>>["data"]>(null);
   const [patientLoadError, setPatientLoadError] = useState<string | null>(null);
+  const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
+  const [accountDeletionSubmitBusy, setAccountDeletionSubmitBusy] = useState(false);
 
   useEffect(() => {
     if (!user?.id || profileLoading) return;
@@ -143,12 +164,83 @@ export default function Account() {
       });
       return;
     }
-    const { error } = await supabase.auth.signOut();
+    clearCarerClientSessionKeys();
+    const { error } = await logout();
     if (error) {
       toast({ title: "Could not sign out", description: error.message, variant: "destructive" });
       return;
     }
-    setLocation("/login");
+    setLocation("/welcome");
+  }
+
+  const supportEmail = getSupportEmail();
+  const deletionRequestText = buildAccountDeletionRequestText({
+    userEmail: email,
+    userId,
+  });
+  const accountDeletionMailtoHref =
+    supportEmail.trim() !== ""
+      ? buildAccountDeletionMailtoHref({
+          supportEmail,
+          userEmail: email,
+          userId,
+        })
+      : null;
+  const gmailComposeUrl =
+    supportEmail.trim() !== ""
+      ? buildGmailWebComposeUrl({
+          supportEmail,
+          userEmail: email,
+          userId,
+        })
+      : null;
+
+  async function submitAccountDeletionRequest() {
+    const supabase = getSupabase();
+    if (!supabase) {
+      toast({
+        title: "Could not submit",
+        description: "Auth is not configured on this build.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setAccountDeletionSubmitBusy(true);
+    const { error } = await supabase.from("account_deletion_requests").insert({
+      user_id: userId,
+      email,
+    });
+    setAccountDeletionSubmitBusy(false);
+    if (error) {
+      const missingTable = isAccountDeletionTableUnavailableMessage(error.message);
+      toast({
+        title: missingTable ? "Deletion request isn’t available here yet" : "Could not submit request",
+        description: missingTable ? accountDeletionSubmitUnavailableDescription() : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({
+      title: "Request received",
+      description: "We’ll process your deletion request. You can follow up by email if needed.",
+    });
+    setAccountDeletionOpen(false);
+  }
+
+  async function copyAccountDeletionRequest() {
+    try {
+      await navigator.clipboard.writeText(deletionRequestText);
+      toast({
+        title: "Copied",
+        description: "Paste into Gmail, Outlook on the web, or any mail app.",
+      });
+    } catch {
+      toast({
+        title: "Could not copy",
+        description: "Select and copy the text in the dialog manually.",
+        variant: "destructive",
+      });
+    }
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -598,16 +690,111 @@ export default function Account() {
             </Link>
           </Button>
 
-          <Button variant="ghost" size="default" className="min-h-11 w-full sm:w-auto text-muted-foreground hover:text-destructive" asChild>
-            <a
-              href={`mailto:${SUPPORT_EMAIL}?subject=Account%20deletion%20request`}
-              data-testid="account-delete-link"
-            >
-              Request account deletion
-            </a>
+          <Button
+            variant="ghost"
+            size="default"
+            className="min-h-11 w-full sm:w-auto text-muted-foreground hover:text-destructive"
+            type="button"
+            data-testid="account-delete-trigger"
+            onClick={() => setAccountDeletionOpen(true)}
+          >
+            Request account deletion
           </Button>
         </CardContent>
       </Card>
+
+      <AlertDialog open={accountDeletionOpen} onOpenChange={setAccountDeletionOpen}>
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request account deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              We include your account email and user ID so support can verify your request. You can send a request in one
+              tap (saved for our team), copy the text to paste anywhere, open Gmail in your browser, or use your
+              device&apos;s default mail app.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 text-sm text-left text-muted-foreground">
+            {!supportEmail.trim() ? (
+              <Alert>
+                <AlertDescription>
+                  {import.meta.env.DEV ? (
+                    <>
+                      Add{" "}
+                      <code className="text-xs">VITE_SUPPORT_EMAIL=your@email.com</code> to repo{" "}
+                      <code className="text-xs">.env.local</code> (then restart the dev server) for Gmail and default-mail
+                      links. &quot;Send deletion request&quot; still works without it. You can still copy the text below.
+                    </>
+                  ) : (
+                    <>
+                      Copy the message below and send it from your email app to your Diabeaters support address. If you
+                      don&apos;t have one, contact whoever gave you this app (for example your clinic or the publisher).
+                    </>
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <p>
+                Support: <span className="font-medium text-foreground">{supportEmail}</span>
+              </p>
+            )}
+            <pre className="rounded-md border border-border/60 bg-muted/40 p-3 text-xs whitespace-pre-wrap break-words max-h-40 overflow-y-auto text-foreground">
+              {deletionRequestText}
+            </pre>
+          </div>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-col items-stretch">
+            <Button
+              type="button"
+              variant="default"
+              className="w-full sm:w-full"
+              data-testid="account-delete-copy-request"
+              onClick={() => void copyAccountDeletionRequest()}
+            >
+              Copy request text
+            </Button>
+            {gmailComposeUrl ? (
+              <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
+                <a
+                  href={gmailComposeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="account-delete-gmail"
+                  onClick={() => setAccountDeletionOpen(false)}
+                >
+                  Open in Gmail (browser)
+                </a>
+              </Button>
+            ) : null}
+            {accountDeletionMailtoHref ? (
+              <div className="w-full space-y-1">
+                <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
+                  <a
+                    href={accountDeletionMailtoHref}
+                    data-testid="account-delete-link"
+                    onClick={() => setAccountDeletionOpen(false)}
+                  >
+                    Open in default mail app
+                  </a>
+                </Button>
+                <p className="text-xs text-muted-foreground text-center px-1">
+                  Uses your system mail handler (on Windows this is often Microsoft Outlook, even if you usually use Gmail
+                  in the browser).
+                </p>
+              </div>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full sm:w-full"
+              data-testid="account-delete-submit"
+              disabled={accountDeletionSubmitBusy}
+              onClick={() => void submitAccountDeletionRequest()}
+            >
+              {accountDeletionSubmitBusy ? "Sending…" : "Send deletion request (no email app)"}
+            </Button>
+            <AlertDialogCancel className="w-full sm:w-full m-0">Close</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

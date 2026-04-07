@@ -18,6 +18,7 @@
     "cap:init": "npx cap init",
     "cap:sync": "npx cap sync",
     "cap:ios": "npx cap open ios",
+    "ios:release:sync": "npm run web:build && npx cap sync ios",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",
     "test:watch": "vitest",
@@ -26,7 +27,8 @@
     "version:patch": "tsx scripts/bump-version.ts patch",
     "version:minor": "tsx scripts/bump-version.ts minor",
     "version:major": "tsx scripts/bump-version.ts major",
-    "preflight": "npm run web:build && (npm run test:e2e || echo 'e2e skipped') && npm run icons:validate"
+    "preflight": "npm run web:build && (npm run test:e2e || echo 'e2e skipped') && npm run icons:validate",
+    "supabase:deploy-notify-functions": "npx supabase functions deploy notify_carers_on_hypo --no-verify-jwt && npx supabase functions deploy notify_scenario_started --no-verify-jwt && npx supabase functions deploy notify_supply_low --no-verify-jwt"
   },
   "dependencies": {
     "@capacitor/cli": "^8.1.0",

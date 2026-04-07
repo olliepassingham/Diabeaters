@@ -18,7 +18,7 @@ import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
-import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
+import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { ToastAction } from "@/components/ui/toast";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 
@@ -2235,7 +2235,7 @@ export default function Supplies() {
         notifyInvokeFailed = true;
         toast({
           title: NOTIFY_EDGE_FAILURE_TITLE,
-          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          description: notifyEdgeFailureDescription(res),
           variant: "destructive",
         });
       }

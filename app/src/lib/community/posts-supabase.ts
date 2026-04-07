@@ -7,6 +7,11 @@ import { getSupabase } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
 import type { CommunityPostCommentRow, CommunityPostRow } from "./types";
+import {
+  DEFAULT_COMMUNITY_TOPIC,
+  isCommunityTopicId,
+  type CommunityTopicId,
+} from "./topics";
 
 export const COMMUNITY_POST_IMAGES_BUCKET = "community_post_images";
 export const MAX_POST_IMAGES = 4;
@@ -16,6 +21,25 @@ export type FeedCursor = { created_at: string; id: string };
 
 const PAGE_LIMIT_CAP = 100;
 
+/** PostgREST only exposes the new RPC after the topic migration; clearer hint when the DB is behind. */
+function wrapFeedRpcError(err: { message: string }): Error {
+  const msg = err.message;
+  if (
+    msg.includes("fetch_community_posts_page") ||
+    (msg.includes("schema cache") && msg.includes("function"))
+  ) {
+    return new Error(
+      `${msg} Apply migration 20260409120000_community_post_topics (see docs/sql/community_post_topics.sql), then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
+  return new Error(msg);
+}
+
+function mapTopic(raw: unknown): CommunityTopicId {
+  const s = String(raw ?? "");
+  return isCommunityTopicId(s) ? s : DEFAULT_COMMUNITY_TOPIC;
+}
+
 function mapPost(r: Record<string, unknown>): CommunityPostRow {
   const cc = Number(r.comment_count ?? 0);
   const lc = Number(r.like_count ?? 0);
@@ -23,6 +47,7 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
     id: String(r.id),
     author_id: String(r.author_id),
     body: String(r.body ?? ""),
+    topic: mapTopic(r.topic),
     image_urls: parseImageUrls(r.image_urls),
     is_reported: Boolean(r.is_reported),
     comment_count: Number.isFinite(cc) ? Math.max(0, Math.floor(cc)) : 0,
@@ -142,6 +167,7 @@ export async function getPostImageSignedUrls(paths: string[]): Promise<string[]>
 export async function fetchCommunityPostsPage(
   limit: number,
   cursor: FeedCursor | null,
+  topicFilter?: CommunityTopicId | null,
 ): Promise<{
   data: CommunityPostRow[] | null;
   error: Error | null;
@@ -156,9 +182,10 @@ export async function fetchCommunityPostsPage(
     p_cursor_created_at: cursor?.created_at ?? null,
     p_cursor_id: cursor?.id ?? null,
     p_author_ids: null,
+    p_topic: topicFilter ?? null,
   });
 
-  if (error) return { data: null, error: new Error(error.message) };
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
   const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
   const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
   return {
@@ -171,6 +198,7 @@ export async function fetchCommunityPostsPage(
 export async function fetchCommunityPostsFromFollowingPage(
   limit: number,
   cursor: FeedCursor | null,
+  topicFilter?: CommunityTopicId | null,
 ): Promise<{
   data: CommunityPostRow[] | null;
   error: Error | null;
@@ -193,9 +221,10 @@ export async function fetchCommunityPostsFromFollowingPage(
     p_cursor_created_at: cursor?.created_at ?? null,
     p_cursor_id: cursor?.id ?? null,
     p_author_ids: authorIds,
+    p_topic: topicFilter ?? null,
   });
 
-  if (error) return { data: null, error: new Error(error.message) };
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
   const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
   const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
   return {
@@ -207,6 +236,7 @@ export async function fetchCommunityPostsFromFollowingPage(
 export async function insertCommunityPost(
   body: string,
   imageFiles?: File[],
+  topic: CommunityTopicId = DEFAULT_COMMUNITY_TOPIC,
 ): Promise<{
   data: CommunityPostRow | null;
   error: Error | null;
@@ -230,7 +260,7 @@ export async function insertCommunityPost(
   if (files.length === 0) {
     const { data, error } = await supabase
       .from("community_posts")
-      .insert({ author_id: uid, body: trimmed, image_urls: [] })
+      .insert({ author_id: uid, body: trimmed, image_urls: [], topic })
       .select("*")
       .single();
 
@@ -265,6 +295,7 @@ export async function insertCommunityPost(
         author_id: uid,
         body: trimmed,
         image_urls: pendingPaths,
+        topic,
       })
       .select("*")
       .single();
@@ -406,10 +437,11 @@ export async function deleteCommunityPost(postId: string): Promise<{ error: Erro
   return { error: null };
 }
 
-/** Update body only; images unchanged. Must still satisfy body + images constraint. */
+/** Update body and optional topic; images unchanged. Must still satisfy body + images constraint. */
 export async function updateCommunityPost(
   postId: string,
   body: string,
+  topic: CommunityTopicId,
 ): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
@@ -437,7 +469,7 @@ export async function updateCommunityPost(
 
   const { data, error } = await supabase
     .from("community_posts")
-    .update({ body: trimmed })
+    .update({ body: trimmed, topic })
     .eq("id", postId)
     .select("*")
     .single();

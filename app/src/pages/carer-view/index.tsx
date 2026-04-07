@@ -146,6 +146,49 @@ function durationLabel(ms: number): string {
   return `${mins}m`;
 }
 
+const CARER_TRAVEL_DATE_LOCALE = "en-GB";
+
+/** Display label only; does not change stored data. */
+function formatCarerScenarioDestinationLabel(destination: string | null): string {
+  const raw = destination?.trim() ?? "";
+  if (!raw) return "Trip";
+  return raw
+    .split(/\s+/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ""))
+    .join(" ");
+}
+
+function formatCarerTravelDateRange(startIso: string, endIso: string): string | null {
+  const d1 = new Date(startIso);
+  const d2 = new Date(endIso);
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) {
+    return `${startIso.trim()} — ${endIso.trim()}`;
+  }
+  const sameYear = d1.getFullYear() === d2.getFullYear();
+  const startOpts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  if (!sameYear) startOpts.year = "numeric";
+  const startStr = d1.toLocaleDateString(CARER_TRAVEL_DATE_LOCALE, startOpts);
+  const endStr = d2.toLocaleDateString(CARER_TRAVEL_DATE_LOCALE, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `${startStr} — ${endStr}`;
+}
+
+function formatCarerTravelSingleDate(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    const t = iso.trim();
+    return t || null;
+  }
+  return d.toLocaleDateString(CARER_TRAVEL_DATE_LOCALE, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
   const lines: string[] = [];
   const now = Date.now();
@@ -199,7 +242,13 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
       const destination = typeof rawState?.destination === "string" ? rawState?.destination.trim() : null;
       const start = typeof rawState?.travel_start === "string" ? rawState?.travel_start.trim() : null;
       const end = typeof rawState?.travel_end === "string" ? rawState?.travel_end.trim() : null;
-      const dates = start && end ? `${start}–${end}` : start ? `${start}` : null;
+      const destLabel = formatCarerScenarioDestinationLabel(destination);
+      const dates =
+        start && end
+          ? formatCarerTravelDateRange(start, end)
+          : start
+            ? formatCarerTravelSingleDate(start)
+            : null;
       const tripDays =
         start && end && !Number.isNaN(new Date(start).getTime()) && !Number.isNaN(new Date(end).getTime())
           ? Math.max(
@@ -207,7 +256,7 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
               Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24)) + 1,
             )
           : null;
-      const core = `Travel — ${destination || "Trip"}${dates ? ` · ${dates}` : ""}${tripDays ? ` (${tripDays} days)` : ""}`;
+      const core = `Travel — ${destLabel}${dates ? ` · ${dates}` : ""}${tripDays ? ` (${tripDays} days)` : ""}`;
       if (active) {
         lines.push(core);
         continue;

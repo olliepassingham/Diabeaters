@@ -9,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { 
   Plane, 
   MapPin, 
@@ -21,6 +23,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Hospital,
   Pill,
   Info,
@@ -39,12 +43,13 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageShell } from "@/components/layout";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
-import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
+import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 
 interface TravelPlan {
   duration: number;
@@ -504,8 +509,16 @@ export default function Travel() {
   const [prepDeparture, setPrepDeparture] = useState("");
   const [prepReturn, setPrepReturn] = useState("");
   const [prepNotes, setPrepNotes] = useState("");
+  const [prepChecklistOpen, setPrepChecklistOpen] = useState(false);
+  const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
 
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const showClimateTab =
+    plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
+
+  useEffect(() => {
+    if (!showClimateTab && resultsTab === "climate") setResultsTab("packing");
+  }, [showClimateTab, resultsTab]);
 
   // Calculate long-acting insulin adjustment schedule for MDI users
   const calculateBasalAdjustmentSchedule = () => {
@@ -778,7 +791,7 @@ export default function Travel() {
       if (!res.success) {
         toast({
           title: NOTIFY_EDGE_FAILURE_TITLE,
-          description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+          description: notifyEdgeFailureDescription(res),
           variant: "destructive",
         });
       }
@@ -1314,29 +1327,29 @@ export default function Travel() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Plan Your Travel
-            </CardTitle>
-            <CardDescription>
-              Travel Mode helps you plan supplies and prepare for unexpected issues while travelling.
-            </CardDescription>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Plan Your Travel
+              </CardTitle>
+              <InlineInfoHint
+                ariaLabel="What Travel Mode does"
+                content={
+                  <div className="space-y-3 text-sm">
+                    <p>
+                      Travel Mode helps you plan supplies and prepare for travel. It builds a smart packing list from
+                      your trip details and tracked supplies, with buffers for delays, breakage, and emergencies.
+                    </p>
+                    <p className="text-xs text-muted-foreground border-t border-border pt-2">
+                      General preparation guidance only—not medical advice. Consult your healthcare team for advice that
+                      fits your situation.
+                    </p>
+                  </div>
+                }
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This feature will help you create a smart packing list based on your trip details 
-              and your tracked supplies. It includes safety buffers for delays, breakage, and emergencies.
-            </p>
-            
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Not Medical Advice</AlertTitle>
-              <AlertDescription>
-                This tool provides general preparation guidance only. Always consult your healthcare 
-                team for medical advice specific to your situation.
-              </AlertDescription>
-            </Alert>
-
             <Button 
               onClick={handleStartPlan} 
               className="w-full"
@@ -1351,13 +1364,21 @@ export default function Travel() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Luggage className="h-5 w-5" />
-              Holiday Prep
-            </CardTitle>
-            <CardDescription>
-              Plan ahead before your trip - track your preparation, check supply coverage, and tick off your checklist.
-            </CardDescription>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <Luggage className="h-5 w-5" />
+                Holiday Prep
+              </CardTitle>
+              <InlineInfoHint
+                ariaLabel="About Holiday Prep"
+                content={
+                  <p className="text-sm">
+                    Plan ahead: track preparation, check supply coverage for your dates, and use the preparation checklist
+                    before you go.
+                  </p>
+                }
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {!holidayPrep && !showPrepForm && (
@@ -1553,33 +1574,51 @@ export default function Travel() {
                     return null;
                   })()}
 
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium flex items-center justify-between gap-1.5">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="h-4 w-4" />
-                        Preparation Checklist
-                      </span>
-                      <span className="text-xs text-muted-foreground">{checkedCount}/{totalChecklist}</span>
-                    </h4>
-                    <Progress value={(checkedCount / totalChecklist) * 100} className="h-2" />
-                    <div className="space-y-1 mt-2">
-                      {holidayPrep.checklist.map((item) => (
-                        <label
-                          key={item.id}
-                          className="flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate"
-                          data-testid={`prep-check-${item.id}`}
-                        >
-                          <Checkbox 
-                            checked={item.checked}
-                            onCheckedChange={() => handleTogglePrepChecklist(item.id)}
-                          />
-                          <span className={`text-sm leading-tight ${item.checked ? "line-through text-muted-foreground" : ""}`}>
-                            {item.label}
+                  <Collapsible open={prepChecklistOpen} onOpenChange={setPrepChecklistOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between h-auto min-h-11 py-3 px-3"
+                        data-testid="button-prep-checklist-toggle"
+                      >
+                        <span className="flex items-center gap-2 text-left">
+                          <CheckCircle2 className="h-4 w-4 shrink-0" />
+                          <span>
+                            <span className="font-medium text-sm block">Preparation checklist</span>
+                            <span className="text-xs text-muted-foreground font-normal">
+                              {checkedCount} of {totalChecklist} done
+                            </span>
                           </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+                        </span>
+                        {prepChecklistOpen ? (
+                          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                        )}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      <Progress value={(checkedCount / totalChecklist) * 100} className="h-2" />
+                      <div className="space-y-1">
+                        {holidayPrep.checklist.map((item) => (
+                          <label
+                            key={item.id}
+                            className="flex items-start gap-2 p-2 rounded-lg cursor-pointer hover-elevate"
+                            data-testid={`prep-check-${item.id}`}
+                          >
+                            <Checkbox 
+                              checked={item.checked}
+                              onCheckedChange={() => handleTogglePrepChecklist(item.id)}
+                            />
+                            <span className={`text-sm leading-tight ${item.checked ? "line-through text-muted-foreground" : ""}`}>
+                              {item.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
                   {isDepartureNear && !isTravelModeActive && (
                     <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20" data-testid="card-departure-prompt">
@@ -1618,15 +1657,23 @@ export default function Travel() {
 
         <Card data-testid="card-pretravel-appointment">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              Pre-travel appointment
-            </CardTitle>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                Pre-travel appointment
+              </CardTitle>
+              <InlineInfoHint
+                ariaLabel="Why book before you travel"
+                content={
+                  <p className="text-sm">
+                    You may need a letter for airport security and a prescription for extra supplies. Booking ahead avoids
+                    last-minute gaps.
+                  </p>
+                }
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Consider booking a GP appointment before your trip. You may need a letter confirming your diabetes and insulin supplies for airport security, and a prescription for extra supplies.
-            </p>
             <Link href="/appointments">
               <Button variant="outline" size="sm" data-testid="link-pretravel-appointments">
                 View Appointments
@@ -1637,13 +1684,21 @@ export default function Travel() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-red-600" />
-              Emergency Card
-            </CardTitle>
-            <CardDescription>
-              A digital medical alert card in 14 languages - perfect for international travel.
-            </CardDescription>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-red-600" />
+                Emergency Card
+              </CardTitle>
+              <InlineInfoHint
+                ariaLabel="About the emergency card"
+                content={
+                  <p className="text-sm">
+                    Digital medical alert text in multiple languages—useful when you need to explain diabetes or get help
+                    abroad.
+                  </p>
+                }
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <Link href="/emergency-card">
@@ -2000,6 +2055,63 @@ export default function Travel() {
         </CardHeader>
       </Card>
 
+      <Card className={isTravelModeActive ? "border-green-500/50 bg-green-50/30 dark:bg-green-950/20" : "border-primary/50"}>
+        <CardContent className="p-4">
+          {isTravelModeActive ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">You'll see reminders until your trip ends</p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
+                End Travel Mode
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Plane className="h-5 w-5 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium">Activate Travel Mode</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enable travel mode to see reminders and timezone guidance across the app until{" "}
+                    {new Date(plan.endDate).toLocaleDateString()}.
+                  </p>
+                </div>
+              </div>
+              <Button onClick={handleActivateTravelMode} className="w-full" data-testid="button-activate-travel">
+                <Plane className="h-4 w-4 mr-2" />
+                Activate Travel Mode
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Tabs
+        value={!showClimateTab && resultsTab === "climate" ? "packing" : resultsTab}
+        onValueChange={(v) => setResultsTab(v as "packing" | "emergency" | "climate")}
+        className="w-full"
+        data-testid="tabs-travel-results"
+      >
+        <TabsList className={cn("grid w-full gap-1", showClimateTab ? "grid-cols-3" : "grid-cols-2")}>
+          <TabsTrigger value="packing" className="text-xs sm:text-sm" data-testid="tab-results-packing">
+            Packing
+          </TabsTrigger>
+          <TabsTrigger value="emergency" className="text-xs sm:text-sm" data-testid="tab-results-emergency">
+            Emergency
+          </TabsTrigger>
+          {showClimateTab && (
+            <TabsTrigger value="climate" className="text-xs sm:text-sm" data-testid="tab-results-climate">
+              Climate & time
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="packing" className="mt-4 space-y-4">
       <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
         <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
         <AlertTitle className="text-amber-900 dark:text-amber-100">Not Medical Advice</AlertTitle>
@@ -2106,7 +2218,9 @@ export default function Travel() {
           })}
         </CardContent>
       </Card>
+        </TabsContent>
 
+        <TabsContent value="emergency" className="mt-4 space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -2161,7 +2275,10 @@ export default function Travel() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
+        {showClimateTab && (
+        <TabsContent value="climate" className="mt-4 space-y-4">
       {/* Weather Considerations Card - Dynamic based on user selection */}
       {plan.weatherChange !== "similar" && (
         <Card className={plan.weatherChange === "warmer" 
@@ -2549,40 +2666,10 @@ export default function Travel() {
         </Card>
       )}
 
-      <Card className={isTravelModeActive ? "border-green-500/50 bg-green-50/30 dark:bg-green-950/20" : "border-primary/50"}>
-        <CardContent className="p-4">
-          {isTravelModeActive ? (
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">You'll see reminders until your trip ends</p>
-                </div>
-              </div>
-              <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
-                End Travel Mode
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <Plane className="h-5 w-5 text-primary mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-medium">Activate Travel Mode</p>
-                  <p className="text-sm text-muted-foreground">
-                    Enable travel mode to see reminders and timezone guidance across the app until {new Date(plan.endDate).toLocaleDateString()}.
-                  </p>
-                </div>
-              </div>
-              <Button onClick={handleActivateTravelMode} className="w-full" data-testid="button-activate-travel">
-                <Plane className="h-4 w-4 mr-2" />
-                Activate Travel Mode
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+        )}
+
+      </Tabs>
 
       <div className="flex flex-wrap justify-center gap-4">
         <Button variant="outline" onClick={resetPlan} data-testid="button-create-new-plan">

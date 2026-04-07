@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useState } from "react";
 import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
+import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
 import { ensureIosPushRegistered } from "@/lib/push-tokens";
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    setActiveUserIdForLocalStorage(null);
 
     (async () => {
       const supabase = getSupabase();
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         setUser(null);
         setSession(null);
+        setActiveUserIdForLocalStorage(null);
         setSentryUserId(null);
         setLoading(false);
         return;
@@ -39,14 +42,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]);
 
         if (!isMounted) return;
+        const uid = data?.user?.id ?? null;
         setUser(data?.user ?? null);
         setSession(sessionRes.data.session ?? null);
-        setSentryUserId(data?.user?.id ?? null);
+        setActiveUserIdForLocalStorage(uid);
+        setSentryUserId(uid);
         setLoading(false);
       } catch {
         if (!isMounted) return;
         setUser(null);
         setSession(null);
+        setActiveUserIdForLocalStorage(null);
         setSentryUserId(null);
         setLoading(false);
       }
@@ -56,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!isMounted) return;
       setSession(session ?? null);
       setUser(session?.user ?? null);
+      setActiveUserIdForLocalStorage(session?.user?.id ?? null);
       setSentryUserId(session?.user?.id ?? null);
     });
 

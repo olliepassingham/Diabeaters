@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,11 +11,21 @@ import {
   Moon,
 } from "lucide-react";
 import { Link } from "wouter";
-import { storage, type Appointment, type HolidayPrep, type Supply, type ScenarioState } from "@/lib/storage";
+import {
+  DIABEATER_ACTIVE_USER_CHANGED_EVENT,
+  DIABEATER_APPOINTMENTS_CHANGED_EVENT,
+  storage,
+  type Appointment,
+  type HolidayPrep,
+  type Supply,
+  type ScenarioState,
+} from "@/lib/storage";
 
 export function SupplyTrackerTodaySection() {
+  const { user } = useAuth();
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
+  const [appointmentsTick, setAppointmentsTick] = useState(0);
 
   useEffect(() => {
     const refresh = () => {
@@ -25,13 +36,23 @@ export function SupplyTrackerTodaySection() {
     const onVis = () => {
       if (document.visibilityState === "visible") refresh();
     };
+    const onAppt = () => setAppointmentsTick((t) => t + 1);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refresh);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     };
-  }, []);
+  }, [user?.id]);
+
+  const upcomingAppointments: Appointment[] = useMemo(
+    () => (user?.id ? storage.getUpcomingAppointmentsForUser(user.id) : []),
+    [user?.id, appointmentsTick],
+  );
 
   const criticalSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "critical");
   const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
@@ -72,7 +93,6 @@ export function SupplyTrackerTodaySection() {
 
   const status = getStatusMessage();
 
-  const upcomingAppointments: Appointment[] = storage.getUpcomingAppointments?.() ?? [];
   const nextAppointment = upcomingAppointments.find((a) => daysUntil(a.date) !== null) ?? null;
   const nextAppointmentDays = nextAppointment ? daysUntil(nextAppointment.date) : null;
   const showNextAppointment = nextAppointment && nextAppointmentDays !== null && nextAppointmentDays >= 0 && nextAppointmentDays <= 7;
@@ -268,8 +288,10 @@ export function SupplyTrackerEntryCard() {
 }
 
 export function TodayAtAGlanceCard() {
+  const { user } = useAuth();
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
+  const [appointmentsTick, setAppointmentsTick] = useState(0);
 
   useEffect(() => {
     const refresh = () => {
@@ -280,13 +302,23 @@ export function TodayAtAGlanceCard() {
     const onVis = () => {
       if (document.visibilityState === "visible") refresh();
     };
+    const onAppt = () => setAppointmentsTick((t) => t + 1);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refresh);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     };
-  }, []);
+  }, [user?.id]);
+
+  const upcomingAppointments: Appointment[] = useMemo(
+    () => (user?.id ? storage.getUpcomingAppointmentsForUser(user.id) : []),
+    [user?.id, appointmentsTick],
+  );
 
   const criticalSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "critical");
   const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
@@ -327,7 +359,6 @@ export function TodayAtAGlanceCard() {
 
   const status = getStatusMessage();
 
-  const upcomingAppointments: Appointment[] = storage.getUpcomingAppointments?.() ?? [];
   const nextAppointment = upcomingAppointments.find((a) => daysUntil(a.date) !== null) ?? null;
   const nextAppointmentDays = nextAppointment ? daysUntil(nextAppointment.date) : null;
   const showNextAppointment = nextAppointment && nextAppointmentDays !== null && nextAppointmentDays >= 0 && nextAppointmentDays <= 7;

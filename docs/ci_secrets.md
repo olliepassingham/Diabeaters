@@ -41,6 +41,10 @@ Add each secret by name. Values are never displayed after saving.
 | `VITE_SUPABASE_URL`      | Build step (`env`)                     | Injected into client bundle at build time         |
 | `VITE_SUPABASE_ANON_KEY` | Build step (`env`)                     | Injected into client bundle at build time         |
 
+**Vercel Dashboard (required for live site):** Add the same `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_APP_ENV` to **Vercel → Project → Settings → Environment Variables** (Production / Preview). The GitHub Action runs `npm run build` locally for verification, then `vercel deploy --prod` triggers a **remote** build on Vercel; that build reads env vars from Vercel, not from GitHub. Without matching variables on Vercel, the deployed bundle can miss Supabase config.
+
+**Supabase after deploy:** Add your production URL to **Authentication → URL Configuration** (Site URL and redirect URLs for `/auth/callback` and `/reset-password`). See the main README “Supabase URL Configuration” section.
+
 ---
 
 ## Quick checklist

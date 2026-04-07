@@ -1,5 +1,10 @@
 import { getSupabase } from "@/lib/supabase";
-import { storage, type Appointment } from "@/lib/storage";
+import {
+  getAppointmentsStorageKeyForUserId,
+  setActiveUserIdForLocalStorage,
+  storage,
+  type Appointment,
+} from "@/lib/storage";
 
 type CloudAppointmentRow = {
   id: string;
@@ -108,15 +113,16 @@ export async function pushLocalAppointmentsToCloud(): Promise<void> {
   if (!supabase) return;
   const userId = await getAuthedUserId();
   if (!userId) return;
+  setActiveUserIdForLocalStorage(userId);
 
-  const locals = storage.getAppointments();
+  // Raw list includes tombstones for delete sync; key must match JWT (not a stale `diabeater_active_user_id`).
+  const apptKey = getAppointmentsStorageKeyForUserId(userId);
   const allRaw = (() => {
-    // `getAppointments()` filters tombstones; we need the raw list to push deletes too.
     try {
-      const raw = localStorage.getItem("diabeater_appointments");
-      return raw ? (JSON.parse(raw) as Appointment[]) : locals;
+      const raw = localStorage.getItem(apptKey);
+      return raw ? (JSON.parse(raw) as Appointment[]) : [];
     } catch {
-      return locals;
+      return [];
     }
   })();
 
@@ -138,6 +144,7 @@ export async function pullCloudAppointmentsToLocal(): Promise<void> {
   if (!supabase) return;
   const userId = await getAuthedUserId();
   if (!userId) return;
+  setActiveUserIdForLocalStorage(userId);
 
   const { data, error } = await supabase
     .from("appointments")
@@ -154,7 +161,7 @@ export async function pullCloudAppointmentsToLocal(): Promise<void> {
   }
 
   const mapped = (data ?? []).map((r) => fromCloudRow(r as CloudAppointmentRow));
-  storage.mergeAppointments(mapped);
+  storage.mergeAppointments(mapped, userId);
 }
 
 let lastSyncAt = 0;

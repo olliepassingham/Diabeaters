@@ -15,6 +15,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import {
+  communityTopicLabel,
   fetchDmThreadsForCurrentUser,
   fetchLikerUserIdsForPost,
   fetchPostLikersWithProfiles,
@@ -315,6 +317,9 @@ export function FeedPostCard({
                 {authorPublicHandle?.trim() ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
                 ) : null}
+                <Badge variant="secondary" className="mt-1.5 w-fit max-w-full font-normal">
+                  {communityTopicLabel(post.topic)}
+                </Badge>
               </div>
               <span className="flex shrink-0 items-center gap-1">
                 {canReportPost && (

@@ -41,6 +41,8 @@ export type DashboardWidgetSettingsProps = {
   setWidgetSize: (id: WidgetType, size: WidgetSize) => void;
   reorderWidgets: (orderedIds: WidgetType[]) => void;
   resetWidgets: () => void;
+  /** When true, hide the Settings progress row (setup is complete). */
+  isSettingsComplete?: boolean;
 };
 
 function SortableRow({
@@ -138,9 +140,14 @@ export function DashboardWidgetSettings({
   setWidgetSize,
   reorderWidgets,
   resetWidgets,
+  isSettingsComplete = false,
 }: DashboardWidgetSettingsProps) {
   const sorted = useMemo(() => [...placements].sort((a, b) => a.order - b.order), [placements]);
-  const enabledCount = sorted.filter((p) => p.enabled).length;
+  const sortedForUi = useMemo(
+    () => (isSettingsComplete ? sorted.filter((p) => p.type !== "settings-completion") : sorted),
+    [sorted, isSettingsComplete],
+  );
+  const enabledCount = sortedForUi.filter((p) => p.enabled).length;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -151,13 +158,13 @@ export function DashboardWidgetSettings({
     (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
-      const oldIndex = sorted.findIndex((p) => p.id === active.id);
-      const newIndex = sorted.findIndex((p) => p.id === over.id);
+      const oldIndex = sortedForUi.findIndex((p) => p.id === active.id);
+      const newIndex = sortedForUi.findIndex((p) => p.id === over.id);
       if (oldIndex < 0 || newIndex < 0) return;
-      const moved = arrayMove(sorted, oldIndex, newIndex).map((p) => p.id);
+      const moved = arrayMove(sortedForUi, oldIndex, newIndex).map((p) => p.id);
       reorderWidgets(moved);
     },
-    [sorted, reorderWidgets],
+    [sortedForUi, reorderWidgets],
   );
 
   return (
@@ -184,9 +191,9 @@ export function DashboardWidgetSettings({
             </CardHeader>
             <CardContent className="space-y-3 px-5 pb-5 pt-0">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sorted.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={sortedForUi.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                   <div className="flex flex-col gap-3">
-                    {sorted.map((p) => (
+                    {sortedForUi.map((p) => (
                       <SortableRow
                         key={p.id}
                         placement={p}

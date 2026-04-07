@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
@@ -36,6 +37,7 @@ function getTypeLabel(type: AppointmentType) {
 }
 
 export default function Appointments() {
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -46,15 +48,25 @@ export default function Appointments() {
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    setAppointments(storage.getAppointments());
     trackFeatureEngagement("appointments");
-    void syncAppointments({ throttleMs: 0 });
-    void rescheduleAppointmentReminders(storage.getAppointments());
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setAppointments([]);
+      return;
+    }
+    const uid = user.id;
+    setAppointments(storage.getAppointmentsForUser(uid));
+    void syncAppointments({ throttleMs: 0 }).then(() => {
+      setAppointments(storage.getAppointmentsForUser(uid));
+    });
+    void rescheduleAppointmentReminders(storage.getAppointmentsForUser(uid));
+  }, [user?.id]);
+
   const handleAdd = async () => {
-    if (!title || !date) return;
-    
+    if (!title || !date || !user?.id) return;
+
     storage.addAppointment({
       title,
       type,
@@ -64,12 +76,12 @@ export default function Appointments() {
       notes: notes || undefined,
       isCompleted: false,
     });
-    
-    setAppointments(storage.getAppointments());
+
+    setAppointments(storage.getAppointmentsForUser(user.id));
     setIsAddOpen(false);
     resetForm();
     await syncAppointments();
-    await rescheduleAppointmentReminders(storage.getAppointments());
+    await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
   };
 
   const resetForm = () => {
@@ -82,17 +94,19 @@ export default function Appointments() {
   };
 
   const handleComplete = async (id: string) => {
+    if (!user?.id) return;
     storage.updateAppointment(id, { isCompleted: true });
-    setAppointments(storage.getAppointments());
+    setAppointments(storage.getAppointmentsForUser(user.id));
     await syncAppointments();
-    await rescheduleAppointmentReminders(storage.getAppointments());
+    await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
   };
 
   const handleDelete = async (id: string) => {
+    if (!user?.id) return;
     storage.deleteAppointment(id);
-    setAppointments(storage.getAppointments());
+    setAppointments(storage.getAppointmentsForUser(user.id));
     await syncAppointments();
-    await rescheduleAppointmentReminders(storage.getAppointments());
+    await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
   };
 
   const today = new Date();

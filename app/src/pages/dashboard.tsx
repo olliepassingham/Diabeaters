@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
 import {
   storage,
+  DIABEATER_SETTINGS_CHANGED_EVENT,
   Supply as LocalSupply,
   ScenarioState,
   UserProfile,
@@ -40,7 +41,7 @@ import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
-import { NOTIFY_EDGE_FAILURE_DESCRIPTION, NOTIFY_EDGE_FAILURE_TITLE } from "@/lib/notify-toast-messages";
+import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 
@@ -76,6 +77,7 @@ async function runHypoTreatmentPipeline(
 
   let description = "Your hypo treatment has been recorded.";
   let notifyInvokeFailed = false;
+  let notifyFailure: { detail?: string; error?: string } | null = null;
 
   if (ctx.userId && getSupabase()) {
     const cloud = await insertHypoLog({
@@ -93,6 +95,7 @@ async function runHypoTreatmentPipeline(
 
       if (!notify.success) {
         notifyInvokeFailed = true;
+        notifyFailure = notify;
       } else {
         const eligible = notify.eligible_carers ?? 0;
         const delivered = (notify.delivered_push ?? 0) + (notify.delivered_inapp ?? 0);
@@ -113,10 +116,10 @@ async function runHypoTreatmentPipeline(
     title: "Hypo treatment logged",
     description,
   });
-  if (notifyInvokeFailed) {
+  if (notifyInvokeFailed && notifyFailure) {
     ctx.toast({
       title: NOTIFY_EDGE_FAILURE_TITLE,
-      description: NOTIFY_EDGE_FAILURE_DESCRIPTION,
+      description: notifyEdgeFailureDescription(notifyFailure),
       variant: "destructive",
     });
   }
@@ -616,8 +619,8 @@ export default function Dashboard() {
     reorderWidgets,
     resetWidgets,
   } = useDashboardWidgets();
-  const [isSettingsComplete, setIsSettingsComplete] = useState(false);
-  const [settingsCompletion, setSettingsCompletion] = useState({ percentage: 0, completed: 0, total: 5 });
+  const [isSettingsComplete, setIsSettingsComplete] = useState(() => storage.isSettingsComplete());
+  const [settingsCompletion, setSettingsCompletion] = useState(() => storage.getSettingsCompletion());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
@@ -641,15 +644,25 @@ export default function Dashboard() {
     
     const handleFocus = () => refreshData();
     
+    const onSettingsChanged = () => refreshData();
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+
     return () => {
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSettingsComplete) return;
+    const row = placements.find((p) => p.id === "settings-completion" && p.enabled);
+    if (row) toggleWidget("settings-completion", false);
+  }, [isSettingsComplete, placements, toggleWidget]);
 
   useEffect(() => {
     try {
@@ -675,10 +688,8 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
-  // When settings incomplete, filter out settings-completion widget from normal flow (we show SetupPromptCard instead)
-  const widgetsToRender = isSettingsComplete
-    ? activeWidgets
-    : activeWidgets.filter((w) => w.type !== "settings-completion");
+  // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
+  const widgetsToRender = activeWidgets.filter((w) => w.type !== "settings-completion");
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -754,6 +765,7 @@ export default function Dashboard() {
         setWidgetSize={setWidgetSize}
         reorderWidgets={reorderWidgets}
         resetWidgets={resetWidgets}
+        isSettingsComplete={isSettingsComplete}
       />
 
       <section className="animate-stagger pt-2" data-testid="dashboard-widgets">

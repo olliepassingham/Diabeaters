@@ -1,8 +1,12 @@
+import type { CommunityTopicId } from "./topics";
+
 /** Rows from public.community_posts / community_post_comments. */
 export type CommunityPostRow = {
   id: string;
   author_id: string;
   body: string;
+  /** Fixed feed category (see `COMMUNITY_TOPICS`). */
+  topic: CommunityTopicId;
   image_urls: string[];
   is_reported: boolean;
   comment_count: number;

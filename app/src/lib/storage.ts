@@ -44,6 +44,102 @@ const STORAGE_KEYS = {
   EXERCISE_OUTCOMES: "diabeater_exercise_outcomes",
 } as const;
 
+/** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
+export const ACTIVE_USER_ID_KEY = "diabeater_active_user_id";
+
+/** Dispatched on same-tab when `ACTIVE_USER_ID_KEY` changes so widgets can reload scoped data. */
+export const DIABEATER_ACTIVE_USER_CHANGED_EVENT = "diabeater-active-user-changed";
+
+/** Dispatched when `saveSettings` updates local storage (same-tab; settings completion UI can refresh). */
+export const DIABEATER_SETTINGS_CHANGED_EVENT = "diabeater-settings-changed";
+
+/** Same-tab: local appointment rows changed (storage event does not fire in the writing tab). */
+export const DIABEATER_APPOINTMENTS_CHANGED_EVENT = "diabeater-appointments-changed";
+
+function notifyAppointmentsLocalChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DIABEATER_APPOINTMENTS_CHANGED_EVENT));
+}
+
+export function getAppointmentsStorageKey(): string | null {
+  if (typeof window === "undefined") return null;
+  const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+  return uid ? `${STORAGE_KEYS.APPOINTMENTS}_u_${uid}` : null;
+}
+
+/** Stable key for a given auth user — use in sync paths so reads never use a stale `ACTIVE_USER_ID_KEY`. */
+export function getAppointmentsStorageKeyForUserId(userId: string): string {
+  return `${STORAGE_KEYS.APPOINTMENTS}_u_${userId}`;
+}
+
+export function setActiveUserIdForLocalStorage(uid: string | null): void {
+  if (typeof window === "undefined") return;
+  const prev = localStorage.getItem(ACTIVE_USER_ID_KEY);
+  if (uid) {
+    localStorage.setItem(ACTIVE_USER_ID_KEY, uid);
+    try {
+      // Legacy unscoped key would leak prior-account data into new sessions.
+      localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
+    } catch {
+      /* ignore */
+    }
+  } else {
+    localStorage.removeItem(ACTIVE_USER_ID_KEY);
+  }
+  if (prev !== (uid ?? null)) {
+    window.dispatchEvent(new Event(DIABEATER_ACTIVE_USER_CHANGED_EVENT));
+  }
+}
+
+export function isAppointmentsStorageKey(key: string | null): boolean {
+  if (!key) return false;
+  if (key === STORAGE_KEYS.APPOINTMENTS) return true;
+  return key.startsWith(`${STORAGE_KEYS.APPOINTMENTS}_u_`);
+}
+
+const LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY = "diabeater_welcome_dismissed";
+
+/** Per-user key so another account on the same browser does not inherit dismiss state. */
+function welcomeStruggleDismissedKeyForUser(uid: string): string {
+  return `${LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY}_u_${uid}`;
+}
+
+/** Whether the onboarding struggle welcome card should stay hidden (X or CTA). */
+export function isWelcomeStruggleCardDismissed(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    if (uid) {
+      const scoped = localStorage.getItem(welcomeStruggleDismissedKeyForUser(uid));
+      if (scoped === "true") return true;
+      const legacy = localStorage.getItem(LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY);
+      if (legacy === "true") {
+        localStorage.setItem(welcomeStruggleDismissedKeyForUser(uid), "true");
+        localStorage.removeItem(LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY);
+        return true;
+      }
+      return false;
+    }
+    return localStorage.getItem(LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function setWelcomeStruggleCardDismissed(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    if (uid) {
+      localStorage.setItem(welcomeStruggleDismissedKeyForUser(uid), "true");
+    } else {
+      localStorage.setItem(LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY, "true");
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export type RatioFormat = "per10g" | "1toXg" | "perCP";
 
 export interface UserProfile {
@@ -366,17 +462,15 @@ export interface RatioHistoryEntry {
   note?: string;
 }
 
-export const COMMUNITY_TOPICS = [
-  { id: "holidays-travel", label: "Holidays & Travel" },
-  { id: "sick-days", label: "Feeling Unwell / Sick Days" },
-  { id: "exercise-activity", label: "Exercise & Activity" },
-  { id: "food-eating-out", label: "Food & Eating Out" },
-  { id: "mental-health", label: "Mental Health & Burnout" },
-  { id: "tips-what-worked", label: "Tips & What Worked for Me" },
-  { id: "general-questions", label: "General Questions" },
-] as const;
+import type { CommunityTopicId } from "./community/topics";
 
-export type CommunityTopicId = typeof COMMUNITY_TOPICS[number]["id"];
+export {
+  COMMUNITY_TOPICS,
+  DEFAULT_COMMUNITY_TOPIC,
+  communityTopicLabel,
+  isCommunityTopicId,
+} from "./community/topics";
+export type { CommunityTopicId } from "./community/topics";
 
 export interface CommunityPost {
   id: string;
@@ -643,29 +737,29 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
   { id: "settings", enabled: true, order: 3 },
 ];
 
-// Default widget layout for new users — other widgets start disabled but can be added via customization
+// Legacy seed for `getDashboardWidgets` — keep aligned with DASHBOARD_WIDGET_REGISTRY defaults (useDashboardWidgets is primary).
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
-  "supply-summary": "full",
   "supply-depletion": "full",
-  "appointments": "half",
+  "quick-exercise": "half",
   "ratio-adviser": "half",
+  "appointments": "half",
+  "routines": "half",
+  "supply-summary": "full",
+  "tip-of-day": "full",
   "settings-completion": "half",
   "welcome": "full",
-  "tip-of-day": "half",
-  "routines": "half",
-  "quick-exercise": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 4, size: "full" },
-  { id: "welcome", type: "welcome", enabled: true, order: 5, size: "full" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "half" },
-  { id: "appointments", type: "appointments", enabled: true, order: 7, size: "half" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
-  { id: "routines", type: "routines", enabled: false, order: 14, size: "half" },
-  { id: "quick-exercise", type: "quick-exercise", enabled: false, order: 15, size: "half" },
+  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 1, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 2, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 3, size: "half" },
+  { id: "routines", type: "routines", enabled: true, order: 4, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 5, size: "full" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
+  { id: "welcome", type: "welcome", enabled: false, order: 8, size: "full" },
 ];
 
 function generateId(): string {
@@ -694,6 +788,9 @@ export const storage = {
 
   saveSettings(settings: UserSettings): void {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+    }
   },
 
   getSupplies(): Supply[] {
@@ -2311,9 +2408,23 @@ export const storage = {
     return newReel;
   },
 
-  // Appointments
+  // Appointments (per signed-in user — see getAppointmentsStorageKey)
   getAppointments(): Appointment[] {
-    const data = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+    const key = getAppointmentsStorageKey();
+    if (!key) return [];
+    const data = localStorage.getItem(key);
+    if (!data) return [];
+    const appointments: Appointment[] = JSON.parse(data);
+    return appointments
+      .filter((a) => !a.deletedAt)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  /** Prefer this from UI when you have `user.id` from auth — avoids stale `diabeater_active_user_id`. */
+  getAppointmentsForUser(userId: string): Appointment[] {
+    if (!userId) return [];
+    const key = getAppointmentsStorageKeyForUserId(userId);
+    const data = localStorage.getItem(key);
     if (!data) return [];
     const appointments: Appointment[] = JSON.parse(data);
     return appointments
@@ -2322,6 +2433,10 @@ export const storage = {
   },
 
   addAppointment(appointment: Omit<Appointment, "id" | "createdAt">): Appointment {
+    const key = getAppointmentsStorageKey();
+    if (!key) {
+      throw new Error("Cannot save appointments: session not ready.");
+    }
     const appointments = this.getAppointments();
     const now = new Date().toISOString();
     const newAppointment: Appointment = {
@@ -2331,27 +2446,38 @@ export const storage = {
       updatedAt: now,
     };
     appointments.push(newAppointment);
-    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    localStorage.setItem(key, JSON.stringify(appointments));
+    notifyAppointmentsLocalChanged();
     return newAppointment;
   },
 
   updateAppointment(id: string, updates: Partial<Appointment>): Appointment | null {
+    const key = getAppointmentsStorageKey();
+    if (!key) {
+      throw new Error("Cannot save appointments: session not ready.");
+    }
     const appointments = this.getAppointments();
     const index = appointments.findIndex(a => a.id === id);
     if (index === -1) return null;
     appointments[index] = { ...appointments[index], ...updates, updatedAt: new Date().toISOString() };
-    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
+    localStorage.setItem(key, JSON.stringify(appointments));
+    notifyAppointmentsLocalChanged();
     return appointments[index];
   },
 
   deleteAppointment(id: string): boolean {
+    const key = getAppointmentsStorageKey();
+    if (!key) {
+      throw new Error("Cannot save appointments: session not ready.");
+    }
     const appointments = this.getAppointments();
     const index = appointments.findIndex((a) => a.id === id);
     if (index === -1) return false;
     const now = new Date().toISOString();
     const next = [...appointments];
     next[index] = { ...next[index], deletedAt: now, updatedAt: now };
-    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(next));
+    localStorage.setItem(key, JSON.stringify(next));
+    notifyAppointmentsLocalChanged();
     return true;
   },
 
@@ -2362,9 +2488,25 @@ export const storage = {
     return appointments.filter(a => !a.isCompleted && new Date(a.date) >= today);
   },
 
-  /** Merge cloud rows into local storage (local-first, last-write-wins by updatedAt). */
-  mergeAppointments(incoming: Appointment[]): Appointment[] {
-    const localRaw = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+  getUpcomingAppointmentsForUser(userId: string): Appointment[] {
+    const appointments = this.getAppointmentsForUser(userId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return appointments.filter((a) => !a.isCompleted && new Date(a.date) >= today);
+  },
+
+  /**
+   * Merge cloud rows into local storage (local-first, last-write-wins by updatedAt).
+   * Pass `userId` from the authenticated session in sync code so the target key always matches JWT (not a stale `ACTIVE_USER_ID_KEY`).
+   */
+  mergeAppointments(incoming: Appointment[], userId?: string): Appointment[] {
+    const key = userId ? getAppointmentsStorageKeyForUserId(userId) : getAppointmentsStorageKey();
+    if (!key) {
+      return incoming
+        .filter((a) => !a.deletedAt)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+    const localRaw = localStorage.getItem(key);
     const local: Appointment[] = localRaw ? JSON.parse(localRaw) : [];
 
     const byId = new Map<string, Appointment>();
@@ -2381,7 +2523,8 @@ export const storage = {
     }
 
     const merged = Array.from(byId.values());
-    localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(merged));
+    localStorage.setItem(key, JSON.stringify(merged));
+    notifyAppointmentsLocalChanged();
     return merged.filter((a) => !a.deletedAt).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
 
@@ -2819,6 +2962,19 @@ export const storage = {
   exportAllData(): string {
     const data: Record<string, unknown> = {};
     for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+      if (key === "APPOINTMENTS") {
+        const apptKey = getAppointmentsStorageKey();
+        if (!apptKey) continue;
+        const value = localStorage.getItem(apptKey);
+        if (value) {
+          try {
+            data[key] = JSON.parse(value);
+          } catch {
+            data[key] = value;
+          }
+        }
+        continue;
+      }
       const value = localStorage.getItem(storageKey);
       if (value) {
         try {
@@ -3080,10 +3236,15 @@ export const storage = {
       }
 
       for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
-        if (data[key] !== undefined) {
-          const value = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
-          localStorage.setItem(storageKey, value);
+        if (data[key] === undefined) continue;
+        const value = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
+        if (key === "APPOINTMENTS") {
+          const apptKey = getAppointmentsStorageKey();
+          if (!apptKey) continue;
+          localStorage.setItem(apptKey, value);
+          continue;
         }
+        localStorage.setItem(storageKey, value);
       }
       return { success: true };
     } catch {

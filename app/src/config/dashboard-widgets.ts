@@ -26,7 +26,8 @@ export interface DashboardWidgetDefinition {
 }
 
 /**
- * Default order is array order. Persisted `order` in localStorage overrides for the user.
+ * Default order is array order (also used as initial `order` index). Persisted `order` in localStorage overrides.
+ * New users: all main widgets on; Welcome stays off by default (same content can appear in Today).
  * UK-English copy throughout.
  */
 export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
@@ -34,9 +35,17 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     id: "supply-depletion",
     label: "Depletion forecast",
     description: "Timeline of when your supplies are likely to run out.",
-    defaultEnabled: false,
+    defaultEnabled: true,
     defaultSize: "full",
     component: SupplyDepletionWidget,
+  },
+  {
+    id: "quick-exercise",
+    label: "Quick exercise",
+    description: "Start exercise mode from saved workout routines in one tap.",
+    defaultEnabled: true,
+    defaultSize: "half",
+    component: QuickExerciseWidget,
   },
   {
     id: "ratio-adviser",
@@ -45,14 +54,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: RatioAdviserWidget,
-  },
-  {
-    id: "tip-of-day",
-    label: "Tip of the day",
-    description: "A practical type 1 reminder — shuffle for another tip anytime.",
-    defaultEnabled: true,
-    defaultSize: "half",
-    component: TipOfDayWidget,
   },
   {
     id: "appointments",
@@ -66,25 +67,25 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     id: "routines",
     label: "Routines",
     description: "Saved meal patterns and quick links to your full routines list.",
-    defaultEnabled: false,
+    defaultEnabled: true,
     defaultSize: "half",
     component: RoutinesWidget,
-  },
-  {
-    id: "quick-exercise",
-    label: "Quick exercise",
-    description: "Start exercise mode from saved workout routines in one tap.",
-    defaultEnabled: false,
-    defaultSize: "half",
-    component: QuickExerciseWidget,
   },
   {
     id: "supply-summary",
     label: "Supply summary",
     description: "Stock levels and days remaining for your supplies.",
-    defaultEnabled: false,
+    defaultEnabled: true,
     defaultSize: "full",
     component: SupplySummaryWidget,
+  },
+  {
+    id: "tip-of-day",
+    label: "Tip of the day",
+    description: "A practical type 1 reminder — shuffle for another tip anytime.",
+    defaultEnabled: true,
+    defaultSize: "full",
+    component: TipOfDayWidget,
   },
   {
     id: "settings-completion",
@@ -98,7 +99,7 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     id: "welcome",
     label: "Welcome",
     description: "Helpful tips and getting-started prompts.",
-    defaultEnabled: true,
+    defaultEnabled: false,
     defaultSize: "full",
     component: WelcomeWidget,
   },
