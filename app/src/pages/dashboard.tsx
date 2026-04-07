@@ -372,27 +372,29 @@ function HeroCard({
             <StatusPill status={status} />
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Link href="/help-now" className="min-w-0 flex-1 basis-[min(100%,12rem)]">
+          <div className="flex flex-nowrap items-center justify-between gap-2 min-w-0">
+            <div className="flex min-w-0 flex-1 flex-nowrap items-stretch gap-2">
+              <Link href="/help-now" className="min-w-0 flex-1">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className={`min-h-11 w-full min-w-0 rounded-full px-2.5 text-xs sm:px-3 sm:text-sm bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
+                  data-testid="button-help-now"
+                >
+                  <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-0.5 sm:mr-1 shrink-0" />
+                  <span className="truncate">Help Now</span>
+                </Button>
+              </Link>
               <Button
-                variant="destructive"
                 size="sm"
-                className={`min-h-11 w-full rounded-full bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
-                data-testid="button-help-now"
+                className="min-h-11 min-w-0 flex-1 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 px-2.5 text-xs sm:px-3 sm:text-sm"
+                onClick={handleTreatedHypoClick}
+                data-testid="button-dashboard-treated-hypo"
               >
-                <Phone className="h-4 w-4 mr-1" />
-                Help Now
+                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                <span className="truncate">Treated a Hypo</span>
               </Button>
-            </Link>
-            <Button
-              size="sm"
-              className="min-h-11 rounded-full bg-green-600 dark:bg-green-700 text-white gap-1 shrink-0 px-4"
-              onClick={handleTreatedHypoClick}
-              data-testid="button-dashboard-treated-hypo"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Treated a Hypo
-            </Button>
+            </div>
             <div className="flex items-center gap-2 shrink-0">
               <DashboardInfoDialog />
               <Button

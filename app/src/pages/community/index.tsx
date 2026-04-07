@@ -139,14 +139,29 @@ export default function CommunityHomePage() {
   }, [toast, feedTab, topicFilter]);
 
   const refresh = useCallback(async () => {
-    await loadFirstPage();
-    setLoading(false);
-  }, [loadFirstPage]);
+    try {
+      await loadFirstPage();
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Could not load posts",
+        description: e instanceof Error ? e.message : "Something went wrong.",
+        variant: "destructive",
+      });
+      setPosts([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadFirstPage, toast]);
 
   const runRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadFirstPage();
-    setRefreshing(false);
+    try {
+      await loadFirstPage();
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadFirstPage]);
 
   useEffect(() => {
@@ -455,15 +470,7 @@ export default function CommunityHomePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Feed"
-        description={
-          <span className="inline-flex flex-wrap items-center gap-1.5">
-            <span>Everyone signed in can see posts.</span>
-            <InlineInfoHint
-              ariaLabel="About profile photos on the feed"
-              content="Profile photos use each person’s account picture when their profile is visible."
-            />
-          </span>
-        }
+        description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
         actions={
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" asChild>

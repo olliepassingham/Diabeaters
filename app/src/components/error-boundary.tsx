@@ -83,6 +83,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-muted-foreground">
               If the problem keeps happening, try closing and reopening the app.
             </p>
+            {import.meta.env.DEV && this.state.error ? (
+              <pre className="mt-2 max-h-32 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                {this.state.error.message}
+              </pre>
+            ) : null}
             <div className="flex justify-center">
               <button
                 onClick={() => window.location.reload()}

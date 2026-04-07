@@ -58,6 +58,13 @@ import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
 import Support from "@/pages/support";
+import CommunityHome from "@/pages/community/index";
+import CommunityPost from "@/pages/community/post";
+import CommunityMessages from "@/pages/community/messages";
+import CommunityThread from "@/pages/community/thread";
+import CommunityProfile from "@/pages/community/profile";
+import CommunitySettings from "@/pages/community/settings";
+import CommunityHandleResolve from "@/pages/community/handle-resolve";
 
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
@@ -84,14 +91,6 @@ const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
 const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
 const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
 const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
-
-const CommunityHome = lazy(() => import("@/pages/community/index"));
-const CommunityPost = lazy(() => import("@/pages/community/post"));
-const CommunityMessages = lazy(() => import("@/pages/community/messages"));
-const CommunityThread = lazy(() => import("@/pages/community/thread"));
-const CommunityProfile = lazy(() => import("@/pages/community/profile"));
-const CommunitySettings = lazy(() => import("@/pages/community/settings"));
-const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
 function RouteFallback() {
   return (
@@ -366,63 +365,49 @@ function InnerRouter() {
       <Route path="/community/messages/:threadId">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityThread />
-            </Suspense>
+            <CommunityThread />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/messages">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityMessages />
-            </Suspense>
+            <CommunityMessages />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/settings">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunitySettings />
-            </Suspense>
+            <CommunitySettings />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/u/:handle">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityHandleResolve />
-            </Suspense>
+            <CommunityHandleResolve />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/profile/:userId">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityProfile />
-            </Suspense>
+            <CommunityProfile />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/post/:postId">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityPost />
-            </Suspense>
+            <CommunityPost />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunityHome />
-            </Suspense>
+            <CommunityHome />
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>

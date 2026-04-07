@@ -56,6 +56,17 @@ function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
+/** date-fns throws RangeError on invalid dates; DB/RPC should always send ISO strings but guard anyway. */
+function formatRelativeTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "recently";
+  try {
+    return formatDistanceToNow(d, { addSuffix: true });
+  } catch {
+    return "recently";
+  }
+}
+
 export type CommentAuthorMeta = { name: string; avatar_url: string | null };
 
 type FeedPostCardProps = {
@@ -485,7 +496,7 @@ export function FeedPostCard({
                                   {cm.name}
                                 </Link>
                                 <span className="text-tiny text-muted-foreground" title={c.created_at}>
-                                  {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                                  {formatRelativeTime(c.created_at)}
                                 </span>
                               </div>
                               <span className="flex shrink-0 items-center gap-0.5">

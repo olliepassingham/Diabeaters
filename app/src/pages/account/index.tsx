@@ -424,108 +424,110 @@ export default function Account() {
               Settings
             </Link>
           </Button>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-            <div
-              className="mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:mx-0 sm:h-24 sm:w-24"
-              data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
-              {...(!showAvatarImage && {
-                role: "img" as const,
-                "aria-label": "No avatar",
-              })}
-            >
-              {showAvatarImage ? (
-                <img
-                  src={avatarDisplayUrl!}
-                  alt="Profile avatar"
-                  className="w-full h-full object-cover"
-                  data-testid="avatar-img"
-                  onError={() => setAvatarImgFailed(true)}
-                />
-              ) : (
-                <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
-                  {nameForInitials
-                    ? nameForInitials
-                        .split(/\s+/)
-                        .map((s) => s[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()
-                    : initial}
-                </span>
-              )}
-            </div>
-            <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-center sm:pr-24 sm:text-left">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-              <p className="text-sm text-muted-foreground break-all">{email}</p>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                <span
-                  data-testid={verified ? "status-verified" : "status-unverified"}
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                    verified
-                      ? "text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 border-green-200 dark:border-green-800/50"
-                      : "text-muted-foreground bg-muted/60 dark:bg-muted/40 border-border dark:border-border"
-                  }`}
-                >
-                  {verified ? "Verified" : "Unverified"}
-                </span>
-              </div>
-              <div className="flex flex-nowrap items-center justify-center gap-2 overflow-x-auto pb-0.5 pt-2 [-webkit-overflow-scrolling:touch] sm:justify-start [&_a]:shrink-0 [&_button]:shrink-0">
-                {carerLinkLoading ? (
-                  <Skeleton
-                    className="h-11 min-w-[7.25rem] shrink-0 rounded-md"
-                    data-testid="account-carer-link-loading"
-                    aria-label="Loading supporter options"
-                    role="status"
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+              <div
+                className="mx-auto flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:mx-0 sm:h-24 sm:w-24"
+                data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
+                {...(!showAvatarImage && {
+                  role: "img" as const,
+                  "aria-label": "No avatar",
+                })}
+              >
+                {showAvatarImage ? (
+                  <img
+                    src={avatarDisplayUrl!}
+                    alt="Profile avatar"
+                    className="w-full h-full object-cover"
+                    data-testid="avatar-img"
+                    onError={() => setAvatarImgFailed(true)}
                   />
                 ) : (
-                  hasCarerLink && (
-                    <Button variant="outline" size="sm" className="min-h-11" asChild>
-                      <Link href="/mode" data-testid="link-change-view">
-                        Change mode
-                      </Link>
-                    </Button>
-                  )
-                )}
-                {isCarer && (
-                  <Button variant="outline" size="sm" className="min-h-11" asChild>
-                    <Link href="/carer-view" data-testid="link-back-to-carer-view">
-                      Back to Supporter Mode
-                    </Link>
-                  </Button>
-                )}
-                {!isCarer && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      id="avatar-file"
-                      onChange={handleAvatarUpload}
-                      disabled={uploadSubmitting}
-                      aria-label="Choose profile photo"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={uploadSubmitting}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      data-testid="avatar-upload"
-                    >
-                      {uploadSubmitting ? "Uploading…" : "Upload new photo"}
-                    </Button>
-                  </>
-                )}
-                {!isCarer && (
-                  <Button variant="outline" size="sm" className="min-h-11" asChild>
-                    <Link href="/family-carers" data-testid="link-manage-carers">
-                      Manage carers
-                    </Link>
-                  </Button>
+                  <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
+                    {nameForInitials
+                      ? nameForInitials
+                          .split(/\s+/)
+                          .map((s) => s[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()
+                      : initial}
+                  </span>
                 )}
               </div>
+              <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-center sm:pr-24 sm:text-left">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
+                <p className="text-sm text-muted-foreground break-all">{email}</p>
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                  <span
+                    data-testid={verified ? "status-verified" : "status-unverified"}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                      verified
+                        ? "text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 border-green-200 dark:border-green-800/50"
+                        : "text-muted-foreground bg-muted/60 dark:bg-muted/40 border-border dark:border-border"
+                    }`}
+                  >
+                    {verified ? "Verified" : "Unverified"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex w-full flex-wrap items-center justify-center gap-2 pt-2 pb-0.5 sm:justify-start [&_a]:shrink-0 [&_button]:shrink-0">
+              {carerLinkLoading ? (
+                <Skeleton
+                  className="h-11 min-w-[7.25rem] shrink-0 rounded-md"
+                  data-testid="account-carer-link-loading"
+                  aria-label="Loading supporter options"
+                  role="status"
+                />
+              ) : (
+                hasCarerLink && (
+                  <Button variant="outline" size="sm" className="min-h-11" asChild>
+                    <Link href="/mode" data-testid="link-change-view">
+                      Change mode
+                    </Link>
+                  </Button>
+                )
+              )}
+              {isCarer && (
+                <Button variant="outline" size="sm" className="min-h-11" asChild>
+                  <Link href="/carer-view" data-testid="link-back-to-carer-view">
+                    Back to Supporter Mode
+                  </Link>
+                </Button>
+              )}
+              {!isCarer && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    id="avatar-file"
+                    onChange={handleAvatarUpload}
+                    disabled={uploadSubmitting}
+                    aria-label="Choose profile photo"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadSubmitting}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    data-testid="avatar-upload"
+                  >
+                    {uploadSubmitting ? "Uploading…" : "Upload new photo"}
+                  </Button>
+                </>
+              )}
+              {!isCarer && (
+                <Button variant="outline" size="sm" className="min-h-11" asChild>
+                  <Link href="/family-carers" data-testid="link-manage-carers">
+                    Manage carers
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
