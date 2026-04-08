@@ -33,6 +33,7 @@ import {
   parseRatioToGramsPerUnit,
   calculateDoseFromCarbs,
 } from "@/lib/ratio-utils";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -530,6 +531,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <MedicalNumericOutputDisclaimer compact />
           <div className="bg-muted/30 rounded-lg p-3">
             <p className="text-sm text-muted-foreground flex items-start gap-1">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />

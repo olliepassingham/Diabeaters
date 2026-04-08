@@ -20,6 +20,7 @@ import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -1021,6 +1022,8 @@ export default function SickDay() {
                       </div>
                     </div>
                   )}
+
+                  <MedicalNumericOutputDisclaimer compact />
 
                   <div className="p-4 bg-primary/5 rounded-lg space-y-2">
                     <div className="flex items-baseline gap-2">
@@ -2105,6 +2108,7 @@ export default function SickDay() {
 
               {results.correctionDose > 0 && (
                 <div className="p-4 bg-primary/5 rounded-lg space-y-2">
+                  <MedicalNumericOutputDisclaimer compact className="mb-3" />
                   <div className="flex flex-wrap items-baseline gap-2">
                     <span className="text-sm text-muted-foreground">Suggested correction</span>
                     <span className="text-2xl font-semibold" data-testid="text-correction-dose">

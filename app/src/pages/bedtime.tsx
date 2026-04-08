@@ -13,6 +13,7 @@ import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
@@ -805,6 +806,8 @@ export default function Bedtime() {
                     <h4 className="font-medium text-sm">Bedtime Correction Suggestion</h4>
                   </div>
 
+                  <MedicalNumericOutputDisclaimer compact />
+
                   <div className="p-3 rounded-lg bg-background/60 space-y-2">
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                       <span className="text-muted-foreground">Current:</span>
@@ -881,10 +884,6 @@ export default function Bedtime() {
                       </p>
                     </div>
                   )}
-
-                  <p className="text-xs italic text-muted-foreground" data-testid="text-correction-disclaimer">
-                    [Not medical advice. This is a calculation based on your settings, not a prescription. Always follow your diabetes team's guidance on bedtime corrections.]
-                  </p>
                 </CardContent>
               </Card>
             )}

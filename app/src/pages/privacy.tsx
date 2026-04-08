@@ -1,8 +1,11 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FaceLogo } from "@/components/face-logo";
+import { getSupportEmail } from "@/lib/support";
 
 export default function Privacy() {
+  const supportEmail = getSupportEmail();
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="p-4 border-b">
@@ -29,12 +32,21 @@ export default function Privacy() {
               <li><strong>Email</strong> – For account creation and sign-in, stored by Supabase Auth.</li>
               <li><strong>Profile name</strong> – Optional, user-supplied for personalisation.</li>
               <li><strong>Supplies data</strong> – Names, quantities and usage you enter. Stored in Supabase, scoped to your account via row-level security (RLS).</li>
+              <li>
+                <strong>Health-related data you choose to enter</strong> – For example blood glucose units, insulin ratios, correction factors, sick-day notes, or journal entries.
+                This may be <strong>special category data</strong> under UK GDPR / EU GDPR Article 9 when it concerns your health.
+              </li>
             </ul>
 
-            <h2 className="text-base font-semibold mt-6">Purpose</h2>
+            <h2 className="text-base font-semibold mt-6">Purpose and lawful basis</h2>
             <p>
-              Data is used solely for lifestyle organisation: tracking supplies, routines, and preparedness.
+              Data is used for lifestyle organisation: tracking supplies, routines, preparedness, and optional educational tools you use in the app.
               We do not sell or share your data with third parties for marketing.
+            </p>
+            <p className="mt-2">
+              Where we process health-related information you provide, we rely on your <strong>explicit consent</strong> at sign-up / in-app disclosures and on{" "}
+              <strong>performance of a service you request</strong>, as appropriate for an app you choose to use to manage your diabetes-related information.
+              Your team remains responsible for medical decisions; the app does not replace them.
             </p>
 
             <h2 className="text-base font-semibold mt-6">Retention</h2>
@@ -52,14 +64,32 @@ export default function Privacy() {
               We use cookies and session storage only for authentication. No tracking across apps or sites.
             </p>
 
-            <h2 className="text-base font-semibold mt-6">Third parties</h2>
-            <p>
-              Supabase provides auth and database hosting. Their privacy policy applies to data processed by their services.
-            </p>
+            <h2 className="text-base font-semibold mt-6">Subprocessors and third parties</h2>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Supabase</strong> – Authentication and database hosting for account data you store in the app. See Supabase&apos;s privacy policy for their processing.
+              </li>
+              <li>
+                <strong>OpenAI</strong> – Used <strong>only</strong> if your deployment enables the optional activity-advice API (<code className="text-xs">ENABLE_ACTIVITY_ADVICE</code>).
+                If enabled, limited profile and settings text may be sent to OpenAI to generate educational wording. Not used in the default configuration.
+              </li>
+              <li>
+                <strong>NewsAPI.org</strong> – Used <strong>only</strong> if <code className="text-xs">NEWS_API_KEY</code> is set on the server to fetch headline articles; otherwise the app uses static curated links.
+              </li>
+            </ul>
 
             <h2 className="text-base font-semibold mt-6">Contact</h2>
             <p>
-              For questions or deletion requests: <em>[Contact email – replace with your support address]</em>
+              For questions or deletion requests:{" "}
+              {supportEmail ? (
+                <a href={`mailto:${supportEmail}`} className="text-primary underline underline-offset-2">
+                  {supportEmail}
+                </a>
+              ) : (
+                <span className="text-muted-foreground">
+                  configure <code className="text-xs">VITE_SUPPORT_EMAIL</code> in your deployment environment
+                </span>
+              )}
             </p>
 
             <h2 id="terms" className="text-base font-semibold mt-6 scroll-mt-20">

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { storage, type UserProfile } from "@/lib/storage";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 
 export default function HypoHelpPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
@@ -150,6 +151,7 @@ export default function HypoHelpPage() {
 
           {hypoResult && (
             <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 space-y-4">
+              <MedicalNumericOutputDisclaimer compact />
               <h4 className="font-medium flex items-center gap-2 text-red-800 dark:text-red-200">
                 <Droplet className="h-4 w-4" />
                 You need approximately:

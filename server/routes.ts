@@ -4,6 +4,39 @@ import OpenAI from "openai";
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
+/** Must be explicitly enabled (default off). See docs/regulatory/dpia_openai_checklist.md */
+const activityAdviceEnabled = process.env.ENABLE_ACTIVITY_ADVICE === "true";
+
+const ACTIVITY_ADVICE_RESPONSE_DISCLAIMER =
+  "This text is educational only and not medical advice. It does not replace your diabetes team. " +
+  "Do not change insulin doses, pump settings, or treatment without their guidance. " +
+  "Seek urgent care for emergencies, severe hypoglycaemia, or suspected DKA.";
+
+const ACTIVITY_ADVICE_SYSTEM_PROMPT = `You are an educational assistant for adults living with Type 1 diabetes in the UK.
+You are NOT a clinician or medical device. You must NEVER:
+- diagnose conditions or replace a healthcare professional
+- instruct the user to set specific insulin doses, pump rates, or prescriptions
+- claim certainty about outcomes
+
+You MAY:
+- give general lifestyle and self-management education tailored to the user's stated settings
+- encourage contacting their diabetes team for dose changes, illness, pregnancy, or unusual situations
+- use only the blood glucose and carb units specified in the user message
+
+Always end with a brief reminder to confirm anything actionable with their care team.`;
+
+function computeDataCompleteness(settings: Record<string, unknown>): "full" | "partial" | "minimal" {
+  const tdd = settings.tdd;
+  const br = settings.breakfastRatio;
+  const lr = settings.lunchRatio;
+  const dr = settings.dinnerRatio;
+  const hasTdd = tdd !== undefined && tdd !== null && String(tdd).trim() !== "";
+  const ratioCount = [br, lr, dr].filter((x) => x !== undefined && x !== null && String(x).trim() !== "").length;
+  if (hasTdd && ratioCount >= 3) return "full";
+  if (hasTdd || ratioCount > 0) return "partial";
+  return "minimal";
+}
+
 // Simple in-memory cache for news articles
 interface NewsCache {
   articles: NewsArticle[];
@@ -69,11 +102,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/ai-status", (_req, res) => {
-    res.json({ available: !!openai });
+    res.json({
+      available: !!(openai && activityAdviceEnabled),
+      activityAdviceEnabled,
+      openaiConfigured: !!openai,
+    });
   });
 
-  // Activity Adviser Route
+  // Activity Adviser Route (opt-in: ENABLE_ACTIVITY_ADVICE=true + OPENAI_API_KEY)
   app.post("/api/activity/advice", async (req, res) => {
+    if (!activityAdviceEnabled) {
+      return res.status(503).json({
+        error: "Activity advice is disabled",
+        code: "FEATURE_DISABLED",
+        hint: "Set ENABLE_ACTIVITY_ADVICE=true when OpenAI is approved for your deployment.",
+      });
+    }
     if (!openai) {
       return res.status(503).send("OpenAI API key not configured");
     }
@@ -88,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = userProfile || {};
       const settings = userSettings || {};
 
-      const userContext = [];
+      const userContext: string[] = [];
       
       if (profile) {
         userContext.push(`Diabetes Type: ${profile.diabetesType || "Type 1"}`);
@@ -139,60 +183,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? "..." : ""}`
           ).join("\n");
       }
-      
-      const prompt = `You are a personalised diabetes management assistant for a UK user. You MUST tailor your advice to their specific settings.
 
-**CRITICAL - UNITS REQUIREMENT:**
+      const userPrompt = `**CRITICAL - UNITS REQUIREMENT:**
 - Blood glucose: ALWAYS use ${bgUnits} (NEVER use ${bgUnits === "mmol/L" ? "mg/dL" : "mmol/L"})
 - Carbohydrates: ALWAYS use ${carbUnits}
-- This is non-negotiable. Using wrong units could be dangerous.
+- Wrong units could mislead the user — stay consistent.
 
 **${timeContext}**
-Use the appropriate meal ratio for this time of day (${mealPeriod}).
+Relevant meal period for ratio discussion: ${mealPeriod}.
 
-**User's Personal Settings:**
+**User context (for education only — not verified by a clinician):**
 ${userContext.length > 0 ? userContext.join("\n") : "No settings configured yet"}
 ${historyContext}
 ${conversationContext}
 
-**Current Question/Activity:**
+**Current question / activity:**
 - Type: ${activityType}
 - Details: ${activityDetails}
 
 **Instructions:**
-1. ALWAYS express blood glucose values in ${bgUnits} - never use any other unit
-2. Use the ${mealPeriod} ratio for this time of day when relevant
-3. Reference their actual numbers and any patterns from history
-4. Consider their insulin delivery method and diabetes type
-5. Give practical, personalised advice based on their unique settings
-6. If this is a follow-up question, reference the conversation context
+1. Express blood glucose only in ${bgUnits}.
+2. Give concise educational bullet points (max 5). Focus on awareness, preparation, and when to involve their diabetes team.
+3. Do NOT give specific insulin doses or tell them to change pump settings.
+4. If information is incomplete, say what is missing and suggest discussing with their team.
+5. If this is a follow-up, briefly reference prior context.
 
-**IMPORTANT - End your response with a confidence indicator on a new line:**
-Format: [Confidence: HIGH/MEDIUM/LOW]
-- HIGH: User has complete settings configured and question is straightforward
-- MEDIUM: Some settings missing or activity involves multiple factors
-- LOW: Significant unknowns or unusual situation
+Do not output any "confidence" score or clinical certainty label.`;
 
-Keep the response concise (4-5 bullet points) and directly actionable. Always include a safety reminder.`;
+      const dataCompleteness = computeDataCompleteness(settings as Record<string, unknown>);
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
+        messages: [
+          { role: "system", content: ACTIVITY_ADVICE_SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.5,
         max_tokens: 400,
       });
 
-      const recommendation = completion.choices[0].message.content || "Unable to generate recommendation";
+      const raw = completion.choices[0].message.content || "Unable to generate educational text.";
+      const recommendationBody = raw.trim();
 
-      // Extract confidence level from response
-      const confidenceMatch = recommendation.match(/\[Confidence:\s*(HIGH|MEDIUM|LOW)\]/i);
-      const confidence = confidenceMatch ? confidenceMatch[1].toUpperCase() : "MEDIUM";
-      const cleanRecommendation = recommendation.replace(/\[Confidence:\s*(HIGH|MEDIUM|LOW)\]/gi, "").trim();
-
-      res.json({ 
-        recommendation: cleanRecommendation, 
-        confidence,
-        mealPeriod 
+      res.json({
+        recommendation: `${recommendationBody}\n\n${ACTIVITY_ADVICE_RESPONSE_DISCLAIMER}`,
+        recommendationBody,
+        disclaimer: ACTIVITY_ADVICE_RESPONSE_DISCLAIMER,
+        dataCompleteness,
+        mealPeriod,
       });
     } catch (error) {
       console.error("Activity advice error:", error);

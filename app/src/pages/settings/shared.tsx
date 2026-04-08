@@ -180,7 +180,7 @@ export function SettingsEmergencySection({
   );
 }
 
-export function SettingsDataBackupSection() {
+export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
 
   const handleExport = () => {
@@ -220,13 +220,14 @@ export function SettingsDataBackupSection() {
   };
 
   return (
-    <div className="space-y-4 border-t border-border pt-6">
+    <div className={cn("space-y-4", !embedded && "border-t border-border pt-6")}>
       <h3 className="text-h3 font-semibold text-foreground flex items-center gap-2">
         <Download className="h-4 w-4 text-primary" aria-hidden />
         Backup &amp; restore
       </h3>
       <p className="text-body text-muted-foreground">
-        Export or import your Diabeaters data. Local device storage only — keep a copy if you change devices.
+        Download a JSON file of your Diabeaters data or restore from a file. Covers local device data; if you use cloud sync, keep this as
+        an extra copy when changing devices or for your records.
       </p>
       <div className="flex flex-col sm:flex-row gap-3">
         <Button onClick={handleExport} variant="outline" data-testid="button-export-data">

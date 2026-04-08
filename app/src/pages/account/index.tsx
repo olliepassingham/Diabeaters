@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { SettingsEmergencySection } from "@/pages/settings/shared";
+import { SettingsDataBackupSection, SettingsEmergencySection } from "@/pages/settings/shared";
 import { storage } from "@/lib/storage";
 import type { LinkedPatientWithProfile } from "@/lib/carers.types";
 import {
@@ -408,7 +408,7 @@ export default function Account() {
         description={
           isCarer
             ? "Your account, plus a read-only snapshot of the person you support."
-            : "Your profile, emergency details, and sign-in options."
+            : "Your profile, emergency details, data backup, and sign-in options."
         }
         className="max-w-xl"
       />
@@ -558,6 +558,18 @@ export default function Account() {
         >
           <CardContent className="p-6 space-y-4">
             <SettingsEmergencySection variant="embedded" showSyncButton={false} />
+          </CardContent>
+        </Card>
+      )}
+
+      {!isCarer && (
+        <Card
+          id="account-backup"
+          className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
+          data-testid="card-account-backup"
+        >
+          <CardContent className="p-6 pt-6">
+            <SettingsDataBackupSection embedded />
           </CardContent>
         </Card>
       )}

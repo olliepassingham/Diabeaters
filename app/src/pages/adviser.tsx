@@ -16,6 +16,7 @@ import { calculateMealDose, roundToHalf, type MealDoseResult } from "@/lib/meal-
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 
 import { Link, useLocation } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -518,6 +519,8 @@ export default function Adviser() {
                   </Button>
                 </div>
 
+                {mealResult.error !== "no_ratios" && <MedicalNumericOutputDisclaimer compact />}
+
                 {mealResult.error === "no_ratios" ? (
                   <div className="p-4 bg-muted rounded-lg text-center space-y-2">
                     <p className="text-sm text-muted-foreground">You need insulin-to-carb ratios before the meal planner can suggest doses.</p>
@@ -703,6 +706,7 @@ export default function Adviser() {
 
                   {splitResult && (
                     <div className="p-4 bg-primary/5 rounded-lg space-y-3">
+                      <MedicalNumericOutputDisclaimer compact />
                       <h4 className="font-medium flex items-center gap-2">
                         <Pizza className="h-4 w-4 text-primary" />
                         Your Split Dose Plan ({splitResult.splitRatio})

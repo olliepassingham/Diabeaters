@@ -676,7 +676,7 @@ export default function Settings() {
       usage: "/settings/usage#settings-usage",
       notifications: "/settings/notifications",
       contacts: emergencyEdit,
-      data: "/settings/about",
+      data: "/account#account-backup",
       appearance: "/settings/appearance",
       sources: "/settings/about#settings-sources",
       about: "/settings/about",
@@ -700,7 +700,7 @@ export default function Settings() {
       notifications: "/settings/notifications",
       "emergency-contacts": emergencyEdit,
       "usual-habits": "/settings/usage#settings-usage",
-      data: "/settings/about",
+      data: "/account#account-backup",
       sources: "/settings/about#settings-sources",
       insulin: "/settings/ratios",
     };
@@ -886,7 +886,7 @@ export default function Settings() {
         </p>
       </InfoSection>
       <InfoSection title="About">
-        <p>Version, privacy, terms, support, backup, sources, and references.</p>
+        <p>Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore lives under Account.</p>
       </InfoSection>
     </PageInfoDialog>
   );
@@ -1105,7 +1105,7 @@ export default function Settings() {
   }
 
   if (pathOnly === "/settings/about") {
-    return <SettingsAboutRoute settingsInfoDialog={settingsInfoDialog} isCarer={isCarer} />;
+    return <SettingsAboutRoute settingsInfoDialog={settingsInfoDialog} />;
   }
 
   return (

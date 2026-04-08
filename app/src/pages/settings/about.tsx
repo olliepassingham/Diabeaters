@@ -7,7 +7,7 @@ import { BookOpen, ExternalLink, Info } from "lucide-react";
 import { Link } from "wouter";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
-import { SettingsBackLink, SettingsDataBackupSection, SettingsNavRow } from "./shared";
+import { SettingsBackLink, SettingsNavRow } from "./shared";
 
 const SOURCES = [
   {
@@ -15,14 +15,18 @@ const SOURCES = [
     sources: [
       { org: "International Diabetes Federation (IDF)", title: "IDF Diabetes Atlas", url: "https://diabetesatlas.org/" },
       { org: "NHS UK", title: "Type 1 Diabetes Overview", url: "https://www.nhs.uk/conditions/type-1-diabetes/" },
-      { org: "American Diabetes Association (ADA)", title: "Standards of Medical Care in Diabetes", url: "https://diabetes.org/about-diabetes/type-1" },
+      { org: "American Diabetes Association (ADA)", title: "Type 1 Diabetes (US)", url: "https://diabetes.org/about-diabetes/type-1" },
     ],
   },
   {
     category: "Hypoglycaemia Treatment",
     sources: [
       { org: "Diabetes UK", title: "Hypoglycaemia (Low Blood Sugar) Guidance", url: "https://www.diabetes.org.uk/about-diabetes/hypos" },
-      { org: "Mayo Clinic", title: "Hypoglycemia: Symptoms & Treatment", url: "https://www.mayoclinic.org/diseases-conditions/hypoglycemia/symptoms-causes/syc-20373685" },
+      {
+        org: "Mayo Clinic",
+        title: "Hypoglycemia — symptoms and causes (general health reference)",
+        url: "https://www.mayoclinic.org/diseases-conditions/hypoglycemia/symptoms-causes/syc-20373685",
+      },
     ],
   },
   {
@@ -30,24 +34,53 @@ const SOURCES = [
     sources: [
       { org: "NHS", title: "Carb Counting for People with Type 1 Diabetes", url: "https://www.nhs.uk/conditions/type-1-diabetes/understanding-food/" },
       { org: "Diabetes UK", title: "Carbohydrate Counting", url: "https://www.diabetes.org.uk/guide-to-diabetes/enjoy-food/carbohydrates-and-diabetes/carb-counting" },
-      { org: "ISPAD", title: "International Society for Pediatric and Adolescent Diabetes Guidelines", url: "https://www.ispad.org/" },
+      {
+        org: "ISPAD",
+        title: "International Society for Pediatric and Adolescent Diabetes (resources hub)",
+        url: "https://www.ispad.org/",
+      },
     ],
   },
   {
     category: "Exercise & Insulin Adjustment",
     sources: [
       { org: "JDRF", title: "Exercise and Type 1 Diabetes", url: "https://www.jdrf.org/t1d-resources/living-with-t1d/exercise/" },
-      { org: "American Diabetes Association (ADA)", title: "Physical Activity and Diabetes", url: "https://diabetes.org/health-wellness/fitness" },
+      { org: "American Diabetes Association (ADA)", title: "Physical Activity and Diabetes (US)", url: "https://diabetes.org/health-wellness/fitness" },
     ],
   },
 ];
 
+function MedicalInformationLead() {
+  return (
+    <div
+      className="rounded-xl border border-border/80 bg-muted/30 p-4 space-y-2 text-body text-muted-foreground"
+      data-testid="sources-medical-information-lead"
+    >
+      <h4 className="text-sm font-semibold text-foreground">Medical information</h4>
+      <p>
+        Diabeaters offers educational lifestyle support for people living with Type 1 diabetes. It is not a medical device and does not
+        replace care from your qualified healthcare professional.
+      </p>
+      <p>
+        Listing organisations below does not imply endorsement, partnership, or approval of this app, or that in-app content matches
+        those organisations&apos; current clinical protocols.
+      </p>
+      <p>
+        Third-party pages may change or move; links are provided in good faith. Some entries are general health references rather than
+        diabetes-specific authority sites. Clinical practice varies by region; resources from different countries are included for general
+        education only.
+      </p>
+    </div>
+  );
+}
+
 function SourcesReferencesContent() {
   return (
     <div className="space-y-6" data-testid="sources-content">
+      <MedicalInformationLead />
       <p className="text-body text-muted-foreground">
-        The guidance in this app is informed by the following reputable, publicly accessible sources. This app does not provide medical
-        advice — always consult your diabetes team.
+        The sections below point to publicly accessible materials that may help you explore topics covered in the app. They do not
+        constitute medical advice — always consult your diabetes team for treatment decisions.
       </p>
       {SOURCES.map((section) => (
         <div key={section.category} className="space-y-2">
@@ -59,7 +92,7 @@ function SourcesReferencesContent() {
           </h3>
           <ul className="space-y-1.5">
             {section.sources.map((source) => (
-              <li key={source.title} className="text-body flex items-start gap-2">
+              <li key={`${source.org}-${source.title}`} className="text-body flex items-start gap-2">
                 <span className="text-muted-foreground shrink-0 mt-0.5">-</span>
                 <span>
                   <span className="font-medium">{source.org}</span>
@@ -71,9 +104,9 @@ function SourcesReferencesContent() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-0.5 ml-1.5 text-primary hover:underline"
                       data-testid={`link-source-${source.org.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+                      aria-label={`${source.org}: ${source.title} (opens in new tab)`}
                     >
-                      <ExternalLink className="h-3 w-3" />
-                      <span className="sr-only">Visit {source.org}</span>
+                      <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                     </a>
                   )}
                 </span>
@@ -83,8 +116,8 @@ function SourcesReferencesContent() {
         </div>
       ))}
       <p className="text-small text-muted-foreground border-t border-border pt-4">
-        These sources are provided for reference only. Diabeaters does not replace professional medical advice. Always follow the guidance
-        of your diabetes healthcare team.
+        Reference only. Diabeaters does not warrant the accuracy, completeness, or currency of external sites. Nothing here replaces
+        professional medical advice — always follow your diabetes healthcare team.
       </p>
     </div>
   );
@@ -92,10 +125,9 @@ function SourcesReferencesContent() {
 
 type SettingsAboutRouteProps = {
   settingsInfoDialog: ReactNode;
-  isCarer: boolean;
 };
 
-export function SettingsAboutRoute({ settingsInfoDialog, isCarer }: SettingsAboutRouteProps) {
+export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRouteProps) {
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
       <FaceLogoWatermark />
@@ -103,7 +135,7 @@ export function SettingsAboutRoute({ settingsInfoDialog, isCarer }: SettingsAbou
       <PageHeader
         className="mb-2"
         title="About"
-        description="Version, legal, support, and references."
+        description="Version, legal, support, and third-party references."
         actions={settingsInfoDialog}
       />
       <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
@@ -126,7 +158,6 @@ export function SettingsAboutRoute({ settingsInfoDialog, isCarer }: SettingsAbou
             </h3>
             <SourcesReferencesContent />
           </div>
-          {!isCarer && <SettingsDataBackupSection />}
           <div className="border-t border-border pt-6">
             <h3 className="text-h3 font-semibold text-foreground mb-2 flex items-center gap-2">
               <Info className="h-4 w-4 text-primary" aria-hidden />
@@ -134,12 +165,18 @@ export function SettingsAboutRoute({ settingsInfoDialog, isCarer }: SettingsAbou
             </h3>
             <Disclaimer />
           </div>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
             <Link href="/account" data-testid="settings-link-account">
               <Button variant="outline" size="sm">
                 Open full account settings
               </Button>
             </Link>
+            <p className="text-xs text-muted-foreground">
+              <Link href="/account#account-backup" className="text-primary underline-offset-2 hover:underline">
+                Export or import app data
+              </Link>{" "}
+              (Backup &amp; restore on Account).
+            </p>
           </div>
         </CardContent>
       </Card>
