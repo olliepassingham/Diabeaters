@@ -6,9 +6,9 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".875rem",
-        md: ".625rem",
-        sm: ".375rem",
+        lg: "1.125rem",
+        md: "1rem",
+        sm: "0.5rem",
       },
       colors: {
         bg: "rgb(var(--app-background) / <alpha-value>)",
@@ -87,6 +87,7 @@ export default {
       },
       fontFamily: {
         sans: ['"Inter Variable"', "Inter", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", '"Inter Variable"', "Inter", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
@@ -107,10 +108,15 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "soft-in": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "soft-in": "soft-in 0.35s ease-out both",
       },
     },
   },

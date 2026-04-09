@@ -100,6 +100,17 @@ function RouteFallback() {
   );
 }
 
+/** Soft gradient mesh behind app content (calm, Flo-like atmosphere). */
+function AppShellBackdrop() {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+      <div className="absolute -top-28 -right-[12%] h-[min(32rem,90vw)] w-[min(32rem,90vw)] rounded-full bg-primary/[0.11] blur-3xl dark:bg-primary/[0.18]" />
+      <div className="absolute top-[38%] -left-[18%] h-[min(26rem,85vw)] w-[min(26rem,85vw)] rounded-full bg-[hsl(280_50%_72%_/_0.13)] blur-3xl dark:bg-[hsl(280_40%_48%_/_0.14)]" />
+      <div className="absolute bottom-[-10%] left-1/2 h-40 w-[min(140%,48rem)] -translate-x-1/2 rounded-[100%] bg-gradient-to-t from-primary/[0.07] to-transparent dark:from-primary/[0.12]" />
+    </div>
+  );
+}
+
 function getSafeNext(pathname: string, search: string): string {
   const p = pathname?.startsWith("/") ? pathname : `/${pathname || ""}`;
   const qs = search ? `?${search.replace(/^\?/, "")}` : "";
@@ -708,7 +719,8 @@ function AuthenticatedShell() {
   }, [toast]);
 
   return (
-    <div className="flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+    <div className="relative flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+      <AppShellBackdrop />
       <OfflineBanner />
       {!isCarerMode && (
         <>
@@ -723,7 +735,7 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
-      <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
+      <main className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
         <InnerRouter />
       </main>
       <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
@@ -761,14 +773,15 @@ function AccountShell() {
   };
 
   return (
-    <div className="flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+    <div className="relative flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+      <AppShellBackdrop />
       <AppTopBar
         isCarer={isCarerMode}
         pathOnly="/account"
         onBrandClick={() => setLocation(isCarerMode ? "/carer-view" : "/")}
         onLogout={handleLogout}
       />
-      <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
+      <main className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
         <Account />
       </main>
       <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">

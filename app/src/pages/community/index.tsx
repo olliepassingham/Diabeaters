@@ -283,7 +283,11 @@ export default function CommunityHomePage() {
     const body = composer.trim();
     if (!body && composerFiles.length === 0) return;
     setSubmitting(true);
-    const res = await insertCommunityPost(body, composerFiles.length ? composerFiles : undefined);
+    const res = await insertCommunityPost(
+      body,
+      composerFiles.length ? composerFiles : undefined,
+      composerTopic,
+    );
     setSubmitting(false);
     if (res.error) {
       toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
@@ -291,7 +295,6 @@ export default function CommunityHomePage() {
     }
     setComposer("");
     setComposerFiles([]);
-    setComposerTopic(DEFAULT_COMMUNITY_TOPIC);
     if (res.data) setPosts((prev) => [res.data!, ...prev]);
     toast({ title: "Posted" });
   }

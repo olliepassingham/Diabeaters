@@ -5,7 +5,6 @@ import { Router } from "wouter";
 import App from "./App";
 import "@/index.css";
 import "@/theme.css";
-import "@fontsource-variable/inter/index.css";
 import {
   applyRootAppearanceClass,
   getEffectiveAppearance,

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import {
   Car,
-  AlertTriangle,
   Droplet,
   Phone,
   RotateCcw,
@@ -20,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile } from "@/lib/storage";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
@@ -37,6 +37,8 @@ function linkWithFrom(path: string): string {
 }
 
 type Phase = "form" | "result";
+
+const FORM_WIZARD_STEPS = 4;
 
 type YesNo = "yes" | "no" | "";
 
@@ -127,6 +129,7 @@ export default function DrivingScenarioPage() {
   const [alertEnough, setAlertEnough] = useState<YesNo>("");
   const [treatmentInReach, setTreatmentInReach] = useState<YesNo>("");
   const [longJourney, setLongJourney] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
 
   const formTopRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -138,8 +141,8 @@ export default function DrivingScenarioPage() {
   }, []);
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
-  const stepIndex = phase === "form" ? 0 : 1;
-  const progressPct = ((stepIndex + 1) / 2) * 100;
+  const progressPct =
+    phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
 
   const runCheck = () => {
     setFormError(null);
@@ -184,8 +187,51 @@ export default function DrivingScenarioPage() {
     setPhase("result");
   };
 
+  const goNextWizard = () => {
+    setFormError(null);
+    if (wizardStep === 0) {
+      if (!bgSkipped) {
+        const t = bgInput.trim().replace(",", ".");
+        if (!t) {
+          setFormError("Enter a blood glucose number or choose to skip.");
+          return;
+        }
+        const n = Number(t);
+        if (Number.isNaN(n) || n <= 0) {
+          setFormError("Enter a valid blood glucose number.");
+          return;
+        }
+      }
+      setWizardStep(1);
+      return;
+    }
+    if (wizardStep === 1) {
+      if (recentHypo === "") {
+        setFormError("Choose an answer to continue.");
+        return;
+      }
+      setWizardStep(2);
+      return;
+    }
+    if (wizardStep === 2) {
+      if (alertEnough === "") {
+        setFormError("Choose an answer to continue.");
+        return;
+      }
+      setWizardStep(3);
+      return;
+    }
+    runCheck();
+  };
+
+  const goPrevWizard = () => {
+    setFormError(null);
+    if (wizardStep > 0) setWizardStep((s) => s - 1);
+  };
+
   const reset = () => {
     setPhase("form");
+    setWizardStep(0);
     setOutcome(null);
     setFormError(null);
     setBgSkipped(false);
@@ -213,130 +259,172 @@ export default function DrivingScenarioPage() {
           <PageHeader
             leading={<PageBackButton />}
             title="Driving"
-            description="Quick readiness check from your answers — not legal or medical advice."
+            description={
+              <>
+                <span>Quick readiness check — not legal or medical advice.</span>
+                <span className="mt-1.5 block text-xs text-muted-foreground font-normal">
+                  This app does not state legal blood-glucose limits. Use the info button for more.
+                </span>
+              </>
+            }
+            actions={
+              <PageInfoDialog title="About this check" description="How to use this tool safely">
+                <InfoSection title="Legal and medical limits">
+                  <p>
+                    This app does not state legal blood-glucose limits for driving. Follow local licensing rules, road
+                    authority guidance, and your diabetes clinic.
+                  </p>
+                </InfoSection>
+                <InfoSection title="What you get">
+                  <p>
+                    A short checklist-based suggestion from your answers. It does not replace professional advice or
+                    confirm you are safe to drive.
+                  </p>
+                </InfoSection>
+              </PageInfoDialog>
+            }
           />
         </div>
 
-        <Alert className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20 py-3">
-          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="text-amber-900 dark:text-amber-100 text-sm">Before you start</AlertTitle>
-          <AlertDescription className="text-small text-amber-900/90 dark:text-amber-100/90">
-            This app does not state legal blood-glucose limits for driving. Follow local rules and your clinic.
-          </AlertDescription>
-        </Alert>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="font-medium uppercase tracking-wide">Step {stepIndex + 1} of 2</span>
+        {phase === "form" ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="font-medium uppercase tracking-wide">
+                Step {wizardStep + 1} of {FORM_WIZARD_STEPS}
+              </span>
+            </div>
+            <Progress value={progressPct} className="h-1.5" data-testid="driving-progress" />
           </div>
-          <Progress value={progressPct} className="h-1.5" data-testid="driving-progress" />
-        </div>
+        ) : null}
 
         {phase === "form" ? (
           <Card className="surface-card">
             <CardHeader>
               <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
                 <Car className="h-6 w-6 text-primary shrink-0" />
-                Checklist
+                {wizardStep === 0
+                  ? "Glucose"
+                  : wizardStep === 1
+                    ? "Recent lows"
+                    : wizardStep === 2
+                      ? "Alertness"
+                      : "Carbs within reach"}
               </CardTitle>
-              <CardDescription>Takes under a minute.</CardDescription>
+              <CardDescription>
+                {wizardStep === 0
+                  ? "Enter a reading or skip — takes under a minute in total."
+                  : wizardStep === 1
+                    ? "One question at a time."
+                    : wizardStep === 2
+                      ? "Be honest — this is for your safety."
+                      : "Almost done — optional longer trip tip below."}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Current blood glucose</Label>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="driving-bg-skip"
-                      checked={bgSkipped}
-                      onCheckedChange={(c) => {
-                        const on = c === true;
-                        setBgSkipped(on);
-                        if (on) setBgTrend("unknown");
-                      }}
-                    />
-                    <Label htmlFor="driving-bg-skip" className="text-sm font-normal cursor-pointer">
-                      Skip
-                    </Label>
+            <CardContent className="space-y-6">
+              {wizardStep === 0 ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="text-sm font-medium">Current blood glucose</Label>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="driving-bg-skip"
+                        checked={bgSkipped}
+                        onCheckedChange={(c) => {
+                          const on = c === true;
+                          setBgSkipped(on);
+                          if (on) setBgTrend("unknown");
+                        }}
+                      />
+                      <Label htmlFor="driving-bg-skip" className="text-sm font-normal cursor-pointer">
+                        Skip
+                      </Label>
+                    </div>
                   </div>
-                </div>
-                {!bgSkipped ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2 max-w-xs">
-                      <Label htmlFor="driving-bg">Reading ({bgUnits})</Label>
-                      <Input
-                        id="driving-bg"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
-                        value={bgInput}
-                        onChange={(e) => setBgInput(e.target.value)}
-                        autoComplete="off"
-                        data-testid="input-driving-bg"
+                  {!bgSkipped ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2 max-w-xs">
+                        <Label htmlFor="driving-bg">Reading ({bgUnits})</Label>
+                        <Input
+                          id="driving-bg"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                          value={bgInput}
+                          onChange={(e) => setBgInput(e.target.value)}
+                          autoComplete="off"
+                          data-testid="input-driving-bg"
+                        />
+                      </div>
+                      <ChoiceGroup
+                        name="driving-trend"
+                        label="Trend (if you know it)"
+                        value={bgTrend}
+                        onChange={setBgTrend}
+                        options={[
+                          { value: "rising", title: "Rising" },
+                          { value: "flat", title: "Flat / stable" },
+                          { value: "falling", title: "Falling" },
+                          { value: "unknown", title: "Unknown" },
+                        ]}
                       />
                     </div>
-                    <ChoiceGroup
-                      name="driving-trend"
-                      label="Trend (if you know it)"
-                      value={bgTrend}
-                      onChange={setBgTrend}
-                      options={[
-                        { value: "rising", title: "Rising" },
-                        { value: "flat", title: "Flat / stable" },
-                        { value: "falling", title: "Falling" },
-                        { value: "unknown", title: "Unknown" },
-                      ]}
-                    />
-                  </div>
-                ) : null}
-              </div>
-
-              <ChoiceGroup
-                name="driving-recent-hypo"
-                label="Any hypo or hypo-like symptoms in the last few hours?"
-                value={recentHypo}
-                onChange={setRecentHypo}
-                options={[
-                  { value: "no", title: "No" },
-                  { value: "yes", title: "Yes" },
-                ]}
-              />
-
-              <ChoiceGroup
-                name="driving-alert"
-                label="Do you feel alert enough to concentrate safely?"
-                value={alertEnough}
-                onChange={setAlertEnough}
-                options={[
-                  { value: "yes", title: "Yes" },
-                  { value: "no", title: "No" },
-                ]}
-              />
-
-              <ChoiceGroup
-                name="driving-treatment"
-                label="Is fast-acting carbohydrate within reach (e.g. in the car with you)?"
-                value={treatmentInReach}
-                onChange={setTreatmentInReach}
-                options={[
-                  { value: "yes", title: "Yes" },
-                  { value: "no", title: "No" },
-                ]}
-              />
-
-              <div className="flex items-start gap-3 rounded-lg border border-border/80 p-4">
-                <Checkbox
-                  id="driving-long"
-                  checked={longJourney}
-                  onCheckedChange={(c) => setLongJourney(c === true)}
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="driving-long" className="text-sm font-medium cursor-pointer leading-snug">
-                    Longer journey (adds one planning tip)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Optional — does not change the main recommendation.</p>
+                  ) : null}
                 </div>
-              </div>
+              ) : null}
+
+              {wizardStep === 1 ? (
+                <ChoiceGroup
+                  name="driving-recent-hypo"
+                  label="Any hypo or hypo-like symptoms in the last few hours?"
+                  value={recentHypo}
+                  onChange={setRecentHypo}
+                  options={[
+                    { value: "no", title: "No" },
+                    { value: "yes", title: "Yes" },
+                  ]}
+                />
+              ) : null}
+
+              {wizardStep === 2 ? (
+                <ChoiceGroup
+                  name="driving-alert"
+                  label="Do you feel alert enough to concentrate safely?"
+                  value={alertEnough}
+                  onChange={setAlertEnough}
+                  options={[
+                    { value: "yes", title: "Yes" },
+                    { value: "no", title: "No" },
+                  ]}
+                />
+              ) : null}
+
+              {wizardStep === 3 ? (
+                <div className="space-y-6">
+                  <ChoiceGroup
+                    name="driving-treatment"
+                    label="Is fast-acting carbohydrate within reach (e.g. in the car with you)?"
+                    value={treatmentInReach}
+                    onChange={setTreatmentInReach}
+                    options={[
+                      { value: "yes", title: "Yes" },
+                      { value: "no", title: "No" },
+                    ]}
+                  />
+                  <div className="flex items-start gap-3 rounded-lg border border-border/80 p-4">
+                    <Checkbox
+                      id="driving-long"
+                      checked={longJourney}
+                      onCheckedChange={(c) => setLongJourney(c === true)}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="driving-long" className="text-sm font-medium cursor-pointer leading-snug">
+                        Longer journey (adds one planning tip)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Optional — does not change the main recommendation.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {formError ? (
                 <p className="text-sm text-destructive" role="alert">
@@ -429,21 +517,40 @@ export default function DrivingScenarioPage() {
           className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
           data-testid="driving-sticky-actions"
         >
-          <PageShell variant="standard" className="flex justify-end">
+          <PageShell variant="standard" className="flex gap-2 items-center justify-between flex-wrap sm:justify-end">
             <Button
               type="button"
-              className="gap-1.5 min-w-[10rem] w-full sm:w-auto"
-              onClick={runCheck}
+              variant="outline"
+              className="gap-1.5 shrink-0"
+              onClick={goPrevWizard}
+              disabled={wizardStep === 0}
+              data-testid="button-driving-wizard-back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              type="button"
+              className="gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
+              onClick={goNextWizard}
               data-testid="button-driving-check"
             >
-              Check readiness
+              {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
               <ArrowRight className="h-4 w-4" />
             </Button>
           </PageShell>
         </div>
       ) : (
         <PageShell variant="standard" className="flex justify-start">
-          <Button type="button" variant="outline" className="gap-1.5" onClick={() => setPhase("form")}>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => {
+              setWizardStep(0);
+              setPhase("form");
+            }}
+          >
             <ArrowLeft className="h-4 w-4" />
             Edit answers
           </Button>

@@ -15,13 +15,14 @@ import {
   X,
   ArrowRight,
   ArrowLeft,
-  Apple,
-  Repeat,
   ChevronDown,
   Utensils,
   Calculator,
+  Minus,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
-import { storage, type UserProfile, type ExerciseRoutine, type ExerciseIntensity } from "@/lib/storage";
+import { storage, type UserProfile, type ExerciseIntensity, type ExerciseBgTrend } from "@/lib/storage";
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
@@ -32,10 +33,10 @@ import {
   activeSessionMatchesPlannerQuery,
   adviserMealExerciseHref,
   bgForPlannerFromActiveSession,
+  trendForPlannerFromActiveSession,
   normalizePlannerExerciseTypeQueryParam,
   resultTabForExercisePhase,
 } from "@/lib/exercise-planner-href";
-import { useToast } from "@/hooks/use-toast";
 import { getExerciseReadinessVerdict, type ExerciseReadinessResult } from "@/lib/exercise-readiness";
 import {
   comparePlannedBolusToPreview,
@@ -45,6 +46,7 @@ import {
   type MealDoseResult,
 } from "@/lib/meal-dose";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { cn } from "@/lib/utils";
 
 type MealTypeForBolus = "snack" | "breakfast" | "lunch" | "dinner";
@@ -84,7 +86,6 @@ function formatSessionStartingLabel(sessionTimingFromNow: string): string {
 
 export function ExercisePlanner() {
   const search = useSearch();
-  const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [scenarioState, setScenarioState] = useState(() => storage.getScenarioState());
 
@@ -94,11 +95,10 @@ export function ExercisePlanner() {
   const [sessionTimingFromNow, setSessionTimingFromNow] = useState("60");
 
   const [exerciseResult, setExerciseResult] = useState<ExercisePlanResult | null>(null);
-  const [savedExerciseRoutines, setSavedExerciseRoutines] = useState<ExerciseRoutine[]>([]);
-
   const [approxCarbs, setApproxCarbs] = useState("");
   const [lastInsulinTiming, setLastInsulinTiming] = useState<LastInsulinTiming | "">("");
   const [currentBgInput, setCurrentBgInput] = useState("");
+  const [exerciseBgTrend, setExerciseBgTrend] = useState<ExerciseBgTrend>("not_sure");
   const [mealTypeForBolus, setMealTypeForBolus] = useState<MealTypeForBolus>("snack");
   const [mealBolusPreview, setMealBolusPreview] = useState<MealDoseResult | null>(null);
   const [mealBolusNoRatios, setMealBolusNoRatios] = useState(false);
@@ -120,7 +120,6 @@ export function ExercisePlanner() {
   }, [lastInsulinTiming]);
 
   useEffect(() => {
-    setSavedExerciseRoutines(storage.getExerciseRoutines());
     const p = storage.getProfile();
     if (p) setProfile(p);
     setScenarioState(storage.getScenarioState());
@@ -159,33 +158,13 @@ export function ExercisePlanner() {
         if (bg != null) {
           setCurrentBgInput(String(bg));
         }
+        const trend = trendForPlannerFromActiveSession(active);
+        if (trend) {
+          setExerciseBgTrend(trend);
+        }
       }
     }
   }, [search]);
-
-  const applyExerciseRoutine = (routine: ExerciseRoutine) => {
-    const existing = storage.getActiveExercise();
-    if (existing) {
-      toast({
-        title: "Exercise already active",
-        description: `"${existing.exerciseName}" is in progress. Finish it first.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    setExerciseType(routine.exerciseType);
-    setExerciseDuration(String(routine.durationMinutes));
-    setExerciseIntensity(routine.intensity);
-    storage.useExerciseRoutine(routine.id);
-    storage.startExerciseSession({
-      routineId: routine.id,
-      exerciseName: routine.name,
-      exerciseType: routine.exerciseType,
-      intensity: routine.intensity,
-      durationMinutes: routine.durationMinutes,
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
 
   const handleQuickExercisePlan = () => {
     const duration = parseInt(exerciseDuration, 10);
@@ -208,6 +187,9 @@ export function ExercisePlanner() {
     const bgParsed = parseFloat(currentBgInput.replace(",", "."));
     if (currentBgInput.trim() !== "" && !Number.isNaN(bgParsed)) {
       ctx.currentBg = bgParsed;
+    }
+    if (exerciseBgTrend !== "not_sure") {
+      ctx.bgTrend = exerciseBgTrend;
     }
     const result = calculateExercisePlan(ctx, freshSettings);
     setExerciseResult(result);
@@ -234,6 +216,7 @@ export function ExercisePlanner() {
       lastInsulin: lastInsulinTiming || undefined,
       carbs: ctx.approximateCarbsGrams,
       bg: ctx.currentBg,
+      bgTrend: ctx.bgTrend,
       minutesUntilStart: ctx.minutesUntilStart,
       mealTypeForBolus,
       plannedBolusUnits: plannedParsed ?? undefined,
@@ -290,7 +273,28 @@ export function ExercisePlanner() {
       exerciseType,
       intensity: exerciseIntensity as ExerciseIntensity,
       phase: "pre",
+      bgTrend: exerciseBgTrend,
     });
+
+  const bgTrendLabel = (t: ExerciseBgTrend): string | null => {
+    if (t === "not_sure") return null;
+    if (t === "flat") return "Stable";
+    if (t === "rising") return "Rising";
+    return "Falling";
+  };
+
+  const plannerCompactExtras = (() => {
+    const parts: string[] = [];
+    if (currentBgInput.trim() !== "") {
+      const t = bgTrendLabel(exerciseBgTrend);
+      parts.push(t ? `BG ${currentBgInput} ${bgUnits} (${t})` : `BG ${currentBgInput} ${bgUnits}`);
+    }
+    const c = parseInt(approxCarbs, 10);
+    if (approxCarbs.trim() !== "" && !Number.isNaN(c) && c > 0) {
+      parts.push(`~${c}g carbs`);
+    }
+    return parts.length ? parts.join(" · ") : null;
+  })();
 
   return (
     <div className="space-y-4">
@@ -315,33 +319,49 @@ export function ExercisePlanner() {
       )}
 
       <Card ref={plannerCardRef} className="rounded-xl shadow-sm border-border/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Dumbbell className="h-6 w-6 text-primary" />
-            Exercise planner
-          </CardTitle>
-          <CardDescription>Plan your workout with before, during, and after recommendations</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {exerciseResult && !plannerInputsOpen ? (
-            <div
-              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
-              data-testid="planner-inputs-summary"
-            >
-              <p className="text-sm text-foreground">{plannerSummaryLine}</p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="min-h-11 shrink-0"
-                onClick={() => setPlannerInputsOpen(true)}
-                data-testid="button-edit-exercise-inputs"
-              >
-                Edit exercise inputs
-              </Button>
+        {exerciseResult && !plannerInputsOpen ? (
+          <CardContent className="py-3 px-4" data-testid="planner-inputs-summary">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <Dumbbell className="h-4 w-4 text-primary shrink-0 mt-0.5" aria-hidden />
+              <div className="min-w-0 space-y-0.5">
+                <p className="text-xs font-medium text-muted-foreground">Planned session</p>
+                <p className="text-sm text-foreground leading-snug">{plannerSummaryLine}</p>
+                {plannerCompactExtras ? (
+                  <p className="text-xs text-muted-foreground leading-snug">{plannerCompactExtras}</p>
+                ) : null}
+              </div>
             </div>
-          ) : (
-            <>
+          </CardContent>
+        ) : (
+          <>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
+                    <Dumbbell className="h-6 w-6 text-primary" />
+                    Exercise planner
+                  </CardTitle>
+                  <CardDescription>
+                    Set your session, then open Food &amp; insulin if you want carb or bolus estimates.
+                  </CardDescription>
+                </div>
+                <PageInfoDialog title="How this planner works" description="What you see and what is optional">
+                  <InfoSection title="Your plan">
+                    <p>
+                      After you tap Plan my workout, you get phase-by-phase tips (prep, during, after, and next hours). Not
+                      medical advice — confirm changes with your care team.
+                    </p>
+                  </InfoSection>
+                  <InfoSection title="Food &amp; insulin (optional)">
+                    <p>
+                      Expand that section to add BG, carbs, meal type, and optional bolus fields for a preview aligned with
+                      the Meal Adviser logic. Skip it if you only want general workout guidance.
+                    </p>
+                  </InfoSection>
+                </PageInfoDialog>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="exercise-type">Type of exercise</Label>
@@ -408,19 +428,7 @@ export function ExercisePlanner() {
             </div>
           </div>
 
-          <div className="bg-primary/5 p-3 rounded-lg">
-            <div className="flex items-start gap-2">
-              <Clock className="h-4 w-4 text-primary mt-0.5" />
-              <div className="text-small">
-                <p className="font-medium text-foreground">Complete workout plan</p>
-                <p className="text-muted-foreground">
-                  Recommendations for what to eat before, during, and after your workout, plus adjusted insulin guidance.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <Collapsible defaultOpen className="group rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10">
+          <Collapsible defaultOpen={false} className="group rounded-xl border border-border/60 bg-muted/20 dark:bg-muted/10">
             <div className="flex items-center gap-0.5">
               <CollapsibleTrigger asChild>
                 <button
@@ -429,7 +437,8 @@ export function ExercisePlanner() {
                   data-testid="collapsible-food-insulin-trigger"
                 >
                   <Utensils className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  Food & insulin
+                  Food &amp; insulin
+                  <span className="text-xs font-normal text-muted-foreground">(optional)</span>
                 </button>
               </CollapsibleTrigger>
               <InlineInfoHint
@@ -459,18 +468,64 @@ export function ExercisePlanner() {
                 <span className="text-tiny text-muted-foreground">Quick tips</span>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="current-bg">Current BG ({bgUnits})</Label>
-                  <Input
-                    id="current-bg"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="For readiness"
-                    value={currentBgInput}
-                    onChange={(e) => setCurrentBgInput(e.target.value)}
-                    data-testid="input-current-bg-exercise"
-                  />
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-bg">Current BG ({bgUnits})</Label>
+                    <Input
+                      id="current-bg"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="For readiness"
+                      value={currentBgInput}
+                      onChange={(e) => setCurrentBgInput(e.target.value)}
+                      data-testid="input-current-bg-exercise"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label id="label-exercise-bg-direction" className="text-foreground">
+                      BG direction <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <div
+                      className="flex flex-wrap gap-2"
+                      role="group"
+                      aria-labelledby="label-exercise-bg-direction"
+                    >
+                      <Button
+                        type="button"
+                        variant={exerciseBgTrend === "flat" ? "default" : "outline"}
+                        size="sm"
+                        className="min-h-10 flex-1 sm:min-w-0 sm:flex-1"
+                        onClick={() => setExerciseBgTrend((prev) => (prev === "flat" ? "not_sure" : "flat"))}
+                        data-testid="button-exercise-bg-trend-stable"
+                      >
+                        <Minus className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Stable
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={exerciseBgTrend === "rising" ? "default" : "outline"}
+                        size="sm"
+                        className="min-h-10 flex-1 sm:min-w-0 sm:flex-1"
+                        onClick={() => setExerciseBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
+                        data-testid="button-exercise-bg-trend-rising"
+                      >
+                        <TrendingUp className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Rising
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={exerciseBgTrend === "falling" ? "default" : "outline"}
+                        size="sm"
+                        className="min-h-10 flex-1 sm:min-w-0 sm:flex-1"
+                        onClick={() => setExerciseBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
+                        data-testid="button-exercise-bg-trend-falling"
+                      >
+                        <TrendingDown className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Falling
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="approx-carbs">Carbs you will eat or already had (g)</Label>
@@ -584,13 +639,6 @@ export function ExercisePlanner() {
             </CollapsibleContent>
           </Collapsible>
 
-          <div className="flex items-center justify-center gap-2">
-            <InlineInfoHint
-              ariaLabel="How tips use your inputs"
-              content="Tips use your workout, timing, BG, carbs, and insulin entries above — add what you know; skip the rest."
-            />
-            <span className="text-tiny text-muted-foreground">How tips use your answers</span>
-          </div>
           <Button
             onClick={handleQuickExercisePlan}
             disabled={!exerciseDuration}
@@ -599,9 +647,9 @@ export function ExercisePlanner() {
           >
             Plan my workout
           </Button>
-            </>
-          )}
-        </CardContent>
+            </CardContent>
+          </>
+        )}
       </Card>
 
       {exerciseResult && (
@@ -638,6 +686,7 @@ export function ExercisePlanner() {
           <CardContent className="space-y-5">
             {(() => {
               const v = verdictForResult();
+              const trendTag = bgTrendLabel(exerciseBgTrend);
               const tone =
                 v.verdict === "ready"
                   ? "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/25"
@@ -673,6 +722,7 @@ export function ExercisePlanner() {
                         {currentBgInput.trim() !== "" ? (
                           <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
                             BG {currentBgInput} {bgUnits}
+                            {trendTag ? ` · ${trendTag}` : ""}
                           </span>
                         ) : null}
                       </div>
@@ -692,11 +742,20 @@ export function ExercisePlanner() {
             })()}
 
             <Tabs value={resultTab} onValueChange={setResultTab} className="w-full" data-testid="exercise-result-tabs">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="before" data-testid="tab-exercise-before">Before</TabsTrigger>
-                <TabsTrigger value="during" data-testid="tab-exercise-during">During</TabsTrigger>
-                <TabsTrigger value="after" data-testid="tab-exercise-after">After</TabsTrigger>
-                <TabsTrigger value="recovery" data-testid="tab-exercise-recovery">Next</TabsTrigger>
+              <p className="text-xs text-muted-foreground mb-2">Jump to a phase — prep opens first.</p>
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 h-auto p-1 bg-muted/40">
+                <TabsTrigger value="before" className="text-xs py-2 px-2" data-testid="tab-exercise-before">
+                  Prep
+                </TabsTrigger>
+                <TabsTrigger value="during" className="text-xs py-2 px-2" data-testid="tab-exercise-during">
+                  During
+                </TabsTrigger>
+                <TabsTrigger value="after" className="text-xs py-2 px-2" data-testid="tab-exercise-after">
+                  After
+                </TabsTrigger>
+                <TabsTrigger value="recovery" className="text-xs py-2 px-2" data-testid="tab-exercise-recovery">
+                  Next hours
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="before" className="mt-4 space-y-3">
@@ -973,13 +1032,7 @@ export function ExercisePlanner() {
             </Tabs>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-tiny text-muted-foreground">
-                <InlineInfoHint
-                  ariaLabel="Disclaimer about this plan"
-                  content="Not medical advice. Individual responses vary — track your patterns with your care team."
-                />
-                <span>Not medical advice</span>
-              </div>
+              <p className="text-tiny text-muted-foreground">Educational only — not medical advice.</p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -999,52 +1052,6 @@ export function ExercisePlanner() {
           </CardContent>
         </Card>
       )}
-
-      <Card className="rounded-xl shadow-sm border-border/80" data-testid="card-saved-routines">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Dumbbell className="h-6 w-6 text-primary" />
-            Exercise routines
-          </CardTitle>
-          <CardDescription>
-            {savedExerciseRoutines.length > 0
-              ? "Tap a routine to prefill the planner and start decision support mode"
-              : "Save workouts in Routines so they appear here for one-tap planning"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {savedExerciseRoutines.length === 0 ? (
-            <p className="text-small text-muted-foreground py-1">No saved exercise routines yet.</p>
-          ) : (
-            savedExerciseRoutines.slice(0, 5).map((routine, idx) => (
-              <button
-                key={routine.id}
-                type="button"
-                onClick={() => applyExerciseRoutine(routine)}
-                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 text-left border border-transparent hover:border-border/60 transition-colors"
-                data-testid={`button-apply-routine-${idx}`}
-              >
-                <div className="flex items-center justify-center min-w-[2.5rem] h-10 rounded-md bg-primary/10">
-                  <Dumbbell className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-small font-medium truncate text-foreground">{routine.name}</p>
-                  <p className="text-tiny text-muted-foreground">
-                    {exerciseLabelsMap[routine.exerciseType] || routine.exerciseType} · {routine.durationMinutes} min · {routine.intensity}
-                  </p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </button>
-            ))
-          )}
-          <Button variant="outline" size="sm" className="w-full mt-1 min-h-11" asChild data-testid="link-manage-routines">
-            <Link href="/routines?section=exercise">
-              <Repeat className="h-3.5 w-3.5 mr-2 shrink-0" />
-              Add or edit exercise routines
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -17,6 +17,8 @@ import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-out
 import { upsertScenario } from "@/lib/scenarios-supabase";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
+
+type BedtimeBgTrend = "rising" | "steady" | "falling" | "not_sure";
 
 interface CorrectionSuggestion {
   fullDose: number;
@@ -42,10 +44,29 @@ interface ReadinessResult {
   snack: { grams: number; reason: string } | null;
 }
 
+/** Home-clock hour from settings "HH:mm" (same source as travel MDI). Returns null if invalid. */
+function parseBasalInjectionHour(basalTime: string | undefined): number | null {
+  if (!basalTime || !/^\d{1,2}:\d{2}$/.test(basalTime.trim())) return null;
+  const [h, m] = basalTime.trim().split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h;
+}
+
+/**
+ * MDI only: "morning" = long-acting usually given well before sleep (approx. 05:00–14:59);
+ * "evening" = closer to overnight (15:00–04:59). Used for educational readiness only, not dose math.
+ */
+function mdiBasalBedtimeBucket(basalTime: string | undefined): "morning" | "evening" | null {
+  const hour = parseBasalInjectionHour(basalTime);
+  if (hour === null) return null;
+  if (hour >= 5 && hour < 15) return "morning";
+  return "evening";
+}
+
 export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
-  const [bgTrend, setBgTrend] = useState<"rising" | "steady" | "falling">("steady");
+  const [bgTrend, setBgTrend] = useState<BedtimeBgTrend>("not_sure");
   const [hoursSinceFood, setHoursSinceFood] = useState("");
   const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
@@ -59,6 +80,7 @@ export default function Bedtime() {
   const [profile, setProfile] = useState<any>(null);
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [aboutCheckOpen, setAboutCheckOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alarmPlanned, setAlarmPlanned] = useState(false);
@@ -193,6 +215,12 @@ export default function Bedtime() {
       cautionCount++;
     } else if (bgTrend === "rising") {
       factors.push({ label: "Trend", status: "good", note: "Rising - recheck before sleep" });
+    } else if (bgTrend === "not_sure") {
+      factors.push({
+        label: "Trend",
+        status: "good",
+        note: "Not set — tap Stable, Rising, or Falling if you know your BG direction",
+      });
     } else {
       factors.push({ label: "Trend", status: "good", note: "Stable" });
     }
@@ -276,6 +304,24 @@ export default function Bedtime() {
       cautionCount++;
     }
 
+    const mdiBasalForBed = !isPumpUser ? mdiBasalBedtimeBucket(userSettings?.basalInjectionTime) : null;
+    if (mdiBasalForBed === "morning") {
+      factors.push({
+        label: "Long-acting timing",
+        status: "caution",
+        note:
+          "Your usual long-acting dose is earlier in the day. Overnight glucose can behave differently than when long-acting is taken near bedtime—trends and snacks still matter.",
+      });
+      cautionCount++;
+    } else if (mdiBasalForBed === "evening") {
+      factors.push({
+        label: "Long-acting timing",
+        status: "good",
+        note:
+          "Your usual long-acting time is closer to sleep. Many people find that lines up with steadier overnight glucose, but illness, food, and activity still count.",
+      });
+    }
+
     let level: ReadinessLevel;
     let title: string;
     let message: string;
@@ -326,6 +372,14 @@ export default function Bedtime() {
       tips.push("Keep your hypo kit easily accessible in an unfamiliar room");
     }
 
+    if (mdiBasalForBed === "morning") {
+      tips.push(
+        "With a morning long-acting routine, some people see glucose drift up later at night—your care team's plan and occasional overnight checks still apply.",
+      );
+    } else if (mdiBasalForBed === "evening") {
+      tips.push("Long-acting near bedtime often supports steadier overnight levels for many people on MDI—still watch for hypos if you exercised or drank alcohol.");
+    }
+
     const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHours);
 
     const snack: ReadinessResult["snack"] =
@@ -366,6 +420,8 @@ export default function Bedtime() {
           meal_carbs: carbs != null && Number.isFinite(carbs) ? carbs : null,
           hours_since_insulin: Number.isFinite(insulinHours) ? insulinHours : null,
           hours_until_sleep: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
+          mdi_basal_bedtime_bucket: mdiBasalForBed,
+          basal_injection_time: !isPumpUser ? userSettings?.basalInjectionTime ?? null : null,
         },
       },
     });
@@ -424,7 +480,7 @@ export default function Bedtime() {
       hoursSinceFood: hoursSinceFood ? parseFloat(hoursSinceFood) : null,
       hoursSinceInsulin: hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : null,
       hoursUntilSleep: hoursUntilSleep ? parseFloat(hoursUntilSleep) : null,
-      bgTrend,
+      bgTrend: bgTrend === "not_sure" ? undefined : bgTrend,
       mealCarbs: mealCarbs ? parseFloat(mealCarbs) : null,
       recentHypos,
       alarmPlanned,
@@ -578,20 +634,44 @@ export default function Bedtime() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bg-trend" className="flex items-center gap-2">
-                {bgTrend === "falling" ? <TrendingDown className="h-4 w-4" /> : bgTrend === "rising" ? <TrendingUp className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
-                Trend
+              <Label id="label-bedtime-bg-direction" className="text-foreground">
+                BG direction <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
-              <Select value={bgTrend} onValueChange={(v) => setBgTrend(v as "rising" | "steady" | "falling")}>
-                <SelectTrigger id="bg-trend" data-testid="select-bg-trend">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rising">Rising</SelectItem>
-                  <SelectItem value="steady">Steady</SelectItem>
-                  <SelectItem value="falling">Falling</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-wrap gap-2" role="group" aria-labelledby="label-bedtime-bg-direction">
+                <Button
+                  type="button"
+                  variant={bgTrend === "steady" ? "default" : "outline"}
+                  size="sm"
+                  className="min-h-10 flex-1 sm:flex-1"
+                  onClick={() => setBgTrend((prev) => (prev === "steady" ? "not_sure" : "steady"))}
+                  data-testid="button-bedtime-bg-trend-stable"
+                >
+                  <Minus className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                  Stable
+                </Button>
+                <Button
+                  type="button"
+                  variant={bgTrend === "rising" ? "default" : "outline"}
+                  size="sm"
+                  className="min-h-10 flex-1 sm:flex-1"
+                  onClick={() => setBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
+                  data-testid="button-bedtime-bg-trend-rising"
+                >
+                  <TrendingUp className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                  Rising
+                </Button>
+                <Button
+                  type="button"
+                  variant={bgTrend === "falling" ? "default" : "outline"}
+                  size="sm"
+                  className="min-h-10 flex-1 sm:flex-1"
+                  onClick={() => setBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
+                  data-testid="button-bedtime-bg-trend-falling"
+                >
+                  <TrendingDown className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                  Falling
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -946,25 +1026,35 @@ export default function Bedtime() {
         </Card>
       )}
 
-      <Card data-testid="card-bedtime-disclaimer">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div className="space-y-2 text-sm text-muted-foreground">
+      <Collapsible open={aboutCheckOpen} onOpenChange={setAboutCheckOpen}>
+        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-disclaimer">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full flex items-center justify-between gap-2 p-4 h-auto font-normal hover:bg-muted/50"
+              data-testid="button-toggle-bedtime-about"
+            >
+              <div className="flex items-center gap-2 text-left min-w-0">
+                <Info className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="font-medium text-foreground">About this check</span>
+              </div>
+              {aboutCheckOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 pb-5 space-y-2 text-sm text-muted-foreground">
               <p>
-                <strong>About this check:</strong> This tool looks at common factors that affect overnight glucose stability. 
-                It's designed to help you build awareness and confidence, not to replace your own judgement or medical advice.
+                This tool looks at common factors that affect overnight glucose stability. It is designed to help you build
+                awareness and confidence, not to replace your own judgement or medical advice.
               </p>
-              <p>
-                Everyone's diabetes is different. Over time, you'll learn which factors matter most for your own steady nights.
-              </p>
+              <p>Everyone&apos;s diabetes is different. Over time, you&apos;ll learn which factors matter most for your own steady nights.</p>
               <p className="text-xs italic" data-testid="text-bedtime-disclaimer">
-                [Not medical advice. Always follow your healthcare team's guidance for overnight management.]
+                [Not medical advice. Always follow your healthcare team&apos;s guidance for overnight management.]
               </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
         <Card data-testid="card-bedtime-history">

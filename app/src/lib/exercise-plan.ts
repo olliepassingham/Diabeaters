@@ -3,6 +3,8 @@
  * Heuristics are conservative; users must confirm with their care team.
  */
 
+import type { ExerciseBgTrend } from "@/lib/storage";
+
 export interface ExercisePlanResult {
   duration: number;
   intensity: string;
@@ -74,6 +76,8 @@ export interface ExercisePlanContext {
   minutesUntilPreExerciseFuel?: number;
   /** Current BG if user entered it. */
   currentBg?: number;
+  /** CGM or meter trend when user sets it (optional). */
+  bgTrend?: ExerciseBgTrend;
   /** Local hour 0–23 for evening / overnight recovery copy. */
   hourOfDay?: number;
 }
@@ -319,6 +323,20 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
       );
     } else if (isBgHigh(context.currentBg, bgUnits)) {
       preTips.push("If BG is high, follow your team's advice on ketones and fluids before intense effort.");
+    } else if (context.bgTrend && context.bgTrend !== "not_sure") {
+      if (context.bgTrend === "falling") {
+        preTips.push(
+          "You noted BG is falling — ease into intensity, keep fast carbs nearby, and recheck if anything feels off.",
+        );
+      } else if (context.bgTrend === "rising") {
+        preTips.push(
+          "You noted BG is rising — some sessions climb then fall sharply; keep fuel handy and plan follow-up checks.",
+        );
+      } else if (context.bgTrend === "flat") {
+        preTips.push(
+          "You noted BG is stable — still worth a quick recheck if effort ramps up or the session runs long.",
+        );
+      }
     }
   }
 

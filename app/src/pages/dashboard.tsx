@@ -354,15 +354,18 @@ function HeroCard({
   return (
     <>
       <Card
-        className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50"
+        className="dashboard-card-hover animate-soft-in overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card to-card shadow-sm ring-1 ring-border/30 hover:shadow-md dark:from-primary/[0.12] dark:via-card dark:to-card dark:ring-border/40"
         data-testid="card-hero"
       >
-        <CardContent className="p-4 md:p-5 space-y-4">
+        <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1 space-y-0.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="text-lg font-semibold tracking-tight text-foreground" data-testid="text-greeting">
+                  <span
+                    className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+                    data-testid="text-greeting"
+                  >
                     {greeting()}
                     {firstName ? `, ${firstName}` : ""}
                   </span>

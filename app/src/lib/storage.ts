@@ -416,7 +416,7 @@ export interface BedtimeLog {
   hoursSinceInsulin: number | null;
   hoursUntilSleep?: number | null;
   /** rising/steady/falling, if user provided */
-  bgTrend?: "rising" | "steady" | "falling";
+  bgTrend?: "rising" | "steady" | "falling" | "not_sure";
   /** optional meal carbs estimate, if user provided */
   mealCarbs?: number | null;
   /** true if user reported any recent hypos today / overnight risk */

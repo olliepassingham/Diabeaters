@@ -11,6 +11,7 @@ import {
   Utensils,
   Moon,
   Calculator,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
 import {
   normalizeBgUnits,
@@ -54,22 +57,22 @@ const SITUATION_CARDS: {
   {
     id: "meal_with_drinks",
     title: "Meal or snacks with drinks",
-    description: "Estimate carb coverage using your ratios — same math as Meal Adviser.",
+    description: "Carb estimate from your saved ratios.",
   },
   {
     id: "late_snack",
     title: "Eating after drinking / late snack",
-    description: "Carb estimate plus reminders about delayed lows.",
+    description: "Late food and delayed-low reminders.",
   },
   {
     id: "before_out",
     title: "Before I go out",
-    description: "Short prep checklist — no dose without food entered.",
+    description: "Quick prep before you leave.",
   },
   {
     id: "feels_wrong",
     title: "Something feels wrong",
-    description: "Red flags and urgent links if you need help now.",
+    description: "Red flags and where to get help fast.",
   },
 ];
 
@@ -331,7 +334,22 @@ export default function AlcoholScenarioPage() {
           <PageHeader
             leading={<PageBackButton />}
             title="Alcohol"
-            description="Situation-first help: carb coverage from your settings (same as Meal Adviser), plus safety gates. Not medical advice — confirm with your team."
+            description="Pick your situation — estimates use your saved ratios (like Meal Adviser). Not medical advice."
+            actions={
+              <PageInfoDialog title="About this tool" description="Alcohol and glucose — read before you rely on estimates">
+                <InfoSection title="Delayed lows">
+                  <p>
+                    Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
+                  </p>
+                </InfoSection>
+                <InfoSection title="Estimates">
+                  <p>
+                    Carb coverage numbers use the same ratio logic as Meal Adviser in this app. They do not replace your
+                    clinic&apos;s plan.
+                  </p>
+                </InfoSection>
+              </PageInfoDialog>
+            }
           />
         </div>
 
@@ -354,13 +372,9 @@ export default function AlcoholScenarioPage() {
               <CardDescription>Pick the closest situation. You can change it anytime.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Alert className="mb-6 border-amber-300/80 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/30">
-                <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
-                <AlertTitle className="text-amber-950 dark:text-amber-100">Delayed lows</AlertTitle>
-                <AlertDescription className="text-amber-950/90 dark:text-amber-100/90">
-                  Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
-                </AlertDescription>
-              </Alert>
+              <p className="text-xs text-muted-foreground mb-4">
+                Tap the info button above for delayed-low safety and how estimates work.
+              </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 {SITUATION_CARDS.map((c) => (
                   <button
@@ -384,11 +398,25 @@ export default function AlcoholScenarioPage() {
 
         {phase === "inputs" && situation ? (
           <Card className="surface-card">
-            <CardHeader>
-              <CardTitle className="text-h3">A few details</CardTitle>
-              <CardDescription>
-                {SITUATION_CARDS.find((s) => s.id === situation)?.title}
-              </CardDescription>
+            <CardHeader className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-h3">A few details</CardTitle>
+                  <CardDescription>
+                    {SITUATION_CARDS.find((s) => s.id === situation)?.title}
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground shrink-0 -mt-1 sm:mt-0"
+                  onClick={backToSituation}
+                  data-testid="button-alcohol-change-situation"
+                >
+                  Change situation
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-8">
               {situation === "feels_wrong" ? (
@@ -630,26 +658,32 @@ export default function AlcoholScenarioPage() {
                 )}
 
                 {outcome.kind === "estimate" && (
-                  <>
-                    <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                      {outcome.tips.map((t) => (
-                        <li key={t}>{t}</li>
-                      ))}
-                    </ul>
-                    <Alert>
-                      <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
-                    </Alert>
-                    <div className="flex flex-wrap gap-2">
-                      {estimateCarbsG != null ? (
-                        <Button asChild className="gap-2">
-                          <Link href={linkWithFrom(adviserLinkFromAlcohol(estimateCarbsG, mealType))}>
-                            <Calculator className="h-4 w-4" />
-                            Open in Meal Adviser
-                          </Link>
-                        </Button>
-                      ) : null}
-                    </div>
-                  </>
+                  <Collapsible className="group rounded-lg border border-border/60">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/50 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <span>Tips, safety note, and Meal Adviser</span>
+                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="border-t border-border/60 px-4 pb-4 pt-3 space-y-4">
+                      <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                        {outcome.tips.map((t) => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                      <Alert>
+                        <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
+                      </Alert>
+                      <div className="flex flex-wrap gap-2">
+                        {estimateCarbsG != null ? (
+                          <Button asChild className="gap-2">
+                            <Link href={linkWithFrom(adviserLinkFromAlcohol(estimateCarbsG, mealType))}>
+                              <Calculator className="h-4 w-4" />
+                              Open in Meal Adviser
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
 
                 {outcome.kind === "prep_only" && (
@@ -660,14 +694,19 @@ export default function AlcoholScenarioPage() {
                       ))}
                     </ul>
                     {outcome.checklist.length > 0 ? (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Quick checklist</p>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                          {outcome.checklist.map((c) => (
-                            <li key={c}>{c}</li>
-                          ))}
-                        </ul>
-                      </div>
+                      <Collapsible className="group rounded-lg border border-border/60">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/50 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          <span>Quick checklist</span>
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border-t border-border/60 px-4 pb-4 pt-2">
+                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                            {outcome.checklist.map((c) => (
+                              <li key={c}>{c}</li>
+                            ))}
+                          </ul>
+                        </CollapsibleContent>
+                      </Collapsible>
                     ) : null}
                   </>
                 )}

@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { Syringe, AlertTriangle, Phone, Package } from "lucide-react";
+import { Syringe, AlertTriangle, Phone, Package, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -61,23 +62,24 @@ export default function PumpFailurePage() {
               </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
 
-      <Card className="rounded-xl border-border/80">
-        <CardHeader>
-          <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Package className="h-6 w-6 text-primary" />
-            Keep accessible
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc list-inside text-small text-muted-foreground space-y-2">
-            <li>Spare rapid-acting and long-acting insulin pens (in date)</li>
-            <li>Pen needles and a written backup dose plan</li>
-            <li>Glucose tabs or juice for hypos</li>
-            <li>Ketone strips if you use them</li>
-          </ul>
+          <Collapsible className="group rounded-xl border border-border/60">
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/40 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                What to keep accessible
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-t border-border/60 px-4 pb-4 pt-2">
+              <ul className="list-disc list-inside text-small text-muted-foreground space-y-2">
+                <li>Spare rapid-acting and long-acting insulin pens (in date)</li>
+                <li>Pen needles and a written backup dose plan</li>
+                <li>Glucose tabs or juice for hypos</li>
+                <li>Ketone strips if you use them</li>
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 

@@ -156,6 +156,14 @@ function refineWithExerciseTypeAndTrend(
       };
     }
 
+    if (trend === "flat" && phase === "pre") {
+      return {
+        verdict: "ready",
+        title: "Ready",
+        detail: "In range with a stable trend — still monitor as intensity changes.",
+      };
+    }
+
     if (trend === "not_sure" && phase === "pre") {
       return {
         verdict: "ready",

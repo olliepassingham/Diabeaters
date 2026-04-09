@@ -1,4 +1,4 @@
-import type { ActiveExerciseSession, ExercisePhase } from "@/lib/storage";
+import type { ActiveExerciseSession, ExerciseBgTrend, ExercisePhase } from "@/lib/storage";
 
 /** Legacy `type=sports` links map to `field` after court/field split. */
 export function normalizePlannerExerciseTypeQueryParam(type: string | null): string | null {
@@ -29,6 +29,14 @@ export function bgForPlannerFromActiveSession(active: ActiveExerciseSession): nu
   if (active.phase === "pre" && active.preBg != null) return active.preBg;
   if (active.phase === "active" && active.midBg != null) return active.midBg;
   if (active.phase === "recovery" && active.recoveryBg != null) return active.recoveryBg;
+  return null;
+}
+
+/** BG trend to prefill alongside {@link bgForPlannerFromActiveSession} when syncing from an active session. */
+export function trendForPlannerFromActiveSession(active: ActiveExerciseSession): ExerciseBgTrend | null {
+  if (active.phase === "pre" && active.preTrend) return active.preTrend;
+  if (active.phase === "active" && active.midTrend) return active.midTrend;
+  if (active.phase === "recovery" && active.recoveryTrend) return active.recoveryTrend;
   return null;
 }
 
