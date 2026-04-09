@@ -57,7 +57,10 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
 function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef) {
   return (
     <Link href={href} className="block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-      <Card className="flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl border border-border/50 bg-card/90 px-5 py-5 shadow-sm backdrop-blur-sm transition-all duration-200 hover:border-primary/20 hover:bg-muted/40 hover:shadow-md active:scale-[0.99] sm:min-h-[7.75rem] sm:px-6 sm:py-6">
+      <Card
+        variant="glass"
+        className="flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 transition-all duration-200 hover:border-primary/50 hover:shadow-md active:scale-[0.99] sm:min-h-[7.75rem] sm:px-6 sm:py-6"
+      >
         <div className="flex items-start gap-3 sm:gap-4">
           <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
           <div className="min-w-0 flex-1">
@@ -130,16 +133,23 @@ export default function Scenarios() {
       />
 
       <div className="mt-2 grid w-full grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-        {SCENARIO_CARDS.map((c) => (
-          <ScenarioCard key={c.href} {...c} />
+        {SCENARIO_CARDS.map((c, idx) => (
+          <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
+            <ScenarioCard {...c} />
+          </div>
         ))}
         {showPumpFailureCard ? (
-          <ScenarioCard
-            href="/scenarios/pump-failure"
-            icon={Syringe}
-            title="Pump failure"
-            description="If delivery stops: clear steps and what to keep nearby."
-          />
+          <div
+            className="animate-soft-in"
+            style={{ animationDelay: `${SCENARIO_CARDS.length * 45}ms` }}
+          >
+            <ScenarioCard
+              href="/scenarios/pump-failure"
+              icon={Syringe}
+              title="Pump failure"
+              description="If delivery stops: clear steps and what to keep nearby."
+            />
+          </div>
         ) : null}
       </div>
 

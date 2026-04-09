@@ -27,16 +27,23 @@ export function activeSessionMatchesPlannerQuery(
 /** BG to prefill in the planner from the active session for the current phase. */
 export function bgForPlannerFromActiveSession(active: ActiveExerciseSession): number | null {
   if (active.phase === "pre" && active.preBg != null) return active.preBg;
-  if (active.phase === "active" && active.midBg != null) return active.midBg;
-  if (active.phase === "recovery" && active.recoveryBg != null) return active.recoveryBg;
+  if (active.phase === "active") return active.midBg ?? active.preBg ?? null;
+  if (active.phase === "recovery") return active.recoveryBg ?? active.midBg ?? active.preBg ?? null;
   return null;
 }
 
 /** BG trend to prefill alongside {@link bgForPlannerFromActiveSession} when syncing from an active session. */
 export function trendForPlannerFromActiveSession(active: ActiveExerciseSession): ExerciseBgTrend | null {
   if (active.phase === "pre" && active.preTrend) return active.preTrend;
-  if (active.phase === "active" && active.midTrend) return active.midTrend;
-  if (active.phase === "recovery" && active.recoveryTrend) return active.recoveryTrend;
+  if (active.phase === "active") {
+    if (active.midBg != null) return active.midTrend ?? active.preTrend ?? null;
+    return active.preTrend ?? null;
+  }
+  if (active.phase === "recovery") {
+    if (active.recoveryBg != null) return active.recoveryTrend ?? active.midTrend ?? active.preTrend ?? null;
+    if (active.midBg != null) return active.midTrend ?? active.preTrend ?? null;
+    return active.preTrend ?? null;
+  }
   return null;
 }
 

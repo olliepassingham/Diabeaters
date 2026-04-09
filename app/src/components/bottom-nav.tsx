@@ -141,7 +141,7 @@ export function BottomNav() {
   const cols = tabs.length;
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-50 bg-card/90 backdrop-blur-md border-t border-border/40 shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)] grid place-items-center px-1 pb-[env(safe-area-inset-bottom)]"
+      className="surface-chrome fixed bottom-0 inset-x-0 z-50 grid place-items-center border-t border-border/40 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)]"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       data-testid="nav-bottom"
     >

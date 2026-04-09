@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { ImagePlus, Loader2, MessageCircle, RefreshCw, Send, Settings, X } from "lucide-react";
+import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -461,15 +462,18 @@ export default function CommunityHomePage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
+      <PageShell variant="standard" className="mx-auto max-w-lg space-y-6">
         <PageHeader leading={<PageBackButton />} title="Feed" />
-        <p className="text-sm text-muted-foreground">Connect Supabase in your environment to use Feed.</p>
+        <EmptyState
+          title="Feed needs Supabase"
+          description="Connect Supabase in your environment to use the community feed."
+        />
       </PageShell>
     );
   }
 
   return (
-    <PageShell variant="standard" className="max-w-lg mx-auto space-y-4 pb-24">
+    <PageShell variant="standard" className="mx-auto max-w-lg space-y-6 pb-24">
       <PageHeader
         leading={<PageBackButton />}
         title="Feed"
@@ -491,29 +495,33 @@ export default function CommunityHomePage() {
         }
       />
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div className="surface-glass-muted space-y-3 rounded-2xl p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="following">Following</TabsTrigger>
-              <TabsTrigger value="everyone">Everyone</TabsTrigger>
+            <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
+              <TabsTrigger value="following" className="rounded-lg data-[state=active]:bg-card/95">
+                Following
+              </TabsTrigger>
+              <TabsTrigger value="everyone" className="rounded-lg data-[state=active]:bg-card/95">
+                Everyone
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="shrink-0 min-h-11"
+            className="min-h-11 shrink-0 border-border/50 bg-card/70"
             disabled={refreshing || loading}
             onClick={() => void runRefresh()}
             aria-label="Refresh feed"
           >
-            <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
+            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             Refresh
           </Button>
         </div>
         <div
-          className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+          className="-mx-1 flex gap-2 overflow-x-auto rounded-xl bg-background/40 px-2 py-2 dark:bg-background/25"
           role="group"
           aria-label="Filter feed by topic"
         >
@@ -521,7 +529,7 @@ export default function CommunityHomePage() {
             type="button"
             variant={topicFilter === null ? "default" : "outline"}
             size="sm"
-            className="shrink-0"
+            className="shrink-0 rounded-full"
             onClick={() => setTopicFilter(null)}
           >
             All topics
@@ -532,7 +540,7 @@ export default function CommunityHomePage() {
               type="button"
               variant={topicFilter === t.id ? "default" : "outline"}
               size="sm"
-              className="shrink-0 whitespace-nowrap"
+              className="shrink-0 whitespace-nowrap rounded-full"
               onClick={() => setTopicFilter(t.id)}
             >
               {t.label}
@@ -541,9 +549,9 @@ export default function CommunityHomePage() {
         </div>
       </div>
 
-      <Card>
+      <Card variant="glass">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">New post</CardTitle>
+          <CardTitle className="font-display text-base font-semibold">New post</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handlePost} className="space-y-2">
@@ -575,6 +583,7 @@ export default function CommunityHomePage() {
               rows={3}
               maxLength={8000}
               disabled={submitting || !user}
+              className="surface-field min-h-[5.5rem] rounded-xl"
             />
             {composerPreviews.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -638,17 +647,21 @@ export default function CommunityHomePage() {
       </Card>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <FeedLoadingSkeleton rows={4} />
       ) : posts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {feedTab === "following"
-            ? topicFilter
-              ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
-              : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
-            : topicFilter
-              ? "No posts in this topic yet. Try another topic or be the first to post here."
-              : "No posts yet. Be the first to post."}
-        </p>
+        <EmptyState
+          icon={MessageCircle}
+          title="Nothing here yet"
+          description={
+            feedTab === "following"
+              ? topicFilter
+                ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
+                : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
+              : topicFilter
+                ? "No posts in this topic yet. Try another topic or be the first to post here."
+                : "No posts yet. Be the first to post."
+          }
+        />
       ) : (
         <ul className="space-y-3">
           {posts.map((p) => {

@@ -29,6 +29,7 @@ import {
   type DrivingTrend,
 } from "@/lib/driving-readiness-tool";
 import { cn } from "@/lib/utils";
+import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -355,17 +356,12 @@ export default function DrivingScenarioPage() {
                           data-testid="input-driving-bg"
                         />
                       </div>
-                      <ChoiceGroup
-                        name="driving-trend"
+                      <BgTrendThreeButtons
                         label="Trend (if you know it)"
                         value={bgTrend}
-                        onChange={setBgTrend}
-                        options={[
-                          { value: "rising", title: "Rising" },
-                          { value: "flat", title: "Flat / stable" },
-                          { value: "falling", title: "Falling" },
-                          { value: "unknown", title: "Unknown" },
-                        ]}
+                        onChange={(v) => setBgTrend(v as DrivingTrend)}
+                        unsetValue="unknown"
+                        flatLabel="Flat / stable"
                       />
                     </div>
                   ) : null}

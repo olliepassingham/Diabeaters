@@ -188,6 +188,14 @@ function refineWithExerciseTypeAndTrend(
 
 /** Planner and active banner: shared go / caution / not recommended copy. */
 export function getExerciseReadinessVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
+  if (input.phase === "recovery") {
+    return {
+      verdict: "caution",
+      title: "Recovery",
+      detail:
+        "Post-workout window — delayed lows can happen for hours afterward. Follow your care team's plan for bolus, basal, and snacks.",
+    };
+  }
   const base = baseVerdict(input);
   return refineWithExerciseTypeAndTrend(base, input);
 }
@@ -209,7 +217,9 @@ export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): stri
 export function getExerciseCarbPlanHintLine(
   plan: ExercisePlanResult,
   verdict: ExerciseReadinessVerdict,
+  options?: { phase?: "pre" | "active" | "recovery" },
 ): string | null {
+  if (options?.phase === "recovery") return null;
   if (verdict === "not_recommended") return null;
 
   const pre = plan.pre.carbsIfLow;

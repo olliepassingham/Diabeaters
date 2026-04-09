@@ -505,6 +505,50 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
   };
 }
 
+/**
+ * One-line insulin-oriented recovery summary for compact banner copy (educational; not dosing advice).
+ */
+export function getRecoveryInsulinHeadline(plan: ExercisePlanResult, isPump: boolean, isEvening: boolean): string {
+  if (isPump) {
+    const postLine = plan.pumpTips.post[0] ?? "";
+    if (isEvening && plan.pumpTips.recovery[0]) {
+      return `${postLine} ${plan.pumpTips.recovery[0]}`;
+    }
+    return postLine || plan.pumpTips.recovery[0] || "";
+  }
+  return `Many care teams discuss cutting the next meal bolus by about ${plan.post.bolusReduction} after this intensity — confirm with your team.`;
+}
+
+/** Planner-backed bullets for recovery education dialogs; dedupes exact duplicates. */
+export function getRecoveryEducationBulletsFromPlan(plan: ExercisePlanResult, isPump: boolean): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (s: string) => {
+    const t = s.trim();
+    if (!t || seen.has(t)) return;
+    seen.add(t);
+    out.push(t);
+  };
+
+  add(plan.post.timing);
+  add(
+    `Meal bolus: many plans use roughly ${plan.post.bolusReduction} less insulin for food in the meal after exercise — only with your team's rules.`,
+  );
+  if (plan.post.carbs > 0) {
+    add(`Recovery snack ballpark: ~${plan.post.carbs}g carbs with ~${plan.post.protein} protein — adjust to your targets.`);
+  }
+  add(`Keep monitoring for the next ${plan.recovery.monitorHours} hours — delayed lows are common.`);
+
+  for (const t of plan.recovery.tips) add(t);
+
+  if (isPump) {
+    for (const t of plan.pumpTips.post) add(t);
+    for (const t of plan.pumpTips.recovery) add(t);
+  }
+
+  return out;
+}
+
 /** Parse legacy free-text (tests / migration). Prefer calculateExercisePlan(ExercisePlanContext). */
 export function calculateExercisePlanFromMessage(message: string, bgUnits: string = "mmol/L"): ExercisePlanResult {
   const durationMatch = message.match(/(\d+)\s*(?:min|minute)/i);

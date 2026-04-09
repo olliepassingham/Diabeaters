@@ -40,6 +40,7 @@ import {
   type AlcoholSituationOutcome,
 } from "@/lib/alcohol-situation-tool";
 import { cn } from "@/lib/utils";
+import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -558,17 +559,12 @@ export default function AlcoholScenarioPage() {
                         data-testid="input-alcohol-bg"
                       />
                     </div>
-                    <ChoiceGroup
-                      name="trend"
+                    <BgTrendThreeButtons
                       label="Trend (if you know it)"
                       value={bgTrend}
-                      onChange={setBgTrend}
-                      options={[
-                        { value: "rising", title: "Rising" },
-                        { value: "flat", title: "Flat / stable" },
-                        { value: "falling", title: "Falling" },
-                        { value: "unknown", title: "Unknown / not using CGM" },
-                      ]}
+                      onChange={(v) => setBgTrend(v as AlcoholTrend)}
+                      unsetValue="unknown"
+                      flatLabel="Flat / stable"
                     />
                   </div>
                 ) : null}

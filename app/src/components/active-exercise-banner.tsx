@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "wouter";
-import { 
-  Dumbbell, Play, Square, Heart, ChevronDown, ChevronUp, 
-  Check, Clock, AlertTriangle, TrendingDown, TrendingUp, 
+import {
+  Dumbbell, Play, Square, ChevronDown, ChevronUp,
+  Check, AlertTriangle, TrendingDown, TrendingUp,
   Minus, Droplet, Zap, Calculator, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,23 @@ import {
   type ExerciseBgTrend,
 } from "@/lib/storage";
 import { getExerciseGuidanceForReading } from "@/lib/exercise-reading-guidance";
-import { calculateExercisePlan } from "@/lib/exercise-plan";
+import {
+  calculateExercisePlan,
+  getRecoveryInsulinHeadline,
+  getRecoveryEducationBulletsFromPlan,
+  type ExercisePlanResult,
+} from "@/lib/exercise-plan";
 import {
   getExerciseReadinessVerdict,
   getReadinessToneClasses,
   getExerciseCarbPlanHintLine,
 } from "@/lib/exercise-readiness";
-import { buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
+import {
+  bgForPlannerFromActiveSession,
+  buildExerciseScenarioPlannerHrefFromSession,
+  trendForPlannerFromActiveSession,
+} from "@/lib/exercise-planner-href";
+import { cn } from "@/lib/utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -32,13 +42,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { useToast } from "@/hooks/use-toast";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
@@ -234,6 +238,47 @@ function formatRemaining(ms: number): string {
   return `${totalMin} min`;
 }
 
+function computeBannerExercisePlan(session: ActiveExerciseSession, bgUnits: string): ExercisePlanResult | null {
+  const bg = bgForPlannerFromActiveSession(session);
+  const minutesUntilStart = session.phase === "pre" ? 60 : session.phase === "active" ? 30 : 0;
+  try {
+    return calculateExercisePlan(
+      {
+        exerciseType: session.exerciseType,
+        durationMinutes: session.durationMinutes,
+        intensity: session.intensity,
+        minutesUntilStart,
+        bgUnits,
+        currentBg: bg ?? undefined,
+        hourOfDay: new Date().getHours(),
+      },
+      storage.getSettings(),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function getRecoveryTypeContextLines(
+  session: ActiveExerciseSession,
+  typeConfig: ExerciseTypeConfig | null,
+  isEvening: boolean,
+): string[] {
+  if (!typeConfig) return [];
+  const out: string[] = [typeConfig.recoveryMessage];
+  if (typeConfig.delayedWarning && (session.intensity === "intense" || session.intensity === "moderate")) {
+    out.push(typeConfig.delayedWarning);
+  }
+  if (isEvening) {
+    out.push(
+      session.intensity === "intense"
+        ? "Evening hard session — overnight delayed lows are more likely for some people; consider extra checks or a snack if your team agrees."
+        : "Evening exercise — consider a bedtime snack to prevent overnight lows",
+    );
+  }
+  return out;
+}
+
 function plannerHref(session: ActiveExerciseSession): string {
   return buildExerciseScenarioPlannerHrefFromSession(session, { syncActive: true });
 }
@@ -281,7 +326,7 @@ function ExerciseReadingPrompt({
       <CardContent className="p-3 space-y-2">
         <p className="text-xs font-medium text-foreground">{title}</p>
         {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-3">
           <div className="space-y-1">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">BG ({bgUnits})</Label>
             <Input
@@ -293,20 +338,15 @@ function ExerciseReadingPrompt({
               data-testid="input-exercise-reading-bg"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Direction</Label>
-            <Select value={trend} onValueChange={(v) => setTrend(v as ExerciseBgTrend)}>
-              <SelectTrigger className="h-9 text-sm" data-testid="select-exercise-reading-trend">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="rising">Rising</SelectItem>
-                <SelectItem value="flat">Flat</SelectItem>
-                <SelectItem value="falling">Falling</SelectItem>
-                <SelectItem value="not_sure">Not sure</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <BgTrendThreeButtons
+            label="Direction"
+            labelClassName="text-[10px] uppercase tracking-wide text-muted-foreground font-normal"
+            value={trend}
+            onChange={(v) => setTrend(v as ExerciseBgTrend)}
+            unsetValue="not_sure"
+            groupTestId="select-exercise-reading-trend"
+            buttonClassName="h-9 text-sm"
+          />
         </div>
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" type="button" onClick={submit} data-testid={saveTestId}>
@@ -321,11 +361,17 @@ function ExerciseReadingPrompt({
   );
 }
 
-function PlannerOpenButton({ session }: { session: ActiveExerciseSession }) {
+function PlannerOpenButton({ session, compact }: { session: ActiveExerciseSession; compact?: boolean }) {
   const planner = plannerHref(session);
   return (
-    <Button variant="outline" size="sm" className="min-h-9" asChild data-testid="button-full-exercise-planner">
-      <Link href={planner}>Open full planner</Link>
+    <Button
+      variant="outline"
+      size="sm"
+      className={cn(compact ? "h-8 min-h-8 shrink-0 px-2.5 text-xs" : "min-h-9")}
+      asChild
+      data-testid="button-full-exercise-planner"
+    >
+      <Link href={planner}>{compact ? "Full planner" : "Open full planner"}</Link>
     </Button>
   );
 }
@@ -339,6 +385,7 @@ function ExerciseEducationDialog({
   patterns,
   isEvening,
   onChecklistToggle,
+  planResult,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -348,6 +395,7 @@ function ExerciseEducationDialog({
   patterns: ReturnType<typeof storage.getExercisePatterns> | null;
   isEvening: boolean;
   onChecklistToggle: (key: "bgChecked" | "carbsConsidered" | "basalAdjusted") => void;
+  planResult: ExercisePlanResult | null;
 }) {
   const typeConfig = getTypeConfig(session.exerciseType);
   const baseTips = getPreExerciseTips(session, isPump);
@@ -362,10 +410,12 @@ function ExerciseEducationDialog({
           phase: "pre",
           isEvening,
         })
-      : session.phase === "active" && session.midBg != null
+      : session.phase === "active" &&
+          (session.midBg ?? session.preBg) != null
         ? getExerciseGuidanceForReading({
-            bg: session.midBg,
-            trend: session.midTrend,
+            bg: (session.midBg ?? session.preBg)!,
+            trend:
+              session.midBg != null ? (session.midTrend ?? session.preTrend) : session.preTrend,
             bgUnits,
             exerciseType: session.exerciseType,
             intensity: session.intensity,
@@ -383,7 +433,23 @@ function ExerciseEducationDialog({
               isEvening,
             })
           : [];
-  const tips = [...guidance, ...baseTips];
+  const recoveryPlanBullets =
+    session.phase === "recovery" && planResult ? getRecoveryEducationBulletsFromPlan(planResult, isPump) : [];
+  const recoveryContextLines =
+    session.phase === "recovery" ? getRecoveryTypeContextLines(session, typeConfig, isEvening) : [];
+  const tips = (() => {
+    if (session.phase === "recovery") {
+      const merged = [...guidance, ...recoveryPlanBullets, ...recoveryContextLines];
+      const seen = new Set<string>();
+      return merged.filter((line) => {
+        const t = line.trim();
+        if (!t || seen.has(t)) return false;
+        seen.add(t);
+        return true;
+      });
+    }
+    return [...guidance, ...baseTips];
+  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -391,10 +457,12 @@ function ExerciseEducationDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            Exercise tips
+            {session.phase === "recovery" ? "Recovery guidance" : "Exercise tips"}
           </DialogTitle>
           <DialogDescription>
-            {EXERCISE_LABELS[session.exerciseType]} — educational only; confirm with your care team.
+            {session.phase === "recovery"
+              ? `${EXERCISE_LABELS[session.exerciseType]} — post-workout window; educational only; confirm with your care team.`
+              : `${EXERCISE_LABELS[session.exerciseType]} — educational only; confirm with your care team.`}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -506,8 +574,11 @@ function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
 }
 
 export function ActiveExerciseBanner() {
+  const { toast } = useToast();
   const [session, setSession] = useState<ActiveExerciseSession | null>(null);
   const [expanded, setExpanded] = useState(true);
+  const [preDraftBg, setPreDraftBg] = useState("");
+  const [preDraftTrend, setPreDraftTrend] = useState<ExerciseBgTrend>("not_sure");
   const [elapsed, setElapsed] = useState(0);
   const [recoveryRemaining, setRecoveryRemaining] = useState(0);
   const [showMidCheck, setShowMidCheck] = useState(false);
@@ -517,42 +588,15 @@ export function ActiveExerciseBanner() {
   const [patterns, setPatterns] = useState<ReturnType<typeof storage.getExercisePatterns> | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [showExerciseTips, setShowExerciseTips] = useState(false);
+  const [recoveryBgDialogOpen, setRecoveryBgDialogOpen] = useState(false);
 
-  const { readinessResult, carbPlanHint } = useMemo(() => {
-    if (!session) return { readinessResult: null, carbPlanHint: null };
+  const { readinessResult, carbPlanHint, exercisePlanResult } = useMemo(() => {
+    if (!session) return { readinessResult: null, carbPlanHint: null, exercisePlanResult: null };
     const scenarioState = storage.getScenarioState();
-    const bg =
-      session.phase === "pre" && session.preBg != null
-        ? session.preBg
-        : session.phase === "active" && session.midBg != null
-          ? session.midBg
-          : session.phase === "recovery" && session.recoveryBg != null
-            ? session.recoveryBg
-            : null;
-    const trend =
-      session.phase === "pre"
-        ? session.preTrend
-        : session.phase === "active"
-          ? session.midTrend
-          : session.recoveryTrend;
-    const minutesUntilStart = session.phase === "pre" ? 60 : session.phase === "active" ? 30 : 0;
-    let planResult = null;
-    try {
-      planResult = calculateExercisePlan(
-        {
-          exerciseType: session.exerciseType,
-          durationMinutes: session.durationMinutes,
-          intensity: session.intensity,
-          minutesUntilStart,
-          bgUnits,
-          currentBg: bg ?? undefined,
-          hourOfDay: new Date().getHours(),
-        },
-        storage.getSettings(),
-      );
-    } catch {
-      return { readinessResult: null, carbPlanHint: null };
-    }
+    const bg = bgForPlannerFromActiveSession(session);
+    const trend = trendForPlannerFromActiveSession(session);
+    const planResult = computeBannerExercisePlan(session, bgUnits);
+    if (!planResult) return { readinessResult: null, carbPlanHint: null, exercisePlanResult: null };
     const readinessResult = getExerciseReadinessVerdict({
       exercisePlanResult: planResult,
       currentBg: bg,
@@ -564,8 +608,10 @@ export function ActiveExerciseBanner() {
       bgTrend: trend ?? null,
       phase: session.phase,
     });
-    const carbPlanHint = getExerciseCarbPlanHintLine(planResult, readinessResult.verdict);
-    return { readinessResult, carbPlanHint };
+    const carbPlanHint = getExerciseCarbPlanHintLine(planResult, readinessResult.verdict, {
+      phase: session.phase,
+    });
+    return { readinessResult, carbPlanHint, exercisePlanResult: planResult };
   }, [session, bgUnits]);
 
   const loadSession = useCallback(() => {
@@ -590,6 +636,13 @@ export function ActiveExerciseBanner() {
   useEffect(() => {
     if (session?.phase !== "active") setShowMidCheck(false);
   }, [session?.phase]);
+
+  useEffect(() => {
+    if (!session || session.phase !== "pre") return;
+    if (session.preBg != null || session.preBgSkipped) return;
+    setPreDraftBg("");
+    setPreDraftTrend("not_sure");
+  }, [session?.id, session?.phase, session?.preBg, session?.preBgSkipped]);
 
   useEffect(() => {
     if (!session) return;
@@ -629,11 +682,35 @@ export function ActiveExerciseBanner() {
     return () => clearInterval(timer);
   }, [session]);
 
-  const handleStartExercise = () => {
+  const handleStartExercise = useCallback(() => {
+    const s = storage.getActiveExercise();
+    if (!s) return;
+    if (s.phase === "pre") {
+      const raw = preDraftBg.trim();
+      if (raw !== "") {
+        const bg = parseFloat(raw.replace(",", "."));
+        if (Number.isNaN(bg)) {
+          toast({
+            title: "Enter a valid BG",
+            description: "Or leave the field empty to start without a reading.",
+            variant: "destructive",
+          });
+          return;
+        }
+        storage.updateActiveExercise({
+          preBg: bg,
+          preTrend: preDraftTrend,
+          preBgAt: new Date().toISOString(),
+          preChecklist: { ...s.preChecklist, bgChecked: true },
+        });
+      } else {
+        storage.updateActiveExercise({ preBgSkipped: true });
+      }
+    }
     storage.startExercisePhase();
     loadSession();
     setExpanded(true);
-  };
+  }, [preDraftBg, preDraftTrend, loadSession, toast]);
 
   const handleFinishExercise = () => {
     storage.finishExercisePhase();
@@ -686,33 +763,19 @@ export function ActiveExerciseBanner() {
     loadSession();
   };
 
-  const handleSavePreReading = (bg: number, trend: ExerciseBgTrend) => {
-    if (!session) return;
-    storage.updateActiveExercise({
-      preBg: bg,
-      preTrend: trend,
-      preBgAt: new Date().toISOString(),
-      preChecklist: { ...session.preChecklist, bgChecked: true },
-    });
-    loadSession();
-  };
-
-  const handleSkipPreReading = () => {
-    storage.updateActiveExercise({ preBgSkipped: true });
-    loadSession();
-  };
-
   const handleSaveRecoveryReading = (bg: number, trend: ExerciseBgTrend) => {
     storage.updateActiveExercise({
       recoveryBg: bg,
       recoveryTrend: trend,
       recoveryBgAt: new Date().toISOString(),
     });
+    setRecoveryBgDialogOpen(false);
     loadSession();
   };
 
   const handleSkipRecoveryReading = () => {
     storage.updateActiveExercise({ recoveryBgSkipped: true });
+    setRecoveryBgDialogOpen(false);
     loadSession();
   };
 
@@ -725,11 +788,18 @@ export function ActiveExerciseBanner() {
 
   if (!session && !showOutcomeDialog) return null;
 
+  const activeEffectiveBg = session?.phase === "active" ? session.midBg ?? session.preBg : null;
+  const activeEffectiveTrend =
+    session?.phase === "active"
+      ? session.midBg != null
+        ? session.midTrend ?? session.preTrend
+        : session.preTrend
+      : undefined;
   const activeGuidance =
-    session && session.phase === "active" && session.midBg != null
+    session && session.phase === "active" && activeEffectiveBg != null
       ? getExerciseGuidanceForReading({
-          bg: session.midBg,
-          trend: session.midTrend,
+          bg: activeEffectiveBg,
+          trend: activeEffectiveTrend,
           bgUnits,
           exerciseType: session.exerciseType,
           intensity: session.intensity,
@@ -738,20 +808,11 @@ export function ActiveExerciseBanner() {
         })
       : [];
 
-  const recoveryGuidance =
-    session && session.phase === "recovery" && session.recoveryBg != null
-      ? getExerciseGuidanceForReading({
-          bg: session.recoveryBg,
-          trend: session.recoveryTrend,
-          bgUnits,
-          exerciseType: session.exerciseType,
-          intensity: session.intensity,
-          phase: "recovery",
-          isEvening,
-        })
-      : [];
-
   const typeConfig = session ? getTypeConfig(session.exerciseType) : null;
+  const recoveryInsulinHeadline =
+    session?.phase === "recovery" && exercisePlanResult
+      ? getRecoveryInsulinHeadline(exercisePlanResult, isPump, isEvening)
+      : null;
   const progressPercent = session?.phase === "active" && session.exerciseStartedAt
     ? Math.min(100, (elapsed / (session.durationMinutes * 60 * 1000)) * 100)
     : 0;
@@ -759,112 +820,143 @@ export function ActiveExerciseBanner() {
   return (
     <>
       {session && (
-        <div className={`border-b-2 transition-colors ${PHASE_COLORS[session.phase]}`} data-testid="banner-active-exercise">
-          <div className="px-4 py-2">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="w-full flex items-center justify-between gap-2"
-              data-testid="button-toggle-exercise-banner"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="p-1.5 rounded-md bg-background/60">
-                  <Dumbbell className="h-4 w-4 text-foreground" />
-                </div>
-                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                  <span className="font-medium text-sm truncate">{session.exerciseName}</span>
-                  <Badge className={`text-[10px] px-1.5 py-0 ${PHASE_BADGE_STYLES[session.phase]}`}>
-                    {PHASE_LABELS[session.phase]}
-                  </Badge>
+        <div
+          className={cn(
+            "relative z-[40] shrink-0 border-b-2 transition-colors",
+            PHASE_COLORS[session.phase],
+            session.phase === "pre" && "rounded-b-xl shadow-md",
+          )}
+          data-testid="banner-active-exercise"
+        >
+          <div className={cn("px-3", session.phase === "pre" ? "py-1.5" : "py-2")}>
+            {session.phase === "pre" ? (
+              <div className="flex w-full items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="rounded-md bg-background/60 p-1">
+                    <Dumbbell className="h-3.5 w-3.5 text-foreground" />
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <span className="truncate text-xs font-medium sm:text-sm">{session.exerciseName}</span>
+                    <Badge className={`px-1.5 py-0 text-[10px] ${PHASE_BADGE_STYLES[session.phase]}`}>
+                      {PHASE_LABELS[session.phase]}
+                    </Badge>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setExpanded(!expanded)}
+                className="flex w-full items-center justify-between gap-2"
+                data-testid="button-toggle-exercise-banner"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="rounded-md bg-background/60 p-1.5">
+                    <Dumbbell className="h-4 w-4 text-foreground" />
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium">{session.exerciseName}</span>
+                    <Badge className={`px-1.5 py-0 text-[10px] ${PHASE_BADGE_STYLES[session.phase]}`}>
+                      {PHASE_LABELS[session.phase]}
+                    </Badge>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {session.phase === "active" && (
-                  <span className="text-sm font-mono font-medium tabular-nums" data-testid="text-exercise-timer">
-                    {formatElapsed(elapsed)}
-                  </span>
-                )}
-                {session.phase === "recovery" && (
-                  <span className="text-xs text-muted-foreground" data-testid="text-recovery-remaining">
-                    {formatRemaining(recoveryRemaining)} left
-                  </span>
-                )}
-                {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </div>
-            </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {session.phase === "active" && (
+                    <span className="font-mono text-sm font-medium tabular-nums" data-testid="text-exercise-timer">
+                      {formatElapsed(elapsed)}
+                    </span>
+                  )}
+                  {session.phase === "recovery" && (
+                    <span className="text-xs text-muted-foreground" data-testid="text-recovery-remaining">
+                      {formatRemaining(recoveryRemaining)} left
+                    </span>
+                  )}
+                  {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </button>
+            )}
 
             {session.phase === "active" && (
-              <div className="mt-1.5 h-1 rounded-full bg-background/40 overflow-hidden">
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-background/40">
                 <div
-                  className="h-full bg-green-500 dark:bg-green-400 rounded-full transition-all duration-1000"
+                  className="h-full rounded-full bg-green-500 transition-all duration-1000 dark:bg-green-400"
                   style={{ width: `${progressPercent}%` }}
                   data-testid="progress-exercise"
                 />
               </div>
             )}
 
-            {expanded && (
-              <div className="mt-3 space-y-3 pb-1 animate-fade-in-up">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  <span>{EXERCISE_LABELS[session.exerciseType]}</span>
-                  <span>·</span>
-                  <span>{session.durationMinutes} min</span>
-                  <span>·</span>
-                  <Badge variant="outline" className={`text-[10px] ${INTENSITY_COLORS[session.intensity]}`}>
-                    {session.intensity}
-                  </Badge>
-                </div>
+            {(session.phase === "pre" || expanded) && (
+              <div
+                className={cn(
+                  session.phase === "pre" ? "space-y-2 pb-1 pt-2" : "mt-3 space-y-3 pb-1 animate-fade-in-up",
+                )}
+              >
+                {session.phase !== "pre" ? (
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{EXERCISE_LABELS[session.exerciseType]}</span>
+                    <span>·</span>
+                    <span>{session.durationMinutes} min</span>
+                    <span>·</span>
+                    <Badge variant="outline" className={`text-[10px] ${INTENSITY_COLORS[session.intensity]}`}>
+                      {session.intensity}
+                    </Badge>
+                  </div>
+                ) : null}
 
-                {readinessResult && (
+                {readinessResult && session.phase === "active" ? (
                   <div
                     className={`rounded-md border px-2.5 py-2 text-xs ${getReadinessToneClasses(readinessResult.verdict)}`}
                     data-testid="exercise-readiness-verdict"
                   >
                     <p className="font-semibold text-foreground">{readinessResult.title}</p>
-                    <p className="text-muted-foreground leading-snug mt-0.5">{readinessResult.detail}</p>
+                    <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
                     {carbPlanHint ? (
                       <p
-                        className="text-[10px] text-muted-foreground leading-snug mt-1.5 pt-1.5 border-t border-border/50"
+                        className="mt-1.5 border-t border-border/50 pt-1.5 text-[10px] leading-snug text-muted-foreground"
                         data-testid="exercise-carb-plan-hint"
                       >
                         {carbPlanHint}
                       </p>
                     ) : null}
                   </div>
-                )}
+                ) : null}
 
                 {session.phase === "pre" && (
                   <div className="space-y-2">
                     {session.preBg == null && !session.preBgSkipped ? (
-                      <ExerciseReadingPrompt
-                        bgUnits={bgUnits}
-                        title="Current BG and direction"
-                        description="Optional — helps tailor readiness. Confirm any changes with your care team."
-                        onSave={handleSavePreReading}
-                        onSkip={handleSkipPreReading}
-                        saveTestId="button-save-pre-reading"
-                        skipTestId="button-skip-pre-reading"
-                      />
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-foreground">Current BG (optional)</p>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                            BG ({bgUnits})
+                          </Label>
+                          <Input
+                            value={preDraftBg}
+                            onChange={(e) => setPreDraftBg(e.target.value)}
+                            inputMode="decimal"
+                            className="h-9 max-w-[11rem] text-sm"
+                            placeholder="e.g. 6.2"
+                            data-testid="input-pre-exercise-bg"
+                          />
+                        </div>
+                        <BgTrendThreeButtons
+                          label="Direction"
+                          labelClassName="text-[10px] font-normal uppercase tracking-wide text-muted-foreground"
+                          value={preDraftTrend}
+                          onChange={(v) => setPreDraftTrend(v as ExerciseBgTrend)}
+                          unsetValue="not_sure"
+                          groupTestId="select-exercise-reading-trend"
+                          buttonClassName="h-9 text-sm"
+                        />
+                      </div>
                     ) : null}
 
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="min-h-9 w-full sm:w-auto"
-                        onClick={() => setShowExerciseTips(true)}
-                        data-testid="button-exercise-tips"
-                      >
-                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                        Exercise tips
-                      </Button>
-                      <PlannerOpenButton session={session} />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
                       <Button size="sm" onClick={handleStartExercise} data-testid="button-start-exercise">
-                        <Play className="h-3.5 w-3.5 mr-1.5" />
+                        <Play className="mr-1.5 h-3.5 w-3.5" />
                         Start Exercise
                       </Button>
                       <Button size="sm" variant="ghost" onClick={handleCancelSession} data-testid="button-cancel-exercise-session">
@@ -930,19 +1022,19 @@ export function ActiveExerciseBanner() {
                       </div>
                     )}
 
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
-                        className="min-h-9 w-full sm:w-auto"
+                        className="h-8 shrink-0 px-2.5 text-xs"
                         onClick={() => setShowExerciseTips(true)}
                         data-testid="button-exercise-tips-active"
                       >
-                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                        <BookOpen className="mr-1 h-3 w-3 shrink-0" />
                         Exercise tips
                       </Button>
-                      <PlannerOpenButton session={session} />
+                      <PlannerOpenButton session={session} compact />
                     </div>
 
                     {typeConfig?.activeReminder && (
@@ -975,67 +1067,52 @@ export function ActiveExerciseBanner() {
 
                 {session.phase === "recovery" && (
                   <div className="space-y-2">
-                    {session.recoveryBg == null && !session.recoveryBgSkipped ? (
-                      <ExerciseReadingPrompt
-                        bgUnits={bgUnits}
-                        title="Recovery check-in"
-                        description="Optional BG now — delayed lows are common after exercise."
-                        onSave={handleSaveRecoveryReading}
-                        onSkip={handleSkipRecoveryReading}
-                        saveTestId="button-save-recovery-reading"
-                        skipTestId="button-skip-recovery-reading"
-                      />
+                    {recoveryInsulinHeadline ? (
+                      <p
+                        className="text-xs leading-snug text-muted-foreground"
+                        data-testid="text-recovery-insulin-headline"
+                      >
+                        {recoveryInsulinHeadline}
+                      </p>
                     ) : null}
 
-                    {recoveryGuidance.length > 0 ? (
-                      <div className="space-y-1">
-                        {recoveryGuidance.map((line, i) => (
-                          <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
-                            <span>{line}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    <div className="space-y-1">
-                      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 shrink-0 mt-0.5" />
-                        <span>
-                          {typeConfig?.recoveryMessage ?? "Recovery window active"} — {formatRemaining(recoveryRemaining)} remaining
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {session.recoveryBg == null && !session.recoveryBgSkipped ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shrink-0 px-2.5 text-xs"
+                          onClick={() => setRecoveryBgDialogOpen(true)}
+                          data-testid="button-log-recovery-bg"
+                        >
+                          Log post-workout BG
+                        </Button>
+                      ) : session.recoveryBg != null ? (
+                        <span className="text-xs text-muted-foreground" data-testid="text-recovery-bg-logged">
+                          Logged {session.recoveryBg} {bgUnits}
+                          {session.recoveryTrend && session.recoveryTrend !== "not_sure"
+                            ? ` · ${session.recoveryTrend}`
+                            : ""}
                         </span>
-                      </div>
-                      {typeConfig?.delayedWarning && (session.intensity === "intense" || session.intensity === "moderate") && (
-                        <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                          <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
-                          <span>{typeConfig.delayedWarning}</span>
-                        </div>
-                      )}
-                      {isEvening && (
-                        <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                          <Heart className="h-3 w-3 shrink-0 mt-0.5 text-indigo-500" />
-                          <span>
-                            {session.intensity === "intense"
-                              ? "Evening hard session — overnight delayed lows are more likely for some people; consider extra checks or a snack if your team agrees."
-                              : "Evening exercise — consider a bedtime snack to prevent overnight lows"}
-                          </span>
-                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Post-workout BG skipped</span>
                       )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Button
                         type="button"
                         variant="secondary"
                         size="sm"
-                        className="min-h-9 w-full sm:w-auto"
+                        className="h-8 shrink-0 px-2.5 text-xs"
                         onClick={() => setShowExerciseTips(true)}
                         data-testid="button-exercise-tips-recovery"
                       >
-                        <BookOpen className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                        Exercise tips
+                        <BookOpen className="mr-1 h-3 w-3 shrink-0" />
+                        Recovery guide
                       </Button>
-                      <PlannerOpenButton session={session} />
+                      <PlannerOpenButton session={session} compact />
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
@@ -1062,10 +1139,12 @@ export function ActiveExerciseBanner() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground pt-0.5">
-                  <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
-                  <span>Not medical advice — always follow your care team's guidance</span>
-                </div>
+                {session.phase !== "pre" ? (
+                  <div className="flex items-center gap-1.5 pt-0.5 text-[10px] text-muted-foreground">
+                    <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
+                    <span>Not medical advice — always follow your care team&apos;s guidance</span>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -1082,8 +1161,29 @@ export function ActiveExerciseBanner() {
           patterns={patterns}
           isEvening={isEvening}
           onChecklistToggle={handleChecklistToggle}
+          planResult={exercisePlanResult}
         />
       )}
+
+      {session?.phase === "recovery" ? (
+        <Dialog open={recoveryBgDialogOpen} onOpenChange={setRecoveryBgDialogOpen}>
+          <DialogContent className="max-w-md" data-testid="dialog-recovery-bg">
+            <DialogHeader>
+              <DialogTitle>Post-workout BG</DialogTitle>
+              <DialogDescription>Optional reading — delayed lows are common after exercise; helps tailor recovery notes.</DialogDescription>
+            </DialogHeader>
+            <ExerciseReadingPrompt
+              bgUnits={bgUnits}
+              title="Recovery check-in"
+              description={undefined}
+              onSave={handleSaveRecoveryReading}
+              onSkip={handleSkipRecoveryReading}
+              saveTestId="button-save-recovery-reading"
+              skipTestId="button-skip-recovery-reading"
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <ExerciseOutcomeDialog
         open={showOutcomeDialog}

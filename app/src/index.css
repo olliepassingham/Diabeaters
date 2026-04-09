@@ -23,3 +23,73 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+/* After Tailwind layers: frosted surfaces (tokens in theme.css). */
+@layer utilities {
+  .surface-glass {
+    background: var(--surface-glass-bg);
+    -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+    backdrop-filter: blur(var(--surface-glass-blur));
+    border: 1px solid var(--surface-glass-border);
+    box-shadow: var(--surface-glass-shadow);
+  }
+
+  .surface-glass-strong {
+    background: var(--surface-glass-bg-strong);
+    -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+    backdrop-filter: blur(var(--surface-glass-blur));
+    border: 1px solid var(--surface-glass-border);
+    box-shadow: var(--surface-glass-shadow);
+  }
+
+  .surface-glass-muted {
+    background: var(--surface-glass-muted-bg);
+    -webkit-backdrop-filter: blur(var(--surface-glass-blur));
+    backdrop-filter: blur(var(--surface-glass-blur));
+    border: 1px solid var(--surface-glass-border);
+    box-shadow: var(--surface-glass-shadow);
+  }
+
+  .surface-chrome {
+    background: var(--surface-glass-chrome-bg);
+    -webkit-backdrop-filter: blur(var(--surface-glass-chrome-blur));
+    backdrop-filter: blur(var(--surface-glass-chrome-blur));
+  }
+
+  .surface-field {
+    /* Override shadcn input/textarea defaults on the same node */
+    background: var(--surface-glass-bg-strong) !important;
+    -webkit-backdrop-filter: blur(var(--surface-glass-blur)) !important;
+    backdrop-filter: blur(var(--surface-glass-blur)) !important;
+    border: 1px solid rgb(var(--color-input) / 0.82) !important;
+    box-shadow: var(--shadow-xs) !important;
+  }
+
+  .surface-solid {
+    background: rgb(var(--color-bg-card));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .surface-glass,
+  .surface-glass-strong,
+  .surface-field {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(var(--color-bg-card));
+  }
+
+  .surface-glass-muted {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(var(--color-bg-muted));
+  }
+
+  .surface-chrome {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(var(--color-bg-card) / 0.96);
+  }
+}

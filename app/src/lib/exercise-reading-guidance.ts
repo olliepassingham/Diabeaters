@@ -43,19 +43,37 @@ export function getExerciseGuidanceForReading(ctx: ExerciseReadingContext): stri
   const ok = isInComfortBand(bg, bgUnits);
 
   if (low) {
-    tips.push("Reading is below typical exercise-start range for many people — treat low BG first and delay hard effort until your team’s targets are met.");
+    if (phase === "recovery") {
+      tips.push(
+        "Reading is low for many people — treat per your hypo plan and keep monitoring; delayed lows can still follow exercise.",
+      );
+    } else {
+      tips.push(
+        "Reading is below typical exercise-start range for many people — treat low BG first and delay hard effort until your team’s targets are met.",
+      );
+    }
     tips.push("If you use a CGM, confirm with a fingerstick if readings don’t match how you feel.");
     return tips;
   }
 
   if (high) {
-    if (intensity === "intense") {
+    if (phase === "recovery") {
+      tips.push(
+        "BG is on the high side after exercise — follow your team’s correction and ketone plan if they use one; you may still see drops later.",
+      );
+    } else if (intensity === "intense") {
       tips.push("Higher BG before intense effort: check ketones and follow your sick-day or ketone plan if your team has one.");
     } else {
       tips.push("BG is on the high side — gentle activity may still be an option; confirm targets and any corrections with your care team.");
     }
   } else if (ok) {
-    tips.push(`Around ${bgUnits === "mmol/L" ? "target" : "a common"} pre-exercise band for many — still watch how you feel and your trend.`);
+    if (phase === "recovery") {
+      tips.push(
+        `Around ${bgUnits === "mmol/L" ? "a comfortable" : "a common"} range for many after exercise — delayed lows are still possible; keep checks and snacks handy.`,
+      );
+    } else {
+      tips.push(`Around ${bgUnits === "mmol/L" ? "target" : "a common"} pre-exercise band for many — still watch how you feel and your trend.`);
+    }
   }
 
   const cardioLike =

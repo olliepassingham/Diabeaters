@@ -2,15 +2,23 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+export type CardVariant = "default" | "glass" | "glass-strong" | "glass-muted"
+
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }
+>(({ className, variant = "default", ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
-      "shadcn-card rounded-2xl border border-border/40 bg-card text-card-foreground shadow-sm dark:border-border/50 dark:shadow-md",
-      className
+      "shadcn-card rounded-2xl text-card-foreground",
+      variant === "default" &&
+        "border border-border/40 bg-card shadow-sm dark:border-border/50 dark:shadow-md",
+      variant === "glass" && "surface-glass shadow-sm dark:shadow-md",
+      variant === "glass-strong" && "surface-glass-strong shadow-sm dark:shadow-md",
+      variant === "glass-muted" && "surface-glass-muted shadow-sm dark:shadow-md",
+      variant !== "default" && "border-0",
+      className,
     )}
     {...props}
   />

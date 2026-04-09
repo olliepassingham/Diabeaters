@@ -36,4 +36,17 @@ describe("getExerciseGuidanceForReading", () => {
       }),
     ).toEqual([]);
   });
+
+  it("uses post-workout framing in recovery when BG in range", () => {
+    const tips = getExerciseGuidanceForReading({
+      bg: 7,
+      trend: "flat",
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      phase: "recovery",
+    });
+    expect(tips.some((t) => t.toLowerCase().includes("pre-exercise"))).toBe(false);
+    expect(tips.some((t) => t.toLowerCase().includes("after exercise"))).toBe(true);
+  });
 });

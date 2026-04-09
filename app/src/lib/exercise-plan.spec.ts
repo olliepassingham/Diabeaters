@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calculateExercisePlan, calculateExercisePlanFromMessage } from "./exercise-plan";
+import {
+  calculateExercisePlan,
+  calculateExercisePlanFromMessage,
+  getRecoveryInsulinHeadline,
+  getRecoveryEducationBulletsFromPlan,
+} from "./exercise-plan";
 
 const baseCtx = {
   exerciseType: "cardio",
@@ -8,6 +13,36 @@ const baseCtx = {
   minutesUntilStart: 60,
   bgUnits: "mmol/L" as const,
 };
+
+describe("getRecoveryInsulinHeadline", () => {
+  it("mentions bolus reduction for MDI", () => {
+    const plan = calculateExercisePlan({ ...baseCtx, intensity: "moderate" });
+    const line = getRecoveryInsulinHeadline(plan, false, false);
+    expect(line).toContain(plan.post.bolusReduction);
+    expect(line.toLowerCase()).toContain("bolus");
+  });
+
+  it("uses pump post copy when isPump", () => {
+    const plan = calculateExercisePlan({ ...baseCtx, intensity: "moderate" });
+    const line = getRecoveryInsulinHeadline(plan, true, false);
+    expect(line).toContain("temp basal");
+  });
+});
+
+describe("getRecoveryEducationBulletsFromPlan", () => {
+  it("includes bolus reduction and monitoring window", () => {
+    const plan = calculateExercisePlan(baseCtx);
+    const bullets = getRecoveryEducationBulletsFromPlan(plan, false);
+    expect(bullets.some((b) => b.includes(plan.post.bolusReduction))).toBe(true);
+    expect(bullets.some((b) => b.includes(plan.recovery.monitorHours))).toBe(true);
+  });
+
+  it("adds pump tips when isPump", () => {
+    const plan = calculateExercisePlan(baseCtx);
+    const bullets = getRecoveryEducationBulletsFromPlan(plan, true);
+    expect(bullets.some((b) => b.toLowerCase().includes("basal"))).toBe(true);
+  });
+});
 
 describe("calculateExercisePlan", () => {
   it("returns structured plan for baseline context", () => {

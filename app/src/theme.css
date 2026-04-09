@@ -8,9 +8,19 @@
     --color-bg-muted: 244 241 248;
     --color-bg-popover: 255 254 253;
     --color-text: var(--app-foreground);
-    --color-text-muted: 100 96 112;
-    --color-border: 235 232 242;
+    --color-text-muted: 92 88 104;
+    --color-border: 226 222 234;
     --color-input: 220 216 228;
+
+    /* Frosted glass surfaces (used by .surface-* in index.css) */
+    --surface-glass-blur: 8px;
+    --surface-glass-chrome-blur: 12px;
+    --surface-glass-bg: rgb(var(--color-bg-card) / 0.9);
+    --surface-glass-bg-strong: rgb(var(--color-bg-card) / 0.92);
+    --surface-glass-chrome-bg: rgb(var(--color-bg-card) / 0.9);
+    --surface-glass-border: rgb(var(--color-border) / 0.55);
+    --surface-glass-shadow: var(--shadow-sm);
+    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.32);
 
     /* Soft teal primary — calm, clinical-trustworthy */
     --color-primary: 20 130 118;
@@ -91,8 +101,9 @@
     --color-bg-muted: 40 36 52;
     --color-bg-popover: 36 33 48;
     --color-text: var(--app-foreground);
-    --color-text-muted: 168 162 186;
-    --color-border: 55 50 68;
+    /* Slightly lifted for WCAG-friendly body copy and dividers on teal-tinted surfaces */
+    --color-text-muted: 182 176 202;
+    --color-border: 68 62 84;
     --color-input: 58 52 75;
 
     --color-primary: 94 211 198;
@@ -153,4 +164,10 @@
     --destructive-border: hsl(
       from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha
     );
+
+    --surface-glass-bg: rgb(var(--color-bg-card) / 0.85);
+    --surface-glass-bg-strong: rgb(var(--color-bg-card) / 0.88);
+    --surface-glass-chrome-bg: rgb(var(--color-bg-card) / 0.88);
+    --surface-glass-border: rgb(var(--color-border) / 0.48);
+    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.24);
   }
