@@ -251,11 +251,9 @@ export default function DrivingScenarioPage() {
     }
   }, [phase, outcome]);
 
-  const showSticky = phase === "form";
-
   return (
     <div className="min-h-[50vh]">
-      <PageShell variant="standard" className={cn("space-y-6", showSticky && "pb-28 sm:pb-6")}>
+      <PageShell variant="standard" className="space-y-6">
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}
@@ -437,6 +435,29 @@ export default function DrivingScenarioPage() {
                   {formError}
                 </p>
               ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5 shrink-0"
+                  onClick={goPrevWizard}
+                  disabled={wizardStep === 0}
+                  data-testid="button-driving-wizard-back"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  className="gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
+                  onClick={goNextWizard}
+                  data-testid="button-driving-check"
+                >
+                  {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : null}
@@ -518,35 +539,7 @@ export default function DrivingScenarioPage() {
         ) : null}
       </PageShell>
 
-      {showSticky ? (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
-          data-testid="driving-sticky-actions"
-        >
-          <PageShell variant="standard" className="flex gap-2 items-center justify-between flex-wrap sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-1.5 shrink-0"
-              onClick={goPrevWizard}
-              disabled={wizardStep === 0}
-              data-testid="button-driving-wizard-back"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-            <Button
-              type="button"
-              className="gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
-              onClick={goNextWizard}
-              data-testid="button-driving-check"
-            >
-              {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </PageShell>
-        </div>
-      ) : (
+      {phase !== "form" ? (
         <PageShell variant="standard" className="flex justify-start">
           <Button
             type="button"
@@ -561,7 +554,7 @@ export default function DrivingScenarioPage() {
             Edit answers
           </Button>
         </PageShell>
-      )}
+      ) : null}
     </div>
   );
 }

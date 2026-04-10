@@ -14,25 +14,24 @@ export type PageHeaderProps = {
 
 /**
  * Shared page title row: semantic `h1` + optional muted description + optional trailing actions.
+ * Actions sit on the same row as the title (wrapping when needed) so small controls like info icons do not consume a full-width row on mobile.
  * Uses design tokens (`text-h1`, `text-body`, `text-foreground`, `text-muted-foreground`).
  */
 export function PageHeader({ title, description, actions, leading, className, screenReaderOnly }: PageHeaderProps) {
   const block = (
-    <div className={cn("flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start", className)}>
-      <div className="flex min-w-0 flex-1 items-start gap-2 sm:gap-3">
-        {leading ? <div className="flex shrink-0 items-start pt-0.5 sm:pt-1">{leading}</div> : null}
-        <div className="min-w-0 flex-1 space-y-1">
-          <h1 className="font-display text-xl font-semibold tracking-tight text-foreground sm:text-h1 sm:tracking-tight">
+    <div className={cn("flex min-w-0 items-start gap-2 sm:gap-3", className)}>
+      {leading ? <div className="flex shrink-0 items-start pt-0.5 sm:pt-1">{leading}</div> : null}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex w-full min-w-0 flex-wrap items-start gap-2">
+          <h1 className="min-w-0 grow basis-0 font-display text-xl font-semibold tracking-tight text-foreground sm:text-h1 sm:tracking-tight">
             {title}
           </h1>
-          {description ? (
-            <div className="text-body text-muted-foreground">{description}</div>
+          {actions ? (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
           ) : null}
         </div>
+        {description ? <div className="text-body text-muted-foreground">{description}</div> : null}
       </div>
-      {actions ? (
-        <div className="w-full min-w-0 shrink-0 sm:ml-auto sm:w-auto">{actions}</div>
-      ) : null}
     </div>
   );
 

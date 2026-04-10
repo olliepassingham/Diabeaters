@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { TrendingUp, Calculator, Moon, BookOpen, ChevronDown } from "lucide-react";
+import { Calculator } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import {
@@ -28,8 +27,6 @@ export default function CorrectionHelpPage() {
   const [bgUnits, setBgUnits] = useState<BgUnits>("mmol/L");
   const [bgInput, setBgInput] = useState("");
   const [targetOverride, setTargetOverride] = useState("");
-  const [relatedOpen, setRelatedOpen] = useState(false);
-
   const load = useCallback(() => {
     setProfile(storage.getProfile());
     setSettings(storage.getSettings());
@@ -187,81 +184,6 @@ export default function CorrectionHelpPage() {
           )}
         </CardContent>
       </Card>
-
-      <Collapsible open={relatedOpen} onOpenChange={setRelatedOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between" data-testid="button-correction-related">
-            Related tools
-            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${relatedOpen ? "rotate-180" : ""}`} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h3 flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-primary" />
-                  Ratios &amp; ISF
-                </CardTitle>
-                <CardDescription>Edit correction factor and carb ratios in one place.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Your <strong>correction factor</strong> (ISF / CF) drives this estimate.
-                </p>
-                <Button asChild className="w-full">
-                  <Link href="/ratios">Open Ratios</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h3 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Meal bolus
-                </CardTitle>
-                <CardDescription>Carb coverage from your meal ratios (not the same as a pure BG correction).</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button asChild variant="secondary" className="w-full">
-                  <Link href="/adviser?tab=meal">Open Meal &amp; ratios</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h3 flex items-center gap-2">
-                  <Moon className="h-5 w-5 text-primary" />
-                  Bedtime check
-                </CardTitle>
-                <CardDescription>Night-time correction suggestion with conservative safeguards.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/bedtime">Open Bedtime</Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-h3 flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                  Sick day
-                </CardTitle>
-                <CardDescription>Illness can change how much correction is appropriate.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/scenarios/sick-day">Open Sick Day</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
     </PageShell>
   );
 }
