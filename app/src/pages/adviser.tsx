@@ -152,6 +152,7 @@ export default function Adviser() {
   } | null>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
+  const isPumpUser = profile.insulinDeliveryMethod === "pump";
 
   useEffect(() => {
     setSettings(storage.getSettings());
@@ -281,7 +282,11 @@ export default function Adviser() {
         leading={<PageBackButton />}
         className="mb-4"
         title="Meal &amp; ratios"
-        description="Quick meal dose suggestions and ratio review from your settings."
+        description={
+          isPumpUser
+            ? "Bolus suggestions from your ratios — program on your pump and check IOB; ratio review below."
+            : "Quick meal dose suggestions and ratio review from your settings."
+        }
         actions={
           <PageInfoDialog title="About Meal &amp; ratios" description="Meal planning and ratio tools">
             <InfoSection title="Meal planner">
@@ -389,8 +394,10 @@ export default function Adviser() {
                 <Utensils className="h-5 w-5 text-primary" />
                 Quick Meal Planner
               </CardTitle>
-              <CardDescription className="flex items-center gap-1">
-                Enter your carbs and get a mealtime dose suggestion
+              <CardDescription className="flex flex-wrap items-center gap-1">
+                {isPumpUser
+                  ? "Enter carbs for a bolus estimate to program on your pump"
+                  : "Enter your carbs and get a mealtime dose suggestion"}
                 <InfoTooltip {...DIABETES_TERMS.bolus} />
               </CardDescription>
             </CardHeader>
@@ -498,7 +505,7 @@ export default function Adviser() {
               </div>
 
               <Button onClick={handleQuickMealPlan} disabled={!mealCarbs} className="w-full" data-testid="button-get-meal-advice">
-                Get Dose Suggestion
+                {isPumpUser ? "Get bolus suggestion" : "Get Dose Suggestion"}
               </Button>
             </CardContent>
           </Card>
@@ -537,10 +544,14 @@ export default function Adviser() {
                           <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
                             During exercise
                           </p>
-                          <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">Usually no insulin</p>
+                          <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                            {isPumpUser ? "Usually no meal bolus" : "Usually no insulin"}
+                          </p>
                           <p className="text-sm text-blue-700/80 dark:text-blue-200/80">
                             {mealResult.carbs}g carbs
-                            {mealResult.standardDose != null ? ` • Standard would be ${mealResult.standardDose}u` : ""}
+                            {mealResult.standardDose != null
+                              ? ` • Standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
+                              : ""}
                           </p>
                         </div>
                       </div>
@@ -570,10 +581,17 @@ export default function Adviser() {
                           <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
                             {mealResult.dose}u
                           </p>
-                          <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">Adjusted dose</p>
+                          <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">
+                            {isPumpUser ? "Adjusted bolus (program on pump)" : "Adjusted dose"}
+                          </p>
                         </div>
                       </div>
                     )}
+                    {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
+                      </p>
+                    ) : null}
                     {!mealResult.exerciseContext && (
                       <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
                         <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">Suggested</p>
@@ -583,6 +601,11 @@ export default function Adviser() {
                         <p className="text-sm text-emerald-700/80 dark:text-emerald-200/80">
                           {mealResult.carbs}g • {mealResult.mealType}
                         </p>
+                        {isPumpUser ? (
+                          <p className="text-xs text-emerald-800/90 dark:text-emerald-200/90 pt-1">
+                            Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
+                          </p>
+                        ) : null}
                       </div>
                     )}
                     {mealResult.roundingAdvice && (
@@ -653,8 +676,10 @@ export default function Adviser() {
                 <CardContent className="pt-0 space-y-4">
                   <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      High-fat meals slow down carb absorption. Taking all insulin upfront can cause an initial hypo, 
-                      then a late spike. Split your dose to match the slower digestion.
+                      High-fat meals slow carb absorption.{" "}
+                      {isPumpUser
+                        ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
+                        : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
                     </p>
                   </div>
 
@@ -714,14 +739,24 @@ export default function Adviser() {
                       
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">FIRST DOSE - NOW</p>
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            {isPumpUser ? "FIRST PART — NOW" : "FIRST DOSE - NOW"}
+                          </p>
                           <p className="text-2xl font-bold text-green-700 dark:text-green-300">{splitResult.firstDose} units</p>
-                          <p className="text-xs text-green-600 dark:text-green-400">Take when you start eating</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            {isPumpUser ? "Program or deliver at meal start" : "Take when you start eating"}
+                          </p>
                         </div>
                         <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">SECOND DOSE - LATER</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                            {isPumpUser ? "SECOND PART — LATER" : "SECOND DOSE - LATER"}
+                          </p>
                           <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{splitResult.secondDose} units</p>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">Take in {splitResult.secondDoseDelay} hours</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            {isPumpUser
+                              ? `Program remainder in ${splitResult.secondDoseDelay} h (or use extended bolus)`
+                              : `Take in ${splitResult.secondDoseDelay} hours`}
+                          </p>
                         </div>
                       </div>
 
@@ -733,10 +768,15 @@ export default function Adviser() {
 
                       <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
                         <p><strong>Rounding guide:</strong> If BG is trending high or above target, round doses up to the nearest 0.5. If trending low or below target, round down.</p>
-                        <p><strong>Tip:</strong> Set a timer for your second dose! Check BG before taking it.</p>
+                        <p>
+                          <strong>Tip:</strong>{" "}
+                          {isPumpUser
+                            ? "Set a timer for the second part; check BG and IOB before delivering."
+                            : "Set a timer for your second dose! Check BG before taking it."}
+                        </p>
                       </div>
 
-                      {profile.insulinDeliveryMethod === "pump" && (
+                      {isPumpUser && (
                         <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
                           <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
                           <p className="text-sm text-indigo-800 dark:text-indigo-200">

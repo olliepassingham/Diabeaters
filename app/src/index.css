@@ -26,8 +26,11 @@
 
 /* After Tailwind layers: frosted surfaces (tokens in theme.css). */
 @layer utilities {
+  /* Subtle primary wash helps glass panels sit on the lavender canvas (light) / violet shell (dark) */
   .surface-glass {
-    background: var(--surface-glass-bg);
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.055) 0%, rgb(var(--color-primary-light) / 0.028) 100%),
+      var(--surface-glass-bg);
     -webkit-backdrop-filter: blur(var(--surface-glass-blur));
     backdrop-filter: blur(var(--surface-glass-blur));
     border: 1px solid var(--surface-glass-border);
@@ -35,7 +38,9 @@
   }
 
   .surface-glass-strong {
-    background: var(--surface-glass-bg-strong);
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.065) 0%, rgb(var(--color-primary-light) / 0.032) 100%),
+      var(--surface-glass-bg-strong);
     -webkit-backdrop-filter: blur(var(--surface-glass-blur));
     backdrop-filter: blur(var(--surface-glass-blur));
     border: 1px solid var(--surface-glass-border);
@@ -43,7 +48,9 @@
   }
 
   .surface-glass-muted {
-    background: var(--surface-glass-muted-bg);
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.04) 0%, transparent 100%),
+      var(--surface-glass-muted-bg);
     -webkit-backdrop-filter: blur(var(--surface-glass-blur));
     backdrop-filter: blur(var(--surface-glass-blur));
     border: 1px solid var(--surface-glass-border);
@@ -51,9 +58,52 @@
   }
 
   .surface-chrome {
-    background: var(--surface-glass-chrome-bg);
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.045) 0%, transparent 100%),
+      var(--surface-glass-chrome-bg);
     -webkit-backdrop-filter: blur(var(--surface-glass-chrome-blur));
     backdrop-filter: blur(var(--surface-glass-chrome-blur));
+  }
+
+  .dark .surface-glass {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.055) 0%, rgb(var(--color-primary) / 0.028) 100%),
+      var(--surface-glass-bg);
+  }
+
+  .dark .surface-glass-strong {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.065) 0%, rgb(var(--color-primary) / 0.032) 100%),
+      var(--surface-glass-bg-strong);
+  }
+
+  .dark .surface-glass-muted {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.045) 0%, transparent 100%),
+      var(--surface-glass-muted-bg);
+  }
+
+  .dark .surface-chrome {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.05) 0%, transparent 100%),
+      var(--surface-glass-chrome-bg);
+  }
+
+  /* Default shadcn Card: translucent fill + blur so lavender / dark shell fades through */
+  .surface-card-default {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.07) 0%, rgb(var(--color-primary-light) / 0.03) 100%),
+      rgb(var(--color-bg-card) / 0.8);
+    -webkit-backdrop-filter: blur(var(--surface-card-blur)) saturate(1.05);
+    backdrop-filter: blur(var(--surface-card-blur)) saturate(1.05);
+  }
+
+  .dark .surface-card-default {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.07) 0%, rgb(var(--color-primary) / 0.03) 100%),
+      rgb(var(--color-bg-card) / 0.74);
+    -webkit-backdrop-filter: blur(var(--surface-card-blur)) saturate(1.08);
+    backdrop-filter: blur(var(--surface-card-blur)) saturate(1.08);
   }
 
   .surface-field {
@@ -78,18 +128,58 @@
   .surface-field {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    background: rgb(var(--color-bg-card));
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.055) 0%, rgb(var(--color-primary-light) / 0.028) 100%),
+      rgb(var(--color-bg-card));
+  }
+
+  .dark .surface-glass,
+  .dark .surface-glass-strong,
+  .dark .surface-field {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.055) 0%, rgb(var(--color-primary) / 0.028) 100%),
+      rgb(var(--color-bg-card));
   }
 
   .surface-glass-muted {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    background: rgb(var(--color-bg-muted));
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.04) 0%, transparent 100%),
+      rgb(var(--color-bg-muted));
+  }
+
+  .dark .surface-glass-muted {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.045) 0%, transparent 100%),
+      rgb(var(--color-bg-muted));
   }
 
   .surface-chrome {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
-    background: rgb(var(--color-bg-card) / 0.96);
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.045) 0%, transparent 100%),
+      rgb(var(--color-bg-card) / 0.96);
+  }
+
+  .dark .surface-chrome {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.05) 0%, transparent 100%),
+      rgb(var(--color-bg-card) / 0.96);
+  }
+
+  .surface-card-default {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary-light) / 0.06) 0%, rgb(var(--color-primary-light) / 0.03) 100%),
+      rgb(var(--color-bg-card) / 0.94);
+  }
+
+  .dark .surface-card-default {
+    background:
+      linear-gradient(180deg, rgb(var(--color-primary) / 0.06) 0%, rgb(var(--color-primary) / 0.03) 100%),
+      rgb(var(--color-bg-card) / 0.92);
   }
 }

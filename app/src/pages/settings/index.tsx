@@ -366,6 +366,10 @@ function UsageTab({
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">Uses your TDD from Insulin Settings</p>
+              <p className="text-xs text-muted-foreground border-t border-border/60 pt-2 mt-2">
+                If you use <strong>hybrid closed loop</strong> (e.g. Control-IQ, Loop), exercise and temp-basal tips in
+                this app may overlap what automation already does — follow your care team and device manuals first.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="reservoir-capacity">Reservoir Capacity</Label>

@@ -4,23 +4,25 @@
     --app-foreground: 28 27 35;
 
     --color-bg: var(--app-background);
-    --color-bg-card: 255 254 253;
-    --color-bg-muted: 244 241 248;
-    --color-bg-popover: 255 254 253;
+    /* Softer raised surfaces — closer to lavender canvas, less “floating white” */
+    --color-bg-card: 252 249 253;
+    --color-bg-muted: 246 243 249;
+    --color-bg-popover: 252 249 253;
     --color-text: var(--app-foreground);
     --color-text-muted: 92 88 104;
-    --color-border: 226 222 234;
-    --color-input: 220 216 228;
+    --color-border: 229 224 236;
+    --color-input: 222 218 230;
 
-    /* Frosted glass surfaces (used by .surface-* in index.css) */
+    /* Frosted glass surfaces (used by .surface-* in index.css); fills get a light primary wash in index.css */
+    --surface-card-blur: 10px;
     --surface-glass-blur: 8px;
     --surface-glass-chrome-blur: 12px;
     --surface-glass-bg: rgb(var(--color-bg-card) / 0.9);
     --surface-glass-bg-strong: rgb(var(--color-bg-card) / 0.92);
     --surface-glass-chrome-bg: rgb(var(--color-bg-card) / 0.9);
-    --surface-glass-border: rgb(var(--color-border) / 0.55);
+    --surface-glass-border: rgb(var(--color-border) / 0.58);
     --surface-glass-shadow: var(--shadow-sm);
-    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.32);
+    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.36);
 
     /* Soft teal primary — calm, clinical-trustworthy */
     --color-primary: 20 130 118;
@@ -97,14 +99,15 @@
     --app-foreground: 248 247 252;
 
     --color-bg: var(--app-background);
-    --color-bg-card: 32 29 42;
-    --color-bg-muted: 40 36 52;
-    --color-bg-popover: 36 33 48;
+    /* Panels slightly closer to deep violet canvas */
+    --color-bg-card: 29 27 38;
+    --color-bg-muted: 37 34 48;
+    --color-bg-popover: 31 28 40;
     --color-text: var(--app-foreground);
     /* Slightly lifted for WCAG-friendly body copy and dividers on teal-tinted surfaces */
     --color-text-muted: 182 176 202;
-    --color-border: 68 62 84;
-    --color-input: 58 52 75;
+    --color-border: 64 59 76;
+    --color-input: 56 51 72;
 
     --color-primary: 94 211 198;
     --color-primary-foreground: 15 24 28;
@@ -168,6 +171,6 @@
     --surface-glass-bg: rgb(var(--color-bg-card) / 0.85);
     --surface-glass-bg-strong: rgb(var(--color-bg-card) / 0.88);
     --surface-glass-chrome-bg: rgb(var(--color-bg-card) / 0.88);
-    --surface-glass-border: rgb(var(--color-border) / 0.48);
-    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.24);
+    --surface-glass-border: rgb(var(--color-border) / 0.52);
+    --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.28);
   }

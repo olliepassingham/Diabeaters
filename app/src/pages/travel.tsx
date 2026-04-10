@@ -123,15 +123,14 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
       checked: false,
     });
     
-    // Pump batteries
-    const batteryChanges = Math.ceil(plan.duration / 7);
-    const batteriesWithBuffer = Math.ceil((batteryChanges + 2) * bufferMultiplier);
-    
+    // Power: many pumps are USB-rechargeable; some still use disposable cells
+    const powerItems = Math.max(2, Math.ceil((plan.duration / 5) * bufferMultiplier * accessBuffer));
     items.push({
-      name: "Pump Batteries",
-      estimatedAmount: batteriesWithBuffer,
-      unit: "batteries",
-      reasoning: "Extra batteries for pump operation + spares",
+      name: "Pump power (cable / adapter / cells)",
+      estimatedAmount: powerItems,
+      unit: "items",
+      reasoning:
+        "Charging cable and plug adapter; add spare disposable cells only if your pump uses them. Skip disposable batteries for rechargeable pumps.",
       category: "delivery",
       checked: false,
     });

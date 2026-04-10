@@ -68,6 +68,7 @@ import CommunityHandleResolve from "@/pages/community/handle-resolve";
 
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
+const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
@@ -502,7 +503,9 @@ function InnerRouter() {
       </Route>
       <Route path="/tools/correction">
         <PatientRouteGuard>
-          <Redirect to="/ratios" replace />
+          <Suspense fallback={<RouteFallback />}>
+            <CorrectionHelpPage />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/tools/education">

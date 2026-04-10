@@ -287,6 +287,16 @@ export default function DrivingScenarioPage() {
           />
         </div>
 
+        {profile.insulinDeliveryMethod === "pump" && (
+          <Alert data-testid="alert-driving-pump">
+            <AlertTitle className="text-sm">Pump</AlertTitle>
+            <AlertDescription className="text-sm">
+              Before driving, check <strong>IOB</strong>, any active temp basal, and that your pump/CGM alarms are set how
+              your team recommends — automation may change delivery without a manual bolus.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {phase === "form" ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">

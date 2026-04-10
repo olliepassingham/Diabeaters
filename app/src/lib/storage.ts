@@ -1394,7 +1394,8 @@ export const storage = {
         settings.shortActingUnitsPerDay = newDailyUsage;
         changed = true;
       }
-    } else if (supplyType === "insulin_long" && !isPump) {
+    } else if (supplyType === "insulin_long") {
+      // Pump users may track backup long-acting (e.g. contingency pen) — keep settings in sync.
       if (newDailyUsage > 0 && settings.longActingUnitsPerDay !== newDailyUsage) {
         settings.longActingUnitsPerDay = newDailyUsage;
         changed = true;

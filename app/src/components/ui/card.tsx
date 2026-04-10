@@ -13,7 +13,7 @@ const Card = React.forwardRef<
     className={cn(
       "shadcn-card rounded-2xl text-card-foreground",
       variant === "default" &&
-        "border border-border/40 bg-card shadow-sm dark:border-border/50 dark:shadow-md",
+        "border border-border/45 shadow-sm ring-1 ring-primary/[0.04] dark:border-border/55 dark:shadow-md dark:ring-primary/[0.06] surface-card-default",
       variant === "glass" && "surface-glass shadow-sm dark:shadow-md",
       variant === "glass-strong" && "surface-glass-strong shadow-sm dark:shadow-md",
       variant === "glass-muted" && "surface-glass-muted shadow-sm dark:shadow-md",

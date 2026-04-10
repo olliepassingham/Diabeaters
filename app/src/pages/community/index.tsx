@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -164,6 +165,14 @@ export default function CommunityHomePage() {
       setRefreshing(false);
     }
   }, [loadFirstPage]);
+
+  const feedPullAnchorRef = useRef<HTMLDivElement>(null);
+  const { pullProgress } = usePullToRefresh({
+    anchorRef: feedPullAnchorRef,
+    onRefresh: runRefresh,
+    enabled: isSupabaseConfigured(),
+    isBusy: refreshing || loading,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -473,53 +482,71 @@ export default function CommunityHomePage() {
   }
 
   return (
-    <PageShell variant="standard" className="mx-auto max-w-lg space-y-6 pb-24">
-      <PageHeader
-        leading={<PageBackButton />}
-        title="Feed"
-        description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
-        actions={
-          <div className="flex items-center gap-1.5">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/account#community" aria-label="Feed profile settings">
-                <Settings className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/community/messages">
-                <MessageCircle className="h-4 w-4 mr-1.5" />
-                Messages
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+    <div ref={feedPullAnchorRef} className="contents">
+      <PageShell variant="standard" className="mx-auto max-w-lg space-y-6 pb-24">
+        <PageHeader
+          leading={<PageBackButton />}
+          title="Feed"
+          description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
+          actions={
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-border/50 bg-card/70 px-2.5"
+                disabled={refreshing || loading}
+                onClick={() => void runRefresh()}
+                aria-label="Refresh feed"
+              >
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/account#community" aria-label="Feed profile settings">
+                  <Settings className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/community/messages">
+                  <MessageCircle className="h-4 w-4 mr-1.5" />
+                  Messages
+                </Link>
+              </Button>
+            </div>
+          }
+        />
 
-      <div className="surface-glass-muted space-y-3 rounded-2xl p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
-            <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
-              <TabsTrigger value="following" className="rounded-lg data-[state=active]:bg-card/95">
-                Following
-              </TabsTrigger>
-              <TabsTrigger value="everyone" className="rounded-lg data-[state=active]:bg-card/95">
-                Everyone
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="min-h-11 shrink-0 border-border/50 bg-card/70"
-            disabled={refreshing || loading}
-            onClick={() => void runRefresh()}
-            aria-label="Refresh feed"
-          >
-            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
-            Refresh
-          </Button>
+        <div
+          className={cn(
+            "flex justify-center overflow-hidden transition-[height,opacity,margin] duration-200 ease-out",
+            refreshing || pullProgress > 0.04 ? "mb-1 h-5 opacity-100" : "h-0 opacity-0",
+          )}
+          aria-hidden
+        >
+          <RefreshCw
+            aria-hidden
+            className={cn("h-4 w-4 text-muted-foreground", refreshing && "animate-spin")}
+            style={
+              refreshing
+                ? undefined
+                : { transform: `rotate(${pullProgress * 240}deg)`, opacity: 0.4 + pullProgress * 0.6 }
+            }
+          />
         </div>
+
+        <div className="surface-glass-muted space-y-3 rounded-2xl p-4">
+          <div className="flex flex-col gap-3">
+            <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
+              <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
+                <TabsTrigger value="following" className="rounded-lg data-[state=active]:bg-card/95">
+                  Following
+                </TabsTrigger>
+                <TabsTrigger value="everyone" className="rounded-lg data-[state=active]:bg-card/95">
+                  Everyone
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         <div
           className="-mx-1 flex gap-2 overflow-x-auto rounded-xl bg-background/40 px-2 py-2 dark:bg-background/25"
           role="group"
@@ -819,5 +846,6 @@ export default function CommunityHomePage() {
         </DialogContent>
       </Dialog>
     </PageShell>
+    </div>
   );
 }

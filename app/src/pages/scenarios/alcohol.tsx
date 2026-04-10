@@ -354,6 +354,17 @@ export default function AlcoholScenarioPage() {
           />
         </div>
 
+        {profile.insulinDeliveryMethod === "pump" && (
+          <Alert data-testid="alert-alcohol-pump">
+            <AlertTitle className="text-sm">Pump</AlertTitle>
+            <AlertDescription className="text-sm">
+              Alcohol can make hypos more likely for many hours. Check <strong>IOB</strong> before extra meal or correction
+              boluses, and be cautious stacking insulin after drinking. Temp basals or extended boluses may need review —
+              follow your team&apos;s alcohol plan.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span className="font-medium uppercase tracking-wide">

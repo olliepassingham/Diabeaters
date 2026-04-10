@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { storage, type UserProfile } from "@/lib/storage";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function HypoHelpPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
@@ -75,6 +76,15 @@ export default function HypoHelpPage() {
           <CardDescription>How much glucose you may need from your current reading to your target</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {profile.insulinDeliveryMethod === "pump" && (
+            <Alert data-testid="alert-hypo-pump-note">
+              <AlertDescription className="text-sm">
+                On a pump: an <strong>extended bolus</strong> or recent correction may still be bringing your BG down.
+                If you use automation (loop/AID), check whether a suspend or reduced delivery is active — treat the low
+                with fast carbs first, then review IOB with your team&apos;s plan.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
             <p className="text-small text-red-800 dark:text-red-200">
               This supports more precise treatment than a fixed 15g rule. If in doubt, use your usual hypo plan.
