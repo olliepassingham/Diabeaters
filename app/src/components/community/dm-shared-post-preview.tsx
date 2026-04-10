@@ -111,7 +111,12 @@ export function DmSharedPostPreview({ postId, className }: Props) {
           </div>
           {thumbUrl ? (
             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border/60 bg-muted/40">
-              <img src={thumbUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <img
+                src={thumbUrl}
+                alt={post.image_alt_texts[0]?.trim() || "Post photo"}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
           ) : null}
         </div>

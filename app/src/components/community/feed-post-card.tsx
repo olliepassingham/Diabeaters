@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Flag,
@@ -15,6 +15,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { FeedLinkPreview } from "@/components/community/feed-link-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,11 +40,16 @@ import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import {
+  castPollVote,
   communityTopicLabel,
   fetchDmThreadsForCurrentUser,
+  fetchPollVoteState,
+  getFirstWhitelistedFeedLink,
   fetchLikerUserIdsForPost,
   fetchPostLikersWithProfiles,
   otherMemberUserId,
+  parseEventExtra,
+  parsePollExtra,
   POST_LIKERS_QUERY_LIMIT,
   sendFeedPostToDmThread,
   type CommunityPostCommentRow,
@@ -54,6 +60,138 @@ const RECENT_DM_PEERS_LIMIT = 10;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function renderBodyWithMentions(body: string, mentionMap: Record<string, string>) {
+  const re = /@([a-z0-9_]{3,30})/gi;
+  const out: ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(body)) !== null) {
+    if (m.index > last) {
+      out.push(<Fragment key={`t-${key++}`}>{body.slice(last, m.index)}</Fragment>);
+    }
+    const rawHandle = m[1]!;
+    const uid = mentionMap[rawHandle.toLowerCase()];
+    if (uid) {
+      out.push(
+        <Link
+          key={`m-${key++}`}
+          href={`/community/profile/${uid}`}
+          className="font-medium text-primary underline-offset-2 hover:underline"
+        >
+          @{rawHandle}
+        </Link>,
+      );
+    } else {
+      out.push(<Fragment key={`h-${key++}`}>@{rawHandle}</Fragment>);
+    }
+    last = re.lastIndex;
+  }
+  if (last < body.length) {
+    out.push(<Fragment key={`t-${key++}`}>{body.slice(last)}</Fragment>);
+  }
+  return out;
+}
+
+function formatEventWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
+}
+
+function FeedPollBlock({
+  postId,
+  question,
+  options,
+  viewerId,
+}: {
+  postId: string;
+  question: string;
+  options: string[];
+  viewerId: string | undefined;
+}) {
+  const { toast } = useToast();
+  const [counts, setCounts] = useState<number[]>(() => Array.from({ length: options.length }, () => 0));
+  const [myIdx, setMyIdx] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const r = await fetchPollVoteState(postId, options.length);
+      if (cancelled) return;
+      setLoading(false);
+      if (!r.error) {
+        setCounts(r.counts);
+        setMyIdx(r.myOptionIndex);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, options.length]);
+
+  const total = useMemo(() => counts.reduce((a, b) => a + b, 0), [counts]);
+  const revealTallies = myIdx !== null;
+
+  async function onPick(i: number) {
+    if (!viewerId) {
+      toast({ title: "Sign in to vote", description: "Log in to cast your vote on this poll.", variant: "destructive" });
+      return;
+    }
+    const errRes = await castPollVote(postId, i);
+    if (errRes.error) {
+      toast({ title: "Could not vote", description: errRes.error.message, variant: "destructive" });
+      return;
+    }
+    const r = await fetchPollVoteState(postId, options.length);
+    if (!r.error) {
+      setCounts(r.counts);
+      setMyIdx(r.myOptionIndex);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl border border-border/60 bg-muted/15 p-3">
+      <p className="text-sm font-semibold leading-snug">{question}</p>
+      {loading ? (
+        <p className="text-xs text-muted-foreground">Loading poll…</p>
+      ) : (
+        <ul className="space-y-2">
+          {options.map((label, i) => {
+            const pct = total > 0 && revealTallies ? Math.round((counts[i]! / total) * 100) : null;
+            return (
+              <li key={i}>
+                <Button
+                  type="button"
+                  variant={myIdx === i ? "default" : "outline"}
+                  size="sm"
+                  className="h-auto min-h-9 w-full justify-start whitespace-normal px-3 py-2 text-left font-normal"
+                  disabled={!viewerId}
+                  onClick={() => void onPick(i)}
+                >
+                  <span className="flex w-full items-start justify-between gap-2">
+                    <span>{label}</span>
+                    {revealTallies && pct !== null ? (
+                      <span className="shrink-0 tabular-nums text-xs opacity-80">
+                        {pct}% · {counts[i]}
+                      </span>
+                    ) : null}
+                  </span>
+                </Button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** date-fns throws RangeError on invalid dates; DB/RPC should always send ISO strings but guard anyway. */
@@ -164,6 +302,24 @@ export function FeedPostCard({
   >([]);
   const [likersError, setLikersError] = useState<string | null>(null);
   const [likersTruncated, setLikersTruncated] = useState(false);
+
+  const [commentSort, setCommentSort] = useState<"oldest" | "newest">("oldest");
+  const sortedComments = useMemo(() => {
+    const arr = [...comments];
+    if (commentSort === "newest") arr.reverse();
+    return arr;
+  }, [comments, commentSort]);
+
+  const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
+
+  const pollExtra = useMemo(
+    () => (post.post_kind === "poll" ? parsePollExtra(post.post_extra) : null),
+    [post.post_kind, post.post_extra],
+  );
+  const eventExtra = useMemo(
+    () => (post.post_kind === "event" ? parseEventExtra(post.post_extra) : null),
+    [post.post_kind, post.post_extra],
+  );
 
   useEffect(() => {
     if (!likersOpen) return;
@@ -359,10 +515,12 @@ export function FeedPostCard({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={onMenuEdit}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit post
-                      </DropdownMenuItem>
+                      {post.post_kind === "standard" ? (
+                        <DropdownMenuItem onClick={onMenuEdit}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit post
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onMenuDelete}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete post
@@ -382,10 +540,35 @@ export function FeedPostCard({
                 </span>
               </span>
             </div>
-            {post.body.trim().length > 0 ? (
-              <p className="text-sm whitespace-pre-wrap">{post.body}</p>
+            {(() => {
+              const b = post.body.trim();
+              if (b.length === 0) return null;
+              if (pollExtra && b === pollExtra.question.trim()) return null;
+              if (eventExtra && b === eventExtra.title.trim()) return null;
+              return (
+                <p className="text-sm whitespace-pre-wrap">{renderBodyWithMentions(post.body, post.mention_map)}</p>
+              );
+            })()}
+            {eventExtra ? (
+              <div className="space-y-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-sm">
+                <p className="font-semibold leading-snug">{eventExtra.title}</p>
+                <p className="text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
+                {eventExtra.location ? <p>{eventExtra.location}</p> : null}
+                {eventExtra.details ? (
+                  <p className="whitespace-pre-wrap text-muted-foreground">{eventExtra.details}</p>
+                ) : null}
+              </div>
             ) : null}
-            <CommunityPostImageGrid paths={post.image_urls} />
+            {pollExtra ? (
+              <FeedPollBlock
+                postId={post.id}
+                question={pollExtra.question}
+                options={pollExtra.options}
+                viewerId={viewerId}
+              />
+            ) : null}
+            {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
+            <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
             <div
               className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
               data-testid="post-engagement-row"
@@ -473,8 +656,32 @@ export function FeedPostCard({
                 {loadingComments ? (
                   <p className="text-xs text-muted-foreground">Loading comments…</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {comments.map((c) => {
+                  <>
+                    {comments.length > 1 ? (
+                      <div className="flex flex-wrap items-center justify-end gap-1 pb-1">
+                        <span className="pr-1 text-tiny text-muted-foreground">Order</span>
+                        <Button
+                          type="button"
+                          variant={commentSort === "oldest" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setCommentSort("oldest")}
+                        >
+                          Oldest
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={commentSort === "newest" ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setCommentSort("newest")}
+                        >
+                          Newest
+                        </Button>
+                      </div>
+                    ) : null}
+                    <ul className="space-y-2">
+                      {sortedComments.map((c) => {
                       const cm = commentMeta(c.author_id);
                       const canReportComment = viewerId && viewerId !== c.author_id;
                       const isCommentAuthor = Boolean(viewerId && viewerId === c.author_id);
@@ -530,8 +737,9 @@ export function FeedPostCard({
                           </div>
                         </li>
                       );
-                    })}
-                  </ul>
+                      })}
+                    </ul>
+                  </>
                 )}
                 <div className="flex gap-2">
                   <Textarea
@@ -602,7 +810,7 @@ export function FeedPostCard({
           </div>
           {likersTruncated ? (
             <p className="text-tiny text-muted-foreground pt-1 border-t border-border/60">
-              Use Refresh on the feed to sync the like count on the post card.
+              Pull down on the feed (or use the refresh icon) to sync the like count on the post card.
             </p>
           ) : null}
         </DialogContent>

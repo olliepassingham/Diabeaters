@@ -1,3 +1,5 @@
+import type { CommunityContentNoteId } from "./content-notes";
+import type { CommunityEventExtra, CommunityPollExtra, CommunityPostKind } from "./post-kinds";
 import type { CommunityTopicId } from "./topics";
 
 /** Rows from public.community_posts / community_post_comments. */
@@ -8,6 +10,15 @@ export type CommunityPostRow = {
   /** Fixed feed category (see `COMMUNITY_TOPICS`). */
   topic: CommunityTopicId;
   image_urls: string[];
+  /** Parallel to `image_urls` (short descriptions for screen readers). */
+  image_alt_texts: string[];
+  /** Self-labeled sensitive-topic hint for readers (optional, legacy). */
+  content_note: CommunityContentNoteId | null;
+  post_kind: CommunityPostKind;
+  post_extra: CommunityPollExtra | CommunityEventExtra | null;
+  /** Lowercase handle -> mentioned user id (for rendering @mentions in body). */
+  mention_map: Record<string, string>;
+  mentioned_user_ids: string[];
   is_reported: boolean;
   comment_count: number;
   like_count: number;

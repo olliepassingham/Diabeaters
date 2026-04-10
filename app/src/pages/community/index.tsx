@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ImagePlus, Loader2, MessageCircle, RefreshCw, Send, Settings, X } from "lucide-react";
+import {
+  BarChart2,
+  Calendar,
+  ImagePlus,
+  Loader2,
+  MessageCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  Send,
+  Settings,
+  X,
+} from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -25,6 +37,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -37,7 +50,8 @@ import {
   fetchCommunityPostsFromFollowingPage,
   fetchCommunityPostsPage,
   insertCommunityComment,
-  insertCommunityPost,
+  insertFeedPost,
+  isCommunityTopicId,
   MAX_POST_IMAGES,
   submitContentReport,
   togglePostLike,
@@ -45,8 +59,9 @@ import {
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
+  type FeedPostMentions,
 } from "@/lib/community";
-import { getProfilesByIds } from "@/lib/profile";
+import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -70,13 +85,67 @@ type FeedTab = "everyone" | "following";
 
 const PAGE_SIZE = 20;
 
+const MAX_POLL_OPTIONS = 6;
+
+const FEED_COMPOSER_DRAFT_KEY = "diabeaters-feed-composer-draft-v1";
+
+function readFeedComposerDraft(): { body: string; topic: CommunityTopicId } | null {
+  try {
+    const raw = localStorage.getItem(FEED_COMPOSER_DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Record<string, unknown>;
+    const body = typeof d.body === "string" ? d.body : "";
+    const topicRaw = d.topic;
+    const topic =
+      typeof topicRaw === "string" && isCommunityTopicId(topicRaw)
+        ? topicRaw
+        : DEFAULT_COMMUNITY_TOPIC;
+    return { body, topic };
+  } catch {
+    return null;
+  }
+}
+
+type ComposerPostKind = "standard" | "poll" | "event";
+
+async function buildMentionsForPost(body: string, authorId: string | undefined): Promise<FeedPostMentions> {
+  const mentionMap: Record<string, string> = {};
+  const idOrder: string[] = [];
+  const seen = new Set<string>();
+  const re = /@([a-z0-9_]{3,30})/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    const raw = m[1]!.toLowerCase();
+    if (mentionMap[raw]) continue;
+    if (seen.size >= 12) continue;
+    let normalized: string | null;
+    try {
+      normalized = normalizePublicHandleInput(raw);
+    } catch {
+      continue;
+    }
+    if (!normalized) continue;
+    const { userId, error } = await getProfileIdByPublicHandle(normalized);
+    if (error || !userId || (authorId && userId === authorId)) continue;
+    mentionMap[raw] = userId;
+    if (!seen.has(userId)) {
+      seen.add(userId);
+      idOrder.push(userId);
+    }
+  }
+  return { userIds: idOrder, mentionMap };
+}
+
 export default function CommunityHomePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [feedTab, setFeedTab] = useState<FeedTab>("everyone");
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
-  const [composerTopic, setComposerTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
+  const [composerTopic, setComposerTopic] = useState<CommunityTopicId>(
+    () => readFeedComposerDraft()?.topic ?? DEFAULT_COMMUNITY_TOPIC,
+  );
+  const [feedSearch, setFeedSearch] = useState("");
   const [posts, setPosts] = useState<CommunityPostRow[]>([]);
   const postsRef = useRef(posts);
   postsRef.current = posts;
@@ -85,8 +154,9 @@ export default function CommunityHomePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const [composer, setComposer] = useState("");
+  const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
   const [composerFiles, setComposerFiles] = useState<File[]>([]);
+  const [composerImageAlts, setComposerImageAlts] = useState<string[]>([]);
   const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
@@ -108,6 +178,14 @@ export default function CommunityHomePage() {
   const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
   const [editBody, setEditBody] = useState("");
   const [editTopic, setEditTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
+  const [editImageAlts, setEditImageAlts] = useState<string[]>([]);
+  const [composerPostKind, setComposerPostKind] = useState<ComposerPostKind>("standard");
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventStartsAt, setEventStartsAt] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [eventDetails, setEventDetails] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +197,41 @@ export default function CommunityHomePage() {
     setComposerPreviews(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [composerFiles]);
+
+  useEffect(() => {
+    setComposerImageAlts((prev) => {
+      const n = composerFiles.length;
+      if (prev.length === n) return prev;
+      const next = prev.slice(0, n);
+      while (next.length < n) next.push("");
+      return next;
+    });
+  }, [composerFiles.length]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        if (!composer.trim()) {
+          localStorage.removeItem(FEED_COMPOSER_DRAFT_KEY);
+          return;
+        }
+        localStorage.setItem(
+          FEED_COMPOSER_DRAFT_KEY,
+          JSON.stringify({
+            body: composer,
+            topic: composerTopic,
+          }),
+        );
+      } catch {
+        /* quota / private mode */
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [composer, composerTopic]);
+
+  useEffect(() => {
+    if (composerPostKind !== "standard") setComposerFiles([]);
+  }, [composerPostKind]);
 
   const loadFirstPage = useCallback(async () => {
     const res =
@@ -270,6 +383,18 @@ export default function CommunityHomePage() {
     return authorMeta[authorId] ?? { name: shortId(authorId), avatar_url: null, public_handle: null };
   }
 
+  const filteredPosts = useMemo(() => {
+    const q = feedSearch.trim().toLowerCase();
+    if (!q) return posts;
+    return posts.filter((p) => {
+      if (p.body.toLowerCase().includes(q)) return true;
+      const m = authorMeta[p.author_id];
+      const name = (m?.name ?? "").toLowerCase();
+      const handle = (m?.public_handle ?? "").toLowerCase();
+      return name.includes(q) || handle.includes(q);
+    });
+  }, [posts, feedSearch, authorMeta]);
+
   function onPickImages(files: FileList | null) {
     if (!files?.length) return;
     const next: File[] = [...composerFiles];
@@ -288,23 +413,114 @@ export default function CommunityHomePage() {
     setComposerFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function resetComposerAfterPost() {
+    setComposer("");
+    setComposerFiles([]);
+    setComposerImageAlts([]);
+    setComposerPostKind("standard");
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setEventTitle("");
+    setEventStartsAt("");
+    setEventLocation("");
+    setEventDetails("");
+    try {
+      localStorage.removeItem(FEED_COMPOSER_DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function onPollModeClick() {
+    if (composerPostKind === "poll") {
+      setComposerPostKind("standard");
+      return;
+    }
+    setEventTitle("");
+    setEventStartsAt("");
+    setEventLocation("");
+    setEventDetails("");
+    setComposerPostKind("poll");
+  }
+
+  function onEventModeClick() {
+    if (composerPostKind === "event") {
+      setComposerPostKind("standard");
+      return;
+    }
+    setPollQuestion("");
+    setPollOptions(["", ""]);
+    setComposerPostKind("event");
+  }
+
+  const composerCanSubmit = useMemo(() => {
+    if (!user) return false;
+    if (composerPostKind === "standard") {
+      const t = composer.trim();
+      return Boolean(t || composerFiles.length > 0);
+    }
+    if (composerPostKind === "poll") {
+      const q = pollQuestion.trim();
+      const opts = pollOptions.map((o) => o.trim()).filter(Boolean);
+      return q.length > 0 && opts.length >= 2 && opts.length <= MAX_POLL_OPTIONS;
+    }
+    const titleOk = eventTitle.trim().length > 0;
+    const whenOk = eventStartsAt.trim().length > 0;
+    return titleOk && whenOk;
+  }, [user, composerPostKind, composer, composerFiles.length, pollQuestion, pollOptions, eventTitle, eventStartsAt]);
+
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
-    const body = composer.trim();
-    if (!body && composerFiles.length === 0) return;
+    if (!user || !composerCanSubmit) return;
     setSubmitting(true);
-    const res = await insertCommunityPost(
-      body,
-      composerFiles.length ? composerFiles : undefined,
-      composerTopic,
-    );
+
+    const mentions = await buildMentionsForPost(composer, user.id);
+
+    let res: { data: CommunityPostRow | null; error: Error | null };
+    if (composerPostKind === "standard") {
+      res = await insertFeedPost({
+        kind: "standard",
+        topic: composerTopic,
+        body: composer,
+        imageFiles: composerFiles.length ? composerFiles : undefined,
+        imageAlts: composerImageAlts,
+        mentions,
+      });
+    } else if (composerPostKind === "poll") {
+      res = await insertFeedPost({
+        kind: "poll",
+        topic: composerTopic,
+        body: composer,
+        question: pollQuestion,
+        options: pollOptions,
+        mentions,
+      });
+    } else {
+      const startDate = new Date(eventStartsAt);
+      if (Number.isNaN(startDate.getTime())) {
+        setSubmitting(false);
+        toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
+        return;
+      }
+      const iso = startDate.toISOString();
+      res = await insertFeedPost({
+        kind: "event",
+        topic: composerTopic,
+        body: composer,
+        title: eventTitle,
+        startsAt: iso,
+        location: eventLocation.trim() || undefined,
+        details: eventDetails.trim() || undefined,
+        mentions,
+      });
+    }
+
     setSubmitting(false);
     if (res.error) {
       toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
       return;
     }
-    setComposer("");
-    setComposerFiles([]);
+    resetComposerAfterPost();
     if (res.data) setPosts((prev) => [res.data!, ...prev]);
     toast({ title: "Posted" });
   }
@@ -439,7 +655,9 @@ export default function CommunityHomePage() {
   async function saveEditPost() {
     if (!editPost) return;
     setEditBusy(true);
-    const res = await updateCommunityPost(editPost.id, editBody, editTopic);
+    const res = await updateCommunityPost(editPost.id, editBody, editTopic, {
+      imageAltTexts: editImageAlts,
+    });
     setEditBusy(false);
     if (res.error) {
       toast({ title: "Could not save", description: res.error.message, variant: "destructive" });
@@ -487,7 +705,6 @@ export default function CommunityHomePage() {
         <PageHeader
           leading={<PageBackButton />}
           title="Feed"
-          description="Everyone signed in can see posts. Profile photos use each person’s account picture when their profile is visible."
           actions={
             <div className="flex items-center gap-1.5">
               <Button
@@ -574,6 +791,19 @@ export default function CommunityHomePage() {
             </Button>
           ))}
         </div>
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            value={feedSearch}
+            onChange={(e) => setFeedSearch(e.target.value)}
+            placeholder="Search loaded posts…"
+            className="pl-9"
+            aria-label="Search feed"
+          />
+        </div>
       </div>
 
       <Card variant="glass">
@@ -581,7 +811,7 @@ export default function CommunityHomePage() {
           <CardTitle className="font-display text-base font-semibold">New post</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handlePost} className="space-y-2">
+          <form onSubmit={handlePost} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="feed-topic" className="text-sm">
                 Topic
@@ -603,16 +833,140 @@ export default function CommunityHomePage() {
                 </SelectContent>
               </Select>
             </div>
+            {composerPostKind === "poll" ? (
+              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="feed-poll-q">Poll question</Label>
+                  <Input
+                    id="feed-poll-q"
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value.slice(0, 500))}
+                    placeholder="What do you want to ask?"
+                    disabled={submitting || !user}
+                    maxLength={500}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">2–6 options, each up to 500 characters.</p>
+                <div className="space-y-2">
+                  {pollOptions.map((opt, i) => (
+                    <div key={i} className="flex gap-2">
+                      <Input
+                        value={opt}
+                        onChange={(e) =>
+                          setPollOptions((prev) => {
+                            const next = [...prev];
+                            next[i] = e.target.value.slice(0, 500);
+                            return next;
+                          })
+                        }
+                        placeholder={`Option ${i + 1}`}
+                        disabled={submitting || !user}
+                        maxLength={500}
+                        aria-label={`Poll option ${i + 1}`}
+                      />
+                      {pollOptions.length > 2 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          disabled={submitting || !user}
+                          onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
+                          aria-label={`Remove option ${i + 1}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                  {pollOptions.length < MAX_POLL_OPTIONS ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={submitting || !user}
+                      onClick={() => setPollOptions((prev) => [...prev, ""])}
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Add option
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {composerPostKind === "event" ? (
+              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="feed-event-title">Event name</Label>
+                  <Input
+                    id="feed-event-title"
+                    value={eventTitle}
+                    onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
+                    placeholder="Meetup title"
+                    disabled={submitting || !user}
+                    maxLength={500}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="feed-event-start">Starts</Label>
+                  <Input
+                    id="feed-event-start"
+                    type="datetime-local"
+                    value={eventStartsAt}
+                    onChange={(e) => setEventStartsAt(e.target.value)}
+                    disabled={submitting || !user}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="feed-event-loc">Location (optional)</Label>
+                  <Input
+                    id="feed-event-loc"
+                    value={eventLocation}
+                    onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
+                    placeholder="Where?"
+                    disabled={submitting || !user}
+                    maxLength={500}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="feed-event-details">Details (optional)</Label>
+                  <Textarea
+                    id="feed-event-details"
+                    value={eventDetails}
+                    onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
+                    placeholder="More about the event…"
+                    rows={3}
+                    disabled={submitting || !user}
+                    maxLength={2000}
+                    className="surface-field rounded-xl"
+                  />
+                </div>
+              </div>
+            ) : null}
             <Textarea
               value={composer}
               onChange={(e) => setComposer(e.target.value)}
-              placeholder="Share something on the feed…"
+              placeholder={
+                composerPostKind === "poll"
+                  ? "Optional intro before the poll…"
+                  : composerPostKind === "event"
+                    ? "Optional intro before the event details…"
+                    : "Share something on the feed…"
+              }
               rows={3}
               maxLength={8000}
               disabled={submitting || !user}
               className="surface-field min-h-[5.5rem] rounded-xl"
             />
-            {composerPreviews.length > 0 && (
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground">
+                Use <code className="rounded bg-muted px-1">@username</code> in the text to mention someone (public handles).
+              </p>
+              <p className="text-right text-xs text-muted-foreground tabular-nums sm:shrink-0">
+                {composer.length} / 8000
+              </p>
+            </div>
+            {composerPostKind === "standard" && composerPreviews.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {composerPreviews.map((src, i) => (
                   <div key={src} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-border">
@@ -629,6 +983,31 @@ export default function CommunityHomePage() {
                 ))}
               </div>
             )}
+            {composerPostKind === "standard" && composerPreviews.length > 0 ? (
+              <div className="space-y-2">
+                {composerPreviews.map((src, i) => (
+                  <div key={src} className="space-y-1">
+                    <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
+                      Photo {i + 1} description (optional)
+                    </Label>
+                    <Input
+                      id={`feed-composer-alt-${i}`}
+                      value={composerImageAlts[i] ?? ""}
+                      onChange={(e) =>
+                        setComposerImageAlts((prev) => {
+                          const next = [...prev];
+                          next[i] = e.target.value.slice(0, 500);
+                          return next;
+                        })
+                      }
+                      placeholder="What’s in this image? Helps people using screen readers."
+                      disabled={submitting || !user}
+                      maxLength={500}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <input
                 ref={fileInputRef}
@@ -637,34 +1016,59 @@ export default function CommunityHomePage() {
                 multiple
                 className="sr-only"
                 id="feed-composer-images"
-                disabled={submitting || !user || composerFiles.length >= MAX_POST_IMAGES}
+                disabled={
+                  submitting ||
+                  !user ||
+                  composerFiles.length >= MAX_POST_IMAGES ||
+                  composerPostKind !== "standard"
+                }
                 onChange={(e) => onPickImages(e.target.files)}
               />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={submitting || !user || composerFiles.length >= MAX_POST_IMAGES}
+                disabled={
+                  submitting ||
+                  !user ||
+                  composerFiles.length >= MAX_POST_IMAGES ||
+                  composerPostKind !== "standard"
+                }
                 onClick={() => fileInputRef.current?.click()}
                 aria-label="Add photos to post"
               >
                 <ImagePlus className="h-4 w-4 mr-1.5" />
                 Photo
               </Button>
+              <Button
+                type="button"
+                variant={composerPostKind === "poll" ? "default" : "outline"}
+                size="sm"
+                disabled={submitting || !user}
+                onClick={onPollModeClick}
+                aria-pressed={composerPostKind === "poll"}
+                aria-label={composerPostKind === "poll" ? "Switch to normal post" : "Add poll"}
+              >
+                <BarChart2 className="h-4 w-4 mr-1.5" />
+                Poll
+              </Button>
+              <Button
+                type="button"
+                variant={composerPostKind === "event" ? "default" : "outline"}
+                size="sm"
+                disabled={submitting || !user}
+                onClick={onEventModeClick}
+                aria-pressed={composerPostKind === "event"}
+                aria-label={composerPostKind === "event" ? "Switch to normal post" : "Add event"}
+              >
+                <Calendar className="h-4 w-4 mr-1.5" />
+                Event
+              </Button>
               <InlineInfoHint
                 ariaLabel="Photo limits for posts"
                 content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`}
               />
-              <Button
-                type="submit"
-                size="sm"
-                className="ml-auto"
-                disabled={
-                  submitting ||
-                  (!composer.trim() && composerFiles.length === 0) ||
-                  !user
-                }
-              >
+              <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit}>
                 <Send className="h-4 w-4 mr-1.5" />
                 Post
               </Button>
@@ -689,9 +1093,15 @@ export default function CommunityHomePage() {
                 : "No posts yet. Be the first to post."
           }
         />
+      ) : filteredPosts.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="No matches"
+          description="Nothing in the posts loaded so far matches your search. Clear the search box or pull to load more, then try again."
+        />
       ) : (
         <ul className="space-y-3">
-          {posts.map((p) => {
+          {filteredPosts.map((p) => {
             const m = metaFor(p.author_id);
             return (
               <li key={p.id}>
@@ -718,9 +1128,11 @@ export default function CommunityHomePage() {
                   commentMeta={metaFor}
                   isAuthor={Boolean(user?.id && user.id === p.author_id)}
                   onMenuEdit={() => {
+                    if (p.post_kind !== "standard") return;
                     setEditPost(p);
                     setEditBody(p.body);
                     setEditTopic(p.topic);
+                    setEditImageAlts([...p.image_alt_texts]);
                   }}
                   onMenuDelete={() => setDeletePostId(p.id)}
                   onDeleteComment={(cid) => void handleDeleteComment(p.id, cid)}
@@ -835,6 +1247,31 @@ export default function CommunityHomePage() {
             maxLength={8000}
             disabled={editBusy}
           />
+          {editPost && editPost.image_urls.length > 0 ? (
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              <p className="text-xs font-medium text-foreground">Photo descriptions</p>
+              {editPost.image_urls.map((_, i) => (
+                <div key={editPost.id + String(i)} className="space-y-1">
+                  <Label htmlFor={`edit-alt-${i}`} className="text-xs">
+                    Photo {i + 1}
+                  </Label>
+                  <Input
+                    id={`edit-alt-${i}`}
+                    value={editImageAlts[i] ?? ""}
+                    onChange={(e) =>
+                      setEditImageAlts((prev) => {
+                        const next = [...prev];
+                        next[i] = e.target.value.slice(0, 500);
+                        return next;
+                      })
+                    }
+                    maxLength={500}
+                    disabled={editBusy}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => setEditPost(null)} disabled={editBusy}>
               Cancel

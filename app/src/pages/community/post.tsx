@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -86,6 +87,7 @@ export default function CommunityPostPage() {
   const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
   const [editBody, setEditBody] = useState("");
   const [editTopic, setEditTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
+  const [editImageAlts, setEditImageAlts] = useState<string[]>([]);
   const [editBusy, setEditBusy] = useState(false);
 
   const loadPost = useCallback(async () => {
@@ -242,7 +244,9 @@ export default function CommunityPostPage() {
   async function saveEditPost() {
     if (!editPost || !post) return;
     setEditBusy(true);
-    const res = await updateCommunityPost(editPost.id, editBody, editTopic);
+    const res = await updateCommunityPost(editPost.id, editBody, editTopic, {
+      imageAltTexts: editImageAlts,
+    });
     setEditBusy(false);
     if (res.error) {
       toast({ title: "Could not save", description: res.error.message, variant: "destructive" });
@@ -348,9 +352,11 @@ export default function CommunityPostPage() {
         commentMeta={metaFor}
         isAuthor={Boolean(user?.id && user.id === post.author_id)}
         onMenuEdit={() => {
+          if (post.post_kind !== "standard") return;
           setEditPost(post);
           setEditBody(post.body);
           setEditTopic(post.topic);
+          setEditImageAlts([...post.image_alt_texts]);
         }}
         onMenuDelete={() => setDeletePostId(post.id)}
         onDeleteComment={(cid) => void handleDeleteComment(cid)}
@@ -445,6 +451,31 @@ export default function CommunityPostPage() {
             maxLength={8000}
             disabled={editBusy}
           />
+          {editPost && editPost.image_urls.length > 0 ? (
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              <p className="text-xs font-medium text-foreground">Photo descriptions</p>
+              {editPost.image_urls.map((_, i) => (
+                <div key={`${editPost.id}-alt-${i}`} className="space-y-1">
+                  <Label htmlFor={`post-edit-alt-${i}`} className="text-xs">
+                    Photo {i + 1}
+                  </Label>
+                  <Input
+                    id={`post-edit-alt-${i}`}
+                    value={editImageAlts[i] ?? ""}
+                    onChange={(e) =>
+                      setEditImageAlts((prev) => {
+                        const next = [...prev];
+                        next[i] = e.target.value.slice(0, 500);
+                        return next;
+                      })
+                    }
+                    maxLength={500}
+                    disabled={editBusy}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => setEditPost(null)} disabled={editBusy}>
               Cancel

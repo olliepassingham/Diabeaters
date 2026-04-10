@@ -6,6 +6,17 @@
 import { getSupabase } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
+import {
+  isCommunityContentNoteId,
+  type CommunityContentNoteId,
+} from "./content-notes";
+import {
+  isCommunityPostKind,
+  parseMentionMap,
+  parseMentionedUserIds,
+  parsePostExtra,
+  type CommunityPostKind,
+} from "./post-kinds";
 import type { CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -32,7 +43,27 @@ function wrapFeedRpcError(err: { message: string }): Error {
       `${msg} Apply migration 20260409120000_community_post_topics (see docs/sql/community_post_topics.sql), then reload the API schema in Supabase Dashboard → Settings → API.`,
     );
   }
+  if (msg.includes("content_note") || msg.includes("image_alt_texts")) {
+    return new Error(
+      `${msg} Apply migration 20260411120000_community_posts_feed_ux_columns.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
+  if (
+    msg.includes("post_kind") ||
+    msg.includes("post_extra") ||
+    msg.includes("mention_map") ||
+    msg.includes("community_poll_votes")
+  ) {
+    return new Error(
+      `${msg} Apply migration 20260412120000_community_posts_poll_event_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
   return new Error(msg);
+}
+
+function mapPostKind(raw: unknown): CommunityPostKind {
+  const s = String(raw ?? "standard");
+  return isCommunityPostKind(s) ? s : "standard";
 }
 
 function mapTopic(raw: unknown): CommunityTopicId {
@@ -40,15 +71,50 @@ function mapTopic(raw: unknown): CommunityTopicId {
   return isCommunityTopicId(s) ? s : DEFAULT_COMMUNITY_TOPIC;
 }
 
+function mapContentNote(raw: unknown): CommunityContentNoteId | null {
+  if (raw == null || raw === "") return null;
+  const s = String(raw);
+  return isCommunityContentNoteId(s) ? s : null;
+}
+
+function parseImageAltTexts(raw: unknown, imageCount: number): string[] {
+  const fromDb: string[] = [];
+  if (Array.isArray(raw)) {
+    for (const x of raw) fromDb.push(String(x ?? "").trim().slice(0, 500));
+  }
+  const out: string[] = [];
+  for (let i = 0; i < imageCount; i++) {
+    out.push(fromDb[i] ?? "");
+  }
+  return out;
+}
+
+function normalizeAltsForCount(raw: string[] | undefined, n: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) {
+    out.push(String(raw?.[i] ?? "").trim().slice(0, 500));
+  }
+  return out;
+}
+
 function mapPost(r: Record<string, unknown>): CommunityPostRow {
   const cc = Number(r.comment_count ?? 0);
   const lc = Number(r.like_count ?? 0);
+  const imgs = parseImageUrls(r.image_urls);
+  const post_kind = mapPostKind(r.post_kind);
+  const post_extra = parsePostExtra(post_kind, r.post_extra);
   return {
     id: String(r.id),
     author_id: String(r.author_id),
     body: String(r.body ?? ""),
     topic: mapTopic(r.topic),
-    image_urls: parseImageUrls(r.image_urls),
+    image_urls: imgs,
+    image_alt_texts: parseImageAltTexts(r.image_alt_texts, imgs.length),
+    content_note: mapContentNote(r.content_note),
+    post_kind,
+    post_extra,
+    mention_map: parseMentionMap(r.mention_map),
+    mentioned_user_ids: parseMentionedUserIds(r.mentioned_user_ids),
     is_reported: Boolean(r.is_reported),
     comment_count: Number.isFinite(cc) ? Math.max(0, Math.floor(cc)) : 0,
     like_count: Number.isFinite(lc) ? Math.max(0, Math.floor(lc)) : 0,
@@ -233,14 +299,56 @@ export async function fetchCommunityPostsFromFollowingPage(
   };
 }
 
-export async function insertCommunityPost(
-  body: string,
-  imageFiles?: File[],
-  topic: CommunityTopicId = DEFAULT_COMMUNITY_TOPIC,
-): Promise<{
-  data: CommunityPostRow | null;
-  error: Error | null;
-}> {
+export type FeedPostMentions = {
+  userIds: string[];
+  mentionMap: Record<string, string>;
+};
+
+export type InsertFeedPostInput =
+  | {
+      kind: "standard";
+      topic: CommunityTopicId;
+      body: string;
+      imageFiles?: File[];
+      imageAlts?: string[];
+      mentions: FeedPostMentions;
+    }
+  | {
+      kind: "poll";
+      topic: CommunityTopicId;
+      body: string;
+      question: string;
+      options: string[];
+      mentions: FeedPostMentions;
+    }
+  | {
+      kind: "event";
+      topic: CommunityTopicId;
+      body: string;
+      title: string;
+      startsAt: string;
+      location?: string;
+      details?: string;
+      mentions: FeedPostMentions;
+    };
+
+function normalizeMentionsForInsert(
+  authorId: string,
+  mentions: FeedPostMentions,
+): { mentioned_user_ids: string[]; mention_map: Record<string, string> } {
+  const ids = [...new Set(mentions.userIds.filter((x) => x && x !== authorId))].slice(0, 12);
+  const map: Record<string, string> = {};
+  for (const [h, uid] of Object.entries(mentions.mentionMap)) {
+    const k = h.trim().toLowerCase();
+    if (!k || !uid || uid === authorId) continue;
+    map[k] = uid;
+  }
+  return { mentioned_user_ids: ids, mention_map: map };
+}
+
+export async function insertFeedPost(
+  input: InsertFeedPostInput,
+): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
@@ -248,8 +356,72 @@ export async function insertCommunityPost(
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
-  const trimmed = body.trim();
-  const files = imageFiles?.filter(Boolean) ?? [];
+  const { mentioned_user_ids, mention_map } = normalizeMentionsForInsert(uid, input.mentions);
+
+  if (input.kind === "poll") {
+    const trimmedBody = input.body.trim();
+    const q = input.question.trim();
+    const opts = input.options.map((o) => o.trim()).filter(Boolean);
+    if (opts.length < 2) {
+      return { data: null, error: new Error("Add at least two poll options.") };
+    }
+    /* Older DBs still enforce community_posts_body_and_images_check (body or images required). */
+    const bodyForRow = trimmedBody || q;
+    const { data, error } = await supabase
+      .from("community_posts")
+      .insert({
+        author_id: uid,
+        body: bodyForRow,
+        image_urls: [],
+        topic: input.topic,
+        post_kind: "poll",
+        post_extra: { question: q, options: opts },
+        mention_map,
+        mentioned_user_ids,
+      })
+      .select("*")
+      .single();
+
+    if (error) return { data: null, error: new Error(error.message) };
+    if (!data) return { data: null, error: new Error("No row returned") };
+    return { data: mapPost(data as Record<string, unknown>), error: null };
+  }
+
+  if (input.kind === "event") {
+    const trimmedBody = input.body.trim();
+    const title = input.title.trim();
+    const startsAt = input.startsAt.trim();
+    if (!title || !startsAt) {
+      return { data: null, error: new Error("Event name and date are required.") };
+    }
+    const extra: Record<string, string> = { title, starts_at: startsAt };
+    const loc = input.location?.trim();
+    const det = input.details?.trim();
+    if (loc) extra.location = loc;
+    if (det) extra.details = det;
+    const bodyForRow = trimmedBody || title;
+    const { data, error } = await supabase
+      .from("community_posts")
+      .insert({
+        author_id: uid,
+        body: bodyForRow,
+        image_urls: [],
+        topic: input.topic,
+        post_kind: "event",
+        post_extra: extra,
+        mention_map,
+        mentioned_user_ids,
+      })
+      .select("*")
+      .single();
+
+    if (error) return { data: null, error: new Error(error.message) };
+    if (!data) return { data: null, error: new Error("No row returned") };
+    return { data: mapPost(data as Record<string, unknown>), error: null };
+  }
+
+  const trimmed = input.body.trim();
+  const files = input.imageFiles?.filter(Boolean) ?? [];
   const vErr = validateImageFiles(files);
   if (vErr) return { data: null, error: vErr };
 
@@ -257,10 +429,21 @@ export async function insertCommunityPost(
     return { data: null, error: new Error("Add text or at least one photo.") };
   }
 
+  const imageAltsForInsert = normalizeAltsForCount(input.imageAlts, files.length);
+
   if (files.length === 0) {
     const { data, error } = await supabase
       .from("community_posts")
-      .insert({ author_id: uid, body: trimmed, image_urls: [], topic })
+      .insert({
+        author_id: uid,
+        body: trimmed,
+        image_urls: [],
+        topic: input.topic,
+        post_kind: "standard",
+        post_extra: null,
+        mention_map,
+        mentioned_user_ids,
+      })
       .select("*")
       .single();
 
@@ -289,16 +472,21 @@ export async function insertCommunityPost(
       pendingPaths.push(path);
     }
 
-    const { data, error } = await supabase
-      .from("community_posts")
-      .insert({
-        author_id: uid,
-        body: trimmed,
-        image_urls: pendingPaths,
-        topic,
-      })
-      .select("*")
-      .single();
+    const insertPayload: Record<string, unknown> = {
+      author_id: uid,
+      body: trimmed,
+      image_urls: pendingPaths,
+      topic: input.topic,
+      post_kind: "standard",
+      post_extra: null,
+      mention_map,
+      mentioned_user_ids,
+    };
+    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
+      insertPayload.image_alt_texts = imageAltsForInsert;
+    }
+
+    const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
 
     if (error) throw new Error(error.message);
     if (!data) throw new Error("No row returned");
@@ -317,9 +505,14 @@ export async function insertCommunityPost(
       movedDests.push(dest);
     }
 
+    const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
+    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
+      updatePayload.image_alt_texts = imageAltsForInsert;
+    }
+
     const { data: updated, error: updErr } = await supabase
       .from("community_posts")
-      .update({ image_urls: finalPaths })
+      .update(updatePayload)
       .eq("id", postId)
       .select("*")
       .single();
@@ -338,6 +531,23 @@ export async function insertCommunityPost(
     const msg = e instanceof Error ? e.message : "Upload failed";
     return { data: null, error: new Error(msg) };
   }
+}
+
+/** @deprecated Use insertFeedPost with kind standard */
+export async function insertCommunityPost(
+  body: string,
+  imageFiles?: File[],
+  topic: CommunityTopicId = DEFAULT_COMMUNITY_TOPIC,
+  options?: { imageAlts?: string[] },
+): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
+  return insertFeedPost({
+    kind: "standard",
+    topic,
+    body,
+    imageFiles,
+    imageAlts: options?.imageAlts,
+    mentions: { userIds: [], mentionMap: {} },
+  });
 }
 
 export async function fetchCommentsForPost(postId: string): Promise<{
@@ -437,11 +647,16 @@ export async function deleteCommunityPost(postId: string): Promise<{ error: Erro
   return { error: null };
 }
 
-/** Update body and optional topic; images unchanged. Must still satisfy body + images constraint. */
+export type UpdateCommunityPostOptions = {
+  imageAltTexts?: string[];
+};
+
+/** Update body and optional topic; images unchanged. Standard posts only. */
 export async function updateCommunityPost(
   postId: string,
   body: string,
   topic: CommunityTopicId,
+  options?: UpdateCommunityPostOptions,
 ): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
@@ -462,14 +677,33 @@ export async function updateCommunityPost(
   if (selErr) return { data: null, error: new Error(selErr.message) };
   if (!existing) return { data: null, error: new Error("Post not found or you cannot edit it.") };
 
-  const imgs = parseImageUrls((existing as Record<string, unknown>).image_urls);
+  const ex = existing as Record<string, unknown>;
+  const kind = mapPostKind(ex.post_kind);
+  if (kind !== "standard") {
+    return { data: null, error: new Error("Only standard posts can be edited.") };
+  }
+
+  const imgs = parseImageUrls(ex.image_urls);
   if (trimmed.length === 0 && imgs.length === 0) {
     return { data: null, error: new Error("Add text or keep at least one photo.") };
   }
 
+  const imageAlts =
+    options?.imageAltTexts !== undefined
+      ? normalizeAltsForCount(options.imageAltTexts, imgs.length)
+      : parseImageAltTexts(ex.image_alt_texts, imgs.length);
+
+  const updatePayload: Record<string, unknown> = {
+    body: trimmed,
+    topic,
+  };
+  if (imageAlts.some((s) => s.trim().length > 0)) {
+    updatePayload.image_alt_texts = imageAlts;
+  }
+
   const { data, error } = await supabase
     .from("community_posts")
-    .update({ body: trimmed, topic })
+    .update(updatePayload)
     .eq("id", postId)
     .select("*")
     .single();
@@ -493,6 +727,64 @@ export async function deleteCommunityComment(commentId: string): Promise<{ error
     .eq("id", commentId)
     .eq("author_id", uid);
 
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
+export async function fetchPollVoteState(
+  postId: string,
+  optionCount: number,
+): Promise<{
+  counts: number[];
+  myOptionIndex: number | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return {
+      counts: Array.from({ length: optionCount }, () => 0),
+      myOptionIndex: null,
+      error: new Error("Supabase not configured"),
+    };
+  }
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id ?? null;
+
+  const { data, error } = await supabase
+    .from("community_poll_votes")
+    .select("user_id, option_index")
+    .eq("post_id", postId);
+
+  if (error) {
+    return {
+      counts: Array.from({ length: optionCount }, () => 0),
+      myOptionIndex: null,
+      error: new Error(error.message),
+    };
+  }
+
+  const counts = Array.from({ length: optionCount }, () => 0);
+  let myOptionIndex: number | null = null;
+  for (const row of data ?? []) {
+    const r = row as { user_id: string; option_index: number };
+    const idx = Number(r.option_index);
+    if (Number.isFinite(idx) && idx >= 0 && idx < optionCount) counts[idx] += 1;
+    if (uid && String(r.user_id) === uid) myOptionIndex = idx;
+  }
+  return { counts, myOptionIndex, error: null };
+}
+
+export async function castPollVote(postId: string, optionIndex: number): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const { error } = await supabase.from("community_poll_votes").upsert(
+    { post_id: postId, user_id: uid, option_index: optionIndex },
+    { onConflict: "post_id,user_id" },
+  );
   if (error) return { error: new Error(error.message) };
   return { error: null };
 }
