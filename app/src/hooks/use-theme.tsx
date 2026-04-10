@@ -27,6 +27,8 @@ import {
   setMode as persistThemeMode,
   type ThemeMode,
 } from "@/hooks/useThemeMode";
+import { hapticLight } from "@/lib/haptics";
+import { syncNativeStatusBar } from "@/lib/native-chrome";
 
 interface ThemeContextType {
   /** Resolved light/dark UI (follows system when theme mode is system). */
@@ -83,11 +85,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyRootAppearanceClass(effectiveTheme);
     applyPrimaryThemeToDocument(primaryTheme, effectiveTheme);
     applyBackgroundTintToDocument(backgroundTint, effectiveTheme, primaryTheme);
+    void syncNativeStatusBar(effectiveTheme);
   }, [effectiveTheme, primaryTheme, backgroundTint]);
 
   const setThemeMode = useCallback((mode: ThemeMode) => {
     persistThemeMode(mode);
     setThemeModeState(mode);
+    void hapticLight();
   }, []);
 
   const toggleTheme = useCallback(() => {

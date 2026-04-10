@@ -174,3 +174,11 @@
     --surface-glass-border: rgb(var(--color-border) / 0.52);
     --surface-glass-muted-bg: rgb(var(--color-bg-muted) / 0.28);
   }
+
+/* Capacitor iOS shell: use San Francisco / system UI for a first-party feel */
+html.ios-native {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}

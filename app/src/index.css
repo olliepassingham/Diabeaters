@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --app-motion-duration: 240ms;
+    --app-motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --app-motion-duration: 1ms;
+    }
+
+    .animate-soft-in {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+
   /* Stable text sizing on orientation change; avoid iOS inflating small text in landscape */
   html {
     -webkit-text-size-adjust: 100%;
@@ -119,6 +136,12 @@
     background: rgb(var(--color-bg-card));
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+
+  .animate-accordion-down,
+  .animate-accordion-up {
+    animation-duration: var(--app-motion-duration);
+    animation-timing-function: var(--app-motion-ease);
   }
 }
 

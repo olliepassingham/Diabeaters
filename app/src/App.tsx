@@ -53,6 +53,7 @@ import {
   hasPendingCarer,
   setActiveAppMode,
 } from "@/lib/carer-session";
+import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
 import { getProfile } from "@/lib/profile";
@@ -745,7 +746,9 @@ function AuthenticatedShell() {
       />
       {!isCarerMode ? <ActiveExerciseBanner /> : null}
       <main className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
-        <InnerRouter />
+        <AnimatedRouteOutlet>
+          <InnerRouter />
+        </AnimatedRouteOutlet>
       </main>
       <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
         <p>
@@ -811,6 +814,7 @@ function AccountShell() {
  */
 function MainRouter() {
   return (
+    <AnimatedRouteOutlet>
     <Switch>
       <Route path="/welcome" component={Welcome} />
       <Route path="/login" component={Login} />
@@ -833,6 +837,7 @@ function MainRouter() {
         </ProtectedLayout>
       </Route>
     </Switch>
+    </AnimatedRouteOutlet>
   );
 }
 
