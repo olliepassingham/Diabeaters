@@ -33,7 +33,7 @@ const PATIENT_TOOLS: ToolDef[] = [
     href: "/tools/correction",
     icon: TrendingUp,
     title: "Correction helper",
-    description: "Where corrections use your ISF — links to Ratios, Meal, Bedtime, Sick day.",
+    description: "Estimate a correction dose from your ISF; links to Ratios, Meal, Bedtime, Sick day.",
   },
   {
     id: "hypo-help",

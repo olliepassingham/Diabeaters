@@ -382,7 +382,8 @@ export type WidgetType =
   | "tip-of-day"
   | "appointments"
   | "routines"
-  | "quick-exercise";
+  | "quick-exercise"
+  | "community-quick-post";
 
 export type WidgetSize = "full" | "half";
 
@@ -752,6 +753,7 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "tip-of-day": "full",
   "settings-completion": "half",
   "welcome": "full",
+  "community-quick-post": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
@@ -763,7 +765,8 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 5, size: "full" },
   { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "full" },
   { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
-  { id: "welcome", type: "welcome", enabled: false, order: 8, size: "full" },
+  { id: "community-quick-post", type: "community-quick-post", enabled: true, order: 8, size: "half" },
+  { id: "welcome", type: "welcome", enabled: false, order: 9, size: "full" },
 ];
 
 function generateId(): string {

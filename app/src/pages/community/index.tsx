@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   BarChart2,
   Calendar,
@@ -44,6 +44,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   COMMUNITY_TOPICS,
   DEFAULT_COMMUNITY_TOPIC,
+  isCommunityTopicId,
   deleteCommunityComment,
   deleteCommunityPost,
   fetchCommentsForPost,
@@ -51,17 +52,18 @@ import {
   fetchCommunityPostsPage,
   insertCommunityComment,
   insertFeedPost,
-  isCommunityTopicId,
+  buildMentionsForPost,
+  FEED_COMPOSER_DRAFT_KEY,
   MAX_POST_IMAGES,
+  readFeedComposerDraft,
   submitContentReport,
   togglePostLike,
   updateCommunityPost,
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
-  type FeedPostMentions,
 } from "@/lib/community";
-import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
+import { getProfilesByIds } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -87,58 +89,13 @@ const PAGE_SIZE = 20;
 
 const MAX_POLL_OPTIONS = 6;
 
-const FEED_COMPOSER_DRAFT_KEY = "diabeaters-feed-composer-draft-v1";
-
-function readFeedComposerDraft(): { body: string; topic: CommunityTopicId } | null {
-  try {
-    const raw = localStorage.getItem(FEED_COMPOSER_DRAFT_KEY);
-    if (!raw) return null;
-    const d = JSON.parse(raw) as Record<string, unknown>;
-    const body = typeof d.body === "string" ? d.body : "";
-    const topicRaw = d.topic;
-    const topic =
-      typeof topicRaw === "string" && isCommunityTopicId(topicRaw)
-        ? topicRaw
-        : DEFAULT_COMMUNITY_TOPIC;
-    return { body, topic };
-  } catch {
-    return null;
-  }
-}
-
 type ComposerPostKind = "standard" | "poll" | "event";
-
-async function buildMentionsForPost(body: string, authorId: string | undefined): Promise<FeedPostMentions> {
-  const mentionMap: Record<string, string> = {};
-  const idOrder: string[] = [];
-  const seen = new Set<string>();
-  const re = /@([a-z0-9_]{3,30})/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body)) !== null) {
-    const raw = m[1]!.toLowerCase();
-    if (mentionMap[raw]) continue;
-    if (seen.size >= 12) continue;
-    let normalized: string | null;
-    try {
-      normalized = normalizePublicHandleInput(raw);
-    } catch {
-      continue;
-    }
-    if (!normalized) continue;
-    const { userId, error } = await getProfileIdByPublicHandle(normalized);
-    if (error || !userId || (authorId && userId === authorId)) continue;
-    mentionMap[raw] = userId;
-    if (!seen.has(userId)) {
-      seen.add(userId);
-      idOrder.push(userId);
-    }
-  }
-  return { userIds: idOrder, mentionMap };
-}
 
 export default function CommunityHomePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [pathname, setLocation] = useLocation();
+  const search = useSearch();
   const [feedTab, setFeedTab] = useState<FeedTab>("everyone");
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
@@ -191,6 +148,18 @@ export default function CommunityHomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+
+  /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
+  useEffect(() => {
+    const raw = search.startsWith("?") ? search.slice(1) : search;
+    const params = new URLSearchParams(raw);
+    const qDraft = params.get("draft");
+    if (qDraft == null || !qDraft.trim()) return;
+    setComposer(qDraft.trim());
+    params.delete("draft");
+    const next = params.toString();
+    setLocation(next ? `${pathname}?${next}` : pathname, { replace: true });
+  }, [search, setLocation, pathname]);
 
   useEffect(() => {
     const urls = composerFiles.map((f) => URL.createObjectURL(f));
@@ -958,14 +927,7 @@ export default function CommunityHomePage() {
               disabled={submitting || !user}
               className="surface-field min-h-[5.5rem] rounded-xl"
             />
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-muted-foreground">
-                Use <code className="rounded bg-muted px-1">@username</code> in the text to mention someone (public handles).
-              </p>
-              <p className="text-right text-xs text-muted-foreground tabular-nums sm:shrink-0">
-                {composer.length} / 8000
-              </p>
-            </div>
+            <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
             {composerPostKind === "standard" && composerPreviews.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {composerPreviews.map((src, i) => (

@@ -3,8 +3,12 @@ const CARER_LINKED_BANNER_KEY = "diabeater_carer_linked_banner";
 const PENDING_CARER_KEY = "diabeater_pending_carer";
 const ACTIVE_CARER_PATIENT_ID_KEY = "diabeater_active_carer_patient_id";
 const ACTIVE_APP_MODE_KEY = "diabeater_active_app_mode";
+const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
 
 export type ActiveAppMode = "patient" | "carer";
+
+/** Chosen on /welcome: drives default session mode when the account can use both User and Supporter. */
+export type PrimaryAppRole = "patient" | "carer";
 
 function emitModeChanged(mode: ActiveAppMode | null) {
   try {
@@ -20,7 +24,18 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(PENDING_CARER_KEY);
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
+  sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
   emitModeChanged(null);
+}
+
+export function setPrimaryAppRole(role: PrimaryAppRole): void {
+  sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, role);
+}
+
+export function getPrimaryAppRole(): PrimaryAppRole | null {
+  const raw = sessionStorage.getItem(PRIMARY_APP_ROLE_KEY);
+  if (raw === "patient" || raw === "carer") return raw;
+  return null;
 }
 
 export function setCarerIntent(): void {

@@ -10,6 +10,7 @@ import {
   RoutinesWidget,
   TipOfDayWidget,
   WelcomeWidget,
+  CommunityQuickPostWidget,
 } from "@/components/widgets";
 
 export type DashboardWidgetComponentProps = { layoutSize?: WidgetSize };
@@ -94,6 +95,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: SettingsCompletionWidget,
+  },
+  {
+    id: "community-quick-post",
+    label: "Community",
+    description: "Short line to open the feed composer with draft text.",
+    defaultEnabled: true,
+    defaultSize: "half",
+    component: CommunityQuickPostWidget,
   },
   {
     id: "welcome",

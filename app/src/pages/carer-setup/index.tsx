@@ -16,7 +16,10 @@ import {
   clearCarerIntent,
   clearPendingCarer,
   hasPendingCarer,
+  getPrimaryAppRole,
+  setActiveAppMode,
   setCarerLinkedBannerMessage,
+  setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { PageBackButton } from "@/components/layout";
 import { Info } from "lucide-react";
@@ -69,6 +72,10 @@ export default function CarerSetupPage() {
     }
     clearPendingCarer();
     clearCarerIntent();
+    if (getPrimaryAppRole() == null) {
+      setPrimaryAppRole("carer");
+    }
+    setActiveAppMode("carer");
     setCode("");
     toast({
       title: "Linked successfully",

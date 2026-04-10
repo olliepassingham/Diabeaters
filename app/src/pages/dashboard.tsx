@@ -44,6 +44,7 @@ import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
+import { isCommunityEnabled } from "@/lib/flags";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -611,7 +612,7 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
 }
 
 export default function Dashboard() {
-  const { profile: cloudProfile } = useProfile();
+  const { profile: cloudProfile, loading: cloudProfileLoading } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
@@ -694,7 +695,11 @@ export default function Dashboard() {
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
-  const widgetsToRender = activeWidgets.filter((w) => w.type !== "settings-completion");
+  const showCommunityQuickPostWidget =
+    isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
+  const widgetsToRender = activeWidgets
+    .filter((w) => w.type !== "settings-completion")
+    .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget);
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -774,11 +779,6 @@ export default function Dashboard() {
       />
 
       <section className="animate-stagger pt-2" data-testid="dashboard-widgets">
-        {widgetsToRender.length > 0 && (
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-muted-foreground">Widgets</h2>
-          </div>
-        )}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;

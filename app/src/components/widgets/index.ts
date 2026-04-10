@@ -7,3 +7,4 @@ export { TipOfDayWidget } from "./tip-of-day-widget";
 export { AppointmentsWidget } from "./appointments-widget";
 export { RoutinesWidget } from "@/components/dashboard/widgets/RoutinesWidget";
 export { QuickExerciseWidget } from "@/components/dashboard/widgets/QuickExerciseWidget";
+export { CommunityQuickPostWidget } from "@/components/dashboard/widgets/CommunityQuickPostWidget";

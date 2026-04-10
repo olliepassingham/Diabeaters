@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
@@ -108,19 +109,21 @@ export default function Bedtime() {
   };
 
   const calculateCorrectionDose = (bgMmol: number, targetHighMmol: number, insulinHours: number): CorrectionSuggestion | null => {
-    if (bgMmol <= targetHighMmol) return null;
-
     const correctionFactor = userSettings?.correctionFactor;
     if (!correctionFactor || correctionFactor <= 0) return null;
 
     const bgInUserUnits = bgUnits === "mg/dL" ? Math.round(bgMmol * 18) : Math.round(bgMmol * 10) / 10;
     const targetInUserUnits = bgUnits === "mg/dL" ? Math.round(targetHighMmol * 18) : Math.round(targetHighMmol * 10) / 10;
-    const cfInUserUnits = correctionFactor;
 
-    const diff = bgInUserUnits - targetInUserUnits;
-    if (diff <= 0) return null;
+    const simple = computeSimpleCorrectionDose({
+      currentBg: bgInUserUnits,
+      targetBg: targetInUserUnits,
+      correctionFactor,
+      bgUnits,
+    });
+    if (simple.status !== "dose") return null;
 
-    const fullDose = Math.round((diff / cfInUserUnits) * 10) / 10;
+    const fullDose = simple.fullDoseRounded;
 
     const hasIOB = insulinHours < 4;
     let iobReduction = 0;
@@ -164,7 +167,7 @@ export default function Bedtime() {
       suggestedDose,
       currentBg: bgInUserUnits,
       targetBg: targetInUserUnits,
-      correctionFactor: cfInUserUnits,
+      correctionFactor,
       bgUnits,
       hasIOB,
       iobWarning,

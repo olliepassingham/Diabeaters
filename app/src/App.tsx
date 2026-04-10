@@ -48,8 +48,10 @@ import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
 import {
   clearCarerClientSessionKeys,
   getActiveAppMode,
+  getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
+  setActiveAppMode,
 } from "@/lib/carer-session";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
@@ -651,10 +653,14 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (!hasCarerLink) return;
-    if (!activeMode && pathOnly !== "/mode") {
-      setLocation("/mode");
+    if (activeMode != null) return;
+    if (pathOnly === "/mode") return;
+    if (getPrimaryAppRole() === "carer") {
+      setActiveAppMode("carer");
+    } else {
+      setActiveAppMode("patient");
     }
-  }, [hasCarerLink, activeMode, pathOnly, setLocation]);
+  }, [hasCarerLink, activeMode, pathOnly]);
 
   useEffect(() => {
     if (!hasCarerLink) return;

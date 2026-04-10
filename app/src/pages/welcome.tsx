@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { FaceLogo } from "@/components/face-logo";
-import { setPendingCarer, setPendingPatient } from "@/lib/carer-session";
+import { setPendingCarer, setPendingPatient, setPrimaryAppRole } from "@/lib/carer-session";
 
 export default function Welcome() {
   const [, setLocation] = useLocation();
@@ -20,6 +20,7 @@ export default function Welcome() {
           size="lg"
           className="w-full h-auto min-h-14 py-4 text-base font-medium"
           onClick={() => {
+            setPrimaryAppRole("patient");
             setPendingPatient();
             setLocation("/login");
           }}
@@ -32,6 +33,7 @@ export default function Welcome() {
           variant="outline"
           className="w-full h-auto min-h-14 py-4 text-base font-medium"
           onClick={() => {
+            setPrimaryAppRole("carer");
             setPendingCarer();
             setLocation("/login");
           }}

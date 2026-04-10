@@ -1,5 +1,10 @@
 import { getLinkedPatientForCarer } from "@/lib/carers";
-import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import {
+  getPrimaryAppRole,
+  hasCarerIntent,
+  hasPendingCarer,
+  setActiveAppMode,
+} from "@/lib/carer-session";
 
 /**
  * Shared navigation after a successful password or OAuth session (login or signup when confirmations are off).
@@ -7,7 +12,18 @@ import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 export async function navigateAfterLoginSuccess(setLocation: (path: string) => void): Promise<void> {
   const link = await getLinkedPatientForCarer();
   if (link.data) {
-    setLocation("/carer-view");
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (getPrimaryAppRole() === "carer") {
+      setActiveAppMode("carer");
+      setLocation("/carer-view");
+      return;
+    }
+    setActiveAppMode("patient");
+    if (next?.startsWith("/") && !next.startsWith("//")) {
+      setLocation(next);
+      return;
+    }
+    setLocation("/");
     return;
   }
   if (hasCarerIntent() || hasPendingCarer()) {
