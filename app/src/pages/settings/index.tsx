@@ -21,6 +21,7 @@ import {
   UserPlus,
   Phone,
   AtSign,
+  HardDrive,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -45,7 +46,7 @@ import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
-import { SettingsHubGroup, SettingsHubNavLink } from "./shared";
+import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
 
 function ProfileTab({ 
   name, setName, bgUnits, setBgUnits, 
@@ -680,7 +681,7 @@ export default function Settings() {
       usage: "/settings/usage#settings-usage",
       notifications: "/settings/notifications",
       contacts: emergencyEdit,
-      data: "/account#account-backup",
+      data: "/settings/usage#settings-backup",
       appearance: "/settings/appearance",
       sources: "/settings/about#settings-sources",
       about: "/settings/about",
@@ -704,7 +705,7 @@ export default function Settings() {
       notifications: "/settings/notifications",
       "emergency-contacts": emergencyEdit,
       "usual-habits": "/settings/usage#settings-usage",
-      data: "/account#account-backup",
+      data: "/settings/usage#settings-backup",
       sources: "/settings/about#settings-sources",
       insulin: "/settings/ratios",
     };
@@ -890,7 +891,10 @@ export default function Settings() {
         </p>
       </InfoSection>
       <InfoSection title="About">
-        <p>Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore lives under Account.</p>
+        <p>
+          Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is under
+          Settings → Backup &amp; restore.
+        </p>
       </InfoSection>
     </PageInfoDialog>
   );
@@ -955,6 +959,10 @@ export default function Settings() {
         />
       </div>
 
+      <div id="settings-backup" className="scroll-mt-28" data-testid="card-account-backup">
+        <SettingsDataBackupSection embedded />
+      </div>
+
     </CardContent>
   );
 
@@ -1015,6 +1023,12 @@ export default function Settings() {
               label="Ratios"
               description="TDD, targets, correction factor, meal ratios"
               icon={Syringe}
+            />
+            <SettingsHubNavLink
+              href="/settings/usage#settings-backup"
+              label="Backup & restore"
+              description="Export or import local app data"
+              icon={HardDrive}
             />
           </SettingsHubGroup>
         )}

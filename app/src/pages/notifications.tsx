@@ -2,18 +2,34 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
+  deleteAllInAppNotificationsForUser,
   fetchInAppNotificationsForUser,
   markAllInAppNotificationsRead,
   markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
+import {
+  INAPP_NOTIFICATIONS_CHANGED,
+  type InAppNotificationsChangedDetail,
+  notifyInAppNotificationsChanged,
+} from "@/lib/in-app-notifications-events";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, Trash2 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 
 export default function NotificationsPage() {
@@ -24,6 +40,8 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(configured);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [rows, setRows] = useState<InAppNotificationRow[]>([]);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
 
   const unread = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
 
@@ -58,6 +76,16 @@ export default function NotificationsPage() {
     void refresh();
   }, [configured, refresh]);
 
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<InAppNotificationsChangedDetail>).detail;
+      if (detail?.skipPageRefresh) return;
+      void refresh();
+    };
+    window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, onChanged);
+    return () => window.removeEventListener(INAPP_NOTIFICATIONS_CHANGED, onChanged);
+  }, [refresh]);
+
   const handleMarkAllRead = async () => {
     if (!configured) return;
     const res = await markAllInAppNotificationsRead();
@@ -66,12 +94,31 @@ export default function NotificationsPage() {
       return;
     }
     setRows((prev) => prev.map((r) => ({ ...r, read: true })));
+    notifyInAppNotificationsChanged({ skipPageRefresh: true });
+  };
+
+  const handleConfirmClearAll = async () => {
+    if (!configured) return;
+    setClearBusy(true);
+    const res = await deleteAllInAppNotificationsForUser();
+    setClearBusy(false);
+    if (res.error) {
+      toast({ title: "Could not clear notifications", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setRows([]);
+    setClearDialogOpen(false);
+    toast({ title: "Notifications cleared" });
+    notifyInAppNotificationsChanged({ skipPageRefresh: true });
   };
 
   const handleOpen = async (row: InAppNotificationRow) => {
     if (!row.read) {
       const res = await markInAppNotificationRead(row.id);
-      if (!res.error) setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read: true } : r)));
+      if (!res.error) {
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read: true } : r)));
+        notifyInAppNotificationsChanged({ skipPageRefresh: true });
+      }
     }
 
     const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
@@ -115,10 +162,23 @@ export default function NotificationsPage() {
         }
         description="In-app alerts and updates."
         actions={
-          <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0}>
-            <Check className="h-4 w-4 mr-2" />
-            Mark all read
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0}>
+              <Check className="h-4 w-4 mr-2" />
+              Mark all read
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setClearDialogOpen(true)}
+              disabled={!configured || loading || rows.length === 0}
+              data-testid="button-clear-all-notifications"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear all
+            </Button>
+          </>
         }
       />
 
@@ -196,6 +256,36 @@ export default function NotificationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={clearDialogOpen}
+        onOpenChange={(o) => {
+          if (!o && !clearBusy) setClearDialogOpen(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all notifications?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes every item from your in-app inbox. You can still receive new alerts afterward. This cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={clearBusy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmClearAll();
+              }}
+              disabled={clearBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {clearBusy ? "Clearing…" : "Clear all"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

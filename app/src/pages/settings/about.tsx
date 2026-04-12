@@ -172,10 +172,10 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
               </Button>
             </Link>
             <p className="text-xs text-muted-foreground">
-              <Link href="/account#account-backup" className="text-primary underline-offset-2 hover:underline">
+              <Link href="/settings/usage#settings-backup" className="text-primary underline-offset-2 hover:underline">
                 Export or import app data
               </Link>{" "}
-              (Backup &amp; restore on Account).
+              (Backup &amp; restore in Settings).
             </p>
           </div>
         </CardContent>

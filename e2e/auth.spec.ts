@@ -7,37 +7,22 @@ test.describe("Auth routes and verification", () => {
     });
   });
 
-  test("login page has OAuth provider buttons with accessible labels", async ({
-    page,
-  }) => {
+  test("login page shows email/password form (no OAuth)", async ({ page }) => {
     await page.goto("/login");
-    await expect(
-      page.getByRole("button", { name: "Continue with Apple" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Continue with Google" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Continue with Microsoft" }),
-    ).toBeVisible();
-    await expect(page.getByTestId("btn-oauth-apple")).toBeVisible();
-    await expect(page.getByTestId("btn-oauth-google")).toBeVisible();
-    await expect(page.getByTestId("btn-oauth-azure")).toBeVisible();
+    await expect(page.getByText("Log in to Diabeaters")).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Apple" })).toHaveCount(0);
   });
 
-  test("signup page has OAuth provider buttons with accessible labels", async ({
-    page,
-  }) => {
+  test("signup page shows email/password form (no OAuth)", async ({ page }) => {
     await page.goto("/signup");
-    await expect(
-      page.getByRole("button", { name: "Continue with Apple" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Continue with Google" }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Continue with Microsoft" }),
-    ).toBeVisible();
+    await expect(page.getByText("Create your Diabeaters account")).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continue with Apple" })).toHaveCount(0);
   });
 
   test("reset-request: submit dummy email, assert success message", async ({

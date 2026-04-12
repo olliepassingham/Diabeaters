@@ -472,7 +472,7 @@ export function FeedPostCard({
             avatarPath={authorAvatarPath}
             profileHref={`/community/profile/${post.author_id}`}
           />
-          <div className="min-w-0 flex-1 space-y-2">
+          <div className="min-w-0 flex-1">
             <div className="flex justify-between gap-2 text-xs text-muted-foreground items-start">
               <div className="min-w-0">
                 <Link
@@ -540,148 +540,151 @@ export function FeedPostCard({
                 </span>
               </span>
             </div>
-            {(() => {
-              const b = post.body.trim();
-              if (b.length === 0) return null;
-              if (pollExtra && b === pollExtra.question.trim()) return null;
-              if (eventExtra && b === eventExtra.title.trim()) return null;
-              return (
-                <p className="text-sm whitespace-pre-wrap">{renderBodyWithMentions(post.body, post.mention_map)}</p>
-              );
-            })()}
-            {eventExtra ? (
-              <div className="space-y-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-sm">
-                <p className="font-semibold leading-snug">{eventExtra.title}</p>
-                <p className="text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
-                {eventExtra.location ? <p>{eventExtra.location}</p> : null}
-                {eventExtra.details ? (
-                  <p className="whitespace-pre-wrap text-muted-foreground">{eventExtra.details}</p>
-                ) : null}
-              </div>
-            ) : null}
-            {pollExtra ? (
-              <FeedPollBlock
-                postId={post.id}
-                question={pollExtra.question}
-                options={pollExtra.options}
-                viewerId={viewerId}
-              />
-            ) : null}
-            {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
-            <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
-            <div
-              className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
-              data-testid="post-engagement-row"
-            >
-              <div className="flex items-center gap-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                  disabled={!viewerId}
-                  aria-pressed={post.liked_by_me}
-                  aria-label={post.liked_by_me ? "Unlike" : "Like"}
-                  onClick={onLike}
-                >
-                  <Heart
-                    className={cn("h-4 w-4 shrink-0", post.liked_by_me && "fill-primary text-primary")}
-                  />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 min-w-[2rem] px-1.5 text-muted-foreground hover:text-foreground"
-                  disabled={!viewerId}
-                  aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
-                  onClick={() => setLikersOpen(true)}
-                  data-testid="button-post-likers"
-                >
-                  <span className="text-xs tabular-nums text-foreground">{post.like_count}</span>
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                aria-expanded={expanded}
-                aria-label={
-                  expanded
-                    ? "Hide comments"
-                    : post.comment_count === 0
-                      ? "Comment"
-                      : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
-                }
-                onClick={onToggleComments}
-              >
-                <MessageSquare className="h-4 w-4 shrink-0" />
-                <span className="text-xs text-foreground">
-                  {expanded
-                    ? "Hide comments"
-                    : post.comment_count === 0
-                      ? "Comment"
-                      : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
-                </span>
-              </Button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {(() => {
+            const b = post.body.trim();
+            if (b.length === 0) return null;
+            if (pollExtra && b === pollExtra.question.trim()) return null;
+            if (eventExtra && b === eventExtra.title.trim()) return null;
+            return (
+              <p className="text-sm whitespace-pre-wrap">{renderBodyWithMentions(post.body, post.mention_map)}</p>
+            );
+          })()}
+          {eventExtra ? (
+            <div className="space-y-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-sm">
+              <p className="font-semibold leading-snug">{eventExtra.title}</p>
+              <p className="text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
+              {eventExtra.location ? <p>{eventExtra.location}</p> : null}
+              {eventExtra.details ? (
+                <p className="whitespace-pre-wrap text-muted-foreground">{eventExtra.details}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {pollExtra ? (
+            <FeedPollBlock
+              postId={post.id}
+              question={pollExtra.question}
+              options={pollExtra.options}
+              viewerId={viewerId}
+            />
+          ) : null}
+          {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
+          <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
+          <div
+            className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
+            data-testid="post-engagement-row"
+          >
+            <div className="flex items-center gap-0">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
-                aria-label="Reply"
-                onClick={onReplyFocus}
+                aria-pressed={post.liked_by_me}
+                aria-label={post.liked_by_me ? "Unlike" : "Like"}
+                onClick={onLike}
               >
-                <Reply className="h-4 w-4 shrink-0" />
-                <span className="text-xs text-foreground">Reply</span>
+                <Heart
+                  className={cn("h-4 w-4 shrink-0", post.liked_by_me && "fill-primary text-primary")}
+                />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                className="h-9 min-w-[2rem] px-1.5 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
-                aria-label="Send post in a private message"
-                onClick={() => setShareOpen(true)}
-                data-testid="button-share-post-to-dm"
+                aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
+                onClick={() => setLikersOpen(true)}
+                data-testid="button-post-likers"
               >
-                <Share2 className="h-4 w-4 shrink-0" />
-                <span className="text-xs text-foreground">Send</span>
+                <span className="text-xs tabular-nums text-foreground">{post.like_count}</span>
               </Button>
             </div>
-            {expanded && (
-              <div className="border-t border-border/60 pt-3 space-y-2">
-                {loadingComments ? (
-                  <p className="text-xs text-muted-foreground">Loading comments…</p>
-                ) : (
-                  <>
-                    {comments.length > 1 ? (
-                      <div className="flex flex-wrap items-center justify-end gap-1 pb-1">
-                        <span className="pr-1 text-tiny text-muted-foreground">Order</span>
-                        <Button
-                          type="button"
-                          variant={commentSort === "oldest" ? "secondary" : "ghost"}
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => setCommentSort("oldest")}
-                        >
-                          Oldest
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={commentSort === "newest" ? "secondary" : "ghost"}
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => setCommentSort("newest")}
-                        >
-                          Newest
-                        </Button>
-                      </div>
-                    ) : null}
-                    <ul className="space-y-2">
-                      {sortedComments.map((c) => {
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+              aria-expanded={expanded}
+              aria-label={
+                expanded
+                  ? "Hide comments"
+                  : post.comment_count === 0
+                    ? "Comment"
+                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+              }
+              onClick={onToggleComments}
+            >
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="text-xs text-foreground">
+                {expanded
+                  ? "Hide comments"
+                  : post.comment_count === 0
+                    ? "Comment"
+                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+              disabled={!viewerId}
+              aria-label="Reply"
+              onClick={onReplyFocus}
+            >
+              <Reply className="h-4 w-4 shrink-0" />
+              <span className="text-xs text-foreground">Reply</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+              disabled={!viewerId}
+              aria-label="Send post in a private message"
+              onClick={() => setShareOpen(true)}
+              data-testid="button-share-post-to-dm"
+            >
+              <Share2 className="h-4 w-4 shrink-0" />
+              <span className="text-xs text-foreground">Send</span>
+            </Button>
+          </div>
+          {expanded && (
+            <div className="border-t border-border/60 pt-3 space-y-2">
+              {loadingComments ? (
+                <p className="text-xs text-muted-foreground">Loading comments…</p>
+              ) : (
+                <>
+                  {comments.length > 1 ? (
+                    <div className="flex flex-wrap items-center justify-end gap-1 pb-1">
+                      <span className="pr-1 text-tiny text-muted-foreground">Order</span>
+                      <Button
+                        type="button"
+                        variant={commentSort === "oldest" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setCommentSort("oldest")}
+                      >
+                        Oldest
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={commentSort === "newest" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setCommentSort("newest")}
+                      >
+                        Newest
+                      </Button>
+                    </div>
+                  ) : null}
+                  <ul className="space-y-2">
+                    {sortedComments.map((c) => {
                       const cm = commentMeta(c.author_id);
                       const canReportComment = viewerId && viewerId !== c.author_id;
                       const isCommentAuthor = Boolean(viewerId && viewerId === c.author_id);
@@ -737,28 +740,27 @@ export function FeedPostCard({
                           </div>
                         </li>
                       );
-                      })}
-                    </ul>
-                  </>
-                )}
-                <div className="flex gap-2">
-                  <Textarea
-                    ref={(el) => {
-                      commentInputRef(el);
-                    }}
-                    rows={2}
-                    placeholder="Write a comment…"
-                    value={commentDraft}
-                    onChange={(e) => onCommentDraftChange(e.target.value)}
-                    maxLength={4000}
-                  />
-                  <Button type="button" size="sm" onClick={onSubmitComment}>
-                    Reply
-                  </Button>
-                </div>
+                    })}
+                  </ul>
+                </>
+              )}
+              <div className="flex gap-2">
+                <Textarea
+                  ref={(el) => {
+                    commentInputRef(el);
+                  }}
+                  rows={2}
+                  placeholder="Write a comment…"
+                  value={commentDraft}
+                  onChange={(e) => onCommentDraftChange(e.target.value)}
+                  maxLength={4000}
+                />
+                <Button type="button" size="sm" onClick={onSubmitComment}>
+                  Reply
+                </Button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </CardContent>
 
