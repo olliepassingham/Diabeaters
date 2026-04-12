@@ -2,6 +2,7 @@
  * Supabase configuration checks. No network calls; purely client-side.
  * Used by DevBanner in development only.
  */
+import { getPublicAppOrigin } from "./auth-app-url";
 
 export const REQUIRED_REDIRECTS: string[] = [
   "/auth/callback",
@@ -13,16 +14,25 @@ export const REQUIRED_REDIRECTS: string[] = [
  * Uses window.location.origin for the current domain.
  */
 export function getRequiredRedirectUrls(): string[] {
-  if (typeof window === "undefined") return [];
-  const origin = window.location.origin;
-  const urls: string[] = [];
-  for (const path of REQUIRED_REDIRECTS) {
-    urls.push(`${origin}${path}`);
+  const origins = new Set<string>();
+  const primary = getPublicAppOrigin();
+  if (primary) origins.add(primary);
+  if (typeof window !== "undefined") origins.add(window.location.origin);
+
+  const urls = new Set<string>();
+  for (const origin of origins) {
+    for (const path of REQUIRED_REDIRECTS) {
+      urls.add(`${origin}${path}`);
+    }
   }
-  if (origin.includes("localhost") || origin.includes("127.0.0.1")) {
-    urls.push(`http://localhost:5173/auth/callback`, `http://localhost:5173/reset-password`);
+  if (typeof window !== "undefined") {
+    const o = window.location.origin;
+    if (o.includes("localhost") || o.includes("127.0.0.1")) {
+      urls.add("http://localhost:5173/auth/callback");
+      urls.add("http://localhost:5173/reset-password");
+    }
   }
-  return [...new Set(urls)];
+  return [...urls];
 }
 
 /**

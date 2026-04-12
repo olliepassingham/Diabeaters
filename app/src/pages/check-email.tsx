@@ -90,6 +90,22 @@ export default function CheckEmail() {
             We&apos;ve sent a verification link to your email. Click the link to
             verify your account. Once verified, return to the app.
           </p>
+          <Alert className="border-border/80 bg-muted/30">
+            <AlertTitle className="text-sm">Not seeing the email?</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground space-y-2 pt-1">
+              <ul className="list-disc pl-4 space-y-1">
+                <li>Check spam, junk, and “Promotions” (Gmail).</li>
+                <li>Wait a few minutes — delivery can be delayed.</li>
+                <li>
+                  The confirmation link must use a URL allowed in Supabase → Authentication → URL
+                  Configuration. In Vercel, set{" "}
+                  <span className="font-mono text-foreground">VITE_PUBLIC_SITE_URL</span> to that same
+                  public URL (no trailing slash).
+                </li>
+                <li>If it still doesn’t arrive, ask your team to enable custom SMTP in Supabase for production mail.</li>
+              </ul>
+            </AlertDescription>
+          </Alert>
           <form onSubmit={handleResend} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="resend-email">Email address</Label>

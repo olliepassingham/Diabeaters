@@ -132,6 +132,17 @@ OAuth opens in the system browser (SFSafariViewController). After sign-in, the u
 
 - Enable **Confirm email** (email confirmations required).
 
+### Canonical app URL (Vercel / production)
+
+Supabase validates the **redirect URL embedded in confirmation and reset emails** against **Redirect URLs** in the dashboard. The app sends `emailRedirectTo` / `redirectTo` using:
+
+1. **`VITE_PUBLIC_SITE_URL`** when set (recommended in Vercel for production), or  
+2. **`window.location.origin`** otherwise.
+
+If users sign up from a URL that is **not** listed (e.g. a one-off preview deployment, or `www` vs apex mismatch), Supabase may **not send** the confirmation email or may reject the link. **Fix:** set **`VITE_PUBLIC_SITE_URL`** in Vercel to your primary public URL (same as **Site URL** in Supabase), and add every URL users might use—including `https://YOUR_PROJECT.vercel.app` and your custom domain—to **Redirect URLs**.
+
+For reliable delivery in production, configure **custom SMTP** under **Project Settings → Auth** (Supabase’s built-in mail can be rate-limited or filtered by providers).
+
 ### URL configuration
 
 See **Supabase URL Configuration (copy/paste)** above.

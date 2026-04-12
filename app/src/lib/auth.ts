@@ -4,6 +4,7 @@ import type {
   Session,
   User,
 } from "@supabase/supabase-js";
+import { getAuthCallbackUrl, getResetPasswordUrl } from "./auth-app-url";
 import { getSupabase } from "./supabase";
 
 const NOT_CONFIGURED = new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env");
@@ -76,7 +77,7 @@ export async function signup(
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(),
       },
     });
     return { data, error };
@@ -126,7 +127,7 @@ export async function resendVerification(
       type: "signup",
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: getAuthCallbackUrl(),
       },
     });
     return { data: {}, error };
@@ -169,7 +170,7 @@ export async function signInWithProvider(
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getAuthCallbackUrl(),
         queryParams: { prompt: "consent" },
       },
     });
@@ -267,7 +268,7 @@ export async function updateEmail(
   try {
     const { data, error } = await supabase.auth.updateUser(
       { email: newEmail },
-      { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      { emailRedirectTo: getAuthCallbackUrl() },
     );
     return { data, error };
   } catch (e) {
