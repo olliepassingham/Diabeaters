@@ -573,6 +573,7 @@ export default function Settings() {
     scenarioAlerts: true,
     hypoDashboardQuickNotify: false,
     communityFeedAlerts: true,
+    communityDmAlerts: true,
   });
   
   useEffect(() => {

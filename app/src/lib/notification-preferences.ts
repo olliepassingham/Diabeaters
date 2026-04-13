@@ -13,6 +13,7 @@ export function toCloudPrefs(settings: NotificationSettings): Record<string, unk
     hypo_alerts: settings.hypoAlerts !== false,
     scenario_alerts: settings.scenarioAlerts !== false,
     feed_alerts: settings.communityFeedAlerts !== false,
+    dm_alerts: settings.communityDmAlerts !== false,
   };
 }
 

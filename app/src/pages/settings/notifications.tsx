@@ -26,6 +26,7 @@ export function NotificationsTab({
   const hypoOn = notifSettings.hypoAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
+  const communityDmOn = notifSettings.communityDmAlerts !== false;
 
   const inner = (
     <div className="space-y-6">
@@ -170,6 +171,19 @@ export function NotificationsTab({
 
       <div className="flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
+          <Label className="text-small text-muted-foreground">Direct messages</Label>
+          <p className="text-small text-muted-foreground">When someone sends you a private message</p>
+        </div>
+        <Switch
+          checked={communityDmOn}
+          onCheckedChange={(checked) => onToggle("communityDmAlerts", checked)}
+          disabled={!notifSettings.enabled}
+          data-testid="switch-community-dm-alerts"
+        />
+      </div>
+
+      <div className="flex items-center justify-between py-3 border-b border-border">
+        <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Appointment reminders</Label>
           <p className="text-small text-muted-foreground">Reminders before upcoming appointments</p>
         </div>
@@ -220,7 +234,7 @@ export function NotificationsTab({
           <CardTitle className="text-h3 font-semibold">Notifications</CardTitle>
         </div>
         <CardDescription className="text-body text-muted-foreground">
-          Control alerts for hypos, supplies, scenarios, and the community feed.
+          Control alerts for hypos, supplies, scenarios, community, and messages.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">{inner}</CardContent>

@@ -17,6 +17,10 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
     const postId = typeof data.post_id === "string" ? data.post_id : "";
     return postId ? `/community/post/${postId}` : "/community";
   }
+  if (kind === "dm_message") {
+    const threadId = typeof data.thread_id === "string" ? data.thread_id : "";
+    return threadId ? `/community/messages/${threadId}` : "/community/messages";
+  }
 
   return null;
 }

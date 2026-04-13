@@ -22,7 +22,20 @@ export type FeedInAppNotificationPayload = {
   deep_link?: string;
 };
 
-export type InAppNotificationPayload = HypoNotificationPayload | FeedInAppNotificationPayload | Record<string, unknown>;
+/** DM rows inserted by notify_dm_thread_members_on_message trigger. */
+export type DmInAppNotificationPayload = {
+  kind: "dm_message";
+  thread_id: string;
+  message_id?: string;
+  sender_user_id?: string;
+  deep_link?: string;
+};
+
+export type InAppNotificationPayload =
+  | HypoNotificationPayload
+  | FeedInAppNotificationPayload
+  | DmInAppNotificationPayload
+  | Record<string, unknown>;
 
 /** Row shape for `public.notifications` (in-app inbox). */
 export type InAppNotificationRow = {

@@ -69,6 +69,15 @@ describe("getPathForInAppNotification", () => {
     ).toBe("/community");
   });
 
+  it("maps dm_message to thread or messages hub", () => {
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "dm_message", thread_id: "t1" } })),
+    ).toBe("/community/messages/t1");
+    expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "dm_message" } }))).toBe(
+      "/community/messages",
+    );
+  });
+
   it("returns null for unknown kind without deep_link", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "future_kind" } }))).toBeNull();
   });

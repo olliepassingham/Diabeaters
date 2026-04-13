@@ -608,6 +608,8 @@ export interface NotificationSettings {
   hypoDashboardQuickNotify?: boolean;
   /** Likes and comments on your community posts (in-app inbox; synced as feed_alerts). */
   communityFeedAlerts?: boolean;
+  /** Direct messages — in-app inbox; synced as dm_alerts. */
+  communityDmAlerts?: boolean;
 }
 
 export type AppointmentType = "clinic" | "eye_check" | "foot_check" | "blood_test" | "pump_review" | "other";
@@ -2228,6 +2230,7 @@ export const storage = {
       scenarioAlerts: true,
       hypoDashboardQuickNotify: false,
       communityFeedAlerts: true,
+      communityDmAlerts: true,
     };
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
     if (!data) return defaults;
@@ -2237,6 +2240,7 @@ export const storage = {
       ...parsed,
       hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify === true,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
+      communityDmAlerts: parsed.communityDmAlerts !== false,
     };
   },
 
