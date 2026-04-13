@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/popover";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -25,7 +24,9 @@ import {
   deleteAllInAppNotificationsForUser,
   fetchInAppNotificationsForUser,
   markAllInAppNotificationsRead,
+  markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
+import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -150,7 +151,10 @@ export function NotificationBell() {
                     size="sm"
                     className="h-8 px-2 text-xs"
                     type="button"
-                    onClick={() => setClearDialogOpen(true)}
+                    onClick={() => {
+                      setOpen(false);
+                      setClearDialogOpen(true);
+                    }}
                     data-testid="button-bell-clear-all-notifications"
                   >
                     <Trash2 className="h-3.5 w-3.5 mr-1" aria-hidden />
@@ -208,9 +212,20 @@ export function NotificationBell() {
                       className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                         n.read ? "hover:bg-muted/60" : "bg-primary/5 hover:bg-primary/10"
                       }`}
+                      data-testid={`bell-notif-row-${n.id}`}
                       onClick={() => {
-                        setOpen(false);
-                        setLocation("/notifications");
+                        void (async () => {
+                          if (!n.read) {
+                            const res = await markInAppNotificationRead(n.id);
+                            if (!res.error) {
+                              setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
+                              notifyInAppNotificationsChanged({ skipPageRefresh: true });
+                            }
+                          }
+                          setOpen(false);
+                          const path = getPathForInAppNotification(n) ?? "/notifications";
+                          setLocation(path);
+                        })();
                       }}
                     >
                       <div className="font-medium truncate">{n.title}</div>
@@ -255,16 +270,16 @@ export function NotificationBell() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={clearBusy}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={(e) => {
-                  e.preventDefault();
-                  void handleConfirmClearAll();
-                }}
+              <Button
+                type="button"
+                variant="destructive"
                 disabled={clearBusy}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => void handleConfirmClearAll()}
+                data-testid="button-bell-confirm-clear-all"
               >
                 {clearBusy ? "Clearing…" : "Clear all"}
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

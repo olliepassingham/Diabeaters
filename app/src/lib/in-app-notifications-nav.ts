@@ -1,0 +1,22 @@
+import type { InAppNotificationRow } from "@/lib/carer-notify-types";
+
+/**
+ * Resolves the in-app route for a notification row (explicit deep_link or known `data.kind`).
+ * Returns null when there is no recognised target (full page leaves you in place; bell may fall back).
+ */
+export function getPathForInAppNotification(row: InAppNotificationRow): string | null {
+  const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
+  const kind = typeof data.kind === "string" ? data.kind : "";
+  const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
+  if (target) return target;
+
+  if (kind === "supplies_low") return "/supplies";
+  if (kind === "hypo_logged_self") return "/dashboard";
+  if (kind === "hypo_logged" || kind === "scenario_started") return "/carer-view";
+  if (kind === "feed_post_like" || kind === "feed_post_comment" || kind === "feed_post_mention") {
+    const postId = typeof data.post_id === "string" ? data.post_id : "";
+    return postId ? `/community/post/${postId}` : "/community";
+  }
+
+  return null;
+}

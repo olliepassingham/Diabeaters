@@ -66,24 +66,30 @@ export async function markAllInAppNotificationsRead(): Promise<{ error: Error | 
   return { error: null };
 }
 
-/** Removes all in-app notification rows for the current user. Prefer RPC (works without client DELETE RLS). */
+/**
+ * Removes all in-app notification rows for the current user.
+ * Tries client DELETE first (RLS: notifications_delete_own); falls back to clear_my_notifications RPC
+ * (no args — do not pass `{}` or PostgREST may reject / no-op on zero-parameter functions).
+ */
 export async function deleteAllInAppNotificationsForUser(): Promise<{ error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { error: new Error("Supabase not configured") };
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const uid = sessionData.session?.user?.id;
-  if (!uid) return { error: new Error("Not signed in") };
-
-  const { error: rpcError } = await supabase.rpc("clear_my_notifications");
-  if (!rpcError) return { error: null };
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user?.id) {
+    return { error: new Error(userErr?.message || "Not signed in") };
+  }
+  const uid = userData.user.id;
 
   const { error: delError } = await supabase.from("notifications").delete().eq("user_id", uid);
   if (!delError) return { error: null };
 
+  const { error: rpcError } = await supabase.rpc("clear_my_notifications");
+  if (!rpcError) return { error: null };
+
   return {
     error: new Error(
-      [rpcError.message, delError.message].filter(Boolean).join(" · ") || "Could not clear notifications",
+      [delError.message, rpcError.message].filter(Boolean).join(" · ") || "Could not clear notifications",
     ),
   };
 }
