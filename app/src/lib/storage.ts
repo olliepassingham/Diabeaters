@@ -53,6 +53,63 @@ export const DIABEATER_ACTIVE_USER_CHANGED_EVENT = "diabeater-active-user-change
 /** Dispatched when `saveSettings` updates local storage (same-tab; settings completion UI can refresh). */
 export const DIABEATER_SETTINGS_CHANGED_EVENT = "diabeater-settings-changed";
 
+const ONBOARDING_FINISHED_AT_KEY = "diabeater_onboarding_finished_at";
+
+/** Persist when the onboarding wizard finishes so the dashboard can show a lighter first week. */
+export function recordOnboardingFinishedAt(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ONBOARDING_FINISHED_AT_KEY, new Date().toISOString());
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * True for `days` after `recordOnboardingFinishedAt` was last called.
+ * No timestamp (e.g. onboarding completed before this existed) => false.
+ */
+export function isWithinOnboardingPostFinishGracePeriod(days: number): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(ONBOARDING_FINISHED_AT_KEY);
+    if (!raw) return false;
+    const t = new Date(raw).getTime();
+    if (Number.isNaN(t)) return false;
+    return Date.now() - t < days * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+function softSetupNudgeDismissedKey(): string {
+  if (typeof window === "undefined") return "diabeater_soft_setup_dismissed";
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    return uid ? `diabeater_soft_setup_dismissed_u_${uid}` : "diabeater_soft_setup_dismissed";
+  } catch {
+    return "diabeater_soft_setup_dismissed";
+  }
+}
+
+export function isSoftSetupNudgeDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(softSetupNudgeDismissedKey()) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function dismissSoftSetupNudge(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(softSetupNudgeDismissedKey(), "true");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Same-tab: local appointment rows changed (storage event does not fire in the writing tab). */
 export const DIABEATER_APPOINTMENTS_CHANGED_EVENT = "diabeater-appointments-changed";
 
@@ -757,15 +814,15 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
-  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 0, size: "full" },
-  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 1, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 2, size: "half" },
-  { id: "appointments", type: "appointments", enabled: true, order: 3, size: "half" },
-  { id: "routines", type: "routines", enabled: true, order: 4, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 5, size: "full" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
-  { id: "community-quick-post", type: "community-quick-post", enabled: true, order: 8, size: "half" },
+  { id: "community-quick-post", type: "community-quick-post", enabled: true, order: 0, size: "half" },
+  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 1, size: "full" },
+  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 2, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
+  { id: "routines", type: "routines", enabled: true, order: 5, size: "half" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 6, size: "full" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 7, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
   { id: "welcome", type: "welcome", enabled: false, order: 9, size: "full" },
 ];
 

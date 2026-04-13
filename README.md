@@ -23,7 +23,9 @@ The above disclaimer appears in:
 | Staging     | Vercel Preview | `develop`| `.env.staging`, staging Supabase, no-index |
 | Production  | Vercel Prod    | `main`   | Production Supabase, indexing allowed      |
 
-**Required env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_ENV` (optional; defaults to `development` when `DEV`, `production` when `PROD`). Vite exposes `VITE_*` to the client via `import.meta.env`. Prefer `.env.local` / `.env.staging.local` over `.env` / `.env.staging`. Restart dev server after env changes.
+**Supabase project naming:** A dashboard project called “staging” may still be the **only** database your production Vercel build uses. Paused projects do not reliably serve Auth or API. For a clear setup (one vs two projects, Auth URLs, verification email), read **[docs/supabase_project_strategy.md](docs/supabase_project_strategy.md)**.
+
+**Required env vars:** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, optional `VITE_PUBLIC_SITE_URL` (must match Supabase **Site URL** for auth email links — see [Email Verification](#email-verification-supabase)), `VITE_APP_ENV` (optional; defaults to `development` when `DEV`, `production` when `PROD`). Vite exposes `VITE_*` to the client via `import.meta.env`. Prefer `.env.local` / `.env.staging.local` over `.env` / `.env.staging`. Restart dev server after env changes.
 
 **How `VITE_APP_ENV` controls the app:**
 - **Banners:** Staging shows a top ribbon “Staging — not for real use” and a “Preview: this feature is in staging” chip on the dashboard. Production shows neither.
@@ -125,6 +127,8 @@ Use `http://localhost:5173/auth/callback` as a redirect URL in each provider’s
 OAuth opens in the system browser (SFSafariViewController). After sign-in, the user returns to the app at `/auth/callback`. ATS already enforces HTTPS.
 
 ## Email Verification (Supabase)
+
+**Rule:** Configure Auth on the **same** Supabase **project** as `VITE_SUPABASE_URL` for that deployment. See [docs/supabase_project_strategy.md](docs/supabase_project_strategy.md) if you have both “Diabeaters” and “Diabeaters (staging)”. If verification email never arrives, see **[docs/troubleshooting_auth_email.md](docs/troubleshooting_auth_email.md)**.
 
 ### Enable confirmations
 

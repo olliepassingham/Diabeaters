@@ -22,8 +22,9 @@ Set these for **Production** (deploys from `main`):
 
 | Variable                | Value                       | Notes                    |
 |-------------------------|-----------------------------|--------------------------|
-| `VITE_SUPABASE_URL`     | Your production Supabase URL | From Supabase → API      |
+| `VITE_SUPABASE_URL`     | Your production Supabase URL | From Supabase → API (project must be **unpaused**). |
 | `VITE_SUPABASE_ANON_KEY`| Production anon key         | From Supabase → API      |
+| `VITE_PUBLIC_SITE_URL`  | e.g. `https://diabeaters.vercel.app` | No trailing slash; **same origin** as Supabase **Site URL** and auth redirect allowlist. Required for reliable verification/reset links. |
 | `VITE_APP_ENV`          | `production`                | Enables prod robots, no staging banner |
 | `VITE_FEATURE_COMMUNITY`| `true`                      | **Required** for Feed + community DMs in production builds (see [`flags.ts`](../app/src/lib/flags.ts)). Omitting it hides Feed entirely. |
 
@@ -37,6 +38,7 @@ Set these for **Preview** (and optionally **Development**):
 |-------------------------|----------------------------|--------------------------|
 | `VITE_SUPABASE_URL`     | Staging Supabase URL       | From staging project     |
 | `VITE_SUPABASE_ANON_KEY`| Staging anon key           | From staging project     |
+| `VITE_PUBLIC_SITE_URL`  | Preview hostname if testing auth there | Often the Vercel preview URL for that deploy; must be listed in **that** project’s Supabase Redirect URLs. Production Preview can instead use the prod site URL if you point Preview at prod Supabase (single-project model). |
 | `VITE_APP_ENV`          | `staging`                  | Enables staging banner, robots no-index |
 | `VITE_FEATURE_COMMUNITY`| `true`                     | Same as production if you want Feed on preview builds. |
 

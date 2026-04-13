@@ -33,6 +33,14 @@ export interface DashboardWidgetDefinition {
  */
 export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
   {
+    id: "community-quick-post",
+    label: "Community",
+    description: "Short line to open the feed composer with draft text.",
+    defaultEnabled: true,
+    defaultSize: "half",
+    component: CommunityQuickPostWidget,
+  },
+  {
     id: "supply-depletion",
     label: "Depletion forecast",
     description: "Timeline of when your supplies are likely to run out.",
@@ -95,14 +103,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: SettingsCompletionWidget,
-  },
-  {
-    id: "community-quick-post",
-    label: "Community",
-    description: "Short line to open the feed composer with draft text.",
-    defaultEnabled: true,
-    defaultSize: "half",
-    component: CommunityQuickPostWidget,
   },
   {
     id: "welcome",

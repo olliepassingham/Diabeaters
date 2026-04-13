@@ -47,6 +47,14 @@ export default function Signup() {
       return;
     }
 
+    if (!data?.user) {
+      const description =
+        "We could not create an account with that email. It may already be registered — try logging in — or sign-ups may be blocked in your project (check Supabase Auth settings).";
+      setError(description);
+      toast({ title: "Sign up unsuccessful", description, variant: "destructive" });
+      return;
+    }
+
     if (data?.session && data.user) {
       if (!isUserVerified(data.user)) {
         const next = new URLSearchParams(window.location.search).get("next");

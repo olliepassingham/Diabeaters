@@ -20,6 +20,9 @@ import { Link } from "wouter";
 import {
   storage,
   DIABEATER_SETTINGS_CHANGED_EVENT,
+  dismissSoftSetupNudge,
+  isSoftSetupNudgeDismissed,
+  isWithinOnboardingPostFinishGracePeriod,
   Supply as LocalSupply,
   ScenarioState,
   UserProfile,
@@ -574,6 +577,50 @@ function DashboardSkeleton() {
   );
 }
 
+const ONBOARDING_SETUP_GRACE_DAYS = 5;
+
+function SoftSettingsNudge({
+  completion,
+  onDismiss,
+}: {
+  completion: { completed: number; total: number };
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      className="animate-fade-in-up rounded-xl border border-border/60 bg-muted/25 px-3 py-2.5 sm:px-4"
+      data-testid="banner-soft-setup-nudge"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          When you are ready, add a few numbers in Settings for fuller suggestions ({completion.completed}/
+          {completion.total} so far).
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link href="/settings">
+            <Button variant="outline" size="sm" data-testid="button-soft-setup-settings">
+              Settings
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            aria-label="Dismiss setup reminder"
+            onClick={onDismiss}
+            data-testid="button-dismiss-soft-setup-nudge"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SetupPromptCard({ completion }: { completion: { percentage: number; completed: number; total: number } }) {
   return (
     <Card className="dashboard-card-hover rounded-xl border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/30 glow-warning shadow-sm hover:shadow-md transition-shadow duration-200" data-testid="card-setup-prompt">
@@ -627,6 +674,7 @@ export default function Dashboard() {
   } = useDashboardWidgets();
   const [isSettingsComplete, setIsSettingsComplete] = useState(() => storage.isSettingsComplete());
   const [settingsCompletion, setSettingsCompletion] = useState(() => storage.getSettingsCompletion());
+  const [softSetupNudgeDismissed, setSoftSetupNudgeDismissed] = useState(() => isSoftSetupNudgeDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
@@ -694,6 +742,11 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
+  const inOnboardingSetupGrace = isWithinOnboardingPostFinishGracePeriod(ONBOARDING_SETUP_GRACE_DAYS);
+  const showSoftSetupNudge =
+    !isSettingsComplete && inOnboardingSetupGrace && !softSetupNudgeDismissed;
+  const showFullSetupPrompt = !isSettingsComplete && !inOnboardingSetupGrace;
+
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
     isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
@@ -754,17 +807,29 @@ export default function Dashboard() {
           />
         </div>
 
+        <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
+          <WelcomeWidget />
+        </section>
+
         <SupplyTrackerTodaySection />
 
-        {!isSettingsComplete && (
-          <section className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
-            <SetupPromptCard completion={settingsCompletion} />
+        {showSoftSetupNudge && (
+          <section className="animate-fade-in-up" style={{ animationDelay: "70ms" }}>
+            <SoftSettingsNudge
+              completion={settingsCompletion}
+              onDismiss={() => {
+                dismissSoftSetupNudge();
+                setSoftSetupNudgeDismissed(true);
+              }}
+            />
           </section>
         )}
 
-        <section className="animate-fade-in-up" style={{ animationDelay: "90ms" }}>
-          <WelcomeWidget />
-        </section>
+        {showFullSetupPrompt && (
+          <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
+            <SetupPromptCard completion={settingsCompletion} />
+          </section>
+        )}
       </section>
 
       <DashboardWidgetSettings

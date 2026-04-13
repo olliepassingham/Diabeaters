@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link } from "wouter";
 import { resendVerification } from "@/lib/auth";
+import { getSupportEmail } from "@/lib/support";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -68,11 +69,14 @@ export default function CheckEmail() {
     >
       {import.meta.env.DEV && (
         <div
-          className="fixed top-0 left-0 right-0 bg-amber-500/90 text-amber-950 px-4 py-2 text-center text-xs font-medium z-50"
+          className="fixed top-0 left-0 right-0 bg-amber-500/90 text-amber-950 px-4 py-2 text-center text-xs font-medium z-50 space-y-1"
           role="status"
         >
-          To test email verification, enable &quot;Confirm email&quot; in Supabase
-          Dashboard → Authentication → Providers → Email.
+          <p>
+            Dev: In Supabase, enable <strong>Confirm email</strong> (Authentication → Providers → Email)
+            and add your app URL to <strong>Redirect URLs</strong>. Set <code className="font-mono">VITE_PUBLIC_SITE_URL</code> to
+            match.
+          </p>
         </div>
       )}
       <Card className="w-full max-w-md">
@@ -93,17 +97,30 @@ export default function CheckEmail() {
           <Alert className="border-border/80 bg-muted/30">
             <AlertTitle className="text-sm">Not seeing the email?</AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground space-y-2 pt-1">
-              <ul className="list-disc pl-4 space-y-1">
-                <li>Check spam, junk, and “Promotions” (Gmail).</li>
-                <li>Wait a few minutes — delivery can be delayed.</li>
-                <li>
-                  The confirmation link must use a URL allowed in Supabase → Authentication → URL
-                  Configuration. In Vercel, set{" "}
-                  <span className="font-mono text-foreground">VITE_PUBLIC_SITE_URL</span> to that same
-                  public URL (no trailing slash).
-                </li>
-                <li>If it still doesn’t arrive, ask your team to enable custom SMTP in Supabase for production mail.</li>
+              <ul className="list-disc pl-4 space-y-1.5">
+                <li>Check spam, junk, and the Promotions tab (if you use Gmail).</li>
+                <li>Wait a few minutes — it can take a little while to arrive.</li>
+                <li>Confirm the email address above is correct, then tap resend if needed.</li>
               </ul>
+              {getSupportEmail() ? (
+                <p className="pt-1">
+                  <a
+                    href={`mailto:${getSupportEmail()}?subject=${encodeURIComponent("Diabeaters — email verification")}`}
+                    className="text-foreground underline underline-offset-2 font-medium"
+                  >
+                    Contact support
+                  </a>{" "}
+                  if you still can&apos;t get the link.
+                </p>
+              ) : (
+                <p className="pt-1">
+                  If it never arrives, use{" "}
+                  <Link href="/support" className="text-foreground underline underline-offset-2 font-medium">
+                    Support
+                  </Link>{" "}
+                  in the app.
+                </p>
+              )}
             </AlertDescription>
           </Alert>
           <form onSubmit={handleResend} className="space-y-4">

@@ -24,7 +24,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
-import { storage } from "@/lib/storage";
+import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
@@ -111,6 +111,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
+  const [minimalPath, setMinimalPath] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
@@ -135,6 +136,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const getSteps = (): Step[] => {
+    if (minimalPath) {
+      return ["welcome", "struggle", "struggle_preview", "disclaimer", "first_win"];
+    }
     return [
       "welcome",
       "struggle",
@@ -203,15 +207,28 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const skipToDisclaimerWithDefaults = () => {
+    setMinimalPath(true);
+    setData((prev) => ({
+      ...prev,
+      insulinDeliveryMethod: prev.insulinDeliveryMethod || "injections",
+    }));
+    setCurrentStep("disclaimer");
+  };
+
   const handleBack = () => {
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex > 0) {
+      if (currentStep === "disclaimer") {
+        setMinimalPath(false);
+      }
       setCurrentStep(steps[stepIndex - 1]);
     }
   };
 
   const handleFinish = async (pathOverride?: string) => {
     localStorage.setItem("diabeater_onboarding_completed", "true");
+    recordOnboardingFinishedAt();
     if (user?.id) {
       const { error } = await upsertProfile({ id: user.id, onboarding_complete: true });
       if (error) {
@@ -251,7 +268,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
       case "struggle_preview":
-        return <StrugglePreviewStep data={data} />;
+        return <StrugglePreviewStep data={data} onMinimalSetup={skipToDisclaimerWithDefaults} />;
       case "essentials":
         return <EssentialsStep data={data} updateData={updateData} />;
       case "path_data":
@@ -476,7 +493,13 @@ function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: 
   );
 }
 
-function StrugglePreviewStep({ data }: { data: OnboardingData }) {
+function StrugglePreviewStep({
+  data,
+  onMinimalSetup,
+}: {
+  data: OnboardingData;
+  onMinimalSetup: () => void;
+}) {
   const s = data.struggle;
   const panels: Record<
     NonNullable<Struggle>,
@@ -537,6 +560,16 @@ function StrugglePreviewStep({ data }: { data: OnboardingData }) {
           </ul>
         </CardContent>
       </Card>
+      <div className="text-center pt-1">
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground min-h-11 px-2"
+          onClick={onMinimalSetup}
+          data-testid="button-onboarding-minimal-setup"
+        >
+          Skip these questions — I’ll add details in Settings
+        </button>
+      </div>
     </div>
   );
 }
