@@ -18,10 +18,8 @@ import {
   Bell,
   Info,
   Users,
-  UserPlus,
   Phone,
   AtSign,
-  HardDrive,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
@@ -897,8 +895,8 @@ export default function Settings() {
       </InfoSection>
       <InfoSection title="About">
         <p>
-          Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is under
-          Settings → Backup &amp; restore.
+          Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is at
+          the bottom of Profile and usage.
         </p>
       </InfoSection>
     </PageInfoDialog>
@@ -1011,16 +1009,16 @@ export default function Settings() {
         <PageHeader
           className="mb-1"
           title="Settings"
-          description="Preferences, clinical defaults, and app behaviour."
+          description="Personal profile, clinical defaults, alerts, and appearance."
           actions={settingsInfoDialog}
         />
 
         {!isCarer && (
-          <SettingsHubGroup title="Profile and usage">
+          <SettingsHubGroup title="Personal & clinical">
             <SettingsHubNavLink
               href="/settings/usage"
-              label="Profile and usage"
-              description="Name, habits, and supply pack sizes"
+              label="Profile & usage"
+              description="Name, units, habits, and supply forecasts"
               icon={Activity}
             />
             <SettingsHubNavLink
@@ -1029,40 +1027,27 @@ export default function Settings() {
               description="TDD, targets, correction factor, meal ratios"
               icon={Syringe}
             />
-            <SettingsHubNavLink
-              href="/settings/usage#settings-backup"
-              label="Backup & restore"
-              description="Export or import local app data"
-              icon={HardDrive}
-            />
           </SettingsHubGroup>
         )}
 
         {!isCarer && (
-          <SettingsHubGroup title="Feed">
+          <SettingsHubGroup title="Community">
             <SettingsHubNavLink
               href="/account#community"
               label="Feed profile"
-              description="Handle, bio, and visibility on the feed"
+              description="Handle, bio, and feed visibility"
               icon={AtSign}
             />
           </SettingsHubGroup>
         )}
 
         {!isCarer && (
-          <SettingsHubGroup title="Family">
+          <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
               href="/family-carers"
               label="Family & carers"
-              description="Linked carers and sharing"
+              description="Invite, link, and control what they can see"
               icon={Users}
-            />
-            <SettingsHubNavLink
-              href="/carer-setup"
-              label="Carer setup"
-              description="Enter an invite code to support someone with their own account"
-              icon={UserPlus}
-              dataTestId="settings-link-carer-setup"
             />
           </SettingsHubGroup>
         )}
@@ -1082,16 +1067,16 @@ export default function Settings() {
           <SettingsHubNavLink
             href="/settings/appearance"
             label="Theme & colour"
-            description="Light, dark, Auto, and primary accent"
+            description="Light, dark, Auto, and accent colour"
             icon={Palette}
           />
         </SettingsHubGroup>
 
         <SettingsHubGroup title="Notifications">
-          <SettingsHubNavLink href="/settings/notifications" label="Alerts" description="Hypo, trends, scenarios, browser" icon={Bell} />
+          <SettingsHubNavLink href="/settings/notifications" label="Alerts" description="Hypo, trends, scenarios, browser notifications" icon={Bell} />
         </SettingsHubGroup>
 
-        <SettingsHubGroup title="About">
+        <SettingsHubGroup title="Help & legal">
           <SettingsHubNavLink
             href="/settings/about"
             label="Version, legal & references"

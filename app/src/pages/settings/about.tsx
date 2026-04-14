@@ -175,7 +175,7 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
               <Link href="/settings/usage#settings-backup" className="text-primary underline-offset-2 hover:underline">
                 Export or import app data
               </Link>{" "}
-              (Backup &amp; restore in Settings).
+              (at the bottom of Profile and usage).
             </p>
           </div>
         </CardContent>
