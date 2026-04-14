@@ -36,7 +36,6 @@
   }
   body {
     height: 100%;
-    overflow: hidden;
     overflow-x: clip;
     min-width: 0;
     -webkit-font-smoothing: antialiased;

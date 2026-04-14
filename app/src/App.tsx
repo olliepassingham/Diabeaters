@@ -735,7 +735,7 @@ function AuthenticatedShell() {
   }, [toast]);
 
   return (
-    <div className="relative flex min-h-0 min-h-screen h-screen w-full min-w-0 flex-col overflow-hidden bg-background text-foreground min-h-[100dvh] h-[100dvh]">
+    <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <AppShellBackdrop />
       <OfflineBanner />
       {!isCarerMode && (
@@ -752,7 +752,7 @@ function AuthenticatedShell() {
       />
       {!isCarerMode ? <ActiveExerciseBanner /> : null}
       <main
-        className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
           paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
           scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
@@ -789,7 +789,7 @@ function AccountShell() {
   };
 
   return (
-    <div className="relative flex min-h-0 min-h-screen h-screen w-full min-w-0 flex-col overflow-hidden bg-background text-foreground min-h-[100dvh] h-[100dvh]">
+    <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <AppShellBackdrop />
       <AppTopBar
         isCarer={isCarerMode}
@@ -798,7 +798,7 @@ function AccountShell() {
         onLogout={handleLogout}
       />
       <main
-        className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
           paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
           scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
