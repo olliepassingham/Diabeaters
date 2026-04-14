@@ -582,6 +582,7 @@ export function ActiveExerciseBanner() {
   const [elapsed, setElapsed] = useState(0);
   const [recoveryRemaining, setRecoveryRemaining] = useState(0);
   const [showMidCheck, setShowMidCheck] = useState(false);
+  const [logBgOpen, setLogBgOpen] = useState(false);
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
   const [endingSession, setEndingSession] = useState<ActiveExerciseSession | null>(null);
   const [isPump, setIsPump] = useState(false);
@@ -976,7 +977,7 @@ export function ActiveExerciseBanner() {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-medium">Mid-exercise check</p>
                               <p className="text-xs text-muted-foreground mt-0.5">
-                                {typeConfig?.midCheckMessage ?? "How are you feeling? Any signs of low blood sugar?"}
+                                {typeConfig?.midCheckMessage ?? "Quick check-in — how are you feeling?"}
                               </p>
                             </div>
                           </div>
@@ -991,76 +992,109 @@ export function ActiveExerciseBanner() {
                             skipLabel="Not now"
                           />
                           <div className="flex gap-2 flex-wrap">
-                                <Button size="sm" variant="outline" onClick={handleDismissMidCheck} data-testid="button-midcheck-ok">
-                                  Feeling fine
-                                </Button>
-                                <Link href="/help-now">
-                                  <Button size="sm" variant="destructive" data-testid="button-midcheck-hypo">
-                                    <Zap className="h-3 w-3 mr-1" />
-                                    Help Now
-                                  </Button>
-                                </Link>
-                                <Link href="/tools/hypo-help">
-                                  <Button size="sm" variant="outline" data-testid="button-midcheck-hypo-calc">
-                                    <Calculator className="h-3 w-3 mr-1" />
-                                    Hypo Calc
-                                  </Button>
-                                </Link>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleDismissMidCheck}
+                              data-testid="button-midcheck-not-now"
+                            >
+                              Not now
+                            </Button>
+                            <Link href="/help-now">
+                              <Button size="sm" variant="destructive" data-testid="button-midcheck-help-now">
+                                <Zap className="h-3 w-3 mr-1" />
+                                Help Now
+                              </Button>
+                            </Link>
                           </div>
                         </CardContent>
                       </Card>
                     )}
 
-                    {activeGuidance.length > 0 && (
-                      <div className="space-y-1">
-                        {activeGuidance.map((line, i) => (
-                          <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                            <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
-                            <span>{line}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        className="h-8 shrink-0 px-2.5 text-xs"
-                        onClick={() => setShowExerciseTips(true)}
-                        data-testid="button-exercise-tips-active"
-                      >
-                        <BookOpen className="mr-1 h-3 w-3 shrink-0" />
-                        Exercise tips
-                      </Button>
-                      <PlannerOpenButton session={session} compact />
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      {activeEffectiveBg != null ? (
+                        <span
+                          className="rounded-full border border-border/60 bg-background/60 px-2 py-1"
+                          data-testid="text-active-bg-summary"
+                        >
+                          BG {activeEffectiveBg} {bgUnits}
+                          {activeEffectiveTrend && activeEffectiveTrend !== "not_sure"
+                            ? ` · ${activeEffectiveTrend}`
+                            : ""}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Log BG to personalize tips.</span>
+                      )}
+                      {typeConfig?.activeReminder ? (
+                        <span className="rounded-full border border-border/60 bg-background/60 px-2 py-1">
+                          {typeConfig.activeReminder}
+                        </span>
+                      ) : null}
                     </div>
 
-                    {typeConfig?.activeReminder && (
-                      <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                        <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-blue-500" />
-                        <span>{typeConfig.activeReminder}</span>
-                      </div>
-                    )}
+                    {activeGuidance.length > 0 ? (
+                      <details className="rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+                        <summary className="cursor-pointer select-none text-xs font-medium text-foreground">
+                          More tips ({activeGuidance.length})
+                        </summary>
+                        <div className="space-y-1 pt-2">
+                          {activeGuidance.map((line, i) => (
+                            <div key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                              <Droplet className="h-3 w-3 shrink-0 mt-0.5 text-amber-600 dark:text-amber-500" />
+                              <span>{line}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button size="sm" onClick={handleFinishExercise} data-testid="button-finish-exercise">
-                        <Square className="h-3.5 w-3.5 mr-1.5" />
-                        Finish Exercise
-                      </Button>
-                      <Link href="/help-now">
-                        <Button size="sm" variant="destructive" data-testid="button-hypo-during-exercise">
-                          <Zap className="h-3.5 w-3.5 mr-1.5" />
-                          Help Now
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (showMidCheck) return;
+                            setLogBgOpen(true);
+                          }}
+                          disabled={showMidCheck}
+                          data-testid="button-log-bg-active"
+                        >
+                          <Droplet className="h-3.5 w-3.5 mr-1.5" />
+                          Log BG
                         </Button>
-                      </Link>
-                      <Link href="/tools/hypo-help">
-                        <Button size="sm" variant="outline" data-testid="button-hypo-calc-during-exercise">
-                          <Calculator className="h-3.5 w-3.5 mr-1.5" />
-                          Hypo Calc
+                        <Button size="sm" onClick={handleFinishExercise} data-testid="button-finish-exercise">
+                          <Square className="h-3.5 w-3.5 mr-1.5" />
+                          Finish Exercise
                         </Button>
-                      </Link>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link href="/help-now">
+                          <Button size="sm" variant="destructive" data-testid="button-help-now-active">
+                            <Zap className="h-3.5 w-3.5 mr-1.5" />
+                            Help Now
+                          </Button>
+                        </Link>
+                        <Link href="/tools/hypo-help">
+                          <Button size="sm" variant="outline" data-testid="button-hypo-calc-active">
+                            <Calculator className="h-3.5 w-3.5 mr-1.5" />
+                            Hypo Calc
+                          </Button>
+                        </Link>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 px-2 text-xs"
+                          onClick={() => setShowExerciseTips(true)}
+                          data-testid="button-exercise-tips-active"
+                        >
+                          <BookOpen className="mr-1 h-3 w-3 shrink-0" />
+                          Tips
+                        </Button>
+                        <PlannerOpenButton session={session} compact />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1164,6 +1198,29 @@ export function ActiveExerciseBanner() {
           planResult={exercisePlanResult}
         />
       )}
+
+      {session?.phase === "active" ? (
+        <Dialog open={logBgOpen} onOpenChange={setLogBgOpen}>
+          <DialogContent className="max-w-md" data-testid="dialog-active-log-bg">
+            <DialogHeader>
+              <DialogTitle>Log BG</DialogTitle>
+              <DialogDescription>
+                Optional mid-exercise reading — helps tailor tips for the rest of this session.
+              </DialogDescription>
+            </DialogHeader>
+            <ExerciseReadingPrompt
+              bgUnits={bgUnits}
+              title="Mid-exercise BG"
+              description={undefined}
+              onSave={handleSaveMidReading}
+              onSkip={() => setLogBgOpen(false)}
+              saveTestId="button-save-mid-reading-dialog"
+              skipTestId="button-skip-mid-reading-dialog"
+              skipLabel="Cancel"
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {session?.phase === "recovery" ? (
         <Dialog open={recoveryBgDialogOpen} onOpenChange={setRecoveryBgDialogOpen}>
