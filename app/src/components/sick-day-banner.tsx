@@ -71,12 +71,12 @@ export function SickDayBanner() {
 
   return (
     <div 
-      className={`${getSeverityColor()} text-white px-4 py-2 flex items-center justify-between gap-4`}
+      className={`${getSeverityColor()} text-white px-3 py-1.5 flex items-center justify-between gap-3`}
       data-testid="banner-sick-day"
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <Thermometer className="h-4 w-4 flex-shrink-0" />
-        <span className="text-sm font-medium truncate">
+        <span className="text-[13px] font-medium truncate">
           Sick Day Mode Active
           <span className="hidden sm:inline"> — {scenarioState.sickDaySeverity || "moderate"} severity</span>
         </span>
@@ -87,7 +87,7 @@ export function SickDayBanner() {
           <Button 
             variant="secondary" 
             size="sm" 
-            className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0"
+            className="h-7 text-[12px] bg-white/20 hover:bg-white/30 text-white border-0 px-2"
             data-testid="button-banner-view-guidance"
           >
             <span className="hidden sm:inline">View Guidance</span>
@@ -98,7 +98,7 @@ export function SickDayBanner() {
         <Button
           variant="secondary"
           size="sm"
-          className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0"
+          className="h-7 text-[12px] bg-white/20 hover:bg-white/30 text-white border-0 px-2"
           onClick={handleDeactivate}
           data-testid="button-banner-deactivate"
         >

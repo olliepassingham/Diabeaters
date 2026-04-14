@@ -427,6 +427,11 @@ function InnerRouter() {
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
+      <Route path="/medical-sources">
+        <PatientRouteGuard>
+          <MedicalSourcesPage />
+        </PatientRouteGuard>
+      </Route>
       <Route path="/">
         <PatientRouteGuard>
           <Dashboard />
@@ -828,7 +833,6 @@ function MainRouter() {
       <Route path="/carer-setup" component={CarerSetup} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
-      <Route path="/medical-sources" component={MedicalSourcesPage} />
       <Route path="/account">
         <AuthOnlyLayout>
           <AccountShell />

@@ -98,7 +98,7 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
             placeholder={PLACEHOLDER}
             rows={2}
             disabled={posting}
-            className="min-h-[4.25rem] resize-none text-sm flex-1 border-muted-foreground/20 bg-background/80 shadow-inner focus-visible:ring-primary/25"
+            className="min-h-[4.25rem] resize-none text-base flex-1 border-muted-foreground/20 bg-background/80 shadow-inner focus-visible:ring-primary/25"
             maxLength={8000}
             data-testid="input-dashboard-quick-post"
             aria-label={PLACEHOLDER}
