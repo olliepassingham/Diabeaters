@@ -71,7 +71,7 @@ export function SickDayBanner() {
 
   return (
     <div 
-      className={`${getSeverityColor()} text-white px-3 py-1.5 flex items-center justify-between gap-3`}
+      className={`${getSeverityColor()} text-white py-1.5 flex items-center justify-between gap-3 px-3 pt-[env(safe-area-inset-top)] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]`}
       data-testid="banner-sick-day"
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">

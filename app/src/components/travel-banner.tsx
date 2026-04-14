@@ -96,7 +96,7 @@ export function TravelBanner() {
 
   return (
     <div 
-      className="bg-blue-500 dark:bg-blue-600 text-white px-3 py-1.5 flex items-center justify-between gap-3"
+      className="bg-blue-500 dark:bg-blue-600 text-white py-1.5 flex items-center justify-between gap-3 px-3 pt-[env(safe-area-inset-top)] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
       data-testid="banner-travel"
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
