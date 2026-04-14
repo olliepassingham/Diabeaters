@@ -10,6 +10,7 @@ import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageShell } from "@/components/layout";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 export default function HelpNow() {
   const { data: linkedPatient } = useLinkedPatient();
@@ -176,8 +177,9 @@ export default function HelpNow() {
                 <div className="flex items-start gap-3 p-2 bg-indigo-50 dark:bg-indigo-900/50 rounded">
                   <span className="text-indigo-600 font-bold flex-shrink-0">3</span>
                   <span>
-                    If you suspect DKA (very high BG + ketones + feeling very unwell): give a correction dose by{" "}
-                    <strong>pen injection</strong>, not through the pump, in case the pump is not delivering.
+                    If you suspect DKA (very high BG + ketones + feeling very unwell): follow your sick-day/DKA plan and
+                    seek urgent medical help. If you think your pump isn&apos;t delivering, contact your diabetes team or
+                    urgent care for advice.
                   </span>
                 </div>
                 <div className="flex items-start gap-3 p-2 bg-red-50 dark:bg-red-900/50 rounded text-sm">
@@ -187,6 +189,9 @@ export default function HelpNow() {
                     unsure.
                   </span>
                 </div>
+              </div>
+              <div className="pt-3">
+                <MedicalSourcesLink anchor="sickday" compact />
               </div>
             </CardContent>
           </Card>
@@ -315,15 +320,9 @@ export default function HelpNow() {
           <AlertCircle className="h-3 w-3" />
           Not medical advice — always follow your diabetes team&apos;s guidance
         </span>
-        <span className="text-muted-foreground/50">|</span>
-        <Link
-          href="/settings/about"
-          className="flex items-center gap-1 hover:underline text-primary"
-          data-testid="link-sources-footer"
-        >
-          <BookOpen className="h-3 w-3" />
-          Sources
-        </Link>
+      </div>
+      <div className="flex justify-center pb-6">
+        <MedicalSourcesLink anchor="emergency" compact />
       </div>
     </PageShell>
   );

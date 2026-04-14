@@ -50,6 +50,7 @@ import { PageBackButton, PageShell } from "@/components/layout";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 interface TravelPlan {
   duration: number;
@@ -1152,7 +1153,7 @@ export default function Travel() {
                   )}
                 </div>
 
-                <Link href="/help">
+                <Link href="/help-now">
                   <Button variant="outline" className="w-full mt-2" data-testid="button-help-now-link">
                     <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
                     Help Now Page
@@ -2119,6 +2120,7 @@ export default function Travel() {
           for medical advice about traveling with diabetes.
         </AlertDescription>
       </Alert>
+      <MedicalSourcesLink anchor="insulin" className="mt-2" compact />
 
       {riskWarnings.length > 0 && (
         <Card className="border-orange-500/50">
@@ -2321,23 +2323,18 @@ export default function Travel() {
                   <div className="space-y-3">
                     <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
                       <p className="text-sm font-medium text-red-900 dark:text-red-100">Mealtime Doses</p>
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                        Reduce by {plan.weatherSeverity === "slight" ? "5-10%" : plan.weatherSeverity === "moderate" ? "10-15%" : "15-25%"}
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                        In heat, insulin can act faster (some people need less mealtime insulin)
                       </p>
-                      {settings.tdd && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Based on your TDD of {settings.tdd}u, this is roughly {Math.round((settings.tdd * 0.6) * (plan.weatherSeverity === "slight" ? 0.075 : plan.weatherSeverity === "moderate" ? 0.125 : 0.2) * 10) / 10}u less mealtime insulin per day
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use your care team’s plan and adjust based on readings — heat affects everyone differently.
+                      </p>
                     </div>
                     <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
                       <p className="text-sm font-medium text-red-900 dark:text-red-100">Background/Basal Insulin</p>
-                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                        {plan.weatherSeverity === "slight" 
-                          ? "Usually no change needed" 
-                          : plan.weatherSeverity === "moderate" 
-                            ? "Consider reducing by 5-10%" 
-                            : "Consider reducing by 10-15%"}
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">Often no change, but monitor closely</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        If you’re running lower than usual, follow your agreed basal plan or contact your team for advice.
                       </p>
                     </div>
                   </div>
@@ -2384,12 +2381,8 @@ export default function Travel() {
                   <div className="space-y-3">
                     <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
                       <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Mealtime Doses</p>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {plan.weatherSeverity === "slight" 
-                          ? "May need 5-10% more" 
-                          : plan.weatherSeverity === "moderate" 
-                            ? "May need 10-15% more" 
-                            : "May need 15-20% more"}
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        In cold, insulin can act slower (some people need more mealtime insulin)
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         Start with your normal dose and adjust based on readings — cold affects everyone differently
@@ -2397,12 +2390,9 @@ export default function Travel() {
                     </div>
                     <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
                       <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Background/Basal Insulin</p>
-                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        {plan.weatherSeverity === "slight" 
-                          ? "Usually no change needed" 
-                          : plan.weatherSeverity === "moderate" 
-                            ? "Monitor — may run slightly higher" 
-                            : "May need 5-10% increase after 2-3 days"}
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">Often no change, but monitor trends</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        If you’re running higher than usual for more than a day, follow your agreed plan or contact your team.
                       </p>
                     </div>
                     {plan.weatherSeverity !== "slight" && (
@@ -2459,7 +2449,7 @@ export default function Travel() {
                       <h5 className="font-medium text-red-900 dark:text-red-100">If It's Hotter</h5>
                     </div>
                     <ul className="text-xs text-red-800 dark:text-red-200 space-y-1 list-disc list-inside">
-                      <li>Insulin absorbs faster → reduce doses 10-20%</li>
+                      <li>Insulin can absorb faster (some people need less insulin)</li>
                       <li>Higher hypo risk</li>
                       <li>Keep insulin cool</li>
                     </ul>
@@ -2470,7 +2460,7 @@ export default function Travel() {
                       <h5 className="font-medium text-blue-900 dark:text-blue-100">If It's Colder</h5>
                     </div>
                     <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-                      <li>Insulin absorbs slower → may need 10-20% more</li>
+                      <li>Insulin can absorb slower (some people need more insulin)</li>
                       <li>Activity in cold = hypo risk</li>
                       <li>Keep insulin warm (don't let it freeze)</li>
                     </ul>

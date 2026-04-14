@@ -23,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 
 function getInitialTab(): string {
@@ -815,11 +816,9 @@ export default function Adviser() {
           <AlertCircle className="h-3 w-3" />
           Not medical advice — always follow your diabetes team's guidance
         </span>
-        <span className="text-muted-foreground/50">|</span>
-        <Link href="/settings/about" className="flex items-center gap-1 hover:underline text-primary" data-testid="link-sources-footer">
-          <BookOpen className="h-3 w-3" />
-          Sources
-        </Link>
+      </div>
+      <div className="flex justify-center pb-6">
+        <MedicalSourcesLink anchor="insulin" compact />
       </div>
     </PageShell>
   );

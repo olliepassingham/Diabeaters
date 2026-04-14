@@ -30,6 +30,7 @@ import {
 } from "@/lib/driving-readiness-tool";
 import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -537,6 +538,8 @@ export default function DrivingScenarioPage() {
             </Card>
           </div>
         ) : null}
+
+        <MedicalSourcesLink anchor="driving" />
       </PageShell>
 
       {phase !== "form" ? (

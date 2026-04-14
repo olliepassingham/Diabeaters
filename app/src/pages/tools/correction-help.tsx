@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
   computeSimpleCorrectionDose,
   getDefaultCorrectionTargetHigh,
@@ -184,6 +185,8 @@ export default function CorrectionHelpPage() {
           )}
         </CardContent>
       </Card>
+
+      <MedicalSourcesLink anchor="insulin" />
     </PageShell>
   );
 }

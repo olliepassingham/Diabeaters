@@ -35,6 +35,7 @@ import {
   trendForPlannerFromActiveSession,
 } from "@/lib/exercise-planner-href";
 import { cn } from "@/lib/utils";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -1179,6 +1180,8 @@ export function ActiveExerciseBanner() {
                     <span>Not medical advice — always follow your care team&apos;s guidance</span>
                   </div>
                 ) : null}
+
+                {session.phase !== "pre" ? <MedicalSourcesLink anchor="exercise" className="pt-1" compact /> : null}
               </div>
             )}
           </div>

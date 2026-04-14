@@ -8,6 +8,7 @@ import { storage, type UserProfile } from "@/lib/storage";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 export default function HypoHelpPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
@@ -231,6 +232,7 @@ export default function HypoHelpPage() {
           </div>
         </div>
       </Card>
+      <MedicalSourcesLink anchor="hypoglycaemia" />
     </PageShell>
   );
 }

@@ -61,6 +61,7 @@ import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
 import Support from "@/pages/support";
+import MedicalSourcesPage from "@/pages/medical-sources";
 import CommunityHome from "@/pages/community/index";
 import CommunityPost from "@/pages/community/post";
 import CommunityMessages from "@/pages/community/messages";
@@ -144,7 +145,7 @@ function useNativeDeepLinks() {
       } catch {
         // ignore malformed URLs
       }
-    }).then((h) => {
+    }).then((h: { remove: () => Promise<void> }) => {
       if (removed) {
         void h.remove();
       } else {
@@ -755,7 +756,7 @@ function AuthenticatedShell() {
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
           · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
           · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>{" "}
-          · <Link href="/account"><span className="underline cursor-pointer hover:text-foreground">Account</span></Link>
+          · <Link href="/medical-sources"><span className="underline cursor-pointer hover:text-foreground">Sources</span></Link>{" "}
         </p>
       </footer>
       <BottomNav />
@@ -800,7 +801,8 @@ function AccountShell() {
         <p>
           Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
           · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
-          · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>
+          · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>{" "}
+          · <Link href="/medical-sources"><span className="underline cursor-pointer hover:text-foreground">Sources</span></Link>
         </p>
       </footer>
       <BottomNav />
@@ -826,6 +828,7 @@ function MainRouter() {
       <Route path="/carer-setup" component={CarerSetup} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
+      <Route path="/medical-sources" component={MedicalSourcesPage} />
       <Route path="/account">
         <AuthOnlyLayout>
           <AccountShell />

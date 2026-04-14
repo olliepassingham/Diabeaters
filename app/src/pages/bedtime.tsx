@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 
@@ -1054,6 +1055,7 @@ export default function Bedtime() {
               <p className="text-xs italic" data-testid="text-bedtime-disclaimer">
                 [Not medical advice. Always follow your healthcare team&apos;s guidance for overnight management.]
               </p>
+              <MedicalSourcesLink anchor="insulin" compact />
             </CardContent>
           </CollapsibleContent>
         </Card>

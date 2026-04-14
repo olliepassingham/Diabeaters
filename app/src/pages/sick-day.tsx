@@ -21,6 +21,7 @@ import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-starte
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -1667,7 +1668,7 @@ export default function SickDay() {
             ))}
             
             <div className="pt-3 space-y-2">
-              <Link href="/help">
+              <Link href="/help-now">
                 <Button variant="outline" className="w-full" data-testid="button-help-now-sick">
                   <Heart className="h-4 w-4 mr-2 text-red-600" />
                   Help Now Page
@@ -1692,6 +1693,9 @@ export default function SickDay() {
                   provider when sick, especially if blood glucose is consistently high, you have 
                   ketones, or symptoms worsen.
                 </p>
+                <div className="pt-2">
+                  <MedicalSourcesLink anchor="sickday" compact />
+                </div>
               </div>
             </div>
           </CardContent>

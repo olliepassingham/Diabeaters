@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 const STEPS = [
   {
@@ -101,6 +102,8 @@ export default function PumpFailurePage() {
         <Phone className="h-3.5 w-3.5 shrink-0" />
         Save your diabetes team and pump manufacturer numbers in your phone.
       </p>
+
+      <MedicalSourcesLink anchor="sickday" />
     </PageShell>
   );
 }

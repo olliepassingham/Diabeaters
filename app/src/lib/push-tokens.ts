@@ -2,12 +2,12 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { getSupabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 let initialised = false;
 
 export async function ensureIosPushRegistered(): Promise<void> {
   if (initialised) return;
-  initialised = true;
 
   // Web/PWA push is out of scope for v1.
   if (!Capacitor.isNativePlatform()) return;
@@ -18,16 +18,25 @@ export async function ensureIosPushRegistered(): Promise<void> {
   const platform = Capacitor.getPlatform();
   if (platform !== "ios") return;
 
+  const settings = storage.getNotificationSettings();
+  if (!settings.enabled || !settings.pushNotifications) return;
+
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user?.id;
   if (!uid) return;
 
+  // Only mark initialised once we know it's appropriate to prompt/register.
+  initialised = true;
+
   const perm = await PushNotifications.requestPermissions();
-  if (perm.receive !== "granted") return;
+  if (perm.receive !== "granted") {
+    initialised = false;
+    return;
+  }
 
   await PushNotifications.register();
 
-  PushNotifications.addListener("registration", async (token) => {
+  PushNotifications.addListener("registration", async (token: { value: string }) => {
     const t = token.value?.trim();
     if (!t) return;
     const { error } = await supabase
@@ -38,7 +47,7 @@ export async function ensureIosPushRegistered(): Promise<void> {
     }
   });
 
-  PushNotifications.addListener("registrationError", (err) => {
+  PushNotifications.addListener("registrationError", (err: unknown) => {
     if (import.meta.env.DEV) {
       console.warn("[push_tokens] registration error:", err);
     }
