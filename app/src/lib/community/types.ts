@@ -53,6 +53,12 @@ export type DmMessageRow = {
   thread_id: string;
   sender_id: string;
   body: string;
+  /** Path in `community_post_images` bucket (`{sender_id}/dm/{thread_id}/…`). */
+  image_storage_path: string | null;
   created_at: string;
   read_at: string | null;
+  /** Client-enriched after fetch. */
+  image_signed_url?: string | null;
+  like_count?: number;
+  liked_by_me?: boolean;
 };

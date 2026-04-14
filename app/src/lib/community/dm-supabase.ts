@@ -1,8 +1,35 @@
 /**
  * Direct messages: dm_threads, dm_thread_members, dm_messages (Supabase + RLS).
+ * Optional images use bucket `community_post_images` (paths `{uid}/dm/{thread_id}/…`).
  */
 import { getSupabase } from "@/lib/supabase";
+import { COMMUNITY_POST_IMAGES_BUCKET } from "./posts-supabase";
 import type { DmMessageRow, DmThreadMemberRow, DmThreadRow } from "./types";
+
+const MAX_DM_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function extFromFile(f: File): string {
+  const name = f.name.toLowerCase();
+  if (name.endsWith(".png")) return "png";
+  if (name.endsWith(".webp")) return "webp";
+  if (name.endsWith(".gif")) return "gif";
+  if (name.endsWith(".heic")) return "heic";
+  return "jpg";
+}
+
+function validateDmImageFile(f: File): Error | null {
+  if (f.size > MAX_DM_IMAGE_BYTES) return new Error("Image must be 5MB or smaller.");
+  if (!f.type.startsWith("image/")) return new Error("Only image files are allowed.");
+  return null;
+}
+
+async function signedUrlForStoragePath(path: string): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
 
 function mapThread(r: Record<string, unknown>): DmThreadRow {
   return {
@@ -21,14 +48,62 @@ function mapMember(r: Record<string, unknown>): DmThreadMemberRow {
 }
 
 function mapMessage(r: Record<string, unknown>): DmMessageRow {
+  const img = r.image_storage_path;
   return {
     id: String(r.id),
     thread_id: String(r.thread_id),
     sender_id: String(r.sender_id),
     body: String(r.body ?? ""),
+    image_storage_path: typeof img === "string" && img.trim() ? img : null,
     created_at: String(r.created_at ?? ""),
     read_at: r.read_at == null ? null : String(r.read_at),
   };
+}
+
+async function enrichDmMessagesWithLikesAndImages(messages: DmMessageRow[]): Promise<DmMessageRow[]> {
+  if (messages.length === 0) return [];
+  const supabase = getSupabase();
+  if (!supabase) return messages;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id ?? null;
+  const ids = messages.map((m) => m.id);
+
+  const { data: likesRows, error: likesErr } = await supabase
+    .from("dm_message_likes")
+    .select("message_id, user_id")
+    .in("message_id", ids);
+
+  if (likesErr && import.meta.env.DEV) {
+    console.warn("[dm] likes fetch", likesErr.message);
+  }
+
+  const likeRows = likesErr ? [] : (likesRows ?? []);
+
+  const countMap = new Map<string, number>();
+  const myLikes = new Set<string>();
+  for (const row of likeRows) {
+    const rec = row as { message_id: string; user_id: string };
+    const mid = String(rec.message_id);
+    countMap.set(mid, (countMap.get(mid) ?? 0) + 1);
+    if (uid && String(rec.user_id) === uid) myLikes.add(mid);
+  }
+
+  const uniquePaths = [...new Set(messages.map((m) => m.image_storage_path).filter(Boolean))] as string[];
+  const urlByPath = new Map<string, string>();
+  await Promise.all(
+    uniquePaths.map(async (p) => {
+      const url = await signedUrlForStoragePath(p);
+      if (url) urlByPath.set(p, url);
+    }),
+  );
+
+  return messages.map((m) => ({
+    ...m,
+    like_count: countMap.get(m.id) ?? 0,
+    liked_by_me: myLikes.has(m.id),
+    image_signed_url: m.image_storage_path ? urlByPath.get(m.image_storage_path) ?? null : null,
+  }));
 }
 
 export async function getOrCreateDmThread(otherUserId: string): Promise<{
@@ -106,7 +181,8 @@ export async function fetchDmMessages(threadId: string): Promise<{
     .order("created_at", { ascending: true });
 
   if (error) return { data: null, error: new Error(error.message) };
-  return { data: (data ?? []).map((r) => mapMessage(r as Record<string, unknown>)), error: null };
+  const mapped = (data ?? []).map((r) => mapMessage(r as Record<string, unknown>));
+  return { data: await enrichDmMessagesWithLikesAndImages(mapped), error: null };
 }
 
 /** Latest message per thread (parallel queries; empty threads map to null). */
@@ -146,7 +222,11 @@ export async function fetchLatestDmMessageForThreads(threadIds: string[]): Promi
   return { data: map, error: null };
 }
 
-export async function insertDmMessage(threadId: string, body: string): Promise<{
+export async function insertDmMessage(
+  threadId: string,
+  body: string,
+  options?: { imageFile?: File | null },
+): Promise<{
   data: DmMessageRow | null;
   error: Error | null;
 }> {
@@ -158,17 +238,101 @@ export async function insertDmMessage(threadId: string, body: string): Promise<{
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
   const trimmed = body.trim();
-  if (!trimmed) return { data: null, error: new Error("Message cannot be empty") };
+  const file = options?.imageFile ?? null;
+  if (file) {
+    const v = validateDmImageFile(file);
+    if (v) return { data: null, error: v };
+  }
+  if (!trimmed && !file) return { data: null, error: new Error("Add a message or a photo.") };
 
-  const { data, error } = await supabase
-    .from("dm_messages")
-    .insert({ thread_id: threadId, sender_id: uid, body: trimmed })
-    .select("*")
-    .single();
+  let imagePath: string | null = null;
+  if (file) {
+    const ext = extFromFile(file);
+    const path = `${uid}/dm/${threadId}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || undefined,
+    });
+    if (upErr) return { data: null, error: new Error(upErr.message) };
+    imagePath = path;
+  }
 
-  if (error) return { data: null, error: new Error(error.message) };
+  const insertPayload: Record<string, unknown> = {
+    thread_id: threadId,
+    sender_id: uid,
+    body: trimmed || "",
+  };
+  if (imagePath) insertPayload.image_storage_path = imagePath;
+
+  const { data, error } = await supabase.from("dm_messages").insert(insertPayload).select("*").single();
+
+  if (error) {
+    if (imagePath) {
+      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove([imagePath]);
+    }
+    return { data: null, error: new Error(error.message) };
+  }
   if (!data) return { data: null, error: new Error("No row returned") };
-  return { data: mapMessage(data as Record<string, unknown>), error: null };
+  const row = mapMessage(data as Record<string, unknown>);
+  const enriched = await enrichDmMessagesWithLikesAndImages([row]);
+  const out = enriched[0] ?? row;
+
+  void supabase.functions
+    .invoke("notify_dm_push", { body: { thread_id: threadId, message_id: out.id } })
+    .then(({ error: fnErr }) => {
+      if (fnErr && import.meta.env.DEV) console.warn("[dm] notify_dm_push:", fnErr.message);
+    });
+
+  return { data: out, error: null };
+}
+
+/** Toggle like for the current user (not allowed on own messages). */
+export async function toggleDmMessageLike(messageId: string): Promise<{
+  liked: boolean;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { liked: false, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { liked: false, error: new Error("Not signed in") };
+
+  const { data: msg, error: msgErr } = await supabase
+    .from("dm_messages")
+    .select("sender_id")
+    .eq("id", messageId)
+    .maybeSingle();
+
+  if (msgErr) return { liked: false, error: new Error(msgErr.message) };
+  if (!msg) return { liked: false, error: new Error("Message not found") };
+  if (String((msg as { sender_id: string }).sender_id) === uid) {
+    return { liked: false, error: new Error("You can't like your own message") };
+  }
+
+  const { data: existing, error: exErr } = await supabase
+    .from("dm_message_likes")
+    .select("message_id")
+    .eq("message_id", messageId)
+    .eq("user_id", uid)
+    .maybeSingle();
+
+  if (exErr) return { liked: false, error: new Error(exErr.message) };
+
+  if (existing) {
+    const { error: delErr } = await supabase
+      .from("dm_message_likes")
+      .delete()
+      .eq("message_id", messageId)
+      .eq("user_id", uid);
+    if (delErr) return { liked: false, error: new Error(delErr.message) };
+    return { liked: false, error: null };
+  }
+
+  const { error: insErr } = await supabase.from("dm_message_likes").insert({ message_id: messageId, user_id: uid });
+  if (insErr) return { liked: false, error: new Error(insErr.message) };
+  return { liked: true, error: null };
 }
 
 /** Other participant in a 1:1 thread (for display). */

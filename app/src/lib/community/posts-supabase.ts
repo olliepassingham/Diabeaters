@@ -299,6 +299,38 @@ export async function fetchCommunityPostsFromFollowingPage(
   };
 }
 
+/** Posts for a specific author (RLS applies for blocks). */
+export async function fetchCommunityPostsByAuthorPage(
+  authorId: string,
+  limit: number,
+  cursor: FeedCursor | null,
+  topicFilter?: CommunityTopicId | null,
+): Promise<{
+  data: CommunityPostRow[] | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const lim = Math.min(Math.max(limit, 1), PAGE_LIMIT_CAP);
+
+  const { data, error } = await supabase.rpc("fetch_community_posts_page", {
+    p_limit: lim,
+    p_cursor_created_at: cursor?.created_at ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_author_ids: [authorId],
+    p_topic: topicFilter ?? null,
+  });
+
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
+  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
+  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
+  return {
+    data: mergeLikedIntoPosts(rows, liked),
+    error: null,
+  };
+}
+
 export type FeedPostMentions = {
   userIds: string[];
   mentionMap: Record<string, string>;

@@ -16,6 +16,7 @@
    supabase functions deploy notify_carers_on_hypo --no-verify-jwt
    supabase functions deploy notify_scenario_started --no-verify-jwt
    supabase functions deploy notify_supply_low --no-verify-jwt
+   supabase functions deploy notify_dm_push --no-verify-jwt
    ```
 
    Or: `npm run supabase:deploy-notify-functions` (same commands).

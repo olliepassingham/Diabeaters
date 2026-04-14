@@ -30,6 +30,17 @@ function firstLinePreview(body: string): string {
   return line || "Message";
 }
 
+function lastMessagePreview(last: DmMessageRow): string {
+  const hasImg = Boolean(last.image_storage_path?.trim());
+  const text = last.body.trim();
+  if (hasImg && !text) return "Photo";
+  if (hasImg && text) {
+    const line = firstLinePreview(last.body);
+    return line === "Message" ? "Photo" : `${line} · Photo`;
+  }
+  return firstLinePreview(last.body);
+}
+
 function timeLabelForThread(last: DmMessageRow | null, thread: ThreadWithMembers): { label: string; title: string } {
   const iso = last?.created_at ?? thread.updated_at;
   const d = new Date(iso);
@@ -254,7 +265,7 @@ export default function CommunityMessagesPage() {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
             const last = lastByThreadId[t.id] ?? null;
-            const preview = last ? firstLinePreview(last.body) : "No messages yet";
+            const preview = last ? lastMessagePreview(last) : "No messages yet";
             const { label: timeStr, title: timeTitle } = timeLabelForThread(last, t);
             const avatarPath = other ? avatarByUserId[other] : null;
 

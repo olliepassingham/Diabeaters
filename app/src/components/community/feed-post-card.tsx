@@ -484,7 +484,7 @@ export function FeedPostCard({
                 {authorPublicHandle?.trim() ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
                 ) : null}
-                <Badge variant="secondary" className="mt-1.5 w-fit max-w-full font-normal">
+                <Badge variant="secondary" className="mt-1.5 max-w-full font-normal whitespace-normal">
                   {communityTopicLabel(post.topic)}
                 </Badge>
               </div>

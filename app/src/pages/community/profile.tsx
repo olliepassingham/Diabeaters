@@ -22,11 +22,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { FeedPostList } from "@/components/community/feed-post-list";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
   blockUser,
+  fetchCommunityPostsByAuthorPage,
   getBlockStatus,
   getFollowCounts,
   getOrCreateDmThread,
@@ -401,6 +403,36 @@ export default function CommunityProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      {!loading && !authLoading && profile ? (
+        !user ? (
+          <Card>
+            <CardContent className="pt-5 space-y-2">
+              <p className="text-sm font-medium text-foreground">Posts</p>
+              <p className="text-sm text-muted-foreground">
+                <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
+                  Sign in
+                </Link>{" "}
+                to view posts from this member.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="pt-1">
+            <div className="flex items-baseline justify-between pb-1">
+              <h2 className="text-sm font-semibold text-foreground">{isSelf ? "Your posts" : "Posts"}</h2>
+            </div>
+            <FeedPostList
+              viewerId={user.id}
+              pageSize={20}
+              showRefreshButton={false}
+              emptyStateTitle="No posts yet"
+              emptyStateDescription={isSelf ? "You haven’t posted yet." : "This member hasn’t posted yet."}
+              fetchPage={(limit, cursor) => fetchCommunityPostsByAuthorPage(userId, limit, cursor, null)}
+            />
+          </div>
+        )
+      ) : null}
 
       <UserListDialog
         open={listOpen}
