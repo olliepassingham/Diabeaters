@@ -317,19 +317,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         <div className="animate-fade-in-up">{renderStep()}</div>
 
         <p className="text-center text-xs text-muted-foreground pt-2 sm:pt-6">
-          Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
-          ·{" "}
-          <Link href="/privacy">
-            <button type="button" className="min-h-11 px-2 -mx-2 underline">
-              Privacy
-            </button>
-          </Link>{" "}
-          ·{" "}
-          <Link href="/support">
-            <button type="button" className="min-h-11 px-2 -mx-2 underline">
-              Support
-            </button>
-          </Link>
+          Privacy, terms, and support are available in Settings → About once you’re signed in.
         </p>
       </PageShell>
 

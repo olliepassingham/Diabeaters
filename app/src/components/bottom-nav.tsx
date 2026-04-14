@@ -1,7 +1,7 @@
 import { Home, Shapes, Users, Wrench, User } from "lucide-react";
 import { isCommunityEnabled } from "@/lib/flags";
 import { Link, useLocation } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
@@ -139,8 +139,33 @@ export function BottomNav() {
   const tabs = isCarerMode ? carerTabs(showCommunityTab) : patientTabs(showCommunityTab);
 
   const cols = tabs.length;
+  const navRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+
+    const set = () => {
+      const h = el.getBoundingClientRect().height;
+      const px = `${Math.ceil(h)}px`;
+      document.documentElement.style.setProperty("--bottom-nav-height", px);
+      document.body?.style?.setProperty("--bottom-nav-height", px);
+      document.getElementById("root")?.style?.setProperty("--bottom-nav-height", px);
+    };
+
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    window.addEventListener("orientationchange", set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("orientationchange", set);
+    };
+  }, [cols]);
+
   return (
     <nav
+      ref={navRef}
       className="surface-chrome fixed bottom-0 inset-x-0 z-50 grid place-items-center border-t border-border/40 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)]"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       data-testid="nav-bottom"

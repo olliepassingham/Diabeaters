@@ -128,6 +128,7 @@ type SettingsAboutRouteProps = {
 };
 
 export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRouteProps) {
+  const year = new Date().getFullYear();
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
       <FaceLogoWatermark />
@@ -151,6 +152,26 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
             <SettingsNavRow href="/privacy#terms" label="Terms" />
             <SettingsNavRow href="/support" label="Support" />
           </nav>
+          <div className="text-xs text-muted-foreground border-t border-border pt-4">
+            <p data-testid="text-copyright">
+              © PassingTime Ltd {year} ·{" "}
+              <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+                Privacy
+              </Link>{" "}
+              ·{" "}
+              <Link href="/privacy#terms" className="underline underline-offset-2 hover:text-foreground">
+                Terms
+              </Link>{" "}
+              ·{" "}
+              <Link href="/support" className="underline underline-offset-2 hover:text-foreground">
+                Support
+              </Link>{" "}
+              ·{" "}
+              <Link href="/medical-sources" className="underline underline-offset-2 hover:text-foreground">
+                Sources
+              </Link>
+            </p>
+          </div>
           <div id="settings-sources" className="scroll-mt-28 border-t border-border pt-6 space-y-3">
             <h3 className="text-h3 font-semibold text-foreground flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-primary" aria-hidden />

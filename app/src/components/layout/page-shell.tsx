@@ -43,7 +43,12 @@ export function PageShell({
 }: PageShellProps) {
   return (
     <div
-      className={cn("mx-auto w-full min-w-0 max-w-full", variantClass[variant], densityClass[density], className)}
+      className={cn(
+        "mx-auto w-full min-w-0 max-w-full pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]",
+        variantClass[variant],
+        densityClass[density],
+        className,
+      )}
       {...props}
     >
       {children}

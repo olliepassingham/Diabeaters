@@ -735,7 +735,7 @@ function AuthenticatedShell() {
   }, [toast]);
 
   return (
-    <div className="relative flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+    <div className="relative flex min-h-0 min-h-screen h-screen w-full min-w-0 flex-col overflow-hidden bg-background text-foreground min-h-[100dvh] h-[100dvh]">
       <AppShellBackdrop />
       <OfflineBanner />
       {!isCarerMode && (
@@ -751,19 +751,17 @@ function AuthenticatedShell() {
         onLogout={handleLogout}
       />
       {!isCarerMode ? <ActiveExerciseBanner /> : null}
-      <main className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
+      <main
+        className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        style={{
+          paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+          scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+        }}
+      >
         <AnimatedRouteOutlet>
           <InnerRouter />
         </AnimatedRouteOutlet>
       </main>
-      <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
-        <p>
-          Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
-          · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
-          · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>{" "}
-          · <Link href="/medical-sources"><span className="underline cursor-pointer hover:text-foreground">Sources</span></Link>{" "}
-        </p>
-      </footer>
       <BottomNav />
     </div>
   );
@@ -791,7 +789,7 @@ function AccountShell() {
   };
 
   return (
-    <div className="relative flex min-h-0 h-dvh w-full min-w-0 flex-col bg-background text-foreground">
+    <div className="relative flex min-h-0 min-h-screen h-screen w-full min-w-0 flex-col overflow-hidden bg-background text-foreground min-h-[100dvh] h-[100dvh]">
       <AppShellBackdrop />
       <AppTopBar
         isCarer={isCarerMode}
@@ -799,17 +797,15 @@ function AccountShell() {
         onBrandClick={() => setLocation(isCarerMode ? "/carer-view" : "/")}
         onLogout={handleLogout}
       />
-      <main className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 pb-24 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6 md:pb-24">
+      <main
+        className="relative z-[1] flex min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        style={{
+          paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+          scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+        }}
+      >
         <Account />
       </main>
-      <footer className="border-0 px-4 py-3 text-center text-xs text-gray-500 mb-12 dark:text-muted-foreground sm:px-6">
-        <p>
-          Copyright PassingTime Ltd {new Date().getFullYear()}{" "}
-          · <Link href="/privacy"><span className="underline cursor-pointer hover:text-foreground">Privacy</span></Link>{" "}
-          · <Link href="/support"><span className="underline cursor-pointer hover:text-foreground">Support</span></Link>{" "}
-          · <Link href="/medical-sources"><span className="underline cursor-pointer hover:text-foreground">Sources</span></Link>
-        </p>
-      </footer>
       <BottomNav />
     </div>
   );

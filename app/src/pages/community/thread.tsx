@@ -159,7 +159,10 @@ export default function CommunityThreadPage() {
   }
 
   return (
-    <PageShell variant="standard" className="max-w-lg mx-auto flex flex-col min-h-[70vh] pb-24">
+    <PageShell
+      variant="standard"
+      className="max-w-lg mx-auto flex flex-col min-h-[70vh] pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
+    >
       <PageHeader
         leading={
           <Link href="/community/messages">
@@ -267,7 +270,7 @@ export default function CommunityThreadPage() {
 
       <form
         onSubmit={handleSend}
-        className="sticky bottom-0 pt-2 pb-[env(safe-area-inset-bottom)] bg-background border-t border-border/60 mt-auto space-y-2"
+        className="sticky bottom-[var(--bottom-nav-height,0px)] pt-2 pb-[env(safe-area-inset-bottom)] bg-background border-t border-border/60 mt-auto space-y-2"
       >
         <input
           ref={fileInputRef}

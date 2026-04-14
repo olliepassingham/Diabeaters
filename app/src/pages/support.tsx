@@ -6,7 +6,10 @@ import { Link } from "wouter";
 export default function Support() {
   const supportEmail = getSupportEmail();
   return (
-    <PageShell variant="standard" className="min-h-screen">
+    <PageShell
+      variant="standard"
+      className="min-h-dvh px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-0"
+    >
       <PageHeader
         leading={<PageBackButton />}
         title="Support"

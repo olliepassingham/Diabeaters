@@ -266,7 +266,10 @@ export default function CommunityProfilePage() {
   }
 
   return (
-    <PageShell variant="standard" className="max-w-lg mx-auto space-y-4 pb-24">
+    <PageShell
+      variant="standard"
+      className="max-w-lg mx-auto space-y-4 pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
+    >
       <PageHeader
         leading={<PageBackButton />}
         title="Profile"
