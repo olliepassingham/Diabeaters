@@ -134,8 +134,13 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
   return (
     <header className="surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
       <div className="relative flex w-full min-w-0 items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
           <HeaderProfileDropdown onLogout={onLogout} />
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link href="/settings" aria-label="Settings" data-testid="button-settings">
+              <Settings className="h-5 w-5" />
+            </Link>
+          </Button>
         </div>
 
         <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
@@ -155,11 +160,6 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
         </div>
 
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/settings" aria-label="Settings" data-testid="button-settings">
-              <Settings className="h-5 w-5" />
-            </Link>
-          </Button>
           {isCommunityEnabled && (
             <Button variant="ghost" size="icon" asChild>
               <Link href="/community/messages" aria-label="Messages" data-testid="button-messages">

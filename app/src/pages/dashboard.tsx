@@ -362,9 +362,9 @@ function HeroCard({
         data-testid="card-hero"
       >
         <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex min-w-0 shrink flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <span
                   className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
                   data-testid="text-greeting"
@@ -373,9 +373,6 @@ function HeroCard({
                   {firstName ? `, ${firstName}` : ""}
                 </span>
                 <StagingChip />
-              </div>
-              <div className="flex min-w-0 flex-1 justify-center px-1">
-                <StatusPill status={status} />
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <DashboardInfoDialog />
@@ -391,7 +388,14 @@ function HeroCard({
                 </Button>
               </div>
             </div>
-            <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                Here&apos;s your diabetes today
+              </p>
+              <div className="shrink-0" data-testid="wrap-dashboard-status-pill">
+                <StatusPill status={status} />
+              </div>
+            </div>
           </div>
 
           <div className="flex min-w-0 flex-nowrap items-stretch gap-2">
