@@ -72,7 +72,7 @@ export function NotificationsTab({
         <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Quick hypo log</Label>
           <p className="text-small text-muted-foreground">
-            When on, the dashboard &quot;Treated a Hypo&quot; button logs a hypo and notifies linked carers without
+            When on, the dashboard &quot;Treated a Hypo&quot; button logs a hypo and notifies linked supporters without
             asking for glucose or treatment first. Turn off to enter details each time.
           </p>
         </div>

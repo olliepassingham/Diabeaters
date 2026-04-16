@@ -68,6 +68,7 @@ export function describeAuthNetworkError(message: string): string {
 export async function signup(
   email: string,
   password: string,
+  captchaToken?: string,
 ): Promise<AuthResult<{ user: User | null; session: Session | null }>> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: NOT_CONFIGURED };
@@ -78,6 +79,7 @@ export async function signup(
       password,
       options: {
         emailRedirectTo: getAuthCallbackUrl(),
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
     return { data, error };

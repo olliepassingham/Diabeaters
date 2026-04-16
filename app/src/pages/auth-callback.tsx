@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { handleAuthCallback, isUserVerified } from "@/lib/auth";
 
-const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
-
 export default function AuthCallback() {
   const [, setLocation] = useLocation();
   const [status, setStatus] = useState<"loading" | "error">("loading");
@@ -16,12 +14,7 @@ export default function AuthCallback() {
         const { user } = await handleAuthCallback();
         if (!cancelled) {
           if (isUserVerified(user)) {
-            try {
-              localStorage.setItem(VERIFIED_WELCOME_PENDING_KEY, "true");
-            } catch {
-              // Ignore
-            }
-            setLocation("/verified-success");
+            setLocation("/welcome?verified=1");
           } else {
             setLocation("/check-email");
           }

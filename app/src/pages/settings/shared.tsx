@@ -130,9 +130,9 @@ export function SettingsEmergencySection({
     variant === "embedded" ? (
       <p className="text-sm text-muted-foreground leading-relaxed">
         Used for <Link href="/help-now" className="text-primary underline-offset-2 hover:underline">Help now</Link>
-        . Linked carers only see this if you allow it under{" "}
+        . Linked supporters only see this if you allow it under{" "}
         <Link href="/family-carers" className="text-primary underline-offset-2 hover:underline">
-          Family &amp; Carers
+          Family &amp; Supporters
         </Link>
         .
       </p>
@@ -144,7 +144,7 @@ export function SettingsEmergencySection({
         <Link href="/account#account-emergency" className="text-primary underline-offset-2 hover:underline">
           Account
         </Link>
-        . Carers see it only if you enable it under Family &amp; Carers.
+        . Supporters see it only if you enable it under Family &amp; Supporters.
       </p>
     );
 

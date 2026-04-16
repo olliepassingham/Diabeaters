@@ -24,7 +24,7 @@ export function getStoredThemeMode(): ThemeMode {
   if (typeof window === "undefined") return "light";
   const raw = localStorage.getItem(THEME_MODE_STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
-  return "light";
+  return "system";
 }
 
 export const AUTO_LIGHT_START_HOUR = 7; // 07:00 inclusive

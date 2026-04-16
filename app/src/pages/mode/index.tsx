@@ -78,7 +78,7 @@ export default function ModeChooserPage() {
               <AlertDescription>
                 This account isn’t linked to support someone yet. If you have an invite code, go to{" "}
                 <Link href="/carer-setup" className="font-medium underline underline-offset-4">
-                  Carer setup
+                  Supporter setup
                 </Link>
                 .
               </AlertDescription>

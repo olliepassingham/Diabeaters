@@ -41,7 +41,11 @@ If the redirect in the signup request is **not** allowed, Supabase often returns
 
 If **CAPTCHA is required for sign-up**, the app must send a captcha token with `signUp`. This codebase **does not** integrate CAPTCHA yet.
 
-**Fix:** Turn **off** CAPTCHA for sign-up (or only enable it after adding a Turnstile/hCaptcha integration to the signup form).
+**Fix options:**
+
+1. **Implement Turnstile in the app (recommended if you want CAPTCHA on)**  
+   - In Supabase, choose **Cloudflare Turnstile** for Auth CAPTCHA.\n+   - Set `VITE_TURNSTILE_SITE_KEY` in the app’s env (Vite) so the signup screen can render Turnstile and submit `options.captchaToken`.\n+2. **Disable CAPTCHA for sign-up (fastest unblock)**  
+   - Turn **off** CAPTCHA for sign-up in Supabase (or only enforce it after you add the UI integration).
 
 ---
 

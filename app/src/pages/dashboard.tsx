@@ -110,7 +110,7 @@ async function runHypoTreatmentPipeline(
             eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
         } else if (eligible > 0 && delivered === 0) {
           description =
-            "Hypo logged. No alerts were delivered — check push API env or in-app carer user IDs in Family & Carers.";
+            "Hypo logged. No alerts were delivered — check push API env or in-app supporter user IDs in Family & Supporters.";
         }
       }
     }
@@ -473,7 +473,7 @@ function HeroCard({
               <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
               <p className="text-sm text-muted-foreground">
                 Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your
-                account and notify any linked carers (push / in-app).
+                account and notify any linked supporters (push / in-app).
               </p>
             </div>
             <Button

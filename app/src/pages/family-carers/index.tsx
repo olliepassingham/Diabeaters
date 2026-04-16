@@ -73,7 +73,7 @@ export default function FamilyCarersPage() {
     const [lr, ir] = await Promise.all([listCarerLinksForPatient(), listInvites()]);
     if (lr.error) {
       toast({
-        title: "Could not load carers",
+        title: "Could not load supporters",
         description: lr.error.message,
         variant: "destructive",
       });
@@ -132,7 +132,7 @@ export default function FamilyCarersPage() {
       toast({ title: "Could not remove", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Carer removed", description: "They can no longer open your shared view." });
+      toast({ title: "Supporter removed", description: "They can no longer open your shared view." });
     await refresh();
   };
 
@@ -171,7 +171,7 @@ export default function FamilyCarersPage() {
         title={
           <span className="inline-flex items-center gap-2" data-testid="heading-family-carers">
             <Users className="h-7 w-7 text-primary shrink-0" />
-            Family &amp; Carers
+            Family &amp; Supporters
           </span>
         }
         description="Invite someone you trust to follow along. They only see what you allow — nothing here replaces professional care."
@@ -198,15 +198,15 @@ export default function FamilyCarersPage() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : links.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="carers-list-empty">
-              No one is linked yet. Generate an invite code below and ask them to enter it in Carer setup (Account →
-              Carer setup) on their device.
+              No one is linked yet. Generate an invite code below and ask them to enter it in Supporter setup (Account →
+              Supporter setup) on their device.
             </p>
           ) : (
             <ul className="space-y-3" data-testid="carers-list">
               {links.map((link) => {
                 const label =
                   link.carer_full_name?.trim() ||
-                  `Linked carer (${link.carerId.slice(0, 8)}…)`;
+                  `Linked supporter (${link.carerId.slice(0, 8)}…)`;
                 const initials = label
                   .split(/\s+/)
                   .map((w) => w[0])
@@ -234,7 +234,7 @@ export default function FamilyCarersPage() {
                       size="sm"
                       className="shrink-0 text-gray-600"
                       onClick={() => handleRemove(link.id)}
-                      aria-label={`Remove ${label} from linked carers`}
+                      aria-label={`Remove ${label} from linked supporters`}
                     >
                       Remove
                     </Button>
@@ -294,7 +294,7 @@ export default function FamilyCarersPage() {
             <p className="font-medium text-foreground">How it works</p>
             <ol className="list-decimal list-inside space-y-1">
               <li>You generate a code and share it privately with one person.</li>
-              <li>They sign in to Diabeaters (or create an account) and enter the code in Carer setup (Account → Carer setup).</li>
+              <li>They sign in to Diabeaters (or create an account) and enter the code in Supporter setup (Account → Supporter setup).</li>
               <li>You stay in control: use the toggles below to limit what they can see.</li>
             </ol>
           </div>
@@ -313,7 +313,7 @@ export default function FamilyCarersPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary shrink-0" />
-            What carers can see
+            What supporters can see
           </CardTitle>
           <CardDescription>
             For this MVP, changes apply to <strong className="font-medium">everyone you have linked</strong>. Per-person
@@ -347,7 +347,7 @@ export default function FamilyCarersPage() {
             {
               key: "scenarios" as const,
               label: "Travel and sick-day flags",
-              description: "High-level status when your project exposes these to linked carers.",
+              description: "High-level status when your project exposes these to linked supporters.",
               testId: "privacy-toggle-scenarios",
             },
             {
@@ -370,7 +370,7 @@ export default function FamilyCarersPage() {
                 disabled={links.length === 0 || privacyBusy !== null}
                 onCheckedChange={(on) => applyPrivacyToAll({ [item.key]: on }, item.key)}
                 data-testid={item.testId}
-                aria-label={`Allow carers to see ${item.label.toLowerCase()}`}
+                aria-label={`Allow supporters to see ${item.label.toLowerCase()}`}
               />
             </div>
           ))}
@@ -381,14 +381,14 @@ export default function FamilyCarersPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Support someone else?</CardTitle>
           <CardDescription>
-            If you have an invite code from someone you support (their own Diabeaters account), open Carer setup to
+            If you have an invite code from someone you support (their own Diabeaters account), open Supporter setup to
             enter it.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <Button variant="outline" className="w-full min-h-11 sm:w-auto" asChild>
             <Link href="/carer-setup" data-testid="link-carer-setup">
-              Carer setup
+              Supporter setup
             </Link>
           </Button>
         </CardContent>
@@ -399,7 +399,7 @@ export default function FamilyCarersPage() {
         <CardHeader>
           <CardTitle className="text-lg">Your emergency details</CardTitle>
           <CardDescription>
-            Carers only see this when &quot;Emergency details&quot; is on above. Edits are shared everywhere in the app.
+            Supporters only see this when &quot;Emergency details&quot; is on above. Edits are shared everywhere in the app.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">

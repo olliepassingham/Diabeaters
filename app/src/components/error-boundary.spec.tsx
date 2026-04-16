@@ -14,8 +14,8 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>,
     );
 
-    expect(screen.getByTestId("app-error-fallback")).toBeInTheDocument();
-    expect(screen.getByText("Something went wrong. Please try again.")).toBeInTheDocument();
+    expect(screen.queryByTestId("app-error-fallback")).not.toBeNull();
+    expect(screen.queryByText("Something went wrong. Please try again.")).not.toBeNull();
   });
 });
 

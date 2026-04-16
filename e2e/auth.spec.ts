@@ -22,6 +22,9 @@ test.describe("Auth routes and verification", () => {
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
+    // When CAPTCHA is enabled, the app renders a Turnstile widget and the button stays disabled until solved.
+    // In local/CI preview (no site key), the widget is not shown and the button is enabled.
+    await expect(page.getByTestId("turnstile")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Continue with Apple" })).toHaveCount(0);
   });
 

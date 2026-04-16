@@ -97,7 +97,7 @@ export default function CarerSetupPage() {
       <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-background text-foreground">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-xl">Family &amp; Carer Access</CardTitle>
+            <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
             <CardDescription>
               If you are supporting someone using Diabeaters, sign in or create an account, then enter the invite code
               they shared with you.
@@ -129,7 +129,7 @@ export default function CarerSetupPage() {
         </div>
         <Card className="w-full">
           <CardHeader>
-            <CardTitle className="text-xl">Family &amp; Carer Access</CardTitle>
+            <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
             <CardDescription>
               If you are supporting someone using Diabeaters, enter the invite code they shared with you.
             </CardDescription>

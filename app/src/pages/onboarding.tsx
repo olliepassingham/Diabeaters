@@ -42,9 +42,6 @@ type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 type Step =
   | "welcome"
   | "struggle"
-  | "struggle_preview"
-  | "essentials"
-  | "path_data"
   | "disclaimer"
   | "first_win";
 
@@ -111,7 +108,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
-  const [minimalPath, setMinimalPath] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
@@ -135,22 +131,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const getSteps = (): Step[] => {
-    if (minimalPath) {
-      return ["welcome", "struggle", "struggle_preview", "disclaimer", "first_win"];
-    }
-    return [
-      "welcome",
-      "struggle",
-      "struggle_preview",
-      "essentials",
-      "path_data",
-      "disclaimer",
-      "first_win",
-    ];
-  };
-
-  const steps = getSteps();
+  const steps: Step[] = ["welcome", "struggle", "disclaimer", "first_win"];
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
 
@@ -200,33 +181,19 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const handleNext = () => {
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex < steps.length - 1) {
-      if (currentStep === "disclaimer") {
-        handleSaveProfile();
-      }
       setCurrentStep(steps[stepIndex + 1]);
     }
-  };
-
-  const skipToDisclaimerWithDefaults = () => {
-    setMinimalPath(true);
-    setData((prev) => ({
-      ...prev,
-      insulinDeliveryMethod: prev.insulinDeliveryMethod || "injections",
-    }));
-    setCurrentStep("disclaimer");
   };
 
   const handleBack = () => {
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex > 0) {
-      if (currentStep === "disclaimer") {
-        setMinimalPath(false);
-      }
       setCurrentStep(steps[stepIndex - 1]);
     }
   };
 
   const handleFinish = async (pathOverride?: string) => {
+    handleSaveProfile();
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     if (user?.id) {
@@ -252,9 +219,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     switch (currentStep) {
       case "welcome": return true;
       case "struggle": return data.struggle !== null;
-      case "struggle_preview": return data.struggle !== null;
-      case "essentials": return !!data.insulinDeliveryMethod;
-      case "path_data": return true;
       case "disclaimer": return data.hasAcceptedDisclaimer;
       case "first_win": return true;
       default: return true;
@@ -267,12 +231,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         return <WelcomeStep data={data} updateData={updateData} />;
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
-      case "struggle_preview":
-        return <StrugglePreviewStep data={data} onMinimalSetup={skipToDisclaimerWithDefaults} />;
-      case "essentials":
-        return <EssentialsStep data={data} updateData={updateData} />;
-      case "path_data":
-        return <PathDataStep data={data} updateData={updateData} />;
       case "disclaimer":
         return <DisclaimerStep data={data} updateData={updateData} />;
       case "first_win":
@@ -336,11 +294,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               <div />
             )}
             <div className="flex-1 min-w-0 flex justify-end gap-2 flex-wrap sm:flex-nowrap">
-              {currentStep === "path_data" && (
-                <Button variant="ghost" onClick={handleNext} data-testid="button-onboarding-skip" className="shrink-0">
-                  Skip for now
-                </Button>
-              )}
               {showNextButton && (
                 <Button
                   onClick={handleNext}

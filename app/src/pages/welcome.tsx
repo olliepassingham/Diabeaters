@@ -2,9 +2,25 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { FaceLogo } from "@/components/face-logo";
 import { setPendingCarer, setPendingPatient, setPrimaryAppRole } from "@/lib/carer-session";
+import { useAuth } from "@/lib/auth-context";
+import { isUserVerified } from "@/lib/auth";
 
 export default function Welcome() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const alreadySignedIn = Boolean(user?.id && isUserVerified(user));
+
+  const onPatient = () => {
+    setPrimaryAppRole("patient");
+    setPendingPatient();
+    setLocation(alreadySignedIn ? "/onboarding" : "/login");
+  };
+
+  const onSupporter = () => {
+    setPrimaryAppRole("carer");
+    setPendingCarer();
+    setLocation(alreadySignedIn ? "/carer-setup" : "/login");
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-background text-foreground">
@@ -19,11 +35,7 @@ export default function Welcome() {
         <Button
           size="lg"
           className="w-full h-auto min-h-14 py-4 text-base font-medium"
-          onClick={() => {
-            setPrimaryAppRole("patient");
-            setPendingPatient();
-            setLocation("/login");
-          }}
+          onClick={onPatient}
           data-testid="welcome-patient"
         >
           I have Type 1 Diabetes
@@ -32,14 +44,10 @@ export default function Welcome() {
           size="lg"
           variant="outline"
           className="w-full h-auto min-h-14 py-4 text-base font-medium"
-          onClick={() => {
-            setPrimaryAppRole("carer");
-            setPendingCarer();
-            setLocation("/login");
-          }}
-          data-testid="welcome-carer"
+          onClick={onSupporter}
+          data-testid="welcome-supporter"
         >
-          I am a Family Member / Carer
+          I am a Family Member / Supporter
         </Button>
       </div>
     </div>

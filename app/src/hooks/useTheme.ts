@@ -272,7 +272,11 @@ export function getStoredPrimaryTheme(): AppPrimaryTheme {
 
 export function getStoredBackgroundTint(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(BACKGROUND_TINT_STORAGE_KEY) === "1";
+  const raw = localStorage.getItem(BACKGROUND_TINT_STORAGE_KEY);
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  // Default ON for new installs.
+  return true;
 }
 
 export function persistBackgroundTint(enabled: boolean): void {
@@ -280,7 +284,7 @@ export function persistBackgroundTint(enabled: boolean): void {
   if (enabled) {
     localStorage.setItem(BACKGROUND_TINT_STORAGE_KEY, "1");
   } else {
-    localStorage.removeItem(BACKGROUND_TINT_STORAGE_KEY);
+    localStorage.setItem(BACKGROUND_TINT_STORAGE_KEY, "0");
   }
 }
 

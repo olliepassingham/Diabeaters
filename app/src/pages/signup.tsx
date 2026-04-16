@@ -15,6 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { PageShell } from "@/components/layout";
+import { TurnstileCaptcha } from "@/components/auth/Turnstile";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const { toast } = useToast();
@@ -22,15 +24,24 @@ export default function Signup() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const turnstileSiteKey = String(
+    import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "",
+  ).trim();
+  const captchaRequired = Boolean(turnstileSiteKey);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (captchaRequired && !captchaToken) return;
+
     setSubmitting(true);
     setError(null);
 
-    const { data, error } = await signup(email, password);
+    const { data, error } = await signup(email, password, captchaToken ?? undefined);
     setSubmitting(false);
 
     if (error) {
@@ -107,19 +118,40 @@ export default function Signup() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
+            {captchaRequired && (
+              <TurnstileCaptcha
+                siteKey={turnstileSiteKey}
+                onToken={(t) => setCaptchaToken(t)}
+              />
+            )}
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting}
+              disabled={submitting || (captchaRequired && !captchaToken)}
             >
               {submitting ? "Creating account..." : "Create account"}
             </Button>
@@ -135,7 +167,7 @@ export default function Signup() {
           <p className="text-xs text-center pt-2">
             <Link href="/welcome">
               <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
-                Choose Family Member / Carer on the welcome screen
+                Choose Family Member / Supporter on the welcome screen
               </span>
             </Link>
           </p>
