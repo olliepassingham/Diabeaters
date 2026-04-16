@@ -7,7 +7,7 @@ export function StagingChip() {
   return (
     <Badge
       variant="outline"
-      className="text-xs font-normal border-amber-500/60 text-amber-700 dark:text-amber-400"
+      className="chip border-amber-500/55 bg-amber-50/70 text-amber-800 dark:border-amber-500/40 dark:bg-amber-950/25 dark:text-amber-200"
       data-testid="staging-chip"
     >
       Preview: this feature is in staging

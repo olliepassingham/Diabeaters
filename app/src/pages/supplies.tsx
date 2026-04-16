@@ -49,6 +49,20 @@ function isInsulinType(type: string): boolean {
   return type === "insulin" || type === "insulin_short" || type === "insulin_long" || type === "insulin_vial";
 }
 
+function isPumpOnlySupplyType(type: string): boolean {
+  return type === "insulin_vial" || type === "infusion_set" || type === "reservoir";
+}
+
+function PumpOnlySupplySelectItems() {
+  return (
+    <>
+      <SelectItem value="insulin_vial">Insulin Vials (Pump)</SelectItem>
+      <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
+      <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
+    </>
+  );
+}
+
 const SUPPLY_ALERT_STATE_KEY = "diabeater_supply_alert_state_v1";
 type SupplyAlertLevel = "ok" | "low" | "critical";
 
@@ -1441,13 +1455,15 @@ function SupplyDialog({
   open, 
   onOpenChange, 
   onSave,
-  lastPrescription 
+  lastPrescription,
+  isPumpUser,
 }: { 
   supply: Supply | null; 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
   onSave: (data: Omit<Supply, "id">) => void;
   lastPrescription: LastPrescription | null;
+  isPumpUser: boolean;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState<Supply["type"]>("needle");
@@ -1484,9 +1500,20 @@ function SupplyDialog({
   const useLastPrescription = () => {
     if (lastPrescription) {
       setName(lastPrescription.name);
-      setType(lastPrescription.type);
+      let nextType = lastPrescription.type;
+      if (!isPumpUser && isPumpOnlySupplyType(nextType)) {
+        nextType = nextType === "insulin_vial" ? "insulin_short" : "other";
+      }
+      setType(nextType);
       setQuantity(lastPrescription.quantity.toString());
-      setDailyUsage(lastPrescription.dailyUsage.toString());
+      const suggested = storage.getSuggestedDailyUsage(nextType);
+      setDailyUsage(
+        lastPrescription.type !== nextType
+          ? suggested
+            ? suggested.value.toString()
+            : ""
+          : lastPrescription.dailyUsage.toString(),
+      );
       setNotes(lastPrescription.notes || "");
       setShowLastPrescriptionOption(false);
     }
@@ -1510,6 +1537,7 @@ function SupplyDialog({
 
   const usesDurationSettings = type === "cgm" || type === "infusion_set" || type === "reservoir";
   const isValid = name.trim() && quantity && (usesDurationSettings || dailyUsage);
+  const showPumpSupplyTypes = isPumpUser || (!!supply && isPumpOnlySupplyType(type));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1569,10 +1597,8 @@ function SupplyDialog({
                 <SelectItem value="needle">Needles/Lancets</SelectItem>
                 <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
                 <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
-                <SelectItem value="insulin_vial">Insulin Vials (Pump)</SelectItem>
+                {showPumpSupplyTypes ? <PumpOnlySupplySelectItems /> : null}
                 <SelectItem value="cgm">CGM/Monitors</SelectItem>
-                <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
-                <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
@@ -1873,13 +1899,15 @@ function EditUsualPrescriptionDialog({
   onOpenChange, 
   usualPrescription, 
   currentSupplies,
-  onSave 
+  onSave,
+  isPumpUser,
 }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void; 
   usualPrescription: UsualPrescription | null;
   currentSupplies: Supply[];
   onSave: (items: UsualPrescriptionItem[]) => void;
+  isPumpUser: boolean;
 }) {
   const [items, setItems] = useState<UsualPrescriptionItem[]>([]);
   const [addingNew, setAddingNew] = useState(false);
@@ -2055,10 +2083,8 @@ function EditUsualPrescriptionDialog({
                     <SelectItem value="needle">Needles/Lancets</SelectItem>
                     <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
                     <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
-                    <SelectItem value="insulin_vial">Insulin Vials (Pump)</SelectItem>
+                    {isPumpUser ? <PumpOnlySupplySelectItems /> : null}
                     <SelectItem value="cgm">CGM/Monitors</SelectItem>
-                    <SelectItem value="infusion_set">Infusion Sets (Pump)</SelectItem>
-                    <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2486,6 +2512,27 @@ export default function Supplies() {
     return supplies.filter(s => s.type === type);
   };
 
+  const profile = storage.getProfile();
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const showInfusionTab = isPumpUser || filterByType("infusion_set").length > 0;
+  const showReservoirTab = isPumpUser || filterByType("reservoir").length > 0;
+  const supplyTabValues = [
+    "all",
+    "needle",
+    "insulin",
+    "cgm",
+    ...(showInfusionTab ? (["infusion_set"] as const) : []),
+    ...(showReservoirTab ? (["reservoir"] as const) : []),
+  ] as const;
+
+  useEffect(() => {
+    if (activeTab === "infusion_set" && !showInfusionTab) {
+      setActiveTab("all");
+    } else if (activeTab === "reservoir" && !showReservoirTab) {
+      setActiveTab("all");
+    }
+  }, [activeTab, showInfusionTab, showReservoirTab]);
+
   const lowStockCount = supplies.filter(s => storage.getSupplyStatus(s) !== "ok").length;
   const criticalSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "critical");
   const lowSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "low");
@@ -2701,15 +2748,19 @@ export default function Supplies() {
           <TabsTrigger value="cgm" data-testid="tab-cgm">
             CGM ({filterByType("cgm").length})
           </TabsTrigger>
-          <TabsTrigger value="infusion_set" data-testid="tab-infusion-sets">
-            Infusion ({filterByType("infusion_set").length})
-          </TabsTrigger>
-          <TabsTrigger value="reservoir" data-testid="tab-reservoirs">
-            Reservoirs ({filterByType("reservoir").length})
-          </TabsTrigger>
+          {showInfusionTab ? (
+            <TabsTrigger value="infusion_set" data-testid="tab-infusion-sets">
+              Infusion ({filterByType("infusion_set").length})
+            </TabsTrigger>
+          ) : null}
+          {showReservoirTab ? (
+            <TabsTrigger value="reservoir" data-testid="tab-reservoirs">
+              Reservoirs ({filterByType("reservoir").length})
+            </TabsTrigger>
+          ) : null}
         </TabsList>
 
-        {["all", "needle", "insulin", "cgm", "infusion_set", "reservoir"].map((tabValue) => (
+        {supplyTabValues.map((tabValue) => (
           <TabsContent key={tabValue} value={tabValue} className="mt-6 animate-fade-in-up">
             {filterByType(tabValue).length === 0 ? (
               <Card>
@@ -2760,6 +2811,7 @@ export default function Supplies() {
         onOpenChange={setDialogOpen}
         onSave={handleSave}
         lastPrescription={lastPrescription}
+        isPumpUser={Boolean(isPumpUser)}
       />
 
       <RefillDialog
@@ -2775,6 +2827,7 @@ export default function Supplies() {
         usualPrescription={usualPrescription}
         currentSupplies={supplies}
         onSave={handleSaveUsualPrescription}
+        isPumpUser={Boolean(isPumpUser)}
       />
     </PageShell>
   );

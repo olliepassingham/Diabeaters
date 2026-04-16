@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GripVertical, Columns2, RectangleHorizontal } from "lucide-react";
+import { GripVertical, Columns2, RectangleHorizontal, LayoutGrid } from "lucide-react";
 import { DASHBOARD_WIDGET_BY_ID } from "@/config/dashboard-widgets";
 import type { WidgetPlacement } from "@/hooks/useDashboardWidgets";
 import type { WidgetSize, WidgetType } from "@/lib/storage";
@@ -72,60 +72,62 @@ function SortableRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex flex-col gap-3 rounded-xl border-0 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4 dark:bg-card ${
+      className={`flex flex-col gap-2 rounded-lg border-0 bg-white p-2.5 shadow-sm sm:flex-row sm:items-center sm:gap-2.5 dark:bg-card ${
         isDragging ? "z-50 opacity-90 shadow-md ring-2 ring-primary/20" : ""
       } ${placement.enabled ? "" : "opacity-75"}`}
       data-testid={`widget-item-${placement.type}`}
     >
       <button
         type="button"
-        className="touch-none flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-lg text-gray-500 active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-muted"
+        className="touch-none flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-md text-gray-500 active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-muted"
         aria-label={`Drag to reorder ${def.label}`}
         data-testid={`drag-handle-${placement.type}`}
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="h-5 w-5" aria-hidden />
+        <GripVertical className="h-4 w-4" aria-hidden />
       </button>
 
-      <div className="min-w-0 flex-1 space-y-1">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-foreground">{def.label}</h3>
-        <p className="text-sm text-gray-600 dark:text-muted-foreground">{def.description}</p>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <h3 className="text-sm font-semibold leading-tight text-gray-900 dark:text-foreground">{def.label}</h3>
+        <p className="line-clamp-2 text-xs leading-snug text-gray-600 dark:text-muted-foreground">{def.description}</p>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 sm:flex-nowrap">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="gap-1 rounded-xl"
+          className="h-8 gap-1 rounded-lg px-2.5 text-xs"
           onClick={() => onResize(placement.id, placement.size === "full" ? "half" : "full")}
           title={placement.size === "full" ? "Use half width on large screens" : "Use full width"}
           data-testid={`button-size-${placement.type}`}
         >
           {placement.size === "full" ? (
             <>
-              <RectangleHorizontal className="h-4 w-4" aria-hidden />
+              <RectangleHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <span className="hidden sm:inline">Full width</span>
             </>
           ) : (
             <>
-              <Columns2 className="h-4 w-4" aria-hidden />
+              <Columns2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <span className="hidden sm:inline">Half width</span>
             </>
           )}
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Label htmlFor={switchId} className="sr-only">
             Show {def.label} on dashboard
           </Label>
-          <Switch
-            id={switchId}
-            checked={placement.enabled}
-            onCheckedChange={(checked) => onToggle(placement.id, checked)}
-            data-testid={`switch-${placement.type}`}
-          />
+          <div className="inline-flex origin-center scale-90">
+            <Switch
+              id={switchId}
+              checked={placement.enabled}
+              onCheckedChange={(checked) => onToggle(placement.id, checked)}
+              data-testid={`switch-${placement.type}`}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -174,7 +176,10 @@ export function DashboardWidgetSettings({
         data-testid="dashboard-widget-settings-dialog"
       >
         <DialogHeader className="space-y-1 border-b border-gray-100 px-6 py-5 text-left dark:border-border">
-          <DialogTitle className="text-xl font-semibold">Edit dashboard widgets</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
+            <LayoutGrid className="h-5 w-5 text-primary" aria-hidden />
+            Customize dashboard
+          </DialogTitle>
           <DialogDescription className="text-base text-gray-600 dark:text-muted-foreground">
             Choose which cards appear on your dashboard and drag them into your preferred order. Your choices are saved on
             this device.
@@ -183,16 +188,16 @@ export function DashboardWidgetSettings({
 
         <div className="px-6 py-4">
           <Card className="border-0 shadow-md" data-testid="widget-library">
-            <CardHeader className="px-5 pb-2 pt-5">
-              <CardTitle className="text-h3 text-foreground">Widgets</CardTitle>
-              <p className="text-sm text-gray-500 dark:text-muted-foreground">
+            <CardHeader className="px-4 pb-1.5 pt-4">
+              <CardTitle className="text-base font-semibold text-foreground">Widgets</CardTitle>
+              <p className="text-xs text-gray-500 dark:text-muted-foreground">
                 {enabledCount} widget{enabledCount === 1 ? "" : "s"} visible on the dashboard
               </p>
             </CardHeader>
-            <CardContent className="space-y-3 px-5 pb-5 pt-0">
+            <CardContent className="space-y-2 px-4 pb-4 pt-0">
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={sortedForUi.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
                     {sortedForUi.map((p) => (
                       <SortableRow
                         key={p.id}

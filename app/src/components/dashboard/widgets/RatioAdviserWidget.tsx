@@ -115,7 +115,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
             <Syringe className="h-5 w-5 text-primary shrink-0" />
             <CardTitle className="text-h3 text-foreground">Your ratios</CardTitle>
             {scenario && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+              <span className="chip border-blue-200/70 bg-blue-50/80 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
                 <scenario.icon className="h-3 w-3" />
                 {scenario.label}
               </span>

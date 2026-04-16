@@ -83,7 +83,7 @@ export function RoutinesWidget(props: DashboardWidgetLayoutProps) {
             <Repeat className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <CardTitle className="text-h3 text-foreground">Routines</CardTitle>
             {hasRoutines && (
-              <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+              <span className="chip border-emerald-200/70 bg-emerald-50/80 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
                 {routines.length}
               </span>
             )}
@@ -97,7 +97,7 @@ export function RoutinesWidget(props: DashboardWidgetLayoutProps) {
             {displayRoutines.slice(0, limit).map((routine) => (
               <Link key={routine.id} href="/routines">
                 <div
-                  className="rounded-xl border border-gray-100 dark:border-border bg-gray-50/90 dark:bg-muted/30 px-3 py-2.5 cursor-pointer hover:shadow-sm transition-shadow"
+                  className="pressable card-interactive rounded-xl border border-gray-100 dark:border-border bg-gray-50/90 dark:bg-muted/30 px-3 py-2.5 cursor-pointer"
                   data-testid={`routine-item-${routine.id}`}
                 >
                   <div className="flex items-center gap-2">

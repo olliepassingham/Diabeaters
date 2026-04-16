@@ -30,7 +30,11 @@ export function PageHeader({ title, description, actions, leading, className, sc
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
           ) : null}
         </div>
-        {description ? <div className="text-body text-muted-foreground">{description}</div> : null}
+        {description ? (
+          <div className="text-sm leading-relaxed text-muted-foreground sm:text-body">
+            {description}
+          </div>
+        ) : null}
       </div>
     </div>
   );

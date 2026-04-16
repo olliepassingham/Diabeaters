@@ -464,7 +464,7 @@ export function FeedPostCard({
   }
 
   return (
-    <Card>
+    <Card className="pressable card-interactive">
       <CardContent className="pt-4 space-y-2">
         <div className="flex gap-3">
           <CommunityAuthorAvatar
@@ -484,7 +484,7 @@ export function FeedPostCard({
                 {authorPublicHandle?.trim() ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
                 ) : null}
-                <Badge variant="secondary" className="mt-1.5 max-w-full font-normal truncate">
+                <Badge variant="secondary" className="mt-1.5 max-w-full font-normal truncate chip chip-muted">
                   {communityTopicLabel(post.topic)}
                 </Badge>
               </div>

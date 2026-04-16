@@ -1,9 +1,8 @@
 import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Clock3 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -64,7 +63,6 @@ export function AccountCommunityProfileFields({
   const [bio, setBio] = useState("");
   const [handleInput, setHandleInput] = useState("");
   const [onsetDateInput, setOnsetDateInput] = useState("");
-  const [onsetOpen, setOnsetOpen] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
@@ -200,6 +198,7 @@ export function AccountCommunityProfileFields({
 
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
   const readOnlyHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
+  const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
 
   const formBody = (
     <>
@@ -301,60 +300,49 @@ export function AccountCommunityProfileFields({
                 />
               </div>
 
-              <Collapsible open={onsetOpen} onOpenChange={setOnsetOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full justify-start gap-2 px-2 py-2 text-left font-normal text-muted-foreground hover:text-foreground"
-                    data-testid="account-community-onset-trigger"
-                  >
-                    <ChevronDown
-                      className={cn("h-4 w-4 shrink-0 transition-transform", onsetOpen && "rotate-180")}
-                      aria-hidden
-                    />
-                    <span>
-                      {onsetDateInput.trim()
-                        ? formatLivingWithDiabetesLine(onsetDateInput) ??
-                          "Living with diabetes since (optional)"
-                        : "Add how long you've been living with diabetes (optional)"}
+              <div className="space-y-2">
+                <FieldLabelWithInfo
+                  htmlFor={onsetId}
+                  info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
+                >
+                  Living with diabetes since
+                </FieldLabelWithInfo>
+                <Input
+                  id={onsetId}
+                  type="date"
+                  min="1900-01-01"
+                  max={todayIso}
+                  value={onsetDateInput}
+                  onChange={(e) => setOnsetDateInput(e.target.value)}
+                  disabled={loading || saving || savingPublic}
+                  data-testid="account-community-onset-input"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {livingLine ? (
+                    <span className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="account-community-onset-line">
+                      <Clock3 className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      <span>{livingLine}</span>
                     </span>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 pt-1">
-                  <div className="space-y-2 rounded-lg border border-border/50 px-3 py-3">
-                    <FieldLabelWithInfo
-                      htmlFor={onsetId}
-                      info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
+                  ) : (
+                    <span className="text-xs text-muted-foreground" data-testid="account-community-onset-empty">
+                      —
+                    </span>
+                  )}
+                  {onsetDateInput.trim() ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      onClick={() => void clearOnsetDate()}
+                      disabled={saving || loading || savingPublic}
+                      data-testid="account-community-onset-remove"
                     >
-                      Living with diabetes since (optional)
-                    </FieldLabelWithInfo>
-                    <Input
-                      id={onsetId}
-                      type="date"
-                      min="1900-01-01"
-                      max={todayIso}
-                      value={onsetDateInput}
-                      onChange={(e) => setOnsetDateInput(e.target.value)}
-                      disabled={loading || saving || savingPublic}
-                      data-testid="account-community-onset-input"
-                    />
-                    {onsetDateInput.trim() ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2"
-                        onClick={() => void clearOnsetDate()}
-                        disabled={saving || loading || savingPublic}
-                        data-testid="account-community-onset-remove"
-                      >
-                        Remove
-                      </Button>
-                    ) : null}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+                      Remove
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
 
               <Button type="submit" disabled={saving || loading || savingPublic} data-testid="account-community-save">
                 {saving ? "Saving…" : "Save"}
@@ -362,6 +350,18 @@ export function AccountCommunityProfileFields({
             </>
           ) : (
             <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">Living with diabetes since</p>
+                {livingLine ? (
+                  <p className="text-sm text-muted-foreground" data-testid="account-community-onset-highlight">
+                    {livingLine}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground" data-testid="account-community-onset-empty">
+                    —
+                  </p>
+                )}
+              </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">Feed handle</p>
                 {readOnlyHandleSlug ? (
@@ -393,15 +393,6 @@ export function AccountCommunityProfileFields({
                   </p>
                 )}
               </div>
-              {profile?.diabetes_onset_date &&
-              formatLivingWithDiabetesLine(profile.diabetes_onset_date) ? (
-                <p
-                  className="text-sm text-muted-foreground"
-                  data-testid="account-community-onset-readonly"
-                >
-                  {formatLivingWithDiabetesLine(profile.diabetes_onset_date)}
-                </p>
-              ) : null}
             </div>
           )}
         </>

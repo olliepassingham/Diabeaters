@@ -106,12 +106,30 @@ function RouteFallback() {
 }
 
 /** Soft gradient mesh behind app content (calm, Flo-like atmosphere). */
-function AppShellBackdrop() {
+function AppShellBackdrop({ tone = "rich" }: { tone?: "quiet" | "rich" }) {
+  const isQuiet = tone === "quiet";
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
-      <div className="absolute -top-28 -right-[12%] h-[min(32rem,90vw)] w-[min(32rem,90vw)] rounded-full bg-primary/[0.11] blur-3xl dark:bg-primary/[0.18]" />
-      <div className="absolute top-[38%] -left-[18%] h-[min(26rem,85vw)] w-[min(26rem,85vw)] rounded-full bg-[hsl(280_50%_72%_/_0.13)] blur-3xl dark:bg-[hsl(280_40%_48%_/_0.14)]" />
-      <div className="absolute bottom-[-10%] left-1/2 h-40 w-[min(140%,48rem)] -translate-x-1/2 rounded-[100%] bg-gradient-to-t from-primary/[0.07] to-transparent dark:from-primary/[0.12]" />
+      <div
+        className={
+          "absolute -top-28 -right-[12%] h-[min(32rem,90vw)] w-[min(32rem,90vw)] rounded-full blur-3xl " +
+          (isQuiet ? "bg-primary/[0.09] dark:bg-primary/[0.12]" : "bg-primary/[0.14] dark:bg-primary/[0.18]")
+        }
+      />
+      <div
+        className={
+          "absolute top-[38%] -left-[18%] h-[min(26rem,85vw)] w-[min(26rem,85vw)] rounded-full blur-3xl " +
+          (isQuiet
+            ? "bg-[hsl(210_70%_74%_/_0.10)] dark:bg-[hsl(280_40%_48%_/_0.11)]"
+            : "bg-[hsl(210_70%_74%_/_0.16)] dark:bg-[hsl(280_40%_48%_/_0.14)]")
+        }
+      />
+      <div
+        className={
+          "absolute bottom-[-10%] left-1/2 h-40 w-[min(140%,48rem)] -translate-x-1/2 rounded-[100%] bg-gradient-to-t to-transparent " +
+          (isQuiet ? "from-primary/[0.06] dark:from-primary/[0.08]" : "from-primary/[0.09] dark:from-primary/[0.12]")
+        }
+      />
     </div>
   );
 }
@@ -736,7 +754,7 @@ function AuthenticatedShell() {
 
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
-      <AppShellBackdrop />
+      <AppShellBackdrop tone="rich" />
       <OfflineBanner />
       {!isCarerMode && (
         <>
@@ -790,7 +808,7 @@ function AccountShell() {
 
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
-      <AppShellBackdrop />
+      <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
         pathOnly="/account"
@@ -926,6 +944,7 @@ function AppContent() {
   if (publicEntry || location === "/privacy" || location === "/support") {
     return (
       <div className={isStaging ? "pt-10" : ""}>
+        <AppShellBackdrop tone="quiet" />
         <StagingBanner />
         <DevBanner />
         <MainRouter />

@@ -18,12 +18,16 @@ export function EmptyState({ title, description, icon: Icon, className, children
   return (
     <div
       className={cn(
-        "surface-glass-strong animate-soft-in rounded-2xl px-5 py-8 text-center",
+        "surface-glass-strong animate-soft-in rounded-2xl border border-border/60 shadow-sm px-5 py-8 text-center",
         className,
       )}
       role="status"
     >
-      {Icon ? <Icon className="mx-auto mb-3 h-10 w-10 text-primary/85" aria-hidden /> : null}
+      {Icon ? (
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/[0.08] ring-1 ring-primary/[0.14]">
+          <Icon className="h-6 w-6 text-primary" aria-hidden />
+        </div>
+      ) : null}
       <p className="font-display text-base font-semibold tracking-tight text-foreground">{title}</p>
       {description ? (
         <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>

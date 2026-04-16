@@ -30,7 +30,7 @@ function statusPill(appointment: Appointment) {
   const appointmentDate = parseAppointmentDate(appointment.date);
   if (!appointmentDate) {
     return (
-      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-muted dark:text-foreground">
+      <span className="chip chip-muted">
         TBC
       </span>
     );
@@ -39,20 +39,20 @@ function statusPill(appointment: Appointment) {
 
   if (daysUntil <= 0) {
     return (
-      <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/40 dark:text-red-300">
+      <span className="chip border-red-200/70 bg-red-50/80 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
         Today
       </span>
     );
   }
   if (daysUntil <= 7) {
     return (
-      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+      <span className="chip border-amber-200/70 bg-amber-50/80 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
         This week
       </span>
     );
   }
   return (
-    <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+    <span className="chip border-blue-200/70 bg-blue-50/80 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200">
       {daysUntil}d
     </span>
   );
@@ -172,7 +172,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
               return (
                 <div
                   key={appointment.id}
-                  className="flex gap-3 rounded-xl border border-border bg-muted/20 p-3"
+                  className="pressable card-interactive flex gap-3 rounded-xl border border-border bg-muted/20 p-3"
                   data-testid={`widget-appointment-${appointment.id}`}
                 >
                   <div

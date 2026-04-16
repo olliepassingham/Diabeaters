@@ -182,7 +182,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                     type="button"
                     onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left shadow-sm hover:shadow transition-shadow",
+                      "pressable card-interactive flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left shadow-sm",
                       isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50 pointer-events-none"
                     )}
                     disabled={isActive}

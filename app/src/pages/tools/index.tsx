@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, TrendingUp, Repeat, Droplet, Package, BookOpen, Calendar } from "lucide-react";
+import { Calculator, TrendingUp, Repeat, Droplet, Package, BookOpen, Calendar, Sparkles, HeartPulse, Map as MapIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
+import { CURATED_RESOURCES } from "@/lib/curated-resources.ts";
 
 type ToolDef = {
   id: string;
@@ -89,15 +90,25 @@ const CARER_TOOLS: ToolDef[] = [
   },
 ];
 
-function ToolCard({ href, icon: Icon, title, description }: Omit<ToolDef, "id">) {
+function ToolCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+  variant = "default",
+}: Omit<ToolDef, "id"> & { variant?: "default" | "featured" }) {
+  const cardClass =
+    variant === "featured"
+      ? "pressable card-interactive flex h-full min-h-[12.5rem] w-full cursor-pointer flex-col gap-3 rounded-2xl"
+      : "pressable card-interactive flex h-full min-h-[11.75rem] w-full cursor-pointer flex-col gap-3 rounded-2xl";
   return (
     <Link
       href={href}
-      className="group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="pressable group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <Card
         variant="glass"
-        className="flex h-full min-h-[11.75rem] w-full cursor-pointer flex-col gap-3 rounded-2xl transition-all duration-200 hover:border-primary/50 hover:shadow-md active:scale-[0.99]"
+        className={cardClass}
       >
         <CardContent className="flex h-full flex-col gap-3 p-6 sm:p-7">
           <div className="flex flex-1 items-start gap-3 sm:gap-4">
@@ -115,9 +126,49 @@ function ToolCard({ href, icon: Icon, title, description }: Omit<ToolDef, "id">)
   );
 }
 
-export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
+function SectionHeader({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
   return (
-    <PageShell variant="standard" className="max-w-5xl space-y-8">
+    <div className="space-y-1">
+      <h2 className="text-h3 font-semibold text-foreground">{title}</h2>
+      {description ? (
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+      ) : null}
+    </div>
+  );
+}
+
+export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
+  const byId = new Map(tools.map((t) => [t.id, t] as const));
+
+  const featured = [
+    "hypo-help",
+    "insulin-calculator",
+    "correction-helper",
+    "supply-tracker",
+  ]
+    .map((id) => byId.get(id))
+    .filter(Boolean) as ToolDef[];
+
+  const actNow = ["hypo-help", "correction-helper"]
+    .map((id) => byId.get(id))
+    .filter(Boolean) as ToolDef[];
+
+  const plan = ["routines", "appointments", "supply-tracker"]
+    .map((id) => byId.get(id))
+    .filter(Boolean) as ToolDef[];
+
+  const learn = ["education"]
+    .map((id) => byId.get(id))
+    .filter(Boolean) as ToolDef[];
+
+  return (
+    <PageShell variant="standard" className="max-w-5xl space-y-10">
       <PageHeader
         className="max-w-2xl"
         leading={<PageBackButton />}
@@ -125,20 +176,118 @@ export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
         description="Calculators, tracking, and learning resources. Educational only — always follow your care team&apos;s advice."
       />
 
-      <ul
-        className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7"
-        aria-label="Tools"
-      >
-        {tools.map((t, idx) => (
-          <li
-            key={t.id}
-            className="min-h-0 animate-soft-in"
-            style={{ animationDelay: `${idx * 45}ms` }}
-          >
-            <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
-          </li>
-        ))}
-      </ul>
+      {featured.length > 0 && (
+        <section className="space-y-4" aria-label="Most used tools" data-testid="tools-section-most-used">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" aria-hidden />
+            <SectionHeader title="Most used" description="Quick access to the tools people reach for most." />
+          </div>
+          <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6" aria-label="Most used">
+            {featured.map((t, idx) => (
+              <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 35}ms` }}>
+                <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} variant="featured" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="space-y-4" aria-label="Act now tools" data-testid="tools-section-act-now">
+        <div className="flex items-center gap-2">
+          <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
+          <SectionHeader title="Act now" description="Fast help for the moments you need an answer." />
+        </div>
+        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Act now">
+          {actNow.map((t, idx) => (
+            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-4" aria-label="Plan tools" data-testid="tools-section-plan">
+        <div className="flex items-center gap-2">
+          <MapIcon className="h-5 w-5 text-primary" aria-hidden />
+          <SectionHeader title="Plan" description="Set up once, then reuse when you need it." />
+        </div>
+        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Plan">
+          {plan.map((t, idx) => (
+            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-4" aria-label="Learn tools" data-testid="tools-section-learn">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-primary" aria-hidden />
+          <SectionHeader title="Learn" description="Clear explanations you can come back to anytime." />
+        </div>
+        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Learn">
+          {learn.map((t, idx) => (
+            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {CURATED_RESOURCES.length > 0 && (
+        <section className="space-y-4" aria-label="News and resources" data-testid="tools-section-resources">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" aria-hidden />
+            <SectionHeader title="News & resources" description="Curated updates and trusted reading." />
+          </div>
+
+          <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2" aria-label="News & resources">
+            {CURATED_RESOURCES.slice(0, 6).map((r, idx) => (
+              <li key={r.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 25}ms` }}>
+                <a
+                  href={r.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label={`${r.title} (${r.source})`}
+                  data-testid={`resource-${r.id}`}
+                >
+                  <Card
+                    variant="glass"
+                    className="pressable card-interactive flex h-full min-h-[9.5rem] flex-col gap-2 rounded-2xl"
+                  >
+                    <CardContent className="flex h-full flex-col gap-2 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {r.source}
+                          </p>
+                          <h3 className="mt-1 text-sm font-semibold text-foreground leading-snug">
+                            {r.title}
+                          </h3>
+                        </div>
+                        {r.tag ? (
+                          <span className="chip chip-muted shrink-0">
+                            {r.tag}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                        {r.description}
+                      </p>
+                      <div className="mt-auto pt-1">
+                        <p className="text-xs text-muted-foreground">
+                          {r.dateLabel}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </PageShell>
   );
 }

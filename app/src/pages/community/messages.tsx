@@ -231,7 +231,7 @@ export default function CommunityMessagesPage() {
         }
       />
 
-      <Card>
+      <Card className="pressable card-interactive">
         <CardContent className="pt-6 space-y-3">
           <form onSubmit={handleStartChat} className="space-y-2">
             <FieldLabelWithInfo
@@ -275,7 +275,7 @@ export default function CommunityMessagesPage() {
             return (
               <li key={t.id}>
                 <Link href={`/community/messages/${t.id}`} className="block">
-                  <Card className="transition-colors hover:bg-muted/30">
+                  <Card className="pressable card-interactive transition-colors hover:bg-muted/30">
                     <CardContent className="flex items-center gap-3 py-3">
                       {other ? (
                         <CommunityAuthorAvatar

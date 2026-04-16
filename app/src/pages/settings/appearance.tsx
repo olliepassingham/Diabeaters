@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { PRIMARY_THEMES, useTheme, type AppPrimaryTheme } from "@/hooks/use-theme";
 import type { ThemeMode } from "@/hooks/useThemeMode";
@@ -51,8 +50,7 @@ const THEME_BOXES: {
 
 export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearanceRouteProps) {
   const { toast } = useToast();
-  const { themeMode, setThemeMode, primaryTheme, setPrimaryTheme, backgroundTint, setBackgroundTint } =
-    useTheme();
+  const { themeMode, setThemeMode, primaryTheme, setPrimaryTheme } = useTheme();
 
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
@@ -78,7 +76,7 @@ export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearan
           <RadioGroup
             value={themeMode}
             onValueChange={(v) => setThemeMode(v as ThemeMode)}
-            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            className="grid gap-3 sm:grid-cols-3"
           >
             {THEME_BOXES.map(({ value, label, testId, previewClass, icon: Icon, iconClass }) => {
               const selected = themeMode === value;
@@ -86,26 +84,23 @@ export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearan
                 <label
                   key={value}
                   className={cn(
-                    "cursor-pointer rounded-2xl border-2 p-1 transition-all outline-none focus-within:ring-2 focus-within:ring-primary/30",
+                    "flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors outline-none focus-within:ring-2 focus-within:ring-primary/30",
                     selected
-                      ? "border-primary shadow-sm ring-2 ring-primary/20"
-                      : "border-border/60 hover:border-primary/50",
+                      ? "border-primary bg-primary/[0.06] ring-2 ring-primary/20"
+                      : "border-border/60 hover:border-primary/40",
                   )}
                 >
-                  <RadioGroupItem value={value} id={`theme-${value}`} data-testid={testId} className="sr-only" />
-                  <div
+                  <RadioGroupItem value={value} id={`theme-${value}`} data-testid={testId} />
+                  <span
                     className={cn(
-                      "flex aspect-[5/4] flex-col overflow-hidden rounded-xl border border-border/40",
+                      "h-9 w-9 shrink-0 rounded-full border border-border/60 shadow-sm flex items-center justify-center",
                       previewClass,
                     )}
+                    aria-hidden
                   >
-                    <div className="flex flex-1 items-center justify-center">
-                      <Icon className={cn("h-10 w-10 drop-shadow-sm", iconClass)} aria-hidden />
-                    </div>
-                    <div className="border-t border-black/5 bg-card/95 px-3 py-2.5 text-center dark:border-white/10">
-                      <span className="text-body font-semibold text-foreground">{label}</span>
-                    </div>
-                  </div>
+                    <Icon className={cn("h-5 w-5 drop-shadow-sm", iconClass)} aria-hidden />
+                  </span>
+                  <span className="text-body font-medium text-foreground">{label}</span>
                 </label>
               );
             })}
@@ -148,27 +143,6 @@ export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearan
               </label>
             ))}
           </RadioGroup>
-        </CardContent>
-      </Card>
-
-      <Card
-        id="appearance-bg-tint"
-        className="scroll-mt-28 overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40"
-      >
-        <CardContent className="space-y-4 p-6">
-          <h2 className="text-h3 font-semibold text-foreground">Page background</h2>
-          <p className="text-body text-muted-foreground">
-            Add a light wash behind screens using your primary colour. Cards and surfaces stay the same.
-          </p>
-          <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 dark:bg-muted/20">
-            <span className="text-body font-medium text-foreground">Tinted background</span>
-            <Switch
-              checked={backgroundTint}
-              onCheckedChange={setBackgroundTint}
-              data-testid="switch-background-tint"
-              aria-label="Tinted page background"
-            />
-          </div>
         </CardContent>
       </Card>
     </PageShell>

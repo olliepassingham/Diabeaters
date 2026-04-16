@@ -11,9 +11,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "shadcn-card rounded-2xl text-card-foreground",
+      "shadcn-card rounded-2xl text-card-foreground transition-[box-shadow,border-color,background-color] duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)]",
       variant === "default" &&
-        "border border-border/45 shadow-sm ring-1 ring-primary/[0.04] dark:border-border/55 dark:shadow-md dark:ring-primary/[0.06] surface-card-default",
+        "border border-border/55 shadow-sm ring-1 ring-primary/[0.05] dark:border-border/55 dark:shadow-md dark:ring-primary/[0.06] surface-glass-strong",
       variant === "glass" && "surface-glass shadow-sm dark:shadow-md",
       variant === "glass-strong" && "surface-glass-strong shadow-sm dark:shadow-md",
       variant === "glass-muted" && "surface-glass-muted shadow-sm dark:shadow-md",
@@ -43,7 +43,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("font-display text-h3 text-foreground tracking-tight", className)}
+    className={cn("font-display text-h3 font-semibold text-foreground tracking-tight", className)}
     {...props}
   />
 ))
@@ -55,7 +55,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-small text-muted-foreground", className)}
+    className={cn("text-small leading-relaxed text-muted-foreground", className)}
     {...props}
   />
 ));

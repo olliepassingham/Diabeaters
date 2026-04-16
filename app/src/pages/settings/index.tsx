@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { storage, UserProfile, UserSettings, NotificationSettings } from "@/lib/storage";
+import {
+  storage,
+  UserProfile,
+  UserSettings,
+  NotificationSettings,
+  UK_DEFAULT_NEEDLES_PER_BOX,
+  UK_DEFAULT_UNITS_PER_INSULIN_PEN,
+} from "@/lib/storage";
 import {
   User,
   Syringe,
@@ -412,12 +419,16 @@ function UsageTab({
             <div className="space-y-2">
               <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
               <Input id="short-acting-units" type="number" placeholder="e.g., 25" value={shortActingUnitsPerDay} onChange={(e) => setShortActingUnitsPerDay(e.target.value)} data-testid="input-short-acting-units" />
-              <p className="text-xs text-muted-foreground">{unitsPerInsulinPen || "300"} units = 1 pen</p>
+              <p className="text-xs text-muted-foreground">
+                {unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN)} units = 1 pen
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
               <Input id="long-acting-units" type="number" placeholder="e.g., 20" value={longActingUnitsPerDay} onChange={(e) => setLongActingUnitsPerDay(e.target.value)} data-testid="input-long-acting-units" />
-              <p className="text-xs text-muted-foreground">{unitsPerInsulinPen || "300"} units = 1 pen</p>
+              <p className="text-xs text-muted-foreground">
+                {unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN)} units = 1 pen
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="short-acting-injections">Short-Acting Injections/Day</Label>
@@ -489,12 +500,28 @@ function UsageTab({
               <>
                 <div className="space-y-2">
                   <Label htmlFor="units-per-pen">Units per Insulin Pen</Label>
-                  <Input id="units-per-pen" type="number" min="1" placeholder="e.g., 300" value={unitsPerInsulinPen} onChange={(e) => setUnitsPerInsulinPen(e.target.value)} data-testid="input-units-per-pen" />
+                  <Input
+                    id="units-per-pen"
+                    type="number"
+                    min="1"
+                    placeholder={`e.g., ${UK_DEFAULT_UNITS_PER_INSULIN_PEN}`}
+                    value={unitsPerInsulinPen}
+                    onChange={(e) => setUnitsPerInsulinPen(e.target.value)}
+                    data-testid="input-units-per-pen"
+                  />
                   <p className="text-xs text-muted-foreground">Units in one disposable pen</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="needles-per-box">Needles per Box</Label>
-                  <Input id="needles-per-box" type="number" min="1" placeholder="e.g., 100" value={needlesPerBox} onChange={(e) => setNeedlesPerBox(e.target.value)} data-testid="input-needles-per-box" />
+                  <Input
+                    id="needles-per-box"
+                    type="number"
+                    min="1"
+                    placeholder={`e.g., ${UK_DEFAULT_NEEDLES_PER_BOX}`}
+                    value={needlesPerBox}
+                    onChange={(e) => setNeedlesPerBox(e.target.value)}
+                    data-testid="input-needles-per-box"
+                  />
                   <p className="text-xs text-muted-foreground">Needles/lancets in one box</p>
                 </div>
               </>
@@ -570,7 +597,7 @@ export default function Settings() {
     appointmentReminders: true,
     hypoAlerts: true,
     scenarioAlerts: true,
-    hypoDashboardQuickNotify: false,
+    hypoDashboardQuickNotify: true,
     communityFeedAlerts: true,
     communityDmAlerts: true,
   });
@@ -641,8 +668,12 @@ export default function Settings() {
       setSiteChangeDays(storedSettings.siteChangeDays?.toString() || "3");
       setReservoirChangeDays(storedSettings.reservoirChangeDays?.toString() || "3");
       setReservoirCapacity(storedSettings.reservoirCapacity?.toString() || "300");
-      setUnitsPerInsulinPen(storedSettings.unitsPerInsulinPen?.toString() || "");
-      setNeedlesPerBox(storedSettings.needlesPerBox?.toString() || "");
+      setUnitsPerInsulinPen(
+        storedSettings.unitsPerInsulinPen ? String(storedSettings.unitsPerInsulinPen) : String(UK_DEFAULT_UNITS_PER_INSULIN_PEN),
+      );
+      setNeedlesPerBox(
+        storedSettings.needlesPerBox ? String(storedSettings.needlesPerBox) : String(UK_DEFAULT_NEEDLES_PER_BOX),
+      );
       setInfusionSetsPerBox(storedSettings.infusionSetsPerBox?.toString() || "");
       setReservoirsPerBox(storedSettings.reservoirsPerBox?.toString() || "");
       setInsulinCartridgeUnits(storedSettings.insulinCartridgeUnits?.toString() || "");
@@ -651,6 +682,8 @@ export default function Settings() {
       setSiteChangeDays("3");
       setReservoirChangeDays("3");
       setReservoirCapacity("300");
+      setUnitsPerInsulinPen(String(UK_DEFAULT_UNITS_PER_INSULIN_PEN));
+      setNeedlesPerBox(String(UK_DEFAULT_NEEDLES_PER_BOX));
     }
     
     setNotifSettings(storage.getNotificationSettings());
@@ -830,8 +863,8 @@ export default function Settings() {
       siteChangeDays: siteChangeDays ? parseInt(siteChangeDays) : undefined,
       reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays) : undefined,
       reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity) : undefined,
-      unitsPerInsulinPen: unitsPerInsulinPen ? Math.max(1, parseInt(unitsPerInsulinPen)) : undefined,
-      needlesPerBox: needlesPerBox ? Math.max(1, parseInt(needlesPerBox)) : undefined,
+      unitsPerInsulinPen: Math.max(1, parseInt(unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN), 10) || UK_DEFAULT_UNITS_PER_INSULIN_PEN),
+      needlesPerBox: Math.max(1, parseInt(needlesPerBox || String(UK_DEFAULT_NEEDLES_PER_BOX), 10) || UK_DEFAULT_NEEDLES_PER_BOX),
       infusionSetsPerBox: infusionSetsPerBox ? Math.max(1, parseInt(infusionSetsPerBox)) : undefined,
       reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,

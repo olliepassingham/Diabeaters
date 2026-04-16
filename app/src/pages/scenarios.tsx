@@ -56,10 +56,13 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
 
 function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef) {
   return (
-    <Link href={href} className="block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+    <Link
+      href={href}
+      className="pressable block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
       <Card
         variant="glass"
-        className="flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 transition-all duration-200 hover:border-primary/50 hover:shadow-md active:scale-[0.99] sm:min-h-[7.75rem] sm:px-6 sm:py-6"
+        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 sm:min-h-[7.75rem] sm:px-6 sm:py-6"
       >
         <div className="flex items-start gap-3 sm:gap-4">
           <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />

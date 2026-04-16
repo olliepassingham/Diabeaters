@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Phone,
-  Settings,
+  LayoutGrid,
   AlertCircle,
   ArrowRight,
   CheckCircle2,
@@ -218,7 +218,7 @@ function StatusPill({ status }: { status: HealthStatus }) {
     <div className={`relative inline-flex ${pulseClass}`} data-testid="status-indicator">
       <div
         ref={pillRef}
-        className="relative inline-flex items-center whitespace-nowrap px-3 py-1"
+        className="relative inline-flex min-w-[5.5rem] items-center justify-center whitespace-nowrap px-4 py-1 sm:min-w-[6rem] sm:px-4"
         style={{ background: fill, borderRadius: `${rx}px` }}
       >
         <span className={`text-xs font-semibold ${textColor}`} data-testid="text-status">
@@ -271,7 +271,7 @@ function DashboardInfoDialog() {
       description="Your personal diabetes command centre"
     >
       <InfoSection title="Customise your view">
-        <p>Tap the gear button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
+        <p>Tap the layout button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
       </InfoSection>
       <InfoSection title="Reordering">
         <p>In the widget editor, drag the handle beside each row to change order. Use the width control for full or half width on larger screens.</p>
@@ -362,36 +362,36 @@ function HeroCard({
         data-testid="card-hero"
       >
         <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span
-                    className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
-                    data-testid="text-greeting"
-                  >
-                    {greeting()}
-                    {firstName ? `, ${firstName}` : ""}
-                  </span>
-                  <StagingChip />
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <DashboardInfoDialog />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={onEditWidgets}
-                    className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-                    data-testid="button-customize"
-                    aria-label="Edit dashboard widgets"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex min-w-0 shrink flex-wrap items-center gap-x-2 gap-y-1">
+                <span
+                  className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+                  data-testid="text-greeting"
+                >
+                  {greeting()}
+                  {firstName ? `, ${firstName}` : ""}
+                </span>
+                <StagingChip />
               </div>
-              <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
+              <div className="flex min-w-0 flex-1 justify-center px-1">
+                <StatusPill status={status} />
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <DashboardInfoDialog />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={onEditWidgets}
+                  className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
+                  data-testid="button-customize"
+                  aria-label="Customize dashboard widgets"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <StatusPill status={status} />
+            <p className="text-sm text-muted-foreground">Here&apos;s your diabetes today</p>
           </div>
 
           <div className="flex min-w-0 flex-nowrap items-stretch gap-2">
@@ -865,7 +865,7 @@ export default function Dashboard() {
         <Card className="animate-fade-in border-border/70 shadow-sm">
           <CardContent className="py-8 text-center md:py-10">
             <p className="mb-4 text-sm text-muted-foreground max-w-sm mx-auto">
-              No widgets on your dashboard yet. Use the gear button above or tap below to pick what you want to see.
+              No widgets on your dashboard yet. Use the layout button above or tap below to pick what you want to see.
             </p>
             <Button
               variant="default"

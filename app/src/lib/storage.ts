@@ -317,12 +317,16 @@ export interface HypoTreatment {
 /** `settingsKey` omitted when pack size is fixed (e.g. CGM: one sensor per dispensing unit). */
 type SupplyPackDefaultDef = { increment: number; label: string; settingsKey?: keyof UserSettings };
 
+/** Disposable pen fill and pen needle box — common UK pack sizes (units / count per pack). */
+export const UK_DEFAULT_UNITS_PER_INSULIN_PEN = 100;
+export const UK_DEFAULT_NEEDLES_PER_BOX = 100;
+
 export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, SupplyPackDefaultDef> = {
-  insulin: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
-  insulin_short: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
-  insulin_long: { increment: 300, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  insulin: { increment: UK_DEFAULT_UNITS_PER_INSULIN_PEN, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  insulin_short: { increment: UK_DEFAULT_UNITS_PER_INSULIN_PEN, label: "pen", settingsKey: "unitsPerInsulinPen" },
+  insulin_long: { increment: UK_DEFAULT_UNITS_PER_INSULIN_PEN, label: "pen", settingsKey: "unitsPerInsulinPen" },
   insulin_vial: { increment: 1000, label: "vial", settingsKey: "unitsPerInsulinPen" },
-  needle: { increment: 100, label: "box", settingsKey: "needlesPerBox" },
+  needle: { increment: UK_DEFAULT_NEEDLES_PER_BOX, label: "box", settingsKey: "needlesPerBox" },
   cgm: { increment: 1, label: "sensor" },
   infusion_set: { increment: 10, label: "box", settingsKey: "infusionSetsPerBox" },
   reservoir: { increment: 10, label: "box", settingsKey: "reservoirsPerBox" },
@@ -369,7 +373,7 @@ export function getSupplyIncrement(type: SupplyType, settings?: UserSettings): {
 
 export function getUnitsPerPen(settings?: UserSettings): number {
   const s = settings || storage.getSettings();
-  return Math.max(1, s.unitsPerInsulinPen || s.insulinCartridgeUnits || 300);
+  return Math.max(1, s.unitsPerInsulinPen || s.insulinCartridgeUnits || UK_DEFAULT_UNITS_PER_INSULIN_PEN);
 }
 
 export function getInsulinContainerLabel(type?: SupplyType): string {
@@ -2228,7 +2232,7 @@ export const storage = {
       appointmentReminders: true,
       hypoAlerts: true,
       scenarioAlerts: true,
-      hypoDashboardQuickNotify: false,
+      hypoDashboardQuickNotify: true,
       communityFeedAlerts: true,
       communityDmAlerts: true,
     };
@@ -2238,7 +2242,8 @@ export const storage = {
     return {
       ...defaults,
       ...parsed,
-      hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify === true,
+      /** Default on (UK-style quick log); only explicit `false` in stored settings turns it off. */
+      hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify !== false,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
       communityDmAlerts: parsed.communityDmAlerts !== false,
     };

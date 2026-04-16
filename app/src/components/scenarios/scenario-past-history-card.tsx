@@ -34,7 +34,7 @@ export function ScenarioPastHistoryCard({ kind }: { kind: ScenarioHistoryKind })
       id={kind === "sick_day" ? "sick-day-past-sessions" : "travel-past-trips"}
       aria-label={title}
     >
-      <Card className="shadow-md w-full" data-testid={`card-past-scenarios-${kind}`}>
+      <Card className="pressable card-interactive shadow-md w-full" data-testid={`card-past-scenarios-${kind}`}>
         <CardHeader
           className="cursor-pointer"
           onClick={() => setExpanded(!expanded)}

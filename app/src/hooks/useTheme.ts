@@ -6,7 +6,9 @@ export const THEME_COLOR_STORAGE_KEY = "diabeaters_theme_color";
 /** Opt-in soft page background tint derived from primary theme. */
 export const BACKGROUND_TINT_STORAGE_KEY = "diabeaters_bg_tint";
 
-const LIGHT_BG_BASE = "247 248 250";
+// Light mode canvas base before primary tint is applied.
+// Keep this slightly darker than the tinted panels so the UI isn't "white on white".
+const LIGHT_BG_BASE = "228 235 247";
 const DARK_BG_BASE = "18 18 18";
 
 /** Mix space-separated RGB triples: `result = t * a + (1-t) * b`. */
@@ -44,7 +46,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   blue: {
     colorPrimary: "59 130 246",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "239 246 255",
+    colorPrimaryLight: "246 250 255",
     colorPrimaryDark: "29 78 216",
     colorPrimaryBorder: "37 99 235",
     ring: "221 83% 53%",
@@ -54,7 +56,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   purple: {
     colorPrimary: "147 51 234",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "243 232 255",
+    colorPrimaryLight: "247 245 255",
     colorPrimaryDark: "107 33 168",
     colorPrimaryBorder: "126 34 206",
     ring: "262 83% 58%",
@@ -64,7 +66,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   teal: {
     colorPrimary: "20 184 166",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "204 251 241",
+    colorPrimaryLight: "245 253 251",
     colorPrimaryDark: "15 118 110",
     colorPrimaryBorder: "13 148 136",
     ring: "173 80% 40%",
@@ -74,7 +76,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   green: {
     colorPrimary: "34 197 94",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "220 252 231",
+    colorPrimaryLight: "246 253 248",
     colorPrimaryDark: "21 128 61",
     colorPrimaryBorder: "22 163 74",
     ring: "142 71% 45%",
@@ -84,7 +86,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   rose: {
     colorPrimary: "244 63 94",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "255 228 230",
+    colorPrimaryLight: "255 245 246",
     colorPrimaryDark: "190 18 60",
     colorPrimaryBorder: "225 29 72",
     ring: "346 77% 50%",
@@ -94,7 +96,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   amber: {
     colorPrimary: "245 158 11",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "255 251 235",
+    colorPrimaryLight: "255 253 250",
     colorPrimaryDark: "180 83 9",
     colorPrimaryBorder: "217 119 6",
     ring: "38 92% 50%",
@@ -104,7 +106,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   orange: {
     colorPrimary: "249 115 22",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "255 247 237",
+    colorPrimaryLight: "255 251 247",
     colorPrimaryDark: "194 65 12",
     colorPrimaryBorder: "234 88 12",
     ring: "25 95% 53%",
@@ -114,7 +116,7 @@ const LIGHT: Record<AppPrimaryTheme, PrimaryPack> = {
   indigo: {
     colorPrimary: "99 102 241",
     colorPrimaryForeground: "255 255 255",
-    colorPrimaryLight: "238 242 255",
+    colorPrimaryLight: "246 248 255",
     colorPrimaryDark: "67 56 202",
     colorPrimaryBorder: "79 70 229",
     ring: "239 84% 67%",
@@ -271,21 +273,15 @@ export function getStoredPrimaryTheme(): AppPrimaryTheme {
 }
 
 export function getStoredBackgroundTint(): boolean {
-  if (typeof window === "undefined") return false;
-  const raw = localStorage.getItem(BACKGROUND_TINT_STORAGE_KEY);
-  if (raw === "1") return true;
-  if (raw === "0") return false;
-  // Default ON for new installs.
+  // Background tint is enforced ON (no user toggle).
+  if (typeof window === "undefined") return true;
   return true;
 }
 
 export function persistBackgroundTint(enabled: boolean): void {
-  if (typeof window === "undefined") return;
-  if (enabled) {
-    localStorage.setItem(BACKGROUND_TINT_STORAGE_KEY, "1");
-  } else {
-    localStorage.setItem(BACKGROUND_TINT_STORAGE_KEY, "0");
-  }
+  // Background tint is enforced ON (no user toggle).
+  // Keep function for compatibility with existing imports.
+  void enabled;
 }
 
 export function applyPrimaryThemeToDocument(id: AppPrimaryTheme, mode: "light" | "dark"): void {
@@ -313,19 +309,17 @@ export function applyBackgroundTintToDocument(
 ): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  // User preference: keep tint for light mode only.
-  if (mode === "dark") {
-    root.style.removeProperty("--app-background");
-    return;
-  }
-  if (!enabled) {
-    root.style.removeProperty("--app-background");
-    return;
-  }
-  const pack = LIGHT[primary];
-  const base = LIGHT_BG_BASE;
-  const blended = mixRgbTriples(pack.colorPrimaryLight, base, 0.28);
-  root.style.setProperty("--app-background", blended);
+  // Do not override light mode styling imperatively.
+  // Light/dark palettes and tinted surfaces are defined in CSS (`theme.css`/`index.css`) and
+  // should remain the single source of truth.
+  void enabled;
+  void mode;
+  void primary;
+  root.style.removeProperty("--app-background");
+  root.style.removeProperty("--surface-glass-bg");
+  root.style.removeProperty("--surface-glass-bg-strong");
+  root.style.removeProperty("--surface-glass-chrome-bg");
+  root.style.removeProperty("--surface-glass-muted-bg");
 }
 
 /**
