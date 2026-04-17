@@ -35,5 +35,10 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
     setLocation(next);
     return;
   }
+  const role = getPrimaryAppRole();
+  if (role === null) {
+    setLocation("/welcome");
+    return;
+  }
   setLocation("/");
 }

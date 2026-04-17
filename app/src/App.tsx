@@ -924,6 +924,11 @@ function AppContent() {
     if (hasCarerIntent() || hasPendingCarer()) return;
     if (patientOnboardingSatisfied) return;
     if (pathOnly === "/onboarding") return;
+    const role = getPrimaryAppRole();
+    if (role === null) {
+      if (pathOnly !== "/welcome") setLocation("/welcome");
+      return;
+    }
     setLocation("/onboarding");
   }, [
     appGateReady,
