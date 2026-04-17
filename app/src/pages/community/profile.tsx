@@ -26,6 +26,7 @@ import { FeedPostList } from "@/components/community/feed-post-list";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { getPrimaryAppRole } from "@/lib/carer-session";
 import {
   blockUser,
   fetchCommunityPostsByAuthorPage,
@@ -83,6 +84,7 @@ export default function CommunityProfilePage() {
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
+  const isSupporterFirstSelf = isSelf && getPrimaryAppRole() === "carer";
 
   const loginNextHref = useMemo(() => {
     if (!userId) return "/community";
@@ -353,7 +355,9 @@ export default function CommunityProfilePage() {
               <p className="text-sm text-muted-foreground italic">No bio yet.</p>
             )}
 
-            {profile.diabetes_onset_date && formatLivingWithDiabetesLine(profile.diabetes_onset_date) ? (
+            {!isSupporterFirstSelf &&
+            profile.diabetes_onset_date &&
+            formatLivingWithDiabetesLine(profile.diabetes_onset_date) ? (
               <p className="text-sm text-muted-foreground">
                 {formatLivingWithDiabetesLine(profile.diabetes_onset_date)}
               </p>

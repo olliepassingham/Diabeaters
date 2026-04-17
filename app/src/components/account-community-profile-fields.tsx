@@ -16,6 +16,7 @@ import {
   updateProfile,
   useProfile,
 } from "@/lib/profile";
+import { getPrimaryAppRole } from "@/lib/carer-session";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -199,6 +200,7 @@ export function AccountCommunityProfileFields({
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
   const readOnlyHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
   const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
+  const showOnsetDate = getPrimaryAppRole() !== "carer";
 
   const formBody = (
     <>
@@ -300,49 +302,51 @@ export function AccountCommunityProfileFields({
                 />
               </div>
 
-              <div className="space-y-2">
-                <FieldLabelWithInfo
-                  htmlFor={onsetId}
-                  info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
-                >
-                  Living with diabetes since
-                </FieldLabelWithInfo>
-                <Input
-                  id={onsetId}
-                  type="date"
-                  min="1900-01-01"
-                  max={todayIso}
-                  value={onsetDateInput}
-                  onChange={(e) => setOnsetDateInput(e.target.value)}
-                  disabled={loading || saving || savingPublic}
-                  data-testid="account-community-onset-input"
-                />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  {livingLine ? (
-                    <span className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="account-community-onset-line">
-                      <Clock3 className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-                      <span>{livingLine}</span>
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground" data-testid="account-community-onset-empty">
-                      —
-                    </span>
-                  )}
-                  {onsetDateInput.trim() ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2"
-                      onClick={() => void clearOnsetDate()}
-                      disabled={saving || loading || savingPublic}
-                      data-testid="account-community-onset-remove"
-                    >
-                      Remove
-                    </Button>
-                  ) : null}
+              {showOnsetDate ? (
+                <div className="space-y-2">
+                  <FieldLabelWithInfo
+                    htmlFor={onsetId}
+                    info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
+                  >
+                    Living with diabetes since
+                  </FieldLabelWithInfo>
+                  <Input
+                    id={onsetId}
+                    type="date"
+                    min="1900-01-01"
+                    max={todayIso}
+                    value={onsetDateInput}
+                    onChange={(e) => setOnsetDateInput(e.target.value)}
+                    disabled={loading || saving || savingPublic}
+                    data-testid="account-community-onset-input"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {livingLine ? (
+                      <span className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="account-community-onset-line">
+                        <Clock3 className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                        <span>{livingLine}</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground" data-testid="account-community-onset-empty">
+                        —
+                      </span>
+                    )}
+                    {onsetDateInput.trim() ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => void clearOnsetDate()}
+                        disabled={saving || loading || savingPublic}
+                        data-testid="account-community-onset-remove"
+                      >
+                        Remove
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               <Button type="submit" disabled={saving || loading || savingPublic} data-testid="account-community-save">
                 {saving ? "Saving…" : "Save"}
@@ -350,18 +354,20 @@ export function AccountCommunityProfileFields({
             </>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Living with diabetes since</p>
-                {livingLine ? (
-                  <p className="text-sm text-muted-foreground" data-testid="account-community-onset-highlight">
-                    {livingLine}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground" data-testid="account-community-onset-empty">
-                    —
-                  </p>
-                )}
-              </div>
+              {showOnsetDate ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">Living with diabetes since</p>
+                  {livingLine ? (
+                    <p className="text-sm text-muted-foreground" data-testid="account-community-onset-highlight">
+                      {livingLine}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="account-community-onset-empty">
+                      —
+                    </p>
+                  )}
+                </div>
+              ) : null}
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">Feed handle</p>
                 {readOnlyHandleSlug ? (

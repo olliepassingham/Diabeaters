@@ -326,7 +326,8 @@ export default function Account() {
   const showPublicProfilePreview = isCommunityEnabled && profile?.is_public === true;
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
-  const livingWithLine = formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null);
+  const livingWithLine =
+    getPrimaryAppRole() === "carer" ? null : formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null);
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
   const canSwitchModes = hasCarerLink && getPrimaryAppRole() !== "carer";
 
