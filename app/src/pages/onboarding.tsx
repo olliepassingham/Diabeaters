@@ -197,7 +197,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     if (user?.id) {
-      const { error } = await upsertProfile({ id: user.id, onboarding_complete: true });
+      const fullName = data.name.trim() ? data.name.trim() : null;
+      const { error } = await upsertProfile({ id: user.id, onboarding_complete: true, full_name: fullName });
       if (error) {
         toast({
           title: "Could not sync profile",

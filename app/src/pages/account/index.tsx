@@ -28,6 +28,7 @@ import {
 } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
+import { getFollowCounts } from "@/lib/community";
 import {
   Select,
   SelectContent,
@@ -57,6 +58,7 @@ import {
   getSupportEmail,
   isAccountDeletionTableUnavailableMessage,
 } from "@/lib/support";
+import { formatLivingWithDiabetesLine } from "@/lib/profile";
 
 function getInitial(email: string): string {
   const first = email.trim().charAt(0).toUpperCase();
@@ -91,6 +93,7 @@ export default function Account() {
   const [patientLoadError, setPatientLoadError] = useState<string | null>(null);
   const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
   const [accountDeletionSubmitBusy, setAccountDeletionSubmitBusy] = useState(false);
+  const [publicCounts, setPublicCounts] = useState<{ followers: number; following: number } | null>(null);
 
   useEffect(() => {
     if (!user?.id || profileLoading) return;
@@ -319,6 +322,28 @@ export default function Account() {
   const displayName = profile?.full_name?.trim() || settingsName || "Your account";
   const nameForInitials = profile?.full_name?.trim() || settingsName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
+  const showPublicProfilePreview = !isCarer && isCommunityEnabled && profile?.is_public === true;
+  const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
+  const bioPreview = profile?.bio?.trim() || "";
+  const livingWithLine = formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null);
+  const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
+
+  useEffect(() => {
+    if (!showPublicProfilePreview) {
+      setPublicCounts(null);
+      return;
+    }
+    let active = true;
+    void (async () => {
+      const res = await getFollowCounts(userId);
+      if (!active) return;
+      if (res.error) return;
+      setPublicCounts({ followers: res.followers, following: res.following });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [showPublicProfilePreview, userId]);
 
   const activeLink = useMemo(
     () => linkedPatients.find((p) => p.patientId === activePatientId) ?? null,
@@ -426,38 +451,123 @@ export default function Account() {
           </Button>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-              <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
-                data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
-                {...(!showAvatarImage && {
-                  role: "img" as const,
-                  "aria-label": "No avatar",
-                })}
-              >
-                {showAvatarImage ? (
-                  <img
-                    src={avatarDisplayUrl!}
-                    alt="Profile avatar"
-                    className="w-full h-full object-cover"
-                    data-testid="avatar-img"
-                    onError={() => setAvatarImgFailed(true)}
-                  />
-                ) : (
-                  <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
-                    {nameForInitials
-                      ? nameForInitials
-                          .split(/\s+/)
-                          .map((s) => s[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase()
-                      : initial}
-                  </span>
-                )}
-              </div>
+              {showPublicProfilePreview ? (
+                <Link
+                  href={myPublicProfileHref}
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
+                  data-testid="link-my-public-profile-avatar"
+                  aria-label="Open your public profile"
+                >
+                  {showAvatarImage ? (
+                    <img
+                      src={avatarDisplayUrl!}
+                      alt="Profile avatar"
+                      className="w-full h-full object-cover"
+                      data-testid="avatar-img"
+                      onError={() => setAvatarImgFailed(true)}
+                    />
+                  ) : (
+                    <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
+                      {nameForInitials
+                        ? nameForInitials
+                            .split(/\s+/)
+                            .map((s) => s[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()
+                        : initial}
+                    </span>
+                  )}
+                </Link>
+              ) : (
+                <div
+                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
+                  data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
+                  {...(!showAvatarImage && {
+                    role: "img" as const,
+                    "aria-label": "No avatar",
+                  })}
+                >
+                  {showAvatarImage ? (
+                    <img
+                      src={avatarDisplayUrl!}
+                      alt="Profile avatar"
+                      className="w-full h-full object-cover"
+                      data-testid="avatar-img"
+                      onError={() => setAvatarImgFailed(true)}
+                    />
+                  ) : (
+                    <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
+                      {nameForInitials
+                        ? nameForInitials
+                            .split(/\s+/)
+                            .map((s) => s[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()
+                        : initial}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-left sm:pr-24">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-                <p className="text-sm text-muted-foreground break-all">{email}</p>
+                {showPublicProfilePreview ? (
+                  <div className="min-w-0">
+                    <Link
+                      href={myPublicProfileHref}
+                      className="block min-w-0"
+                      data-testid="link-my-public-profile-name"
+                      aria-label="Open your public profile"
+                    >
+                      <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
+                    </Link>
+                    {publicHandle ? (
+                      <p className="text-sm text-muted-foreground">@{publicHandle}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No handle set.{" "}
+                        <a href="#community" className="text-primary underline-offset-4 hover:underline">
+                          Add one
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
+                    <p className="text-sm text-muted-foreground break-all">{email}</p>
+                  </>
+                )}
+
+                {showPublicProfilePreview ? (
+                  <div className="pt-1 space-y-1">
+                    <p className="text-sm text-muted-foreground italic">
+                      {bioPreview ? bioPreview : "No bio yet."}
+                    </p>
+                    {livingWithLine ? (
+                      <p className="text-sm text-muted-foreground">{livingWithLine}</p>
+                    ) : null}
+                    <div className="flex items-center gap-4 pt-1">
+                      <Link
+                        href={myPublicProfileHref}
+                        className="text-sm text-foreground hover:underline underline-offset-4"
+                        data-testid="link-my-public-profile-followers"
+                      >
+                        <span className="font-semibold tabular-nums">{publicCounts?.followers ?? 0}</span>{" "}
+                        <span className="text-muted-foreground">followers</span>
+                      </Link>
+                      <Link
+                        href={myPublicProfileHref}
+                        className="text-sm text-foreground hover:underline underline-offset-4"
+                        data-testid="link-my-public-profile-following"
+                      >
+                        <span className="font-semibold tabular-nums">{publicCounts?.following ?? 0}</span>{" "}
+                        <span className="text-muted-foreground">following</span>
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap items-center justify-start gap-2 pt-1">
                   <span
                     data-testid={verified ? "status-verified" : "status-unverified"}
