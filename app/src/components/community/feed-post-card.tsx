@@ -47,6 +47,7 @@ import {
   getFirstWhitelistedFeedLink,
   fetchLikerUserIdsForPost,
   fetchPostLikersWithProfiles,
+  fetchPollVotersWithProfiles,
   otherMemberUserId,
   parseEventExtra,
   parsePollExtra,
@@ -120,6 +121,9 @@ function FeedPollBlock({
   const [counts, setCounts] = useState<number[]>(() => Array.from({ length: options.length }, () => 0));
   const [myIdx, setMyIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [votersOpen, setVotersOpen] = useState(false);
+  const [votersLoading, setVotersLoading] = useState(false);
+  const [voters, setVoters] = useState<Array<{ user_id: string; name: string; avatar_url: string | null; option_index: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +161,19 @@ function FeedPollBlock({
     }
   }
 
+  async function openVoters() {
+    setVotersOpen(true);
+    if (votersLoading || voters.length > 0) return;
+    setVotersLoading(true);
+    const res = await fetchPollVotersWithProfiles(postId);
+    setVotersLoading(false);
+    if (res.error) {
+      toast({ title: "Could not load voters", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setVoters(res.data.map((r) => ({ user_id: r.user_id, name: r.name, avatar_url: r.avatar_url, option_index: r.option_index })));
+  }
+
   return (
     <div className="space-y-2 rounded-xl border border-border/60 bg-muted/15 p-3">
       <p className="text-sm font-semibold leading-snug">{question}</p>
@@ -190,6 +207,46 @@ function FeedPollBlock({
           })}
         </ul>
       )}
+      {!loading && total > 0 ? (
+        <div className="pt-1">
+          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => void openVoters()}>
+            View who voted
+          </Button>
+        </div>
+      ) : null}
+
+      <Dialog open={votersOpen} onOpenChange={setVotersOpen}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Poll voters</DialogTitle>
+            <DialogDescription>Who has voted so far (hidden for blocked users).</DialogDescription>
+          </DialogHeader>
+          {votersLoading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : voters.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No votes yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {voters.map((v) => (
+                <li key={v.user_id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/60 p-2">
+                  <CommunityAuthorAvatar
+                    displayName={v.name}
+                    avatarPath={v.avatar_url}
+                    size="sm"
+                    profileHref={`/community/profile/${encodeURIComponent(v.user_id)}`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">{v.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      Voted: {options[v.option_index] ?? "—"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

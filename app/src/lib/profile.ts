@@ -193,6 +193,40 @@ export async function getProfileIdByPublicHandle(handle: string): Promise<{
   }
 }
 
+export type ProfileHandleSuggestion = Pick<ProfileRow, "id" | "full_name" | "avatar_url" | "public_handle" | "is_public">;
+
+/** Autocomplete: public profiles whose handle starts with the given prefix. */
+export async function searchProfilesByHandlePrefix(
+  rawPrefix: string,
+  limit = 10,
+): Promise<{ data: ProfileHandleSuggestion[]; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured") };
+
+  const prefix = rawPrefix.trim().replace(/^@/, "").toLowerCase();
+  if (!prefix) return { data: [], error: null };
+
+  // Keep query permissive; RLS will still apply. Also filter to explicit public profiles.
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, avatar_url, public_handle, is_public")
+    .eq("is_public", true)
+    .ilike("public_handle", `${prefix}%`)
+    .order("public_handle", { ascending: true })
+    .limit(Math.max(1, Math.min(20, limit)));
+
+  if (error) return { data: [], error: new Error(error.message) };
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  const mapped: ProfileHandleSuggestion[] = rows.map((r) => ({
+    id: String(r.id),
+    full_name: (r.full_name as string | null) ?? null,
+    avatar_url: (r.avatar_url as string | null) ?? null,
+    public_handle: (r.public_handle as string | null) ?? null,
+    is_public: typeof r.is_public === "boolean" ? r.is_public : true,
+  }));
+  return { data: mapped.filter((p) => Boolean(p.public_handle?.trim())), error: null };
+}
+
 export type ProfileUpdatePayload = {
   id: string;
 } & Partial<

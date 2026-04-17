@@ -16,6 +16,7 @@ import { FeedPostList } from "@/components/community/feed-post-list";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ import {
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
+import { followUser, listFolloweeIdsForCurrentUser } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -46,6 +48,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { getProfilesByIds, searchProfilesByHandlePrefix } from "@/lib/profile";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -88,6 +92,19 @@ export default function CommunityHomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedListKey, setFeedListKey] = useState(0);
 
+  const [peopleOpen, setPeopleOpen] = useState(false);
+  const [peopleQuery, setPeopleQuery] = useState("");
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleError, setPeopleError] = useState<string | null>(null);
+  const [peopleResults, setPeopleResults] = useState<
+    Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
+  >([]);
+  const [suggested, setSuggested] = useState<
+    Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
+  >([]);
+  const [suggestedLoading, setSuggestedLoading] = useState(false);
+  const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
+
   /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
   useEffect(() => {
     const raw = search.startsWith("?") ? search.slice(1) : search;
@@ -99,6 +116,106 @@ export default function CommunityHomePage() {
     const next = params.toString();
     setLocation(next ? `${pathname}?${next}` : pathname, { replace: true });
   }, [search, setLocation, pathname]);
+
+  useEffect(() => {
+    if (!peopleOpen) return;
+    const t = window.setTimeout(() => {
+      const q = peopleQuery.trim();
+      if (!q) {
+        setPeopleLoading(false);
+        setPeopleError(null);
+        setPeopleResults([]);
+        return;
+      }
+      setPeopleLoading(true);
+      setPeopleError(null);
+      void searchProfilesByHandlePrefix(q, 10).then((res) => {
+        setPeopleLoading(false);
+        if (res.error) {
+          setPeopleError(res.error.message);
+          setPeopleResults([]);
+          return;
+        }
+        const mapped = (res.data ?? [])
+          .filter((p) => p.is_public === true)
+          .map((p) => ({
+            id: p.id,
+            name: p.full_name?.trim() || shortId(p.id),
+            avatar_url: p.avatar_url ?? null,
+            handle: (p.public_handle ?? "").trim(),
+          }))
+          .filter((p) => Boolean(p.handle));
+        setPeopleResults(mapped);
+      });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [peopleOpen, peopleQuery]);
+
+  useEffect(() => {
+    if (!peopleOpen) return;
+    if (!user?.id) return;
+    if (suggestedLoading || suggested.length > 0) return;
+    setSuggestedLoading(true);
+    void (async () => {
+      const [pageRes, followingRes] = await Promise.all([
+        fetchCommunityPostsPage(50, null),
+        listFolloweeIdsForCurrentUser(),
+      ]);
+      if (pageRes.error || followingRes.error) {
+        setSuggestedLoading(false);
+        return;
+      }
+      const followeeSet = new Set(followingRes.ids);
+      const ids: string[] = [];
+      for (const p of pageRes.data ?? []) {
+        const id = String(p.author_id);
+        if (!id || id === user.id) continue;
+        if (followeeSet.has(id)) continue;
+        if (!ids.includes(id)) ids.push(id);
+        if (ids.length >= 12) break;
+      }
+      if (ids.length === 0) {
+        setSuggested([]);
+        setSuggestedLoading(false);
+        return;
+      }
+      const profiles = await getProfilesByIds(ids);
+      const out = ids
+        .map((id) => {
+          const pr = profiles.get(id);
+          const handle = (pr?.public_handle ?? "").trim();
+          const isPublic = pr?.is_public !== false;
+          if (!handle || !isPublic) return null;
+          return {
+            id,
+            name: pr?.full_name?.trim() || shortId(id),
+            avatar_url: pr?.avatar_url ?? null,
+            handle,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => Boolean(x))
+        .slice(0, 6);
+      setSuggested(out);
+      setSuggestedLoading(false);
+    })();
+  }, [peopleOpen, user?.id, suggestedLoading, suggested.length]);
+
+  async function handleFollow(id: string) {
+    if (!user?.id) {
+      toast({ title: "Sign in to follow", variant: "destructive" });
+      return;
+    }
+    setFollowBusyIds((prev) => ({ ...prev, [id]: true }));
+    const res = await followUser(id);
+    setFollowBusyIds((prev) => ({ ...prev, [id]: false }));
+    if (res.error) {
+      toast({ title: "Follow failed", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setSuggested((prev) => prev.filter((p) => p.id !== id));
+    setPeopleResults((prev) => prev.filter((p) => p.id !== id));
+    toast({ title: "Following", description: "You’ll now see their posts in Following." });
+  }
 
   useEffect(() => {
     const urls = composerFiles.map((f) => URL.createObjectURL(f));
@@ -293,6 +410,17 @@ export default function CommunityHomePage() {
         title="Feed"
         actions={
           <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setPeopleOpen(true)}
+              data-testid="button-find-people"
+              aria-label="Find people"
+              title="Find people"
+            >
+              <Search className="h-4 w-4" aria-hidden />
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/account#community" aria-label="Feed profile settings">
                 <Settings className="h-4 w-4" />
@@ -307,6 +435,98 @@ export default function CommunityHomePage() {
           </div>
         }
       />
+
+      <Dialog open={peopleOpen} onOpenChange={setPeopleOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Find people</DialogTitle>
+            <DialogDescription>Search by handle (e.g. @ollie). We’ll suggest matches as you type.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              value={peopleQuery}
+              onChange={(e) => setPeopleQuery(e.target.value)}
+              placeholder="Type a handle…"
+              aria-label="Search people by handle"
+              data-testid="input-find-people"
+            />
+
+            {peopleQuery.trim() ? (
+              <>
+                {peopleLoading ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
+                {peopleError ? <p className="text-sm text-destructive">{peopleError}</p> : null}
+                {!peopleLoading && !peopleError && peopleResults.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No matches.</p>
+                ) : null}
+                {peopleResults.length > 0 ? (
+                  <ul className="space-y-2">
+                    {peopleResults.map((p) => (
+                      <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
+                        <CommunityAuthorAvatar
+                          displayName={p.name}
+                          avatarPath={p.avatar_url}
+                          size="sm"
+                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={Boolean(followBusyIds[p.id])}
+                          onClick={() => void handleFollow(p.id)}
+                        >
+                          {followBusyIds[p.id] ? "…" : "Follow"}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Suggested</p>
+                  {suggestedLoading ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
+                </div>
+                {suggested.length === 0 && !suggestedLoading ? (
+                  <p className="text-sm text-muted-foreground">No suggestions yet.</p>
+                ) : null}
+                {suggested.length > 0 ? (
+                  <ul className="space-y-2">
+                    {suggested.map((p) => (
+                      <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
+                        <CommunityAuthorAvatar
+                          displayName={p.name}
+                          avatarPath={p.avatar_url}
+                          size="sm"
+                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={Boolean(followBusyIds[p.id])}
+                          onClick={() => void handleFollow(p.id)}
+                        >
+                          {followBusyIds[p.id] ? "…" : "Follow"}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
         <div className="surface-glass-muted space-y-3 rounded-2xl p-4">
           <div className="flex flex-col gap-3">

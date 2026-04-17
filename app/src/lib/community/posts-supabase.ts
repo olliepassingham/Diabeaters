@@ -821,6 +821,55 @@ export async function castPollVote(postId: string, optionIndex: number): Promise
   return { error: null };
 }
 
+export type PollVoterDisplay = {
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  option_index: number;
+  created_at: string;
+};
+
+function shortPollVoterId(id: string) {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+/** Poll voters with display names from profiles (RLS applies; blocked users are hidden). */
+export async function fetchPollVotersWithProfiles(postId: string): Promise<{
+  data: PollVoterDisplay[];
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured") };
+
+  const { data, error } = await supabase
+    .from("community_poll_votes")
+    .select("user_id, option_index, created_at")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+
+  if (error) return { data: [], error: new Error(error.message) };
+  const rows = (data ?? []) as Array<{ user_id: string; option_index: number; created_at: string }>;
+  if (rows.length === 0) return { data: [], error: null };
+
+  const ids = rows.map((r) => String(r.user_id));
+  const profiles = await getProfilesByIds(ids);
+
+  const out: PollVoterDisplay[] = rows.map((r) => {
+    const uid = String(r.user_id);
+    const p = profiles.get(uid);
+    return {
+      user_id: uid,
+      option_index: Number(r.option_index),
+      created_at: String(r.created_at),
+      name: p?.full_name?.trim() || shortPollVoterId(uid),
+      avatar_url: p?.avatar_url ?? null,
+    };
+  });
+
+  return { data: out, error: null };
+}
+
 /**
  * Max rows returned for “who liked” (UI shows a truncation note above this).
  * RLS on `community_post_reactions` hides rows where the viewer is blocked with the
