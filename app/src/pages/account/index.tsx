@@ -323,7 +323,7 @@ export default function Account() {
   const displayName = profile?.full_name?.trim() || settingsName || "Your account";
   const nameForInitials = profile?.full_name?.trim() || settingsName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
-  const showPublicProfilePreview = !isCarer && isCommunityEnabled && profile?.is_public === true;
+  const showPublicProfilePreview = isCommunityEnabled && profile?.is_public === true;
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
   const livingWithLine = formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null);
@@ -608,7 +608,7 @@ export default function Account() {
                   </Link>
                 </Button>
               )}
-              {!isCarer && (
+              {(
                 <>
                   <input
                     ref={fileInputRef}
@@ -645,7 +645,7 @@ export default function Account() {
         </CardContent>
       </Card>
 
-      {!isCarer && isCommunityEnabled && (
+      {isCommunityEnabled && (
         <AccountCommunityProfileFields variant="standalone" cardId="community" idPrefix="account" />
       )}
 
