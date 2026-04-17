@@ -50,6 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getPrimaryAppRole } from "@/lib/carer-session";
 import {
   accountDeletionSubmitUnavailableDescription,
   buildAccountDeletionMailtoHref,
@@ -327,6 +328,7 @@ export default function Account() {
   const bioPreview = profile?.bio?.trim() || "";
   const livingWithLine = formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null);
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
+  const canSwitchModes = hasCarerLink && getPrimaryAppRole() !== "carer";
 
   useEffect(() => {
     if (!showPublicProfilePreview) {
@@ -591,7 +593,7 @@ export default function Account() {
                   role="status"
                 />
               ) : (
-                hasCarerLink && (
+                canSwitchModes && (
                   <Button variant="outline" size="sm" className="min-h-11" asChild>
                     <Link href="/mode" data-testid="link-change-view">
                       Change mode
