@@ -38,6 +38,7 @@ import Account from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
 import VerifiedSuccess from "@/pages/verified-success";
 import Welcome from "@/pages/welcome";
+import VerifiedReturn from "@/pages/verified-return";
 import FamilyCarers from "@/pages/family-carers";
 import CarerView from "@/pages/carer-view";
 import CarerSetup from "@/pages/carer-setup";
@@ -259,6 +260,7 @@ function bypassesOnboardingGate(path: string): boolean {
     "/carer-setup",
     "/auth/callback",
     "/verified-success",
+    "/verified-return",
     "/reset-request",
     "/reset-password",
     "/check-email",
@@ -841,6 +843,7 @@ function MainRouter() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/verified-return" component={VerifiedReturn} />
       <Route path="/reset-request" component={ResetRequest} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/check-email" component={CheckEmail} />

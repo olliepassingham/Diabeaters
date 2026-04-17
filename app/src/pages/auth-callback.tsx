@@ -22,8 +22,12 @@ export default function AuthCallback() {
       } catch (err) {
         if (!cancelled) {
           setStatus("error");
-          const message =
-            err instanceof Error ? err.message : "Sign in failed. Please try again.";
+          const message = err instanceof Error ? err.message : "Sign in failed. Please try again.";
+          const isTimeout = message.toLowerCase().includes("could not complete sign in");
+          if (isTimeout) {
+            setLocation("/verified-return");
+            return;
+          }
           setLocation(`/login?error=${encodeURIComponent(message)}`);
         }
       }
