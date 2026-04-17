@@ -670,9 +670,7 @@ export function FeedPostCard({
               aria-label={
                 expanded
                   ? "Hide comments"
-                  : post.comment_count === 0
-                    ? "Comment"
-                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+                  : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
               }
               onClick={onToggleComments}
             >
@@ -680,9 +678,7 @@ export function FeedPostCard({
               <span className="text-xs text-foreground">
                 {expanded
                   ? "Hide comments"
-                  : post.comment_count === 0
-                    ? "Comment"
-                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
+                  : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
               </span>
             </Button>
             <Button
