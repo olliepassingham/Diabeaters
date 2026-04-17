@@ -338,6 +338,9 @@ function mapRedeemCarerInviteError(message: string): string {
   ) {
     return "You're already linked to this person. Open Supporter Mode from Account, or tap Change mode on Account to switch.";
   }
+  if (m.includes("already used") || (m.includes("used") && m.includes("invite"))) {
+    return "This invite code has already been used. If you already linked successfully, open Supporter Mode from Account (or try again after a few seconds).";
+  }
   return message;
 }
 

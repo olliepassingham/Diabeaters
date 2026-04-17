@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   redeemInvite,
   fetchPatientProfileForCarer,
+  getLinkedPatientForCarer,
 } from "@/lib/carers";
 import { getSupabase } from "@/lib/supabase";
 import {
@@ -53,6 +54,30 @@ export default function CarerSetupPage() {
     const { data, error } = await redeemInvite(code);
     setBusy(false);
     if (error || !data) {
+      // If the link was created but the invite is now marked used (or duplicate link),
+      // send the supporter straight into Supporter Mode.
+      const msg = (error?.message ?? "").toLowerCase();
+      const mightBeAlreadyLinked =
+        msg.includes("already linked") ||
+        msg.includes("already used") ||
+        msg.includes("duplicate") ||
+        msg.includes("used");
+      if (mightBeAlreadyLinked) {
+        const link = await getLinkedPatientForCarer();
+        if (link.data?.patientId) {
+          clearPendingCarer();
+          clearCarerIntent();
+          if (getPrimaryAppRole() == null) setPrimaryAppRole("carer");
+          setActiveAppMode("carer");
+          setCode("");
+          toast({
+            title: "Linked already",
+            description: "You're already linked. Opening Supporter Mode.",
+          });
+          setLocation("/carer-view");
+          return;
+        }
+      }
       toast({
         title: "Could not redeem invite",
         description: error?.message ?? "Unknown error",
