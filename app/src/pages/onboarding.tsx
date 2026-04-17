@@ -282,12 +282,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       {(showBackButton || showNextButton) && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
           data-testid="onboarding-sticky-actions"
         >
           <PageShell variant="narrow" className="flex justify-between gap-3 items-center">
             {showBackButton ? (
-              <Button variant="outline" onClick={handleBack} data-testid="button-onboarding-back">
+              <Button variant="outline" size="sm" onClick={handleBack} data-testid="button-onboarding-back">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
@@ -299,7 +299,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 <Button
                   onClick={handleNext}
                   disabled={!canProceed()}
-                  className="min-w-[8rem] shrink-0"
+                  size="sm"
+                  className="min-w-[7rem] shrink-0"
                   data-testid="button-onboarding-next"
                 >
                   {currentStep === "disclaimer" ? "Let's go" : "Next"}
@@ -407,14 +408,14 @@ function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: 
           return (
             <div
               key={option.id}
-              className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all hover-elevate ${
+              className={`flex items-center gap-3 p-3 sm:gap-4 sm:p-4 rounded-lg border cursor-pointer transition-all hover-elevate ${
                 isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : ""
               }`}
               onClick={() => updateData("struggle", option.id)}
               data-testid={`struggle-${option.id}`}
             >
-              <div className={`p-3 rounded-lg ${option.bg}`}>
-                <Icon className={`h-5 w-5 ${option.color}`} />
+              <div className={`p-2.5 sm:p-3 rounded-lg ${option.bg}`}>
+                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${option.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{option.title}</p>
