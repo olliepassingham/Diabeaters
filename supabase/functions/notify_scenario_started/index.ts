@@ -1,7 +1,10 @@
 /**
  * Supabase Edge Function: notify linked carers when a scenario starts (sick_day/travel).
+ *
+ * Push: APNs (APNS_*) or legacy PUSH_NOTIFICATION_API_URL — see ../_shared/deliver-ios-push.ts
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -97,9 +100,6 @@ Deno.serve(async (req: Request) => {
       (prefsRows ?? []).map((r: any) => [String(r.user_id), r.prefs]),
     );
 
-    const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
-    const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
-
     let deliveredInapp = 0;
     let deliveredPush = 0;
 
@@ -134,7 +134,7 @@ Deno.serve(async (req: Request) => {
         if (!error) deliveredInapp += 1;
       }
 
-      if (pushOn && pushUrl) {
+      if (pushOn && iosPushDeliveryConfigured()) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
           .select("token")
@@ -142,14 +142,8 @@ Deno.serve(async (req: Request) => {
           .eq("platform", "ios");
         const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
         for (const t of tokens) {
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
-          const res = await fetch(pushUrl, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ to: t, title, body: bodyText, data }),
-          });
-          if (res.ok) deliveredPush += 1;
+          const ok = await deliverIosPushToDevice(t, title, bodyText, data);
+          if (ok) deliveredPush += 1;
         }
       }
     }

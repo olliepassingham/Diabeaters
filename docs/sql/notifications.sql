@@ -1,6 +1,11 @@
 -- Notifications v1 (push + in-app inbox)
 -- Apply in Supabase SQL editor (or `supabase db push` if you convert to a migration).
 --
+-- iOS push delivery (Edge Functions `notify_*`): configure APNs Auth Key in Supabase → Edge Functions → Secrets:
+--   APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY (full .p8 PEM; use \n for newlines in the secret value)
+--   optional: APNS_BUNDLE_ID (default com.passingtime.diabeaters), APNS_USE_SANDBOX=true for Xcode debug tokens
+-- Alternatively set PUSH_NOTIFICATION_API_URL (+ optional PUSH_NOTIFICATION_API_KEY) for a custom HTTP relay.
+--
 -- Tables:
 -- - public.notifications: in-app inbox rows per recipient user_id
 -- - public.push_tokens: device push tokens per user (iOS Capacitor)

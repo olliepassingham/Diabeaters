@@ -12,13 +12,16 @@
  * - SUPABASE_ANON_KEY
  * - SUPABASE_SERVICE_ROLE_KEY
  *
- * Optional push relay:
- * - PUSH_NOTIFICATION_API_URL — POST JSON { to, title, body, data }
- * - PUSH_NOTIFICATION_API_KEY — Bearer token for that API
+ * Push delivery (configure one path):
+ * - Direct APNs: APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY (.p8 body; use \\n for newlines in secrets)
+ *   optional: APNS_BUNDLE_ID (default com.passingtime.diabeaters), APNS_USE_SANDBOX=true for Xcode debug builds
+ * - Legacy relay: PUSH_NOTIFICATION_API_URL — POST JSON { to, title, body, data }
+ *   optional: PUSH_NOTIFICATION_API_KEY — Bearer token
  *
  * Invoke with user's JWT; body: { hypo_id, user_id } must match the hypo row and JWT sub.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -170,9 +173,6 @@ Deno.serve(async (req: Request) => {
       (prefsRows ?? []).map((r: any) => [String(r.user_id), r.prefs]),
     );
 
-    const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
-    const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
-
     let pushDelivered = 0;
     let inappDelivered = 0;
 
@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
         else console.error("[notify_carers_on_hypo] notification insert", insErr);
       }
 
-      if (pushOn && pushUrl) {
+      if (pushOn && iosPushDeliveryConfigured()) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
           .select("token")
@@ -215,22 +215,10 @@ Deno.serve(async (req: Request) => {
         const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
         for (const t of tokens) {
           try {
-            const headers: Record<string, string> = { "Content-Type": "application/json" };
-            if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
-            const res = await fetch(pushUrl, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                to: t,
-                title,
-                body: bodyText,
-                data: payload,
-              }),
-            });
-            if (res.ok) pushDelivered += 1;
-            else console.warn("[notify_carers_on_hypo] push API status", res.status, await res.text());
+            const ok = await deliverIosPushToDevice(t, title, bodyText, payload);
+            if (ok) pushDelivered += 1;
           } catch (e) {
-            console.error("[notify_carers_on_hypo] push fetch", e);
+            console.error("[notify_carers_on_hypo] push send", e);
           }
         }
       }

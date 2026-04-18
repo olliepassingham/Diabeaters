@@ -6,11 +6,11 @@
  * - SUPABASE_ANON_KEY
  * - SUPABASE_SERVICE_ROLE_KEY
  *
- * Optional push relay:
- * - PUSH_NOTIFICATION_API_URL — POST JSON { to, title, body, data }
- * - PUSH_NOTIFICATION_API_KEY — Bearer token for that API
+ * Push: direct APNs (APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY, optional APNS_BUNDLE_ID, APNS_USE_SANDBOX)
+ * or legacy relay (PUSH_NOTIFICATION_API_URL, optional PUSH_NOTIFICATION_API_KEY).
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -37,25 +37,6 @@ function prefsAllowSupply(prefs: unknown): { enabled: boolean; inapp: boolean; p
     inapp: p.inapp !== false,
     push: p.push === true,
   };
-}
-
-async function sendPush(opts: { to: string; title: string; body: string; data: unknown }) {
-  const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
-  if (!pushUrl) return false;
-
-  const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
-
-  const res = await fetch(pushUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ to: opts.to, title: opts.title, body: opts.body, data: opts.data }),
-  });
-  if (!res.ok) {
-    console.warn("[notify_supply_low] push API status", res.status, await res.text());
-  }
-  return res.ok;
 }
 
 Deno.serve(async (req: Request) => {
@@ -188,7 +169,7 @@ Deno.serve(async (req: Request) => {
         else console.error("[notify_supply_low] notification insert", insErr);
       }
 
-      if (prefs.push) {
+      if (prefs.push && iosPushDeliveryConfigured()) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
           .select("token")
@@ -197,7 +178,7 @@ Deno.serve(async (req: Request) => {
         const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
         for (const t of tokens) {
           try {
-            const ok = await sendPush({ to: t, title, body: bodyText, data });
+            const ok = await deliverIosPushToDevice(t, title, bodyText, data);
             if (ok) pushDelivered += 1;
           } catch (e) {
             console.error("[notify_supply_low] push send", e);

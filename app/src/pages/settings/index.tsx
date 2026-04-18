@@ -30,7 +30,7 @@ import {
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { requestNotificationPermission } from "@/hooks/use-offline";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
-import { ensureIosPushRegistered } from "@/lib/push-tokens";
+import { ensureIosPushRegistered, resetIosPushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -888,8 +888,13 @@ export default function Settings() {
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
     void syncNotificationPreferences(updated);
-    if (key === "pushNotifications" && value) {
-      void ensureIosPushRegistered();
+    if (key === "pushNotifications") {
+      if (!value) {
+        resetIosPushRegistrationState();
+      } else {
+        resetIosPushRegistrationState();
+        void ensureIosPushRegistered();
+      }
     }
   };
 

@@ -6,11 +6,10 @@
  *
  * Secrets:
  * - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
- * Optional push relay (same as other notify_* functions):
- * - PUSH_NOTIFICATION_API_URL — POST JSON { to, title, body, data }
- * - PUSH_NOTIFICATION_API_KEY — Bearer token for that API
+ * Push: APNs (APNS_*) or legacy PUSH_NOTIFICATION_API_URL — see ../_shared/deliver-ios-push.ts
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -44,25 +43,6 @@ function shouldDeliverDmPush(prefsRaw: unknown): boolean {
   if (pr.enabled === false) return false;
   if (pr.dm_alerts === false) return false;
   return pr.push === true;
-}
-
-async function sendPush(opts: { to: string; title: string; body: string; data: unknown }): Promise<boolean> {
-  const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
-  if (!pushUrl) return false;
-
-  const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
-
-  const res = await fetch(pushUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ to: opts.to, title: opts.title, body: opts.body, data: opts.data }),
-  });
-  if (!res.ok) {
-    console.warn("[notify_dm_push] push API status", res.status, await res.text());
-  }
-  return res.ok;
 }
 
 Deno.serve(async (req: Request) => {
@@ -211,12 +191,11 @@ Deno.serve(async (req: Request) => {
       (prefsRows ?? []).map((r: { user_id: string; prefs: unknown }) => [String(r.user_id), r.prefs]),
     );
 
-    const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
     let pushDelivered = 0;
 
     for (const rid of recipientIds) {
       if (!shouldDeliverDmPush(prefsById.get(rid))) continue;
-      if (!pushUrl) continue;
+      if (!iosPushDeliveryConfigured()) continue;
 
       const { data: tokenRows } = await admin
         .from("push_tokens")
@@ -226,12 +205,7 @@ Deno.serve(async (req: Request) => {
       const tokens = (tokenRows ?? []).map((t: { token: string }) => String(t.token)).filter(Boolean);
       for (const t of tokens) {
         try {
-          const ok = await sendPush({
-            to: t,
-            title: "New message",
-            body: bodyText,
-            data: payload,
-          });
+          const ok = await deliverIosPushToDevice(t, "New message", bodyText, payload);
           if (ok) pushDelivered += 1;
         } catch (e) {
           console.error("[notify_dm_push] push send", e);

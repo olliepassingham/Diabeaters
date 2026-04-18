@@ -6,6 +6,17 @@ import { storage } from "@/lib/storage";
 
 let initialised = false;
 
+/** Call when turning iOS push off (or before re-registering) so the next ensure can run again. */
+export function resetIosPushRegistrationState(): void {
+  initialised = false;
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+  try {
+    void PushNotifications.removeAllListeners();
+  } catch {
+    // ignore
+  }
+}
+
 export async function ensureIosPushRegistered(): Promise<void> {
   if (initialised) return;
 
@@ -22,11 +33,16 @@ export async function ensureIosPushRegistered(): Promise<void> {
   if (!settings.enabled || !settings.pushNotifications) return;
 
   const { data: sessionData } = await supabase.auth.getSession();
-  const uid = sessionData.session?.user?.id;
-  if (!uid) return;
+  if (!sessionData.session?.user?.id) return;
 
   // Only mark initialised once we know it's appropriate to prompt/register.
   initialised = true;
+
+  try {
+    void PushNotifications.removeAllListeners();
+  } catch {
+    // ignore
+  }
 
   const perm = await PushNotifications.requestPermissions();
   if (perm.receive !== "granted") {
@@ -39,9 +55,13 @@ export async function ensureIosPushRegistered(): Promise<void> {
   PushNotifications.addListener("registration", async (token: { value: string }) => {
     const t = token.value?.trim();
     if (!t) return;
-    const { error } = await supabase
-      .from("push_tokens")
-      .upsert({ user_id: uid, platform: "ios", token: t }, { onConflict: "user_id,platform,token" });
+    const { data: sess } = await supabase.auth.getSession();
+    const uid = sess.session?.user?.id;
+    if (!uid) return;
+    const { error } = await supabase.from("push_tokens").upsert(
+      { user_id: uid, platform: "ios", token: t },
+      { onConflict: "user_id,platform,token" },
+    );
     if (import.meta.env.DEV && error) {
       console.warn("[push_tokens] upsert failed:", error.message);
     }
@@ -53,4 +73,3 @@ export async function ensureIosPushRegistered(): Promise<void> {
     }
   });
 }
-
