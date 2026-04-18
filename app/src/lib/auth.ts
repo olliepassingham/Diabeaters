@@ -4,7 +4,7 @@ import type {
   Session,
   User,
 } from "@supabase/supabase-js";
-import { getAuthCallbackUrl, getResetPasswordUrl } from "./auth-app-url";
+import { getAuthCallbackUrl, getEmailAuthRedirectUrl, getResetPasswordUrl } from "./auth-app-url";
 import { getSupabase } from "./supabase";
 
 const NOT_CONFIGURED = new Error("Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env");
@@ -78,7 +78,7 @@ export async function signup(
       email,
       password,
       options: {
-        emailRedirectTo: getAuthCallbackUrl(),
+        emailRedirectTo: getEmailAuthRedirectUrl(),
         ...(captchaToken ? { captchaToken } : {}),
       },
     });
@@ -129,7 +129,7 @@ export async function resendVerification(
       type: "signup",
       email,
       options: {
-        emailRedirectTo: getAuthCallbackUrl(),
+        emailRedirectTo: getEmailAuthRedirectUrl(),
       },
     });
     return { data: {}, error };
@@ -270,7 +270,7 @@ export async function updateEmail(
   try {
     const { data, error } = await supabase.auth.updateUser(
       { email: newEmail },
-      { emailRedirectTo: getAuthCallbackUrl() },
+      { emailRedirectTo: getEmailAuthRedirectUrl() },
     );
     return { data, error };
   } catch (e) {

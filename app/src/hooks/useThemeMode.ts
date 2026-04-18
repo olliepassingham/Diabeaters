@@ -3,6 +3,9 @@ export const THEME_MODE_STORAGE_KEY = "diabeaters_theme_mode";
 /** Light, dark, or Auto (time-based schedule). */
 export type ThemeMode = "light" | "dark" | "system";
 
+/** When no preference is stored (first launch), use dark appearance. */
+export const DEFAULT_THEME_MODE: ThemeMode = "dark";
+
 export function isThemeMode(s: string | null): s is ThemeMode {
   return s === "light" || s === "dark" || s === "system";
 }
@@ -21,10 +24,10 @@ export function migrateLegacyThemeModeKey(): void {
 }
 
 export function getStoredThemeMode(): ThemeMode {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return DEFAULT_THEME_MODE;
   const raw = localStorage.getItem(THEME_MODE_STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "system") return raw;
-  return "system";
+  return DEFAULT_THEME_MODE;
 }
 
 export const AUTO_LIGHT_START_HOUR = 7; // 07:00 inclusive

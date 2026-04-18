@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   describeAuthErrorForDisplay,
@@ -6,6 +6,7 @@ import {
   isUserVerified,
   login,
 } from "@/lib/auth";
+import { useAuth } from "@/lib/auth-context";
 import { navigateAfterLoginSuccess } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -18,16 +19,19 @@ import { Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const verifiedToastShown = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const err = params.get("error");
+    const verified = params.get("verified") === "1";
     const next = params.get("next");
     if (next?.startsWith("/") && !next.startsWith("//")) {
       try {
@@ -43,8 +47,25 @@ export default function Login() {
         variant: "destructive",
       });
       window.history.replaceState({}, "", "/login");
+      return;
     }
-  }, [toast]);
+
+    if (verified) {
+      if (!verifiedToastShown.current) {
+        verifiedToastShown.current = true;
+        toast({
+          title: "Email verified",
+          description: "You can log in with your email and password.",
+        });
+      }
+      if (authLoading) return;
+      if (user && isUserVerified(user)) {
+        void navigateAfterLoginSuccess(setLocation);
+        return;
+      }
+      window.history.replaceState({}, "", "/login");
+    }
+  }, [toast, authLoading, user, setLocation]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

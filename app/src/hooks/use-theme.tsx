@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useTheme";
 import {
   applyRootAppearanceClass,
+  DEFAULT_THEME_MODE,
   getStoredThemeMode,
   getTimePrefersDark,
   migrateLegacyThemeModeKey,
@@ -52,7 +53,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       migrateLegacyThemeModeKey();
       migrateLegacyColourTheme();
     }
-    return typeof window === "undefined" ? "light" : getStoredThemeMode();
+    return typeof window === "undefined" ? DEFAULT_THEME_MODE : getStoredThemeMode();
   });
 
   // Used to periodically re-evaluate time-based Auto mode.

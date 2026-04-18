@@ -8,13 +8,16 @@ export default function AuthCallback() {
 
   useEffect(() => {
     let cancelled = false;
+    const pathOnly =
+      typeof window !== "undefined" ? window.location.pathname.split("?")[0] ?? "" : "";
+    const isEmailVerifyRoute = pathOnly === "/auth/email-verify";
 
     (async () => {
       try {
         const { user } = await handleAuthCallback();
         if (!cancelled) {
           if (isUserVerified(user)) {
-            setLocation("/welcome?verified=1");
+            setLocation(isEmailVerifyRoute ? "/login?verified=1" : "/welcome?verified=1");
           } else {
             setLocation("/check-email");
           }

@@ -2,10 +2,11 @@
  * Supabase configuration checks. No network calls; purely client-side.
  * Used by DevBanner in development only.
  */
-import { getPublicAppOrigin } from "./auth-app-url";
+import { getPublicAppOrigin, NATIVE_EMAIL_VERIFY_REDIRECT_URL } from "./auth-app-url";
 
 export const REQUIRED_REDIRECTS: string[] = [
   "/auth/callback",
+  "/auth/email-verify",
   "/reset-password",
 ];
 
@@ -25,10 +26,12 @@ export function getRequiredRedirectUrls(): string[] {
       urls.add(`${origin}${path}`);
     }
   }
+  urls.add(NATIVE_EMAIL_VERIFY_REDIRECT_URL);
   if (typeof window !== "undefined") {
     const o = window.location.origin;
     if (o.includes("localhost") || o.includes("127.0.0.1")) {
       urls.add("http://localhost:5173/auth/callback");
+      urls.add("http://localhost:5173/auth/email-verify");
       urls.add("http://localhost:5173/reset-password");
     }
   }
@@ -43,8 +46,11 @@ export function getRedirectUrlsCopyBlock(): string {
   const isLocalhost = origin.includes("localhost") || origin.includes("127.0.0.1");
   const lines: string[] = [
     `https://YOUR_DOMAIN/auth/callback`,
+    `https://YOUR_DOMAIN/auth/email-verify`,
     `https://YOUR_DOMAIN/reset-password`,
+    `diabeaters://auth/email-verify`,
     `http://localhost:5173/auth/callback`,
+    `http://localhost:5173/auth/email-verify`,
     `http://localhost:5173/reset-password`,
   ];
   if (isLocalhost) {

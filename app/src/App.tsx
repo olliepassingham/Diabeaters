@@ -157,7 +157,7 @@ function useNativeDeepLinks() {
         const isHttp = url.protocol === "https:" || url.protocol === "http:";
         const nextPath = isHttp
           ? `${url.pathname}${url.search}${url.hash}`
-          : `/${url.host || ""}${url.pathname}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
+          : `/${url.hostname || url.host || ""}${url.pathname || ""}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
 
         const safe = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
         setLocation(safe);
@@ -259,6 +259,7 @@ function bypassesOnboardingGate(path: string): boolean {
     "/signup",
     "/carer-setup",
     "/auth/callback",
+    "/auth/email-verify",
     "/verified-success",
     "/verified-return",
     "/reset-request",
@@ -843,6 +844,7 @@ function MainRouter() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/auth/email-verify" component={AuthCallback} />
       <Route path="/verified-return" component={VerifiedReturn} />
       <Route path="/reset-request" component={ResetRequest} />
       <Route path="/reset-password" component={ResetPassword} />
