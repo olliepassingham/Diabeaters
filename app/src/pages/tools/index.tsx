@@ -1,13 +1,36 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Calculator, TrendingUp, Repeat, Droplet, Package, BookOpen, Calendar, Sparkles, HeartPulse, Map as MapIcon } from "lucide-react";
+import {
+  Calculator,
+  TrendingUp,
+  Repeat,
+  Droplet,
+  Package,
+  BookOpen,
+  Calendar,
+  HeartPulse,
+  Map as MapIcon,
+  ChevronRight,
+  Users,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
-import { CURATED_RESOURCES } from "@/lib/curated-resources.ts";
+import { CURATED_RESOURCES, type CuratedResource } from "@/lib/curated-resources.ts";
+import { openExternalUrl } from "@/lib/open-external-url";
+import { cn } from "@/lib/utils";
 
 type ToolDef = {
   id: string;
@@ -18,8 +41,7 @@ type ToolDef = {
 };
 
 /**
- * Single hub for patient tools — six tiles in a balanced grid (2×3 on large screens).
- * No redundant shortcuts to Home or Settings; each link goes to a dedicated feature.
+ * Patient tools hub — each tool appears in exactly one section (no duplicate rows).
  */
 const PATIENT_TOOLS: ToolDef[] = [
   {
@@ -73,7 +95,7 @@ const PATIENT_TOOLS: ToolDef[] = [
   },
 ];
 
-const CARER_TOOLS: ToolDef[] = [
+export const CARER_TOOLS: ToolDef[] = [
   {
     id: "hypo-help",
     href: "/tools/hypo-help",
@@ -95,22 +117,20 @@ function ToolCard({
   icon: Icon,
   title,
   description,
-  variant = "default",
-}: Omit<ToolDef, "id"> & { variant?: "default" | "featured" }) {
+  layout = "default",
+}: Omit<ToolDef, "id"> & { layout?: "default" | "compact" }) {
   const cardClass =
-    variant === "featured"
-      ? "pressable card-interactive flex h-full min-h-[12.5rem] w-full cursor-pointer flex-col gap-3 rounded-2xl"
-      : "pressable card-interactive flex h-full min-h-[11.75rem] w-full cursor-pointer flex-col gap-3 rounded-2xl";
+    layout === "compact"
+      ? "pressable card-interactive flex h-full min-h-[9.5rem] w-full cursor-pointer flex-col gap-2 rounded-2xl sm:min-h-[10.5rem]"
+      : "pressable card-interactive flex h-full min-h-[10.5rem] w-full cursor-pointer flex-col gap-3 rounded-2xl md:min-h-[11.75rem]";
+  const pad = layout === "compact" ? "p-5 sm:p-6" : "p-6 sm:p-7";
   return (
     <Link
       href={href}
       className="pressable group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <Card
-        variant="glass"
-        className={cardClass}
-      >
-        <CardContent className="flex h-full flex-col gap-3 p-6 sm:p-7">
+      <Card variant="glass" className={cardClass}>
+        <CardContent className={cn("flex h-full flex-col gap-3", pad)}>
           <div className="flex flex-1 items-start gap-3 sm:gap-4">
             <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
             <div className="min-w-0 flex-1">
@@ -120,6 +140,34 @@ function ToolCard({
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+/** Full-width horizontal strip for a single “Learn” tool on patient hub. */
+function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "id">) {
+  return (
+    <Link
+      href={href}
+      className="pressable group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border border-border/50">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
+          <div className="flex items-start gap-4 sm:items-center">
+            <Icon className="h-9 w-9 shrink-0 text-primary sm:h-10 sm:w-10" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem]">
+                {description}
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            className="hidden h-6 w-6 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:block"
+            aria-hidden
+          />
         </CardContent>
       </Card>
     </Link>
@@ -143,29 +191,75 @@ function SectionHeader({
   );
 }
 
-export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
+function ResourcePreviewDialog({
+  resource,
+  open,
+  onOpenChange,
+}: {
+  resource: CuratedResource | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {resource ? (
+        <DialogContent className="max-h-[min(90vh,36rem)] overflow-y-auto sm:max-w-lg" data-testid="resource-preview-dialog">
+          <DialogHeader>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{resource.source}</p>
+            <DialogTitle className="text-left text-base leading-snug sm:text-lg">{resource.title}</DialogTitle>
+            {resource.tag ? (
+              <span className="inline-flex w-fit rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {resource.tag}
+              </span>
+            ) : null}
+            <DialogDescription className="text-left text-sm text-muted-foreground">{resource.dateLabel}</DialogDescription>
+          </DialogHeader>
+          <p className="text-sm leading-relaxed text-foreground">{resource.description}</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Opens the official site in your browser. You can return to Diabeaters anytime.
+          </p>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                openExternalUrl(resource.href);
+                onOpenChange(false);
+              }}
+              data-testid="resource-open-external"
+            >
+              Open on {resource.source}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
+    </Dialog>
+  );
+}
+
+export function ToolsHubPage({
+  tools = PATIENT_TOOLS,
+  hubVariant = "patient",
+}: {
+  tools?: ToolDef[];
+  hubVariant?: "patient" | "carer";
+}) {
+  const [previewResource, setPreviewResource] = useState<CuratedResource | null>(null);
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
-  const featured = [
-    "hypo-help",
-    "insulin-calculator",
-    "correction-helper",
-    "supply-tracker",
-  ]
+  const actNowIds =
+    hubVariant === "carer" ? (["hypo-help"] as const) : (["insulin-calculator", "hypo-help", "correction-helper"] as const);
+  const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+
+  const plan = (["routines", "appointments", "supply-tracker"] as const)
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
-  const actNow = ["hypo-help", "correction-helper"]
-    .map((id) => byId.get(id))
-    .filter(Boolean) as ToolDef[];
+  const learn = (["education"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
-  const plan = ["routines", "appointments", "supply-tracker"]
-    .map((id) => byId.get(id))
-    .filter(Boolean) as ToolDef[];
-
-  const learn = ["education"]
-    .map((id) => byId.get(id))
-    .filter(Boolean) as ToolDef[];
+  const supporterTools = hubVariant === "carer" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-10">
@@ -175,80 +269,103 @@ export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
         description="Calculators, tracking, and learning resources. Educational only — always follow your care team&apos;s advice."
       />
 
-      {featured.length > 0 && (
-        <section className="space-y-4" aria-label="Most used tools" data-testid="tools-section-most-used">
+      {hubVariant === "carer" && supporterTools.length > 0 ? (
+        <section className="space-y-4" aria-label="Supporter tools" data-testid="tools-section-supporter">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title="Most used" description="Quick access to the tools people reach for most." />
+            <Users className="h-5 w-5 text-primary" aria-hidden />
+            <SectionHeader
+              title="Supporter tools"
+              description="General education and hypo guidance. Always follow the care team&apos;s plan for the person you support."
+            />
           </div>
-          <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6" aria-label="Most used">
-            {featured.map((t, idx) => (
-              <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 35}ms` }}>
-                <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} variant="featured" />
+          <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" aria-label="Supporter tools">
+            {supporterTools.map((t, idx) => (
+              <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 40}ms` }}>
+                <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
               </li>
             ))}
           </ul>
         </section>
+      ) : (
+        <>
+          {actNow.length > 0 ? (
+            <section className="space-y-4" aria-label="Act now tools" data-testid="tools-section-act-now">
+              <div className="flex items-center gap-2">
+                <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
+                <SectionHeader
+                  title="Act now"
+                  description="Meal doses, corrections, and fast hypo help when you need an answer."
+                />
+              </div>
+              <ul
+                className="flex list-none gap-4 overflow-x-auto pb-2 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0 md:snap-none [&::-webkit-scrollbar]:hidden"
+                aria-label="Act now"
+              >
+                {actNow.map((t, idx) => (
+                  <li
+                    key={t.id}
+                    className="w-[min(85vw,22rem)] shrink-0 snap-start md:w-auto md:min-h-0 md:shrink animate-soft-in"
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  >
+                    <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {plan.length > 0 ? (
+            <section className="space-y-4" aria-label="Plan tools" data-testid="tools-section-plan">
+              <div className="flex items-center gap-2">
+                <MapIcon className="h-5 w-5 text-primary" aria-hidden />
+                <SectionHeader title="Plan" description="Set up once, then reuse when you need it." />
+              </div>
+              <ul
+                className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7"
+                aria-label="Plan"
+              >
+                {plan.map((t, idx) => (
+                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+                    <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {learn.length > 0 ? (
+            <section className="space-y-4" aria-label="Learn tools" data-testid="tools-section-learn">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" aria-hidden />
+                <SectionHeader title="Learn" description="Clear explanations you can come back to anytime." />
+              </div>
+              <ul className="list-none space-y-4" aria-label="Learn">
+                {learn.map((t, idx) => (
+                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+                    <LearnToolRow href={t.href} icon={t.icon} title={t.title} description={t.description} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
       )}
-
-      <section className="space-y-4" aria-label="Act now tools" data-testid="tools-section-act-now">
-        <div className="flex items-center gap-2">
-          <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
-          <SectionHeader title="Act now" description="Fast help for the moments you need an answer." />
-        </div>
-        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Act now">
-          {actNow.map((t, idx) => (
-            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
-              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-4" aria-label="Plan tools" data-testid="tools-section-plan">
-        <div className="flex items-center gap-2">
-          <MapIcon className="h-5 w-5 text-primary" aria-hidden />
-          <SectionHeader title="Plan" description="Set up once, then reuse when you need it." />
-        </div>
-        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Plan">
-          {plan.map((t, idx) => (
-            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
-              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-4" aria-label="Learn tools" data-testid="tools-section-learn">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" aria-hidden />
-          <SectionHeader title="Learn" description="Clear explanations you can come back to anytime." />
-        </div>
-        <ul className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7" aria-label="Learn">
-          {learn.map((t, idx) => (
-            <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
-              <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
-            </li>
-          ))}
-        </ul>
-      </section>
 
       {CURATED_RESOURCES.length > 0 && (
         <section className="space-y-4" aria-label="News and resources" data-testid="tools-section-resources">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title="News & resources" description="Curated updates and trusted reading." />
+            <SectionHeader title="News & resources" description="Curated updates and trusted reading — preview here, then open the official site." />
           </div>
 
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2" aria-label="News & resources">
             {CURATED_RESOURCES.slice(0, 6).map((r, idx) => (
               <li key={r.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 25}ms` }}>
-                <a
-                  href={r.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  aria-label={`${r.title} (${r.source})`}
+                <button
+                  type="button"
+                  onClick={() => setPreviewResource(r)}
+                  className="group block h-full w-full rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label={`Preview ${r.title} (${r.source})`}
                   data-testid={`resource-${r.id}`}
                 >
                   <Card
@@ -258,35 +375,32 @@ export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
                     <CardContent className="flex h-full flex-col gap-2 p-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {r.source}
-                          </p>
-                          <h3 className="mt-1 text-sm font-semibold text-foreground leading-snug">
-                            {r.title}
-                          </h3>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{r.source}</p>
+                          <h3 className="mt-1 text-sm font-semibold text-foreground leading-snug">{r.title}</h3>
                         </div>
-                        {r.tag ? (
-                          <span className="chip chip-muted shrink-0">
-                            {r.tag}
-                          </span>
-                        ) : null}
+                        {r.tag ? <span className="chip chip-muted shrink-0">{r.tag}</span> : null}
                       </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
-                        {r.description}
-                      </p>
-                      <div className="mt-auto pt-1">
-                        <p className="text-xs text-muted-foreground">
-                          {r.dateLabel}
-                        </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{r.description}</p>
+                      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                        <p className="text-xs text-muted-foreground">{r.dateLabel}</p>
+                        <span className="text-xs font-medium text-primary">Preview</span>
                       </div>
                     </CardContent>
                   </Card>
-                </a>
+                </button>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      <ResourcePreviewDialog
+        resource={previewResource}
+        open={previewResource != null}
+        onOpenChange={(o) => {
+          if (!o) setPreviewResource(null);
+        }}
+      />
     </PageShell>
   );
 }
@@ -345,6 +459,6 @@ export default function ToolsPage() {
     );
   }
   if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
-  if (isCarerMode) return <ToolsHubPage tools={CARER_TOOLS} />;
-  return <ToolsHubPage tools={PATIENT_TOOLS} />;
+  if (isCarerMode) return <ToolsHubPage tools={CARER_TOOLS} hubVariant="carer" />;
+  return <ToolsHubPage tools={PATIENT_TOOLS} hubVariant="patient" />;
 }
