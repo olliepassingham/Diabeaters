@@ -368,7 +368,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               onClick={() => setMode("scratch_intro")}
               data-testid="button-adviser-no-ratios"
             >
-              <div>
+              <div className="min-w-0 text-pretty">
                 <p className="font-medium text-sm">I don't know my ratios yet</p>
                 <p className="text-xs text-muted-foreground">Help me estimate starting ratios</p>
               </div>
@@ -379,9 +379,9 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               onClick={() => setMode("refine")}
               data-testid="button-adviser-have-ratios"
             >
-              <div>
-                <p className="font-medium text-sm">I have ratios but haven't entered them</p>
-                <p className="text-xs text-muted-foreground">I'll enter them in Settings, then come back to check if they need adjusting</p>
+              <div className="min-w-0 text-pretty">
+                <p className="font-medium text-sm">I have ratios to add</p>
+                <p className="text-xs text-muted-foreground">Save them in Settings, then return here to review.</p>
               </div>
             </Button>
           </div>

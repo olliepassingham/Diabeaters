@@ -788,10 +788,11 @@ export default function AlcoholScenarioPage() {
 
       {showSticky ? (
         <div
-          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
+          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
           data-testid="alcohol-sticky-actions"
         >
-          <PageShell variant="standard" className="flex gap-2 items-center justify-between">
+          {/* PageShell reserves nav padding-bottom; never use it inside this fixed bar or it balloons the footer height. */}
+          <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center justify-between gap-2">
             <Button
               type="button"
               variant="outline"
@@ -814,17 +815,19 @@ export default function AlcoholScenarioPage() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <span className="text-sm text-muted-foreground sm:ml-auto">Choose a situation to continue</span>
+              <span className="text-sm text-muted-foreground sm:ml-auto line-clamp-2 text-right">
+                Choose a situation to continue
+              </span>
             )}
-          </PageShell>
+          </div>
         </div>
       ) : (
-        <PageShell variant="standard" className="flex justify-start">
+        <div className="mx-auto flex w-full min-w-0 max-w-3xl justify-start">
           <Button type="button" variant="outline" className="gap-1.5" onClick={backToInputs}>
             <ArrowLeft className="h-4 w-4" />
             Edit details
           </Button>
-        </PageShell>
+        </div>
       )}
     </div>
   );
