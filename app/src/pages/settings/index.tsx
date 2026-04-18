@@ -25,7 +25,6 @@ import {
   Bell,
   Info,
   Users,
-  Phone,
   AtSign,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -707,7 +706,7 @@ export default function Settings() {
 
     const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
     const tab = new URLSearchParams(qs).get("tab");
-    const emergencyEdit = isCarer ? "/settings/emergency" : "/account#account-emergency";
+    const emergencyEdit = isCarer ? "/carer-view#carer-emergency" : "/account#account-emergency";
     const tabRoutes: Record<string, string> = {
       profile: "/settings/usage#settings-personal",
       insulin: "/settings/ratios",
@@ -1085,17 +1084,6 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        {isCarer && (
-          <SettingsHubGroup title="Your account">
-            <SettingsHubNavLink
-              href="/settings/emergency"
-              label="Emergency details"
-              description="Your contact info for Help now"
-              icon={Phone}
-            />
-          </SettingsHubGroup>
-        )}
-
         <SettingsHubGroup title="Appearance">
           <SettingsHubNavLink
             href="/settings/appearance"
@@ -1106,7 +1094,16 @@ export default function Settings() {
         </SettingsHubGroup>
 
         <SettingsHubGroup title="Notifications">
-          <SettingsHubNavLink href="/settings/notifications" label="Alerts" description="Hypo, trends, scenarios, browser notifications" icon={Bell} />
+          <SettingsHubNavLink
+            href="/settings/notifications"
+            label="Alerts"
+            description={
+              isCarer
+                ? "Feed, messages, and device alerts for your supporter account"
+                : "Hypo, trends, scenarios, browser notifications"
+            }
+            icon={Bell}
+          />
         </SettingsHubGroup>
 
         <SettingsHubGroup title="Help & legal">
@@ -1141,6 +1138,7 @@ export default function Settings() {
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
         onEnableBrowser={handleEnableBrowserNotifications}
+        supporterMode={isCarer}
       />
     );
   }

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedPostList } from "@/components/community/feed-post-list";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -391,7 +391,7 @@ export default function CommunityHomePage() {
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="mx-auto max-w-lg space-y-6">
-        <PageHeader leading={<PageBackButton />} title="Feed" />
+        <PageHeader title="Feed" />
         <EmptyState
           title="Feed needs Supabase"
           description="Connect Supabase in your environment to use the community feed."
@@ -406,7 +406,6 @@ export default function CommunityHomePage() {
       className="mx-auto max-w-lg space-y-6 pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
     >
       <PageHeader
-        leading={<PageBackButton />}
         title="Feed"
         actions={
           <div className="flex items-center gap-1.5">

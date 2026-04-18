@@ -120,17 +120,26 @@ export async function getFollowCounts(userId: string): Promise<{
     return { followers: 0, following: 0, error: new Error("Supabase not configured") };
   }
 
-  const { count: followers, error: e1 } = await supabase
-    .from("user_follows")
-    .select("*", { count: "exact", head: true })
-    .eq("followee_id", userId);
-
-  const { count: following, error: e2 } = await supabase
-    .from("user_follows")
-    .select("*", { count: "exact", head: true })
-    .eq("follower_id", userId);
-
-  const err = e1 ?? e2;
-  if (err) return { followers: 0, following: 0, error: new Error(err.message) };
-  return { followers: followers ?? 0, following: following ?? 0, error: null };
+  const { data, error } = await supabase.rpc("public_follow_counts", { p_user_id: userId });
+  if (error) {
+    return { followers: 0, following: 0, error: new Error(error.message) };
+  }
+  const row = data as { followers?: unknown; following?: unknown } | null;
+  const followers =
+    typeof row?.followers === "number"
+      ? row.followers
+      : typeof row?.followers === "string"
+        ? Number(row.followers)
+        : Number(row?.followers);
+  const following =
+    typeof row?.following === "number"
+      ? row.following
+      : typeof row?.following === "string"
+        ? Number(row.following)
+        : Number(row?.following);
+  return {
+    followers: Number.isFinite(followers) ? followers : 0,
+    following: Number.isFinite(following) ? following : 0,
+    error: null,
+  };
 }

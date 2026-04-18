@@ -6,7 +6,7 @@ import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage } from "@/lib/storage";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 
 type ScenarioCardDef = {
   href: string;
@@ -101,7 +101,6 @@ export default function Scenarios() {
   return (
     <PageShell variant="standard" className="space-y-8">
       <PageHeader
-        leading={<PageBackButton />}
         title="Scenarios"
         description="One situation at a time — pick what matches yours."
         actions={

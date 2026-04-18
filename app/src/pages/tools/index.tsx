@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CURATED_RESOURCES } from "@/lib/curated-resources.ts";
 
@@ -171,7 +171,6 @@ export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
     <PageShell variant="standard" className="max-w-5xl space-y-10">
       <PageHeader
         className="max-w-2xl"
-        leading={<PageBackButton />}
         title="Tools"
         description="Calculators, tracking, and learning resources. Educational only — always follow your care team&apos;s advice."
       />
@@ -295,7 +294,7 @@ export function ToolsHubPage({ tools = PATIENT_TOOLS }: { tools?: ToolDef[] }) {
 export function CarerToolsPlaceholder() {
   return (
     <PageShell variant="narrow" className="space-y-4">
-      <PageHeader title="Tools" leading={<PageBackButton />} />
+      <PageHeader title="Tools" />
       <Alert className="rounded-2xl border-border/60 shadow-sm">
         <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
           Only general tools are shown here. Use <strong>Supporter Mode</strong> for read-only information about the person

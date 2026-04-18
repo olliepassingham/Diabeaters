@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info } from "lucide-react";
+import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info, Users } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   normaliseScopes,
@@ -28,14 +28,6 @@ import {
 } from "@/lib/carer-session";
 import { DevNote } from "@/components/dev/DevNote";
 import { PageShell } from "@/components/layout";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNowStrict } from "date-fns";
 
 function SectionHeading({
@@ -566,15 +558,6 @@ export default function CarerViewPage() {
       .map((x) => x.row);
   }, [appointmentRows]);
   const scenarioLines = scenarioBannerLines(scenarioRows);
-  const patientOptions = useMemo(
-    () =>
-      linkedPatients.map((p) => ({
-        id: p.patientId,
-        label: p.patient_full_name?.trim() || "Linked person",
-      })),
-    [linkedPatients],
-  );
-
   if (!getSupabase()) {
     return (
       <>
@@ -703,29 +686,45 @@ export default function CarerViewPage() {
                   </a>
                 )}
               </div>
+            </CardContent>
+          </Card>
 
-              {patientOptions.length > 1 && (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">Switch person</p>
-                    <p className="text-xs text-muted-foreground">Choose who you’re viewing in this session.</p>
-                  </div>
-                  <div className="w-60 shrink-0">
-                    <Select value={activePatientId ?? undefined} onValueChange={onPatientChange}>
-                      <SelectTrigger aria-label="Select linked person">
-                        <SelectValue placeholder="Select…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {patientOptions.map((o) => (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
+          <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Users className="h-5 w-5 text-primary shrink-0" aria-hidden />
+                People you support
+              </CardTitle>
+              <CardDescription>
+                Each person chooses what you can see. Use{" "}
+                <span className="font-medium text-foreground">Switch to</span> when you support more than one account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              <ul className="m-0 list-none space-y-2 p-0">
+                {linkedPatients.map((p) => {
+                  const label = p.patient_full_name?.trim() || "Linked person";
+                  const active = p.patientId === activePatientId;
+                  return (
+                    <li key={p.patientId}>
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm">
+                        <span className="min-w-0 font-medium text-foreground">{label}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {active ? (
+                            <Badge variant="secondary">Viewing</Badge>
+                          ) : linkedPatients.length > 1 ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => onPatientChange(p.patientId)}>
+                              Switch to
+                            </Button>
+                          ) : (
+                            <Badge variant="outline">Linked</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </CardContent>
           </Card>
         </div>

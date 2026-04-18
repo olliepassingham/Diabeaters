@@ -16,12 +16,15 @@ export function NotificationsTab({
   onThreshold,
   onEnableBrowser,
   embedded = false,
+  supporterMode = false,
 }: {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onEnableBrowser: () => void;
   embedded?: boolean;
+  /** Supporter Mode: only alerts for the supporter’s own account (e.g. feed and messages), not the person they support. */
+  supporterMode?: boolean;
 }) {
   const hypoOn = notifSettings.hypoAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
@@ -55,106 +58,110 @@ export function NotificationsTab({
         />
       </div>
 
-      <div id="notif-hypo" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
-        <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Hypo alerts</Label>
-          <p className="text-small text-muted-foreground">Reminders related to low glucose and hypo treatment</p>
-        </div>
-        <Switch
-          checked={hypoOn}
-          onCheckedChange={(checked) => onToggle("hypoAlerts", checked)}
-          disabled={!notifSettings.enabled}
-          data-testid="switch-hypo-alerts"
-        />
-      </div>
-
-      <div className="flex items-center justify-between py-3 border-b border-border">
-        <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Quick hypo log</Label>
-          <p className="text-small text-muted-foreground">
-            When on, the dashboard &quot;Treated a Hypo&quot; button logs a hypo and notifies linked supporters without
-            asking for glucose or treatment first. Turn off to enter details each time.
-          </p>
-        </div>
-        <Switch
-          checked={notifSettings.hypoDashboardQuickNotify === true}
-          onCheckedChange={(checked) => onToggle("hypoDashboardQuickNotify", checked)}
-          data-testid="switch-hypo-dashboard-quick"
-        />
-      </div>
-
-      <div id="notif-trends" className="scroll-mt-28 space-y-4 border-b border-border pb-6">
-        <div className="flex items-center justify-between py-3">
-          <div className="space-y-0.5 pr-4">
-            <Label className="text-small text-muted-foreground">Trend alerts</Label>
-            <p className="text-small text-muted-foreground">Supply levels and depletion forecasts</p>
+      {!supporterMode && (
+        <>
+          <div id="notif-hypo" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Hypo alerts</Label>
+              <p className="text-small text-muted-foreground">Reminders related to low glucose and hypo treatment</p>
+            </div>
+            <Switch
+              checked={hypoOn}
+              onCheckedChange={(checked) => onToggle("hypoAlerts", checked)}
+              disabled={!notifSettings.enabled}
+              data-testid="switch-hypo-alerts"
+            />
           </div>
-          <Switch
-            checked={notifSettings.supplyAlerts}
-            onCheckedChange={(checked) => onToggle("supplyAlerts", checked)}
-            disabled={!notifSettings.enabled}
-            data-testid="switch-supply-alerts"
-          />
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="critical-days" className="text-small text-muted-foreground">
-              Critical alert (days)
-            </Label>
-            <Select
-              value={notifSettings.criticalThresholdDays.toString()}
-              onValueChange={(v) => onThreshold("criticalThresholdDays", v)}
-              disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
-            >
-              <SelectTrigger id="critical-days" data-testid="select-critical-days">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1 day</SelectItem>
-                <SelectItem value="2">2 days</SelectItem>
-                <SelectItem value="3">3 days</SelectItem>
-                <SelectItem value="5">5 days</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-small text-muted-foreground">Urgent when supply estimate falls below this</p>
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Quick hypo log</Label>
+              <p className="text-small text-muted-foreground">
+                When on, the dashboard &quot;Treated a Hypo&quot; button logs a hypo and notifies linked supporters without
+                asking for glucose or treatment first. Turn off to enter details each time.
+              </p>
+            </div>
+            <Switch
+              checked={notifSettings.hypoDashboardQuickNotify === true}
+              onCheckedChange={(checked) => onToggle("hypoDashboardQuickNotify", checked)}
+              data-testid="switch-hypo-dashboard-quick"
+            />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="low-days" className="text-small text-muted-foreground">
-              Low alert (days)
-            </Label>
-            <Select
-              value={notifSettings.lowThresholdDays.toString()}
-              onValueChange={(v) => onThreshold("lowThresholdDays", v)}
-              disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
-            >
-              <SelectTrigger id="low-days" data-testid="select-low-days">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5 days</SelectItem>
-                <SelectItem value="7">7 days</SelectItem>
-                <SelectItem value="10">10 days</SelectItem>
-                <SelectItem value="14">14 days</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-small text-muted-foreground">Reminder to reorder</p>
-          </div>
-        </div>
-      </div>
 
-      <div id="notif-scenario" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
-        <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Scenario alerts</Label>
-          <p className="text-small text-muted-foreground">Sick day, travel, and similar prompts</p>
-        </div>
-        <Switch
-          checked={scenarioOn}
-          onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
-          disabled={!notifSettings.enabled}
-          data-testid="switch-scenario-alerts"
-        />
-      </div>
+          <div id="notif-trends" className="scroll-mt-28 space-y-4 border-b border-border pb-6">
+            <div className="flex items-center justify-between py-3">
+              <div className="space-y-0.5 pr-4">
+                <Label className="text-small text-muted-foreground">Trend alerts</Label>
+                <p className="text-small text-muted-foreground">Supply levels and depletion forecasts</p>
+              </div>
+              <Switch
+                checked={notifSettings.supplyAlerts}
+                onCheckedChange={(checked) => onToggle("supplyAlerts", checked)}
+                disabled={!notifSettings.enabled}
+                data-testid="switch-supply-alerts"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="critical-days" className="text-small text-muted-foreground">
+                  Critical alert (days)
+                </Label>
+                <Select
+                  value={notifSettings.criticalThresholdDays.toString()}
+                  onValueChange={(v) => onThreshold("criticalThresholdDays", v)}
+                  disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+                >
+                  <SelectTrigger id="critical-days" data-testid="select-critical-days">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 day</SelectItem>
+                    <SelectItem value="2">2 days</SelectItem>
+                    <SelectItem value="3">3 days</SelectItem>
+                    <SelectItem value="5">5 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-small text-muted-foreground">Urgent when supply estimate falls below this</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="low-days" className="text-small text-muted-foreground">
+                  Low alert (days)
+                </Label>
+                <Select
+                  value={notifSettings.lowThresholdDays.toString()}
+                  onValueChange={(v) => onThreshold("lowThresholdDays", v)}
+                  disabled={!notifSettings.enabled || !notifSettings.supplyAlerts}
+                >
+                  <SelectTrigger id="low-days" data-testid="select-low-days">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 days</SelectItem>
+                    <SelectItem value="7">7 days</SelectItem>
+                    <SelectItem value="10">10 days</SelectItem>
+                    <SelectItem value="14">14 days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-small text-muted-foreground">Reminder to reorder</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="notif-scenario" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Scenario alerts</Label>
+              <p className="text-small text-muted-foreground">Sick day, travel, and similar prompts</p>
+            </div>
+            <Switch
+              checked={scenarioOn}
+              onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
+              disabled={!notifSettings.enabled}
+              data-testid="switch-scenario-alerts"
+            />
+          </div>
+        </>
+      )}
 
       <div id="notif-community" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
@@ -182,18 +189,20 @@ export function NotificationsTab({
         />
       </div>
 
-      <div className="flex items-center justify-between py-3 border-b border-border">
-        <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Appointment reminders</Label>
-          <p className="text-small text-muted-foreground">Reminders before upcoming appointments</p>
+      {!supporterMode && (
+        <div className="flex items-center justify-between py-3 border-b border-border">
+          <div className="space-y-0.5 pr-4">
+            <Label className="text-small text-muted-foreground">Appointment reminders</Label>
+            <p className="text-small text-muted-foreground">Reminders before upcoming appointments</p>
+          </div>
+          <Switch
+            checked={notifSettings.appointmentReminders}
+            onCheckedChange={(checked) => onToggle("appointmentReminders", checked)}
+            disabled={!notifSettings.enabled}
+            data-testid="switch-appointment-reminders"
+          />
         </div>
-        <Switch
-          checked={notifSettings.appointmentReminders}
-          onCheckedChange={(checked) => onToggle("appointmentReminders", checked)}
-          disabled={!notifSettings.enabled}
-          data-testid="switch-appointment-reminders"
-        />
-      </div>
+      )}
 
       <div className="flex items-center justify-between py-3">
         <div className="space-y-0.5 pr-4">
@@ -234,7 +243,9 @@ export function NotificationsTab({
           <CardTitle className="text-h3 font-semibold">Notifications</CardTitle>
         </div>
         <CardDescription className="text-body text-muted-foreground">
-          Control alerts for hypos, supplies, scenarios, community, and messages.
+          {supporterMode
+            ? "Alerts for your supporter account: community and messages. The person you support manages their own clinical alerts."
+            : "Control alerts for hypos, supplies, scenarios, community, and messages."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">{inner}</CardContent>
@@ -248,6 +259,7 @@ type SettingsNotificationsRouteProps = {
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onEnableBrowser: () => void;
+  supporterMode?: boolean;
 };
 
 export function SettingsNotificationsRoute({
@@ -256,6 +268,7 @@ export function SettingsNotificationsRoute({
   onToggle,
   onThreshold,
   onEnableBrowser,
+  supporterMode = false,
 }: SettingsNotificationsRouteProps) {
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
@@ -264,7 +277,11 @@ export function SettingsNotificationsRoute({
       <PageHeader
         className="mb-2"
         title="Notifications"
-        description="Hypo alerts, trend alerts, scenario alerts, and community feed."
+        description={
+          supporterMode
+            ? "Feed, messages, and device alerts for your supporter account."
+            : "Hypo alerts, trend alerts, scenario alerts, and community feed."
+        }
         actions={settingsInfoDialog}
       />
       <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
@@ -275,6 +292,7 @@ export function SettingsNotificationsRoute({
             onThreshold={onThreshold}
             onEnableBrowser={onEnableBrowser}
             embedded
+            supporterMode={supporterMode}
           />
         </CardContent>
       </Card>
