@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Loader2, Send } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,13 +30,22 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
   if (!isCommunityEnabled || loading || !profile?.is_public) return null;
 
   const trimmed = text.trim();
-  const canPost = trimmed.length > 0 && !posting && Boolean(user);
+  const hasFeedHandle = Boolean(profile?.public_handle?.trim());
+  const canPost = trimmed.length > 0 && !posting && Boolean(user) && hasFeedHandle;
 
   async function handlePost() {
     if (!user || !trimmed) {
       toast({
         title: "Add something to post",
         description: "Write a short message first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!hasFeedHandle) {
+      toast({
+        title: "Choose a @handle to post",
+        description: "Set your public handle in Feed profile settings first.",
         variant: "destructive",
       });
       return;
@@ -95,9 +104,9 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
                 void handlePost();
               }
             }}
-            placeholder={PLACEHOLDER}
+            placeholder={hasFeedHandle ? PLACEHOLDER : "Set a @handle in Feed profile to post from here"}
             rows={2}
-            disabled={posting}
+            disabled={posting || !hasFeedHandle}
             className="min-h-[4.25rem] resize-none text-base flex-1 border-muted-foreground/20 bg-background/80 shadow-inner focus-visible:ring-primary/25"
             maxLength={8000}
             data-testid="input-dashboard-quick-post"
@@ -118,6 +127,14 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
             Post
           </Button>
         </form>
+        {!hasFeedHandle ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            <Link href="/account#community" className="font-medium text-primary underline-offset-4 hover:underline">
+              Open Feed profile
+            </Link>{" "}
+            to choose your @handle (required to post).
+          </p>
+        ) : null}
       </CardContent>
     </WidgetCard>
   );

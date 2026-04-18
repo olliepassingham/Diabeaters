@@ -221,7 +221,7 @@ export function AccountCommunityProfileFields({
                       .
                     </>
                   ) : (
-                    "When on, you can use the Feed and set your handle and bio below. Photo and display name use this account above."
+                    "When on, you can read the Feed right away. Set a @handle below before you post — it powers mentions and your public link. Photo and display name use this account above."
                   )
                 }
               />

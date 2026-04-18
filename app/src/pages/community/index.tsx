@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/empty-state";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,7 +50,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { getProfilesByIds, searchProfilesByHandlePrefix } from "@/lib/profile";
+import { getProfilesByIds, searchProfilesByHandlePrefix, useProfile } from "@/lib/profile";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -65,6 +66,7 @@ type ComposerPostKind = "standard" | "poll" | "event";
 
 export default function CommunityHomePage() {
   const { user } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
@@ -104,6 +106,12 @@ export default function CommunityHomePage() {
   >([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
   const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
+  /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
+  const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
+  const [followeesLoading, setFolloweesLoading] = useState(false);
+
+  const hasFeedHandle = Boolean(profile?.public_handle?.trim());
+  const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
 
   /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
   useEffect(() => {
@@ -116,6 +124,32 @@ export default function CommunityHomePage() {
     const next = params.toString();
     setLocation(next ? `${pathname}?${next}` : pathname, { replace: true });
   }, [search, setLocation, pathname]);
+
+  useEffect(() => {
+    if (!peopleOpen) {
+      setFolloweeIds(new Set());
+      setFolloweesLoading(false);
+      return;
+    }
+    if (!user?.id) {
+      setFolloweeIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    setFolloweesLoading(true);
+    void listFolloweeIdsForCurrentUser().then((res) => {
+      if (cancelled) return;
+      setFolloweesLoading(false);
+      if (res.error) {
+        setFolloweeIds(new Set());
+        return;
+      }
+      setFolloweeIds(new Set(res.ids));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [peopleOpen, user?.id]);
 
   useEffect(() => {
     if (!peopleOpen) return;
@@ -205,15 +239,27 @@ export default function CommunityHomePage() {
       toast({ title: "Sign in to follow", variant: "destructive" });
       return;
     }
+    if (followeeIds.has(id)) return;
     setFollowBusyIds((prev) => ({ ...prev, [id]: true }));
     const res = await followUser(id);
     setFollowBusyIds((prev) => ({ ...prev, [id]: false }));
     if (res.error) {
+      const msg = res.error.message.toLowerCase();
+      const already =
+        msg.includes("duplicate") ||
+        msg.includes("unique") ||
+        msg.includes("23505") ||
+        msg.includes("already exists");
+      if (already) {
+        setFolloweeIds((prev) => new Set(prev).add(id));
+        toast({ title: "Already following", description: "You’re already following this person." });
+        return;
+      }
       toast({ title: "Follow failed", description: res.error.message, variant: "destructive" });
       return;
     }
+    setFolloweeIds((prev) => new Set(prev).add(id));
     setSuggested((prev) => prev.filter((p) => p.id !== id));
-    setPeopleResults((prev) => prev.filter((p) => p.id !== id));
     toast({ title: "Following", description: "You’ll now see their posts in Following." });
   }
 
@@ -335,6 +381,14 @@ export default function CommunityHomePage() {
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !composerCanSubmit) return;
+    if (!canComposeToFeed) {
+      toast({
+        title: "Choose a @handle to post",
+        description: "Set your public handle in Feed profile settings — it powers mentions and your profile link.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSubmitting(true);
 
     const mentions = await buildMentionsForPost(composer, user.id);
@@ -435,6 +489,18 @@ export default function CommunityHomePage() {
         }
       />
 
+      {user && !profileLoading && !hasFeedHandle ? (
+        <Alert className="rounded-2xl border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/25">
+          <AlertDescription className="text-sm leading-relaxed text-foreground">
+            <span className="font-medium">Set a @handle to post on the Feed.</span> You can still read posts. Your handle
+            is used for @mentions and your public link.{" "}
+            <Link href="/account#community" className="font-medium text-primary underline-offset-4 hover:underline">
+              Open Feed profile
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Dialog open={peopleOpen} onOpenChange={setPeopleOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -459,29 +525,49 @@ export default function CommunityHomePage() {
                 ) : null}
                 {peopleResults.length > 0 ? (
                   <ul className="space-y-2">
-                    {peopleResults.map((p) => (
-                      <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
-                        <CommunityAuthorAvatar
-                          displayName={p.name}
-                          avatarPath={p.avatar_url}
-                          size="sm"
-                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{p.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={Boolean(followBusyIds[p.id])}
-                          onClick={() => void handleFollow(p.id)}
-                        >
-                          {followBusyIds[p.id] ? "…" : "Follow"}
-                        </Button>
-                      </li>
-                    ))}
+                    {peopleResults.map((p) => {
+                      const isSelf = Boolean(user?.id && p.id === user.id);
+                      const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
+                      const busy = Boolean(followBusyIds[p.id]);
+                      const waitFollowees = Boolean(user?.id && followeesLoading);
+                      return (
+                        <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
+                          <CommunityAuthorAvatar
+                            displayName={p.name}
+                            avatarPath={p.avatar_url}
+                            size="sm"
+                            profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{p.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={alreadyFollowing ? "secondary" : "outline"}
+                            disabled={
+                              !user ||
+                              isSelf ||
+                              busy ||
+                              (waitFollowees && !alreadyFollowing) ||
+                              alreadyFollowing
+                            }
+                            onClick={() => void handleFollow(p.id)}
+                          >
+                            {!user
+                              ? "Follow"
+                              : busy || (waitFollowees && !alreadyFollowing)
+                                ? "…"
+                                : alreadyFollowing
+                                  ? "Following"
+                                  : isSelf
+                                    ? "You"
+                                    : "Follow"}
+                          </Button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </>
@@ -496,29 +582,49 @@ export default function CommunityHomePage() {
                 ) : null}
                 {suggested.length > 0 ? (
                   <ul className="space-y-2">
-                    {suggested.map((p) => (
-                      <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
-                        <CommunityAuthorAvatar
-                          displayName={p.name}
-                          avatarPath={p.avatar_url}
-                          size="sm"
-                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{p.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={Boolean(followBusyIds[p.id])}
-                          onClick={() => void handleFollow(p.id)}
-                        >
-                          {followBusyIds[p.id] ? "…" : "Follow"}
-                        </Button>
-                      </li>
-                    ))}
+                    {suggested.map((p) => {
+                      const isSelf = Boolean(user?.id && p.id === user.id);
+                      const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
+                      const busy = Boolean(followBusyIds[p.id]);
+                      const waitFollowees = Boolean(user?.id && followeesLoading);
+                      return (
+                        <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
+                          <CommunityAuthorAvatar
+                            displayName={p.name}
+                            avatarPath={p.avatar_url}
+                            size="sm"
+                            profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{p.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={alreadyFollowing ? "secondary" : "outline"}
+                            disabled={
+                              !user ||
+                              isSelf ||
+                              busy ||
+                              (waitFollowees && !alreadyFollowing) ||
+                              alreadyFollowing
+                            }
+                            onClick={() => void handleFollow(p.id)}
+                          >
+                            {!user
+                              ? "Follow"
+                              : busy || (waitFollowees && !alreadyFollowing)
+                                ? "…"
+                                : alreadyFollowing
+                                  ? "Following"
+                                  : isSelf
+                                    ? "You"
+                                    : "Follow"}
+                          </Button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </>
@@ -582,7 +688,7 @@ export default function CommunityHomePage() {
         </div>
       </div>
 
-      <Card variant="glass">
+      <Card variant="glass" className={cn(!canComposeToFeed && user ? "opacity-90" : undefined)}>
         <CardHeader className="pb-2">
           <CardTitle className="font-display text-base font-semibold">New post</CardTitle>
         </CardHeader>
@@ -595,7 +701,7 @@ export default function CommunityHomePage() {
               <Select
                 value={composerTopic}
                 onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
-                disabled={submitting || !user}
+                disabled={submitting || !user || !canComposeToFeed}
               >
                 <SelectTrigger id="feed-topic" className="w-full">
                   <SelectValue placeholder="Choose a topic" />
@@ -618,7 +724,7 @@ export default function CommunityHomePage() {
                     value={pollQuestion}
                     onChange={(e) => setPollQuestion(e.target.value.slice(0, 500))}
                     placeholder="What do you want to ask?"
-                    disabled={submitting || !user}
+                    disabled={submitting || !user || !canComposeToFeed}
                     maxLength={500}
                   />
                 </div>
@@ -636,7 +742,7 @@ export default function CommunityHomePage() {
                           })
                         }
                         placeholder={`Option ${i + 1}`}
-                        disabled={submitting || !user}
+                        disabled={submitting || !user || !canComposeToFeed}
                         maxLength={500}
                         aria-label={`Poll option ${i + 1}`}
                       />
@@ -646,7 +752,7 @@ export default function CommunityHomePage() {
                           variant="outline"
                           size="icon"
                           className="shrink-0"
-                          disabled={submitting || !user}
+                          disabled={submitting || !user || !canComposeToFeed}
                           onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
                           aria-label={`Remove option ${i + 1}`}
                         >
@@ -660,7 +766,7 @@ export default function CommunityHomePage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={submitting || !user}
+                      disabled={submitting || !user || !canComposeToFeed}
                       onClick={() => setPollOptions((prev) => [...prev, ""])}
                     >
                       <Plus className="h-4 w-4 mr-1.5" />
@@ -679,7 +785,7 @@ export default function CommunityHomePage() {
                     value={eventTitle}
                     onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
                     placeholder="Meetup title"
-                    disabled={submitting || !user}
+                    disabled={submitting || !user || !canComposeToFeed}
                     maxLength={500}
                   />
                 </div>
@@ -690,7 +796,7 @@ export default function CommunityHomePage() {
                     type="datetime-local"
                     value={eventStartsAt}
                     onChange={(e) => setEventStartsAt(e.target.value)}
-                    disabled={submitting || !user}
+                    disabled={submitting || !user || !canComposeToFeed}
                   />
                 </div>
                 <div className="space-y-1">
@@ -700,7 +806,7 @@ export default function CommunityHomePage() {
                     value={eventLocation}
                     onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
                     placeholder="Where?"
-                    disabled={submitting || !user}
+                    disabled={submitting || !user || !canComposeToFeed}
                     maxLength={500}
                   />
                 </div>
@@ -712,7 +818,7 @@ export default function CommunityHomePage() {
                     onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
                     placeholder="More about the event…"
                     rows={3}
-                    disabled={submitting || !user}
+                    disabled={submitting || !user || !canComposeToFeed}
                     maxLength={2000}
                     className="surface-field rounded-xl"
                   />
@@ -731,7 +837,7 @@ export default function CommunityHomePage() {
               }
               rows={3}
               maxLength={8000}
-              disabled={submitting || !user}
+              disabled={submitting || !user || !canComposeToFeed}
               className="surface-field min-h-[5.5rem] rounded-xl"
             />
             <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
@@ -745,6 +851,7 @@ export default function CommunityHomePage() {
                       className="absolute right-0.5 top-0.5 rounded-full bg-background/90 p-0.5 shadow"
                       onClick={() => removeComposerImage(i)}
                       aria-label="Remove image"
+                      disabled={submitting}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -770,7 +877,7 @@ export default function CommunityHomePage() {
                         })
                       }
                       placeholder="What’s in this image? Helps people using screen readers."
-                      disabled={submitting || !user}
+                      disabled={submitting || !user || !canComposeToFeed}
                       maxLength={500}
                     />
                   </div>
@@ -788,6 +895,7 @@ export default function CommunityHomePage() {
                 disabled={
                   submitting ||
                   !user ||
+                  !canComposeToFeed ||
                   composerFiles.length >= MAX_POST_IMAGES ||
                   composerPostKind !== "standard"
                 }
@@ -800,6 +908,7 @@ export default function CommunityHomePage() {
                 disabled={
                   submitting ||
                   !user ||
+                  !canComposeToFeed ||
                   composerFiles.length >= MAX_POST_IMAGES ||
                   composerPostKind !== "standard"
                 }
@@ -837,7 +946,12 @@ export default function CommunityHomePage() {
                 ariaLabel="Photo limits for posts"
                 content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`}
               />
-              <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit}>
+              <Button
+                type="submit"
+                size="sm"
+                className="ml-auto"
+                disabled={submitting || !composerCanSubmit || !canComposeToFeed}
+              >
                 <Send className="h-4 w-4 mr-1.5" />
                 Post
               </Button>

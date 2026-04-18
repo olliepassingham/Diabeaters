@@ -17,7 +17,12 @@ import {
   type DmMessageRow,
   type ThreadWithMembers,
 } from "@/lib/community";
-import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
+import {
+  getProfileIdByPublicHandle,
+  getProfilesByIds,
+  normalizePublicHandleInput,
+  searchProfilesByHandlePrefix,
+} from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
 
@@ -64,6 +69,11 @@ export default function CommunityMessagesPage() {
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [lastByThreadId, setLastByThreadId] = useState<Record<string, DmMessageRow | null>>({});
   const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string | null>>({});
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<
+    Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
+  >([]);
 
   const refresh = useCallback(async () => {
     const res = await fetchDmThreadsForCurrentUser();
@@ -137,6 +147,69 @@ export default function CommunityMessagesPage() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const raw = handleInput.trim().replace(/^@/, "");
+    if (!raw) {
+      setSuggestLoading(false);
+      setSuggestError(null);
+      setSuggestions([]);
+      return;
+    }
+    const t = window.setTimeout(() => {
+      setSuggestLoading(true);
+      setSuggestError(null);
+      void searchProfilesByHandlePrefix(raw, 10).then((res) => {
+        setSuggestLoading(false);
+        if (res.error) {
+          setSuggestError(res.error.message);
+          setSuggestions([]);
+          return;
+        }
+        const mapped = (res.data ?? [])
+          .filter((p) => p.is_public === true)
+          .filter((p) => p.id !== user?.id)
+          .map((p) => ({
+            id: p.id,
+            name: p.full_name?.trim() || shortId(p.id),
+            avatar_url: p.avatar_url ?? null,
+            handle: (p.public_handle ?? "").trim(),
+          }))
+          .filter((p) => Boolean(p.handle));
+        setSuggestions(mapped);
+      });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [handleInput, user?.id]);
+
+  async function navigateToDmThread(targetUserId: string): Promise<boolean> {
+    const res = await getOrCreateDmThread(targetUserId);
+    if (res.error) {
+      toast({ title: "Could not open chat", description: res.error.message, variant: "destructive" });
+      return false;
+    }
+    if (res.data) {
+      setLocation(`/community/messages/${res.data}`);
+    }
+    return true;
+  }
+
+  async function openChatWithUserId(targetUserId: string) {
+    if (!user?.id) {
+      toast({ title: "Sign in to message", variant: "destructive" });
+      return;
+    }
+    if (targetUserId === user.id) {
+      toast({ title: "Choose someone else", variant: "destructive" });
+      return;
+    }
+    setStarting(true);
+    try {
+      await navigateToDmThread(targetUserId);
+    } finally {
+      setStarting(false);
+    }
+  }
+
   async function handleStartChat(e: React.FormEvent) {
     e.preventDefault();
     const raw = handleInput.trim().replace(/^@/, "");
@@ -170,36 +243,33 @@ export default function CommunityMessagesPage() {
       return;
     }
 
-    setStarting(true);
-    const { userId, error: lookupError } = await getProfileIdByPublicHandle(normalized);
-    if (lookupError) {
-      setStarting(false);
-      toast({ title: "Could not look up handle", description: lookupError.message, variant: "destructive" });
-      return;
-    }
-    if (!userId) {
-      setStarting(false);
-      toast({
-        title: "No user found",
-        description: `No one is using @${normalized} yet. They need to set a community handle in settings.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    if (userId === user?.id) {
-      setStarting(false);
-      toast({ title: "Choose someone else", variant: "destructive" });
+    if (!user?.id) {
+      toast({ title: "Sign in to message", variant: "destructive" });
       return;
     }
 
-    const res = await getOrCreateDmThread(userId);
-    setStarting(false);
-    if (res.error) {
-      toast({ title: "Could not open chat", description: res.error.message, variant: "destructive" });
-      return;
-    }
-    if (res.data) {
-      setLocation(`/community/messages/${res.data}`);
+    setStarting(true);
+    try {
+      const { userId, error: lookupError } = await getProfileIdByPublicHandle(normalized);
+      if (lookupError) {
+        toast({ title: "Could not look up handle", description: lookupError.message, variant: "destructive" });
+        return;
+      }
+      if (!userId) {
+        toast({
+          title: "No user found",
+          description: `No one is using @${normalized} yet. They need to set a community handle in settings.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (userId === user.id) {
+        toast({ title: "Choose someone else", variant: "destructive" });
+        return;
+      }
+      await navigateToDmThread(userId);
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -250,7 +320,48 @@ export default function CommunityMessagesPage() {
               spellCheck={false}
               autoComplete="off"
               disabled={starting || !user}
+              aria-autocomplete="list"
+              aria-controls="messages-handle-suggestions"
             />
+            {handleInput.trim() ? (
+              <div id="messages-handle-suggestions" className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-2">
+                {suggestLoading ? <p className="text-sm text-muted-foreground px-1">Searching…</p> : null}
+                {suggestError ? <p className="text-sm text-destructive px-1">{suggestError}</p> : null}
+                {!suggestLoading && !suggestError && suggestions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-1">No matching handles. Check spelling or try another prefix.</p>
+                ) : null}
+                {suggestions.length > 0 ? (
+                  <ul className="space-y-1.5">
+                    {suggestions.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/70 px-2 py-2"
+                      >
+                        <CommunityAuthorAvatar
+                          displayName={p.name}
+                          avatarPath={p.avatar_url}
+                          size="sm"
+                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{p.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={starting || !user}
+                          onClick={() => void openChatWithUserId(p.id)}
+                        >
+                          Chat
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
             <Button type="submit" size="sm" disabled={starting || !handleInput.trim() || !user}>
               Open or start chat
             </Button>

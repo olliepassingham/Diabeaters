@@ -388,6 +388,23 @@ export async function insertFeedPost(
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: null, error: new Error("Not signed in") };
 
+  const { data: handleRow, error: handleErr } = await supabase
+    .from("profiles")
+    .select("public_handle")
+    .eq("id", uid)
+    .maybeSingle();
+  if (handleErr) return { data: null, error: new Error(handleErr.message) };
+  const publicHandle =
+    typeof (handleRow as { public_handle?: unknown } | null)?.public_handle === "string"
+      ? String((handleRow as { public_handle: string }).public_handle).trim()
+      : "";
+  if (!publicHandle) {
+    return {
+      data: null,
+      error: new Error("Set a public @handle in Feed profile settings before posting."),
+    };
+  }
+
   const { mentioned_user_ids, mention_map } = normalizeMentionsForInsert(uid, input.mentions);
 
   if (input.kind === "poll") {

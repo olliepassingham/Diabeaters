@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { ChevronLeft, Heart, ImagePlus, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
+import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +37,8 @@ export default function CommunityThreadPage() {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [peerLabel, setPeerLabel] = useState<string | null>(null);
+  const [peerAvatarPath, setPeerAvatarPath] = useState<string | null>(null);
+  const [peerUserId, setPeerUserId] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -74,7 +77,15 @@ export default function CommunityThreadPage() {
   }, [pendingImage]);
 
   useEffect(() => {
-    if (!threadId || !user?.id) return;
+    if (!threadId || !user?.id) {
+      setPeerLabel(null);
+      setPeerAvatarPath(null);
+      setPeerUserId(null);
+      return;
+    }
+    setPeerLabel(null);
+    setPeerAvatarPath(null);
+    setPeerUserId(null);
     let cancelled = false;
     void (async () => {
       const res = await fetchDmThreadsForCurrentUser();
@@ -91,7 +102,10 @@ export default function CommunityThreadPage() {
       }
       const { profile } = await getProfile(other);
       if (cancelled) return;
-      setPeerLabel(profile?.full_name?.trim() || shortId(other));
+      const name = profile?.full_name?.trim() || shortId(other);
+      setPeerLabel(name);
+      setPeerAvatarPath(profile?.avatar_url ?? null);
+      setPeerUserId(other);
     })();
     return () => {
       cancelled = true;
@@ -140,6 +154,21 @@ export default function CommunityThreadPage() {
 
   if (!match || !threadId) return null;
 
+  const headerTitle =
+    peerUserId && peerLabel && peerLabel !== "Conversation" ? (
+      <span className="flex min-w-0 items-center gap-2.5">
+        <CommunityAuthorAvatar
+          size="sm"
+          displayName={peerLabel}
+          avatarPath={peerAvatarPath}
+          profileHref={`/community/profile/${encodeURIComponent(peerUserId)}`}
+        />
+        <span className="truncate">{peerLabel}</span>
+      </span>
+    ) : (
+      (peerLabel ?? "Chat")
+    );
+
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
@@ -151,7 +180,7 @@ export default function CommunityThreadPage() {
               </Button>
             </Link>
           }
-          title="Chat"
+          title={headerTitle}
         />
         <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
       </PageShell>
@@ -171,7 +200,7 @@ export default function CommunityThreadPage() {
             </Button>
           </Link>
         }
-        title={peerLabel ?? "Chat"}
+        title={headerTitle}
       />
 
       <div className="flex-1 overflow-y-auto space-y-3 py-2">
