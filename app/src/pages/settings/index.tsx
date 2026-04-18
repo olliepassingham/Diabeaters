@@ -1078,7 +1078,7 @@ export default function Settings() {
           <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
               href="/family-carers"
-              label="Family & carers"
+              label="Family & supporters"
               description="Invite, link, and control what they can see"
               icon={Users}
             />

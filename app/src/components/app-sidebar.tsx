@@ -25,7 +25,7 @@ const patientItems = [
   { title: "Meal planner", url: "/adviser", icon: Bot },
   { title: "Scenarios", url: "/scenarios", icon: AlertTriangle },
   { title: "Appointments", url: "/appointments", icon: Calendar },
-  { title: "Carers", url: "/family-carers", icon: Heart },
+  { title: "Supporters", url: "/family-carers", icon: Heart },
   { title: "Settings", url: "/settings", icon: Settings },
 ] as const;
 

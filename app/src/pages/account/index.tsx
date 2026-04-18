@@ -637,7 +637,7 @@ export default function Account() {
               {!isCarer && (
                 <Button variant="outline" size="sm" className="min-h-11" asChild>
                   <Link href="/family-carers" data-testid="link-manage-carers">
-                    Manage carers
+                    Manage supporters
                   </Link>
                 </Button>
               )}

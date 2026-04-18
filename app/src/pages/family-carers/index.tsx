@@ -202,7 +202,7 @@ export default function FamilyCarersPage() {
               Supporter setup) on their device.
             </p>
           ) : (
-            <ul className="space-y-3" data-testid="carers-list">
+            <ul className="space-y-3" data-testid="supporters-list">
               {links.map((link) => {
                 const label =
                   link.carer_full_name?.trim() ||
@@ -217,7 +217,7 @@ export default function FamilyCarersPage() {
                   <li
                     key={link.id}
                     className="flex items-center justify-between gap-3 rounded-xl bg-gray-50/80 p-4 shadow-sm dark:bg-muted/40"
-                    data-testid={`carer-row-${link.id}`}
+                    data-testid={`supporter-row-${link.id}`}
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <AvatarBubble label={label} initials={initials} avatarUrl={link.carer_avatar_url ?? null} />

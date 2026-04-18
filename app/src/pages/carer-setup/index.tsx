@@ -20,6 +20,7 @@ import {
   getPrimaryAppRole,
   setActiveAppMode,
   setCarerLinkedBannerMessage,
+  markCarerLinkJustCompleted,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { PageBackButton } from "@/components/layout";
@@ -69,6 +70,7 @@ export default function CarerSetupPage() {
           clearCarerIntent();
           if (getPrimaryAppRole() == null) setPrimaryAppRole("carer");
           setActiveAppMode("carer");
+          markCarerLinkJustCompleted();
           setCode("");
           toast({
             title: "Linked already",
@@ -101,6 +103,7 @@ export default function CarerSetupPage() {
       setPrimaryAppRole("carer");
     }
     setActiveAppMode("carer");
+    markCarerLinkJustCompleted();
     setCode("");
     toast({
       title: "Linked successfully",

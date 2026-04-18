@@ -1,6 +1,7 @@
 const CARER_INTENT_KEY = "diabeater_carer_intent";
 const CARER_LINKED_BANNER_KEY = "diabeater_carer_linked_banner";
 const PENDING_CARER_KEY = "diabeater_pending_carer";
+const CARER_LINK_JUST_COMPLETED_AT_KEY = "diabeater_carer_link_just_completed_at";
 const ACTIVE_CARER_PATIENT_ID_KEY = "diabeater_active_carer_patient_id";
 const ACTIVE_APP_MODE_KEY = "diabeater_active_app_mode";
 const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
@@ -22,6 +23,7 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(CARER_INTENT_KEY);
   sessionStorage.removeItem(CARER_LINKED_BANNER_KEY);
   sessionStorage.removeItem(PENDING_CARER_KEY);
+  sessionStorage.removeItem(CARER_LINK_JUST_COMPLETED_AT_KEY);
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
   sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
@@ -78,6 +80,22 @@ export function consumeCarerLinkedBannerMessage(): string | null {
   const v = sessionStorage.getItem(CARER_LINKED_BANNER_KEY);
   if (v) sessionStorage.removeItem(CARER_LINKED_BANNER_KEY);
   return v;
+}
+
+/** Used to avoid bouncing back to /carer-setup while the new link propagates. */
+export function markCarerLinkJustCompleted(): void {
+  sessionStorage.setItem(CARER_LINK_JUST_COMPLETED_AT_KEY, String(Date.now()));
+}
+
+export function clearCarerLinkJustCompleted(): void {
+  sessionStorage.removeItem(CARER_LINK_JUST_COMPLETED_AT_KEY);
+}
+
+export function getCarerLinkJustCompletedAt(): number | null {
+  const raw = sessionStorage.getItem(CARER_LINK_JUST_COMPLETED_AT_KEY);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function setActiveCarerPatientId(patientId: string): void {

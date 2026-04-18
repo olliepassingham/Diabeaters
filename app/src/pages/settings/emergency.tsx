@@ -10,7 +10,7 @@ export default function SettingsEmergencyPage() {
       <SettingsBackLink />
       <PageHeader
         title="Your emergency details"
-        description="Used for Help now. Linked carers only see this if the account holder allows it under Family & carers."
+        description="Used for Help now. Linked supporters only see this if the account holder allows it under Family & supporters."
       />
       <Card className="rounded-2xl border-border/60 shadow-sm">
         <CardContent className="p-6">

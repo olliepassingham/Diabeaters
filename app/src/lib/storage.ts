@@ -3136,7 +3136,7 @@ export const storage = {
       this.addCarerActivity({
         carerName: "System",
         action: "Hypo Alert",
-        detail: "Hypo treatment logged and carers notified",
+        detail: "Hypo treatment logged and supporters notified",
       });
     }
     return created;

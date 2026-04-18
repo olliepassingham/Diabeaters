@@ -21,6 +21,8 @@ import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { getSupabase } from "@/lib/supabase";
 import {
   consumeCarerLinkedBannerMessage,
+  clearCarerLinkJustCompleted,
+  getCarerLinkJustCompletedAt,
   getActiveCarerPatientId,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
@@ -401,17 +403,39 @@ export default function CarerViewPage() {
     let active = true;
     (async () => {
       try {
-        const { data, error: linkErr } = await listLinkedPatientsForCarer();
+        const justLinkedAt = getCarerLinkJustCompletedAt();
+        const linkingGraceMs = 20_000;
+        const shouldRetry =
+          typeof justLinkedAt === "number" &&
+          Date.now() - justLinkedAt >= 0 &&
+          Date.now() - justLinkedAt < linkingGraceMs;
+        const delays = shouldRetry ? [300, 600, 1200, 2400, 4000] : [];
+
+        const sleep = (ms: number) =>
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, ms);
+          });
+
+        let lastErr: Error | null = null;
+        let rows: LinkedPatientWithProfile[] = [];
+        for (let attempt = 0; attempt <= delays.length; attempt++) {
+          const res = await listLinkedPatientsForCarer();
+          if (!active) return;
+          lastErr = res.error;
+          rows = res.data ?? [];
+          if (!lastErr && rows.length > 0) break;
+          if (attempt < delays.length) await sleep(delays[attempt]!);
+        }
+
         if (!active) return;
-        if (linkErr) {
-          console.error("carer-view: link error", linkErr);
+        if (lastErr) {
+          console.error("carer-view: link error", lastErr);
           setLinkedPatients([]);
           setActivePatientIdState(null);
           setError("unlinked or load error");
           setPhase("unlinked");
           return;
         }
-        const rows = data ?? [];
         if (rows.length === 0) {
           console.warn("carer-view: no linked patients");
           setLinkedPatients([]);
@@ -420,6 +444,7 @@ export default function CarerViewPage() {
           setPhase("unlinked");
           return;
         }
+        clearCarerLinkJustCompleted();
         setError(null);
         setLinkedPatients(rows);
         const remembered = getActiveCarerPatientId();

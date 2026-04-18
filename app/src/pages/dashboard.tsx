@@ -107,7 +107,7 @@ async function runHypoTreatmentPipeline(
         if (eligible > 0 && delivered > 0) {
           storage.updateHypoTreatmentCarerNotified(created.id, true);
           description =
-            eligible === 1 ? "Your carer has been notified." : "Your carers have been notified.";
+            eligible === 1 ? "Your supporter has been notified." : "Your supporters have been notified.";
         } else if (eligible > 0 && delivered === 0) {
           description =
             "Hypo logged. No alerts were delivered — check push API env or in-app supporter user IDs in Family & Supporters.";
