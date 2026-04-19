@@ -25,7 +25,7 @@ export function CommunityFeatureGate({
     );
   }
 
-  if (requirePublicProfile && !profile?.is_public) return <Redirect to="/account#community" replace />;
+  if (requirePublicProfile && !profile?.is_public) return <Redirect to="/account#profile" replace />;
 
   return <>{children}</>;
 }

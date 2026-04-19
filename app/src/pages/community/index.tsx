@@ -475,7 +475,7 @@ export default function CommunityHomePage() {
               <Search className="h-4 w-4" aria-hidden />
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/account#community" aria-label="Feed profile settings">
+              <Link href="/account#profile" aria-label="Profile settings">
                 <Settings className="h-4 w-4" />
               </Link>
             </Button>
@@ -494,8 +494,8 @@ export default function CommunityHomePage() {
           <AlertDescription className="text-sm leading-relaxed text-foreground">
             <span className="font-medium">Set a @handle to post on the Feed.</span> You can still read posts. Your handle
             is used for @mentions and your public link.{" "}
-            <Link href="/account#community" className="font-medium text-primary underline-offset-4 hover:underline">
-              Open Feed profile
+            <Link href="/account#profile" className="font-medium text-primary underline-offset-4 hover:underline">
+              Open Profile
             </Link>
           </AlertDescription>
         </Alert>

@@ -17,6 +17,7 @@ import {
   useProfile,
 } from "@/lib/profile";
 import { getPrimaryAppRole } from "@/lib/carer-session";
+import { storage } from "@/lib/storage";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -25,7 +26,7 @@ type AccountCommunityProfileFieldsProps = {
   showAccountLinkInCopy?: boolean;
   /** Standalone wraps in a Card with title + Edit; embedded is form only (no Card). */
   variant?: "standalone" | "embedded";
-  /** When standalone: element id for deep links (e.g. `community` for /account#community). */
+  /** When standalone: element id for deep links (e.g. `profile` for /account#profile). */
   cardId?: string;
   className?: string;
 };
@@ -60,7 +61,9 @@ export function AccountCommunityProfileFields({
   const handleId = `${idPrefix}-handle-${reactId}`;
   const bioId = `${idPrefix}-bio-${reactId}`;
   const onsetId = `${idPrefix}-onset-${reactId}`;
+  const fullNameId = `${idPrefix}-fullname-${reactId}`;
 
+  const [fullNameInput, setFullNameInput] = useState("");
   const [bio, setBio] = useState("");
   const [handleInput, setHandleInput] = useState("");
   const [onsetDateInput, setOnsetDateInput] = useState("");
@@ -85,6 +88,7 @@ export function AccountCommunityProfileFields({
 
   useEffect(() => {
     if (!profile) return;
+    setFullNameInput(profile.full_name ?? "");
     setBio(profile.bio ?? "");
     setHandleInput(profile.public_handle ?? "");
     setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
@@ -191,6 +195,24 @@ export function AccountCommunityProfileFields({
     e.preventDefault();
     if (!profile?.id) return;
     setSaving(true);
+    const nameVal = fullNameInput.trim() || null;
+
+    if (!isPublic) {
+      const { error } = await updateProfile({
+        id: profile.id,
+        full_name: nameVal,
+      });
+      setSaving(false);
+      if (error) {
+        toast({ title: "Could not save", description: error.message, variant: "destructive" });
+        return;
+      }
+      void refresh();
+      setEditing(false);
+      toast({ title: "Saved", description: "Your name has been updated." });
+      return;
+    }
+
     let normalizedHandle: string | null;
     try {
       normalizedHandle =
@@ -207,6 +229,7 @@ export function AccountCommunityProfileFields({
 
     const { error } = await updateProfile({
       id: profile.id,
+      full_name: nameVal,
       bio: bio.trim() || null,
       public_handle: normalizedHandle,
       is_public: isPublic,
@@ -219,15 +242,51 @@ export function AccountCommunityProfileFields({
     }
     void refresh();
     setEditing(false);
-    toast({ title: "Saved", description: "Your community profile was updated." });
+    toast({ title: "Saved", description: "Your profile was updated." });
   }
 
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
   const readOnlyHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
   const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
 
+  const settingsName = storage.getProfile()?.name?.trim() ?? "";
+  const displayNameReadOnly =
+    profile?.full_name?.trim() || settingsName || "Your account";
+
   const formBody = (
     <>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-1">
+          <Label htmlFor={editing ? fullNameId : undefined}>Name</Label>
+          <InlineInfoHint
+            ariaLabel="About this name"
+            content={
+              showAccountLinkInCopy
+                ? "This is how the app greets you. Your photo is on Account."
+                : "This is how the app greets you and, with Public profile on, how you appear in the community."
+            }
+          />
+        </div>
+        {editing ? (
+          <Input
+            id={fullNameId}
+            value={fullNameInput}
+            onChange={(e) => setFullNameInput(e.target.value)}
+            autoComplete="name"
+            placeholder="Your name"
+            disabled={loading || savingPublic}
+            data-testid="account-profile-display-name-input"
+          />
+        ) : (
+          <p
+            className="text-sm font-medium text-foreground truncate"
+            data-testid="account-profile-display-name-readonly"
+          >
+            {displayNameReadOnly}
+          </p>
+        )}
+      </div>
+
       <div className="rounded-lg border border-border/60">
         <div className="flex items-center justify-between gap-3 px-3 py-2">
           <div className="min-w-0 flex-1 space-y-0.5">
@@ -238,14 +297,14 @@ export function AccountCommunityProfileFields({
                 content={
                   showAccountLinkInCopy ? (
                     <>
-                      Let signed-in members see your community card. Photo and display name are on{" "}
-                      <Link href="/account" className="text-primary underline-offset-4 hover:underline">
+                      Let signed-in members see your community card. Photo and name are on{" "}
+                      <Link href="/account#profile" className="text-primary underline-offset-4 hover:underline">
                         Account
                       </Link>
                       .
                     </>
                   ) : (
-                    "When on, you can read the Feed right away. Set a @handle below before you post — it powers mentions and your public link. Photo and display name use this account above."
+                    "When on, you can use the Feed. Set a @handle below before you post — it powers mentions and your public link."
                   )
                 }
               />
@@ -427,21 +486,28 @@ export function AccountCommunityProfileFields({
           )}
         </>
       ) : (
-        <div className="flex items-start gap-2">
-          <p className="text-sm text-muted-foreground flex-1 min-w-0">
-            Turn on Public profile to use the Feed and edit your handle and bio.
-          </p>
-          <InlineInfoHint
-            ariaLabel="More about community profile"
-            content="Turn on Public profile to open Feed in the app and edit your handle and bio."
-          />
+        <div className="space-y-3">
+          <div className="flex items-start gap-2">
+            <p className="text-sm text-muted-foreground flex-1 min-w-0">
+              Turn on Public profile to use the Feed and edit your handle and bio.
+            </p>
+            <InlineInfoHint
+              ariaLabel="More about community profile"
+              content="Turn on Public profile to open the Feed and edit your handle and bio."
+            />
+          </div>
+          {editing ? (
+            <Button type="submit" disabled={saving || loading || savingPublic} data-testid="account-community-save">
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          ) : null}
         </div>
       )}
     </>
   );
 
   const embeddedEditRow =
-    variant === "embedded" && isPublic && !editing ? (
+    variant === "embedded" && !editing ? (
       <div className="flex justify-end">
         <Button
           type="button"
@@ -475,16 +541,16 @@ export function AccountCommunityProfileFields({
         <CardHeader className="pb-2 space-y-0">
           <div className="flex flex-row items-start justify-between gap-3">
             <div className="min-w-0 space-y-1">
-              <CardTitle className="text-[0.9375rem] font-semibold">Feed</CardTitle>
+              <CardTitle className="text-[0.9375rem] font-semibold">Profile</CardTitle>
               <CardDescription className="flex flex-wrap items-center gap-1.5">
-                <span>Turn on Public profile to use the Feed tab.</span>
+                <span>Your name, visibility in the community, and optional feed details.</span>
                 <InlineInfoHint
-                  ariaLabel="More about Feed profile"
-                  content="Then set your handle and bio below, or on Account."
+                  ariaLabel="More about Profile"
+                  content="Edit your name, turn Public profile on or off, and when it is on, set your handle and bio."
                 />
               </CardDescription>
             </div>
-            {isPublic && !editing ? (
+            {!editing ? (
               <Button
                 type="button"
                 variant="outline"

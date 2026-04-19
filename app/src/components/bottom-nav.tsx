@@ -98,10 +98,10 @@ function carerTabs(showCommunityTab: boolean): TabDef[] {
     },
     {
       title: "Account",
-      href: "/supporter-profile",
+      href: "/account",
       icon: User,
       testId: "bottomnav-account",
-      isActive: (pathname) => pathname === "/supporter-profile" || pathname === "/account",
+      isActive: (pathname) => pathname === "/account",
     },
   );
   return tabs;

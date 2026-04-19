@@ -332,27 +332,23 @@ export default function Account() {
         title="Account"
         description={
           isCarer
-            ? "Your supporter profile and sign-in options. Open Supporter Mode to see the people you support."
+            ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
             : "Your profile, emergency details, and sign-in options."
         }
         className="max-w-xl"
       />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
         <CardContent className="relative p-4 sm:p-5 space-y-0">
-          <div className="absolute right-4 top-4 z-10 flex flex-wrap justify-end gap-2 sm:right-5 sm:top-5">
-            {hasCarerLink ? (
-              <Button variant="outline" size="sm" className="min-h-11" asChild>
-                <Link href="/supporter-profile" data-testid="link-supporter-profile">
-                  Supporter profile
-                </Link>
-              </Button>
-            ) : null}
-            <Button variant="outline" size="sm" className="min-h-11" asChild>
-              <Link href="/settings" data-testid="link-account-settings">
-                Settings
-              </Link>
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="absolute right-4 top-4 z-10 min-h-11 sm:right-5 sm:top-5"
+            asChild
+          >
+            <Link href="/settings" data-testid="link-account-settings">
+              Settings
+            </Link>
+          </Button>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
               {showPublicProfilePreview ? (
@@ -431,7 +427,7 @@ export default function Account() {
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         No handle set.{" "}
-                        <a href="#community" className="text-primary underline-offset-4 hover:underline">
+                        <a href="#profile" className="text-primary underline-offset-4 hover:underline">
                           Add one
                         </a>
                       </p>
@@ -548,7 +544,7 @@ export default function Account() {
       </Card>
 
       {isCommunityEnabled && (
-        <AccountCommunityProfileFields variant="standalone" cardId="community" idPrefix="account" />
+        <AccountCommunityProfileFields variant="standalone" cardId="profile" idPrefix="account" />
       )}
 
       {!verified && (

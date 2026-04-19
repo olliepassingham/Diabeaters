@@ -282,7 +282,7 @@ export default function CommunityProfilePage() {
         actions={
           isSelf ? (
             <Button variant="outline" size="sm" asChild>
-              <Link href="/account#community">Edit</Link>
+              <Link href="/account#profile">Edit</Link>
             </Button>
           ) : !isSelf && user && profile ? (
             <div className="flex flex-wrap items-center justify-end gap-2">

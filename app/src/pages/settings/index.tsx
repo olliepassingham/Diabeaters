@@ -52,7 +52,6 @@ import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
-
 function ProfileTab({ 
   name, setName, bgUnits, setBgUnits, 
   carbUnits, setCarbUnits, deliveryMethod, setDeliveryMethod, 
@@ -1054,17 +1053,6 @@ export default function Settings() {
           actions={settingsInfoDialog}
         />
 
-        {isCarer && (
-          <SettingsHubGroup title="Account">
-            <SettingsHubNavLink
-              href="/supporter-profile"
-              label="Supporter profile"
-              description="Your display name, email, and who you support"
-              icon={User}
-            />
-          </SettingsHubGroup>
-        )}
-
         {!isCarer && (
           <SettingsHubGroup title="Personal & clinical">
             <SettingsHubNavLink
@@ -1085,9 +1073,9 @@ export default function Settings() {
         {!isCarer && (
           <SettingsHubGroup title="Community">
             <SettingsHubNavLink
-              href="/account#community"
-              label="Feed profile"
-              description="Handle, bio, and feed visibility"
+              href="/account#profile"
+              label="Profile"
+              description="Name, handle, bio, and feed visibility"
               icon={AtSign}
             />
           </SettingsHubGroup>
