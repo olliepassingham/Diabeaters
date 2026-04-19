@@ -36,6 +36,14 @@ export function useLinkedPatient(): {
   }, [authLoading, refetch]);
 
   useEffect(() => {
+    const onLink = () => {
+      void refetch();
+    };
+    window.addEventListener("diabeater:carer-link-updated", onLink);
+    return () => window.removeEventListener("diabeater:carer-link-updated", onLink);
+  }, [refetch]);
+
+  useEffect(() => {
     const onMode = (ev: Event) => {
       const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());

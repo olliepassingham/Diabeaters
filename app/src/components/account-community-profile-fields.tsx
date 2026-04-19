@@ -30,17 +30,17 @@ type AccountCommunityProfileFieldsProps = {
   className?: string;
 };
 
-function hasSavedCommunityDetails(profile: {
-  public_handle?: string | null;
-  bio?: string | null;
-  diabetes_onset_date?: string | null;
-} | null): boolean {
+function hasSavedCommunityDetails(
+  profile: {
+    public_handle?: string | null;
+    bio?: string | null;
+    diabetes_onset_date?: string | null;
+  } | null,
+  countDiabetesOnset: boolean,
+): boolean {
   if (!profile) return false;
-  return !!(
-    profile.public_handle?.trim() ||
-    profile.bio?.trim() ||
-    profile.diabetes_onset_date?.trim()
-  );
+  const hasOnset = countDiabetesOnset && !!profile.diabetes_onset_date?.trim();
+  return !!(profile.public_handle?.trim() || profile.bio?.trim() || hasOnset);
 }
 
 /**
@@ -70,6 +70,10 @@ export function AccountCommunityProfileFields({
   const [editing, setEditing] = useState(false);
   const profileIdRef = useRef<string | undefined>(undefined);
   const bioRef = useRef<HTMLTextAreaElement>(null);
+  const clearedStaleDiabetesOnset = useRef(false);
+
+  /** Only people using the app primarily as someone with diabetes should set or show this. */
+  const showOnsetDate = getPrimaryAppRole() === "patient";
 
   const adjustBioHeight = useCallback(() => {
     const el = bioRef.current;
@@ -83,19 +87,40 @@ export function AccountCommunityProfileFields({
     if (!profile) return;
     setBio(profile.bio ?? "");
     setHandleInput(profile.public_handle ?? "");
-    setOnsetDateInput(profile.diabetes_onset_date ?? "");
+    setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
     setIsPublic(profile.is_public);
 
     if (profileIdRef.current !== profile.id) {
       profileIdRef.current = profile.id;
-      const saved = hasSavedCommunityDetails(profile);
+      const saved = hasSavedCommunityDetails(profile, showOnsetDate);
       setEditing(!(profile.is_public && saved));
     }
-  }, [profile]);
+  }, [profile, showOnsetDate]);
 
   useEffect(() => {
     adjustBioHeight();
   }, [bio, adjustBioHeight]);
+
+  /** Supporters may have a legacy value; clear it so public cards do not imply they have diabetes. */
+  useEffect(() => {
+    if (showOnsetDate || !profile?.id) return;
+    if (!profile.diabetes_onset_date?.trim()) return;
+    if (clearedStaleDiabetesOnset.current) return;
+    clearedStaleDiabetesOnset.current = true;
+    void (async () => {
+      const { error } = await updateProfile({ id: profile.id, diabetes_onset_date: null });
+      if (error) {
+        clearedStaleDiabetesOnset.current = false;
+        return;
+      }
+      setOnsetDateInput("");
+      void refresh();
+    })();
+  }, [showOnsetDate, profile?.id, profile?.diabetes_onset_date, refresh]);
+
+  useEffect(() => {
+    clearedStaleDiabetesOnset.current = false;
+  }, [profile?.id]);
 
   useEffect(() => {
     if (!isPublic) return;
@@ -110,7 +135,7 @@ export function AccountCommunityProfileFields({
 
     setIsPublic(next);
     if (next) {
-      const saved = hasSavedCommunityDetails(profile);
+      const saved = hasSavedCommunityDetails(profile, showOnsetDate);
       setEditing(!saved);
     }
 
@@ -185,7 +210,7 @@ export function AccountCommunityProfileFields({
       bio: bio.trim() || null,
       public_handle: normalizedHandle,
       is_public: isPublic,
-      diabetes_onset_date: onsetDateInput.trim() || null,
+      diabetes_onset_date: showOnsetDate ? onsetDateInput.trim() || null : null,
     });
     setSaving(false);
     if (error) {
@@ -200,7 +225,6 @@ export function AccountCommunityProfileFields({
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
   const readOnlyHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
   const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
-  const showOnsetDate = getPrimaryAppRole() !== "carer";
 
   const formBody = (
     <>

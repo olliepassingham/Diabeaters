@@ -25,6 +25,14 @@ export function useLinkedCarer() {
     void refetch();
   }, [authLoading, refetch]);
 
+  useEffect(() => {
+    const onLink = () => {
+      void refetch();
+    };
+    window.addEventListener("diabeater:carer-link-updated", onLink);
+    return () => window.removeEventListener("diabeater:carer-link-updated", onLink);
+  }, [refetch]);
+
   return {
     loading: authLoading || resolving,
     linked,

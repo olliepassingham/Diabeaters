@@ -13,6 +13,7 @@ import {
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
   fetchHypoLogsForLinkedPatient,
+  getLinkedPatientForCarer,
   listLinkedPatientsForCarer,
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
@@ -429,6 +430,23 @@ export default function CarerViewPage() {
           return;
         }
         if (rows.length === 0) {
+          const fallback = await getLinkedPatientForCarer();
+          if (!active) return;
+          if (fallback.data && !fallback.error) {
+            const fp = fallback.data;
+            rows = [
+              {
+                linkId: fp.linkId,
+                patientId: fp.patientId,
+                carerId: fp.carerId,
+                scopes: fp.scopes,
+                patient_full_name: null,
+                patient_avatar_url: null,
+              },
+            ];
+          }
+        }
+        if (rows.length === 0) {
           console.warn("carer-view: no linked patients");
           setLinkedPatients([]);
           setActivePatientIdState(null);
@@ -436,7 +454,6 @@ export default function CarerViewPage() {
           setPhase("unlinked");
           return;
         }
-        clearCarerLinkJustCompleted();
         setError(null);
         setLinkedPatients(rows);
         const remembered = getActiveCarerPatientId();
@@ -527,6 +544,7 @@ export default function CarerViewPage() {
         }
       } finally {
         if (active) {
+          clearCarerLinkJustCompleted();
           setPhase("ready");
         }
       }

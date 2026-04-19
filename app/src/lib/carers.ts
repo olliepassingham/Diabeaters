@@ -565,10 +565,19 @@ export async function listLinkedPatientsForCarer(): Promise<{
     .select("id, full_name, avatar_url")
     .in("id", patientIds);
 
-  if (profErr) return { data: null, error: new Error(profErr.message) };
+  // Do not fail the whole supporter link load if profile names are blocked by RLS;
+  // CarerView can still load patient data using patient_id + scopes.
+  if (profErr) {
+    console.warn("[listLinkedPatientsForCarer] profiles join failed; continuing without names", profErr.message);
+  }
 
+  const profRows = ((profErr ? [] : profs) ?? []) as {
+    id: string;
+    full_name?: string | null;
+    avatar_url?: string | null;
+  }[];
   const profileById = new Map(
-    ((profs ?? []) as { id: string; full_name?: string | null; avatar_url?: string | null }[]).map((p) => [
+    profRows.map((p) => [
       p.id,
       { full_name: p.full_name ?? null, avatar_url: p.avatar_url ?? null },
     ]),

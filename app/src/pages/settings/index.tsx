@@ -1046,9 +1046,24 @@ export default function Settings() {
         <PageHeader
           className="mb-1"
           title="Settings"
-          description="Personal profile, clinical defaults, alerts, and appearance."
+          description={
+            isCarer
+              ? "Your supporter account, alerts, and appearance."
+              : "Personal profile, clinical defaults, alerts, and appearance."
+          }
           actions={settingsInfoDialog}
         />
+
+        {isCarer && (
+          <SettingsHubGroup title="Account">
+            <SettingsHubNavLink
+              href="/supporter-profile"
+              label="Supporter profile"
+              description="Your display name, email, and who you support"
+              icon={User}
+            />
+          </SettingsHubGroup>
+        )}
 
         {!isCarer && (
           <SettingsHubGroup title="Personal & clinical">

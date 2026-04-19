@@ -26,6 +26,14 @@ import {
 import { PageBackButton } from "@/components/layout";
 import { Info } from "lucide-react";
 
+function emitCarerLinkUpdated(): void {
+  try {
+    window.dispatchEvent(new CustomEvent("diabeater:carer-link-updated"));
+  } catch {
+    // ignore
+  }
+}
+
 export default function CarerSetupPage() {
   const { user, loading: authLoading } = useAuth();
   const configured = Boolean(getSupabase());
@@ -71,6 +79,7 @@ export default function CarerSetupPage() {
           if (getPrimaryAppRole() == null) setPrimaryAppRole("carer");
           setActiveAppMode("carer");
           markCarerLinkJustCompleted();
+          emitCarerLinkUpdated();
           setCode("");
           toast({
             title: "Linked already",
@@ -104,6 +113,7 @@ export default function CarerSetupPage() {
     }
     setActiveAppMode("carer");
     markCarerLinkJustCompleted();
+    emitCarerLinkUpdated();
     setCode("");
     toast({
       title: "Linked successfully",

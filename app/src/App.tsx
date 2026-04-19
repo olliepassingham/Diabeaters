@@ -91,6 +91,7 @@ const Travel = lazy(() => import("@/pages/travel"));
 
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const SettingsEmergencyPage = lazy(() => import("@/pages/settings/emergency"));
+const SupporterProfilePage = lazy(() => import("@/pages/supporter-profile"));
 
 const Scenarios = lazy(() => import("@/pages/scenarios"));
 const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
@@ -323,6 +324,8 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/appearance") return true;
   if (p === "/settings/notifications") return true;
   if (p === "/settings/about") return true;
+  if (p === "/settings/account") return true;
+  if (p === "/supporter-profile") return true;
   if (p === "/settings/emergency") return true;
   if (p === "/privacy" || p === "/support") return true;
   if (isCommunityPath(p)) return true;
@@ -397,6 +400,11 @@ function InnerRouter() {
       <Route path="/mode" component={ModeChooser} />
       <Route path="/carer-view/:section" component={CarerView} />
       <Route path="/carer-view" component={CarerView} />
+      <Route path="/supporter-profile">
+        <Suspense fallback={<RouteFallback />}>
+          <SupporterProfilePage />
+        </Suspense>
+      </Route>
       <Route path="/family-carers" component={FamilyCarersGate} />
       <Route path="/notifications" component={NotificationsPage} />
       <Route path="/community/messages/:threadId">
@@ -613,9 +621,7 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/settings/account">
-        <PatientRouteGuard>
-          <Redirect to="/account" replace />
-        </PatientRouteGuard>
+        <Redirect to="/supporter-profile" replace />
       </Route>
       <Route path="/settings">
         <Suspense fallback={<RouteFallback />}>
@@ -918,6 +924,18 @@ function AppContent() {
       cancelled = true;
     };
   }, [authLoading, user?.id]);
+
+  useEffect(() => {
+    const bumpLinkedCarer = () => {
+      void (async () => {
+        if (!user?.id) return;
+        const link = await getLinkedPatientForCarer();
+        if (link.data) setLinkedCarer(true);
+      })();
+    };
+    window.addEventListener("diabeater:carer-link-updated", bumpLinkedCarer);
+    return () => window.removeEventListener("diabeater:carer-link-updated", bumpLinkedCarer);
+  }, [user?.id]);
 
   const publicEntry = bypassesOnboardingGate(location);
 

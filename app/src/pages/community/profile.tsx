@@ -84,7 +84,11 @@ export default function CommunityProfilePage() {
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
-  const isSupporterFirstSelf = isSelf && getPrimaryAppRole() === "carer";
+  /** Diabetes journey line: show to others when present; on your own profile only if you use the app as a patient. */
+  const onset = profile?.diabetes_onset_date?.trim() ?? "";
+  const showDiabetesJourneyLine = Boolean(
+    onset && formatLivingWithDiabetesLine(onset) && (!isSelf || getPrimaryAppRole() === "patient"),
+  );
 
   const loginNextHref = useMemo(() => {
     if (!userId) return "/community";
@@ -355,9 +359,7 @@ export default function CommunityProfilePage() {
               <p className="text-sm text-muted-foreground italic">No bio yet.</p>
             )}
 
-            {!isSupporterFirstSelf &&
-            profile.diabetes_onset_date &&
-            formatLivingWithDiabetesLine(profile.diabetes_onset_date) ? (
+            {showDiabetesJourneyLine && profile ? (
               <p className="text-sm text-muted-foreground">
                 {formatLivingWithDiabetesLine(profile.diabetes_onset_date)}
               </p>

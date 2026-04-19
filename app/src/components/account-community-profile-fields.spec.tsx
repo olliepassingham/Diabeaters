@@ -50,6 +50,10 @@ vi.mock("@/lib/profile", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/carer-session", () => ({
+  getPrimaryAppRole: () => "patient" as const,
+}));
+
 import * as profileLib from "@/lib/profile";
 
 const profilePublic: ProfileRow = {
