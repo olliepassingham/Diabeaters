@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useId, useMemo, useRef, useState } f
 import { Clock3 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/profile";
 import { getPrimaryAppRole } from "@/lib/carer-session";
 import { storage } from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -31,21 +32,28 @@ type AccountCommunityProfileFieldsProps = {
   className?: string;
 };
 
-function hasSavedCommunityDetails(
-  profile: {
-    public_handle?: string | null;
-    bio?: string | null;
-    diabetes_onset_date?: string | null;
-  } | null,
-  countDiabetesOnset: boolean,
-): boolean {
+/**
+ * Public profile is "complete" (read-only / published layout) when name and valid handle are set.
+ * Bio and living-with-diabetes date are optional.
+ */
+function isPublicProfileComplete(profile: {
+  full_name?: string | null;
+  public_handle?: string | null;
+} | null): boolean {
   if (!profile) return false;
-  const hasOnset = countDiabetesOnset && !!profile.diabetes_onset_date?.trim();
-  return !!(profile.public_handle?.trim() || profile.bio?.trim() || hasOnset);
+  if (!profile.full_name?.trim()) return false;
+  try {
+    const raw = (profile.public_handle ?? "").replace(/^@/, "").trim();
+    const h = normalizePublicHandleInput(raw);
+    if (!h) return false;
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 /**
- * Public profile switch + optional handle/bio when on. Shared by Account and Community settings.
+ * Public profile switch + handle/bio when on. Shared by Account and Community settings.
  */
 export function AccountCommunityProfileFields({
   idPrefix = "comm",
@@ -54,8 +62,10 @@ export function AccountCommunityProfileFields({
   cardId,
   className,
 }: AccountCommunityProfileFieldsProps) {
+  const { user } = useAuth();
   const { profile, loading, refresh } = useProfile();
   const { toast } = useToast();
+  const accountEmail = user?.email?.trim() ?? "";
   const reactId = useId();
   const pubId = `${idPrefix}-pub-${reactId}`;
   const handleId = `${idPrefix}-handle-${reactId}`;
@@ -96,10 +106,20 @@ export function AccountCommunityProfileFields({
 
     if (profileIdRef.current !== profile.id) {
       profileIdRef.current = profile.id;
-      const saved = hasSavedCommunityDetails(profile, showOnsetDate);
-      setEditing(!(profile.is_public && saved));
+      if (!profile.is_public) {
+        setEditing(false);
+      } else {
+        setEditing(!isPublicProfileComplete(profile));
+      }
     }
   }, [profile, showOnsetDate]);
+
+  useEffect(() => {
+    if (!profile?.is_public) return;
+    if (!isPublicProfileComplete(profile)) {
+      setEditing(true);
+    }
+  }, [profile?.is_public, profile?.full_name, profile?.public_handle]);
 
   useEffect(() => {
     adjustBioHeight();
@@ -139,8 +159,9 @@ export function AccountCommunityProfileFields({
 
     setIsPublic(next);
     if (next) {
-      const saved = hasSavedCommunityDetails(profile, showOnsetDate);
-      setEditing(!saved);
+      setEditing(!isPublicProfileComplete(profile));
+    } else {
+      setEditing(false);
     }
 
     setSavingPublic(true);
@@ -149,6 +170,11 @@ export function AccountCommunityProfileFields({
 
     if (error) {
       setIsPublic(previous);
+      if (!previous) {
+        setEditing(false);
+      } else {
+        setEditing(!isPublicProfileComplete(profile));
+      }
       toast({
         title: "Could not update visibility",
         description: error.message,
@@ -161,7 +187,7 @@ export function AccountCommunityProfileFields({
     toast({
       title: "Saved",
       description: next
-        ? "Public profile is on. You can use the Feed and edit your details below."
+        ? "Public profile is on. Add your name, @handle, and other required details, then save."
         : "Public profile is off. The Feed is hidden until you turn this on again.",
     });
   }
@@ -213,10 +239,22 @@ export function AccountCommunityProfileFields({
       return;
     }
 
+    if (!fullNameInput.trim()) {
+      setSaving(false);
+      toast({
+        title: "Missing name",
+        description: "Your name is required for a public profile.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     let normalizedHandle: string | null;
     try {
       normalizedHandle =
-        handleInput.trim() === "" ? null : normalizePublicHandleInput(handleInput);
+        handleInput.trim() === ""
+          ? null
+          : normalizePublicHandleInput(handleInput.replace(/^@/, "").trim());
     } catch (err) {
       setSaving(false);
       toast({
@@ -226,14 +264,24 @@ export function AccountCommunityProfileFields({
       });
       return;
     }
+    if (!normalizedHandle) {
+      setSaving(false);
+      toast({
+        title: "Missing handle",
+        description: "Choose a @handle (3–30 characters). It is required for a public profile.",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    const onsetVal = showOnsetDate ? onsetDateInput.trim() || null : null;
     const { error } = await updateProfile({
       id: profile.id,
       full_name: nameVal,
       bio: bio.trim() || null,
       public_handle: normalizedHandle,
       is_public: isPublic,
-      diabetes_onset_date: showOnsetDate ? onsetDateInput.trim() || null : null,
+      diabetes_onset_date: onsetVal,
     });
     setSaving(false);
     if (error) {
@@ -241,7 +289,11 @@ export function AccountCommunityProfileFields({
       return;
     }
     void refresh();
-    setEditing(false);
+    const completeAfterSave = isPublicProfileComplete({
+      full_name: nameVal,
+      public_handle: normalizedHandle,
+    });
+    setEditing(!completeAfterSave);
     toast({ title: "Saved", description: "Your profile was updated." });
   }
 
@@ -253,11 +305,14 @@ export function AccountCommunityProfileFields({
   const displayNameReadOnly =
     profile?.full_name?.trim() || settingsName || "Your account";
 
+  const readOnlyPublicSummary = Boolean(isPublic && profile && isPublicProfileComplete(profile) && !editing);
+  const showNameInput = !isPublic ? editing : !readOnlyPublicSummary;
+
   const formBody = (
     <>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-1">
-          <Label htmlFor={editing ? fullNameId : undefined}>Name</Label>
+          <Label htmlFor={showNameInput ? fullNameId : undefined}>Name</Label>
           <InlineInfoHint
             ariaLabel="About this name"
             content={
@@ -267,7 +322,7 @@ export function AccountCommunityProfileFields({
             }
           />
         </div>
-        {editing ? (
+        {showNameInput ? (
           <Input
             id={fullNameId}
             value={fullNameInput}
@@ -285,6 +340,11 @@ export function AccountCommunityProfileFields({
             {displayNameReadOnly}
           </p>
         )}
+        {accountEmail ? (
+          <p className="text-sm text-muted-foreground break-all" data-testid="account-profile-email-readonly">
+            {accountEmail}
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-lg border border-border/60">
@@ -304,7 +364,7 @@ export function AccountCommunityProfileFields({
                       .
                     </>
                   ) : (
-                    "When on, you can use the Feed. Set a @handle below before you post — it powers mentions and your public link."
+                    "When on, add your name and @handle to finish your profile. Bio and diagnosis date are optional."
                   )
                 }
               />
@@ -327,14 +387,14 @@ export function AccountCommunityProfileFields({
 
       {isPublic ? (
         <>
-          {editing ? (
+          {!readOnlyPublicSummary ? (
             <>
               <div className="space-y-2">
                 <FieldLabelWithInfo
                   htmlFor={handleId}
                   info={
                     <>
-                      3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
+                      Required. 3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
                       {handleInput.trim() ? (
                         <Link
                           href={`/community/u/${encodeURIComponent(handleSlug)}`}
@@ -370,7 +430,9 @@ export function AccountCommunityProfileFields({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor={bioId}>Bio</Label>
+                <Label htmlFor={bioId}>
+                  Bio <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
                 <Textarea
                   ref={bioRef}
                   id={bioId}
@@ -389,9 +451,10 @@ export function AccountCommunityProfileFields({
                 <div className="space-y-2">
                   <FieldLabelWithInfo
                     htmlFor={onsetId}
-                    info="Shown on your public feed profile when Public profile is on. You can remove this anytime."
+                    info="Optional. Shown on your community card when set. You can change or remove it anytime."
                   >
-                    Living with diabetes since
+                    Living with diabetes since{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
                   </FieldLabelWithInfo>
                   <Input
                     id={onsetId}
@@ -439,7 +502,10 @@ export function AccountCommunityProfileFields({
             <div className="space-y-4">
               {showOnsetDate ? (
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">Living with diabetes since</p>
+                  <p className="text-sm font-medium text-foreground">
+                    Living with diabetes since{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </p>
                   {livingLine ? (
                     <p className="text-sm text-muted-foreground" data-testid="account-community-onset-highlight">
                       {livingLine}
@@ -487,13 +553,15 @@ export function AccountCommunityProfileFields({
         </>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-start gap-2">
-            <p className="text-sm text-muted-foreground flex-1 min-w-0">
-              Turn on Public profile to use the Feed and edit your handle and bio.
-            </p>
+          <div className="flex items-center justify-start">
             <InlineInfoHint
-              ariaLabel="More about community profile"
-              content="Turn on Public profile to open the Feed and edit your handle and bio."
+              ariaLabel="About Public profile"
+              content={
+                <>
+                  Turn on Public profile to use the Feed. You will add your name and @handle to publish your card. Bio
+                  and diagnosis date are optional.
+                </>
+              }
             />
           </div>
           {editing ? (
@@ -540,15 +608,22 @@ export function AccountCommunityProfileFields({
       >
         <CardHeader className="pb-2 space-y-0">
           <div className="flex flex-row items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
+            <div className="min-w-0 flex flex-wrap items-center gap-1.5">
               <CardTitle className="text-[0.9375rem] font-semibold">Profile</CardTitle>
-              <CardDescription className="flex flex-wrap items-center gap-1.5">
-                <span>Your name, visibility in the community, and optional feed details.</span>
-                <InlineInfoHint
-                  ariaLabel="More about Profile"
-                  content="Edit your name, turn Public profile on or off, and when it is on, set your handle and bio."
-                />
-              </CardDescription>
+              <InlineInfoHint
+                ariaLabel="About Profile"
+                content={
+                  <>
+                    <p className="mb-2 last:mb-0">
+                      With Public profile on, your community card is complete when your name and @handle are saved. Bio
+                      and diagnosis date are optional.
+                    </p>
+                    <p className="mb-0">
+                      Turn Public profile on to use the Feed. Until name and handle are saved, you stay in the editor.
+                    </p>
+                  </>
+                }
+              />
             </div>
             {!editing ? (
               <Button

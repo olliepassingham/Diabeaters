@@ -54,6 +54,10 @@ vi.mock("@/lib/carer-session", () => ({
   getPrimaryAppRole: () => "patient" as const,
 }));
 
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => ({ user: { id: "u1", email: "test@example.com" } as import("@supabase/supabase-js").User }),
+}));
+
 import * as profileLib from "@/lib/profile";
 
 const profilePublic: ProfileRow = {

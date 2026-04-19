@@ -17,7 +17,7 @@ import { storage } from "@/lib/storage";
 import { clearCarerClientSessionKeys } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
-import { getFollowCounts } from "@/lib/community";
+import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
 import heic2any from "heic2any";
@@ -30,6 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getPrimaryAppRole } from "@/lib/carer-session";
 import {
   accountDeletionSubmitUnavailableDescription,
@@ -39,7 +46,7 @@ import {
   getSupportEmail,
   isAccountDeletionTableUnavailableMessage,
 } from "@/lib/support";
-import { formatLivingWithDiabetesLine } from "@/lib/profile";
+import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
 
 function getInitial(email: string): string {
   const first = email.trim().charAt(0).toUpperCase();
@@ -71,6 +78,10 @@ export default function Account() {
   const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
   const [accountDeletionSubmitBusy, setAccountDeletionSubmitBusy] = useState(false);
   const [publicCounts, setPublicCounts] = useState<{ followers: number; following: number } | null>(null);
+  const [followListKind, setFollowListKind] = useState<"followers" | "following" | null>(null);
+  const [followListLoading, setFollowListLoading] = useState(false);
+  const [followListError, setFollowListError] = useState<string | null>(null);
+  const [followListRows, setFollowListRows] = useState<{ id: string; label: string }[]>([]);
 
   useEffect(() => {
     if (!user?.id || profileLoading) return;
@@ -326,6 +337,28 @@ export default function Account() {
     };
   }, [showPublicProfilePreview, userId]);
 
+  async function openFollowList(kind: "followers" | "following") {
+    setFollowListKind(kind);
+    setFollowListLoading(true);
+    setFollowListError(null);
+    setFollowListRows([]);
+    const { ids, error } = kind === "followers" ? await listFollowers(userId) : await listFollowing(userId);
+    if (error) {
+      setFollowListError(error.message);
+      setFollowListLoading(false);
+      return;
+    }
+    const map = await getProfilesByIds(ids);
+    const rows = ids.map((id) => {
+      const p = map.get(id);
+      const handle = (p?.public_handle ?? "").replace(/^@/, "").trim();
+      const label = p?.full_name?.trim() || (handle ? `@${handle}` : "Member");
+      return { id, label };
+    });
+    setFollowListRows(rows);
+    setFollowListLoading(false);
+  }
+
   return (
     <PageShell variant="narrow" className="md:max-w-2xl space-y-6 py-4 md:py-8">
       <PageHeader
@@ -434,10 +467,7 @@ export default function Account() {
                     )}
                   </div>
                 ) : (
-                  <>
-                    <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-                    <p className="text-sm text-muted-foreground break-all">{email}</p>
-                  </>
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
                 )}
 
                 {showPublicProfilePreview ? (
@@ -449,22 +479,24 @@ export default function Account() {
                       <p className="text-sm text-muted-foreground">{livingWithLine}</p>
                     ) : null}
                     <div className="flex items-center gap-4 pt-1">
-                      <Link
-                        href={myPublicProfileHref}
+                      <button
+                        type="button"
                         className="text-sm text-foreground hover:underline underline-offset-4"
                         data-testid="link-my-public-profile-followers"
+                        onClick={() => void openFollowList("followers")}
                       >
                         <span className="font-semibold tabular-nums">{publicCounts?.followers ?? 0}</span>{" "}
                         <span className="text-muted-foreground">followers</span>
-                      </Link>
-                      <Link
-                        href={myPublicProfileHref}
+                      </button>
+                      <button
+                        type="button"
                         className="text-sm text-foreground hover:underline underline-offset-4"
                         data-testid="link-my-public-profile-following"
+                        onClick={() => void openFollowList("following")}
                       >
                         <span className="font-semibold tabular-nums">{publicCounts?.following ?? 0}</span>{" "}
                         <span className="text-muted-foreground">following</span>
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 ) : null}
@@ -568,26 +600,6 @@ export default function Account() {
         >
           <CardContent className="p-6 space-y-4">
             <SettingsEmergencySection variant="embedded" showSyncButton={false} />
-          </CardContent>
-        </Card>
-      )}
-
-      {isCarer && (
-        <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40">
-          <CardContent className="p-6 space-y-2">
-            <p className="text-sm font-medium text-foreground">People you support</p>
-            <p className="text-sm text-muted-foreground">
-              Names, emergency contacts (if shared), and read-only updates are on{" "}
-              <Link href="/carer-view" className="font-medium text-primary underline-offset-4 hover:underline">
-                Supporter Mode
-              </Link>
-              .
-            </p>
-            <Button variant="outline" size="sm" className="mt-2 min-h-11" asChild>
-              <Link href="/carer-view" data-testid="link-open-supporter-mode-from-account">
-                Open Supporter Mode
-              </Link>
-            </Button>
           </CardContent>
         </Card>
       )}
@@ -722,6 +734,53 @@ export default function Account() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={followListKind !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFollowListKind(null);
+            setFollowListError(null);
+            setFollowListRows([]);
+            setFollowListLoading(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{followListKind === "following" ? "Following" : "Followers"}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {followListKind === "following"
+                ? "Accounts you follow on the Feed."
+                : "Accounts that follow you on the Feed."}
+            </DialogDescription>
+          </DialogHeader>
+          {followListLoading ? (
+            <div className="space-y-2 py-2" role="status" aria-label="Loading list">
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ) : followListError ? (
+            <p className="text-sm text-destructive">{followListError}</p>
+          ) : followListRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-2">No one yet.</p>
+          ) : (
+            <ul className="max-h-[min(60vh,22rem)] overflow-y-auto space-y-1 pr-1 m-0 list-none p-0">
+              {followListRows.map((row) => (
+                <li key={row.id}>
+                  <Link
+                    href={`/community/profile/${encodeURIComponent(row.id)}`}
+                    className="flex min-h-10 items-center rounded-md px-2 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80"
+                  >
+                    {row.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

@@ -707,44 +707,44 @@ export default function CarerViewPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                <Users className="h-5 w-5 text-primary shrink-0" aria-hidden />
-                People you support
-              </CardTitle>
-              <CardDescription>
-                Each person chooses what you can see. Use{" "}
-                <span className="font-medium text-foreground">Switch to</span> when you support more than one account.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 pt-0">
-              <ul className="m-0 list-none space-y-2 p-0">
-                {linkedPatients.map((p) => {
-                  const label = p.patient_full_name?.trim() || "Linked person";
-                  const active = p.patientId === activePatientId;
-                  return (
-                    <li key={p.patientId}>
-                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm">
-                        <span className="min-w-0 font-medium text-foreground">{label}</span>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {active ? (
-                            <Badge variant="secondary">Viewing</Badge>
-                          ) : linkedPatients.length > 1 ? (
-                            <Button type="button" size="sm" variant="outline" onClick={() => onPatientChange(p.patientId)}>
-                              Switch to
-                            </Button>
-                          ) : (
-                            <Badge variant="outline">Linked</Badge>
-                          )}
+          {linkedPatients.length > 1 ? (
+            <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                  <Users className="h-5 w-5 text-primary shrink-0" aria-hidden />
+                  People you support
+                </CardTitle>
+                <CardDescription>
+                  Each person chooses what you can see. Use{" "}
+                  <span className="font-medium text-foreground">Switch to</span> to change who you are viewing.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                <ul className="m-0 list-none space-y-2 p-0">
+                  {linkedPatients.map((p) => {
+                    const label = p.patient_full_name?.trim() || "Linked person";
+                    const active = p.patientId === activePatientId;
+                    return (
+                      <li key={p.patientId}>
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm">
+                          <span className="min-w-0 font-medium text-foreground">{label}</span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            {active ? (
+                              <Badge variant="secondary">Viewing</Badge>
+                            ) : (
+                              <Button type="button" size="sm" variant="outline" onClick={() => onPatientChange(p.patientId)}>
+                                Switch to
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </CardContent>
-          </Card>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
       {linkedBanner && (
