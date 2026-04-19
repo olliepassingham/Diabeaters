@@ -28,7 +28,7 @@ import {
 } from "@/lib/in-app-notifications-supabase";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 
 export function NotificationBell() {
   try {
@@ -75,6 +75,65 @@ export function NotificationBell() {
       window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, handler);
       return () => window.removeEventListener(INAPP_NOTIFICATIONS_CHANGED, handler);
     }, [load]);
+
+    /** Brief top toast + bell/list refresh when a new notification row arrives while the app is open. */
+    useEffect(() => {
+      if (!configured) return;
+      const supabase = getSupabase();
+      if (!supabase) return;
+
+      let cancelled = false;
+      let channel: ReturnType<typeof supabase.channel> | null = null;
+
+      const detach = () => {
+        if (channel) {
+          void supabase.removeChannel(channel);
+          channel = null;
+        }
+      };
+
+      const attach = (uid: string) => {
+        detach();
+        channel = supabase
+          .channel(`inapp-notifications-insert:${uid}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${uid}`,
+            },
+            (payload) => {
+              const row = payload.new as Record<string, unknown>;
+              const title = String(row.title ?? "Notification");
+              const bodyRaw = row.body;
+              const description =
+                typeof bodyRaw === "string" && bodyRaw.trim() ? bodyRaw : undefined;
+              toast({
+                title,
+                description,
+                duration: 4000,
+              });
+              notifyInAppNotificationsChanged();
+            },
+          )
+          .subscribe();
+      };
+
+      const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+        detach();
+        if (cancelled) return;
+        const uid = session?.user?.id;
+        if (uid) attach(uid);
+      });
+
+      return () => {
+        cancelled = true;
+        detach();
+        authSub.subscription.unsubscribe();
+      };
+    }, [configured, toast]);
 
     const handleMarkAllRead = async () => {
       const res = await markAllInAppNotificationsRead();
