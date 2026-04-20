@@ -335,7 +335,8 @@ export default function Account() {
   const bioPreview = profile?.bio?.trim() || "";
   const primaryRole = getPrimaryAppRole();
   const livingWithLine =
-    primaryRole === "patient" && activeMode === "patient"
+    // Treat unset activeMode as patient (default app experience).
+    primaryRole === "patient" && (activeMode == null || activeMode === "patient")
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
