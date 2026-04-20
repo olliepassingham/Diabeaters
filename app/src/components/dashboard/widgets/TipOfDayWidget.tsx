@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lightbulb, RefreshCw } from "lucide-react";
+import { Link } from "wouter";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { TIPS, CATEGORY_LABELS, getTipIndex } from "./tipOfDayData";
@@ -32,7 +33,13 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <Lightbulb className="h-5 w-5 text-amber-500 shrink-0" />
-            <CardTitle className="text-h3 text-foreground">Tip of the day</CardTitle>
+            <Link
+              href="/tools/tips"
+              className="rounded-md underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              aria-label="Open all tips"
+            >
+              <CardTitle className="text-h3 text-foreground">Tip of the day</CardTitle>
+            </Link>
           </div>
           <Button
             variant="ghost"

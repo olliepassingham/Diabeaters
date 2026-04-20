@@ -7,6 +7,7 @@ import {
   Droplet,
   Package,
   BookOpen,
+  Lightbulb,
   Calendar,
   HeartPulse,
   Map as MapIcon,
@@ -92,6 +93,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: BookOpen,
     title: "Education",
     description: "A–Z glossary of type 1 diabetes and app terms.",
+  },
+  {
+    id: "tips",
+    href: "/tools/tips",
+    icon: Lightbulb,
+    title: "Tips",
+    description: "Tip of the day and a bigger library of practical reminders.",
   },
 ];
 
@@ -257,7 +265,7 @@ export function ToolsHubPage({
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
-  const learn = (["education"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+  const learn = (["education", "tips"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
   const supporterTools = hubVariant === "carer" ? ([...actNow, ...learn] as ToolDef[]) : [];
 

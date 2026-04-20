@@ -74,6 +74,7 @@ import CommunityHandleResolve from "@/pages/community/handle-resolve";
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
+const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
@@ -538,6 +539,13 @@ function InnerRouter() {
         <PatientRouteGuard>
           <Suspense fallback={<RouteFallback />}>
             <CorrectionHelpPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/tools/tips">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <TipsPage />
           </Suspense>
         </PatientRouteGuard>
       </Route>
