@@ -827,21 +827,29 @@ export function ExercisePlanner() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-stretch sm:justify-end sm:shrink-0">
                       <Button
                         type="button"
                         size="sm"
-                        className="min-h-11"
+                        className="min-h-11 w-full justify-center sm:w-auto"
                         onClick={handleStartExerciseMode}
                         data-testid="button-exercise-start-mode"
                       >
-                        <Play className="h-4 w-4 mr-2" />
-                        Start exercise mode
+                        <Play className="h-4 w-4 sm:mr-2" />
+                        <span className="sm:hidden">Start mode</span>
+                        <span className="hidden sm:inline">Start exercise mode</span>
                       </Button>
-                      <Button variant="outline" size="sm" className="min-h-11" asChild data-testid="button-exercise-open-adviser">
-                        <Link href={adviserHref("before")}>
-                          <Calculator className="h-4 w-4 mr-2" />
-                          Insulin calculator
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-11 w-full justify-center px-3 text-xs sm:w-auto sm:px-3 sm:text-sm"
+                        asChild
+                        data-testid="button-exercise-open-adviser"
+                      >
+                        <Link href={adviserHref("before")} aria-label="Open insulin calculator" className="inline-flex items-center justify-center gap-1.5">
+                          <Calculator className="h-4 w-4 shrink-0" aria-hidden />
+                          <span className="sm:hidden">Calculator</span>
+                          <span className="hidden sm:inline">Insulin calculator</span>
                         </Link>
                       </Button>
                     </div>
