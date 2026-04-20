@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
@@ -44,6 +47,42 @@ interface ReadinessResult {
   factors: { label: string; status: "good" | "caution" | "concern"; note: string }[];
   correction: CorrectionSuggestion | null;
   snack: { grams: number; reason: string } | null;
+}
+
+const BEDTIME_ALARM_NOTIFICATION_ID_KEY = "diabeater_bedtime_alarm_notification_id";
+const BEDTIME_ALARM_NOTIFICATION_AT_KEY = "diabeater_bedtime_alarm_notification_at";
+
+function readBedtimeAlarm(): { id: number; at: Date } | null {
+  try {
+    const idRaw = localStorage.getItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY);
+    const atRaw = localStorage.getItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY);
+    if (!idRaw || !atRaw) return null;
+    const id = Number(idRaw);
+    const at = new Date(atRaw);
+    if (!Number.isFinite(id) || Number.isNaN(at.getTime())) return null;
+    if (at.getTime() <= Date.now()) return null;
+    return { id, at };
+  } catch {
+    return null;
+  }
+}
+
+function writeBedtimeAlarm(alarm: { id: number; at: Date }): void {
+  try {
+    localStorage.setItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY, String(alarm.id));
+    localStorage.setItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY, alarm.at.toISOString());
+  } catch {
+    // ignore
+  }
+}
+
+function clearBedtimeAlarm(): void {
+  try {
+    localStorage.removeItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY);
+    localStorage.removeItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 /** Home-clock hour from settings "HH:mm" (same source as travel MDI). Returns null if invalid. */
@@ -86,6 +125,12 @@ export default function Bedtime() {
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [alarmPlanned, setAlarmPlanned] = useState(false);
+  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false);
+  const [alarmPreset, setAlarmPreset] = useState<"2h" | "3h" | "custom">("3h");
+  const [alarmCustomTime, setAlarmCustomTime] = useState("02:30");
+  const [alarmNotification, setAlarmNotification] = useState<{ id: number; at: Date } | null>(() => readBedtimeAlarm());
+  const [quickCheckOpen, setQuickCheckOpen] = useState(true);
+  const [tipsOpen, setTipsOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -98,6 +143,10 @@ export default function Bedtime() {
     setProfile(storage.getProfile());
     setScenarioState(storage.getScenarioState());
     setBedtimeLogs(storage.getBedtimeLogs());
+  }, []);
+
+  useEffect(() => {
+    setAlarmNotification(readBedtimeAlarm());
   }, []);
 
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
@@ -403,6 +452,19 @@ export default function Bedtime() {
     setSaved(false);
     setDetailsOpen(false);
     setAlarmPlanned(false);
+    setQuickCheckOpen(false);
+    setTipsOpen(false);
+
+    // Bring the verdict/status card into view after calculating.
+    try {
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        });
+      }
+    } catch {
+      // no-op (non-browser env)
+    }
 
     const bedtimeReady = level === "steady";
     void upsertScenario({
@@ -542,6 +604,98 @@ export default function Bedtime() {
   const recentLogs = getRecentLogs();
   const patternInsight = getPatternInsight();
 
+  const scheduleBedtimeAlarm = async (at: Date) => {
+    if (!Capacitor.isNativePlatform()) {
+      toast({
+        title: "Not available here",
+        description: "Overnight alarms can only be set from the installed app on your phone.",
+      });
+      return;
+    }
+
+    const perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== "granted") {
+      toast({
+        title: "Notifications not enabled",
+        description: "Enable notifications to get an overnight reminder.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const id = Math.floor(Date.now() % 2_000_000_000);
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id,
+          title: "Overnight check",
+          body: "Time to check your glucose.",
+          schedule: { at },
+          extra: { kind: "bedtime_overnight_check" },
+        },
+      ],
+    });
+
+    const next = { id, at };
+    writeBedtimeAlarm(next);
+    setAlarmNotification(next);
+    setAlarmPlanned(true);
+    toast({ title: "Alarm set", description: "We’ll remind you to do an overnight check." });
+  };
+
+  const cancelBedtimeAlarm = async () => {
+    const existing = alarmNotification ?? readBedtimeAlarm();
+    if (!existing) {
+      setAlarmPlanned(false);
+      return;
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: existing.id }] });
+      } catch {
+        // ignore
+      }
+    }
+
+    clearBedtimeAlarm();
+    setAlarmNotification(null);
+    setAlarmPlanned(false);
+    toast({ title: "Alarm removed", description: "No overnight reminder is scheduled." });
+  };
+
+  const confirmBedtimeAlarm = async () => {
+    const now = new Date();
+
+    if (alarmPreset === "2h" || alarmPreset === "3h") {
+      const hours = alarmPreset === "2h" ? 2 : 3;
+      await scheduleBedtimeAlarm(new Date(now.getTime() + hours * 60 * 60 * 1000));
+      setAlarmDialogOpen(false);
+      return;
+    }
+
+    const t = alarmCustomTime.trim();
+    if (!/^\d{2}:\d{2}$/.test(t)) {
+      toast({ title: "Choose a time", description: "Please enter a time like 02:30.", variant: "destructive" });
+      return;
+    }
+
+    const [hh, mm] = t.split(":").map(Number);
+    if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+      toast({ title: "Invalid time", description: "Please choose a valid time.", variant: "destructive" });
+      return;
+    }
+
+    const at = new Date(now);
+    at.setHours(hh, mm, 0, 0);
+    if (at.getTime() <= now.getTime() + 60_000) {
+      at.setDate(at.getDate() + 1);
+    }
+
+    await scheduleBedtimeAlarm(at);
+    setAlarmDialogOpen(false);
+  };
+
   return (
     <PageShell variant="standard" className="space-y-6">
       <PageHeader
@@ -610,12 +764,83 @@ export default function Bedtime() {
         </Card>
       )}
 
-      <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-inputs">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Quick check</CardTitle>
-          <CardDescription>30 seconds. Save the result to track patterns.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      {result ? (
+        <div className="-mt-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-between"
+            onClick={() => setDetailsOpen((v) => !v)}
+            data-testid="button-open-details-top"
+          >
+            <span>{detailsOpen ? "Hide details" : "Show details"}</span>
+            {detailsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
+          </Button>
+        </div>
+      ) : null}
+
+      {result ? (
+        <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <CollapsibleContent>
+            <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-factors">
+              <CardContent className="p-5 md:p-6 space-y-3">
+                <h3 className="font-semibold text-foreground">Factors</h3>
+                <div className="grid gap-2 md:grid-cols-2" data-testid="container-bedtime-factors">
+                  {result.factors.map((factor, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2"
+                      data-testid={`card-factor-${i}`}
+                    >
+                      {getStatusIcon(factor.status)}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium" data-testid={`text-factor-label-${i}`}>
+                          {factor.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground" data-testid={`text-factor-note-${i}`}>
+                          {factor.note}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+
+      <Collapsible open={quickCheckOpen} onOpenChange={setQuickCheckOpen}>
+        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-inputs">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="w-full text-left rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              aria-label={quickCheckOpen ? "Collapse quick check" : "Expand quick check"}
+              data-testid="button-bedtime-quick-check-toggle"
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg">Quick check</CardTitle>
+                    <CardDescription>
+                      {quickCheckOpen
+                        ? "30 seconds. Save the result to track patterns."
+                        : currentBg.trim()
+                          ? `Tap to edit • BG ${currentBg} ${bgUnits}`
+                          : "Tap to edit your inputs"}
+                    </CardDescription>
+                  </div>
+                  <span className="mt-1 shrink-0 text-muted-foreground">
+                    {quickCheckOpen ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
+                  </span>
+                </div>
+              </CardHeader>
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <CardContent className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="current-bg" className="flex items-center gap-2">
@@ -802,8 +1027,10 @@ export default function Bedtime() {
             <Moon className="h-4 w-4 mr-2" />
             Check bedtime
           </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {result && (
         <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-result">
@@ -819,68 +1046,82 @@ export default function Bedtime() {
                 <span className="text-sm text-muted-foreground">{result.title}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Link href="/help-now">
+                <Link href="/tools/hypo-help">
                   <Button variant="outline" size="sm" className="gap-2">
                     <Info className="h-4 w-4" />
                     Hypo help
-                  </Button>
-                </Link>
-                <Link href="/adviser">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Calculator className="h-4 w-4" />
-                    Calculator
                   </Button>
                 </Link>
               </div>
             </div>
 
             {(result.level !== "steady" || result.snack) && (
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2">
                 <Button
                   type="button"
                   className="w-full"
                   onClick={() => {
-                    setAlarmPlanned(true);
-                    toast({ title: "Alarm planned", description: "Set an alarm for 2–3am to check your glucose." });
+                    if (alarmNotification) {
+                      void cancelBedtimeAlarm();
+                      return;
+                    }
+                    setAlarmDialogOpen(true);
                   }}
                   data-testid="button-plan-alarm"
                 >
                   <Clock className="h-4 w-4 mr-2" />
-                  Set an overnight alarm
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setDetailsOpen(true)}
-                  data-testid="button-open-details"
-                >
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Show details
+                  {alarmNotification ? "Cancel overnight alarm" : "Set an overnight alarm"}
                 </Button>
               </div>
             )}
 
-            <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-              <CollapsibleContent>
-                <div className="space-y-4 pt-2">
+            <Dialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Overnight reminder</DialogTitle>
+                  <DialogDescription>Set a Diabeaters notification to remind you to do an overnight glucose check.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium text-sm text-muted-foreground">Factors</h4>
-                    <div className="grid gap-2 md:grid-cols-2" data-testid="container-bedtime-factors">
-                      {result.factors.map((factor, i) => (
-                        <div key={i} className="flex items-start gap-2 p-2 bg-muted/30 rounded-lg border border-border/50" data-testid={`card-factor-${i}`}>
-                          {getStatusIcon(factor.status)}
-                          <div>
-                            <p className="text-sm font-medium" data-testid={`text-factor-label-${i}`}>{factor.label}</p>
-                            <p className="text-xs text-muted-foreground" data-testid={`text-factor-note-${i}`}>{factor.note}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <Label>When should we remind you?</Label>
+                    <Select value={alarmPreset} onValueChange={(v) => setAlarmPreset(v as "2h" | "3h" | "custom")}>
+                      <SelectTrigger className="min-h-11">
+                        <SelectValue placeholder="Choose a time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2h">In 2 hours</SelectItem>
+                        <SelectItem value="3h">In 3 hours</SelectItem>
+                        <SelectItem value="custom">Pick a time (e.g. 02:30)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {alarmPreset === "custom" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="bedtime-alarm-time">Time</Label>
+                      <Input
+                        id="bedtime-alarm-time"
+                        type="time"
+                        value={alarmCustomTime}
+                        onChange={(e) => setAlarmCustomTime(e.target.value)}
+                        className="min-h-11"
+                      />
+                      <p className="text-xs text-muted-foreground">If the time has already passed, we’ll schedule it for tomorrow.</p>
+                    </div>
+                  ) : null}
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setAlarmDialogOpen(false)} className="min-h-11">
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={() => void confirmBedtimeAlarm()} className="min-h-11">
+                    Set reminder
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {result.correction && (
               <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20" data-testid="card-correction-suggestion">
@@ -993,23 +1234,49 @@ export default function Bedtime() {
             )}
 
             {result.tips.length > 0 && (
-              <div className="space-y-2" data-testid="container-bedtime-tips">
-                <h4 className="font-medium text-sm text-muted-foreground flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Tips for tonight:
-                </h4>
-                <ul className="space-y-1">
-                  {result.tips.map((tip, i) => (
-                    <li key={i} className="text-sm flex items-start gap-2" data-testid={`text-tip-${i}`}>
-                      <span className="text-muted-foreground">•</span>
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Collapsible open={tipsOpen} onOpenChange={setTipsOpen}>
+                <div className="space-y-2" data-testid="container-bedtime-tips">
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                      aria-label={tipsOpen ? "Hide tips for tonight" : "Show tips for tonight"}
+                      data-testid="button-toggle-bedtime-tips"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium text-sm text-foreground">Tips for tonight</span>
+                          <span className="text-xs text-muted-foreground">({result.tips.length})</span>
+                        </div>
+                        {tipsOpen ? (
+                          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+                        )}
+                      </div>
+                    </button>
+                  </CollapsibleTrigger>
+
+                  <CollapsibleContent>
+                    <ul className="space-y-2">
+                      {result.tips.map((tip, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
+                          data-testid={`text-tip-${i}`}
+                        >
+                          <span className="mt-0.5 text-muted-foreground">•</span>
+                          <span className="min-w-0">{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
             )}
 
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2">
               <Button
                 onClick={handleSaveCheck}
                 disabled={saved}
@@ -1019,12 +1286,6 @@ export default function Bedtime() {
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 {saved ? "Saved" : "Save check"}
               </Button>
-              <Link href="/supplies">
-                <Button variant="outline" className="w-full">
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                  Open supplies
-                </Button>
-              </Link>
             </div>
           </CardContent>
         </Card>
