@@ -12,6 +12,7 @@ import {
   suggestedRecoveryTargetBg,
 } from "@/lib/hypo-context";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
@@ -81,7 +82,14 @@ export default function HypoHelpPage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Hypo help"
-        description="Estimate fast-acting carbs to bring you back toward target. Educational only — follow your care team&apos;s plan."
+        actions={
+          <PageInfoDialog
+            title="About Hypo help"
+            description="Estimate fast-acting carbs to bring you back toward target. Educational only — follow your care team's plan."
+          >
+            {null}
+          </PageInfoDialog>
+        }
       />
 
       <Card className="surface-card">

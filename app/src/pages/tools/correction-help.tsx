@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
@@ -83,10 +84,15 @@ export default function CorrectionHelpPage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Correction helper"
-        description="Estimate a standard correction dose from your current BG and the correction factor (ISF) saved in Ratios."
+        actions={
+          <PageInfoDialog
+            title="About Correction helper"
+            description="Estimate a standard correction dose from your current BG and the correction factor (ISF) saved in Ratios."
+          >
+            {null}
+          </PageInfoDialog>
+        }
       />
-
-      <MedicalNumericOutputDisclaimer />
 
       {isPump && (
         <Alert data-testid="alert-correction-pump-iob">
@@ -202,6 +208,8 @@ export default function CorrectionHelpPage() {
           )}
         </CardContent>
       </Card>
+
+      <MedicalNumericOutputDisclaimer compact />
 
       <MedicalSourcesLink anchor="insulin" />
     </PageShell>
