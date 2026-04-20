@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Calculator, Droplet, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { storage, type UserProfile } from "@/lib/storage";
+import {
+  formatTargetBgInput,
+  lastHypoWithDetail,
+  suggestedRecoveryTargetBg,
+} from "@/lib/hypo-context";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,6 +18,8 @@ import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 export default function HypoHelpPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
+  const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
+  const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
   const [currentBg, setCurrentBg] = useState("");
   const [targetBg, setTargetBg] = useState("");
   const [userWeight, setUserWeight] = useState("");
@@ -28,6 +36,14 @@ export default function HypoHelpPage() {
   useEffect(() => {
     const p = storage.getProfile();
     if (p) setProfile(p);
+    const s = storage.getSettings();
+    const units = p?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+    const sug = suggestedRecoveryTargetBg(s, units);
+    if (sug != null) {
+      setTargetBg(formatTargetBgInput(sug, units));
+      setTargetPrefilledFromRange(true);
+    }
+    setLastHypoDetail(lastHypoWithDetail(storage.getHypoTreatments()));
   }, []);
 
   const calculateHypoTreatment = () => {
@@ -86,6 +102,14 @@ export default function HypoHelpPage() {
               </AlertDescription>
             </Alert>
           )}
+          {lastHypoDetail && (
+            <Alert className="border-border bg-muted/40" data-testid="alert-last-hypo-context">
+              <AlertDescription className="text-sm text-muted-foreground">
+                Last logged hypo {formatDistanceToNow(new Date(lastHypoDetail.at), { addSuffix: true })}:{" "}
+                <span className="text-foreground font-medium">{lastHypoDetail.label}</span>
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
             <p className="text-small text-red-800 dark:text-red-200">
               This supports more precise treatment than a fixed 15g rule. If in doubt, use your usual hypo plan.
@@ -116,6 +140,11 @@ export default function HypoHelpPage() {
                 onChange={(e) => setTargetBg(e.target.value)}
                 data-testid="input-target-bg"
               />
+              {targetPrefilledFromRange && (
+                <p className="text-xs text-muted-foreground">
+                  Prefilled toward the middle of your Ratios target range — adjust to match your hypo plan.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="user-weight">Your weight (optional)</Label>

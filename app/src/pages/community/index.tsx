@@ -3,12 +3,12 @@ import { Link, useLocation, useSearch } from "wouter";
 import {
   BarChart2,
   Calendar,
+  ChevronDown,
   ImagePlus,
   MessageCircle,
   Plus,
   Search,
   Send,
-  Settings,
   X,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -16,7 +16,7 @@ import { FeedPostList } from "@/components/community/feed-post-list";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import {
   readFeedComposerDraft,
   type CommunityPostRow,
   type CommunityTopicId,
+  type FeedCursor,
 } from "@/lib/community";
 import { followUser, listFolloweeIdsForCurrentUser } from "@/lib/community";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, useProfile } from "@/lib/profile";
 
@@ -63,6 +65,17 @@ const PAGE_SIZE = 20;
 const MAX_POLL_OPTIONS = 6;
 
 type ComposerPostKind = "standard" | "poll" | "event";
+
+function initialFeedComposerOpen(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const draft = readFeedComposerDraft();
+    if (draft?.body?.trim()) return true;
+  } catch {
+    /* ignore */
+  }
+  return window.matchMedia("(min-width: 768px)").matches;
+}
 
 export default function CommunityHomePage() {
   const { user } = useAuth();
@@ -93,6 +106,7 @@ export default function CommunityHomePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedListKey, setFeedListKey] = useState(0);
+  const [composerPanelOpen, setComposerPanelOpen] = useState(initialFeedComposerOpen);
 
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [peopleQuery, setPeopleQuery] = useState("");
@@ -112,6 +126,14 @@ export default function CommunityHomePage() {
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
+
+  const fetchFeedPage = useCallback(
+    (limit: number, cursor: FeedCursor | null) =>
+      feedTab === "everyone"
+        ? fetchCommunityPostsPage(limit, cursor, topicFilter)
+        : fetchCommunityPostsFromFollowingPage(limit, cursor, topicFilter),
+    [feedTab, topicFilter],
+  );
 
   /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
   useEffect(() => {
@@ -378,6 +400,17 @@ export default function CommunityHomePage() {
     return titleOk && whenOk;
   }, [user, composerPostKind, composer, composerFiles.length, pollQuestion, pollOptions, eventTitle, eventStartsAt]);
 
+  const composerExpandSignal = useMemo(() => {
+    if (composer.trim()) return true;
+    if (composerFiles.length > 0) return true;
+    if (composerPostKind !== "standard") return true;
+    return false;
+  }, [composer, composerFiles.length, composerPostKind]);
+
+  useEffect(() => {
+    if (composerExpandSignal) setComposerPanelOpen(true);
+  }, [composerExpandSignal]);
+
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !composerCanSubmit) return;
@@ -473,11 +506,6 @@ export default function CommunityHomePage() {
               title="Find people"
             >
               <Search className="h-4 w-4" aria-hidden />
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/account#profile" aria-label="Profile settings">
-                <Settings className="h-4 w-4" />
-              </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/community/messages">
@@ -688,11 +716,34 @@ export default function CommunityHomePage() {
         </div>
       </div>
 
-      <Card variant="glass" className={cn(!canComposeToFeed && user ? "opacity-90" : undefined)}>
-        <CardHeader className="pb-2">
-          <CardTitle className="font-display text-base font-semibold">New post</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Collapsible open={composerPanelOpen} onOpenChange={setComposerPanelOpen}>
+        <Card variant="glass" className={cn(!canComposeToFeed && user ? "opacity-90" : undefined)} data-testid="feed-composer-card">
+          <CardHeader className="space-y-0 pb-2">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 rounded-xl text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-expanded={composerPanelOpen}
+                data-testid="feed-composer-trigger"
+              >
+                <div className="min-w-0 flex-1 space-y-1">
+                  <span className="font-display text-base font-semibold text-foreground tracking-tight">New post</span>
+                  {!composerPanelOpen && composer.trim() ? (
+                    <p className="line-clamp-2 text-sm text-muted-foreground">{composer}</p>
+                  ) : null}
+                </div>
+                <ChevronDown
+                  className={cn(
+                    "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
+                    composerPanelOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent className="overflow-hidden">
+            <CardContent className="pt-0">
           <form onSubmit={handlePost} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="feed-topic" className="text-sm">
@@ -957,8 +1008,10 @@ export default function CommunityHomePage() {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <FeedPostList
         key={feedListKey}
@@ -976,11 +1029,7 @@ export default function CommunityHomePage() {
               ? "No posts in this topic yet. Try another topic or be the first to post here."
               : "No posts yet. Be the first to post."
         }
-        fetchPage={(limit, cursor) =>
-          feedTab === "everyone"
-            ? fetchCommunityPostsPage(limit, cursor, topicFilter)
-            : fetchCommunityPostsFromFollowingPage(limit, cursor, topicFilter)
-        }
+        fetchPage={fetchFeedPage}
       />
     </PageShell>
   );

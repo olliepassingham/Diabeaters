@@ -10,6 +10,8 @@ const iconClass = "h-[23px] w-[23px]";
 
 let prefetchedCommunity = false;
 let prefetchedAccount = false;
+let prefetchedTools = false;
+let prefetchedScenarios = false;
 
 function prefetchCommunity(): void {
   if (prefetchedCommunity) return;
@@ -21,6 +23,18 @@ function prefetchAccount(): void {
   if (prefetchedAccount) return;
   prefetchedAccount = true;
   void import("@/pages/account");
+}
+
+function prefetchTools(): void {
+  if (prefetchedTools) return;
+  prefetchedTools = true;
+  void import("@/pages/tools/index");
+}
+
+function prefetchScenarios(): void {
+  if (prefetchedScenarios) return;
+  prefetchedScenarios = true;
+  void import("@/pages/scenarios");
 }
 
 type TabDef = {
@@ -151,6 +165,23 @@ export function BottomNav() {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
+  /** Warm lazy chunks for bottom-nav targets so first taps feel instant (after idle / short delay). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const run = () => {
+      prefetchTools();
+      prefetchAccount();
+      if (!isCarerMode) prefetchScenarios();
+      if (showCommunityTab) prefetchCommunity();
+    };
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(run, { timeout: 4500 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = window.setTimeout(run, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [isCarerMode, showCommunityTab]);
+
   const tabs = isCarerMode ? carerTabs(showCommunityTab) : patientTabs(showCommunityTab);
 
   const cols = tabs.length;
@@ -195,10 +226,14 @@ export function BottomNav() {
             onPointerEnter={() => {
               if (tab.href === "/community") prefetchCommunity();
               if (tab.href === "/account") prefetchAccount();
+              if (tab.href === "/tools") prefetchTools();
+              if (tab.href === "/scenarios") prefetchScenarios();
             }}
             onTouchStart={() => {
               if (tab.href === "/community") prefetchCommunity();
               if (tab.href === "/account") prefetchAccount();
+              if (tab.href === "/tools") prefetchTools();
+              if (tab.href === "/scenarios") prefetchScenarios();
             }}
           >
             <button

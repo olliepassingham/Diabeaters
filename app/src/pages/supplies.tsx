@@ -16,6 +16,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
@@ -2594,6 +2595,25 @@ export default function Supplies() {
           </PageInfoDialog>
         }
       />
+
+      {scenarioState.travelModeActive && (criticalSupplies.length > 0 || lowSupplies.length > 0) && (
+        <Alert
+          className="border-blue-300/80 bg-blue-50/70 dark:bg-blue-950/25 dark:border-blue-800/60"
+          data-testid="alert-travel-low-supplies"
+        >
+          <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-sm text-blue-950 dark:text-blue-100 sm:flex sm:items-center sm:justify-between sm:gap-3">
+            <span>
+              Travel mode is on and some supplies are running low — consider ordering spares before you go, including
+              backup hypo treatment.
+            </span>
+            <Button variant="outline" size="sm" className="mt-2 sm:mt-0 shrink-0" asChild>
+              <Link href="/scenarios/travel">Travel checklist</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="w-full">
           <div className="-mx-2 px-2 flex items-center gap-2 flex-nowrap md:flex-wrap">

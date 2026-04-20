@@ -24,6 +24,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
 
 
 function getInitialTab(): string {
@@ -44,6 +45,7 @@ export default function Adviser() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [cameFromRatios, setCameFromRatios] = useState(false);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [recentHypoCount48h, setRecentHypoCount48h] = useState(0);
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
 
@@ -158,6 +160,7 @@ export default function Adviser() {
   useEffect(() => {
     setSettings(storage.getSettings());
     setScenarioState(storage.getScenarioState());
+    setRecentHypoCount48h(hypoTreatmentsInRollingHours(storage.getHypoTreatments(), 48).length);
     const storedProfile = storage.getProfile();
     if (storedProfile) {
       setProfile(storedProfile);
@@ -317,6 +320,16 @@ export default function Adviser() {
           </div>
         </CardContent>
       </Card>
+
+      {recentHypoCount48h > 0 && (
+        <Alert className="mb-4 border-red-200/80 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20" data-testid="banner-recent-hypos-adviser">
+          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+          <AlertDescription className="text-sm text-red-900 dark:text-red-100">
+            You&apos;ve logged <strong>{recentHypoCount48h}</strong> hypo treatment{recentHypoCount48h === 1 ? "" : "s"} in
+            the last 48 hours. Take extra care with boluses and corrections — follow your usual safeguards and care plan.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {scenarioState.sickDayActive && (
         <Alert className="mb-4 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" data-testid="banner-sick-day-active">

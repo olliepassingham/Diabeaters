@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -269,6 +269,48 @@ export function RoutinesContent() {
     ? routines 
     : routines.filter(r => r.mealType === filterMealType);
 
+  const logHints = useMemo(() => {
+    const cutoff30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const mealLogs = storage.getActivityLogs().filter(
+      (l) => l.activityType === "meal_planning" && new Date(l.createdAt).getTime() >= cutoff30,
+    );
+    const mealCounts: Partial<Record<RoutineMealType, number>> = {};
+    for (const l of mealLogs) {
+      const m = l.activityDetails.match(/\bfor (breakfast|lunch|dinner|snack)\b/i);
+      if (!m) continue;
+      const mt = m[1].toLowerCase() as RoutineMealType;
+      if (mt !== "breakfast" && mt !== "lunch" && mt !== "dinner" && mt !== "snack") continue;
+      mealCounts[mt] = (mealCounts[mt] ?? 0) + 1;
+    }
+    let bestMeal: RoutineMealType | undefined;
+    let bestMealN = 0;
+    (["breakfast", "lunch", "dinner", "snack"] as const).forEach((k) => {
+      const n = mealCounts[k] ?? 0;
+      if (n > bestMealN) {
+        bestMealN = n;
+        bestMeal = k;
+      }
+    });
+
+    const cutoff90 = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const outcomes = storage.getExerciseOutcomes().filter((o) => new Date(o.completedAt).getTime() >= cutoff90);
+    const exMap = new Map<string, number>();
+    for (const o of outcomes) {
+      const k = `${o.exerciseType}\0${o.intensity}`;
+      exMap.set(k, (exMap.get(k) ?? 0) + 1);
+    }
+    let bestEx: { type: ExerciseType; intensity: ExerciseIntensity; n: number } | undefined;
+    for (const [k, n] of exMap) {
+      const [type, intensity] = k.split("\0") as [ExerciseType, ExerciseIntensity];
+      if (!bestEx || n > bestEx.n) bestEx = { type, intensity, n };
+    }
+
+    return {
+      meal: bestMeal && bestMealN >= 2 ? { mealType: bestMeal, count: bestMealN } : null,
+      exercise: bestEx && bestEx.n >= 3 ? bestEx : null,
+    };
+  }, []);
+
   const mostUsed = storage.getMostUsedRoutines(5);
   const recentlyUsed = storage.getRecentRoutines(5);
 
@@ -354,6 +396,33 @@ export function RoutinesContent() {
             </div>
           </CardContent>
         </Card>
+
+        {logHints.meal && (
+          <Card className="border-emerald-200/60 dark:border-emerald-800/50" data-testid="card-meal-log-hint">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">From your logs:</span> Meal planner entries often use{" "}
+                  <strong>{getMealLabel(logHints.meal.mealType)}</strong> ({logHints.meal.count} in the last 30 days). Open
+                  a new routine with that meal type?
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    resetForm();
+                    setMealType(logHints.meal!.mealType);
+                    setIsAddOpen(true);
+                  }}
+                  data-testid="button-apply-meal-hint"
+                >
+                  Prefill &amp; save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <Dialog open={isAddOpen} onOpenChange={(open) => { setIsAddOpen(open); if (!open) resetForm(); }}>
@@ -694,6 +763,35 @@ export function RoutinesContent() {
             </div>
           </CardContent>
         </Card>
+
+        {logHints.exercise && (
+          <Card className="border-green-200/60 dark:border-green-800/50" data-testid="card-exercise-log-hint">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">From your logs:</span> Similar workouts (
+                  {EXERCISE_INTENSITIES.find((i) => i.value === logHints.exercise!.intensity)?.label?.toLowerCase()}{" "}
+                  {EXERCISE_TYPES.find((t) => t.value === logHints.exercise!.type)?.label.toLowerCase()}) appear often (
+                  {logHints.exercise.n} sessions in the last 90 days). Prefill a new exercise routine?
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    resetExerciseForm();
+                    setExType(logHints.exercise!.type);
+                    setExIntensity(logHints.exercise!.intensity);
+                    setIsExerciseAddOpen(true);
+                  }}
+                  data-testid="button-apply-exercise-hint"
+                >
+                  Prefill &amp; save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <Dialog open={isExerciseAddOpen} onOpenChange={(open) => { setIsExerciseAddOpen(open); if (!open) resetExerciseForm(); }}>

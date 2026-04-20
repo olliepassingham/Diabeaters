@@ -72,6 +72,7 @@ export function FeedPostList(props: {
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
+  const { fetchPage } = props;
 
   const [posts, setPosts] = useState<CommunityPostRow[]>([]);
   const postsRef = useRef(posts);
@@ -107,7 +108,7 @@ export function FeedPostList(props: {
   const pullAnchorRef = useRef<HTMLDivElement>(null);
 
   const loadFirstPage = useCallback(async () => {
-    const res = await props.fetchPage(pageSize, null);
+    const res = await fetchPage(pageSize, null);
     if (res.error) {
       toast({ title: "Could not load posts", description: res.error.message, variant: "destructive" });
       setPosts([]);
@@ -117,7 +118,7 @@ export function FeedPostList(props: {
     const list = res.data ?? [];
     setPosts(list);
     setHasMore(list.length >= pageSize);
-  }, [props, pageSize, toast]);
+  }, [fetchPage, pageSize, toast]);
 
   const refresh = useCallback(async () => {
     try {
@@ -169,7 +170,7 @@ export function FeedPostList(props: {
     const last = list[list.length - 1];
     if (!last) return;
     setLoadingMore(true);
-    const res = await props.fetchPage(pageSize, { created_at: last.created_at, id: last.id });
+    const res = await fetchPage(pageSize, { created_at: last.created_at, id: last.id });
     setLoadingMore(false);
     if (res.error) {
       toast({ title: "Could not load more", description: res.error.message, variant: "destructive" });
@@ -182,7 +183,7 @@ export function FeedPostList(props: {
     }
     setPosts((prev) => [...prev, ...next]);
     setHasMore(next.length >= pageSize);
-  }, [hasMore, loadingMore, loading, props, pageSize, toast]);
+  }, [hasMore, loadingMore, loading, fetchPage, pageSize, toast]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;

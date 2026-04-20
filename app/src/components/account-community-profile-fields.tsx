@@ -85,8 +85,11 @@ export function AccountCommunityProfileFields({
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const clearedStaleDiabetesOnset = useRef(false);
 
-  /** Only people using the app primarily as someone with diabetes should set or show this. */
-  const showOnsetDate = getPrimaryAppRole() === "patient";
+  /**
+   * Hide for users who chose supporter-first onboarding only. If primary role was never set (null —
+   * common on older installs or when sessionStorage was cleared), still show: default experience is patient.
+   */
+  const showOnsetDate = getPrimaryAppRole() !== "carer";
 
   const adjustBioHeight = useCallback(() => {
     const el = bioRef.current;

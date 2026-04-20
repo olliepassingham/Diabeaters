@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
 import { Link } from "wouter";
 import { Calculator } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +74,10 @@ export default function CorrectionHelpPage() {
   const unitLabel = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const isPump = profile?.insulinDeliveryMethod === "pump";
 
+  const recentHypoCount = useMemo(() => {
+    return hypoTreatmentsInRollingHours(storage.getHypoTreatments(), 7 * 24).length;
+  }, []);
+
   return (
     <PageShell variant="standard" className="space-y-6">
       <PageHeader
@@ -89,6 +94,18 @@ export default function CorrectionHelpPage() {
             <strong>Pump users:</strong> Before stacking a manual correction, check <strong>active insulin (IOB)</strong> on
             your pump — the pump may already credit recent boluses. Temp basals and extended boluses also affect how much
             extra insulin is safe.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {recentHypoCount >= 2 && (
+        <Alert
+          className="border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/25"
+          data-testid="alert-correction-recent-hypos"
+        >
+          <AlertDescription className="text-sm">
+            You&apos;ve logged <strong>{recentHypoCount}</strong> hypo treatments in the
+            last 7 days. Be extra cautious stacking corrections — check IOB and your team&apos;s plan for lows.
           </AlertDescription>
         </Alert>
       )}
