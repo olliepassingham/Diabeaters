@@ -32,6 +32,7 @@ import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CURATED_RESOURCES, type CuratedResource } from "@/lib/curated-resources.ts";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { cn } from "@/lib/utils";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 type ToolDef = {
   id: string;
@@ -182,20 +183,46 @@ function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "i
   );
 }
 
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="space-y-1">
+    <div>
       <h2 className="text-h3 font-semibold text-foreground">{title}</h2>
-      {description ? (
-        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-      ) : null}
     </div>
+  );
+}
+
+function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" }) {
+  return (
+    <PageInfoDialog
+      title="About Tools"
+      description="Calculators, tracking, and learning resources. Educational only — always follow your care team’s advice."
+    >
+      {hubVariant === "carer" ? (
+        <>
+          <InfoSection title="Supporter tools">
+            <p>General education and hypo guidance. Always follow the care team’s plan for the person you support.</p>
+          </InfoSection>
+          <InfoSection title="News & resources">
+            <p>Curated updates and trusted reading — preview here, then open the official site.</p>
+          </InfoSection>
+        </>
+      ) : (
+        <>
+          <InfoSection title="Act now">
+            <p>Meal doses, corrections, and fast hypo help when you need an answer.</p>
+          </InfoSection>
+          <InfoSection title="Plan">
+            <p>Set up once, then reuse when you need it.</p>
+          </InfoSection>
+          <InfoSection title="Learn">
+            <p>Clear explanations you can come back to anytime.</p>
+          </InfoSection>
+          <InfoSection title="News & resources">
+            <p>Curated updates and trusted reading — preview here, then open the official site.</p>
+          </InfoSection>
+        </>
+      )}
+    </PageInfoDialog>
   );
 }
 
@@ -271,20 +298,13 @@ export function ToolsHubPage({
 
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-10">
-      <PageHeader
-        className="max-w-2xl"
-        title="Tools"
-        description="Calculators, tracking, and learning resources. Educational only — always follow your care team&apos;s advice."
-      />
+      <PageHeader className="max-w-2xl" title="Tools" actions={<ToolsAboutDialog hubVariant={hubVariant} />} />
 
       {hubVariant === "carer" && supporterTools.length > 0 ? (
         <section className="space-y-4" aria-label="Supporter tools" data-testid="tools-section-supporter">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader
-              title="Supporter tools"
-              description="General education and hypo guidance. Always follow the care team&apos;s plan for the person you support."
-            />
+            <SectionHeader title="Supporter tools" />
           </div>
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
@@ -300,10 +320,7 @@ export function ToolsHubPage({
             <section className="space-y-4" aria-label="Act now tools" data-testid="tools-section-act-now">
               <div className="flex items-center gap-2">
                 <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
-                <SectionHeader
-                  title="Act now"
-                  description="Meal doses, corrections, and fast hypo help when you need an answer."
-                />
+                <SectionHeader title="Act now" />
               </div>
               <ul
                 className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
@@ -322,7 +339,7 @@ export function ToolsHubPage({
             <section className="space-y-4" aria-label="Plan tools" data-testid="tools-section-plan">
               <div className="flex items-center gap-2">
                 <MapIcon className="h-5 w-5 text-primary" aria-hidden />
-                <SectionHeader title="Plan" description="Set up once, then reuse when you need it." />
+                <SectionHeader title="Plan" />
               </div>
               <ul
                 className="grid list-none grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7"
@@ -341,7 +358,7 @@ export function ToolsHubPage({
             <section className="space-y-4" aria-label="Learn tools" data-testid="tools-section-learn">
               <div className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" aria-hidden />
-                <SectionHeader title="Learn" description="Clear explanations you can come back to anytime." />
+                <SectionHeader title="Learn" />
               </div>
               <ul className="list-none space-y-4" aria-label="Learn">
                 {learn.map((t, idx) => (
@@ -359,7 +376,7 @@ export function ToolsHubPage({
         <section className="space-y-4" aria-label="News and resources" data-testid="tools-section-resources">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title="News & resources" description="Curated updates and trusted reading — preview here, then open the official site." />
+            <SectionHeader title="News & resources" />
           </div>
 
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2" aria-label="News & resources">
