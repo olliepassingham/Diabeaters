@@ -17,6 +17,34 @@ import { useToast } from "@/hooks/use-toast";
 import { PageShell } from "@/components/layout";
 import { Eye, EyeOff } from "lucide-react";
 
+const LAST_LOGIN_EMAIL_KEY = "diabeater_last_login_email";
+
+function readLastLoginEmail(): string | null {
+  try {
+    const raw = localStorage.getItem(LAST_LOGIN_EMAIL_KEY);
+    const v = (raw ?? "").trim();
+    return v ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLastLoginEmail(email: string): void {
+  try {
+    localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email.trim().toLowerCase());
+  } catch {
+    // ignore
+  }
+}
+
+function clearLastLoginEmail(): void {
+  try {
+    localStorage.removeItem(LAST_LOGIN_EMAIL_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export default function Login() {
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
@@ -67,6 +95,15 @@ export default function Login() {
     }
   }, [toast, authLoading, user, setLocation]);
 
+  useEffect(() => {
+    // Prefill remembered email for returning users (email only, never password).
+    if (email.trim()) return;
+    const remembered = readLastLoginEmail();
+    if (remembered) setEmail(remembered);
+    // intentionally runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -94,6 +131,7 @@ export default function Login() {
       return;
     }
 
+    writeLastLoginEmail(email);
     await navigateAfterLoginSuccess(setLocation);
   }
 
@@ -113,7 +151,20 @@ export default function Login() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <Label htmlFor="email">Email</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="email">Email</Label>
+                <button
+                  type="button"
+                  className="min-h-11 px-2 -mx-2 text-xs underline text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    clearLastLoginEmail();
+                    setEmail("");
+                    setPassword("");
+                  }}
+                >
+                  Clear saved email
+                </button>
+              </div>
               <Input
                 id="email"
                 type="email"
