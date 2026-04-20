@@ -846,10 +846,10 @@ export function ExercisePlanner() {
                         asChild
                         data-testid="button-exercise-open-adviser"
                       >
-                        <Link href={adviserHref("before")} aria-label="Open insulin calculator" className="inline-flex items-center justify-center gap-1.5">
+                        <Link href={adviserHref("before")} aria-label="Open meal and ratios planner" className="inline-flex items-center justify-center gap-1.5">
                           <Calculator className="h-4 w-4 shrink-0" aria-hidden />
                           <span className="sm:hidden">Calculator</span>
-                          <span className="hidden sm:inline">Insulin calculator</span>
+                          <span className="hidden sm:inline">Meal & ratios</span>
                         </Link>
                       </Button>
                     </div>
@@ -933,7 +933,7 @@ export function ExercisePlanner() {
                       <p className="text-sm font-semibold text-foreground">Meal bolus preview</p>
                       <InlineInfoHint
                         ariaLabel="About this bolus preview"
-                        content="Educational only — same time-to-exercise logic as the insulin calculator. Confirm with your care team."
+                        content="Educational only — same time-to-exercise logic as Meal & ratios. Confirm with your care team."
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">

@@ -726,11 +726,18 @@ export default function CommunityHomePage() {
                 aria-expanded={composerPanelOpen}
                 data-testid="feed-composer-trigger"
               >
-                <div className="min-w-0 flex-1 space-y-1">
-                  <span className="font-display text-base font-semibold text-foreground tracking-tight">New post</span>
-                  {!composerPanelOpen && composer.trim() ? (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{composer}</p>
-                  ) : null}
+                <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  <Plus
+                    className="mt-0.5 h-5 w-5 shrink-0 text-primary"
+                    aria-hidden
+                    strokeWidth={2.25}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <span className="font-display text-base font-semibold text-foreground tracking-tight">New post</span>
+                    {!composerPanelOpen && composer.trim() ? (
+                      <p className="line-clamp-2 text-sm text-muted-foreground">{composer}</p>
+                    ) : null}
+                  </div>
                 </div>
                 <ChevronDown
                   className={cn(

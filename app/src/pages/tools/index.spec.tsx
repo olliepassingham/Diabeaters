@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { CARER_TOOLS, ToolsHubPage } from "./index";
 
 describe("ToolsHubPage", () => {
-  it("renders patient sections without duplicate Most used; insulin calculator appears once", () => {
+  it("renders patient sections without duplicate Most used; meal and ratios tool appears once", () => {
     render(<ToolsHubPage hubVariant="patient" />);
 
     expect(screen.queryByTestId("tools-section-most-used")).toBeNull();
@@ -12,7 +12,7 @@ describe("ToolsHubPage", () => {
     expect(screen.queryByTestId("tools-section-learn")).not.toBeNull();
     expect(screen.queryByTestId("tools-section-resources")).not.toBeNull();
 
-    const titles = screen.getAllByRole("heading", { name: /insulin calculator/i });
+    const titles = screen.getAllByRole("heading", { name: /meal.*ratios/i });
     expect(titles.length).toBe(1);
 
     expect(screen.getByText("NHS")).not.toBeNull();

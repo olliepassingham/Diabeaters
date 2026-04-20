@@ -50,8 +50,8 @@ const PATIENT_TOOLS: ToolDef[] = [
     id: "insulin-calculator",
     href: "/adviser?tab=meal",
     icon: Calculator,
-    title: "Insulin calculator",
-    description: "Meal-time dose suggestions from your carb ratios and settings.",
+    title: "Meal & ratios",
+    description: "Meal bolus ideas from your saved carb ratios, plus ratio review and the ratio adviser.",
   },
   {
     id: "correction-helper",
