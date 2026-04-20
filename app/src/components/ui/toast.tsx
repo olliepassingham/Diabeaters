@@ -14,8 +14,8 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      // Keep toasts below the sticky app top bar (min-h-14 + safe-area inset top).
-      "fixed top-[calc(env(safe-area-inset-top)+3.5rem)] z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      // Show toasts within the app header area (but not under the iPhone notch/status bar).
+      "fixed top-[env(safe-area-inset-top)] z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px]",
       className
     )}
     {...props}

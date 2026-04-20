@@ -111,11 +111,12 @@
     --color-border: 64 59 76;
     --color-input: 56 51 72;
 
-    --color-primary: 94 211 198;
+    /* Slightly calmer primary in dark mode (reduce neon feel on tinted boxes). */
+    --color-primary: 84 196 186;
     --color-primary-foreground: 15 24 28;
     --color-primary-light: 28 64 60;
     --color-primary-dark: 180 240 232;
-    --color-primary-border: 72 200 188;
+    --color-primary-border: 64 186 176;
     --primary: var(--color-primary);
 
     --ring: 173 58% 55%;
