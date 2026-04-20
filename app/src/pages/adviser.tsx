@@ -286,15 +286,20 @@ export default function Adviser() {
         leading={<PageBackButton />}
         className="mb-4"
         title="Meal &amp; ratios"
-        description={
-          isPumpUser
-            ? "Bolus suggestions from your ratios — program on your pump and check IOB; ratio review below."
-            : "Quick meal dose suggestions and ratio review from your settings."
-        }
         actions={
           <PageInfoDialog title="About Meal &amp; ratios" description="Meal planning and ratio tools">
             <InfoSection title="Meal planner">
-              <p>Enter carbs and meal type for a dose suggestion based on your ratios. Toggle &quot;Planning around exercise?&quot; to get adjusted doses for meals before, during, or after workouts.</p>
+              <p>
+                Enter carbs and meal type for a dose suggestion based on your ratios. Toggle &quot;Planning around exercise?&quot; to get
+                adjusted doses for meals before, during, or after workouts.
+                {isPumpUser && (
+                  <>
+                    {" "}
+                    If you use a pump, program boluses on your device and always check IOB; your pump may suggest different amounts if
+                    automation is on.
+                  </>
+                )}
+              </p>
             </InfoSection>
             <InfoSection title="Ratio adviser">
               <p>Estimate or refine insulin-to-carb ratios with guided steps, then return to the meal planner to use them.</p>
@@ -309,24 +314,16 @@ export default function Adviser() {
         }
       />
 
-      <Card className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20 mb-4">
-        <CardContent className="p-3">
-          <div className="flex gap-2">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800 dark:text-amber-200">
-              <strong>Not Medical Advice:</strong> All suggestions are calculated from your settings and are educational only. 
-              Always verify with your own calculations and consult your healthcare provider.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {recentHypoCount48h > 0 && (
-        <Alert className="mb-4 border-red-200/80 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20" data-testid="banner-recent-hypos-adviser">
-          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-          <AlertDescription className="text-sm text-red-900 dark:text-red-100">
-            You&apos;ve logged <strong>{recentHypoCount48h}</strong> hypo treatment{recentHypoCount48h === 1 ? "" : "s"} in
-            the last 48 hours. Take extra care with boluses and corrections — follow your usual safeguards and care plan.
+        <Alert
+          className="mb-3 border-red-200/80 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg~*]:pl-6"
+          data-testid="banner-recent-hypos-adviser"
+        >
+          <AlertCircle className="text-red-600 dark:text-red-400" />
+          <AlertDescription className="text-xs text-red-900 dark:text-red-100 leading-snug">
+            <strong className="font-semibold">Recent hypo:</strong>{" "}
+            {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} logged in the last 48 hours — take extra
+            care with boluses and corrections.
           </AlertDescription>
         </Alert>
       )}

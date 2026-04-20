@@ -227,6 +227,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   const handleSelectMeal = (meal: MealKey) => {
     setSelectedMeal(meal);
+    setPreviewMeal(meal);
     setStep(1);
   };
 
@@ -656,100 +657,63 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              <span><strong>This tool does not give medical advice or prescribe ratio changes.</strong> It helps you recognise patterns in your blood sugars so you can have a more informed conversation with your diabetes team.</span>
-            </p>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Answer a few questions about your post-meal blood sugars and we'll help you spot patterns
-            and prepare talking points for your next clinic appointment.
-          </p>
-
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="justify-start" onClick={() => setMode("scratch_intro")} data-testid="button-open-estimate-flow">
-              <Sparkles className="h-4 w-4" />
-              Estimate starting ratios
-            </Button>
-            <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-ratios-page">
-              <Link href="/ratios">Edit ratios &amp; ISF</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-isf">
-              <Link href="/ratios">Correction factor (ISF)</Link>
-            </Button>
-          </div>
-
           {hasAnyRatio && step === 0 && (
-            <Collapsible className="border rounded-lg px-3 py-2">
-              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
-                <span className="flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-primary" />
-                  Quick carb bolus preview (your saved ratio)
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-3 pb-3 pt-1">
-                <p className="text-xs text-muted-foreground">
-                  Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules.
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {mealOptions.map(({ key, label, icon: Icon }) => (
-                    <Button
-                      key={key}
-                      type="button"
-                      size="sm"
-                      variant={previewMeal === key ? "default" : "outline"}
-                      className="h-auto min-h-9 justify-start gap-2 py-2"
-                      onClick={() => setPreviewMeal(key)}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
-                  <Input
-                    id="preview-carbs"
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="1"
-                    placeholder="e.g. 45"
-                    value={previewCarbs}
-                    onChange={(e) => setPreviewCarbs(e.target.value)}
-                    data-testid="input-ratio-preview-carbs"
-                  />
-                </div>
-                {previewCarbsNum > 0 && (
-                  <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
-                    {!previewHasRatio ? (
-                      <p className="text-muted-foreground">
-                        No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Add it on the{" "}
-                        <Link href="/ratios" className="text-primary underline underline-offset-2">
-                          Ratios
-                        </Link>{" "}
-                        page.
-                      </p>
-                    ) : (
-                      <>
-                        <p>
-                          <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
-                          <span className="font-semibold tabular-nums">{previewRounded} units</span>
-                          {Math.abs(previewRounded - previewExact) >= 0.05 && (
-                            <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to 0.5u)</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Ratio used: {formatStoredRatio(previewRatioStr)} — carb-only; confirm with your team before dosing.
-                        </p>
-                      </>
-                    )}
+            <div
+              className="rounded-lg border border-primary/25 bg-primary/[0.04] dark:bg-primary/10 p-3 sm:p-4 space-y-3"
+              data-testid="adviser-saved-ratios-strip"
+            >
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your saved ratios</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
+                  <div
+                    key={key}
+                    className="rounded-md border border-border/80 bg-background/60 dark:bg-background/40 px-2 py-2 text-center sm:text-left"
+                  >
+                    <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground sm:justify-start">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="font-medium text-foreground/90">{label}</span>
+                    </div>
+                    <p className="text-lg font-bold tabular-nums tracking-tight mt-0.5" data-testid={`adviser-strip-ratio-${key}`}>
+                      {ratio ?? "Not set"}
+                    </p>
                   </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm border-t border-border/60 pt-2">
+                <span>
+                  <span className="text-muted-foreground">ISF </span>
+                  <span className="font-semibold tabular-nums">
+                    {settings.correctionFactor != null
+                      ? `${settings.correctionFactor} ${bgUnit}`
+                      : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                  </span>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Target </span>
+                  <span className="font-semibold tabular-nums">
+                    {settings.targetBgLow != null && settings.targetBgHigh != null
+                      ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
+                      : <span className="text-muted-foreground italic font-normal">Not set</span>}
+                  </span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {step >= 1 && step < 4 && selectedMeal && (
+            <div
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+              data-testid="adviser-wizard-meal-context"
+            >
+              <span className="font-medium text-foreground">{mealLabel(selectedMeal)}</span>
+              <span className="text-muted-foreground hidden sm:inline">·</span>
+              <span className="text-muted-foreground">
+                Saved ratio:{" "}
+                <strong className="text-foreground tabular-nums">
+                  {formatStoredRatio(settings[settingsRatioKey(selectedMeal)] as string | undefined) ?? "Not set"}
+                </strong>
+              </span>
+            </div>
           )}
 
           {step > 0 && step < 4 && (
@@ -764,26 +728,127 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           )}
 
           {step === 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Which meal do you want to check?</p>
-              <div className="grid grid-cols-2 gap-2">
-                {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
-                  <Button
-                    key={key}
-                    variant="outline"
-                    className="h-auto py-3 justify-start gap-2 flex-col items-start"
-                    onClick={() => handleSelectMeal(key)}
-                    data-testid={`button-adviser-meal-${key}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <span>{label}</span>
-                    </div>
-                    {ratio && <span className="text-xs text-muted-foreground">Current: {ratio}</span>}
-                  </Button>
-                ))}
+            <>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Which meal do you want to check?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
+                    <Button
+                      key={key}
+                      variant="outline"
+                      className="h-auto py-3 justify-start gap-2 flex-col items-stretch text-left"
+                      onClick={() => handleSelectMeal(key)}
+                      data-testid={`button-adviser-meal-${key}`}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="font-medium">{label}</span>
+                      </div>
+                      {ratio ? (
+                        <span className="text-base font-bold tabular-nums tracking-tight text-foreground w-full" data-testid={`adviser-meal-button-ratio-${key}`}>
+                          {ratio}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not set</span>
+                      )}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+
+              {hasAnyRatio && (
+                <div className="rounded-lg border border-border/80 bg-muted/20 p-3 sm:p-4 space-y-3" data-testid="adviser-quick-bolus-preview">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Calculator className="h-4 w-4 text-primary shrink-0" />
+                    Quick carb bolus preview
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mealOptions.map(({ key, label, icon: Icon }) => (
+                      <Button
+                        key={key}
+                        type="button"
+                        size="sm"
+                        variant={previewMeal === key ? "default" : "outline"}
+                        className="h-auto min-h-9 justify-start gap-2 py-2"
+                        onClick={() => setPreviewMeal(key)}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
+                    <Input
+                      id="preview-carbs"
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      step="1"
+                      placeholder="e.g. 45"
+                      value={previewCarbs}
+                      onChange={(e) => setPreviewCarbs(e.target.value)}
+                      data-testid="input-ratio-preview-carbs"
+                    />
+                  </div>
+                  {previewCarbsNum > 0 && (
+                    <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
+                      {!previewHasRatio ? (
+                        <p className="text-muted-foreground">
+                          No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Add it on the{" "}
+                          <Link href="/ratios" className="text-primary underline underline-offset-2">
+                            Ratios
+                          </Link>{" "}
+                          page.
+                        </p>
+                      ) : (
+                        <>
+                          <p>
+                            <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
+                            <span className="font-semibold tabular-nums text-lg">{previewRounded} units</span>
+                            {Math.abs(previewRounded - previewExact) >= 0.05 && (
+                              <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to 0.5u)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Ratio used: {formatStoredRatio(previewRatioStr)} — carb-only; confirm with your team before dosing.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-muted/30 rounded-lg p-3 space-y-1">
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span><strong>This tool does not give medical advice or prescribe ratio changes.</strong> It helps you recognise patterns in your blood sugars so you can have a more informed conversation with your diabetes team.</span>
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Answer a few questions about your post-meal blood sugars and we will help you spot patterns
+                and prepare talking points for your next clinic appointment.
+              </p>
+
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                {!hasAnyRatio && (
+                  <Button variant="outline" size="sm" className="justify-start" onClick={() => setMode("scratch_intro")} data-testid="button-open-estimate-flow">
+                    <Sparkles className="h-4 w-4" />
+                    Estimate starting ratios
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-ratios-page">
+                  <Link href="/ratios">Edit ratios</Link>
+                </Button>
+                <p className="text-xs text-muted-foreground sm:self-center w-full sm:w-auto">
+                  Includes insulin-to-carb ratios, ISF, and target range.
+                </p>
+              </div>
+            </>
           )}
 
           {step === 1 && selectedMeal && (

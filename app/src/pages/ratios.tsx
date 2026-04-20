@@ -351,7 +351,7 @@ export default function Ratios() {
           {!editing ? (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="button-edit-ratios">
               <Pencil className="h-4 w-4 mr-1" />
-              Edit
+              Edit ratios
             </Button>
           ) : (
             <div className="flex items-center gap-2">
@@ -367,6 +367,95 @@ export default function Ratios() {
           )}
         </div>
       </div>
+
+      <Card className="border-primary/25 bg-primary/[0.04] dark:bg-primary/10" data-testid="card-ratios-at-a-glance">
+        <CardContent className="p-4 sm:p-5 space-y-4">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your ratios at a glance</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Carb coverage by meal
+              {hasAnyAdjustment && !editing
+                ? " — struck-through values are your saved base; amber values reflect your active scenario."
+                : "."}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {meals.map((meal) => {
+              const Icon = getMealIcon(meal.name);
+              const stored = settings[meal.key];
+              const draft = editValues[meal.key];
+              let primary: string | null = null;
+              let adjusted: string | null = null;
+              if (editing) {
+                const gpu = parseInputToGramsPerUnit(draft, ratioFormat, cpSize);
+                primary = gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : draft.trim() || null;
+              } else {
+                const baseGpu = parseRatioToGramsPerUnit(stored);
+                primary = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : stored || null;
+                if (hasAnyAdjustment && stored) {
+                  adjusted = getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize);
+                }
+              }
+              return (
+                <div
+                  key={meal.key}
+                  className="rounded-lg border border-border/80 bg-background/60 dark:bg-background/40 px-3 py-3 text-center sm:text-left"
+                  data-testid={`at-a-glance-${meal.name.toLowerCase()}`}
+                >
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mb-1 sm:justify-start">
+                    <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span className="font-medium text-foreground/90">{meal.name}</span>
+                  </div>
+                  {primary ? (
+                    <div className="space-y-0.5">
+                      <p
+                        className={`text-xl font-bold tabular-nums tracking-tight ${!editing && hasAnyAdjustment && adjusted ? "text-muted-foreground line-through text-base" : "text-foreground"}`}
+                        data-testid={`at-a-glance-value-${meal.name.toLowerCase()}`}
+                      >
+                        {primary}
+                      </p>
+                      {!editing && adjusted && (
+                        <p className="text-lg font-bold tabular-nums text-amber-700 dark:text-amber-400" data-testid={`at-a-glance-adjusted-${meal.name.toLowerCase()}`}>
+                          {adjusted}
+                          <span className="text-[10px] font-normal ml-1 text-amber-600 dark:text-amber-500">adj.</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">Not set</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border/60 pt-3 text-sm">
+            <div>
+              <span className="text-muted-foreground">ISF </span>
+              <span className="font-semibold tabular-nums" data-testid="at-a-glance-isf">
+                {editing
+                  ? editValues.correctionFactor.trim()
+                    ? `${editValues.correctionFactor} ${bgUnit}`
+                    : "Not set"
+                  : settings.correctionFactor
+                    ? `${settings.correctionFactor} ${bgUnit}`
+                    : <span className="text-muted-foreground italic font-normal">Not set</span>}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Target </span>
+              <span className="font-semibold tabular-nums" data-testid="at-a-glance-target">
+                {editing
+                  ? editValues.targetBgLow.trim() && editValues.targetBgHigh.trim()
+                    ? `${editValues.targetBgLow}–${editValues.targetBgHigh} ${bgUnit}`
+                    : "Not set"
+                  : settings.targetBgLow != null && settings.targetBgHigh != null
+                    ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
+                    : <span className="text-muted-foreground italic font-normal">Not set</span>}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {hasAnyAdjustment && (
         <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20" data-testid="scenario-adjustments-banner">
