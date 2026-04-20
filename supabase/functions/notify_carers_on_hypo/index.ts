@@ -241,7 +241,7 @@ Deno.serve(async (req: Request) => {
     if (patientEnabled && patientHypoOn && patientInappOn) {
       const patientPayload = {
         kind: "hypo_logged_self",
-        deep_link: "/dashboard",
+        deep_link: "/",
         ...hypoPayload,
       };
       const { error: patientInsErr } = await admin.from("notifications").insert({
