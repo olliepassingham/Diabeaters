@@ -306,15 +306,11 @@ export function ToolsHubPage({
                 />
               </div>
               <ul
-                className="flex list-none gap-4 overflow-x-auto pb-2 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:pb-0 md:snap-none [&::-webkit-scrollbar]:hidden"
+                className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
                 aria-label="Act now"
               >
                 {actNow.map((t, idx) => (
-                  <li
-                    key={t.id}
-                    className="w-[min(85vw,22rem)] shrink-0 snap-start md:w-auto md:min-h-0 md:shrink animate-soft-in"
-                    style={{ animationDelay: `${idx * 30}ms` }}
-                  >
+                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
                     <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
                   </li>
                 ))}
