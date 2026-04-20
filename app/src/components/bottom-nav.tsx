@@ -8,6 +8,21 @@ import { useProfile } from "@/lib/profile";
 
 const iconClass = "h-[23px] w-[23px]";
 
+let prefetchedCommunity = false;
+let prefetchedAccount = false;
+
+function prefetchCommunity(): void {
+  if (prefetchedCommunity) return;
+  prefetchedCommunity = true;
+  void import("@/pages/community/index");
+}
+
+function prefetchAccount(): void {
+  if (prefetchedAccount) return;
+  prefetchedAccount = true;
+  void import("@/pages/account");
+}
+
 type TabDef = {
   title: string;
   href: string;
@@ -173,7 +188,19 @@ export function BottomNav() {
       {tabs.map((tab) => {
         const active = tab.isActive(pathname, hash);
         return (
-          <Link key={tab.testId} href={tab.href} className="flex w-full justify-center min-w-0">
+          <Link
+            key={tab.testId}
+            href={tab.href}
+            className="flex w-full justify-center min-w-0"
+            onPointerEnter={() => {
+              if (tab.href === "/community") prefetchCommunity();
+              if (tab.href === "/account") prefetchAccount();
+            }}
+            onTouchStart={() => {
+              if (tab.href === "/community") prefetchCommunity();
+              if (tab.href === "/account") prefetchAccount();
+            }}
+          >
             <button
               type="button"
               className={`flex min-h-11 flex-col items-center justify-center gap-0.5 max-w-[6.5rem] px-2 py-2 rounded-2xl transition-all duration-200 ease-out ${

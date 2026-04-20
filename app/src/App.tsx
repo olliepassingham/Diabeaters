@@ -34,7 +34,6 @@ import AuthCallback from "@/pages/auth-callback";
 import ResetRequest from "@/pages/reset-request";
 import ResetPassword from "@/pages/reset-password";
 import CheckEmail from "@/pages/check-email";
-import Account from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
 import VerifiedSuccess from "@/pages/verified-success";
 import Welcome from "@/pages/welcome";
@@ -63,13 +62,14 @@ import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
 import Support from "@/pages/support";
 import MedicalSourcesPage from "@/pages/medical-sources";
-import CommunityHome from "@/pages/community/index";
-import CommunityPost from "@/pages/community/post";
-import CommunityMessages from "@/pages/community/messages";
-import CommunityThread from "@/pages/community/thread";
-import CommunityProfile from "@/pages/community/profile";
-import CommunitySettings from "@/pages/community/settings";
-import CommunityHandleResolve from "@/pages/community/handle-resolve";
+const Account = lazy(() => import("@/pages/account"));
+const CommunityHome = lazy(() => import("@/pages/community/index"));
+const CommunityPost = lazy(() => import("@/pages/community/post"));
+const CommunityMessages = lazy(() => import("@/pages/community/messages"));
+const CommunityThread = lazy(() => import("@/pages/community/thread"));
+const CommunityProfile = lazy(() => import("@/pages/community/profile"));
+const CommunitySettings = lazy(() => import("@/pages/community/settings"));
+const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
@@ -406,49 +406,63 @@ function InnerRouter() {
       <Route path="/community/messages/:threadId">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <CommunityThread />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityThread />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/messages">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <CommunityMessages />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityMessages />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/settings">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <CommunitySettings />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunitySettings />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/u/:handle">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <CommunityHandleResolve />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityHandleResolve />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/profile/:userId">
         <PatientRouteGuard>
           <CommunityFeatureGate requirePublicProfile={false}>
-            <CommunityProfile />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityProfile />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community/post/:postId">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <CommunityPost />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityPost />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
       <Route path="/community">
         <PatientRouteGuard>
           <CommunityFeatureGate>
-            <CommunityHome />
+            <Suspense fallback={<RouteFallback />}>
+              <CommunityHome />
+            </Suspense>
           </CommunityFeatureGate>
         </PatientRouteGuard>
       </Route>
@@ -834,7 +848,9 @@ function AccountShell() {
           scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
         }}
       >
-        <Account />
+        <Suspense fallback={<RouteFallback />}>
+          <Account />
+        </Suspense>
       </main>
       <BottomNav />
     </div>
