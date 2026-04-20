@@ -53,11 +53,10 @@ import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
 function ProfileTab({ 
-  name, setName, bgUnits, setBgUnits, 
+  bgUnits, setBgUnits, 
   carbUnits, setCarbUnits, deliveryMethod, setDeliveryMethod, 
   onSave 
 }: {
-  name: string; setName: (v: string) => void;
   bgUnits: string; setBgUnits: (v: string) => void;
   carbUnits: string; setCarbUnits: (v: string) => void;
   deliveryMethod: "pen" | "pump"; setDeliveryMethod: (v: "pen" | "pump") => void;
@@ -68,17 +67,11 @@ function ProfileTab({
       <CardHeader>
         <div className="flex items-center gap-2">
           <User className="h-5 w-5 text-primary" />
-          <CardTitle className="text-h3 font-semibold">Profile Information</CardTitle>
+          <CardTitle className="text-h3 font-semibold">Personal information</CardTitle>
         </div>
         <CardDescription className="text-body text-muted-foreground">Your personal details and preferences.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-name" />
-          </div>
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="bg-units">Blood Glucose Units</Label>
@@ -551,7 +544,6 @@ export default function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
   
-  const [name, setName] = useState("");
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [carbUnits, setCarbUnits] = useState("grams");
   const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
@@ -618,7 +610,6 @@ export default function Settings() {
     
     if (storedProfile) {
       setProfile(storedProfile);
-      setName(storedProfile.name || "");
       setBgUnits(storedProfile.bgUnits || "mmol/L");
       setCarbUnits(storedProfile.carbUnits || "grams");
       setDeliveryMethod((storedProfile.insulinDeliveryMethod as "pen" | "pump") || "pen");
@@ -688,12 +679,6 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    const fromCloud = cloudProfile?.full_name?.trim();
-    if (!fromCloud) return;
-    setName((prev) => (prev.trim() ? prev : fromCloud));
-  }, [cloudProfile?.full_name]);
-
-  useEffect(() => {
     if (isCarer && (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios")) {
       setLocation("/settings");
     }
@@ -757,27 +742,11 @@ export default function Settings() {
 
   const handleSaveProfile = async () => {
     if (!profile) return;
-    const updatedProfile = { ...profile, name, bgUnits, carbUnits, insulinDeliveryMethod: deliveryMethod };
+    const updatedProfile = { ...profile, bgUnits, carbUnits, insulinDeliveryMethod: deliveryMethod };
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
 
-    if (user?.id && getSupabase()) {
-      const { error } = await updateProfile({
-        id: user.id,
-        full_name: name.trim() || null,
-      });
-      if (error) {
-        toast({
-          title: "Saved on this device",
-          description: `Name could not sync to your account: ${error.message}`,
-          variant: "destructive",
-        });
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) });
-    }
-
-    toast({ title: "Profile updated", description: "Your profile has been saved." });
+    toast({ title: "Saved", description: "Your personal settings have been updated." });
   };
 
   const handleRatioFormatChange = (newFormat: RatioFormat) => {
@@ -917,8 +886,8 @@ export default function Settings() {
 
   const settingsInfoDialog = (
     <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
-      <InfoSection title="Profile and usage">
-        <p>Your clinical profile, insulin habits, and supply pack sizes for forecasts.</p>
+      <InfoSection title="Personal information and usage">
+        <p>Your units, insulin habits, and supply pack sizes for forecasts.</p>
       </InfoSection>
       <InfoSection title="Appearance">
         <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
@@ -932,7 +901,7 @@ export default function Settings() {
       <InfoSection title="About">
         <p>
           Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is at
-          the bottom of Profile and usage.
+          the bottom of Personal information and usage.
         </p>
       </InfoSection>
     </PageInfoDialog>
@@ -941,11 +910,9 @@ export default function Settings() {
   const usageToolsInner = (
     <CardContent className="pt-6 pb-6 space-y-8">
       <div id="settings-personal" className="scroll-mt-28 space-y-3">
-        <h3 className="text-h3 font-semibold text-foreground">Profile</h3>
-        <p className="text-small text-muted-foreground">Name, glucose units, carbs, and delivery method.</p>
+        <h3 className="text-h3 font-semibold text-foreground">Personal information</h3>
+        <p className="text-small text-muted-foreground">Glucose units, carbs, and delivery method.</p>
         <ProfileTab
-          name={name}
-          setName={setName}
           bgUnits={bgUnits}
           setBgUnits={setBgUnits}
           carbUnits={carbUnits}
@@ -1057,8 +1024,8 @@ export default function Settings() {
           <SettingsHubGroup title="Personal & clinical">
             <SettingsHubNavLink
               href="/settings/usage"
-              label="Profile & usage"
-              description="Name, units, habits, and supply forecasts"
+              label="Personal info & usage"
+              description="Units, habits, and supply forecasts"
               icon={Activity}
             />
             <SettingsHubNavLink
