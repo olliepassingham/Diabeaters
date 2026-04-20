@@ -23,8 +23,8 @@ import {
   markCarerLinkJustCompleted,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
-import { PageBackButton } from "@/components/layout";
-import { Info } from "lucide-react";
+// Note: we intentionally avoid PageBackButton (history.back) here; we need a safe fallback.
+import { ChevronLeft, Info } from "lucide-react";
 
 function emitCarerLinkUpdated(): void {
   try {
@@ -48,6 +48,23 @@ export default function CarerSetupPage() {
     if (hasPendingCarer()) return;
     clearCarerIntent();
   }, [user]);
+
+  const handleBack = () => {
+    // When Supporter setup is opened from inside the app (e.g. Account → Manage supporters),
+    // a stale carer intent can leave the /family-carers gate rendering null on history back (white screen).
+    // Explicitly clear intent and return to a safe destination.
+    if (!user) {
+      setLocation("/welcome");
+      return;
+    }
+    if (hasPendingCarer()) {
+      setLocation("/welcome");
+      return;
+    }
+    clearCarerIntent();
+    setCode("");
+    setLocation("/family-carers");
+  };
 
   async function handleRedeem(e: FormEvent) {
     e.preventDefault();
@@ -163,7 +180,16 @@ export default function CarerSetupPage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-background text-foreground">
       <div className="w-full max-w-md space-y-4">
         <div className="flex items-center -ml-2">
-          <PageBackButton />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="mr-2"
+            aria-label="Go back"
+            onClick={handleBack}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
         </div>
         <Card className="w-full">
           <CardHeader>
