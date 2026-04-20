@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Users, Copy, UserPlus, Shield, Info, Check } from "lucide-react";
+import { Users, Copy, UserPlus, Shield, Info, Check, ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -19,8 +19,8 @@ import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
 import { getSupabase } from "@/lib/supabase";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
-import { Link } from "wouter";
-import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { Link, useLocation } from "wouter";
+import { PageHeader, PageShell } from "@/components/layout";
 
 function AvatarBubble({
   label,
@@ -59,6 +59,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
 export default function FamilyCarersPage() {
   const configured = Boolean(getSupabase());
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { data: emergency, syncGeneration } = useEmergencyProfile();
   const [links, setLinks] = useState<CarerLinkWithProfile[]>([]);
   const [invites, setInvites] = useState<CarerInviteRow[]>([]);
@@ -165,7 +166,16 @@ export default function FamilyCarersPage() {
   return (
     <PageShell variant="standard" className="max-w-2xl space-y-6">
       <div className="flex items-center">
-        <PageBackButton />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="mr-2"
+          aria-label="Back to account"
+          onClick={() => setLocation("/account")}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
       </div>
       <PageHeader
         title={
