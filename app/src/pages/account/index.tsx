@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { ChevronRight } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/lib/carers";
@@ -12,14 +13,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader, PageShell } from "@/components/layout";
+import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { storage } from "@/lib/storage";
-import { clearCarerClientSessionKeys } from "@/lib/carer-session";
+import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import heic2any from "heic2any";
 import {
   AlertDialog,
@@ -37,7 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getPrimaryAppRole } from "@/lib/carer-session";
 import {
   accountDeletionSubmitUnavailableDescription,
   buildAccountDeletionMailtoHref,
@@ -81,7 +83,25 @@ export default function Account() {
   const [followListKind, setFollowListKind] = useState<"followers" | "following" | null>(null);
   const [followListLoading, setFollowListLoading] = useState(false);
   const [followListError, setFollowListError] = useState<string | null>(null);
-  const [followListRows, setFollowListRows] = useState<{ id: string; label: string }[]>([]);
+  const [followListRows, setFollowListRows] = useState<
+    { id: string; full_name: string; public_handle: string | null; avatar_url: string | null }[]
+  >([]);
+  const [activeMode, setActiveMode] = useState<ActiveAppMode | null>(() => {
+    try {
+      return getActiveAppMode();
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: ActiveAppMode | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   useEffect(() => {
     if (!user?.id || profileLoading) return;
@@ -313,12 +333,13 @@ export default function Account() {
   const showPublicProfilePreview = isCommunityEnabled && profile?.is_public === true;
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
+  const primaryRole = getPrimaryAppRole();
   const livingWithLine =
-    getPrimaryAppRole() === "patient"
+    primaryRole === "patient" && activeMode === "patient"
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
-  const canSwitchModes = hasCarerLink && getPrimaryAppRole() !== "carer";
+  const canSwitchModes = hasCarerLink && primaryRole !== "carer";
 
   useEffect(() => {
     if (!showPublicProfilePreview) {
@@ -351,9 +372,12 @@ export default function Account() {
     const map = await getProfilesByIds(ids);
     const rows = ids.map((id) => {
       const p = map.get(id);
-      const handle = (p?.public_handle ?? "").replace(/^@/, "").trim();
-      const label = p?.full_name?.trim() || (handle ? `@${handle}` : "Member");
-      return { id, label };
+      return {
+        id,
+        full_name: p?.full_name?.trim() || shortId(id),
+        public_handle: p?.public_handle?.trim() || null,
+        avatar_url: p?.avatar_url ?? null,
+      };
     });
     setFollowListRows(rows);
     setFollowListLoading(false);
@@ -746,7 +770,7 @@ export default function Account() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[70vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{followListKind === "following" ? "Following" : "Followers"}</DialogTitle>
             <DialogDescription className="sr-only">
@@ -766,18 +790,32 @@ export default function Account() {
           ) : followListRows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">No one yet.</p>
           ) : (
-            <ul className="max-h-[min(60vh,22rem)] overflow-y-auto space-y-1 pr-1 m-0 list-none p-0">
-              {followListRows.map((row) => (
-                <li key={row.id}>
-                  <Link
-                    href={`/community/profile/${encodeURIComponent(row.id)}`}
-                    className="flex min-h-10 items-center rounded-md px-2 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80"
-                  >
-                    {row.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <ScrollArea className="flex-1 pr-1">
+              <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card m-0 list-none p-0">
+                {followListRows.map((row) => (
+                  <li key={row.id}>
+                    <Link
+                      href={`/community/profile/${encodeURIComponent(row.id)}`}
+                      className="flex items-center gap-3 px-3 py-3 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                    >
+                      <CommunityAuthorAvatar
+                        displayName={row.full_name}
+                        avatarPath={row.avatar_url}
+                        size="sm"
+                        className="h-9 w-9"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{row.full_name}</div>
+                        {row.public_handle ? (
+                          <div className="text-xs text-muted-foreground truncate">@{row.public_handle}</div>
+                        ) : null}
+                      </div>
+                      <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>

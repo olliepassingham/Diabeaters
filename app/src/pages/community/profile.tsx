@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { MessageCircle, UserCheck, UserPlus } from "lucide-react";
+import { ChevronRight, MessageCircle, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
@@ -503,23 +504,29 @@ function UserListDialog(props: {
   userIds: string[];
   loading: boolean;
 }) {
-  const [labels, setLabels] = useState<Record<string, string>>({});
+  const [profilesById, setProfilesById] = useState<
+    Record<string, { full_name: string; public_handle: string | null; avatar_url: string | null }>
+  >({});
 
   useEffect(() => {
     if (!props.open || props.userIds.length === 0) {
-      setLabels({});
+      setProfilesById({});
       return;
     }
     let cancelled = false;
     void (async () => {
       const map = await getProfilesByIds(props.userIds);
       if (cancelled) return;
-      const next: Record<string, string> = {};
+      const next: Record<string, { full_name: string; public_handle: string | null; avatar_url: string | null }> = {};
       for (const id of props.userIds) {
         const p = map.get(id);
-        next[id] = p?.full_name?.trim() || shortId(id);
+        next[id] = {
+          full_name: p?.full_name?.trim() || shortId(id),
+          public_handle: p?.public_handle?.trim() || null,
+          avatar_url: p?.avatar_url ?? null,
+        };
       }
-      setLabels(next);
+      setProfilesById(next);
     })();
     return () => {
       cancelled = true;
@@ -534,27 +541,47 @@ function UserListDialog(props: {
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="overflow-y-auto space-y-2 pr-1">
+        <ScrollArea className="flex-1 pr-1">
           {props.loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <div className="py-2">
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </div>
           ) : props.userIds.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No one yet.</p>
+            <div className="py-2">
+              <p className="text-sm text-muted-foreground">No one yet.</p>
+            </div>
           ) : (
-            <ul className="space-y-1">
+            <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card">
               {props.userIds.map((id) => (
                 <li key={id}>
                   <Link
                     href={`/community/profile/${id}`}
-                    className="block rounded-md px-2 py-2 text-sm hover:bg-muted/60"
+                    className="flex items-center gap-3 px-3 py-3 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
                     onClick={() => props.onOpenChange(false)}
                   >
-                    {labels[id] ?? shortId(id)}
+                    <CommunityAuthorAvatar
+                      displayName={profilesById[id]?.full_name ?? shortId(id)}
+                      avatarPath={profilesById[id]?.avatar_url ?? null}
+                      size="sm"
+                      className="h-9 w-9"
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {profilesById[id]?.full_name ?? shortId(id)}
+                      </div>
+                      {profilesById[id]?.public_handle ? (
+                        <div className="text-xs text-muted-foreground truncate">
+                          @{profilesById[id]?.public_handle}
+                        </div>
+                      ) : null}
+                    </div>
+                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" aria-hidden />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
