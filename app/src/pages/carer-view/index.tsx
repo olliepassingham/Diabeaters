@@ -785,7 +785,7 @@ export default function CarerViewPage() {
                   <p className="text-sm text-muted-foreground py-4 text-center">No hypo logs visible yet.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {hypoLogs.slice(0, 8).map((h) => {
+                    {hypoLogs.slice(0, 4).map((h) => {
                       const when = new Date(h.created_at);
                       const whenText = Number.isNaN(when.getTime())
                         ? "Unknown time"
