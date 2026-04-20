@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,15 @@ import {
   ArrowRight,
   ArrowLeft,
   ChevronDown,
+  Pencil,
   Utensils,
   Calculator,
   Minus,
   TrendingDown,
   TrendingUp,
+  Play,
 } from "lucide-react";
-import { storage, type UserProfile, type ExerciseIntensity, type ExerciseBgTrend } from "@/lib/storage";
+import { storage, type UserProfile, type ExerciseIntensity, type ExerciseBgTrend, type ExerciseType } from "@/lib/storage";
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
@@ -49,6 +51,8 @@ import {
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { buildExercisePersonalizationLines } from "@/lib/exercise-personalization";
 
 type MealTypeForBolus = "snack" | "breakfast" | "lunch" | "dinner";
 
@@ -87,6 +91,7 @@ function formatSessionStartingLabel(sessionTimingFromNow: string): string {
 
 export function ExercisePlanner() {
   const search = useSearch();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [scenarioState, setScenarioState] = useState(() => storage.getScenarioState());
 
@@ -235,6 +240,52 @@ export function ExercisePlanner() {
     setPlannerInputsOpen(false);
   };
 
+  const handleEditPlannedSession = () => {
+    setPlannerInputsOpen(true);
+    requestAnimationFrame(() => {
+      plannerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const handleStartExerciseMode = () => {
+    try {
+      const existing = storage.getActiveExercise?.();
+      if (existing) {
+        toast({
+          title: "Exercise already active",
+          description: `You have "${existing.exerciseName}" in progress. Finish it first.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const duration = parseInt(exerciseDuration, 10);
+      if (!exerciseDuration || Number.isNaN(duration) || duration < 1) return;
+
+      const exerciseName = `${exerciseLabelsMap[exerciseType] || "Exercise"} · ${exerciseIntensity} · ${duration} min`;
+      storage.startExerciseSession({
+        exerciseName,
+        exerciseType: exerciseType as ExerciseType,
+        intensity: exerciseIntensity as ExerciseIntensity,
+        durationMinutes: duration,
+      });
+
+      // Update local state so any downstream "sync=active" flows stay aligned.
+      setScenarioState(storage.getScenarioState());
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      toast({
+        title: "Exercise mode started",
+        description: `${exerciseName} — use the banner for BG, readiness, and tips.`,
+      });
+    } catch {
+      toast({
+        title: "Something went wrong",
+        description: "Could not start exercise mode.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (!exerciseResult) return;
     const id = requestAnimationFrame(() => {
@@ -297,6 +348,40 @@ export function ExercisePlanner() {
     return parts.length ? parts.join(" · ") : null;
   })();
 
+  const exercisePersonalizationLines = useMemo(() => {
+    if (!exerciseResult) return [];
+    const duration = parseInt(exerciseDuration, 10);
+    if (!exerciseDuration || Number.isNaN(duration) || duration < 1) return [];
+
+    let outcomes: ReturnType<typeof storage.getExerciseOutcomes> = [];
+    let hypos: ReturnType<typeof storage.getHypoTreatments> = [];
+    let logs: ReturnType<typeof storage.getActivityLogs> = [];
+    try {
+      outcomes = storage.getExerciseOutcomes();
+    } catch {
+      outcomes = [];
+    }
+    try {
+      hypos = storage.getHypoTreatments();
+    } catch {
+      hypos = [];
+    }
+    try {
+      logs = storage.getActivityLogs();
+    } catch {
+      logs = [];
+    }
+
+    return buildExercisePersonalizationLines({
+      exerciseType,
+      intensity: exerciseIntensity as ExerciseIntensity,
+      durationMinutes: duration,
+      outcomes,
+      hypoTreatments: hypos,
+      activityLogs: logs,
+    });
+  }, [exerciseResult, exerciseType, exerciseIntensity, exerciseDuration]);
+
   return (
     <div className="space-y-4">
       {scenarioState.sickDayActive && (
@@ -322,15 +407,28 @@ export function ExercisePlanner() {
       <Card ref={plannerCardRef} className="rounded-xl shadow-sm border-border/80">
         {exerciseResult && !plannerInputsOpen ? (
           <CardContent className="py-3 px-4" data-testid="planner-inputs-summary">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <Dumbbell className="h-4 w-4 text-primary shrink-0 mt-0.5" aria-hidden />
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-xs font-medium text-muted-foreground">Planned session</p>
-                <p className="text-sm text-foreground leading-snug">{plannerSummaryLine}</p>
-                {plannerCompactExtras ? (
-                  <p className="text-xs text-muted-foreground leading-snug">{plannerCompactExtras}</p>
-                ) : null}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <Dumbbell className="h-4 w-4 text-primary shrink-0 mt-0.5" aria-hidden />
+                <div className="min-w-0 space-y-0.5">
+                  <p className="text-xs font-medium text-muted-foreground">Planned session</p>
+                  <p className="text-sm text-foreground leading-snug">{plannerSummaryLine}</p>
+                  {plannerCompactExtras ? (
+                    <p className="text-xs text-muted-foreground leading-snug">{plannerCompactExtras}</p>
+                  ) : null}
+                </div>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-9 shrink-0"
+                onClick={handleEditPlannedSession}
+                data-testid="button-edit-planned-session"
+              >
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
             </div>
           </CardContent>
         ) : (
@@ -703,7 +801,7 @@ export function ExercisePlanner() {
                         <Dumbbell className="h-5 w-5 text-primary shrink-0" />
                         <p className="text-sm font-semibold text-foreground">{v.title}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground">{v.detail}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{v.detail}</p>
                       <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
                         <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
                           {exerciseResult.duration} min
@@ -730,10 +828,20 @@ export function ExercisePlanner() {
                     </div>
 
                     <div className="flex gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-h-11"
+                        onClick={handleStartExerciseMode}
+                        data-testid="button-exercise-start-mode"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Start exercise mode
+                      </Button>
                       <Button variant="outline" size="sm" className="min-h-11" asChild data-testid="button-exercise-open-adviser">
                         <Link href={adviserHref("before")}>
                           <Calculator className="h-4 w-4 mr-2" />
-                          Use in insulin calculator
+                          Insulin calculator
                         </Link>
                       </Button>
                     </div>
@@ -742,8 +850,24 @@ export function ExercisePlanner() {
               );
             })()}
 
+            {exercisePersonalizationLines.length > 0 ? (
+              <div className="rounded-xl border border-border/60 bg-muted/15 px-3 py-3 space-y-2" data-testid="exercise-personalization">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+                  <p className="text-sm font-medium text-foreground">Your history</p>
+                </div>
+                <ul className="space-y-2">
+                  {exercisePersonalizationLines.map((line) => (
+                    <li key={line.id} className="text-sm text-muted-foreground leading-snug">
+                      {line.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <Tabs value={resultTab} onValueChange={setResultTab} className="w-full" data-testid="exercise-result-tabs">
-              <p className="text-xs text-muted-foreground mb-2">Jump to a phase — prep opens first.</p>
+              <p className="text-xs text-muted-foreground mb-2">Jump to a phase.</p>
               <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 h-auto p-1 bg-muted/40">
                 <TabsTrigger value="before" className="text-xs py-2 px-2" data-testid="tab-exercise-before">
                   Prep
