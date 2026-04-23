@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Thermometer, X, ChevronRight, Power } from "lucide-react";
+import { Thermometer, ChevronRight, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { storage, ScenarioState } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +11,6 @@ export function SickDayBanner() {
     travelModeActive: false, 
     sickDayActive: false 
   });
-  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     const state = storage.getScenarioState();
@@ -22,9 +21,6 @@ export function SickDayBanner() {
     const handleStorageChange = () => {
       const state = storage.getScenarioState();
       setScenarioState(state);
-      if (state.sickDayActive) {
-        setDismissed(false);
-      }
     };
 
     window.addEventListener("storage", handleStorageChange);
@@ -32,9 +28,6 @@ export function SickDayBanner() {
       const state = storage.getScenarioState();
       if (state.sickDayActive !== scenarioState.sickDayActive) {
         setScenarioState(state);
-        if (state.sickDayActive) {
-          setDismissed(false);
-        }
       }
     }, 1000);
 
@@ -54,7 +47,7 @@ export function SickDayBanner() {
     });
   };
 
-  if (!scenarioState.sickDayActive || dismissed) {
+  if (!scenarioState.sickDayActive) {
     return null;
   }
 
@@ -71,7 +64,7 @@ export function SickDayBanner() {
 
   return (
     <div 
-      className={`${getSeverityColor()} text-white py-1.5 flex items-center justify-between gap-3 px-3 pt-[env(safe-area-inset-top)] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]`}
+      className={`${getSeverityColor()} text-white py-1.5 flex items-center justify-between gap-3 px-3 sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-40 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]`}
       data-testid="banner-sick-day"
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -105,15 +98,6 @@ export function SickDayBanner() {
           <Power className="h-3 w-3 mr-1" />
           <span className="hidden sm:inline">I'm Better</span>
           <span className="sm:hidden">End</span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-white hover:bg-white/20"
-          onClick={() => setDismissed(true)}
-          data-testid="button-banner-dismiss"
-        >
-          <X className="h-4 w-4" />
         </Button>
       </div>
     </div>

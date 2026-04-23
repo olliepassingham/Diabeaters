@@ -782,18 +782,18 @@ function AuthenticatedShell() {
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
-      {!isCarerMode && (
-        <>
-          <SickDayBanner />
-          <TravelBanner />
-        </>
-      )}
       <AppTopBar
         isCarer={isCarerMode}
         pathOnly={location.split("?")[0] ?? location}
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
+      {!isCarerMode && (
+        <>
+          <SickDayBanner />
+          <TravelBanner />
+        </>
+      )}
       {!isCarerMode ? <ActiveExerciseBanner /> : null}
       <main
         className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"

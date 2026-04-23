@@ -38,6 +38,8 @@ const STORAGE_KEYS = {
   RATIO_HISTORY: "diabeater_ratio_history",
   BEDTIME_LOGS: "diabeater_bedtime_logs",
   SICK_DAY_JOURNAL: "diabeater_sick_day_journal",
+  SICK_DAY_MEDS: "diabeater_sick_day_meds",
+  SICK_DAY_TEMPS: "diabeater_sick_day_temps",
   SCENARIO_HISTORY: "diabeater_scenario_history",
   EXERCISE_ROUTINES: "diabeater_exercise_routines",
   ACTIVE_EXERCISE: "diabeater_active_exercise",
@@ -152,6 +154,26 @@ export function isAppointmentsStorageKey(key: string | null): boolean {
   if (!key) return false;
   if (key === STORAGE_KEYS.APPOINTMENTS) return true;
   return key.startsWith(`${STORAGE_KEYS.APPOINTMENTS}_u_`);
+}
+
+function getSickDayMedsStorageKey(): string {
+  if (typeof window === "undefined") return STORAGE_KEYS.SICK_DAY_MEDS;
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    return uid ? `${STORAGE_KEYS.SICK_DAY_MEDS}_u_${uid}` : STORAGE_KEYS.SICK_DAY_MEDS;
+  } catch {
+    return STORAGE_KEYS.SICK_DAY_MEDS;
+  }
+}
+
+function getSickDayTempsStorageKey(): string {
+  if (typeof window === "undefined") return STORAGE_KEYS.SICK_DAY_TEMPS;
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    return uid ? `${STORAGE_KEYS.SICK_DAY_TEMPS}_u_${uid}` : STORAGE_KEYS.SICK_DAY_TEMPS;
+  } catch {
+    return STORAGE_KEYS.SICK_DAY_TEMPS;
+  }
 }
 
 const LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY = "diabeater_welcome_dismissed";
@@ -504,6 +526,27 @@ export interface SickDayJournalEntry {
   symptoms: string;
   notes: string;
   severity: string;
+}
+
+export interface SickDayMedicationLogEntry {
+  id: string;
+  name: string;
+  doseLabel?: string;
+  notes?: string;
+  takenAtIso: string;
+  repeatEveryMinutes: number;
+  nextDueAtIso: string;
+  createdAtIso: string;
+  /** Optional if the user snoozes/dismisses or stops the reminder. */
+  dismissedAtIso?: string;
+}
+
+export interface SickDayTemperatureEntry {
+  id: string;
+  value: number;
+  unit: "c" | "f";
+  loggedAtIso: string;
+  notes?: string;
 }
 
 export interface ScenarioHistoryEntry {
@@ -1916,6 +1959,12 @@ export const storage = {
         journalEntryCount: journal.length,
       });
       localStorage.removeItem(STORAGE_KEYS.SICK_DAY_JOURNAL);
+      try {
+        localStorage.removeItem(getSickDayMedsStorageKey());
+        localStorage.removeItem(getSickDayTempsStorageKey());
+      } catch {
+        /* ignore */
+      }
     }
     state.sickDayActive = false;
     state.sickDaySeverity = undefined;
@@ -1949,6 +1998,82 @@ export const storage = {
   deleteSickDayJournalEntry(id: string): void {
     const journal = this.getSickDayJournal().filter(e => e.id !== id);
     localStorage.setItem(STORAGE_KEYS.SICK_DAY_JOURNAL, JSON.stringify(journal));
+  },
+
+  getSickDayMedicationLog(): SickDayMedicationLogEntry[] {
+    const key = getSickDayMedsStorageKey();
+    const data = (() => {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    })();
+    const parsed = data ? (JSON.parse(data) as unknown) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is SickDayMedicationLogEntry => x && typeof x === "object") as SickDayMedicationLogEntry[];
+  },
+
+  saveSickDayMedicationLog(entries: SickDayMedicationLogEntry[]): void {
+    const key = getSickDayMedsStorageKey();
+    try {
+      localStorage.setItem(key, JSON.stringify(entries));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  addSickDayMedicationEntry(entry: SickDayMedicationLogEntry): void {
+    const items = this.getSickDayMedicationLog();
+    items.unshift(entry);
+    const trimmed = items.slice(0, 200);
+    this.saveSickDayMedicationLog(trimmed);
+  },
+
+  updateSickDayMedicationEntry(id: string, patch: Partial<SickDayMedicationLogEntry>): void {
+    const items = this.getSickDayMedicationLog();
+    const next = items.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    this.saveSickDayMedicationLog(next);
+  },
+
+  deleteSickDayMedicationEntry(id: string): void {
+    const items = this.getSickDayMedicationLog().filter((e) => e.id !== id);
+    this.saveSickDayMedicationLog(items);
+  },
+
+  getSickDayTemperatureLog(): SickDayTemperatureEntry[] {
+    const key = getSickDayTempsStorageKey();
+    const data = (() => {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    })();
+    const parsed = data ? (JSON.parse(data) as unknown) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is SickDayTemperatureEntry => x && typeof x === "object") as SickDayTemperatureEntry[];
+  },
+
+  saveSickDayTemperatureLog(entries: SickDayTemperatureEntry[]): void {
+    const key = getSickDayTempsStorageKey();
+    try {
+      localStorage.setItem(key, JSON.stringify(entries));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  addSickDayTemperatureEntry(entry: SickDayTemperatureEntry): void {
+    const items = this.getSickDayTemperatureLog();
+    items.unshift(entry);
+    const trimmed = items.slice(0, 120);
+    this.saveSickDayTemperatureLog(trimmed);
+  },
+
+  deleteSickDayTemperatureEntry(id: string): void {
+    const items = this.getSickDayTemperatureLog().filter((e) => e.id !== id);
+    this.saveSickDayTemperatureLog(items);
   },
 
   getScenarioHistory(): ScenarioHistoryEntry[] {

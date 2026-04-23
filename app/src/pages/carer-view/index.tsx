@@ -215,6 +215,30 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
         const dur = Number.isNaN(startT) ? null : durationLabel(now - startT);
         const startLabel = startedAt ? `Started ${new Date(startedAt).toLocaleString(undefined, { timeStyle: "short" })}` : "Started";
         lines.push(`Sick day${sevLabel} — ${startLabel}${dur ? ` · ${dur}` : ""}`);
+        const meds = rawState?.meds_next_due && typeof rawState.meds_next_due === "object" ? (rawState.meds_next_due as Record<string, unknown>) : null;
+        const medName = meds && typeof meds.name === "string" ? meds.name.trim() : "";
+        const dueAt = meds && typeof meds.due_at === "string" ? meds.due_at : null;
+        if (medName && dueAt) {
+          const t = new Date(dueAt).getTime();
+          if (!Number.isNaN(t)) {
+            const when = formatDistanceToNowStrict(new Date(dueAt), { addSuffix: true });
+            lines.push(`Next meds: ${medName} · ${when}`);
+          }
+        }
+        const temp =
+          rawState?.temp_latest && typeof rawState.temp_latest === "object"
+            ? (rawState.temp_latest as Record<string, unknown>)
+            : null;
+        const tempVal = temp && typeof temp.value === "number" ? temp.value : null;
+        const tempUnit = temp && (temp.unit === "c" || temp.unit === "f") ? (temp.unit as "c" | "f") : null;
+        const tempAt = temp && typeof temp.at === "string" ? temp.at : null;
+        if (tempVal != null && tempUnit && tempAt) {
+          const tT = new Date(tempAt).getTime();
+          if (!Number.isNaN(tT)) {
+            const when = formatDistanceToNowStrict(new Date(tempAt), { addSuffix: true });
+            lines.push(`Temp: ${tempVal}°${tempUnit.toUpperCase()} · ${when}`);
+          }
+        }
         continue;
       }
       if (endedAt) {

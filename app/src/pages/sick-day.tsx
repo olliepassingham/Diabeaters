@@ -4,14 +4,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Activity, Info, Plane, ChevronRight, ChevronDown, Power, Check, Clock, ShieldAlert, Heart, Package, Syringe, Droplets, AlertTriangle, ArrowLeft, Thermometer, TrendingUp, TrendingDown, Trash2 } from "lucide-react";
+import { AlertCircle, Activity, Info, Plane, ChevronRight, ChevronDown, Power, Check, Clock, ShieldAlert, Heart, Package, Syringe, Droplets, AlertTriangle, ArrowLeft, Thermometer, TrendingUp, TrendingDown, Trash2, Pill } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { storage, UserSettings, Supply, SickDayJournalEntry, RatioFormat } from "@/lib/storage";
+import { storage, UserSettings, Supply, SickDayJournalEntry, RatioFormat, SickDayMedicationLogEntry, SickDayTemperatureEntry } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -22,6 +22,8 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
+import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -68,6 +70,15 @@ const BG_ZONES = {
   VERY_HIGH: { min: 300, max: 400, name: "Very High" },
   CRITICAL: { min: 400, max: Infinity, name: "Critical" },
 };
+
+function formatCountdownMs(ms: number): string {
+  const abs = Math.abs(ms);
+  const mins = Math.round(abs / 60000);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const label = h > 0 ? `${h}h ${m}m` : `${m}m`;
+  return ms <= 0 ? `Due ${label} ago` : `Due in ${label}`;
+}
 
 function calculateSickDayRecommendations(
   tdd: number,
@@ -342,26 +353,6 @@ function calculateSickDayRecommendations(
 }
 
 const SICK_DAY_STORAGE_KEY = "diabeater_sick_day_session";
-const SICK_DAY_CHECKLIST_KEY = "diabeater_sick_day_checklist_v1";
-
-type SickDayChecklistItemId =
-  | "fluids"
-  | "bg_check"
-  | "ketones_check"
-  | "correction_given"
-  | "carbs_tolerated"
-  | "contact_team";
-
-type SickDayChecklistState = Record<SickDayChecklistItemId, boolean>;
-
-const DEFAULT_CHECKLIST: SickDayChecklistState = {
-  fluids: false,
-  bg_check: false,
-  ketones_check: false,
-  correction_given: false,
-  carbs_tolerated: false,
-  contact_team: false,
-};
 
 interface SickDaySession {
   bgLevel: string;
@@ -387,13 +378,22 @@ export default function SickDay() {
   const [travelDestination, setTravelDestination] = useState<string | undefined>();
   const [isPumpUser, setIsPumpUser] = useState(false);
   const [journalEntries, setJournalEntries] = useState<SickDayJournalEntry[]>([]);
+  const [medEntries, setMedEntries] = useState<SickDayMedicationLogEntry[]>([]);
+  const [tempEntries, setTempEntries] = useState<SickDayTemperatureEntry[]>([]);
+  const [tempValue, setTempValue] = useState("");
+  const [tempUnit, setTempUnit] = useState<"c" | "f">("c");
+  const [medPreset, setMedPreset] = useState<"paracetamol" | "ibuprofen" | "antibiotic" | "custom">("paracetamol");
+  const [medCustomName, setMedCustomName] = useState("");
+  const [medDoseLabel, setMedDoseLabel] = useState("");
+  const [medRepeat, setMedRepeat] = useState<string>("4h");
+  const [medRepeatCustomMins, setMedRepeatCustomMins] = useState<string>("");
+  const [medNotes, setMedNotes] = useState("");
   const [journalBg, setJournalBg] = useState("");
   const [journalKetone, setJournalKetone] = useState<string>("");
   const [journalCorrection, setJournalCorrection] = useState("");
   const [journalFluids, setJournalFluids] = useState("");
   const [journalSymptoms, setJournalSymptoms] = useState("");
   const [journalNotes, setJournalNotes] = useState("");
-  const [checklist, setChecklist] = useState<SickDayChecklistState>(DEFAULT_CHECKLIST);
   const [activeModeTab, setActiveModeTab] = useState<"now" | "checklist" | "log">(() => {
     if (typeof window === "undefined") return "now";
     const hash = window.location.hash;
@@ -441,15 +441,8 @@ export default function SickDay() {
     setTravelDestination(scenarioState.travelDestination);
 
     setJournalEntries(storage.getSickDayJournal());
-    const savedChecklist = localStorage.getItem(SICK_DAY_CHECKLIST_KEY);
-    if (savedChecklist) {
-      try {
-        const parsed = JSON.parse(savedChecklist) as Partial<SickDayChecklistState>;
-        setChecklist({ ...DEFAULT_CHECKLIST, ...parsed });
-      } catch {
-        // ignore
-      }
-    }
+    setMedEntries(storage.getSickDayMedicationLog());
+    setTempEntries(storage.getSickDayTemperatureLog());
 
     if (scenarioState.sickDayActive) {
       const savedSession = localStorage.getItem(SICK_DAY_STORAGE_KEY);
@@ -470,10 +463,6 @@ export default function SickDay() {
       localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(SICK_DAY_CHECKLIST_KEY, JSON.stringify(checklist));
-  }, [checklist]);
 
   useEffect(() => {
     if (!isSickDayActive) return;
@@ -537,6 +526,256 @@ export default function SickDay() {
         : "Keep monitoring and stay hydrated.";
     return { label, tone, title, message };
   }, [results, severity]);
+
+  const activeMedReminders = useMemo(() => {
+    const now = Date.now();
+    return medEntries
+      .filter((e) => !e.dismissedAtIso)
+      .map((e) => ({ e, dueMs: new Date(e.nextDueAtIso).getTime() - now }))
+      .filter((x) => Number.isFinite(new Date(x.e.nextDueAtIso).getTime()))
+      .sort((a, b) => a.dueMs - b.dueMs);
+  }, [medEntries, nowTick]);
+
+  const resolvedRepeatMinutes = (repeatKey: string, customMins: string): number | null => {
+    if (repeatKey === "custom") {
+      const n = parseInt(customMins, 10);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return Math.min(7 * 24 * 60, Math.max(5, n));
+    }
+    const map: Record<string, number> = { "2h": 120, "4h": 240, "6h": 360, "8h": 480, "12h": 720, "24h": 1440 };
+    return map[repeatKey] ?? null;
+  };
+
+  const handleAddMedicationReminder = () => {
+    const name =
+      medPreset === "custom"
+        ? medCustomName.trim()
+        : medPreset === "paracetamol"
+          ? "Paracetamol"
+          : medPreset === "ibuprofen"
+            ? "Ibuprofen"
+            : "Antibiotic";
+    if (!name) {
+      toast({ title: "Add a medication name", description: "Choose a preset or enter a custom medication.", variant: "destructive" });
+      return;
+    }
+    const repeatMins = resolvedRepeatMinutes(medRepeat, medRepeatCustomMins);
+    if (!repeatMins) {
+      toast({ title: "Choose a reminder interval", description: "Select how long until the next reminder.", variant: "destructive" });
+      return;
+    }
+    const takenAtIso = new Date().toISOString();
+    const nextDue = new Date(Date.now() + repeatMins * 60_000).toISOString();
+    const entry: SickDayMedicationLogEntry = {
+      id: crypto.randomUUID(),
+      name,
+      doseLabel: medDoseLabel.trim() || undefined,
+      notes: medNotes.trim() || undefined,
+      takenAtIso,
+      repeatEveryMinutes: repeatMins,
+      nextDueAtIso: nextDue,
+      createdAtIso: takenAtIso,
+    };
+    storage.addSickDayMedicationEntry(entry);
+    const next = storage.getSickDayMedicationLog();
+    setMedEntries(next);
+    setMedDoseLabel("");
+    setMedNotes("");
+    if (medPreset === "custom") setMedCustomName("");
+    void (async () => {
+      const res = await scheduleSickDayMedReminder(entry);
+      if (res.permission === "denied") {
+        toast({
+          title: "Notifications not enabled",
+          description: "We’ll still track reminders here, but enable notifications to get a phone alert.",
+          variant: "destructive",
+        });
+      }
+      await createSickDayMedInAppNotification({
+        title: "Medication reminder set",
+        body: `${entry.name} · next due ${new Date(entry.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+        reminderId: entry.id,
+        dueAtIso: entry.nextDueAtIso,
+        name: entry.name,
+      });
+      void upsertScenario({
+        scenarioKey: "sick_day",
+        title: "Sick day",
+        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+        state: {
+          sick_day_active: isSickDayActive,
+          severity,
+          started_at: sickDayActivatedAt ?? null,
+          ended_at: null,
+          last_check_at: lastCheckAtIso,
+          inputs_summary: results
+            ? {
+                bg_level: bgLevel ? parseFloat(bgLevel) : null,
+                bg_units: bgUnits,
+                ketone_level: ketoneLevel || null,
+                correction_dose_units: results.correctionDose,
+              }
+            : null,
+          meds_next_due: {
+            name: entry.name,
+            due_at: entry.nextDueAtIso,
+            repeat_mins: entry.repeatEveryMinutes,
+          },
+        },
+      });
+    })();
+    toast({
+      title: "Reminder added",
+      description: `We’ll remind you again in ${repeatMins >= 60 ? `${Math.round(repeatMins / 60)}h` : `${repeatMins}m`}.`,
+    });
+  };
+
+  const handleStopMedicationReminder = (id: string) => {
+    void cancelSickDayMedReminder(id);
+    storage.updateSickDayMedicationEntry(id, { dismissedAtIso: new Date().toISOString() });
+    const next = storage.getSickDayMedicationLog();
+    setMedEntries(next);
+    void (async () => {
+      await createSickDayMedInAppNotification({
+        title: "Medication reminder stopped",
+        body: "A medication reminder was stopped.",
+        reminderId: id,
+        dueAtIso: new Date().toISOString(),
+        name: "Medication",
+      });
+      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
+      void upsertScenario({
+        scenarioKey: "sick_day",
+        title: "Sick day",
+        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+        state: {
+          sick_day_active: isSickDayActive,
+          severity,
+          started_at: sickDayActivatedAt ?? null,
+          ended_at: null,
+          last_check_at: lastCheckAtIso,
+          meds_next_due: upcoming
+            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
+            : null,
+        },
+      });
+    })();
+  };
+
+  const handleSnoozeMedicationReminder = (id: string, minutes: number) => {
+    const now = Date.now();
+    storage.updateSickDayMedicationEntry(id, { nextDueAtIso: new Date(now + minutes * 60_000).toISOString() });
+    const next = storage.getSickDayMedicationLog();
+    setMedEntries(next);
+    const updated = next.find((e) => e.id === id);
+    if (updated) {
+      void scheduleSickDayMedReminder(updated);
+      void createSickDayMedInAppNotification({
+        title: "Medication reminder snoozed",
+        body: `${updated.name} · snoozed ${minutes}m`,
+        reminderId: updated.id,
+        dueAtIso: updated.nextDueAtIso,
+        name: updated.name,
+      });
+      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
+      void upsertScenario({
+        scenarioKey: "sick_day",
+        title: "Sick day",
+        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+        state: {
+          sick_day_active: isSickDayActive,
+          severity,
+          started_at: sickDayActivatedAt ?? null,
+          ended_at: null,
+          last_check_at: lastCheckAtIso,
+          meds_next_due: upcoming
+            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
+            : null,
+        },
+      });
+    }
+  };
+
+  const handleMedicationTakenNow = (id: string) => {
+    const entry = medEntries.find((e) => e.id === id);
+    if (!entry) return;
+    const takenAtIso = new Date().toISOString();
+    const nextDue = new Date(Date.now() + entry.repeatEveryMinutes * 60_000).toISOString();
+    storage.updateSickDayMedicationEntry(id, { takenAtIso, nextDueAtIso: nextDue });
+    const next = storage.getSickDayMedicationLog();
+    setMedEntries(next);
+    const updated = next.find((e) => e.id === id);
+    if (updated) {
+      void scheduleSickDayMedReminder(updated);
+      void createSickDayMedInAppNotification({
+        title: "Medication logged",
+        body: `${updated.name} taken · next due ${new Date(updated.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+        reminderId: updated.id,
+        dueAtIso: updated.nextDueAtIso,
+        name: updated.name,
+      });
+      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
+      void upsertScenario({
+        scenarioKey: "sick_day",
+        title: "Sick day",
+        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+        state: {
+          sick_day_active: isSickDayActive,
+          severity,
+          started_at: sickDayActivatedAt ?? null,
+          ended_at: null,
+          last_check_at: lastCheckAtIso,
+          meds_next_due: upcoming
+            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
+            : null,
+        },
+      });
+    }
+  };
+
+  const latestTemp = useMemo(() => tempEntries[0] ?? null, [tempEntries]);
+  const recentTemps = useMemo(() => tempEntries.slice(0, 10), [tempEntries]);
+
+  const handleLogTemperature = () => {
+    const raw = tempValue.trim().replace(",", ".");
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      toast({ title: "Enter a valid temperature", description: "Please enter a number like 38.2.", variant: "destructive" });
+      return;
+    }
+    const entry: SickDayTemperatureEntry = {
+      id: crypto.randomUUID(),
+      value: Math.round(n * 10) / 10,
+      unit: tempUnit,
+      loggedAtIso: new Date().toISOString(),
+    };
+    storage.addSickDayTemperatureEntry(entry);
+    setTempEntries(storage.getSickDayTemperatureLog());
+    setTempValue("");
+    toast({
+      title: "Temperature logged",
+      description: `${entry.value}°${entry.unit.toUpperCase()} recorded ${new Date(entry.loggedAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}.`,
+    });
+    void upsertScenario({
+      scenarioKey: "sick_day",
+      title: "Sick day",
+      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
+      state: {
+        sick_day_active: isSickDayActive,
+        severity,
+        started_at: sickDayActivatedAt ?? null,
+        ended_at: null,
+        last_check_at: lastCheckAtIso,
+        temp_latest: { value: entry.value, unit: entry.unit, at: entry.loggedAtIso },
+      },
+    });
+  };
+
+  const handleDeleteTemperature = (id: string) => {
+    storage.deleteSickDayTemperatureEntry(id);
+    setTempEntries(storage.getSickDayTemperatureLog());
+    toast({ title: "Temperature deleted" });
+  };
 
   const handleActivateSickDay = () => {
     if (!severity) return;
@@ -680,6 +919,10 @@ export default function SickDay() {
       activityDetails: `TDD: ${tddNum}, BG: ${bgNum}, Severity: ${severity}, Ketones: ${ketoneLevel}`,
       recommendation: `Correction: ${recommendations.correctionDose}u, Ratios adjusted`,
     });
+
+    // After updating from the Update tab, bring the user back to "Now" to see the latest correction.
+    setActiveModeTab("now");
+    scrollToId("sickday-now-recommendations");
   };
 
   const getSickDayDuration = () => {
@@ -988,19 +1231,43 @@ export default function SickDay() {
         <Tabs value={activeModeTab} onValueChange={(v) => setActiveModeTab(v as "now" | "checklist" | "log")} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="now" className="text-xs sm:text-sm" data-testid="tab-sickday-now">Now</TabsTrigger>
-            <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-sickday-checklist">Checklist</TabsTrigger>
+              <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-sickday-checklist">Reminders</TabsTrigger>
             <TabsTrigger value="log" className="text-xs sm:text-sm" data-testid="tab-sickday-update">Update</TabsTrigger>
           </TabsList>
 
           <TabsContent value="now" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-now">
-            {results.correctionDose > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Current Recommendations</CardTitle>
-                  <CardDescription>Based on your latest readings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {results.ketoneActionRequired === "emergency" && (
+            <Card id="sickday-now-recommendations">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">Current Recommendations</CardTitle>
+                    <CardDescription>
+                      {lastCheckAtIso
+                        ? `Latest check: ${new Date(lastCheckAtIso).toLocaleString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}`
+                        : "Update your readings to get the latest correction estimate"}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setActiveModeTab("log");
+                      scrollToId("sickday-log");
+                    }}
+                    data-testid="button-now-update-reading"
+                  >
+                    Update reading
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {results?.ketoneActionRequired === "emergency" && (
                     <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500">
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
@@ -1012,7 +1279,7 @@ export default function SickDay() {
                     </div>
                   )}
 
-                  {results.ketoneActionRequired === "urgent" && (
+                {results?.ketoneActionRequired === "urgent" && (
                     <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
@@ -1024,27 +1291,40 @@ export default function SickDay() {
                     </div>
                   )}
 
-                  <MedicalNumericOutputDisclaimer compact />
+                {results ? (
+                  <>
+                    <div className="p-4 bg-primary/5 rounded-lg space-y-2">
+                      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm text-muted-foreground">Suggested correction</span>
+                          <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
+                            {results.correctionDose} units
+                          </span>
+                        </div>
+                      </div>
 
-                  <div className="p-4 bg-primary/5 rounded-lg space-y-2">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm text-muted-foreground">Suggested correction</span>
-                      <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
-                        {results.correctionDose} units
-                      </span>
+                      <Collapsible className="group">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
+                          Educational estimate only
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-2">
+                          <MedicalNumericOutputDisclaimer compact />
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      <Collapsible className="group">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
+                          How this was calculated
+                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="text-xs text-muted-foreground pt-1">
+                          <p>{results.correctionExplanation}</p>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
-                    <Collapsible className="group">
-                      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
-                        How this was calculated
-                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="text-xs text-muted-foreground pt-1">
-                        <p>{results.correctionExplanation}</p>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
 
-                  {results.stackingWarning && (
+                    {results.stackingWarning && (
                     <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="flex items-start gap-2">
                         <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
@@ -1056,33 +1336,43 @@ export default function SickDay() {
                     </div>
                   )}
 
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-semibold text-sm">Adjusted Mealtime Ratios</h3>
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                        x{results.ratioMultiplier} adjustment
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio },
-                        { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio },
-                        { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio },
-                        { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio },
-                      ].map(r => (
-                        <div key={r.label} className="p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground">{r.label}</p>
-                          <div className="flex items-baseline gap-2 mt-1">
-                            <p className="font-semibold">{r.ratio}</p>
-                            <span className="text-xs text-muted-foreground line-through">{r.original}</span>
-                          </div>
+                    <Collapsible className="border rounded-lg px-3 py-2">
+                      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
+                        <span className="flex items-center gap-2 text-left">
+                          Adjusted mealtime ratios
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                            x{results.ratioMultiplier}
+                          </span>
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-3 pb-3 pt-1">
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio },
+                            { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio },
+                            { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio },
+                            { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio },
+                          ].map(r => (
+                            <div key={r.label} className="p-3 bg-muted rounded-lg">
+                              <p className="text-xs text-muted-foreground">{r.label}</p>
+                              <div className="flex items-baseline gap-2 mt-1">
+                                <p className="font-semibold">{r.ratio}</p>
+                                <span className="text-xs text-muted-foreground line-through">{r.original}</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </>
+                ) : (
+                  <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground" data-testid="sickday-now-no-results">
+                    Add your current blood glucose, ketones, and how unwell you feel to see a suggested correction and updated guidance.
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+              </CardContent>
+            </Card>
 
             {isTravelAlsoActive && (
               <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-travel-also-active">
@@ -1111,14 +1401,20 @@ export default function SickDay() {
             )}
 
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <ShieldAlert className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  Sick Day Rules
-                </CardTitle>
-                <CardDescription>Key principles to follow when unwell</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+              <CardHeader className="pb-2">
+                <Collapsible className="group">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left py-2">
+                    <div className="min-w-0">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <ShieldAlert className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        Sick day rules
+                      </CardTitle>
+                      <CardDescription>Tap to expand</CardDescription>
+                    </div>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="space-y-3 pt-2">
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                     <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
@@ -1169,77 +1465,230 @@ export default function SickDay() {
                     </div>
                   )}
                 </div>
-              </CardContent>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardHeader>
             </Card>
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-checklist">
             <Card className="rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Checklist</CardTitle>
-                <CardDescription>Tap items as you complete them.</CardDescription>
+                <CardTitle className="text-lg">Reminders</CardTitle>
+                <CardDescription>Track recurring actions during sick days (meds, checks, key tasks).</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div id="sickday-checklist" className="space-y-2">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {([
-                      { id: "fluids", label: "Take fluids (small amounts often)" },
-                      { id: "bg_check", label: "Check blood glucose" },
-                      { id: "ketones_check", label: "Check ketones (if BG high / feeling worse)" },
-                      { id: "correction_given", label: "Give correction if needed" },
-                      { id: "carbs_tolerated", label: "Carbs kept down (if eating)" },
-                      {
-                        id: "contact_team",
-                        label:
-                          results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
-                            ? "Contact diabetes team / urgent care now"
-                            : "Contact diabetes team if not improving",
-                        tone:
-                          results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
-                            ? "urgent"
-                            : "normal",
-                      },
-                    ] as const).map((item) => {
-                      const checked = checklist[item.id as SickDayChecklistItemId];
-                      const urgent = (item as any).tone === "urgent";
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() =>
-                            setChecklist((prev) => ({ ...prev, [item.id]: !prev[item.id as SickDayChecklistItemId] }))
-                          }
-                          className={[
-                            "flex items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
-                            checked ? "border-primary/40 bg-primary/5" : "border-border/60 hover:bg-muted/30",
-                            urgent && !checked ? "border-red-300 dark:border-red-800 bg-red-50/40 dark:bg-red-950/20" : "",
-                          ].join(" ")}
-                          data-testid={`checklist-${item.id}`}
-                        >
-                          <span
-                            className={[
-                              "mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full border",
-                              checked ? "border-primary bg-primary text-primary-foreground" : "border-border/70",
-                            ].join(" ")}
-                            aria-hidden
-                          >
-                            {checked ? <Check className="h-4 w-4" /> : null}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium">{item.label}</span>
-                            {item.id === "ketones_check" ? (
-                              <span className="block text-xs text-muted-foreground">
-                                {results.ketoneActionRequired === "urgent" || results.ketoneActionRequired === "emergency"
-                                  ? "Recommended now."
-                                  : "Recommended if BG stays above 250 mg/dL (13.9 mmol/L)."}
-                              </span>
-                            ) : null}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <Card className="border-border/60" data-testid="card-sickday-med-reminders">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Pill className="h-4 w-4 text-primary" />
+                      Medication reminders
+                    </CardTitle>
+                    <CardDescription>Log what you’ve taken and get a reminder when it’s due again.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-sm">What did you take?</Label>
+                        <Select value={medPreset} onValueChange={(v) => setMedPreset(v as any)}>
+                          <SelectTrigger data-testid="select-med-preset">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="paracetamol">Paracetamol</SelectItem>
+                            <SelectItem value="ibuprofen">Ibuprofen</SelectItem>
+                            <SelectItem value="antibiotic">Antibiotic</SelectItem>
+                            <SelectItem value="custom">Custom…</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {medPreset === "custom" && (
+                          <Input
+                            placeholder="Medication name"
+                            value={medCustomName}
+                            onChange={(e) => setMedCustomName(e.target.value)}
+                            data-testid="input-med-custom-name"
+                          />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Remind me again in</Label>
+                        <Select value={medRepeat} onValueChange={setMedRepeat}>
+                          <SelectTrigger data-testid="select-med-repeat">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2h">2 hours</SelectItem>
+                            <SelectItem value="4h">4 hours</SelectItem>
+                            <SelectItem value="6h">6 hours</SelectItem>
+                            <SelectItem value="8h">8 hours</SelectItem>
+                            <SelectItem value="12h">12 hours</SelectItem>
+                            <SelectItem value="24h">24 hours</SelectItem>
+                            <SelectItem value="custom">Custom…</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {medRepeat === "custom" && (
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={5}
+                            step={5}
+                            placeholder="Minutes"
+                            value={medRepeatCustomMins}
+                            onChange={(e) => setMedRepeatCustomMins(e.target.value)}
+                            data-testid="input-med-repeat-custom"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Dose (optional)</Label>
+                        <Input
+                          placeholder="e.g. 500mg, 2 tablets"
+                          value={medDoseLabel}
+                          onChange={(e) => setMedDoseLabel(e.target.value)}
+                          data-testid="input-med-dose"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Notes (optional)</Label>
+                        <Input
+                          placeholder="e.g. with food"
+                          value={medNotes}
+                          onChange={(e) => setMedNotes(e.target.value)}
+                          data-testid="input-med-notes"
+                        />
+                      </div>
+                    </div>
+
+                    <Button type="button" className="w-full" onClick={handleAddMedicationReminder} data-testid="button-add-med-reminder">
+                      Add reminder
+                    </Button>
+
+                    {activeMedReminders.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Active reminders</p>
+                        <div className="space-y-2">
+                          {activeMedReminders.map(({ e, dueMs }) => (
+                            <div
+                              key={e.id}
+                              className={[
+                                "rounded-xl border px-3 py-3 space-y-2",
+                                dueMs <= 0 ? "border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20" : "border-border/60",
+                              ].join(" ")}
+                              data-testid={`med-reminder-${e.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {e.name}
+                                    {e.doseLabel ? <span className="text-muted-foreground font-normal"> · {e.doseLabel}</span> : null}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatCountdownMs(dueMs)} · next at{" "}
+                                    {new Date(e.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary" className="text-xs">
+                                  every {e.repeatEveryMinutes >= 60 ? `${Math.round(e.repeatEveryMinutes / 60)}h` : `${e.repeatEveryMinutes}m`}
+                                </Badge>
+                              </div>
+                              {e.notes ? <p className="text-xs text-muted-foreground">{e.notes}</p> : null}
+                              <div className="flex flex-wrap gap-2">
+                                <Button size="sm" onClick={() => handleMedicationTakenNow(e.id)} data-testid={`button-med-taken-${e.id}`}>
+                                  Taken now
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => handleSnoozeMedicationReminder(e.id, 30)} data-testid={`button-med-snooze-${e.id}`}>
+                                  Snooze 30m
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleStopMedicationReminder(e.id)} data-testid={`button-med-stop-${e.id}`}>
+                                  Stop
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No active reminders yet.</p>
+                    )}
+
+                    <div className="border-t border-border/60 pt-4 space-y-3" data-testid="sickday-temperature-log">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Temperature</p>
+                        <span className="text-xs text-muted-foreground">
+                          {recentTemps.length > 0 ? `${recentTemps.length} logged` : "No temperature logged yet"}
+                        </span>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="sm:col-span-2 space-y-2">
+                          <Label htmlFor="input-sickday-temp" className="text-sm">Log temperature</Label>
+                          <Input
+                            id="input-sickday-temp"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.1"
+                            placeholder={tempUnit === "c" ? "e.g. 38.2" : "e.g. 101.3"}
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            data-testid="input-sickday-temp"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Unit</Label>
+                          <Select value={tempUnit} onValueChange={(v) => setTempUnit(v as "c" | "f")}>
+                            <SelectTrigger data-testid="select-sickday-temp-unit">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="c">°C</SelectItem>
+                              <SelectItem value="f">°F</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button type="button" variant="outline" className="w-full" onClick={handleLogTemperature} data-testid="button-log-temperature">
+                        Log temperature
+                      </Button>
+
+                      {recentTemps.length > 0 && (
+                        <div className="space-y-2" data-testid="sickday-temperature-history">
+                          <p className="text-sm font-medium">Recent temperatures</p>
+                          <div className="space-y-2">
+                            {recentTemps.map((t) => (
+                              <div
+                                key={t.id}
+                                className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 flex items-center justify-between gap-3"
+                                data-testid={`sickday-temp-row-${t.id}`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold tabular-nums">
+                                    {t.value}°{t.unit.toUpperCase()}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(t.loggedAtIso).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })} · {getTimeAgo(t.loggedAtIso)}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteTemperature(t.id)}
+                                  data-testid={`button-delete-temp-${t.id}`}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -1253,15 +1702,6 @@ export default function SickDay() {
                   >
                     <Activity className="h-4 w-4 mr-2" />
                     Log a check
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setChecklist(DEFAULT_CHECKLIST)}
-                    data-testid="button-reset-checklist"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Reset checklist
                   </Button>
                   <Button variant="outline" asChild data-testid="button-open-help-now">
                     <Link href="/help-now">Open Help now</Link>
@@ -1564,80 +2004,94 @@ export default function SickDay() {
           <>
         {impactedSupplies.length > 0 && (
           <Card className="border-orange-200 dark:border-orange-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                Adjusted Supply Forecast
-              </CardTitle>
-              <CardDescription>
-                Sick days can increase insulin and testing supply usage
-              </CardDescription>
+            <CardHeader className="pb-2">
+              <Collapsible className="group">
+                <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left py-2">
+                  <div className="min-w-0">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Package className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      Adjusted supply forecast
+                      <span className="text-xs bg-orange-100/70 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded-full">
+                        {impactedSupplies.length} item{impactedSupplies.length === 1 ? "" : "s"}
+                      </span>
+                    </CardTitle>
+                    <CardDescription>Tap to expand</CardDescription>
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-3 pt-2">
+                    {impactedSupplies.map(supply => (
+                      <div key={supply.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-medium">{supply.name}</p>
+                            <p className="text-xs text-muted-foreground">{supply.reason}</p>
+                          </div>
+                          <Badge variant="outline" className="text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                            {Math.round((supply.multiplier - 1) * 100)}% more
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-2 bg-background rounded-lg text-center">
+                            <p className="text-xs text-muted-foreground">Normal</p>
+                            <p className="text-sm font-medium" data-testid={`text-normal-days-${supply.id}`}>
+                              {supply.normalDaysLeft > 365 ? "365+" : supply.normalDaysLeft} days
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">{supply.dailyUsage}/day</p>
+                          </div>
+                          <div className={`p-2 rounded-lg text-center ${
+                            supply.sickDaysLeft <= 3 
+                              ? "bg-red-50 dark:bg-red-950/30"
+                              : supply.sickDaysLeft <= 7 
+                              ? "bg-orange-50 dark:bg-orange-950/30"
+                              : "bg-background"
+                          }`}>
+                            <p className="text-xs text-muted-foreground">Sick Day Rate</p>
+                            <p className={`text-sm font-medium ${
+                              supply.sickDaysLeft <= 3 ? "text-red-600 dark:text-red-400" : supply.sickDaysLeft <= 7 ? "text-orange-600 dark:text-orange-400" : ""
+                            }`} data-testid={`text-sick-days-${supply.id}`}>
+                              {supply.sickDaysLeft > 365 ? "365+" : supply.sickDaysLeft} days
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">{supply.adjustedDailyUsage}/day</p>
+                          </div>
+                        </div>
+                        {supply.sickDaysLeft <= 7 && (
+                          <p className={`text-xs ${supply.sickDaysLeft <= 3 ? "text-red-600 dark:text-red-400 font-medium" : "text-orange-600 dark:text-orange-400"}`}>
+                            {supply.sickDaysLeft <= 3 ? "Running low — check your supplies urgently" : "Keep an eye on this supply"}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    <Link href="/supplies">
+                      <Button variant="outline" className="w-full mt-2" data-testid="button-view-supplies">
+                        <Package className="h-4 w-4 mr-2" />
+                        View All Supplies
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {impactedSupplies.map(supply => (
-                <div key={supply.id} className="p-3 bg-muted/50 rounded-lg space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-medium">{supply.name}</p>
-                      <p className="text-xs text-muted-foreground">{supply.reason}</p>
-                    </div>
-                    <Badge variant="outline" className="text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
-                      {Math.round((supply.multiplier - 1) * 100)}% more
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-2 bg-background rounded-lg text-center">
-                      <p className="text-xs text-muted-foreground">Normal</p>
-                      <p className="text-sm font-medium" data-testid={`text-normal-days-${supply.id}`}>
-                        {supply.normalDaysLeft > 365 ? "365+" : supply.normalDaysLeft} days
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{supply.dailyUsage}/day</p>
-                    </div>
-                    <div className={`p-2 rounded-lg text-center ${
-                      supply.sickDaysLeft <= 3 
-                        ? "bg-red-50 dark:bg-red-950/30"
-                        : supply.sickDaysLeft <= 7 
-                        ? "bg-orange-50 dark:bg-orange-950/30"
-                        : "bg-background"
-                    }`}>
-                      <p className="text-xs text-muted-foreground">Sick Day Rate</p>
-                      <p className={`text-sm font-medium ${
-                        supply.sickDaysLeft <= 3 ? "text-red-600 dark:text-red-400" : supply.sickDaysLeft <= 7 ? "text-orange-600 dark:text-orange-400" : ""
-                      }`} data-testid={`text-sick-days-${supply.id}`}>
-                        {supply.sickDaysLeft > 365 ? "365+" : supply.sickDaysLeft} days
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">{supply.adjustedDailyUsage}/day</p>
-                    </div>
-                  </div>
-                  {supply.sickDaysLeft <= 7 && (
-                    <p className={`text-xs ${supply.sickDaysLeft <= 3 ? "text-red-600 dark:text-red-400 font-medium" : "text-orange-600 dark:text-orange-400"}`}>
-                      {supply.sickDaysLeft <= 3 ? "Running low — check your supplies urgently" : "Keep an eye on this supply"}
-                    </p>
-                  )}
-                </div>
-              ))}
-              <Link href="/supplies">
-                <Button variant="outline" className="w-full mt-2" data-testid="button-view-supplies">
-                  <Package className="h-4 w-4 mr-2" />
-                  View All Supplies
-                  <ChevronRight className="h-4 w-4 ml-auto" />
-                </Button>
-              </Link>
-            </CardContent>
           </Card>
         )}
 
         <Card className="border-red-300 dark:border-red-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              When to Seek Urgent Help
-            </CardTitle>
-            <CardDescription>
-              Contact your diabetes team or go to A&E immediately if any of these apply
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+          <CardHeader className="pb-2">
+            <Collapsible className="group">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left py-2">
+                <div className="min-w-0">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    When to seek urgent help
+                  </CardTitle>
+                  <CardDescription>Tap to expand</CardDescription>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-2 pt-2">
             {[
               { text: "Persistent vomiting — unable to keep fluids down for more than 2 hours", severity: "high" },
               { text: "Moderate or large ketones that are not coming down despite extra insulin", severity: "high" },
@@ -1679,7 +2133,10 @@ export default function SickDay() {
                 UK Emergency: 999 | NHS 111 for non-emergency advice
               </p>
             </div>
-          </CardContent>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </CardHeader>
         </Card>
 
         <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
