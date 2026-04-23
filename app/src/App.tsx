@@ -56,6 +56,8 @@ import {
 import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
+import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
+import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -780,6 +782,8 @@ function AuthenticatedShell() {
 
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
+      <ClinicalPrefsCloudSync />
+      {!isCarerMode ? <SickDayMedDuePoller /> : null}
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
       <AppTopBar
@@ -834,6 +838,8 @@ function AccountShell() {
 
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
+      <ClinicalPrefsCloudSync />
+      {!isCarerMode ? <SickDayMedDuePoller /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}

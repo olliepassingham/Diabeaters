@@ -1,3 +1,11 @@
+import {
+  holidaySupplyDaysNeeded,
+  travelPlanStockBufferMultiplier,
+  travelWeatherPlanSliceFromStoredPlan,
+  travelWeatherSupplyShortfallMultiplier,
+  tripCalendarDaysBetween,
+} from "./travel-supply-policy";
+
 const STORAGE_KEYS = {
   PROFILE: "diabeater_profile",
   SETTINGS: "diabeater_settings",
@@ -539,6 +547,8 @@ export interface SickDayMedicationLogEntry {
   createdAtIso: string;
   /** Optional if the user snoozes/dismisses or stops the reminder. */
   dismissedAtIso?: string;
+  /** Matches `nextDueAtIso` after we sent a due-time in-app alert for that cycle (avoids spam while overdue). */
+  lastInAppNotifiedDueAtIso?: string;
 }
 
 export interface SickDayTemperatureEntry {
@@ -1294,11 +1304,15 @@ export const storage = {
     }
 
     if (scenarioState.travelModeActive && scenarioState.travelStartDate && scenarioState.travelEndDate) {
-      const travelStart = new Date(scenarioState.travelStartDate);
-      const travelEnd = new Date(scenarioState.travelEndDate);
-      travelStart.setHours(0, 0, 0, 0);
-      travelEnd.setHours(0, 0, 0, 0);
-      const tripDuration = Math.max(1, Math.floor((travelEnd.getTime() - travelStart.getTime()) / (1000 * 60 * 60 * 24)));
+      const tripDuration = tripCalendarDaysBetween(scenarioState.travelStartDate, scenarioState.travelEndDate);
+      const savedTravelPlan = this.getTravelPlan();
+      const stockBuffer = travelPlanStockBufferMultiplier(savedTravelPlan);
+      const weatherSlice = travelWeatherPlanSliceFromStoredPlan(savedTravelPlan);
+      const intervalCfg = {
+        cgmDays: settings.cgmDays || 14,
+        siteChangeDays: settings.siteChangeDays || 3,
+        reservoirChangeDays: settings.reservoirChangeDays || 3,
+      };
 
       for (const supply of supplies) {
         const daysRemaining = this.getDaysRemaining(supply);
@@ -1306,18 +1320,18 @@ export const storage = {
 
         let dailyRate: number;
         if (supply.type === "cgm") {
-          dailyRate = 1 / (settings.cgmDays || 14);
+          dailyRate = 1 / intervalCfg.cgmDays;
         } else if (supply.type === "infusion_set") {
-          dailyRate = 1 / (settings.siteChangeDays || 3);
+          dailyRate = 1 / intervalCfg.siteChangeDays;
         } else if (supply.type === "reservoir") {
-          dailyRate = 1 / (settings.reservoirChangeDays || 3);
+          dailyRate = 1 / intervalCfg.reservoirChangeDays;
         } else {
           dailyRate = supply.dailyUsage;
         }
         if (dailyRate <= 0) continue;
 
-        const travelBuffer = 2;
-        const totalNeeded = Math.ceil(dailyRate * tripDuration * travelBuffer);
+        const weatherMult = travelWeatherSupplyShortfallMultiplier(supply.type, weatherSlice, tripDuration, intervalCfg);
+        const totalNeeded = Math.ceil(dailyRate * tripDuration * stockBuffer * weatherMult);
         const currentStock = Math.floor(this.getAdjustedQuantity(supply));
         const shortfall = totalNeeded - currentStock;
 
@@ -1326,10 +1340,14 @@ export const storage = {
           if (inSkipList !== -1) {
             skipSuggestions.splice(inSkipList, 1);
           }
+          const wx =
+            weatherMult > 1.001
+              ? `, ${weatherSlice.weatherChange} ${weatherSlice.weatherSeverity} climate`
+              : "";
           travelExtras.push({
             supply,
             extraNeeded: shortfall,
-            reason: `Your ${scenarioState.travelDestination || "trip"} (${tripDuration} days) needs extra ${supply.name} — order ${shortfall} more with your prescription`,
+            reason: `Your ${scenarioState.travelDestination || "trip"} (${tripDuration} days, ${stockBuffer.toFixed(1)}× buffer${wx}) needs extra ${supply.name} — order ${shortfall} more with your prescription`,
           });
         }
       }
@@ -3378,24 +3396,41 @@ export const storage = {
     localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
   },
 
-  getHolidaySupplyCoverage(): { supply: Supply; daysRemaining: number; tripDays: number; shortfall: number; coveragePercent: number }[] {
+  /**
+   * Holiday prep: compare forecast "days of supply left" to ~2× calendar trip length,
+   * consistent with common travel guidance to pack extra (not medical advice — follow your team).
+   */
+  getHolidaySupplyCoverage(): {
+    supply: Supply;
+    daysRemaining: number;
+    /** Whole calendar days between departure and return (midnight dates). */
+    calendarTripDays: number;
+    /** Target duration of cover used for % / shortfall (multiplier × calendar trip). */
+    daysNeeded: number;
+    shortfall: number;
+    coveragePercent: number;
+  }[] {
     const prep = this.getHolidayPrep();
     if (!prep) return [];
     const supplies = this.getSupplies();
-    const departureDate = new Date(prep.departureDate);
-    const returnDate = new Date(prep.returnDate);
-    departureDate.setHours(0, 0, 0, 0);
-    returnDate.setHours(0, 0, 0, 0);
-    const tripDays = Math.max(1, Math.ceil((returnDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60 * 24)));
-    const bufferDays = 2;
-    const totalNeededDays = tripDays + bufferDays;
+    const calendarTripDays = tripCalendarDaysBetween(prep.departureDate, prep.returnDate);
+    const daysNeeded = holidaySupplyDaysNeeded(calendarTripDays);
 
     return supplies.map(supply => {
       const daysRemaining = this.getDaysRemaining(supply);
-      if (daysRemaining >= 999) return { supply, daysRemaining: 999, tripDays: totalNeededDays, shortfall: 0, coveragePercent: 100 };
-      const coveragePercent = Math.min(100, Math.round((daysRemaining / totalNeededDays) * 100));
-      const shortfall = Math.max(0, totalNeededDays - daysRemaining);
-      return { supply, daysRemaining, tripDays: totalNeededDays, shortfall, coveragePercent };
+      if (daysRemaining >= 999) {
+        return {
+          supply,
+          daysRemaining: 999,
+          calendarTripDays,
+          daysNeeded,
+          shortfall: 0,
+          coveragePercent: 100,
+        };
+      }
+      const coveragePercent = Math.min(100, Math.round((daysRemaining / daysNeeded) * 100));
+      const shortfall = Math.max(0, daysNeeded - daysRemaining);
+      return { supply, daysRemaining, calendarTripDays, daysNeeded, shortfall, coveragePercent };
     });
   },
 

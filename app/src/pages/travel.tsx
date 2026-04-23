@@ -43,6 +43,17 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
+import {
+  buildTravelWeatherRiskWarnings,
+  travelAccessBufferMultiplier,
+  travelPackingBufferMultiplier,
+  travelWeatherAdhesivePiecesMultiplier,
+  travelWeatherCgmSpareExtraCount,
+  travelWeatherHypoTreatmentsMultiplier,
+  travelWeatherPumpPowerMultiplier,
+  travelWeatherTestStripMultiplier,
+  tripCalendarDaysBetween,
+} from "@/lib/travel-supply-policy";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -83,8 +94,13 @@ interface RiskWarning {
 
 function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: UserSettings, isPumpUser: boolean): PackingItem[] {
   const items: PackingItem[] = [];
-  const bufferMultiplier = plan.travelType === "international" ? 2 : 1.5;
-  const accessBuffer = plan.accessRisk === "limited" ? 1.5 : plan.accessRisk === "unsure" ? 1.3 : 1;
+  const bufferMultiplier = travelPackingBufferMultiplier(plan.travelType);
+  const accessBuffer = travelAccessBufferMultiplier(plan.accessRisk);
+  const wxHypo = travelWeatherHypoTreatmentsMultiplier(plan);
+  const wxAdhesive = travelWeatherAdhesivePiecesMultiplier(plan);
+  const wxStrips = travelWeatherTestStripMultiplier(plan);
+  const wxCgmExtra = travelWeatherCgmSpareExtraCount(plan);
+  const wxPower = travelWeatherPumpPowerMultiplier(plan);
   
   const insulinSupplies = supplies.filter(s => s.type === "insulin" || s.type === "insulin_short" || s.type === "insulin_long");
   const needleSupplies = supplies.filter(s => s.type === "needle");
@@ -125,13 +141,15 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
     });
     
     // Power: many pumps are USB-rechargeable; some still use disposable cells
-    const powerItems = Math.max(2, Math.ceil((plan.duration / 5) * bufferMultiplier * accessBuffer));
+    const powerItems = Math.max(2, Math.ceil((plan.duration / 5) * bufferMultiplier * accessBuffer * wxPower));
     items.push({
       name: "Pump power (cable / adapter / cells)",
       estimatedAmount: powerItems,
       unit: "items",
       reasoning:
-        "Charging cable and plug adapter; add spare disposable cells only if your pump uses them. Skip disposable batteries for rechargeable pumps.",
+        wxPower > 1
+          ? "Charging cable and plug adapter; warm climates can increase charging needs — add spare cells only if your pump uses disposables."
+          : "Charging cable and plug adapter; add spare disposable cells only if your pump uses them. Skip disposable batteries for rechargeable pumps.",
       category: "delivery",
       checked: false,
     });
@@ -148,9 +166,12 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
     
     items.push({
       name: "Extra Adhesive/Tape",
-      estimatedAmount: Math.ceil(plan.duration / 3),
+      estimatedAmount: Math.ceil((plan.duration / 3) * wxAdhesive),
       unit: "pieces",
-      reasoning: "For securing sites in hot/humid conditions",
+      reasoning:
+        wxAdhesive > 1
+          ? `For securing sites (${plan.weatherChange} ${plan.weatherSeverity} climate — extra tape)`
+          : "For securing sites in hot/humid conditions",
       category: "delivery",
       checked: false,
     });
@@ -285,13 +306,13 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
     // For CGMs: domestic = 1 spare, international = 2 spares, limited access = extra 1
     const spares = plan.travelType === "international" ? 2 : 1;
     const accessSpare = plan.accessRisk === "limited" ? 1 : 0;
-    const totalSensors = sensorsNeeded + spares + accessSpare;
-    const sparesText = spares + accessSpare;
+    const totalSensors = sensorsNeeded + spares + accessSpare + wxCgmExtra;
+    const sparesText = spares + accessSpare + wxCgmExtra;
     items.push({
       name: supply.name,
       estimatedAmount: totalSensors,
       unit: "sensors",
-      reasoning: `${plan.duration} days ÷ ${cgmDays} days/sensor = ${sensorsNeeded} + ${sparesText} spare${sparesText > 1 ? 's' : ''}`,
+      reasoning: `${plan.duration} days ÷ ${cgmDays} days/sensor = ${sensorsNeeded} + ${sparesText} spare${sparesText === 1 ? "" : "s"}${wxCgmExtra ? " (includes heat/adhesion buffer)" : ""}`,
       category: "monitoring",
       checked: false,
     });
@@ -308,18 +329,24 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
 
   items.push({
     name: "Test Strips",
-    estimatedAmount: Math.ceil(plan.duration * 4 * bufferMultiplier),
+    estimatedAmount: Math.ceil(plan.duration * 4 * bufferMultiplier * wxStrips),
     unit: "strips",
-    reasoning: "For meter backup testing",
+    reasoning:
+      wxStrips > 1
+        ? `For meter backup testing (+climate adjustment: ${plan.weatherChange} ${plan.weatherSeverity})`
+        : "For meter backup testing",
     category: "monitoring",
     checked: false,
   });
 
   items.push({
     name: "Fast-Acting Glucose",
-    estimatedAmount: Math.ceil(plan.duration * 2),
+    estimatedAmount: Math.ceil(plan.duration * 2 * wxHypo),
     unit: "treatments",
-    reasoning: "Glucose tablets/juice for hypo treatment",
+    reasoning:
+      wxHypo > 1
+        ? `Glucose tablets/juice for hypo treatment (+climate: ${plan.weatherChange} ${plan.weatherSeverity})`
+        : "Glucose tablets/juice for hypo treatment",
     category: "hypo",
     checked: false,
   });
@@ -435,6 +462,10 @@ function calculateRiskWarnings(plan: TravelPlan, isPumpUser: boolean): RiskWarni
       description: "Carry a doctor's letter explaining your diabetes supplies. Keep insulin and supplies in carry-on luggage to prevent freezing and loss.",
       severity: "medium",
     });
+  }
+
+  for (const w of buildTravelWeatherRiskWarnings(plan)) {
+    warnings.push(w);
   }
 
   return warnings;
@@ -711,9 +742,7 @@ export default function Travel() {
 
   const handleActivateFromPrep = () => {
     if (!holidayPrep) return;
-    const dep = new Date(holidayPrep.departureDate);
-    const ret = new Date(holidayPrep.returnDate);
-    const duration = Math.max(1, Math.ceil((ret.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24)));
+    const duration = tripCalendarDaysBetween(holidayPrep.departureDate, holidayPrep.returnDate);
     setPlan(prev => ({
       ...prev,
       destination: holidayPrep.destination,
@@ -735,11 +764,7 @@ export default function Travel() {
 
   const getPrepTripDays = (): number => {
     if (!holidayPrep) return 0;
-    const dep = new Date(holidayPrep.departureDate);
-    const ret = new Date(holidayPrep.returnDate);
-    dep.setHours(0, 0, 0, 0);
-    ret.setHours(0, 0, 0, 0);
-    return Math.max(1, Math.ceil((ret.getTime() - dep.getTime()) / (1000 * 60 * 60 * 24)));
+    return tripCalendarDaysBetween(holidayPrep.departureDate, holidayPrep.returnDate);
   };
 
   const handleActivateTravelMode = () => {
@@ -1506,10 +1531,13 @@ export default function Travel() {
                     <div className="space-y-2">
                       <h4 className="text-sm font-medium flex items-center gap-1.5">
                         <Package className="h-4 w-4" />
-                        Supply Coverage ({tripDays}+2 buffer days)
+                        Supply Coverage (~2× {tripDays}-day trip)
                       </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Bars compare your forecast days of stock to about twice your trip length, in line with usual travel planning advice.
+                      </p>
                       <div className="space-y-2">
-                        {coverage.map(({ supply, daysRemaining, tripDays: needed, shortfall, coveragePercent }) => (
+                        {coverage.map(({ supply, daysRemaining, daysNeeded, shortfall, coveragePercent }) => (
                           <div key={supply.id} className="space-y-1" data-testid={`prep-supply-${supply.id}`}>
                             <div className="flex flex-wrap items-center justify-between gap-1 text-sm">
                               <span>{supply.name}</span>

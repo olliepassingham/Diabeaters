@@ -49,3 +49,29 @@ export async function upsertScenario(input: ScenarioUpsertInput): Promise<void> 
   }
 }
 
+/** Current JSON `state` for the signed-in patient (read-merge before upsert). */
+export async function fetchScenarioStateForUser(scenarioKey: string): Promise<Record<string, unknown> | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+
+  const userId = await getAuthedUserId();
+  if (!userId) return null;
+
+  const key = scenarioKey.trim();
+  if (!key) return null;
+
+  const { data, error } = await supabase
+    .from("scenarios")
+    .select("state")
+    .eq("user_id", userId)
+    .eq("scenario_key", key)
+    .maybeSingle();
+
+  if (error && import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.warn("scenarios: fetch state failed", error);
+  }
+  const st = data?.state;
+  return st && typeof st === "object" ? (st as Record<string, unknown>) : null;
+}
+

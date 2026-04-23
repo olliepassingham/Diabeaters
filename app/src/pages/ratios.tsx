@@ -17,6 +17,13 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Syringe,
   Sun,
   Sunset,
@@ -329,55 +336,137 @@ export default function Ratios() {
 
   return (
     <PageShell variant="standard" className="max-w-2xl" data-testid="page-ratios">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          leading={<PageBackButton />}
-          className="min-w-0 flex-1"
-          title={
-            <span className="inline-flex items-center gap-2">
-              <Syringe className="h-6 w-6 text-primary shrink-0" />
-              Your Ratios
-            </span>
-          }
-          description="Carb ratios, correction factor (ISF), and target range"
-        />
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/settings/ratios">
-            <Button variant="outline" size="sm" data-testid="button-ratio-settings">
-              <Settings className="h-4 w-4 mr-1" />
-              Settings
-            </Button>
-          </Link>
-          {!editing ? (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="button-edit-ratios">
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit ratios
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleCancelEdit} data-testid="button-cancel-edit">
-                <X className="h-4 w-4 mr-1" />
-                Cancel
+      <div className="w-full min-w-0 space-y-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <PageHeader
+            leading={<PageBackButton />}
+            className="min-w-0 w-full sm:flex-1"
+            title={
+              <span className="inline-flex items-center gap-2">
+                <Syringe className="h-6 w-6 text-primary shrink-0" />
+                Your Ratios
+              </span>
+            }
+          />
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:justify-start">
+            <Link href="/settings/ratios">
+              <Button variant="outline" size="sm" data-testid="button-ratio-settings">
+                <Settings className="h-4 w-4 mr-1" />
+                Settings
               </Button>
-              <Button size="sm" onClick={handleSaveRatios} data-testid="button-save-ratios">
-                <Save className="h-4 w-4 mr-1" />
-                Save
+            </Link>
+            {!editing ? (
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)} data-testid="button-edit-ratios">
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit ratios
               </Button>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleCancelEdit} data-testid="button-cancel-edit">
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSaveRatios} data-testid="button-save-ratios">
+                  <Save className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
+        <p className="text-sm leading-snug text-muted-foreground sm:text-body">
+          Carb ratios, correction factor (ISF), and target range.
+        </p>
       </div>
 
       <Card className="border-primary/25 bg-primary/[0.04] dark:bg-primary/10" data-testid="card-ratios-at-a-glance">
         <CardContent className="p-4 sm:p-5 space-y-4">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your ratios at a glance</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Carb coverage by meal
-              {hasAnyAdjustment && !editing
-                ? " — struck-through values are your saved base; amber values reflect your active scenario."
-                : "."}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-2 gap-y-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your ratios at a glance</p>
+              <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                {hasAnyAdjustment && !editing
+                  ? "Carb coverage by meal — strikethrough is your saved base. Open Adjusted ratios for scenario values."
+                  : "Carb coverage by meal."}
+              </p>
+            </div>
+            {hasAnyAdjustment && !editing && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1 border-amber-300 bg-amber-50/80 text-amber-950 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-900/50"
+                    data-testid="button-adjusted-ratios-dropdown"
+                  >
+                    Adjusted ratios
+                    <ChevronDown className="h-4 w-4 opacity-80" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-[min(calc(100vw-2rem),22rem)] max-h-[min(32rem,75vh)] overflow-y-auto p-0"
+                  align="end"
+                >
+                  <div className="border-b border-border/80 px-3 py-2">
+                    <DropdownMenuLabel className="p-0 text-sm font-semibold text-foreground">
+                      Scenario-adjusted carb coverage
+                    </DropdownMenuLabel>
+                    <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                      Estimates only — monitor glucose and follow your care team.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
+                    {meals.map((meal) => {
+                      const Icon = getMealIcon(meal.name);
+                      const stored = settings[meal.key];
+                      const baseGpu = parseRatioToGramsPerUnit(stored);
+                      const primary = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : stored || null;
+                      const adjusted =
+                        stored && hasAnyAdjustment ? getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize) : null;
+                      return (
+                        <div
+                          key={`dd-${meal.key}`}
+                          className="rounded-md border border-border/70 bg-muted/30 px-2 py-2 text-center"
+                          data-testid={`dropdown-adjusted-${meal.name.toLowerCase()}`}
+                        >
+                          <div className="flex items-center justify-center gap-1 text-[11px] text-muted-foreground">
+                            <Icon className="h-3 w-3 text-primary" aria-hidden />
+                            <span className="font-medium text-foreground/90">{meal.name}</span>
+                          </div>
+                          {adjusted ? (
+                            <p className="mt-1 text-base font-bold tabular-nums text-amber-800 dark:text-amber-300">{adjusted}</p>
+                          ) : (
+                            <p className="mt-1 text-xs text-muted-foreground italic">Not set</p>
+                          )}
+                          {primary && adjusted ? (
+                            <p className="mt-0.5 text-[10px] tabular-nums text-muted-foreground line-through">{primary}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <DropdownMenuSeparator className="my-0" />
+                  <div className="space-y-2 px-3 py-2">
+                    {adjustments.map((adj, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <adj.icon className={`h-4 w-4 mt-0.5 shrink-0 ${adj.color}`} aria-hidden />
+                        <div className="min-w-0">
+                          <span className="font-medium text-foreground">{adj.label}</span>
+                          <p className="mt-0.5 text-muted-foreground leading-snug">{adj.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {adjustments.length > 1 ? (
+                      <p className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground leading-snug">
+                        <strong className="text-foreground">Multiple adjustments active.</strong> Combined change is capped
+                        at 25% from your base ratios for safety. Check with your diabetes team before large changes.
+                      </p>
+                    ) : null}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {meals.map((meal) => {
@@ -385,16 +474,14 @@ export default function Ratios() {
               const stored = settings[meal.key];
               const draft = editValues[meal.key];
               let primary: string | null = null;
-              let adjusted: string | null = null;
+              let showStrike = false;
               if (editing) {
                 const gpu = parseInputToGramsPerUnit(draft, ratioFormat, cpSize);
                 primary = gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : draft.trim() || null;
               } else {
                 const baseGpu = parseRatioToGramsPerUnit(stored);
                 primary = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : stored || null;
-                if (hasAnyAdjustment && stored) {
-                  adjusted = getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize);
-                }
+                showStrike = Boolean(hasAnyAdjustment && stored && getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize));
               }
               return (
                 <div
@@ -407,20 +494,12 @@ export default function Ratios() {
                     <span className="font-medium text-foreground/90">{meal.name}</span>
                   </div>
                   {primary ? (
-                    <div className="space-y-0.5">
-                      <p
-                        className={`text-xl font-bold tabular-nums tracking-tight ${!editing && hasAnyAdjustment && adjusted ? "text-muted-foreground line-through text-base" : "text-foreground"}`}
-                        data-testid={`at-a-glance-value-${meal.name.toLowerCase()}`}
-                      >
-                        {primary}
-                      </p>
-                      {!editing && adjusted && (
-                        <p className="text-lg font-bold tabular-nums text-amber-700 dark:text-amber-400" data-testid={`at-a-glance-adjusted-${meal.name.toLowerCase()}`}>
-                          {adjusted}
-                          <span className="text-[10px] font-normal ml-1 text-amber-600 dark:text-amber-500">adj.</span>
-                        </p>
-                      )}
-                    </div>
+                    <p
+                      className={`text-xl font-bold tabular-nums tracking-tight ${showStrike ? "text-muted-foreground line-through text-base" : "text-foreground"}`}
+                      data-testid={`at-a-glance-value-${meal.name.toLowerCase()}`}
+                    >
+                      {primary}
+                    </p>
                   ) : (
                     <p className="text-sm text-muted-foreground italic">Not set</p>
                   )}
@@ -457,40 +536,6 @@ export default function Ratios() {
         </CardContent>
       </Card>
 
-      {hasAnyAdjustment && (
-        <Card className="border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20" data-testid="scenario-adjustments-banner">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              <p className="font-medium text-amber-900 dark:text-amber-200">Active Scenario Adjustments</p>
-            </div>
-            <p className="text-sm text-amber-800 dark:text-amber-300">
-              Your ratios below show adjusted values based on your current situation.
-              These are estimates only — always monitor your blood glucose and adjust based on your actual readings.
-            </p>
-            {adjustments.map((adj, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm">
-                <adj.icon className={`h-4 w-4 mt-0.5 ${adj.color}`} />
-                <div>
-                  <span className="font-medium text-amber-900 dark:text-amber-200">{adj.label}:</span>{" "}
-                  <span className="text-amber-800 dark:text-amber-300">{adj.description}</span>
-                </div>
-              </div>
-            ))}
-            {adjustments.length > 1 && (
-              <div className="bg-amber-100 dark:bg-amber-900/30 rounded-lg p-2 text-sm text-amber-800 dark:text-amber-300">
-                <strong>Multiple adjustments active.</strong> Combined adjustments are capped at 25% change from your base ratios for safety.
-                Speak to your diabetes team before making significant ratio changes during complex situations.
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground flex items-center gap-1 pt-1">
-              <AlertCircle className="h-3 w-3" />
-              Not medical advice — these are rough estimates to prompt awareness, not exact dose calculations
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {!hasRatios && !editing ? (
         <Card data-testid="no-ratios-prompt">
           <CardContent className="p-8 text-center space-y-4">
@@ -518,6 +563,7 @@ export default function Ratios() {
             const baseGpu = parseRatioToGramsPerUnit(baseRatio);
             const displayRatio = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : baseRatio;
             const adjustedRatio = hasAnyAdjustment ? getAdjustedRatio(baseRatio, combinedFactor, ratioFormat, cpSize) : null;
+            const strikeBase = Boolean(hasAnyAdjustment && adjustedRatio);
 
             return (
               <Card key={meal.name} data-testid={`card-ratio-${meal.name.toLowerCase()}`}>
@@ -548,17 +594,12 @@ export default function Ratios() {
                   ) : (
                     <div className="mt-1">
                       {baseRatio ? (
-                        <div>
-                          <p className={`text-2xl font-bold ${hasAnyAdjustment ? "text-muted-foreground line-through text-lg" : ""}`} data-testid={`display-ratio-${meal.name.toLowerCase()}`}>
-                            {displayRatio}
-                          </p>
-                          {adjustedRatio && (
-                            <p className="text-2xl font-bold text-amber-700 dark:text-amber-400" data-testid={`adjusted-ratio-${meal.name.toLowerCase()}`}>
-                              {adjustedRatio}
-                              <span className="text-xs font-normal ml-1 text-amber-600 dark:text-amber-500">adjusted</span>
-                            </p>
-                          )}
-                        </div>
+                        <p
+                          className={`text-2xl font-bold ${strikeBase ? "text-muted-foreground line-through text-lg" : ""}`}
+                          data-testid={`display-ratio-${meal.name.toLowerCase()}`}
+                        >
+                          {displayRatio}
+                        </p>
                       ) : (
                         <p className="text-sm text-muted-foreground italic">Not set</p>
                       )}

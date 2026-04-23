@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info, Users } from "lucide-react";
+import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info, Users, Pill } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   normaliseScopes,
@@ -15,6 +15,8 @@ import {
   fetchHypoLogsForLinkedPatient,
   getLinkedPatientForCarer,
   listLinkedPatientsForCarer,
+  carerAppendSickDayTemperature,
+  carerAppendSickDayMedNote,
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
@@ -30,6 +32,9 @@ import {
 import { DevNote } from "@/components/dev/DevNote";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function SectionHeading({
   title,
@@ -225,6 +230,18 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
             lines.push(`Next meds: ${medName} · ${when}`);
           }
         }
+        const medsActive = rawState?.meds_active;
+        if (Array.isArray(medsActive) && medsActive.length > 1) {
+          lines.push(`${medsActive.length} active medication reminders shared`);
+        }
+        const tempRecent = rawState?.temp_recent;
+        if (Array.isArray(tempRecent) && tempRecent.length > 1) {
+          lines.push(`${tempRecent.length} patient temperature readings shared`);
+        }
+        const carerTemps = rawState?.carer_temp_recent;
+        if (Array.isArray(carerTemps) && carerTemps.length > 0) {
+          lines.push(`${carerTemps.length} supporter temperature log entr${carerTemps.length === 1 ? "y" : "ies"}`);
+        }
         const temp =
           rawState?.temp_latest && typeof rawState.temp_latest === "object"
             ? (rawState.temp_latest as Record<string, unknown>)
@@ -311,6 +328,286 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
     }
   }
   return lines;
+}
+
+function sickDayScenarioState(rows: Record<string, unknown>[]): Record<string, unknown> | null {
+  for (const row of rows) {
+    const scenarioKey =
+      typeof row.scenario_key === "string" && row.scenario_key.trim()
+        ? row.scenario_key.trim()
+        : typeof row.scenarioKey === "string" && row.scenarioKey.trim()
+          ? row.scenarioKey.trim()
+          : null;
+    if (scenarioKey !== "sick_day") continue;
+    const rawState =
+      (row.state && typeof row.state === "object" ? (row.state as Record<string, unknown>) : null) ??
+      (row.payload && typeof row.payload === "object" ? (row.payload as Record<string, unknown>) : null) ??
+      (row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null);
+    return rawState;
+  }
+  return null;
+}
+
+function combinedSickDayTemperatureRows(state: Record<string, unknown>): Array<{
+  value: number;
+  unit: string;
+  at: string;
+  source: "patient" | "carer";
+}> {
+  const out: Array<{ value: number; unit: string; at: string; source: "patient" | "carer" }> = [];
+  const pushRow = (t: Record<string, unknown>, source: "patient" | "carer") => {
+    const v = typeof t.value === "number" ? t.value : Number(t.value);
+    const u = t.unit === "f" || t.unit === "c" ? String(t.unit) : "";
+    const a = typeof t.at === "string" ? t.at : "";
+    if (!Number.isFinite(v) || !u || !a) return;
+    out.push({ value: v, unit: u, at: a, source });
+  };
+  for (const t of (Array.isArray(state.temp_recent) ? state.temp_recent : []) as Record<string, unknown>[]) {
+    pushRow(t, "patient");
+  }
+  for (const t of (Array.isArray(state.carer_temp_recent) ? state.carer_temp_recent : []) as Record<
+    string,
+    unknown
+  >[]) {
+    pushRow(t, "carer");
+  }
+  out.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return out;
+}
+
+function SickDaySupporterCareCard(props: {
+  patientId: string;
+  sickState: Record<string, unknown> | null;
+  onUpdated: () => Promise<void>;
+}) {
+  const { patientId, sickState, onUpdated } = props;
+  const [tempVal, setTempVal] = useState("");
+  const [tempUnit, setTempUnit] = useState<"c" | "f">("c");
+  const [medName, setMedName] = useState("");
+  const [medNote, setMedNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  if (!sickState || sickState.sick_day_active !== true) return null;
+
+  const medsActive = Array.isArray(sickState.meds_active)
+    ? (sickState.meds_active as Record<string, unknown>[])
+    : [];
+  const carerNotes = Array.isArray(sickState.carer_med_notes)
+    ? (sickState.carer_med_notes as Record<string, unknown>[])
+    : [];
+  const tempsCombined = combinedSickDayTemperatureRows(sickState);
+
+  const submitTemp = async () => {
+    setFormError(null);
+    const raw = tempVal.trim().replace(",", ".");
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+      setFormError("Enter a valid temperature.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await carerAppendSickDayTemperature(patientId, {
+        value: Math.round(n * 10) / 10,
+        unit: tempUnit,
+      });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      setTempVal("");
+      await onUpdated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitMedNote = async () => {
+    setFormError(null);
+    const text = medNote.trim();
+    if (!text) {
+      setFormError("Enter a short note (e.g. paracetamol given).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await carerAppendSickDayMedNote(patientId, {
+        text,
+        medicationName: medName.trim() || undefined,
+      });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      setMedNote("");
+      setMedName("");
+      await onUpdated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="border-orange-200/60 dark:border-orange-900/40" data-testid="carer-sick-day-care">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Thermometer className="h-5 w-5 text-orange-600" />
+          Sick day — temperatures & medication notes
+        </CardTitle>
+        <CardDescription>
+          Shared from their app when Sick Day mode is on. You can add readings and notes here; they sync to their
+          scenario for both of you.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {formError ? (
+          <Alert variant="destructive" className="py-2">
+            <AlertDescription className="text-sm">{formError}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {medsActive.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Active reminders (from their device)
+            </p>
+            <ul className="space-y-2">
+              {medsActive.map((m, idx) => {
+                const name = typeof m.name === "string" ? m.name : "Medication";
+                const due = typeof m.due_at === "string" ? m.due_at : null;
+                const dose = typeof m.dose_label === "string" ? m.dose_label : null;
+                const when =
+                  due && !Number.isNaN(new Date(due).getTime())
+                    ? formatDistanceToNowStrict(new Date(due), { addSuffix: true })
+                    : null;
+                return (
+                  <li
+                    key={typeof m.id === "string" ? m.id : `med-${idx}`}
+                    className="rounded-lg border border-border/60 px-3 py-2 text-sm flex items-start gap-2"
+                  >
+                    <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{name}</p>
+                      {dose ? <p className="text-xs text-muted-foreground">{dose}</p> : null}
+                      {when ? <p className="text-xs text-muted-foreground">Next due {when}</p> : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {tempsCombined.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Recent temperatures
+            </p>
+            <ul className="space-y-2 max-h-48 overflow-y-auto">
+              {tempsCombined.slice(0, 12).map((t, idx) => {
+                const when = formatDistanceToNowStrict(new Date(t.at), { addSuffix: true });
+                return (
+                  <li
+                    key={`${t.at}-${idx}`}
+                    className="rounded-lg border border-border/60 px-3 py-2 text-sm flex justify-between gap-2"
+                  >
+                    <span className="font-medium tabular-nums">
+                      {t.value}°{t.unit.toUpperCase()}
+                    </span>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {t.source === "carer" ? "You · " : ""}
+                      {when}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {carerNotes.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Your medication / care notes
+            </p>
+            <ul className="space-y-2 max-h-40 overflow-y-auto">
+              {carerNotes.map((n, idx) => {
+                const at = typeof n.at === "string" ? n.at : "";
+                const when =
+                  at && !Number.isNaN(new Date(at).getTime())
+                    ? formatDistanceToNowStrict(new Date(at), { addSuffix: true })
+                    : "";
+                const med = typeof n.medication_name === "string" ? n.medication_name : null;
+                const text = typeof n.text === "string" ? n.text : "";
+                return (
+                  <li key={typeof n.id === "string" ? n.id : `note-${idx}`} className="rounded-lg border border-border/60 px-3 py-2 text-sm">
+                    {med ? <p className="font-medium">{med}</p> : null}
+                    <p className="text-muted-foreground whitespace-pre-wrap">{text}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{when}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2 border-t border-border/60 pt-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Log temperature</p>
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">Value</Label>
+                <Input
+                  inputMode="decimal"
+                  value={tempVal}
+                  onChange={(e) => setTempVal(e.target.value)}
+                  placeholder="e.g. 38.2"
+                  className="w-28"
+                  disabled={busy}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Unit</Label>
+                <Select value={tempUnit} onValueChange={(v) => setTempUnit(v as "c" | "f")} disabled={busy}>
+                  <SelectTrigger className="w-24 h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="c">°C</SelectItem>
+                    <SelectItem value="f">°F</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" size="sm" className="min-h-10" onClick={() => void submitTemp()} disabled={busy}>
+                Save reading
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Medication / care note</p>
+            <div className="space-y-2">
+              <Input
+                value={medName}
+                onChange={(e) => setMedName(e.target.value)}
+                placeholder="Medicine name (optional)"
+                disabled={busy}
+              />
+              <Input
+                value={medNote}
+                onChange={(e) => setMedNote(e.target.value)}
+                placeholder="What was given / observed?"
+                disabled={busy}
+              />
+              <Button type="button" size="sm" className="w-full min-h-10" onClick={() => void submitMedNote()} disabled={busy}>
+                Save note
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function supplyTone(row: CloudSupplyRow): "ok" | "low" | "critical" {
@@ -600,6 +897,14 @@ export default function CarerViewPage() {
       .map((x) => x.row);
   }, [appointmentRows]);
   const scenarioLines = scenarioBannerLines(scenarioRows);
+  const sickDayState = useMemo(() => sickDayScenarioState(scenarioRows), [scenarioRows]);
+
+  const refreshScenarios = useCallback(async () => {
+    if (!activeLink?.patientId) return;
+    const sc = await fetchScenariosForLinkedPatient(activeLink.patientId);
+    if (!sc.error && sc.data) setScenarioRows(sc.data);
+  }, [activeLink?.patientId]);
+
   if (!getSupabase()) {
     return (
       <>
@@ -870,6 +1175,14 @@ export default function CarerViewPage() {
                 </CardContent>
               </Card>
             )}
+
+            {(scopes.scenarios ?? false) && sickDayState?.sick_day_active === true && activeLink?.patientId ? (
+              <SickDaySupporterCareCard
+                patientId={activeLink.patientId}
+                sickState={sickDayState}
+                onUpdated={refreshScenarios}
+              />
+            ) : null}
 
             {(scopes.supplies ?? false) && (
               <Card className="border-border/60 shadow-sm" data-testid="carer-view-supplies">

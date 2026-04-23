@@ -20,6 +20,10 @@ export type ProfileRow = {
   emergency_notes?: string | null;
   /** ISO date YYYY-MM-DD; optional community-only. */
   diabetes_onset_date?: string | null;
+  /** pen | pump; owner sync from app (not exposed in batch community profile selects). */
+  insulin_delivery_method?: string | null;
+  /** Total daily insulin (units); optional owner sync from app settings. */
+  tdd?: number | null;
 };
 
 /** Safe fields for community public profile pages (never include emergency_*). */
@@ -30,7 +34,24 @@ export type PublicCommunityProfile = Pick<
 
 export const profileQueryKey = (userId: string | undefined) => ["profile", userId] as const;
 
+/** Batch / community fetches: exclude owner-only clinical columns from the select list. */
+const PROFILE_LIST_SELECT =
+  "id, full_name, avatar_url, bio, public_handle, is_public, onboarding_complete, emergency_contact_name, emergency_contact_phone, emergency_notes, diabetes_onset_date";
+
 function rowFromData(data: Record<string, unknown>): ProfileRow {
+  const rawTdd = data.tdd;
+  let tdd: number | null | undefined;
+  if (rawTdd === null) tdd = null;
+  else if (typeof rawTdd === "number" && Number.isFinite(rawTdd)) tdd = rawTdd;
+  else tdd = undefined;
+
+  const idm = data.insulin_delivery_method;
+  let insulin_delivery_method: string | null | undefined;
+  if (idm === "pen" || idm === "pump") insulin_delivery_method = idm;
+  else if (idm === null) insulin_delivery_method = null;
+  else if (idm === undefined) insulin_delivery_method = undefined;
+  else insulin_delivery_method = null;
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -44,6 +65,8 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     emergency_contact_phone: (data.emergency_contact_phone as string | null) ?? null,
     emergency_notes: (data.emergency_notes as string | null) ?? null,
     diabetes_onset_date: (data.diabetes_onset_date as string | null) ?? null,
+    insulin_delivery_method,
+    tdd,
   };
 }
 
@@ -76,7 +99,7 @@ export async function getProfilesByIds(userIds: string[]): Promise<Map<string, P
   if (unique.length === 0) return map;
 
   try {
-    const { data, error } = await supabase.from("profiles").select("*").in("id", unique);
+    const { data, error } = await supabase.from("profiles").select(PROFILE_LIST_SELECT).in("id", unique);
     if (error || !data) return map;
     for (const row of data) {
       map.set(String((row as Record<string, unknown>).id), rowFromData(row as Record<string, unknown>));
@@ -232,7 +255,14 @@ export type ProfileUpdatePayload = {
 } & Partial<
   Pick<
     ProfileRow,
-    "full_name" | "avatar_url" | "bio" | "is_public" | "public_handle" | "diabetes_onset_date"
+    | "full_name"
+    | "avatar_url"
+    | "bio"
+    | "is_public"
+    | "public_handle"
+    | "diabetes_onset_date"
+    | "insulin_delivery_method"
+    | "tdd"
   >
 >;
 
@@ -242,7 +272,17 @@ export async function updateProfile(
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
-  const { id, full_name, avatar_url, bio, is_public, public_handle, diabetes_onset_date } = payload;
+  const {
+    id,
+    full_name,
+    avatar_url,
+    bio,
+    is_public,
+    public_handle,
+    diabetes_onset_date,
+    insulin_delivery_method,
+    tdd,
+  } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
   if (avatar_url !== undefined) update.avatar_url = avatar_url ?? null;
@@ -257,6 +297,20 @@ export async function updateProfile(
   }
   if (diabetes_onset_date !== undefined) {
     update.diabetes_onset_date = diabetes_onset_date?.trim() ? diabetes_onset_date.trim() : null;
+  }
+  if (insulin_delivery_method !== undefined) {
+    if (insulin_delivery_method === null) {
+      update.insulin_delivery_method = null;
+    } else if (insulin_delivery_method === "pen" || insulin_delivery_method === "pump") {
+      update.insulin_delivery_method = insulin_delivery_method;
+    } else {
+      update.insulin_delivery_method = null;
+    }
+  }
+  if (tdd !== undefined) {
+    if (tdd === null) update.tdd = null;
+    else if (typeof tdd === "number" && Number.isFinite(tdd) && tdd > 0) update.tdd = tdd;
+    else update.tdd = null;
   }
 
   try {

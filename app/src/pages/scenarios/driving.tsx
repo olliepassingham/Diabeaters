@@ -286,7 +286,7 @@ export default function DrivingScenarioPage() {
           />
         </div>
 
-        {profile.insulinDeliveryMethod === "pump" && (
+        {profile?.insulinDeliveryMethod === "pump" && (
           <Alert data-testid="alert-driving-pump">
             <AlertTitle className="text-sm">Pump</AlertTitle>
             <AlertDescription className="text-sm">

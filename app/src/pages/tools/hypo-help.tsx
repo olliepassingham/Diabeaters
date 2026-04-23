@@ -101,7 +101,7 @@ export default function HypoHelpPage() {
           <CardDescription>How much glucose you may need from your current reading to your target</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {profile.insulinDeliveryMethod === "pump" && (
+          {profile?.insulinDeliveryMethod === "pump" && (
             <Alert data-testid="alert-hypo-pump-note">
               <AlertDescription className="text-sm">
                 On a pump: an <strong>extended bolus</strong> or recent correction may still be bringing your BG down.

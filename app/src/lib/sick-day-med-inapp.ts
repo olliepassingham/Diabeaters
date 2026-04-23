@@ -9,6 +9,8 @@ export async function createSickDayMedInAppNotification(params: {
   reminderId: string;
   dueAtIso: string;
   name: string;
+  /** `due_time` = fired when a dose is due; default `event` = user actions (set/snooze/taken). */
+  subtype?: "event" | "due_time";
 }): Promise<{ ok: boolean; error?: string }> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, error: "supabase_not_configured" };
@@ -20,12 +22,15 @@ export async function createSickDayMedInAppNotification(params: {
   const dueAt = new Date(params.dueAtIso);
   const dueLabel = Number.isNaN(dueAt.getTime()) ? null : formatDistanceToNowStrict(dueAt, { addSuffix: true });
 
+  const subtype = params.subtype ?? "event";
+
   const { error } = await supabase.from("notifications").insert({
     user_id: uid,
     title: params.title,
     body: dueLabel ? `${params.body} (${dueLabel})` : params.body,
     data: {
       kind: "sick_day_med_reminder",
+      subtype,
       reminder_id: params.reminderId,
       name: params.name,
       due_at: params.dueAtIso,

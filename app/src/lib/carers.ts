@@ -765,4 +765,128 @@ export async function fetchPatientProfileForCarer(
   };
 }
 
+function readScenarioStateField(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+}
+
+function isoTimeMs(v: unknown): number {
+  if (typeof v !== "string") return 0;
+  const t = new Date(v).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+export type CarerSickDayTempEntry = {
+  id: string;
+  value: number;
+  unit: "c" | "f";
+  at: string;
+  logged_by: "carer";
+};
+
+export type CarerSickDayMedNote = {
+  id: string;
+  at: string;
+  text: string;
+  medication_name?: string | null;
+  logged_by: "carer";
+};
+
+/** Carer: append a temperature reading to the patient sick_day scenario (RLS: scenarios_linked_carer_update). */
+export async function carerAppendSickDayTemperature(
+  patientId: string,
+  params: { value: number; unit: "c" | "f" },
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const { data: row, error: fe } = await supabase
+    .from("scenarios")
+    .select("state")
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day")
+    .maybeSingle();
+
+  if (fe) return { error: new Error(fe.message) };
+  if (!row) {
+    return {
+      error: new Error(
+        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+      ),
+    };
+  }
+
+  const prev = readScenarioStateField((row as Record<string, unknown>).state);
+  const entry: CarerSickDayTempEntry = {
+    id: crypto.randomUUID(),
+    value: params.value,
+    unit: params.unit,
+    at: new Date().toISOString(),
+    logged_by: "carer",
+  };
+  const prevCarer = Array.isArray(prev.carer_temp_recent) ? (prev.carer_temp_recent as unknown[]) : [];
+  const carer_temp_recent = [entry, ...prevCarer].slice(0, 15);
+
+  const tNew = isoTimeMs(entry.at);
+  const tOldLatest = isoTimeMs((prev.temp_latest as Record<string, unknown> | undefined)?.at);
+  const temp_latest =
+    tNew >= tOldLatest ? { value: entry.value, unit: entry.unit, at: entry.at } : prev.temp_latest;
+
+  const nextState = { ...prev, carer_temp_recent, temp_latest };
+  const { error: ue } = await supabase
+    .from("scenarios")
+    .update({ state: nextState, updated_at: new Date().toISOString() })
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day");
+
+  return { error: ue ? new Error(ue.message) : null };
+}
+
+/** Carer: append a medication / care note to sick_day scenario state. */
+export async function carerAppendSickDayMedNote(
+  patientId: string,
+  params: { text: string; medicationName?: string },
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const text = params.text.trim();
+  if (!text) return { error: new Error("Please enter a note.") };
+
+  const { data: row, error: fe } = await supabase
+    .from("scenarios")
+    .select("state")
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day")
+    .maybeSingle();
+
+  if (fe) return { error: new Error(fe.message) };
+  if (!row) {
+    return {
+      error: new Error(
+        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+      ),
+    };
+  }
+
+  const prev = readScenarioStateField((row as Record<string, unknown>).state);
+  const entry: CarerSickDayMedNote = {
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    text,
+    medication_name: params.medicationName?.trim() || null,
+    logged_by: "carer",
+  };
+  const prevNotes = Array.isArray(prev.carer_med_notes) ? (prev.carer_med_notes as unknown[]) : [];
+  const carer_med_notes = [entry, ...prevNotes].slice(0, 25);
+
+  const nextState = { ...prev, carer_med_notes };
+  const { error: ue } = await supabase
+    .from("scenarios")
+    .update({ state: nextState, updated_at: new Date().toISOString() })
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day");
+
+  return { error: ue ? new Error(ue.message) : null };
+}
+
 export { useLinkedPatient } from "../hooks/use-linked-patient";

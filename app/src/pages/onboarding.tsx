@@ -33,6 +33,7 @@ import { Disclaimer } from "@/components/disclaimer";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile } from "@/lib/profile";
+import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { PageShell } from "@/components/layout/page-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getOnboardingSecondaryCta, getPostOnboardingPath } from "@/lib/onboarding-routes";
@@ -205,6 +206,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           description: error.message,
           variant: "destructive",
         });
+      } else {
+        const syncRes = await syncClinicalPrefsToCloud(user.id);
+        if (syncRes.error) {
+          toast({
+            title: "Profile synced; clinical prefs pending",
+            description: syncRes.error.message,
+            variant: "destructive",
+          });
+        }
       }
     }
     toast({

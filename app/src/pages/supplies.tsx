@@ -22,6 +22,12 @@ import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { ToastAction } from "@/components/ui/toast";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
+import {
+  travelPlanStockBufferMultiplier,
+  travelWeatherPlanSliceFromStoredPlan,
+  travelWeatherSupplyShortfallMultiplier,
+  tripCalendarDaysBetween,
+} from "@/lib/travel-supply-policy";
 
 const typeIcons: Record<string, any> = {
   needle: Syringe,
@@ -562,12 +568,21 @@ function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; sc
   if (!scenarioState.travelModeActive) return null;
 
   const settings = storage.getSettings();
-  const profile = storage.getProfile();
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   const travelStart = scenarioState.travelStartDate ? new Date(scenarioState.travelStartDate) : new Date();
   const travelEnd = scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate) : addDays(new Date(), 7);
-  const tripDuration = Math.max(1, differenceInDays(travelEnd, travelStart));
+  const tripDuration =
+    scenarioState.travelStartDate && scenarioState.travelEndDate
+      ? tripCalendarDaysBetween(scenarioState.travelStartDate, scenarioState.travelEndDate)
+      : Math.max(1, differenceInDays(travelEnd, travelStart));
+  const savedTravelPlan = storage.getTravelPlan();
+  const stockBuffer = travelPlanStockBufferMultiplier(savedTravelPlan);
+  const weatherSlice = travelWeatherPlanSliceFromStoredPlan(savedTravelPlan);
+  const intervalCfg = {
+    cgmDays: settings.cgmDays || 14,
+    siteChangeDays: settings.siteChangeDays || 3,
+    reservoirChangeDays: settings.reservoirChangeDays || 3,
+  };
 
   const getSupplyNeedsForTrip = () => {
     const needs: Array<{ supply: Supply; currentDaysLeft: number; daysNeededForTrip: number; shortfall: number; extraNeeded: number }> = [];
@@ -578,22 +593,19 @@ function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; sc
       
       let dailyRate: number;
       if (supply.type === "cgm") {
-        const cgmDays = settings.cgmDays || 14;
-        dailyRate = 1 / cgmDays;
+        dailyRate = 1 / intervalCfg.cgmDays;
       } else if (supply.type === "infusion_set") {
-        const siteChangeDays = settings.siteChangeDays || 3;
-        dailyRate = 1 / siteChangeDays;
+        dailyRate = 1 / intervalCfg.siteChangeDays;
       } else if (supply.type === "reservoir") {
-        const reservoirChangeDays = settings.reservoirChangeDays || 3;
-        dailyRate = 1 / reservoirChangeDays;
+        dailyRate = 1 / intervalCfg.reservoirChangeDays;
       } else {
         dailyRate = supply.dailyUsage;
       }
       
       if (dailyRate <= 0) continue;
-      
-      const travelBuffer = 2;
-      const totalNeededForTrip = Math.ceil(dailyRate * tripDuration * travelBuffer);
+
+      const weatherMult = travelWeatherSupplyShortfallMultiplier(supply.type, weatherSlice, tripDuration, intervalCfg);
+      const totalNeededForTrip = Math.ceil(dailyRate * tripDuration * stockBuffer * weatherMult);
       const currentStock = Math.floor(storage.getAdjustedQuantity(supply));
       const shortfall = totalNeededForTrip - currentStock;
 
@@ -626,7 +638,7 @@ function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; sc
           </Badge>
         </div>
         <CardDescription>
-          How your trip affects supply levels (includes 2x NHS travel buffer)
+          Uses trip dates, your saved travel buffer ({stockBuffer.toFixed(1)}×), and climate from Travel when saved (same rules as travel supply extras).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -639,7 +651,7 @@ function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; sc
                   You may not have enough for the trip
                 </p>
                 <p className="text-xs text-red-700 dark:text-red-400 mt-0.5">
-                  With the recommended 2x travel buffer, you may need more of these:
+                  With your travel-plan buffer ({stockBuffer.toFixed(1)}×) and any climate adjustment, you may need more of these:
                 </p>
               </div>
             </div>

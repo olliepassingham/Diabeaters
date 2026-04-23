@@ -32,7 +32,7 @@ export default function PumpFailurePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Pump or infusion failure"
-        description="Emergency-style steps when delivery stops unexpectedly. This is educational — always follow your clinic&apos;s written backup plan."
+        description="Emergency-style steps when delivery stops unexpectedly. This is educational — always follow your clinic's written backup plan."
       />
 
       <Alert variant="destructive" className="border-destructive/50">

@@ -1034,7 +1034,7 @@ export function ExercisePlanner() {
                   <p className="text-sm text-foreground pt-2 pb-1">{exerciseResult.pre.snackIdeas.join(", ")}</p>
                 </details>
 
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
+                {profile?.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.pre.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
@@ -1077,7 +1077,7 @@ export function ExercisePlanner() {
                   </div>
                 )}
 
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.during.length > 0 && (
+                {profile?.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.during.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
@@ -1110,7 +1110,7 @@ export function ExercisePlanner() {
                   <p className="text-sm text-foreground pt-2 pb-1">{exerciseResult.post.snackIdeas.join(", ")}</p>
                 </details>
 
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
+                {profile?.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.post.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
@@ -1153,7 +1153,7 @@ export function ExercisePlanner() {
                   </p>
                 </details>
 
-                {profile.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.recovery.length > 0 && (
+                {profile?.insulinDeliveryMethod === "pump" && exerciseResult.pumpTips.recovery.length > 0 && (
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">

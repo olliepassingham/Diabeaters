@@ -43,6 +43,7 @@ import appPackage from "../../../package.json";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
 import { profileQueryKey, updateProfile, useProfile } from "@/lib/profile";
+import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
@@ -746,6 +747,18 @@ export default function Settings() {
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
 
+    if (user?.id) {
+      const { error } = await syncClinicalPrefsToCloud(user.id);
+      if (error) {
+        toast({
+          title: "Saved on this device",
+          description: `Could not sync delivery method to your account: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     toast({ title: "Saved", description: "Your personal settings have been updated." });
   };
 
@@ -781,7 +794,7 @@ export default function Settings() {
     }
   };
 
-  const handleSaveInsulin = () => {
+  const handleSaveInsulin = async () => {
     const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
     const bGpu = parseInputToGramsPerUnit(breakfastRatio, ratioFormat, cpSize);
     const lGpu = parseInputToGramsPerUnit(lunchRatio, ratioFormat, cpSize);
@@ -807,6 +820,17 @@ export default function Settings() {
       const updatedProfile = { ...profile, ratioFormat, carbPortionSize: cpSize && cpSize > 0 ? cpSize : undefined };
       storage.saveProfile(updatedProfile);
       setProfile(updatedProfile);
+    }
+    if (user?.id) {
+      const { error } = await syncClinicalPrefsToCloud(user.id);
+      if (error) {
+        toast({
+          title: "Insulin settings saved on this device",
+          description: `Could not sync TDD to your account: ${error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
     }
     toast({ title: "Insulin settings saved", description: "Your insulin settings have been updated." });
   };

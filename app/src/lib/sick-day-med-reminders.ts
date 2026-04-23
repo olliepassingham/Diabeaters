@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
-import type { SickDayMedicationLogEntry } from "@/lib/storage";
+import { storage, type SickDayMedicationLogEntry } from "@/lib/storage";
 
 function notificationIdForReminder(id: string): number {
   const hex = id.replace(/-/g, "").slice(0, 8);
@@ -63,6 +63,17 @@ export async function cancelSickDayMedReminder(entryId: string): Promise<void> {
     await LocalNotifications.cancel({ notifications: [{ id }] });
   } catch {
     // ignore
+  }
+}
+
+/** Re-schedule OS local notifications for all active sick-day med reminders (e.g. after app resume). */
+export async function rescheduleAllSickDayNativeMedReminders(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  const sc = storage.getScenarioState();
+  if (!sc.sickDayActive) return;
+  const meds = storage.getSickDayMedicationLog().filter((e) => !e.dismissedAtIso);
+  for (const e of meds) {
+    await scheduleSickDayMedReminder(e);
   }
 }
 

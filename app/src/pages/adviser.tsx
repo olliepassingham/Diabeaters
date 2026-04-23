@@ -155,7 +155,7 @@ export default function Adviser() {
   } | null>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
-  const isPumpUser = profile.insulinDeliveryMethod === "pump";
+  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
 
   useEffect(() => {
     setSettings(storage.getSettings());

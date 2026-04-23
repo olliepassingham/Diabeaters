@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { upsertScenario } from "@/lib/scenarios-supabase";
+import { upsertScenario, fetchScenarioStateForUser } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -546,6 +546,69 @@ export default function SickDay() {
     return map[repeatKey] ?? null;
   };
 
+  const buildLocalSickDayScenarioState = useCallback((): Record<string, unknown> => {
+    const sc = storage.getScenarioState();
+    const journal = storage.getSickDayJournal();
+    const lastCheck = journal[0]?.timestamp ?? null;
+    const meds = storage.getSickDayMedicationLog();
+    const tempsLog = storage.getSickDayTemperatureLog();
+    const activeMeds = meds
+      .filter((e) => !e.dismissedAtIso)
+      .sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime());
+    const upcoming = activeMeds[0];
+    const temps = tempsLog.slice(0, 10).map((e) => ({
+      id: e.id,
+      value: e.value,
+      unit: e.unit,
+      at: e.loggedAtIso,
+    }));
+    return {
+      sick_day_active: !!sc.sickDayActive,
+      severity: sc.sickDaySeverity ?? severity ?? null,
+      started_at: sc.sickDayActivatedAt ?? sickDayActivatedAt ?? null,
+      ended_at: null,
+      last_check_at: lastCheck,
+      meds_next_due: upcoming
+        ? {
+            name: upcoming.name,
+            due_at: upcoming.nextDueAtIso,
+            repeat_mins: upcoming.repeatEveryMinutes,
+          }
+        : null,
+      meds_active: activeMeds.slice(0, 10).map((e) => ({
+        id: e.id,
+        name: e.name,
+        due_at: e.nextDueAtIso,
+        repeat_mins: e.repeatEveryMinutes,
+        dose_label: e.doseLabel ?? null,
+      })),
+      temp_latest: temps[0] ? { value: temps[0].value, unit: temps[0].unit, at: temps[0].at } : null,
+      temp_recent: temps,
+    };
+  }, [severity, sickDayActivatedAt]);
+
+  const pushSickDayScenario = useCallback(
+    async (overrides: Record<string, unknown> = {}, labelOverride?: string) => {
+      const remote = await fetchScenarioStateForUser("sick_day");
+      const preservedCarerTemps = Array.isArray(remote?.carer_temp_recent) ? remote!.carer_temp_recent : [];
+      const preservedCarerNotes = Array.isArray(remote?.carer_med_notes) ? remote!.carer_med_notes : [];
+      const off = overrides.sick_day_active === false;
+      const localBase = off ? {} : buildLocalSickDayScenarioState();
+      await upsertScenario({
+        scenarioKey: "sick_day",
+        title: "Sick day",
+        label: labelOverride ?? (off ? "Sick day mode (off)" : `Sick day mode${severity ? ` (${severity})` : ""}`),
+        state: {
+          ...localBase,
+          ...overrides,
+          carer_temp_recent: preservedCarerTemps,
+          carer_med_notes: preservedCarerNotes,
+        },
+      });
+    },
+    [buildLocalSickDayScenarioState, severity],
+  );
+
   const handleAddMedicationReminder = () => {
     const name =
       medPreset === "custom"
@@ -598,30 +661,15 @@ export default function SickDay() {
         dueAtIso: entry.nextDueAtIso,
         name: entry.name,
       });
-      void upsertScenario({
-        scenarioKey: "sick_day",
-        title: "Sick day",
-        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-        state: {
-          sick_day_active: isSickDayActive,
-          severity,
-          started_at: sickDayActivatedAt ?? null,
-          ended_at: null,
-          last_check_at: lastCheckAtIso,
-          inputs_summary: results
-            ? {
-                bg_level: bgLevel ? parseFloat(bgLevel) : null,
-                bg_units: bgUnits,
-                ketone_level: ketoneLevel || null,
-                correction_dose_units: results.correctionDose,
-              }
-            : null,
-          meds_next_due: {
-            name: entry.name,
-            due_at: entry.nextDueAtIso,
-            repeat_mins: entry.repeatEveryMinutes,
-          },
-        },
+      await pushSickDayScenario({
+        inputs_summary: results
+          ? {
+              bg_level: bgLevel ? parseFloat(bgLevel) : null,
+              bg_units: bgUnits,
+              ketone_level: ketoneLevel || null,
+              correction_dose_units: results.correctionDose,
+            }
+          : null,
       });
     })();
     toast({
@@ -643,28 +691,16 @@ export default function SickDay() {
         dueAtIso: new Date().toISOString(),
         name: "Medication",
       });
-      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
-      void upsertScenario({
-        scenarioKey: "sick_day",
-        title: "Sick day",
-        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-        state: {
-          sick_day_active: isSickDayActive,
-          severity,
-          started_at: sickDayActivatedAt ?? null,
-          ended_at: null,
-          last_check_at: lastCheckAtIso,
-          meds_next_due: upcoming
-            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
-            : null,
-        },
-      });
+      await pushSickDayScenario({});
     })();
   };
 
   const handleSnoozeMedicationReminder = (id: string, minutes: number) => {
     const now = Date.now();
-    storage.updateSickDayMedicationEntry(id, { nextDueAtIso: new Date(now + minutes * 60_000).toISOString() });
+    storage.updateSickDayMedicationEntry(id, {
+      nextDueAtIso: new Date(now + minutes * 60_000).toISOString(),
+      lastInAppNotifiedDueAtIso: undefined,
+    });
     const next = storage.getSickDayMedicationLog();
     setMedEntries(next);
     const updated = next.find((e) => e.id === id);
@@ -677,22 +713,7 @@ export default function SickDay() {
         dueAtIso: updated.nextDueAtIso,
         name: updated.name,
       });
-      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
-      void upsertScenario({
-        scenarioKey: "sick_day",
-        title: "Sick day",
-        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-        state: {
-          sick_day_active: isSickDayActive,
-          severity,
-          started_at: sickDayActivatedAt ?? null,
-          ended_at: null,
-          last_check_at: lastCheckAtIso,
-          meds_next_due: upcoming
-            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
-            : null,
-        },
-      });
+      void pushSickDayScenario({});
     }
   };
 
@@ -701,7 +722,11 @@ export default function SickDay() {
     if (!entry) return;
     const takenAtIso = new Date().toISOString();
     const nextDue = new Date(Date.now() + entry.repeatEveryMinutes * 60_000).toISOString();
-    storage.updateSickDayMedicationEntry(id, { takenAtIso, nextDueAtIso: nextDue });
+    storage.updateSickDayMedicationEntry(id, {
+      takenAtIso,
+      nextDueAtIso: nextDue,
+      lastInAppNotifiedDueAtIso: undefined,
+    });
     const next = storage.getSickDayMedicationLog();
     setMedEntries(next);
     const updated = next.find((e) => e.id === id);
@@ -714,22 +739,7 @@ export default function SickDay() {
         dueAtIso: updated.nextDueAtIso,
         name: updated.name,
       });
-      const upcoming = next.filter((e) => !e.dismissedAtIso).sort((a, b) => new Date(a.nextDueAtIso).getTime() - new Date(b.nextDueAtIso).getTime())[0];
-      void upsertScenario({
-        scenarioKey: "sick_day",
-        title: "Sick day",
-        label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-        state: {
-          sick_day_active: isSickDayActive,
-          severity,
-          started_at: sickDayActivatedAt ?? null,
-          ended_at: null,
-          last_check_at: lastCheckAtIso,
-          meds_next_due: upcoming
-            ? { name: upcoming.name, due_at: upcoming.nextDueAtIso, repeat_mins: upcoming.repeatEveryMinutes }
-            : null,
-        },
-      });
+      void pushSickDayScenario({});
     }
   };
 
@@ -756,46 +766,32 @@ export default function SickDay() {
       title: "Temperature logged",
       description: `${entry.value}°${entry.unit.toUpperCase()} recorded ${new Date(entry.loggedAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}.`,
     });
-    void upsertScenario({
-      scenarioKey: "sick_day",
-      title: "Sick day",
-      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-      state: {
-        sick_day_active: isSickDayActive,
-        severity,
-        started_at: sickDayActivatedAt ?? null,
-        ended_at: null,
-        last_check_at: lastCheckAtIso,
-        temp_latest: { value: entry.value, unit: entry.unit, at: entry.loggedAtIso },
-      },
-    });
+    void pushSickDayScenario({});
   };
 
   const handleDeleteTemperature = (id: string) => {
     storage.deleteSickDayTemperatureEntry(id);
     setTempEntries(storage.getSickDayTemperatureLog());
     toast({ title: "Temperature deleted" });
+    void pushSickDayScenario({});
   };
 
   const handleActivateSickDay = () => {
     if (!severity) return;
     storage.activateSickDay(severity);
     setIsSickDayActive(true);
-    const startedAt = new Date().toISOString();
-    void upsertScenario({
-      scenarioKey: "sick_day",
-      title: "Sick day",
-      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-      state: {
-        sick_day_active: true,
-        severity,
-        started_at: startedAt,
-        ended_at: null,
-        inputs_summary: {
-          bg_level: bgLevel ? Number(bgLevel) : null,
-          bg_units: bgUnits,
-          ketone_level: ketoneLevel || null,
-        },
+    const scAfter = storage.getScenarioState();
+    const startedAt = scAfter.sickDayActivatedAt || new Date().toISOString();
+    setSickDayActivatedAt(scAfter.sickDayActivatedAt);
+    void pushSickDayScenario({
+      sick_day_active: true,
+      severity,
+      started_at: startedAt,
+      ended_at: null,
+      inputs_summary: {
+        bg_level: bgLevel ? Number(bgLevel) : null,
+        bg_units: bgUnits,
+        ketone_level: ketoneLevel || null,
       },
     });
     toast({
@@ -819,6 +815,9 @@ export default function SickDay() {
   };
 
   const handleDeactivateSickDay = () => {
+    for (const m of storage.getSickDayMedicationLog()) {
+      void cancelSickDayMedReminder(m.id);
+    }
     storage.deactivateSickDay();
     setIsSickDayActive(false);
     localStorage.removeItem(SICK_DAY_STORAGE_KEY);
@@ -827,18 +826,20 @@ export default function SickDay() {
     setKetoneLevel("");
     const endedAt = new Date().toISOString();
     const startedAt = sickDayActivatedAt || null;
-    void upsertScenario({
-      scenarioKey: "sick_day",
-      title: "Sick day",
-      label: "Sick day mode (off)",
-      state: {
+    void pushSickDayScenario(
+      {
         sick_day_active: false,
         started_at: startedAt,
         ended_at: endedAt,
         inputs_summary: null,
         last_check_at: lastCheckAtIso,
+        meds_next_due: null,
+        meds_active: [],
+        temp_recent: [],
+        temp_latest: null,
       },
-    });
+      "Sick day mode (off)",
+    );
     toast({
       title: "Sick Day Mode Deactivated",
       description: "Glad you're feeling better! Status removed from dashboard.",
@@ -891,22 +892,12 @@ export default function SickDay() {
     
     setResults(recommendations);
     saveSession(recommendations);
-    void upsertScenario({
-      scenarioKey: "sick_day",
-      title: "Sick day",
-      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-      state: {
-        sick_day_active: isSickDayActive,
-        severity,
-        started_at: sickDayActivatedAt ?? null,
-        ended_at: null,
-        inputs_summary: {
-          bg_level: bgNum,
-          bg_units: bgUnits,
-          ketone_level: ketoneLevel,
-          correction_dose_units: recommendations.correctionDose,
-        },
-        last_check_at: lastCheckAtIso,
+    void pushSickDayScenario({
+      inputs_summary: {
+        bg_level: bgNum,
+        bg_units: bgUnits,
+        ketone_level: ketoneLevel,
+        correction_dose_units: recommendations.correctionDose,
       },
     });
 
@@ -1004,23 +995,14 @@ export default function SickDay() {
     };
     storage.addSickDayJournalEntry(entry);
     setJournalEntries(storage.getSickDayJournal());
-    void upsertScenario({
-      scenarioKey: "sick_day",
-      title: "Sick day",
-      label: `Sick day mode${severity ? ` (${severity})` : ""}`,
-      state: {
-        sick_day_active: isSickDayActive,
-        severity,
-        started_at: sickDayActivatedAt ?? null,
-        ended_at: null,
-        inputs_summary: {
-          bg: bgNum,
-          bg_units: bgUnits,
-          ketone_level: journalKetone,
-          correction_dose_units: journalCorrection ? parseFloat(journalCorrection) : null,
-        },
-        last_check_at: entry.timestamp,
+    void pushSickDayScenario({
+      inputs_summary: {
+        bg: bgNum,
+        bg_units: bgUnits,
+        ketone_level: journalKetone,
+        correction_dose_units: journalCorrection ? parseFloat(journalCorrection) : null,
       },
+      last_check_at: entry.timestamp,
     });
     setJournalBg("");
     setJournalKetone("");
