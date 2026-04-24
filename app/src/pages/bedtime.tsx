@@ -184,7 +184,7 @@ export default function Bedtime() {
 
     const bedtimeReduction = 0.5;
     const effectiveDose = fullDose * bedtimeReduction * (1 - iobReduction);
-    const suggestedDose = Math.round(effectiveDose * 2) / 2;
+    const suggestedDose = Math.round(effectiveDose);
 
     if (suggestedDose <= 0) return null;
 

@@ -32,6 +32,7 @@ import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Bell, Check, Trash2 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
+import { FeedLoadingSkeleton } from "@/components/empty-state";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -188,7 +189,7 @@ export default function NotificationsPage() {
               </Button>
             </div>
           ) : loading ? (
-            <p className="text-sm text-muted-foreground py-4">Loading…</p>
+            <FeedLoadingSkeleton rows={4} />
           ) : fetchError ? (
             <div className="py-8 text-center text-muted-foreground">
               <p className="text-sm text-destructive">Could not load notifications</p>

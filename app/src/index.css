@@ -87,6 +87,9 @@
     color: rgb(var(--color-text) / 0.8);
     box-shadow: var(--shadow-2xs);
     max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .dark .chip {

@@ -15,9 +15,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
 import { AppTopBar } from "@/components/app-top-bar";
 import { OfflineBanner } from "@/components/offline-banner";
-import { SickDayBanner } from "@/components/sick-day-banner";
-import { TravelBanner } from "@/components/travel-banner";
-import { ActiveExerciseBanner } from "@/components/active-exercise-banner";
+import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
 
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -792,13 +790,7 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
-      {!isCarerMode && (
-        <>
-          <SickDayBanner />
-          <TravelBanner />
-        </>
-      )}
-      {!isCarerMode ? <ActiveExerciseBanner /> : null}
+      {!isCarerMode ? <AppStatusStrip /> : null}
       <main
         className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{

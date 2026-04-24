@@ -139,8 +139,8 @@ function getAdviserResult(
   };
 }
 
-function roundToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
+function roundInsulinUnits(value: number): number {
+  return Math.round(value);
 }
 
 function mealLabel(key: MealKey): string {
@@ -336,7 +336,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const previewCarbsNum = parseFloat(previewCarbs);
   const previewExact =
     Number.isFinite(previewCarbsNum) && previewCarbsNum > 0 ? calculateDoseFromCarbs(previewCarbsNum, previewRatioStr) : 0;
-  const previewRounded = previewExact > 0 ? roundToHalf(previewExact) : 0;
+  const previewRounded = previewExact > 0 ? roundInsulinUnits(previewExact) : 0;
   const previewHasRatio = !!previewRatioStr && parseRatioToGramsPerUnit(previewRatioStr);
 
   const stepLabels = ["Select meal", "Post-meal pattern", "When does it happen?", "How often?", "Assessment"];
@@ -810,7 +810,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                             <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
                             <span className="font-semibold tabular-nums text-lg">{previewRounded} units</span>
                             {Math.abs(previewRounded - previewExact) >= 0.05 && (
-                              <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to 0.5u)</span>
+                              <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to whole units)</span>
                             )}
                           </p>
                           <p className="text-xs text-muted-foreground">

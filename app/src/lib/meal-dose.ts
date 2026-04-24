@@ -1,16 +1,17 @@
 import type { UserSettings } from "@/lib/storage";
 import { calculateDoseFromCarbs } from "@/lib/ratio-utils";
 
-export function roundToHalf(value: number): number {
-  return Math.round(value * 2) / 2;
+/** Round insulin units to whole numbers (pen-friendly). */
+export function roundInsulinUnits(value: number): number {
+  return Math.round(value);
 }
 
 export function getRoundingAdvice(exactDose: number, roundedDose: number, bgUnits: string): string {
   const diff = exactDose - roundedDose;
   if (Math.abs(diff) < 0.05) return "";
 
-  const roundedDown = Math.floor(exactDose * 2) / 2;
-  const roundedUp = Math.ceil(exactDose * 2) / 2;
+  const roundedDown = Math.floor(exactDose);
+  const roundedUp = Math.ceil(exactDose);
 
   if (roundedDown === roundedUp) return "";
 
@@ -70,7 +71,7 @@ export function calculateMealDose(
   }
 
   if (!exerciseContext) {
-    const rounded = roundToHalf(exactBaseUnits);
+    const rounded = roundInsulinUnits(exactBaseUnits);
     return {
       carbs,
       mealType,
@@ -90,7 +91,7 @@ export function calculateMealDose(
       exactDose: 0,
       roundingAdvice: "",
       exerciseContext,
-      standardDose: roundToHalf(exactBaseUnits),
+      standardDose: roundInsulinUnits(exactBaseUnits),
       tips: [
         "Carbs during exercise are usually used immediately by working muscles",
         "For sessions under 90 min: skip insulin for exercise snacks/gels",
@@ -114,8 +115,8 @@ export function calculateMealDose(
           : 15;
 
   const adjustedExact = exactBaseUnits * (1 - reductionPercent / 100);
-  const rounded = roundToHalf(adjustedExact);
-  const stdDose = roundToHalf(exactBaseUnits);
+  const rounded = roundInsulinUnits(adjustedExact);
+  const stdDose = roundInsulinUnits(exactBaseUnits);
 
   const tips =
     exerciseContext === "before"

@@ -24,6 +24,7 @@ import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-out
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -174,9 +175,9 @@ function calculateSickDayRecommendations(
     correctionDose = maxSafeCorrection;
   }
   
-  // Round to 0.5 unit increments for practical dosing
-  correctionDose = Math.round(correctionDose * 2) / 2;
-  baseCorrectionDose = Math.round(baseCorrectionDose * 10) / 10;
+  // Round to whole units for pen dosing.
+  correctionDose = Math.round(correctionDose);
+  baseCorrectionDose = Math.round(baseCorrectionDose);
 
   // Build explanation
   const correctionExplanation = baseCorrectionDose > 0 
@@ -380,6 +381,9 @@ export default function SickDay() {
   const [journalEntries, setJournalEntries] = useState<SickDayJournalEntry[]>([]);
   const [medEntries, setMedEntries] = useState<SickDayMedicationLogEntry[]>([]);
   const [tempEntries, setTempEntries] = useState<SickDayTemperatureEntry[]>([]);
+  const [medTakenAtOpen, setMedTakenAtOpen] = useState(false);
+  const [medTakenAtId, setMedTakenAtId] = useState<string | null>(null);
+  const [medTakenAtLocal, setMedTakenAtLocal] = useState("");
   const [tempValue, setTempValue] = useState("");
   const [tempUnit, setTempUnit] = useState<"c" | "f">("c");
   const [medPreset, setMedPreset] = useState<"paracetamol" | "ibuprofen" | "antibiotic" | "custom">("paracetamol");
@@ -741,6 +745,59 @@ export default function SickDay() {
       });
       void pushSickDayScenario({});
     }
+  };
+
+  const openMedicationTakenAt = (id: string) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    setMedTakenAtId(id);
+    setMedTakenAtLocal(local);
+    setMedTakenAtOpen(true);
+  };
+
+  const handleMedicationTakenAtSave = () => {
+    const id = medTakenAtId;
+    if (!id) return;
+    const entry = medEntries.find((e) => e.id === id);
+    if (!entry) return;
+
+    const raw = medTakenAtLocal.trim();
+    const takenAt = raw ? new Date(raw) : null;
+    if (!takenAt || Number.isNaN(takenAt.getTime())) {
+      toast({ title: "Choose a valid time", description: "Pick when you took the medication.", variant: "destructive" });
+      return;
+    }
+    if (takenAt.getTime() > Date.now() + 60_000) {
+      toast({ title: "Time is in the future", description: "Use a time up to now.", variant: "destructive" });
+      return;
+    }
+
+    const takenAtIso = takenAt.toISOString();
+    const nextDue = new Date(takenAt.getTime() + entry.repeatEveryMinutes * 60_000).toISOString();
+
+    storage.updateSickDayMedicationEntry(id, {
+      takenAtIso,
+      nextDueAtIso: nextDue,
+      lastInAppNotifiedDueAtIso: undefined,
+    });
+    const next = storage.getSickDayMedicationLog();
+    setMedEntries(next);
+    const updated = next.find((e) => e.id === id);
+    if (updated) {
+      void scheduleSickDayMedReminder(updated);
+      void createSickDayMedInAppNotification({
+        title: "Medication logged",
+        body: `${updated.name} taken · next due ${new Date(updated.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+        reminderId: updated.id,
+        dueAtIso: updated.nextDueAtIso,
+        name: updated.name,
+      });
+      void pushSickDayScenario({});
+    }
+
+    setMedTakenAtOpen(false);
+    setMedTakenAtId(null);
   };
 
   const latestTemp = useMemo(() => tempEntries[0] ?? null, [tempEntries]);
@@ -1470,6 +1527,50 @@ export default function SickDay() {
                     <CardDescription>Log what you’ve taken and get a reminder when it’s due again.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <Dialog
+                      open={medTakenAtOpen}
+                      onOpenChange={(v) => {
+                        setMedTakenAtOpen(v);
+                        if (!v) setMedTakenAtId(null);
+                      }}
+                    >
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Log medication time</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="input-med-taken-at" className="text-sm">
+                              Taken at
+                            </Label>
+                            <Input
+                              id="input-med-taken-at"
+                              type="datetime-local"
+                              value={medTakenAtLocal}
+                              onChange={(e) => setMedTakenAtLocal(e.target.value)}
+                              data-testid="input-med-taken-at"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              We’ll update the next due time based on your repeat interval.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setMedTakenAtOpen(false)}
+                              data-testid="button-med-taken-at-cancel"
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="button" onClick={handleMedicationTakenAtSave} data-testid="button-med-taken-at-save">
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label className="text-sm">What did you take?</Label>
@@ -1581,6 +1682,9 @@ export default function SickDay() {
                               <div className="flex flex-wrap gap-2">
                                 <Button size="sm" onClick={() => handleMedicationTakenNow(e.id)} data-testid={`button-med-taken-${e.id}`}>
                                   Taken now
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => openMedicationTakenAt(e.id)} data-testid={`button-med-taken-at-${e.id}`}>
+                                  Log time
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={() => handleSnoozeMedicationReminder(e.id, 30)} data-testid={`button-med-snooze-${e.id}`}>
                                   Snooze 30m
@@ -1979,6 +2083,24 @@ export default function SickDay() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Mobile-only sticky action bar for long forms */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+              <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+                <Button
+                  onClick={() => {
+                    scrollToId("sickday-log");
+                    handleLogJournalEntry();
+                  }}
+                  className="w-full"
+                  disabled={!journalBg.trim() || !journalKetone}
+                  data-testid="button-log-journal-entry-sticky"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Log Entry
+                </Button>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 

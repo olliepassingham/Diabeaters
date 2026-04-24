@@ -12,7 +12,7 @@ import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat } from "@/lib/storage";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { calculateMealDose, roundToHalf, type MealDoseResult } from "@/lib/meal-dose";
+import { calculateMealDose, roundInsulinUnits, type MealDoseResult } from "@/lib/meal-dose";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -231,9 +231,9 @@ export default function Adviser() {
         break;
     }
     
-    const totalRounded = roundToHalf(totalUnits);
-    const firstDose = roundToHalf(totalRounded * (firstPercent / 100));
-    const secondDose = roundToHalf(totalRounded - firstDose);
+    const totalRounded = roundInsulinUnits(totalUnits);
+    const firstDose = roundInsulinUnits(totalRounded * (firstPercent / 100));
+    const secondDose = roundInsulinUnits(totalRounded - firstDose);
     
     setSplitResult({
       totalUnits: totalRounded,
@@ -778,7 +778,7 @@ export default function Adviser() {
                       </div>
 
                       <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
-                        <p><strong>Rounding guide:</strong> If BG is trending high or above target, round doses up to the nearest 0.5. If trending low or below target, round down.</p>
+                        <p><strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use a device that can deliver finer increments, follow your care team’s guidance.</p>
                         <p>
                           <strong>Tip:</strong>{" "}
                           {isPumpUser

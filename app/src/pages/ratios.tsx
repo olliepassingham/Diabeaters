@@ -844,6 +844,21 @@ export default function Ratios() {
           Sources
         </Link>
       </div>
+
+      {editing ? (
+        <div className="fixed inset-x-0 bottom-[calc(var(--bottom-nav-height,7.5rem)+0.75rem)] z-40 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:hidden">
+          <div className="mx-auto max-w-2xl rounded-2xl border border-border/60 bg-background/80 p-3 shadow-lg backdrop-blur">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" className="flex-1" onClick={handleCancelEdit} data-testid="button-cancel-edit-sticky">
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleSaveRatios} data-testid="button-save-ratios-sticky">
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }

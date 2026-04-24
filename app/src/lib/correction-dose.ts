@@ -15,7 +15,7 @@ export type SimpleCorrectionDoseResult =
     }
   | {
       status: "dose";
-      /** Standard (full) correction dose in units, rounded to 0.1u (same rounding as Bedtime full dose). */
+      /** Standard (full) correction dose in whole units (pen-friendly). */
       fullDoseRounded: number;
       diff: number;
       currentBg: number;
@@ -52,7 +52,7 @@ export function computeSimpleCorrectionDose(params: {
       bgUnits,
     };
   }
-  const fullDoseRounded = Math.round((diff / correctionFactor) * 10) / 10;
+  const fullDoseRounded = Math.round(diff / correctionFactor);
   return {
     status: "dose",
     fullDoseRounded,

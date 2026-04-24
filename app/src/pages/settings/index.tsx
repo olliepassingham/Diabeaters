@@ -64,15 +64,16 @@ function ProfileTab({
   onSave: () => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <User className="h-5 w-5 text-primary" />
-          <CardTitle className="text-h3 font-semibold">Personal information</CardTitle>
-        </div>
-        <CardDescription className="text-body text-muted-foreground">Your personal details and preferences.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <User className="h-5 w-5 text-primary" />
+            <CardTitle className="text-h3 font-semibold">Personal information</CardTitle>
+          </div>
+          <CardDescription className="text-body text-muted-foreground">Your personal details and preferences.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="bg-units">Blood Glucose Units</Label>
@@ -109,14 +110,25 @@ function ProfileTab({
             {deliveryMethod === "pump" ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
           </p>
         </div>
-        <div className="flex justify-end">
-          <Button onClick={onSave} data-testid="button-save-profile">
+          <div className="flex justify-end">
+            <Button onClick={onSave} data-testid="button-save-profile">
+              <Save className="h-4 w-4 mr-2" />
+              Save Profile
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mobile-only sticky action bar for long forms */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+          <Button onClick={onSave} className="w-full" data-testid="button-save-profile-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Profile
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
 
@@ -143,17 +155,18 @@ function InsulinTab({
   onSave: () => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Syringe className="h-5 w-5 text-primary" />
-          <CardTitle className="text-h3 font-semibold">Insulin Settings</CardTitle>
-        </div>
-        <CardDescription className="text-body text-muted-foreground">
-          Configure your insulin ratios and targets for calculations.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Syringe className="h-5 w-5 text-primary" />
+            <CardTitle className="text-h3 font-semibold">Insulin Settings</CardTitle>
+          </div>
+          <CardDescription className="text-body text-muted-foreground">
+            Configure your insulin ratios and targets for calculations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tdd" className="flex items-center">
@@ -278,14 +291,25 @@ function InsulinTab({
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button onClick={onSave} data-testid="button-save-insulin">
+          <div className="flex justify-end">
+            <Button onClick={onSave} data-testid="button-save-insulin">
+              <Save className="h-4 w-4 mr-2" />
+              Save Insulin Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mobile-only sticky action bar for long forms */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+          <Button onClick={onSave} className="w-full" data-testid="button-save-insulin-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Insulin Settings
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
 
@@ -329,18 +353,19 @@ function UsageTab({
   onSave: () => void;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-primary" />
-          <CardTitle className="text-h3 font-semibold">Usual Habits</CardTitle>
-        </div>
-        <CardDescription className="text-body text-muted-foreground">
-          Help estimate when you'll need to reorder supplies.
-          {isPumpUser && <span className="ml-1 text-primary">(Pump user settings)</span>}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            <CardTitle className="text-h3 font-semibold">Usual Habits</CardTitle>
+          </div>
+          <CardDescription className="text-body text-muted-foreground">
+            Help estimate when you'll need to reorder supplies.
+            {isPumpUser && <span className="ml-1 text-primary">(Pump user settings)</span>}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
         <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Smarter supply forecast</p>
@@ -521,14 +546,25 @@ function UsageTab({
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button onClick={onSave} data-testid="button-save-usage">
+          <div className="flex justify-end">
+            <Button onClick={onSave} data-testid="button-save-usage">
+              <Save className="h-4 w-4 mr-2" />
+              Save Usage Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mobile-only sticky action bar for long forms */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+          <Button onClick={onSave} className="w-full" data-testid="button-save-usage-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Usage Settings
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </>
   );
 }
 

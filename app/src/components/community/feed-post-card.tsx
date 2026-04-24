@@ -541,9 +541,6 @@ export function FeedPostCard({
                 {authorPublicHandle?.trim() ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
                 ) : null}
-                <Badge variant="secondary" className="mt-1.5 max-w-full font-normal truncate chip chip-muted">
-                  {communityTopicLabel(post.topic)}
-                </Badge>
               </div>
               <span className="flex shrink-0 items-center gap-1">
                 {canReportPost && (
@@ -596,6 +593,16 @@ export function FeedPostCard({
                   {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
                 </span>
               </span>
+            </div>
+            <div className="mt-1.5 max-w-full">
+              <Badge
+                variant="secondary"
+                className="w-full max-w-full font-normal truncate chip chip-muted"
+                data-testid="feed-post-topic"
+                title={communityTopicLabel(post.topic)}
+              >
+                {communityTopicLabel(post.topic)}
+              </Badge>
             </div>
           </div>
         </div>

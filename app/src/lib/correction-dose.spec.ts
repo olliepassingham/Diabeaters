@@ -57,7 +57,7 @@ describe("computeSimpleCorrectionDose", () => {
     }
   });
 
-  it("computes mg/dL example and rounds full dose to 0.1u", () => {
+  it("computes mg/dL example and rounds full dose to whole units", () => {
     const r = computeSimpleCorrectionDose({
       currentBg: 250,
       targetBg: 144,
@@ -67,7 +67,7 @@ describe("computeSimpleCorrectionDose", () => {
     expect(r.status).toBe("dose");
     if (r.status === "dose") {
       expect(r.diff).toBe(106);
-      expect(r.fullDoseRounded).toBe(2.1);
+      expect(r.fullDoseRounded).toBe(2);
     }
   });
 });
