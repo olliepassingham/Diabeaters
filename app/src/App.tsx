@@ -18,6 +18,8 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
 import { KeyboardInsets } from "@/components/keyboard-insets";
+import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
+import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -784,6 +786,8 @@ function AuthenticatedShell() {
       <ClinicalPrefsCloudSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
+      {!isCarerMode ? <AlcoholReminderPoller /> : null}
+      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
       <AppTopBar
@@ -835,6 +839,8 @@ function AccountShell() {
       <ClinicalPrefsCloudSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
+      {!isCarerMode ? <AlcoholReminderPoller /> : null}
+      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}

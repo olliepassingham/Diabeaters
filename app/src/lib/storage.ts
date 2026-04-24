@@ -52,6 +52,8 @@ const STORAGE_KEYS = {
   EXERCISE_ROUTINES: "diabeater_exercise_routines",
   ACTIVE_EXERCISE: "diabeater_active_exercise",
   EXERCISE_OUTCOMES: "diabeater_exercise_outcomes",
+  ALCOHOL_SESSION: "diabeater_alcohol_session",
+  PUMP_FAILURE_SESSION: "diabeater_pump_failure_session",
 } as const;
 
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
@@ -496,6 +498,51 @@ export interface ScenarioState {
   sickDayActive: boolean;
   sickDaySeverity?: string;
   sickDayActivatedAt?: string;
+  /** Alcohol Mode (local-only) to help plan bedtime checks and next-morning review. */
+  alcoholModeActive?: boolean;
+  alcoholActivatedAt?: string;
+  alcoholPlannedBedtimeIso?: string;
+  alcoholIntensity?: "light" | "moderate" | "long_or_heavy";
+  pumpFailureActive?: boolean;
+  pumpFailureActivatedAt?: string;
+}
+
+export type AlcoholReminderKind = "bedtime_check" | "overnight_check" | "morning_review";
+
+export interface AlcoholReminder {
+  kind: AlcoholReminderKind;
+  atIso: string;
+  sentAtIso?: string;
+}
+
+export interface AlcoholSession {
+  id: string;
+  createdAtIso: string;
+  situation?: string | null;
+  intensity: "light" | "moderate" | "long_or_heavy";
+  plannedBedtimeIso: string;
+  reminders: AlcoholReminder[];
+  endedAtIso?: string;
+}
+
+export type PumpFailureReminderKind = "bg_recheck_60m" | "bg_recheck_120m" | "ketone_recheck_120m" | "morning_review";
+
+export interface PumpFailureReminder {
+  kind: PumpFailureReminderKind;
+  atIso: string;
+  sentAtIso?: string;
+}
+
+export interface PumpFailureSession {
+  id: string;
+  createdAtIso: string;
+  /** User-entered, optional values (educational prompts only). */
+  bgValue?: number | null;
+  bgUnits?: string | null;
+  ketonesLevel?: "unknown" | "none" | "trace" | "small" | "moderate" | "large";
+  symptoms?: { vomiting?: boolean; confusion?: boolean };
+  reminders: PumpFailureReminder[];
+  endedAtIso?: string;
 }
 
 export interface BedtimeLog {
@@ -1896,7 +1943,9 @@ export const storage = {
 
   getScenarioState(): ScenarioState {
     const data = localStorage.getItem(STORAGE_KEYS.SCENARIO_STATE);
-    return data ? JSON.parse(data) : { travelModeActive: false, sickDayActive: false };
+    return data
+      ? JSON.parse(data)
+      : { travelModeActive: false, sickDayActive: false, alcoholModeActive: false, pumpFailureActive: false };
   },
 
   saveScenarioState(state: ScenarioState): void {
@@ -1988,6 +2037,150 @@ export const storage = {
     state.sickDaySeverity = undefined;
     state.sickDayActivatedAt = undefined;
     this.saveScenarioState(state);
+  },
+
+  getAlcoholSession(): AlcoholSession | null {
+    const raw = localStorage.getItem(STORAGE_KEYS.ALCOHOL_SESSION);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as AlcoholSession;
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!parsed.id || !parsed.createdAtIso || !parsed.plannedBedtimeIso) return null;
+      if (!Array.isArray(parsed.reminders)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  },
+
+  saveAlcoholSession(session: AlcoholSession): void {
+    localStorage.setItem(STORAGE_KEYS.ALCOHOL_SESSION, JSON.stringify(session));
+  },
+
+  activateAlcoholMode(params: {
+    intensity: AlcoholSession["intensity"];
+    plannedBedtimeIso: string;
+    situation?: string | null;
+  }): AlcoholSession {
+    const nowIso = new Date().toISOString();
+
+    const bedtime = new Date(params.plannedBedtimeIso);
+    const bedtimeMs = bedtime.getTime();
+    const safeBedtimeIso = Number.isNaN(bedtimeMs) ? nowIso : bedtime.toISOString();
+
+    const reminders: AlcoholReminder[] = [
+      { kind: "bedtime_check", atIso: safeBedtimeIso },
+      ...(params.intensity === "light"
+        ? []
+        : [
+            {
+              kind: "overnight_check" as const,
+              atIso: new Date(new Date(safeBedtimeIso).getTime() + 2 * 60 * 60 * 1000).toISOString(),
+            },
+          ]),
+      (() => {
+        const d = new Date(safeBedtimeIso);
+        d.setDate(d.getDate() + 1);
+        d.setHours(10, 0, 0, 0);
+        return { kind: "morning_review" as const, atIso: d.toISOString() } as AlcoholReminder;
+      })(),
+    ];
+
+    const session: AlcoholSession = {
+      id: crypto.randomUUID(),
+      createdAtIso: nowIso,
+      situation: params.situation ?? null,
+      intensity: params.intensity,
+      plannedBedtimeIso: safeBedtimeIso,
+      reminders,
+    };
+    this.saveAlcoholSession(session);
+
+    const sc = this.getScenarioState();
+    sc.alcoholModeActive = true;
+    sc.alcoholActivatedAt = nowIso;
+    sc.alcoholPlannedBedtimeIso = safeBedtimeIso;
+    sc.alcoholIntensity = params.intensity;
+    this.saveScenarioState(sc);
+
+    return session;
+  },
+
+  endAlcoholMode(): void {
+    const sc = this.getScenarioState();
+    sc.alcoholModeActive = false;
+    sc.alcoholActivatedAt = undefined;
+    sc.alcoholPlannedBedtimeIso = undefined;
+    sc.alcoholIntensity = undefined;
+    this.saveScenarioState(sc);
+    localStorage.removeItem(STORAGE_KEYS.ALCOHOL_SESSION);
+  },
+
+  getPumpFailureSession(): PumpFailureSession | null {
+    const raw = localStorage.getItem(STORAGE_KEYS.PUMP_FAILURE_SESSION);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as PumpFailureSession;
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!parsed.id || !parsed.createdAtIso) return null;
+      if (!Array.isArray(parsed.reminders)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  },
+
+  savePumpFailureSession(session: PumpFailureSession): void {
+    localStorage.setItem(STORAGE_KEYS.PUMP_FAILURE_SESSION, JSON.stringify(session));
+  },
+
+  activatePumpFailureMode(params?: {
+    bgValue?: number | null;
+    bgUnits?: string | null;
+    ketonesLevel?: PumpFailureSession["ketonesLevel"];
+    symptoms?: PumpFailureSession["symptoms"];
+  }): PumpFailureSession {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const nowMs = now.getTime();
+
+    const reminders: PumpFailureReminder[] = [
+      { kind: "bg_recheck_60m", atIso: new Date(nowMs + 60 * 60 * 1000).toISOString() },
+      { kind: "bg_recheck_120m", atIso: new Date(nowMs + 2 * 60 * 60 * 1000).toISOString() },
+      { kind: "ketone_recheck_120m", atIso: new Date(nowMs + 2 * 60 * 60 * 1000).toISOString() },
+      (() => {
+        const d = new Date(nowMs);
+        d.setDate(d.getDate() + 1);
+        d.setHours(10, 0, 0, 0);
+        return { kind: "morning_review", atIso: d.toISOString() } as PumpFailureReminder;
+      })(),
+    ];
+
+    const session: PumpFailureSession = {
+      id: crypto.randomUUID(),
+      createdAtIso: nowIso,
+      bgValue: params?.bgValue ?? null,
+      bgUnits: params?.bgUnits ?? null,
+      ketonesLevel: params?.ketonesLevel ?? "unknown",
+      symptoms: params?.symptoms ?? {},
+      reminders,
+    };
+    this.savePumpFailureSession(session);
+
+    const sc = this.getScenarioState();
+    sc.pumpFailureActive = true;
+    sc.pumpFailureActivatedAt = nowIso;
+    this.saveScenarioState(sc);
+
+    return session;
+  },
+
+  endPumpFailureMode(): void {
+    const sc = this.getScenarioState();
+    sc.pumpFailureActive = false;
+    sc.pumpFailureActivatedAt = undefined;
+    this.saveScenarioState(sc);
+    localStorage.removeItem(STORAGE_KEYS.PUMP_FAILURE_SESSION);
   },
 
   getBedtimeLogs(): BedtimeLog[] {

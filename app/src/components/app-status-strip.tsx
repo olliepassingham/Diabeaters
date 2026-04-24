@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Activity, Plane, Thermometer, WifiOff, Power, ChevronRight, Dumbbell } from "lucide-react";
+import { Activity, Plane, Thermometer, WifiOff, Power, ChevronRight, Dumbbell, Syringe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { storage, type ScenarioState, type ActiveExerciseSession } from "@/lib/storage";
@@ -51,7 +51,7 @@ export function AppStatusStrip() {
   }, []);
 
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
-  const show = sc.sickDayActive || sc.travelModeActive || Boolean(ex) || !online;
+  const show = sc.sickDayActive || sc.travelModeActive || Boolean(ex) || sc.pumpFailureActive || !online;
   if (!show) return null;
 
   const sickTone =
@@ -86,6 +86,15 @@ export function AppStatusStrip() {
     toast({ title: "Exercise ended", description: "Session cleared." });
   };
 
+  const handleEndPumpFailure = () => {
+    try {
+      storage.endPumpFailureMode();
+    } catch {
+      // ignore
+    }
+    toast({ title: "Pump failure mode ended", description: "Session cleared." });
+  };
+
   return (
     <div
       className="relative z-40 -mt-2 mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
@@ -117,6 +126,13 @@ export function AppStatusStrip() {
         <Badge className="chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200" variant="secondary">
           <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Exercise · {ex.phase}
+        </Badge>
+      ) : null}
+
+      {sc.pumpFailureActive ? (
+        <Badge className="chip border border-red-500/25 bg-red-500/15 text-red-900 dark:text-red-200" variant="secondary">
+          <Syringe className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Pump failure
         </Badge>
       ) : null}
 
@@ -154,6 +170,20 @@ export function AppStatusStrip() {
             <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
             End
           </Button>
+        ) : null}
+
+        {sc.pumpFailureActive ? (
+          <>
+            <Link href="/scenarios/pump-failure">
+              <Button size="sm" variant="outline" className="h-7 px-2" data-testid="status-pumpfailure-view">
+                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleEndPumpFailure} data-testid="status-pumpfailure-end">
+              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+              End
+            </Button>
+          </>
         ) : null}
       </div>
     </div>
