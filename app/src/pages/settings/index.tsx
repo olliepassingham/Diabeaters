@@ -120,8 +120,8 @@ function ProfileTab({
       </Card>
 
       {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button onClick={onSave} className="w-full" data-testid="button-save-profile-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Profile
@@ -301,8 +301,8 @@ function InsulinTab({
       </Card>
 
       {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button onClick={onSave} className="w-full" data-testid="button-save-insulin-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Insulin Settings
@@ -556,8 +556,8 @@ function UsageTab({
       </Card>
 
       {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 py-3">
+      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button onClick={onSave} className="w-full" data-testid="button-save-usage-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Usage Settings

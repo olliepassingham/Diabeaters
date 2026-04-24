@@ -17,6 +17,7 @@ import { AppTopBar } from "@/components/app-top-bar";
 import { OfflineBanner } from "@/components/offline-banner";
 import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
+import { KeyboardInsets } from "@/components/keyboard-insets";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -781,6 +782,7 @@ function AuthenticatedShell() {
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
+      <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
@@ -831,6 +833,7 @@ function AccountShell() {
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
+      <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar

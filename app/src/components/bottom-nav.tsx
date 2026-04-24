@@ -212,7 +212,7 @@ export function BottomNav() {
   return (
     <nav
       ref={navRef}
-      className="surface-chrome fixed bottom-0 inset-x-0 z-50 grid place-items-center border-t border-border/40 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)]"
+      className="surface-chrome fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-50 grid place-items-center border-t border-border/40 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)]"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       data-testid="nav-bottom"
     >

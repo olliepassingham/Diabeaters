@@ -292,7 +292,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       {(showBackButton || showNextButton) && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
+          className="fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
           data-testid="onboarding-sticky-actions"
         >
           <PageShell variant="narrow" className="flex justify-between gap-3 items-center">
