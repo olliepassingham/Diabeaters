@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,8 +41,11 @@ import { getOnboardingAccountPath } from "@/lib/carer-session";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
+type CareContext = "mostly_me" | "mostly_them" | "both_equally" | null;
+
 type Step =
   | "welcome"
+  | "care_context"
   | "struggle"
   | "disclaimer"
   | "first_win";
@@ -85,6 +88,7 @@ const STRUGGLE_OPTIONS = [
 interface OnboardingData {
   name: string;
   diabetesType: string;
+  careContext: CareContext;
   struggle: Struggle;
   insulinDeliveryMethod: string;
   bgUnits: string;
@@ -109,10 +113,16 @@ interface OnboardingProps {
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const showBothPath = useMemo(() => getOnboardingAccountPath() === "both", []);
+  const steps: Step[] = useMemo(
+    () => (showBothPath ? ["welcome", "care_context", "struggle", "disclaimer", "first_win"] : ["welcome", "struggle", "disclaimer", "first_win"]),
+    [showBothPath],
+  );
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
+    careContext: null,
     struggle: null,
     insulinDeliveryMethod: "",
     bgUnits: "mmol/L",
@@ -129,11 +139,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     cgmDays: "",
   });
 
-  const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle) => {
+  const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext) => {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const steps: Step[] = ["welcome", "struggle", "disclaimer", "first_win"];
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
 
@@ -177,6 +186,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     if (data.struggle) {
       localStorage.setItem("diabeater_onboarding_struggle", data.struggle);
       localStorage.setItem("diabeater_profile_incomplete", "true");
+    }
+    if (data.careContext) {
+      try {
+        localStorage.setItem("diabeater_onboarding_care_context", data.careContext);
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -230,6 +246,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const canProceed = (): boolean => {
     switch (currentStep) {
       case "welcome": return true;
+      case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
       case "disclaimer": return data.hasAcceptedDisclaimer;
       case "first_win": return true;
@@ -240,7 +257,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const renderStep = () => {
     switch (currentStep) {
       case "welcome":
-        return <WelcomeStep data={data} updateData={updateData} />;
+        return <WelcomeStep data={data} updateData={updateData} showBothPath={showBothPath} />;
+      case "care_context":
+        return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
       case "disclaimer":
@@ -252,7 +271,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
-  const showProgress = currentStep !== "welcome" && currentStep !== "first_win";
+  const showProgress = currentStep !== "welcome" && currentStep !== "care_context" && currentStep !== "first_win";
   const showBackButton = currentStep !== "welcome" && currentStep !== "first_win";
   const showNextButton = currentStep !== "first_win";
   const stepLabel =
@@ -326,7 +345,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   );
 }
 
-function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+function WelcomeStep({
+  data,
+  updateData,
+  showBothPath,
+}: {
+  data: OnboardingData;
+  updateData: (field: keyof OnboardingData, value: any) => void;
+  showBothPath: boolean;
+}) {
   return (
     <div className="text-center space-y-8">
       <div className="space-y-4">
@@ -341,7 +368,9 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Diabeaters</h1>
           <p className="text-lg text-muted-foreground max-w-sm mx-auto leading-relaxed">
-            You’ll leave with the one thing you care about most working for you — less guessing, more living.
+            {showBothPath
+              ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
+              : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
           </p>
         </div>
       </div>
@@ -400,7 +429,61 @@ function WelcomeStep({ data, updateData }: { data: OnboardingData; updateData: (
   );
 }
 
+function CareContextStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+  const options: Array<{ id: NonNullable<CareContext>; title: string; description: string }> = [
+    {
+      id: "mostly_me",
+      title: "Mostly for my own diabetes day-to-day",
+      description: "Supporter tools are secondary for now.",
+    },
+    {
+      id: "mostly_them",
+      title: "Mostly to help someone I support",
+      description: "We’ll still capture your basics so the tools make sense when you switch modes.",
+    },
+    {
+      id: "both_equally",
+      title: "Both equally",
+      description: "We’ll keep the setup balanced for you and the person you support.",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-bold">Quick context</h2>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          You chose that you have Type&nbsp;1 and you support someone too. Where should we focus this first setup?
+        </p>
+      </div>
+
+      <RadioGroup
+        value={data.careContext ?? ""}
+        onValueChange={(v) => updateData("careContext", v as CareContext)}
+        className="space-y-3"
+      >
+        {options.map((opt) => (
+          <label
+            key={opt.id}
+            htmlFor={`care-${opt.id}`}
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all hover-elevate ${
+              data.careContext === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary/20" : ""
+            }`}
+          >
+            <RadioGroupItem id={`care-${opt.id}`} value={opt.id} className="mt-1" data-testid={`care-context-${opt.id}`} />
+            <div className="min-w-0">
+              <div className="font-medium">{opt.title}</div>
+              <div className="text-sm text-muted-foreground mt-1">{opt.description}</div>
+            </div>
+          </label>
+        ))}
+      </RadioGroup>
+    </div>
+  );
+}
+
 function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+  const supporterAngle = data.careContext === "mostly_them" || data.careContext === "both_equally";
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -408,7 +491,9 @@ function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: 
           {data.name ? `${data.name}, what` : "What"} do you want working better first?
         </h2>
         <p className="text-muted-foreground">
-          We’ll tune the app around it so you see value quickly
+          {supporterAngle
+            ? "Pick the pain point you want help with right now (for you, or for the person you support)."
+            : "We’ll tune the app around it so you see value quickly"}
         </p>
       </div>
 
