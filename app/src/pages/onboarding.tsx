@@ -50,9 +50,18 @@ type Step =
   | "disclaimer"
   | "first_win";
 
-const STRUGGLE_OPTIONS = [
+type StruggleOptionDef = {
+  id: Exclude<Struggle, null>;
+  icon: typeof Package;
+  title: string;
+  description: string;
+  color: string;
+  bg: string;
+};
+
+const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
   {
-    id: "supplies" as Struggle,
+    id: "supplies",
     icon: Package,
     title: "I keep running out of supplies",
     description: "Insulin, needles, sensors — I never know when to reorder",
@@ -60,7 +69,7 @@ const STRUGGLE_OPTIONS = [
     bg: "bg-blue-500/10",
   },
   {
-    id: "meals" as Struggle,
+    id: "meals",
     icon: Utensils,
     title: "I struggle with meal dosing",
     description: "Working out carbs and insulin for meals is stressful",
@@ -68,7 +77,7 @@ const STRUGGLE_OPTIONS = [
     bg: "bg-amber-500/10",
   },
   {
-    id: "exercise" as Struggle,
+    id: "exercise",
     icon: Dumbbell,
     title: "Exercise throws my levels off",
     description: "I worry about going low or high when I'm active",
@@ -76,7 +85,7 @@ const STRUGGLE_OPTIONS = [
     bg: "bg-green-500/10",
   },
   {
-    id: "overview" as Struggle,
+    id: "overview",
     icon: LayoutDashboard,
     title: "I want everything in one place",
     description: "A single hub for supplies, meals, exercise and more",
@@ -84,6 +93,105 @@ const STRUGGLE_OPTIONS = [
     bg: "bg-purple-500/10",
   },
 ];
+
+function getStruggleOptionOrder(careContext: CareContext): Array<Exclude<Struggle, null>> {
+  if (careContext === "mostly_me") return ["meals", "supplies", "exercise", "overview"];
+  if (careContext === "mostly_them") return ["supplies", "meals", "exercise", "overview"];
+  if (careContext === "both_equally") return ["meals", "supplies", "exercise", "overview"];
+  return ["supplies", "meals", "exercise", "overview"];
+}
+
+function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext): { title: string; description: string } {
+  if (careContext === "mostly_me") {
+    if (id === "supplies") {
+      return {
+        title: "I need steadier stock of my supplies",
+        description: "Even with supporter responsibilities, running out of insulin, sensors, or sets still catches me out.",
+      };
+    }
+    if (id === "meals") {
+      return {
+        title: "Mealtimes are stressful for me",
+        description: "Carbs, doses, and timing — I want calmer decisions for my own diabetes day-to-day.",
+      };
+    }
+    if (id === "exercise") {
+      return {
+        title: "Exercise throws my levels off",
+        description: "I worry about going low or high when I’m active — especially on busy days.",
+      };
+    }
+    return {
+      title: "I want a clearer hub for my own diabetes",
+      description: "Supplies, meals, exercise, and planning — one place that matches how I actually live.",
+    };
+  }
+
+  if (careContext === "mostly_them") {
+    if (id === "supplies") {
+      return {
+        title: "We lose track of their supplies",
+        description: "Sensors, insulin, sets — it’s hard to know what’s running low and when to reorder.",
+      };
+    }
+    if (id === "meals") {
+      return {
+        title: "Mealtimes feel unpredictable for them",
+        description: "Carb counting, ratios, and corrections can be stressful to support in the moment.",
+      };
+    }
+    if (id === "exercise") {
+      return {
+        title: "Activity makes their levels swing",
+        description: "Sports, school runs, and busy days can make highs/lows harder to anticipate.",
+      };
+    }
+    return {
+      title: "I want a calmer overview for their care",
+      description: "A single place to see what matters next — without bouncing between screens.",
+    };
+  }
+
+  if (careContext === "both_equally") {
+    if (id === "supplies") {
+      return {
+        title: "We need clearer supply planning",
+        description: "Between two people’s routines, it’s easy to miss what’s running low.",
+      };
+    }
+    if (id === "meals") {
+      return {
+        title: "We need better meal-time planning",
+        description: "Carbs, doses, and timing — we want less second-guessing at the table.",
+      };
+    }
+    if (id === "exercise") {
+      return {
+        title: "Exercise days are harder to manage",
+        description: "Activity changes quickly — we want steadier guidance before, during, and after.",
+      };
+    }
+    return {
+      title: "We want one calm hub for everything",
+      description: "Supplies, meals, exercise, and day-to-day planning — together in one place.",
+    };
+  }
+
+  // Default + "mostly_me" (and non-both flows): keep the original first-person wording.
+  const base = BASE_STRUGGLE_OPTIONS.find((o) => o.id === id);
+  return { title: base?.title ?? "", description: base?.description ?? "" };
+}
+
+function getStruggleOptionsForCareContext(careContext: CareContext): StruggleOptionDef[] {
+  const order = getStruggleOptionOrder(careContext);
+  const byId = new Map(BASE_STRUGGLE_OPTIONS.map((o) => [o.id, o]));
+  return order.map((id) => {
+    const base = byId.get(id);
+    if (!base) return BASE_STRUGGLE_OPTIONS[0];
+    const copy = getStruggleCopy(id, careContext);
+    return { ...base, title: copy.title, description: copy.description };
+  });
+}
 
 interface OnboardingData {
   name: string;
@@ -484,6 +592,12 @@ function CareContextStep({ data, updateData }: { data: OnboardingData; updateDat
 
 function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
   const supporterAngle = data.careContext === "mostly_them" || data.careContext === "both_equally";
+  const strugglePresentationContext: CareContext = useMemo(() => {
+    return getOnboardingAccountPath() === "both" ? data.careContext : null;
+  }, [data.careContext]);
+
+  const struggleOptions = useMemo(() => getStruggleOptionsForCareContext(strugglePresentationContext), [strugglePresentationContext]);
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -498,7 +612,7 @@ function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: 
       </div>
 
       <div className="space-y-3">
-        {STRUGGLE_OPTIONS.map((option) => {
+        {struggleOptions.map((option) => {
           const isSelected = data.struggle === option.id;
           const Icon = option.icon;
           return (
