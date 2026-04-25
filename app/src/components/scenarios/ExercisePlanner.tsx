@@ -642,7 +642,7 @@ export function ExercisePlanner() {
                     htmlFor="approx-carbs"
                     info="Enter carbs if you want an insulin-unit preview using your saved ratios. Leave blank to skip food/insulin guidance."
                   >
-                    Carbs for this food/snack (grams)
+                    Carbs you’ll eat for exercise (grams)
                   </FieldLabelWithInfo>
                   <Input
                     id="approx-carbs"
