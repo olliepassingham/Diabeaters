@@ -31,6 +31,7 @@ import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile } from "@/lib/profile";
 import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
@@ -47,6 +48,7 @@ type Step =
   | "welcome"
   | "care_context"
   | "struggle"
+  | "details"
   | "disclaimer"
   | "first_win";
 
@@ -193,6 +195,10 @@ function getStruggleOptionsForCareContext(careContext: CareContext): StruggleOpt
   });
 }
 
+function getPathDataCareContext(data: OnboardingData): CareContext {
+  return getOnboardingAccountPath() === "both" ? data.careContext : null;
+}
+
 interface OnboardingData {
   name: string;
   diabetesType: string;
@@ -223,7 +229,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const { toast } = useToast();
   const showBothPath = useMemo(() => getOnboardingAccountPath() === "both", []);
   const steps: Step[] = useMemo(
-    () => (showBothPath ? ["welcome", "care_context", "struggle", "disclaimer", "first_win"] : ["welcome", "struggle", "disclaimer", "first_win"]),
+    () =>
+      showBothPath
+        ? ["welcome", "care_context", "struggle", "details", "disclaimer", "first_win"]
+        : ["welcome", "struggle", "details", "disclaimer", "first_win"],
     [showBothPath],
   );
   const [currentStep, setCurrentStep] = useState<Step>("welcome");
@@ -356,6 +365,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
+      case "details": return true;
       case "disclaimer": return data.hasAcceptedDisclaimer;
       case "first_win": return true;
       default: return true;
@@ -370,6 +380,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
+      case "details":
+        return (
+          <div className="space-y-8">
+            <EssentialsStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />
+            <PathDataStep data={data} updateData={updateData} />
+          </div>
+        );
       case "disclaimer":
         return <DisclaimerStep data={data} updateData={updateData} />;
       case "first_win":
@@ -392,7 +409,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       <PageShell
         variant="narrow"
         className={`px-4 pt-6 md:pt-8 sm:pb-10 ${
-          currentStep === "first_win" ? "pb-44 sm:pb-10" : "pb-28"
+          currentStep === "first_win" || currentStep === "details" || currentStep === "disclaimer"
+            ? "pb-44 sm:pb-10"
+            : "pb-28"
         }`}
       >
         {currentStep !== "welcome" && (
@@ -727,20 +746,36 @@ function StrugglePreviewStep({
   );
 }
 
-function EssentialsStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+function EssentialsStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: (field: keyof OnboardingData, value: any) => void;
+  pathCare?: CareContext | null;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">A few essentials</h2>
         <p className="text-muted-foreground">
-          Just the basics so we can personalise your experience
+          {supporterHeavy
+            ? "A few basics so dose planning and forecasts make sense — you can refine this later."
+            : "Just the basics so we can personalise your experience"}
         </p>
       </div>
 
       <Card>
         <CardContent className="pt-6 space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium">How do you take your insulin?</Label>
+            <Label className="text-sm font-medium">
+              {pathCare === "mostly_them"
+                ? "How does the person you support take insulin?"
+                : "How do you take your insulin?"}
+            </Label>
             <RadioGroup
               value={data.insulinDeliveryMethod}
               onValueChange={(value) => updateData("insulinDeliveryMethod", value)}
@@ -796,299 +831,382 @@ function EssentialsStep({ data, updateData }: { data: OnboardingData; updateData
   );
 }
 
-function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
-  const struggle = data.struggle;
+type PathDataUpdate = (field: keyof OnboardingData, value: any) => void;
 
-  if (struggle === "supplies") {
-    const isPump = data.insulinDeliveryMethod === "pump";
-    return (
-      <div className="space-y-6" data-testid="onboarding-path-supplies">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <div className="p-3 rounded-full bg-blue-500/10">
-              <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-            </div>
+function PathDataSuppliesStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: PathDataUpdate;
+  pathCare: CareContext;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+  const isPump = data.insulinDeliveryMethod === "pump";
+  const defaultSuppliesTab = isPump ? "basics" : "usage";
+  const [suppliesTab, setSuppliesTab] = useState(defaultSuppliesTab);
+  const optionalTone = cn("text-xs sm:text-sm", supporterHeavy && "opacity-80");
+
+  return (
+    <div className="space-y-6" data-testid="onboarding-path-supplies">
+      <div className="text-center space-y-2">
+        <div className="flex justify-center">
+          <div className="p-3 rounded-full bg-blue-500/10">
+            <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold">Let's sort your supplies</h2>
-          <p className="text-muted-foreground">
-            A couple of numbers so we can predict when you'll run out
-          </p>
         </div>
+        <h2 className="text-2xl font-bold">
+          {pathCare === "mostly_them" ? "Let’s sort their supplies" : "Let’s sort your supplies"}
+        </h2>
+        <p className="text-muted-foreground">
+          {supporterHeavy
+            ? "A couple of numbers so forecasts match their real usage — you can refine later in Supplies."
+            : "A couple of numbers so we can predict when you'll run out"}
+        </p>
+      </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="basics" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
-                <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-basics">
-                  Basics
-                </TabsTrigger>
-                <TabsTrigger value="usage" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-usage">
-                  Usage
-                </TabsTrigger>
-                <TabsTrigger value="optional" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-optional">
-                  Optional
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="basics" className="mt-4 space-y-4">
-                {isPump ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="path-tdd" className="flex items-center gap-1">
-                      Total Daily Dose (units)
-                      <InfoTooltip {...DIABETES_TERMS.tdd} />
-                    </Label>
-                    <Input
-                      id="path-tdd"
-                      type="number"
-                      placeholder="e.g., 40"
-                      value={data.tdd}
-                      onChange={(e) => updateData("tdd", e.target.value)}
-                      data-testid="input-onboarding-tdd"
-                    />
-                    <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-                    <p className="text-xs text-muted-foreground">All insulin your pump delivers in a day</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    We’ll use your daily insulin totals in the next tab to estimate how quickly you go through pens and
-                    vials. Add sensor duration in Optional if you use a CGM.
-                  </p>
-                )}
-              </TabsContent>
-              <TabsContent value="usage" className="mt-4 space-y-4">
-                {isPump ? (
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Your pump delivers basal and bolus together — total daily dose is the main number we use for supply
-                    forecasts. You can refine usage logs later in the Supply Tracker.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="path-short" className="flex items-center gap-1">
-                        Short-Acting (units/day)
-                        <InfoTooltip {...DIABETES_TERMS.shortActing} />
-                      </Label>
-                      <Input
-                        id="path-short"
-                        type="number"
-                        placeholder="e.g., 25"
-                        value={data.shortActingUnitsPerDay}
-                        onChange={(e) => updateData("shortActingUnitsPerDay", e.target.value)}
-                        data-testid="input-onboarding-short-acting"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="path-long" className="flex items-center gap-1">
-                        Long-Acting (units/day)
-                        <InfoTooltip {...DIABETES_TERMS.longActing} />
-                      </Label>
-                      <Input
-                        id="path-long"
-                        type="number"
-                        placeholder="e.g., 20"
-                        value={data.longActingUnitsPerDay}
-                        onChange={(e) => updateData("longActingUnitsPerDay", e.target.value)}
-                        data-testid="input-onboarding-long-acting"
-                      />
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="optional" className="mt-4 space-y-4">
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs value={suppliesTab} onValueChange={setSuppliesTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
+              <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-basics">
+                {isPump ? "Pump basics" : "Basics"}
+              </TabsTrigger>
+              <TabsTrigger value="usage" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-usage">
+                {isPump ? "Pump usage" : "Daily totals"}
+              </TabsTrigger>
+              <TabsTrigger value="optional" className={optionalTone} data-testid="onboarding-path-tab-optional">
+                CGM (optional)
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="basics" className="mt-4 space-y-4">
+              {isPump ? (
                 <div className="space-y-2">
-                  <Label htmlFor="path-cgm" className="flex items-center gap-1">
-                    Sensor Duration (days)
-                    <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
+                  <Label htmlFor="path-tdd" className="flex items-center gap-1">
+                    Total Daily Dose (units)
+                    <InfoTooltip {...DIABETES_TERMS.tdd} />
                   </Label>
                   <Input
-                    id="path-cgm"
+                    id="path-tdd"
                     type="number"
-                    placeholder="e.g., 10 or 14"
-                    value={data.cgmDays}
-                    onChange={(e) => updateData("cgmDays", e.target.value)}
-                    data-testid="input-onboarding-cgm"
+                    placeholder="e.g., 40"
+                    value={data.tdd}
+                    onChange={(e) => updateData("tdd", e.target.value)}
+                    data-testid="input-onboarding-tdd"
                   />
+                  <ClinicalWarningHint warning={validateTDD(data.tdd)} />
+                  <p className="text-xs text-muted-foreground">All insulin your pump delivers in a day</p>
                 </div>
-                <p className="text-xs text-muted-foreground italic">
-                  You can always update these later in Settings.
+              ) : (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {supporterHeavy
+                    ? "We’ll use daily insulin totals in the next tab to estimate how quickly they go through pens and vials. Add sensor duration in CGM (optional) if they use a CGM."
+                    : "We’ll use your daily insulin totals in the next tab to estimate how quickly you go through pens and vials. Add sensor duration in CGM (optional) if you use a CGM."}
                 </p>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (struggle === "meals") {
-    return (
-      <div className="space-y-6" data-testid="onboarding-path-meals">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <div className="p-3 rounded-full bg-amber-500/10">
-              <Utensils className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold">Let's simplify mealtimes</h2>
-          <p className="text-muted-foreground">
-            Your ratios let us suggest doses — even rough numbers help
-          </p>
-        </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="ratios" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
-                <TabsTrigger value="ratios" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ratios">
-                  Ratios
-                </TabsTrigger>
-                <TabsTrigger value="corrections" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-corrections">
-                  Corrections
-                </TabsTrigger>
-                <TabsTrigger value="optional" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-optional-meals">
-                  Optional
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="ratios" className="mt-4 space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-1">
-                  Carb Ratios (units:10g carbs)
-                  <InfoTooltip {...DIABETES_TERMS.carbRatio} />
-                </Label>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Breakfast</Label>
+              )}
+            </TabsContent>
+            <TabsContent value="usage" className="mt-4 space-y-4">
+              {isPump ? (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {supporterHeavy
+                    ? "Pump therapy delivers basal and bolus together — total daily dose is the main number we use for supply forecasts. You can refine usage logs later in the Supply Tracker."
+                    : "Your pump delivers basal and bolus together — total daily dose is the main number we use for supply forecasts. You can refine usage logs later in the Supply Tracker."}
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="path-short" className="flex items-center gap-1">
+                      Short-Acting (units/day)
+                      <InfoTooltip {...DIABETES_TERMS.shortActing} />
+                    </Label>
                     <Input
+                      id="path-short"
                       type="number"
-                      step="0.1"
-                      placeholder="e.g., 1.0"
-                      value={data.breakfastRatio}
-                      onChange={(e) => updateData("breakfastRatio", e.target.value)}
-                      data-testid="input-onboarding-breakfast-ratio"
+                      placeholder="e.g., 25"
+                      value={data.shortActingUnitsPerDay}
+                      onChange={(e) => updateData("shortActingUnitsPerDay", e.target.value)}
+                      data-testid="input-onboarding-short-acting"
                     />
-                    <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.breakfastRatio, "per10g"))} />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Lunch</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="path-long" className="flex items-center gap-1">
+                      Long-Acting (units/day)
+                      <InfoTooltip {...DIABETES_TERMS.longActing} />
+                    </Label>
                     <Input
+                      id="path-long"
                       type="number"
-                      step="0.1"
-                      placeholder="e.g., 0.8"
-                      value={data.lunchRatio}
-                      onChange={(e) => updateData("lunchRatio", e.target.value)}
-                      data-testid="input-onboarding-lunch-ratio"
+                      placeholder="e.g., 20"
+                      value={data.longActingUnitsPerDay}
+                      onChange={(e) => updateData("longActingUnitsPerDay", e.target.value)}
+                      data-testid="input-onboarding-long-acting"
                     />
-                    <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.lunchRatio, "per10g"))} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">Dinner</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder="e.g., 1.0"
-                      value={data.dinnerRatio}
-                      onChange={(e) => updateData("dinnerRatio", e.target.value)}
-                      data-testid="input-onboarding-dinner-ratio"
-                    />
-                    <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.dinnerRatio, "per10g"))} />
                   </div>
                 </div>
-              </TabsContent>
-              <TabsContent value="corrections" className="mt-4 space-y-2">
-                <Label htmlFor="path-correction" className="flex items-center gap-1">
-                  Correction Factor
-                  <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
+              )}
+            </TabsContent>
+            <TabsContent value="optional" className="mt-4 space-y-4">
+              {supporterHeavy ? (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Only needed if they use a CGM/sensor. Skip if you’re not sure — you can add it later.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Optional — only needed if you use a CGM/sensor.
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="path-cgm" className="flex items-center gap-1">
+                  Sensor Duration (days)
+                  <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
                 </Label>
                 <Input
-                  id="path-correction"
+                  id="path-cgm"
                   type="number"
-                  step="0.1"
-                  placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
-                  value={data.correctionFactor}
-                  onChange={(e) => updateData("correctionFactor", e.target.value)}
-                  data-testid="input-onboarding-correction"
+                  placeholder="e.g., 10 or 14"
+                  value={data.cgmDays}
+                  onChange={(e) => updateData("cgmDays", e.target.value)}
+                  data-testid="input-onboarding-cgm"
                 />
-                <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-                <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
-              </TabsContent>
-              <TabsContent value="optional" className="mt-4">
-                <p className="text-xs text-muted-foreground italic">
-                  Not sure? No problem — you can always add these later in Settings, or use our Ratio Adviser to figure
-                  them out.
-                </p>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                You can always update these later in Settings.
+              </p>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
-  if (struggle === "exercise") {
-    return (
-      <div className="space-y-6" data-testid="onboarding-path-exercise">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center">
-            <div className="p-3 rounded-full bg-green-500/10">
-              <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
-            </div>
+function PathDataMealsStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: PathDataUpdate;
+  pathCare: CareContext;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+  const defaultMealsTab = pathCare === "mostly_them" ? "corrections" : "ratios";
+  const [mealsTab, setMealsTab] = useState(defaultMealsTab);
+  const mealsOptionalTone = cn("text-xs sm:text-sm", supporterHeavy && "opacity-80");
+
+  return (
+    <div className="space-y-6" data-testid="onboarding-path-meals">
+      <div className="text-center space-y-2">
+        <div className="flex justify-center">
+          <div className="p-3 rounded-full bg-amber-500/10">
+            <Utensils className="h-6 w-6 text-amber-600 dark:text-amber-400" />
           </div>
-          <h2 className="text-2xl font-bold">Let's make exercise easier</h2>
-          <p className="text-muted-foreground">
-            We need a couple of numbers to give you adjustment suggestions
-          </p>
         </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="basics" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-auto min-h-11 p-1 gap-1">
-                <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ex-basics">
-                  Basics
-                </TabsTrigger>
-                <TabsTrigger value="corrections" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ex-corrections">
-                  Corrections
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="basics" className="mt-4 space-y-2">
-                <Label htmlFor="path-tdd-ex" className="flex items-center gap-1">
-                  Total Daily Dose (units)
-                  <InfoTooltip {...DIABETES_TERMS.tdd} />
-                </Label>
-                <Input
-                  id="path-tdd-ex"
-                  type="number"
-                  placeholder="e.g., 40"
-                  value={data.tdd}
-                  onChange={(e) => updateData("tdd", e.target.value)}
-                  data-testid="input-onboarding-tdd"
-                />
-                <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-                <p className="text-xs text-muted-foreground">All insulin you take in a day — this helps calculate exercise adjustments</p>
-              </TabsContent>
-              <TabsContent value="corrections" className="mt-4 space-y-2">
-                <Label htmlFor="path-correction-ex" className="flex items-center gap-1">
-                  Correction Factor
-                  <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
-                </Label>
-                <Input
-                  id="path-correction-ex"
-                  type="number"
-                  step="0.1"
-                  placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
-                  value={data.correctionFactor}
-                  onChange={(e) => updateData("correctionFactor", e.target.value)}
-                  data-testid="input-onboarding-correction"
-                />
-                <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-                <p className="text-xs text-muted-foreground italic mt-4">
-                  You can always update these later in Settings.
-                </p>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <h2 className="text-2xl font-bold">
+          {pathCare === "mostly_them" ? "Let’s simplify their mealtimes" : "Let’s simplify mealtimes"}
+        </h2>
+        <p className="text-muted-foreground">
+          {supporterHeavy
+            ? "Ratios and corrections help dose suggestions — rough numbers are fine."
+            : "Your ratios let us suggest doses — even rough numbers help"}
+        </p>
       </div>
-    );
-  }
+
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs value={mealsTab} onValueChange={setMealsTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
+              <TabsTrigger value="ratios" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ratios">
+                Ratios
+              </TabsTrigger>
+              <TabsTrigger value="corrections" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-corrections">
+                Corrections
+              </TabsTrigger>
+              <TabsTrigger value="optional" className={mealsOptionalTone} data-testid="onboarding-path-tab-optional-meals">
+                Tips (optional)
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="ratios" className="mt-4 space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                Carb Ratios (units:10g carbs)
+                <InfoTooltip {...DIABETES_TERMS.carbRatio} />
+              </Label>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Breakfast</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 1.0"
+                    value={data.breakfastRatio}
+                    onChange={(e) => updateData("breakfastRatio", e.target.value)}
+                    data-testid="input-onboarding-breakfast-ratio"
+                  />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.breakfastRatio, "per10g"))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Lunch</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 0.8"
+                    value={data.lunchRatio}
+                    onChange={(e) => updateData("lunchRatio", e.target.value)}
+                    data-testid="input-onboarding-lunch-ratio"
+                  />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.lunchRatio, "per10g"))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Dinner</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 1.0"
+                    value={data.dinnerRatio}
+                    onChange={(e) => updateData("dinnerRatio", e.target.value)}
+                    data-testid="input-onboarding-dinner-ratio"
+                  />
+                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.dinnerRatio, "per10g"))} />
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="corrections" className="mt-4 space-y-2">
+              <Label htmlFor="path-correction" className="flex items-center gap-1">
+                Correction Factor
+                <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
+              </Label>
+              <Input
+                id="path-correction"
+                type="number"
+                step="0.1"
+                placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
+                value={data.correctionFactor}
+                onChange={(e) => updateData("correctionFactor", e.target.value)}
+                data-testid="input-onboarding-correction"
+              />
+              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
+              <p className="text-xs text-muted-foreground">
+                {pathCare === "mostly_them"
+                  ? "How much 1 unit lowers their blood sugar"
+                  : "How much 1 unit lowers your blood sugar"}
+              </p>
+            </TabsContent>
+            <TabsContent value="optional" className="mt-4">
+              <p className="text-xs text-muted-foreground italic">
+                Not sure? No problem — you can always add these later in Settings, or use our Ratio Adviser to figure
+                them out.
+              </p>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PathDataExerciseStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: PathDataUpdate;
+  pathCare: CareContext;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+  const defaultExerciseTab = pathCare === "mostly_them" ? "corrections" : "basics";
+  const [exerciseTab, setExerciseTab] = useState(defaultExerciseTab);
+  const correctionsTone = cn("text-xs sm:text-sm", supporterHeavy && pathCare !== "mostly_them" && "opacity-90");
+
+  return (
+    <div className="space-y-6" data-testid="onboarding-path-exercise">
+      <div className="text-center space-y-2">
+        <div className="flex justify-center">
+          <div className="p-3 rounded-full bg-green-500/10">
+            <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold">
+          {pathCare === "mostly_them" ? "Let’s make activity easier for them" : "Let’s make exercise easier"}
+        </h2>
+        <p className="text-muted-foreground">
+          {supporterHeavy
+            ? "A couple of numbers help us suggest safer adjustments around activity."
+            : "We need a couple of numbers to give you adjustment suggestions"}
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs value={exerciseTab} onValueChange={setExerciseTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 h-auto min-h-11 p-1 gap-1">
+              <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ex-basics">
+                Basics
+              </TabsTrigger>
+              <TabsTrigger value="corrections" className={correctionsTone} data-testid="onboarding-path-tab-ex-corrections">
+                Corrections
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="basics" className="mt-4 space-y-2">
+              <Label htmlFor="path-tdd-ex" className="flex items-center gap-1">
+                Total Daily Dose (units)
+                <InfoTooltip {...DIABETES_TERMS.tdd} />
+              </Label>
+              <Input
+                id="path-tdd-ex"
+                type="number"
+                placeholder="e.g., 40"
+                value={data.tdd}
+                onChange={(e) => updateData("tdd", e.target.value)}
+                data-testid="input-onboarding-tdd"
+              />
+              <ClinicalWarningHint warning={validateTDD(data.tdd)} />
+              <p className="text-xs text-muted-foreground">
+                {pathCare === "mostly_them"
+                  ? "All insulin they take in a day — this helps calculate exercise adjustments"
+                  : "All insulin you take in a day — this helps calculate exercise adjustments"}
+              </p>
+            </TabsContent>
+            <TabsContent value="corrections" className="mt-4 space-y-2">
+              <Label htmlFor="path-correction-ex" className="flex items-center gap-1">
+                Correction Factor
+                <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
+              </Label>
+              <Input
+                id="path-correction-ex"
+                type="number"
+                step="0.1"
+                placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
+                value={data.correctionFactor}
+                onChange={(e) => updateData("correctionFactor", e.target.value)}
+                data-testid="input-onboarding-correction"
+              />
+              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
+              <p className="text-xs text-muted-foreground italic mt-4">
+                You can always update these later in Settings.
+              </p>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function PathDataOverviewStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: PathDataUpdate;
+  pathCare: CareContext;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+  const defaultOverviewTab = pathCare === "mostly_them" ? "sensors" : "basics";
+  const [overviewTab, setOverviewTab] = useState(defaultOverviewTab);
+  const sensorsTone = cn("text-xs sm:text-sm", supporterHeavy && pathCare !== "mostly_them" && "opacity-90");
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-overview">
@@ -1098,20 +1216,24 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
             <LayoutDashboard className="h-6 w-6 text-purple-600 dark:text-purple-400" />
           </div>
         </div>
-        <h2 className="text-2xl font-bold">Your all-in-one hub</h2>
+        <h2 className="text-2xl font-bold">
+          {pathCare === "mostly_them" ? "A calmer overview for their care" : "Your all-in-one hub"}
+        </h2>
         <p className="text-muted-foreground">
-          A few details so we can make everything work together
+          {supporterHeavy
+            ? "Start with what you know now — you can layer in detail later."
+            : "A few details so we can make everything work together"}
         </p>
       </div>
 
       <Card>
         <CardContent className="pt-6">
-          <Tabs defaultValue="basics" className="w-full">
+          <Tabs value={overviewTab} onValueChange={setOverviewTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-auto min-h-11 p-1 gap-1">
               <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ov-basics">
                 Basics
               </TabsTrigger>
-              <TabsTrigger value="sensors" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-sensors">
+              <TabsTrigger value="sensors" className={sensorsTone} data-testid="onboarding-path-tab-sensors">
                 Sensors
               </TabsTrigger>
             </TabsList>
@@ -1153,6 +1275,26 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
       </Card>
     </div>
   );
+}
+
+function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: PathDataUpdate }) {
+  const struggle = data.struggle;
+  const pathCare = getPathDataCareContext(data);
+
+  if (!struggle) return null;
+
+  switch (struggle) {
+    case "supplies":
+      return <PathDataSuppliesStep data={data} updateData={updateData} pathCare={pathCare} />;
+    case "meals":
+      return <PathDataMealsStep data={data} updateData={updateData} pathCare={pathCare} />;
+    case "exercise":
+      return <PathDataExerciseStep data={data} updateData={updateData} pathCare={pathCare} />;
+    case "overview":
+      return <PathDataOverviewStep data={data} updateData={updateData} pathCare={pathCare} />;
+    default:
+      return null;
+  }
 }
 
 function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
