@@ -19,7 +19,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { Disclaimer } from "@/components/disclaimer";
+import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile } from "@/lib/storage";
@@ -287,7 +287,7 @@ export default function DrivingScenarioPage() {
           />
         </div>
 
-        <Disclaimer className="text-xs border border-border/60 rounded-lg p-3 bg-muted/20" />
+        <ScenarioToolDisclaimer />
 
         {profile?.insulinDeliveryMethod === "pump" && (
           <Alert data-testid="alert-driving-pump">

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { Disclaimer } from "@/components/disclaimer";
+import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { storage, type PumpFailureSession } from "@/lib/storage";
 import { schedulePumpFailureReminders, cancelPumpFailureReminders } from "@/lib/pump-failure-reminders";
@@ -106,7 +106,7 @@ export default function PumpFailurePage() {
         description="Emergency-style steps when delivery stops unexpectedly. This is educational — always follow your clinic's written backup plan."
       />
 
-      <Disclaimer className="text-xs border border-border/60 rounded-lg p-3 bg-muted/20" />
+      <ScenarioToolDisclaimer />
 
       <Alert variant="destructive" className="border-destructive/50">
         <AlertTriangle className="h-4 w-4" />
