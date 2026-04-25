@@ -900,21 +900,38 @@ export default function CommunityHomePage() {
             />
             <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
             {composerPostKind === "standard" && composerPreviews.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {composerPreviews.map((src, i) => (
-                  <div key={src} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-border">
-                    <img src={src} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      className="absolute right-0.5 top-0.5 rounded-full bg-background/90 p-0.5 shadow"
-                      onClick={() => removeComposerImage(i)}
-                      aria-label="Remove image"
-                      disabled={submitting}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
+              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Attached photos
+                  <span className="ml-1.5 tabular-nums text-foreground/80">({composerPreviews.length})</span>
+                </p>
+                <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:thin]">
+                  {composerPreviews.map((src, i) => {
+                    const name = composerFiles[i]?.name?.trim() || `Photo ${i + 1}`;
+                    return (
+                      <div
+                        key={`${src}-${i}`}
+                        className="relative w-[5.5rem] shrink-0 sm:w-24"
+                      >
+                        <div className="relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
+                          <img src={src} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeComposerImage(i)}
+                            aria-label={`Remove ${name}`}
+                            disabled={submitting}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <p className="mt-1.5 truncate text-center text-[10px] leading-tight text-muted-foreground sm:text-xs" title={name}>
+                          {name}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
             {composerPostKind === "standard" && composerPreviews.length > 0 ? (

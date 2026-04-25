@@ -58,14 +58,17 @@ function ScenarioCard({ href, icon: Icon, title, description }: ScenarioCardDef)
   return (
     <Link
       href={href}
-      className="pressable block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className="group pressable block h-full min-w-0 w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       <Card
         variant="glass"
-        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 sm:min-h-[7.75rem] sm:px-6 sm:py-6"
+        className="pressable card-interactive flex h-full min-h-[7.25rem] w-full cursor-pointer flex-col gap-3 rounded-2xl px-5 py-5 ring-1 ring-inset ring-transparent transition-[ring-color,background-color] duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] sm:min-h-[7.75rem] sm:px-6 sm:py-6 group-hover:bg-muted/15 group-hover:ring-primary/15 dark:group-hover:ring-primary/25"
       >
         <div className="flex items-start gap-3 sm:gap-4">
-          <Icon className="mt-0.5 h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" aria-hidden />
+          <Icon
+            className="mt-0.5 h-7 w-7 shrink-0 origin-top-left text-primary transition-transform duration-[var(--app-motion-duration)] ease-[var(--app-motion-ease)] group-hover:scale-105 sm:h-8 sm:w-8"
+            aria-hidden
+          />
           <div className="min-w-0 flex-1">
             <h3 className="font-display text-h3 font-semibold text-foreground">{title}</h3>
             <p className="text-small mt-1.5 leading-relaxed text-muted-foreground sm:text-[0.9375rem]">{description}</p>
@@ -134,7 +137,7 @@ export default function Scenarios() {
         }
       />
 
-      <div className="mt-2 grid w-full grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+      <div className="mt-2 grid w-full grid-cols-1 gap-6 md:grid-cols-2">
         {SCENARIO_CARDS.map((c, idx) => (
           <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
             <ScenarioCard {...c} />

@@ -224,6 +224,47 @@ interface OnboardingProps {
   onComplete?: (pathOverride?: string) => void;
 }
 
+const ONBOARDING_STEP_LABELS: Partial<Record<Step, string>> = {
+  care_context: "Care",
+  struggle: "Focus",
+  details: "Details",
+  disclaimer: "Terms",
+};
+
+function OnboardingStepPills({ steps, currentStep }: { steps: Step[]; currentStep: Step }) {
+  if (currentStep === "welcome" || currentStep === "first_win") return null;
+  const rail = steps.filter((s) => s !== "welcome" && s !== "first_win") as Exclude<Step, "welcome" | "first_win">[];
+  const activeIdx = rail.indexOf(currentStep as (typeof rail)[number]);
+  if (activeIdx < 0) return null;
+
+  return (
+    <nav
+      className="flex flex-wrap justify-center gap-1.5 px-1 pt-1 sm:gap-2"
+      aria-label="Onboarding steps"
+    >
+      {rail.map((step, i) => {
+        const done = i < activeIdx;
+        const current = i === activeIdx;
+        const label = ONBOARDING_STEP_LABELS[step] ?? step;
+        return (
+          <span
+            key={step}
+            aria-current={current ? "step" : undefined}
+            className={cn(
+              "inline-flex max-w-[6.5rem] items-center justify-center truncate rounded-full border px-2.5 py-1 text-center text-[10px] font-medium uppercase tracking-wide sm:max-w-none sm:text-xs",
+              done && "border-primary/30 bg-primary/10 text-foreground",
+              current && "border-primary bg-primary text-primary-foreground shadow-sm",
+              !done && !current && "border-border/50 bg-muted/40 text-muted-foreground",
+            )}
+          >
+            {label}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -420,11 +461,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           </div>
         )}
 
-        {stepLabel && (
-          <p className="text-center text-xs font-medium text-muted-foreground tracking-wide uppercase">
+        {stepLabel ? (
+          <p className="sr-only" aria-live="polite">
             {stepLabel}
           </p>
-        )}
+        ) : null}
+        <OnboardingStepPills steps={steps} currentStep={currentStep} />
 
         {showProgress && (
           <Progress value={progress} className="h-1.5" data-testid="progress-onboarding" />

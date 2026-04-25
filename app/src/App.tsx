@@ -23,6 +23,7 @@ import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -237,6 +238,47 @@ function useNativeLocalNotificationDeepLinks() {
   }, [setLocation]);
 }
 
+/** Mirrors signed-in shell (backdrop, top bar, content, bottom nav) while auth/session resolves. */
+function SessionLoadingSkeleton() {
+  return (
+    <div
+      className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground"
+      aria-busy="true"
+      aria-label="Loading app"
+    >
+      <AppShellBackdrop tone="rich" />
+      <header className="relative z-[1] border-b border-border/50 bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-4xl items-center gap-3 px-4 md:px-6">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
+          <Skeleton className="h-6 flex-1 rounded-md skeleton-shimmer sm:max-w-[12rem]" />
+          <div className="flex shrink-0 gap-2">
+            <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
+            <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
+          </div>
+        </div>
+      </header>
+      <main
+        className="relative z-[1] flex-1 space-y-4 overflow-x-hidden p-4 md:p-6"
+        style={{ paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 0.5rem)" }}
+      >
+        <Skeleton className="h-8 w-52 max-w-full rounded-lg skeleton-shimmer" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Skeleton className="h-40 w-full rounded-2xl skeleton-shimmer" />
+          <Skeleton className="h-40 w-full rounded-2xl skeleton-shimmer" />
+        </div>
+        <Skeleton className="h-28 w-full rounded-2xl skeleton-shimmer" />
+      </main>
+      <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-end justify-between gap-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-10 w-10 shrink-0 rounded-xl skeleton-shimmer" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Protects the main app layout: redirects to /login when not authenticated, /check-email when not verified. */
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -292,13 +334,7 @@ function AuthOnlyLayout({ children }: { children: React.ReactNode }) {
   }, [loading, user, pathname, search, setLocation]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <div className="animate-pulse text-muted-foreground">
-          Checking session...
-        </div>
-      </div>
-    );
+    return <SessionLoadingSkeleton />;
   }
 
   if (!user) return null;
