@@ -74,6 +74,7 @@ export default function CorrectionHelpPage() {
 
   const unitLabel = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const isPump = profile?.insulinDeliveryMethod === "pump";
+  const exercisedRecently24h = storage.didExerciseRecently(24);
 
   const recentHypoCount = useMemo(() => {
     return hypoTreatmentsInRollingHours(storage.getHypoTreatments(), 7 * 24).length;
@@ -112,6 +113,14 @@ export default function CorrectionHelpPage() {
           <AlertDescription className="text-sm">
             You&apos;ve logged <strong>{recentHypoCount}</strong> hypo treatments in the
             last 7 days. Be extra cautious stacking corrections — check IOB and your team&apos;s plan for lows.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {exercisedRecently24h && (
+        <Alert className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20" data-testid="alert-correction-recent-exercise">
+          <AlertDescription className="text-sm">
+            <strong>Recent exercise:</strong> you may be more insulin sensitive for up to 24 hours. Be cautious stacking corrections and watch for delayed lows (especially overnight).
           </AlertDescription>
         </Alert>
       )}

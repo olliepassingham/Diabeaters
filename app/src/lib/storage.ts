@@ -54,6 +54,7 @@ const STORAGE_KEYS = {
   EXERCISE_OUTCOMES: "diabeater_exercise_outcomes",
   ALCOHOL_SESSION: "diabeater_alcohol_session",
   PUMP_FAILURE_SESSION: "diabeater_pump_failure_session",
+  LAST_EXERCISE_ENDED_AT: "diabeater_last_exercise_ended_at",
 } as const;
 
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
@@ -937,6 +938,34 @@ function generateId(): string {
 }
 
 export const storage = {
+  getLastExerciseEndedAt(): string | null {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.LAST_EXERCISE_ENDED_AT);
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * True if the user finished an exercise session within the last `hours`.
+   * Used for educational risk nudges (e.g. Bedtime: “exercise today”).
+   */
+  didExerciseRecently(hours = 24): boolean {
+    const iso = this.getLastExerciseEndedAt();
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return false;
+    return Date.now() - t <= hours * 60 * 60 * 1000;
+  },
+
+  /** Record exercise end timestamp for “next 24h” educational nudges. */
+  recordExerciseEndedAt(endedAtIso: string): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.LAST_EXERCISE_ENDED_AT, endedAtIso);
+    } catch {
+      /* ignore */
+    }
+  },
   getProfile(): UserProfile | null {
     const data = localStorage.getItem(STORAGE_KEYS.PROFILE);
     return data ? JSON.parse(data) : null;
@@ -3295,6 +3324,8 @@ export const storage = {
     if (!session) return null;
     const now = new Date();
     const recoveryEnds = new Date(now.getTime() + session.recoveryMinutes * 60 * 1000);
+    // Mark “exercise ended” for next-24h educational nudges (e.g. Bedtime).
+    this.recordExerciseEndedAt(now.toISOString());
     return this.updateActiveExercise({
       phase: "recovery",
       exerciseEndedAt: now.toISOString(),
@@ -3304,6 +3335,11 @@ export const storage = {
 
   endExerciseSession(): ActiveExerciseSession | null {
     const session = this.getActiveExercise();
+    // If a session actually started (active/recovery), record an end time for next-24h nudges.
+    if (session?.exerciseStartedAt) {
+      const endedIso = session.exerciseEndedAt || new Date().toISOString();
+      this.recordExerciseEndedAt(endedIso);
+    }
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
     return session;
   },

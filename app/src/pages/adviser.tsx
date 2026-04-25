@@ -46,6 +46,7 @@ export default function Adviser() {
   const [cameFromRatios, setCameFromRatios] = useState(false);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [recentHypoCount48h, setRecentHypoCount48h] = useState(0);
+  const exercisedRecently24h = storage.didExerciseRecently(24);
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
 
@@ -324,6 +325,15 @@ export default function Adviser() {
             <strong className="font-semibold">Recent hypo:</strong>{" "}
             {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} logged in the last 48 hours — take extra
             care with boluses and corrections.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {exercisedRecently24h && (
+        <Alert className="mb-3 border-emerald-300/60 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20" data-testid="banner-recent-exercise-adviser">
+          <Dumbbell className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+          <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100">
+            <strong>Recent exercise:</strong> sensitivity can be higher for up to 24 hours. Be extra cautious with corrections and watch for delayed lows (especially overnight).
           </AlertDescription>
         </Alert>
       )}

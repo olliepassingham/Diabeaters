@@ -143,6 +143,8 @@ export default function Bedtime() {
     setProfile(storage.getProfile());
     setScenarioState(storage.getScenarioState());
     setBedtimeLogs(storage.getBedtimeLogs());
+    // Auto-nudge based on recent exercise sessions (within last 24h).
+    setExercisedToday(storage.didExerciseRecently(24));
   }, []);
 
   useEffect(() => {

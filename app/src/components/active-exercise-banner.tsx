@@ -34,6 +34,7 @@ import {
   buildExerciseScenarioPlannerHrefFromSession,
   trendForPlannerFromActiveSession,
 } from "@/lib/exercise-planner-href";
+import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
 import { cn } from "@/lib/utils";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import {
@@ -710,6 +711,8 @@ export function ActiveExerciseBanner() {
       }
     }
     storage.startExercisePhase();
+    const updated = storage.getActiveExercise();
+    if (updated) void scheduleExerciseActiveReminders(updated);
     loadSession();
     setExpanded(true);
   }, [preDraftBg, preDraftTrend, loadSession, toast]);
@@ -721,6 +724,8 @@ export function ActiveExerciseBanner() {
   };
 
   const handleEndSession = () => {
+    const existing = storage.getActiveExercise();
+    if (existing) void cancelExerciseReminders(existing.id);
     const s = storage.endExerciseSession();
     if (s) {
       setEndingSession(s);
@@ -730,6 +735,8 @@ export function ActiveExerciseBanner() {
   };
 
   const handleSkipRecovery = () => {
+    const existing = storage.getActiveExercise();
+    if (existing) void cancelExerciseReminders(existing.id);
     const s = storage.endExerciseSession();
     if (s) {
       setEndingSession(s);
@@ -782,6 +789,8 @@ export function ActiveExerciseBanner() {
   };
 
   const handleCancelSession = () => {
+    const existing = storage.getActiveExercise();
+    if (existing) void cancelExerciseReminders(existing.id);
     storage.endExerciseSession();
     setSession(null);
   };

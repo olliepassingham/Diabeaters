@@ -41,6 +41,7 @@ export function AppStatusStrip() {
   const online = useOnline();
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
   const [ex, setEx] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
+  const exercisedRecently24h = storage.didExerciseRecently(24);
 
   useEffect(() => {
     const tick = window.setInterval(() => {
@@ -51,7 +52,8 @@ export function AppStatusStrip() {
   }, []);
 
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
-  const show = sc.sickDayActive || sc.travelModeActive || Boolean(ex) || sc.pumpFailureActive || !online;
+  const show =
+    sc.sickDayActive || sc.travelModeActive || Boolean(ex) || exercisedRecently24h || sc.pumpFailureActive || !online;
   if (!show) return null;
 
   const sickTone =
@@ -126,6 +128,13 @@ export function AppStatusStrip() {
         <Badge className="chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200" variant="secondary">
           <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
           Exercise · {ex.phase}
+        </Badge>
+      ) : null}
+
+      {!ex && exercisedRecently24h ? (
+        <Badge className="chip border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200" variant="secondary">
+          <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Post‑exercise · 24h
         </Badge>
       ) : null}
 

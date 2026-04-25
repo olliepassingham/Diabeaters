@@ -9,7 +9,7 @@ export default function ScenarioExercisePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Exercise"
-        description="Plan activity with carbs, checks, and bolus adjustments — always confirm with your care team."
+        description="Plan activity with carbs, checks, and insulin-unit adjustments — always confirm with your care team."
         actions={
           <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
             <Link href="/routines?section=exercise" data-testid="link-exercise-routines-header">

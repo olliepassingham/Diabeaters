@@ -33,6 +33,7 @@ export default function HypoHelpPage() {
   } | null>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
+  const exercisedRecently24h = storage.didExerciseRecently(24);
 
   useEffect(() => {
     const p = storage.getProfile();
@@ -101,6 +102,13 @@ export default function HypoHelpPage() {
           <CardDescription>How much glucose you may need from your current reading to your target</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {exercisedRecently24h && (
+            <Alert className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20" data-testid="alert-hypo-recent-exercise">
+              <AlertDescription className="text-sm">
+                <strong>Recent exercise:</strong> delayed lows are more likely for some people for up to 24 hours after. Keep fast carbs nearby and consider extra checks, especially overnight.
+              </AlertDescription>
+            </Alert>
+          )}
           {profile?.insulinDeliveryMethod === "pump" && (
             <Alert data-testid="alert-hypo-pump-note">
               <AlertDescription className="text-sm">

@@ -53,6 +53,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { buildExercisePersonalizationLines } from "@/lib/exercise-personalization";
+import { scheduleExercisePreReminders } from "@/lib/exercise-reminders";
 
 type MealTypeForBolus = "snack" | "breakfast" | "lunch" | "dinner";
 
@@ -263,12 +264,13 @@ export function ExercisePlanner() {
       if (!exerciseDuration || Number.isNaN(duration) || duration < 1) return;
 
       const exerciseName = `${exerciseLabelsMap[exerciseType] || "Exercise"} · ${exerciseIntensity} · ${duration} min`;
-      storage.startExerciseSession({
+      const session = storage.startExerciseSession({
         exerciseName,
         exerciseType: exerciseType as ExerciseType,
         intensity: exerciseIntensity as ExerciseIntensity,
         durationMinutes: duration,
       });
+      void scheduleExercisePreReminders(session, minutesUntilStart);
 
       // Update local state so any downstream "sync=active" flows stay aligned.
       setScenarioState(storage.getScenarioState());
@@ -441,7 +443,7 @@ export function ExercisePlanner() {
                     Exercise planner
                   </CardTitle>
                   <CardDescription>
-                    Set your session, then open Food &amp; insulin if you want carb or bolus estimates.
+                    Set your session, then open Food &amp; insulin if you want carb or insulin-unit estimates.
                   </CardDescription>
                 </div>
                 <PageInfoDialog title="How this planner works" description="What you see and what is optional">
@@ -453,7 +455,7 @@ export function ExercisePlanner() {
                   </InfoSection>
                   <InfoSection title="Food &amp; insulin (optional)">
                     <p>
-                      Expand that section to add BG, carbs, meal type, and optional bolus fields for a preview aligned with
+                      Expand that section to add BG, carbs, meal type, and optional insulin-unit fields for a preview aligned with
                       the Meal Adviser logic. Skip it if you only want general workout guidance.
                     </p>
                   </InfoSection>
@@ -543,7 +545,7 @@ export function ExercisePlanner() {
               <InlineInfoHint
                 ariaLabel="What this section covers"
                 className="shrink-0"
-                content="BG, carbs, meal type for ratios, optional planned bolus units, then recent rapid-acting insulin — enough for preview and tips."
+                content="BG and carbs are the key ones. Add meal type for ratios, optional planned insulin units, then last rapid‑acting insulin timing — enough for a preview and safer tips."
               />
               <CollapsibleTrigger asChild>
                 <button
@@ -627,12 +629,17 @@ export function ExercisePlanner() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="approx-carbs">Carbs you will eat or already had (g)</Label>
+                  <FieldLabelWithInfo
+                    htmlFor="approx-carbs"
+                    info="Enter carbs if you want an insulin-unit preview using your saved ratios. Leave blank to skip food/insulin guidance."
+                  >
+                    Carbs for this food/snack (grams)
+                  </FieldLabelWithInfo>
                   <Input
                     id="approx-carbs"
                     type="number"
                     min={0}
-                    placeholder="e.g. 30 — needed for bolus preview"
+                    placeholder="e.g. 30"
                     value={approxCarbs}
                     onChange={(e) => setApproxCarbs(e.target.value)}
                     data-testid="input-approx-carbs"
@@ -645,11 +652,8 @@ export function ExercisePlanner() {
                 const showMealType = approxCarbs.trim() !== "" && !Number.isNaN(c) && c > 0;
                 return showMealType ? (
                   <div className="space-y-2">
-                    <FieldLabelWithInfo
-                      htmlFor="meal-type-bolus"
-                      info="Uses your saved insulin:carb ratio for that meal."
-                    >
-                      Which meal is this for?
+                    <FieldLabelWithInfo htmlFor="meal-type-bolus" info="So we can use the right saved ratio for that time of day.">
+                      Which ratio should we use?
                     </FieldLabelWithInfo>
                     <Select
                       value={mealTypeForBolus}
@@ -673,15 +677,15 @@ export function ExercisePlanner() {
                 <div className="space-y-2">
                   <FieldLabelWithInfo
                     htmlFor="planned-bolus-units"
-                    info="If you already know how many units you plan for this food, enter it — results compare to the carb-based estimate (does not replace your care team's plan)."
+                    info="Optional: if you already have a number in mind, we’ll compare it to the carb-based preview (educational only)."
                   >
-                    Planned bolus for this food (units, optional)
+                    Planned rapid‑acting insulin for this food (units, optional)
                   </FieldLabelWithInfo>
                   <Input
                     id="planned-bolus-units"
                     type="text"
                     inputMode="decimal"
-                    placeholder="e.g. 4 — compared to preview after you plan"
+                    placeholder="e.g. 4"
                     value={plannedBolusUnitsInput}
                     onChange={(e) => setPlannedBolusUnitsInput(e.target.value)}
                     data-testid="input-planned-bolus-units"
@@ -690,20 +694,20 @@ export function ExercisePlanner() {
                 <div className="space-y-2">
                   <FieldLabelWithInfo
                     htmlFor="last-insulin"
-                    info="Meal bolus or correction — whichever was most recent. Not basal insulin."
+                    info="This helps warn about insulin still working (IOB). Rapid‑acting only — not long‑acting/basal."
                   >
-                    Last rapid-acting insulin (meal or correction)
+                    When did you last take rapid‑acting insulin?
                   </FieldLabelWithInfo>
                   <Select
                     value={lastInsulinTiming || "unset"}
                     onValueChange={(v) => setLastInsulinTiming(v === "unset" ? "" : (v as LastInsulinTiming))}
                   >
                     <SelectTrigger id="last-insulin" data-testid="select-last-insulin">
-                      <SelectValue placeholder="Optional" />
+                      <SelectValue placeholder="Select (or skip)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unset">Skip</SelectItem>
-                      <SelectItem value="none">No recent bolus / not sure</SelectItem>
+                      <SelectItem value="unset">Skip this</SelectItem>
+                      <SelectItem value="none">Not sure / none recently</SelectItem>
                       <SelectItem value="lt_1h">Under 1 hour ago</SelectItem>
                       <SelectItem value="h1_2">1–2 hours ago</SelectItem>
                       <SelectItem value="h2_4">2–4 hours ago</SelectItem>
@@ -720,15 +724,15 @@ export function ExercisePlanner() {
                 <div className="space-y-2">
                   <FieldLabelWithInfo
                     htmlFor="last-bolus-units"
-                    info="Optional — how many units were in that bolus. Shown for context only; the time you chose above still drives general insulin-on-board tips."
+                    info="Optional: helps you remember what you took. The timing you chose above is what drives the safety tips."
                   >
-                    Last rapid bolus amount (units, optional)
+                    How many units was that? (optional)
                   </FieldLabelWithInfo>
                   <Input
                     id="last-bolus-units"
                     type="text"
                     inputMode="decimal"
-                    placeholder="e.g. 6 — meal or correction"
+                    placeholder="e.g. 6"
                     value={lastBolusUnitsInput}
                     onChange={(e) => setLastBolusUnitsInput(e.target.value)}
                     data-testid="input-last-bolus-units"
@@ -811,11 +815,11 @@ export function ExercisePlanner() {
                         </span>
                         {mealBolusPreviewPersonalized && mealBolusPreview ? (
                           <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
-                            ~{mealBolusPreview.dose}u bolus (−{mealBolusPreview.exerciseReduction}%)
+                            ~{mealBolusPreview.dose}u insulin (−{mealBolusPreview.exerciseReduction}%)
                           </span>
                         ) : (
                           <span className="rounded-full bg-background/70 px-2 py-1 border border-border/60">
-                            Bolus guide {exerciseResult.pre.bolusReduction}
+                            Insulin guide {exerciseResult.pre.bolusReduction}
                           </span>
                         )}
                         {currentBgInput.trim() !== "" ? (
@@ -913,7 +917,7 @@ export function ExercisePlanner() {
                     className="rounded-xl border border-amber-200/80 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-3 text-sm text-foreground"
                     data-testid="exercise-meal-bolus-no-ratios"
                   >
-                    <p className="font-medium">Add carb ratios to see a bolus preview</p>
+                    <p className="font-medium">Add carb ratios to see an insulin-unit preview</p>
                     <p className="text-tiny text-muted-foreground mt-1">
                       Enter your insulin:carb ratios (or TDD) in settings so we can estimate units from the carbs you
                       entered.
@@ -930,9 +934,9 @@ export function ExercisePlanner() {
                     data-testid="exercise-meal-bolus-preview"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">Meal bolus preview</p>
+                      <p className="text-sm font-semibold text-foreground">Meal insulin preview</p>
                       <InlineInfoHint
-                        ariaLabel="About this bolus preview"
+                        ariaLabel="About this insulin preview"
                         content="Educational only — same time-to-exercise logic as Meal & ratios. Confirm with your care team."
                       />
                     </div>
@@ -959,7 +963,7 @@ export function ExercisePlanner() {
                         data-testid="exercise-planned-bolus-compare"
                       >
                         <p className="text-sm text-foreground">
-                          <span className="font-medium">Your planned bolus:</span> {plannedBolusCompare.userUnits}u ·{" "}
+                          <span className="font-medium">Your planned insulin:</span> {plannedBolusCompare.userUnits}u ·{" "}
                           <span className="font-medium">Carb-based preview:</span> {plannedBolusCompare.previewDose}u (Δ{" "}
                           {plannedBolusCompare.deltaAbs.toFixed(1)}u)
                         </p>
@@ -985,7 +989,7 @@ export function ExercisePlanner() {
                         <div className="space-y-2 pt-2 text-tiny text-muted-foreground">
                           {lastBolusUnitsParsed !== null ? (
                             <p data-testid="exercise-last-bolus-note">
-                              You noted {lastBolusUnitsParsed}u for your most recent rapid bolus — context only; timing
+                              You noted {lastBolusUnitsParsed}u for your most recent rapid‑acting insulin — context only; timing
                               above still drives IOB tips.
                             </p>
                           ) : null}
@@ -1008,7 +1012,7 @@ export function ExercisePlanner() {
                     <p className="text-sm font-medium text-foreground">BG and fuel</p>
                     {mealBolusPreviewPersonalized && mealBolusPreview ? (
                       <InlineInfoHint
-                        ariaLabel="How general workout bolus bands relate to your preview"
+                        ariaLabel="How general workout insulin bands relate to your preview"
                         content={`General intensity band from this workout plan: ${exerciseResult.pre.bolusReduction} — your team may use different rules; the preview above uses time-to-exercise like the calculator.`}
                       />
                     ) : null}
@@ -1024,7 +1028,7 @@ export function ExercisePlanner() {
                   )}
                   {!mealBolusPreviewPersonalized || !mealBolusPreview ? (
                     <TipRow>
-                      <strong>Meal bolus:</strong> reduce by {exerciseResult.pre.bolusReduction} if eating before
+                      <strong>Meal insulin:</strong> reduce by {exerciseResult.pre.bolusReduction} if eating before
                     </TipRow>
                   ) : null}
                 </div>
@@ -1100,7 +1104,7 @@ export function ExercisePlanner() {
                 </div>
 
                 <TipRow>
-                  <strong>Recovery meal bolus:</strong> reduce by {exerciseResult.post.bolusReduction}
+                  <strong>Recovery meal insulin:</strong> reduce by {exerciseResult.post.bolusReduction}
                 </TipRow>
 
                 <details className="rounded-xl border border-border/60 bg-card px-3 py-2">

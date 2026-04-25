@@ -16,8 +16,8 @@ type FieldLabelWithInfoProps = {
 /** Label plus click-to-open helper (popover). Keeps forms scannable without hiding the label. */
 export function FieldLabelWithInfo({ htmlFor, children, info, className }: FieldLabelWithInfoProps) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      <Label htmlFor={htmlFor} className="mb-0 cursor-default">
+    <div className={cn("flex items-start gap-1.5", className)}>
+      <Label htmlFor={htmlFor} className="mb-0 flex-1 min-w-0 cursor-default leading-snug">
         {children}
       </Label>
       <Popover>
