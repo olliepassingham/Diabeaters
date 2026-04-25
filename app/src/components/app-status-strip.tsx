@@ -34,7 +34,7 @@ function daysRemaining(endIsoOrDate: string | undefined): number | null {
 
 /**
  * Compact status strip shown under the top bar.
- * Consolidates Sick Day / Travel / Exercise / Offline into one row (wraps on very small screens).
+ * One row per active context so actions are unambiguous on phones.
  */
 export function AppStatusStrip() {
   const { toast } = useToast();
@@ -97,111 +97,110 @@ export function AppStatusStrip() {
     toast({ title: "Pump failure mode ended", description: "Session cleared." });
   };
 
+  const rowClass =
+    "flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
+  const btnClass = "h-7 px-2 text-xs";
+
   return (
-    <div
-      className="relative z-40 -mt-2 mb-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/60 bg-background/55 px-2.5 py-1.5 backdrop-blur sm:gap-2 sm:px-3 sm:py-2 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
-      data-testid="app-status-strip"
-    >
+    <div className="relative z-40 -mt-2 mb-2 space-y-2" data-testid="app-status-strip">
       {!online ? (
-        <Badge className={cn("chip border border-border/60 bg-muted/50 text-muted-foreground", "max-w-full")} variant="secondary">
-          <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Offline
-        </Badge>
+        <div className={rowClass}>
+          <Badge className={cn("chip border border-border/60 bg-muted/50 text-muted-foreground", "max-w-full")} variant="secondary">
+            <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Offline
+          </Badge>
+        </div>
       ) : null}
 
       {sc.sickDayActive ? (
-        <Badge className={cn("chip border", sickTone)} variant="secondary">
-          <Thermometer className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Sick Day{sc.sickDaySeverity ? ` · ${sc.sickDaySeverity}` : ""}
-        </Badge>
+        <div className={rowClass}>
+          <Badge className={cn("chip border", sickTone)} variant="secondary">
+            <Thermometer className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Sick Day{sc.sickDaySeverity ? ` · ${sc.sickDaySeverity}` : ""}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <Link href="/scenarios/sick-day#sickday-checklist">
+              <Button size="sm" variant="outline" className={btnClass} data-testid="status-sick-view">
+                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className={btnClass} onClick={handleEndSick} data-testid="status-sick-end">
+              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+              End
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {sc.travelModeActive ? (
-        <Badge className="chip border border-blue-500/25 bg-blue-500/15 text-blue-900 dark:text-blue-200" variant="secondary">
-          <Plane className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Travel{sc.travelDestination ? ` · ${sc.travelDestination}` : ""}
-          {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
-        </Badge>
+        <div className={rowClass}>
+          <Badge className="chip border border-blue-500/25 bg-blue-500/15 text-blue-900 dark:text-blue-200" variant="secondary">
+            <Plane className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Travel{sc.travelDestination ? ` · ${sc.travelDestination}` : ""}
+            {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <Link href="/scenarios?tab=travel">
+              <Button size="sm" variant="outline" className={btnClass} data-testid="status-travel-view">
+                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className={btnClass} onClick={handleEndTravel} data-testid="status-travel-end">
+              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+              End
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {ex ? (
-        <Badge className="chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200" variant="secondary">
-          <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Exercise · {ex.phase}
-        </Badge>
+        <div className={rowClass}>
+          <Badge className="chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200" variant="secondary">
+            <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Exercise · {ex.phase}
+          </Badge>
+          <div className="flex items-center gap-2">
+            <Link href="/scenarios/exercise?sync=active" data-testid="status-exercise-view">
+              <Button size="sm" variant="outline" className={btnClass}>
+                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className={btnClass} onClick={handleEndExercise} data-testid="status-exercise-end">
+              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+              End
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {!ex && exercisedRecently24h ? (
-        <Badge className="chip border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200" variant="secondary">
-          <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Post‑exercise · 24h
-        </Badge>
+        <div className={rowClass}>
+          <Badge className="chip border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200" variant="secondary">
+            <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Post‑exercise · 24h
+          </Badge>
+        </div>
       ) : null}
 
       {sc.pumpFailureActive ? (
-        <Badge className="chip border border-red-500/25 bg-red-500/15 text-red-900 dark:text-red-200" variant="secondary">
-          <Syringe className="h-3.5 w-3.5 shrink-0" aria-hidden />
-          Pump failure
-        </Badge>
-      ) : null}
-
-      <div className="ml-auto flex flex-wrap items-center gap-2">
-        {sc.sickDayActive ? (
-          <>
-            <Link href="/scenarios/sick-day#sickday-checklist">
-              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-sick-view">
-                View sick day <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              </Button>
-            </Link>
-            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndSick} data-testid="status-sick-end">
-              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              End sick day
-            </Button>
-          </>
-        ) : null}
-
-        {sc.travelModeActive ? (
-          <>
-            <Link href="/scenarios?tab=travel">
-              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-travel-view">
-                View travel <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              </Button>
-            </Link>
-            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndTravel} data-testid="status-travel-end">
-              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              End travel
-            </Button>
-          </>
-        ) : null}
-
-        {ex ? (
-          <>
-            <Link href="/scenarios/exercise?sync=active" data-testid="status-exercise-view">
-              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs">
-                View exercise <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              </Button>
-            </Link>
-            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndExercise} data-testid="status-exercise-end">
-              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              End exercise
-            </Button>
-          </>
-        ) : null}
-
-        {sc.pumpFailureActive ? (
-          <>
+        <div className={rowClass}>
+          <Badge className="chip border border-red-500/25 bg-red-500/15 text-red-900 dark:text-red-200" variant="secondary">
+            <Syringe className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            Pump failure
+          </Badge>
+          <div className="flex items-center gap-2">
             <Link href="/scenarios/pump-failure">
-              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-pumpfailure-view">
-                View pump <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              <Button size="sm" variant="outline" className={btnClass} data-testid="status-pumpfailure-view">
+                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
               </Button>
             </Link>
-            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndPumpFailure} data-testid="status-pumpfailure-end">
-              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
-              End pump
+            <Button size="sm" variant="outline" className={btnClass} onClick={handleEndPumpFailure} data-testid="status-pumpfailure-end">
+              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+              End
             </Button>
-          </>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
