@@ -791,6 +791,84 @@ export type CarerSickDayMedNote = {
   logged_by: "carer";
 };
 
+export type CarerSickDayMedReminder = {
+  id: string;
+  name: string;
+  due_at: string;
+  repeat_mins: number;
+  dose_label?: string | null;
+  updated_by: "carer";
+  updated_at: string;
+};
+
+function parseRepeatMinutes(repeatMins: unknown): number | null {
+  const n = typeof repeatMins === "number" ? repeatMins : Number(repeatMins);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.min(7 * 24 * 60, Math.max(5, Math.round(n)));
+}
+
+function normaliseIso(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  const t = new Date(s).getTime();
+  return Number.isNaN(t) ? null : s;
+}
+
+function computeMedsNextDue(medsActive: CarerSickDayMedReminder[]): Record<string, unknown> | null {
+  if (medsActive.length === 0) return null;
+  const sorted = [...medsActive].sort((a, b) => isoTimeMs(a.due_at) - isoTimeMs(b.due_at));
+  const m = sorted[0]!;
+  return {
+    name: m.name,
+    due_at: m.due_at,
+    repeat_mins: m.repeat_mins,
+    dose_label: m.dose_label ?? null,
+  };
+}
+
+async function fetchSickDayScenarioStateForCarer(
+  patientId: string,
+): Promise<{ prev: Record<string, unknown> | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { prev: null, error: NOT_CONFIGURED };
+
+  const { data: row, error: fe } = await supabase
+    .from("scenarios")
+    .select("state")
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day")
+    .maybeSingle();
+
+  if (fe) return { prev: null, error: new Error(fe.message) };
+  if (!row) {
+    return {
+      prev: null,
+      error: new Error(
+        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+      ),
+    };
+  }
+
+  return { prev: readScenarioStateField((row as Record<string, unknown>).state), error: null };
+}
+
+async function updateSickDayScenarioStateForCarer(
+  patientId: string,
+  nextState: Record<string, unknown>,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const { error: ue } = await supabase
+    .from("scenarios")
+    .update({ state: nextState, updated_at: new Date().toISOString() })
+    .eq("user_id", patientId)
+    .eq("scenario_key", "sick_day");
+
+  return { error: ue ? new Error(ue.message) : null };
+}
+
 /** Carer: append a temperature reading to the patient sick_day scenario (RLS: scenarios_linked_carer_update). */
 export async function carerAppendSickDayTemperature(
   patientId: string,
@@ -887,6 +965,181 @@ export async function carerAppendSickDayMedNote(
     .eq("scenario_key", "sick_day");
 
   return { error: ue ? new Error(ue.message) : null };
+}
+
+/** Carer: add or edit a medication reminder in sick_day scenario state. */
+export async function carerUpsertSickDayMedicationReminder(
+  patientId: string,
+  params: {
+    id?: string;
+    name: string;
+    repeatEveryMinutes: number;
+    doseLabel?: string | null;
+    /** If provided, set next due relative to now; otherwise keep existing due when editing. */
+    resetDueFromNow?: boolean;
+  },
+): Promise<{ error: Error | null }> {
+  const name = params.name.trim();
+  if (!name) return { error: new Error("Enter a medication name.") };
+  const repeatMins = parseRepeatMinutes(params.repeatEveryMinutes);
+  if (!repeatMins) return { error: new Error("Choose a valid repeat interval.") };
+
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+
+  const nowIso = new Date().toISOString();
+  const id = params.id?.trim() || crypto.randomUUID();
+  const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
+  const mapped: CarerSickDayMedReminder[] = prevActive
+    .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : null))
+    .filter(Boolean)
+    .map((r) => {
+      const rid = typeof r!.id === "string" ? r!.id : crypto.randomUUID();
+      const rname = typeof r!.name === "string" ? r!.name : "Medication";
+      const due = normaliseIso(r!.due_at) ?? nowIso;
+      const rm = parseRepeatMinutes(r!.repeat_mins) ?? 240;
+      const dose = typeof r!.dose_label === "string" ? (r!.dose_label as string) : null;
+      return { id: rid, name: rname, due_at: due, repeat_mins: rm, dose_label: dose, updated_by: "carer", updated_at: nowIso };
+    });
+
+  const existing = mapped.find((m) => m.id === id) ?? null;
+  const due_at =
+    params.resetDueFromNow === true
+      ? new Date(Date.now() + repeatMins * 60_000).toISOString()
+      : existing?.due_at ?? new Date(Date.now() + repeatMins * 60_000).toISOString();
+
+  const next: CarerSickDayMedReminder = {
+    id,
+    name,
+    due_at,
+    repeat_mins: repeatMins,
+    dose_label: params.doseLabel?.trim() ? params.doseLabel.trim() : null,
+    updated_by: "carer",
+    updated_at: nowIso,
+  };
+
+  const nextActive = [...mapped.filter((m) => m.id !== id), next].sort((a, b) => isoTimeMs(a.due_at) - isoTimeMs(b.due_at));
+  const meds_next_due = computeMedsNextDue(nextActive);
+  const nextState = { ...prev, meds_active: nextActive, meds_next_due };
+  return await updateSickDayScenarioStateForCarer(patientId, nextState);
+}
+
+/** Carer: snooze a reminder by minutes. */
+export async function carerSnoozeSickDayMedicationReminder(
+  patientId: string,
+  params: { id: string; minutes: number },
+): Promise<{ error: Error | null }> {
+  const id = params.id.trim();
+  if (!id) return { error: new Error("Invalid reminder.") };
+  const minutes = Math.min(24 * 60, Math.max(5, Math.round(params.minutes)));
+
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+
+  const nowIso = new Date().toISOString();
+  const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
+  const mapped: CarerSickDayMedReminder[] = prevActive
+    .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : null))
+    .filter(Boolean)
+    .map((r) => {
+      const rid = typeof r!.id === "string" ? r!.id : crypto.randomUUID();
+      const rname = typeof r!.name === "string" ? r!.name : "Medication";
+      const due = normaliseIso(r!.due_at) ?? nowIso;
+      const rm = parseRepeatMinutes(r!.repeat_mins) ?? 240;
+      const dose = typeof r!.dose_label === "string" ? (r!.dose_label as string) : null;
+      return { id: rid, name: rname, due_at: due, repeat_mins: rm, dose_label: dose, updated_by: "carer", updated_at: nowIso };
+    });
+
+  const idx = mapped.findIndex((m) => m.id === id);
+  if (idx < 0) return { error: new Error("Reminder not found.") };
+  mapped[idx] = {
+    ...mapped[idx]!,
+    due_at: new Date(Date.now() + minutes * 60_000).toISOString(),
+    updated_by: "carer",
+    updated_at: nowIso,
+  };
+
+  const nextActive = mapped.sort((a, b) => isoTimeMs(a.due_at) - isoTimeMs(b.due_at));
+  const meds_next_due = computeMedsNextDue(nextActive);
+  const nextState = { ...prev, meds_active: nextActive, meds_next_due };
+  return await updateSickDayScenarioStateForCarer(patientId, nextState);
+}
+
+/** Carer: stop (remove) a reminder. */
+export async function carerStopSickDayMedicationReminder(
+  patientId: string,
+  params: { id: string },
+): Promise<{ error: Error | null }> {
+  const id = params.id.trim();
+  if (!id) return { error: new Error("Invalid reminder.") };
+
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+
+  const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
+  const nextActive = prevActive
+    .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : null))
+    .filter(Boolean)
+    .filter((r) => (typeof r!.id === "string" ? r!.id : "") !== id);
+
+  const typedActive: CarerSickDayMedReminder[] = nextActive.map((x) => {
+    const r = x as Record<string, unknown>;
+    const nowIso = new Date().toISOString();
+    return {
+      id: typeof r.id === "string" ? r.id : crypto.randomUUID(),
+      name: typeof r.name === "string" ? r.name : "Medication",
+      due_at: normaliseIso(r.due_at) ?? nowIso,
+      repeat_mins: parseRepeatMinutes(r.repeat_mins) ?? 240,
+      dose_label: typeof r.dose_label === "string" ? (r.dose_label as string) : null,
+      updated_by: "carer",
+      updated_at: nowIso,
+    };
+  });
+
+  const meds_next_due = computeMedsNextDue(typedActive);
+  const nextState = { ...prev, meds_active: typedActive, meds_next_due };
+  return await updateSickDayScenarioStateForCarer(patientId, nextState);
+}
+
+/** Carer: mark taken now (reset due to now + repeat). */
+export async function carerMarkSickDayMedicationTakenNow(
+  patientId: string,
+  params: { id: string },
+): Promise<{ error: Error | null }> {
+  const id = params.id.trim();
+  if (!id) return { error: new Error("Invalid reminder.") };
+
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+
+  const nowIso = new Date().toISOString();
+  const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
+  const mapped: CarerSickDayMedReminder[] = prevActive
+    .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : null))
+    .filter(Boolean)
+    .map((r) => {
+      const rid = typeof r!.id === "string" ? r!.id : crypto.randomUUID();
+      const rname = typeof r!.name === "string" ? r!.name : "Medication";
+      const due = normaliseIso(r!.due_at) ?? nowIso;
+      const rm = parseRepeatMinutes(r!.repeat_mins) ?? 240;
+      const dose = typeof r!.dose_label === "string" ? (r!.dose_label as string) : null;
+      return { id: rid, name: rname, due_at: due, repeat_mins: rm, dose_label: dose, updated_by: "carer", updated_at: nowIso };
+    });
+
+  const idx = mapped.findIndex((m) => m.id === id);
+  if (idx < 0) return { error: new Error("Reminder not found.") };
+  const repeat = mapped[idx]!.repeat_mins;
+  mapped[idx] = {
+    ...mapped[idx]!,
+    due_at: new Date(Date.now() + repeat * 60_000).toISOString(),
+    updated_by: "carer",
+    updated_at: nowIso,
+  };
+
+  const nextActive = mapped.sort((a, b) => isoTimeMs(a.due_at) - isoTimeMs(b.due_at));
+  const meds_next_due = computeMedsNextDue(nextActive);
+  const nextState = { ...prev, meds_active: nextActive, meds_next_due };
+  return await updateSickDayScenarioStateForCarer(patientId, nextState);
 }
 
 export { useLinkedPatient } from "../hooks/use-linked-patient";

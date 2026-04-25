@@ -725,22 +725,18 @@ export default function SickDay() {
     const entry = medEntries.find((e) => e.id === id);
     if (!entry) return;
     const takenAtIso = new Date().toISOString();
-    const nextDue = new Date(Date.now() + entry.repeatEveryMinutes * 60_000).toISOString();
     storage.updateSickDayMedicationEntry(id, {
       takenAtIso,
-      nextDueAtIso: nextDue,
-      lastInAppNotifiedDueAtIso: undefined,
     });
     const next = storage.getSickDayMedicationLog();
     setMedEntries(next);
     const updated = next.find((e) => e.id === id);
     if (updated) {
-      void scheduleSickDayMedReminder(updated);
       void createSickDayMedInAppNotification({
         title: "Medication logged",
-        body: `${updated.name} taken · next due ${new Date(updated.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+        body: `${updated.name} taken`,
         reminderId: updated.id,
-        dueAtIso: updated.nextDueAtIso,
+        dueAtIso: takenAtIso,
         name: updated.name,
       });
       void pushSickDayScenario({});
@@ -774,23 +770,18 @@ export default function SickDay() {
     }
 
     const takenAtIso = takenAt.toISOString();
-    const nextDue = new Date(takenAt.getTime() + entry.repeatEveryMinutes * 60_000).toISOString();
-
     storage.updateSickDayMedicationEntry(id, {
       takenAtIso,
-      nextDueAtIso: nextDue,
-      lastInAppNotifiedDueAtIso: undefined,
     });
     const next = storage.getSickDayMedicationLog();
     setMedEntries(next);
     const updated = next.find((e) => e.id === id);
     if (updated) {
-      void scheduleSickDayMedReminder(updated);
       void createSickDayMedInAppNotification({
         title: "Medication logged",
-        body: `${updated.name} taken · next due ${new Date(updated.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+        body: `${updated.name} taken`,
         reminderId: updated.id,
-        dueAtIso: updated.nextDueAtIso,
+        dueAtIso: takenAtIso,
         name: updated.name,
       });
       void pushSickDayScenario({});
@@ -1524,7 +1515,7 @@ export default function SickDay() {
                       <Pill className="h-4 w-4 text-primary" />
                       Medication reminders
                     </CardTitle>
-                    <CardDescription>Log what you’ve taken and get a reminder when it’s due again.</CardDescription>
+                    <CardDescription>Reminders keep running while Sick Day mode is on. Logging is optional.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Dialog
@@ -1551,7 +1542,7 @@ export default function SickDay() {
                               data-testid="input-med-taken-at"
                             />
                             <p className="text-xs text-muted-foreground">
-                              We’ll update the next due time based on your repeat interval.
+                              This is for your record only — reminders continue on their interval.
                             </p>
                           </div>
                           <div className="flex items-center justify-end gap-2">

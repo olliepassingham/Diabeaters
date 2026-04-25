@@ -17,6 +17,10 @@ import {
   listLinkedPatientsForCarer,
   carerAppendSickDayTemperature,
   carerAppendSickDayMedNote,
+  carerUpsertSickDayMedicationReminder,
+  carerSnoozeSickDayMedicationReminder,
+  carerStopSickDayMedicationReminder,
+  carerMarkSickDayMedicationTakenNow,
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
@@ -385,6 +389,12 @@ function SickDaySupporterCareCard(props: {
   const [tempUnit, setTempUnit] = useState<"c" | "f">("c");
   const [medName, setMedName] = useState("");
   const [medNote, setMedNote] = useState("");
+  const [remName, setRemName] = useState("");
+  const [remRepeat, setRemRepeat] = useState("4h");
+  const [remRepeatCustomMins, setRemRepeatCustomMins] = useState("");
+  const [remDoseLabel, setRemDoseLabel] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -397,6 +407,16 @@ function SickDaySupporterCareCard(props: {
     ? (sickState.carer_med_notes as Record<string, unknown>[])
     : [];
   const tempsCombined = combinedSickDayTemperatureRows(sickState);
+
+  const resolvedRepeatMinutes = (repeatKey: string, customMins: string): number | null => {
+    if (repeatKey === "custom") {
+      const n = parseInt(customMins, 10);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      return Math.min(7 * 24 * 60, Math.max(5, n));
+    }
+    const map: Record<string, number> = { "2h": 120, "4h": 240, "6h": 360, "8h": 480, "12h": 720, "24h": 1440 };
+    return map[repeatKey] ?? null;
+  };
 
   const submitTemp = async () => {
     setFormError(null);
@@ -448,6 +468,111 @@ function SickDaySupporterCareCard(props: {
     }
   };
 
+  const openEdit = (m: Record<string, unknown>) => {
+    const id = typeof m.id === "string" ? m.id : null;
+    if (!id) return;
+    const name = typeof m.name === "string" ? m.name : "";
+    const dose = typeof m.dose_label === "string" ? m.dose_label : "";
+    const repeatMins = typeof m.repeat_mins === "number" ? m.repeat_mins : Number(m.repeat_mins);
+    const preset =
+      repeatMins === 120 ? "2h" :
+      repeatMins === 240 ? "4h" :
+      repeatMins === 360 ? "6h" :
+      repeatMins === 480 ? "8h" :
+      repeatMins === 720 ? "12h" :
+      repeatMins === 1440 ? "24h" : "custom";
+    setEditId(id);
+    setRemName(name);
+    setRemDoseLabel(dose);
+    setRemRepeat(preset);
+    setRemRepeatCustomMins(preset === "custom" && Number.isFinite(repeatMins) ? String(Math.max(5, Math.round(repeatMins))) : "");
+    setEditOpen(true);
+  };
+
+  const submitReminder = async (mode: "add" | "edit") => {
+    setFormError(null);
+    const name = remName.trim();
+    if (!name) {
+      setFormError("Enter a medication name.");
+      return;
+    }
+    const repeatMins = resolvedRepeatMinutes(remRepeat, remRepeatCustomMins);
+    if (!repeatMins) {
+      setFormError("Choose a reminder interval.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await carerUpsertSickDayMedicationReminder(patientId, {
+        id: mode === "edit" ? editId ?? undefined : undefined,
+        name,
+        repeatEveryMinutes: repeatMins,
+        doseLabel: remDoseLabel.trim() ? remDoseLabel.trim() : null,
+        resetDueFromNow: mode === "add",
+      });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      await onUpdated();
+      if (mode === "add") {
+        setRemName("");
+        setRemDoseLabel("");
+        setRemRepeat("4h");
+        setRemRepeatCustomMins("");
+      }
+      setEditOpen(false);
+      setEditId(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const snoozeReminder = async (id: string, minutes: number) => {
+    setFormError(null);
+    setBusy(true);
+    try {
+      const res = await carerSnoozeSickDayMedicationReminder(patientId, { id, minutes });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      await onUpdated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const stopReminder = async (id: string) => {
+    setFormError(null);
+    setBusy(true);
+    try {
+      const res = await carerStopSickDayMedicationReminder(patientId, { id });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      await onUpdated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markTakenNow = async (id: string) => {
+    setFormError(null);
+    setBusy(true);
+    try {
+      const res = await carerMarkSickDayMedicationTakenNow(patientId, { id });
+      if (res.error) {
+        setFormError(res.error.message);
+        return;
+      }
+      await onUpdated();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Card className="border-orange-200/60 dark:border-orange-900/40" data-testid="carer-sick-day-care">
       <CardHeader className="pb-2">
@@ -467,13 +592,59 @@ function SickDaySupporterCareCard(props: {
           </Alert>
         ) : null}
 
-        {medsActive.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              Active reminders (from their device)
-            </p>
-            <ul className="space-y-2">
+        <div className="rounded-xl border border-border/60 p-3 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Medication reminders (shared)
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Medication name</Label>
+              <Input value={remName} onChange={(e) => setRemName(e.target.value)} placeholder="e.g. Paracetamol" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Repeat</Label>
+              <Select value={remRepeat} onValueChange={setRemRepeat}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2h">2 hours</SelectItem>
+                  <SelectItem value="4h">4 hours</SelectItem>
+                  <SelectItem value="6h">6 hours</SelectItem>
+                  <SelectItem value="8h">8 hours</SelectItem>
+                  <SelectItem value="12h">12 hours</SelectItem>
+                  <SelectItem value="24h">24 hours</SelectItem>
+                  <SelectItem value="custom">Custom…</SelectItem>
+                </SelectContent>
+              </Select>
+              {remRepeat === "custom" ? (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={5}
+                  step={5}
+                  placeholder="Minutes"
+                  value={remRepeatCustomMins}
+                  onChange={(e) => setRemRepeatCustomMins(e.target.value)}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Dose (optional)</Label>
+            <Input value={remDoseLabel} onChange={(e) => setRemDoseLabel(e.target.value)} placeholder="e.g. 500mg, 2 tablets" />
+          </div>
+
+          <Button type="button" disabled={busy} onClick={() => void submitReminder("add")}>
+            Add reminder
+          </Button>
+
+          {medsActive.length > 0 ? (
+            <ul className="space-y-2 pt-1">
               {medsActive.map((m, idx) => {
+                const id = typeof m.id === "string" ? m.id : `med-${idx}`;
                 const name = typeof m.name === "string" ? m.name : "Medication";
                 const due = typeof m.due_at === "string" ? m.due_at : null;
                 const dose = typeof m.dose_label === "string" ? m.dose_label : null;
@@ -482,22 +653,102 @@ function SickDaySupporterCareCard(props: {
                     ? formatDistanceToNowStrict(new Date(due), { addSuffix: true })
                     : null;
                 return (
-                  <li
-                    key={typeof m.id === "string" ? m.id : `med-${idx}`}
-                    className="rounded-lg border border-border/60 px-3 py-2 text-sm flex items-start gap-2"
-                  >
-                    <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{name}</p>
-                      {dose ? <p className="text-xs text-muted-foreground">{dose}</p> : null}
-                      {when ? <p className="text-xs text-muted-foreground">Next due {when}</p> : null}
+                  <li key={id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{name}</p>
+                        {dose ? <p className="text-xs text-muted-foreground">{dose}</p> : null}
+                        {when ? <p className="text-xs text-muted-foreground">Next due {when}</p> : null}
+                      </div>
+                      <Badge variant="secondary" className="text-xs">
+                        {typeof m.repeat_mins === "number" ? `${m.repeat_mins >= 60 ? `${Math.round(m.repeat_mins / 60)}h` : `${m.repeat_mins}m`}` : "repeat"}
+                      </Badge>
                     </div>
+                    {typeof m.id === "string" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => openEdit(m)}>
+                          Edit
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void markTakenNow(m.id as string)}>
+                          Taken now
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void snoozeReminder(m.id as string, 30)}>
+                          Snooze 30m
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => void stopReminder(m.id as string)}>
+                          Stop
+                        </Button>
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-muted-foreground">No active medication reminders yet.</p>
+          )}
+
+          {editOpen ? (
+            <div className="mt-2 rounded-lg border border-border/60 bg-muted/15 p-3 space-y-2">
+              <p className="text-sm font-medium">Edit reminder</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Medication name</Label>
+                  <Input value={remName} onChange={(e) => setRemName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Repeat</Label>
+                  <Select value={remRepeat} onValueChange={setRemRepeat}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2h">2 hours</SelectItem>
+                      <SelectItem value="4h">4 hours</SelectItem>
+                      <SelectItem value="6h">6 hours</SelectItem>
+                      <SelectItem value="8h">8 hours</SelectItem>
+                      <SelectItem value="12h">12 hours</SelectItem>
+                      <SelectItem value="24h">24 hours</SelectItem>
+                      <SelectItem value="custom">Custom…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {remRepeat === "custom" ? (
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={5}
+                      step={5}
+                      placeholder="Minutes"
+                      value={remRepeatCustomMins}
+                      onChange={(e) => setRemRepeatCustomMins(e.target.value)}
+                    />
+                  ) : null}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Dose (optional)</Label>
+                <Input value={remDoseLabel} onChange={(e) => setRemDoseLabel(e.target.value)} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" disabled={busy} onClick={() => void submitReminder("edit")}>
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditOpen(false);
+                    setEditId(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         {tempsCombined.length > 0 && (
           <div>
