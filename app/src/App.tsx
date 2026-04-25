@@ -149,28 +149,48 @@ function getSafeNext(pathname: string, search: string): string {
   return next.startsWith("/") && !next.startsWith("//") ? next : "/";
 }
 
+/** Map an opened URL (custom scheme or http(s)) to an in-app path for wouter. */
+function pathFromOpenedAppUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl);
+    const isHttp = url.protocol === "https:" || url.protocol === "http:";
+    const nextPath = isHttp
+      ? `${url.pathname}${url.search}${url.hash}`
+      : `/${url.hostname || url.host || ""}${url.pathname || ""}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
+
+    const safe = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
+    return safe;
+  } catch {
+    return null;
+  }
+}
+
 function useNativeDeepLinks() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform?.()) return;
 
+    const applyOpenedUrl = (rawUrl: string) => {
+      const safe = pathFromOpenedAppUrl(rawUrl);
+      if (safe) setLocation(safe);
+    };
+
+    void CapacitorApp.getLaunchUrl()
+      .then((info: unknown) => {
+        const url =
+          info && typeof (info as { url?: unknown }).url === "string" ? String((info as { url: string }).url).trim() : "";
+        if (url) applyOpenedUrl(url);
+      })
+      .catch(() => {
+        // ignore
+      });
+
     let removed = false;
     let handle: { remove: () => Promise<void> } | null = null;
 
     void CapacitorApp.addListener("appUrlOpen", (event: { url: string }) => {
-      try {
-        const url = new URL(event.url);
-        const isHttp = url.protocol === "https:" || url.protocol === "http:";
-        const nextPath = isHttp
-          ? `${url.pathname}${url.search}${url.hash}`
-          : `/${url.hostname || url.host || ""}${url.pathname || ""}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
-
-        const safe = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
-        setLocation(safe);
-      } catch {
-        // ignore malformed URLs
-      }
+      applyOpenedUrl(event.url);
     }).then((h: { remove: () => Promise<void> }) => {
       if (removed) {
         void h.remove();
@@ -239,7 +259,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
       }
       setLocation(`/check-email?message=${encodeURIComponent("Please verify your email to continue.")}`);
     }
-  }, [loading, user, setLocation]);
+  }, [loading, user, pathname, search, setLocation]);
 
   if (loading || linkedPatientLoading) {
     return (
@@ -269,7 +289,7 @@ function AuthOnlyLayout({ children }: { children: React.ReactNode }) {
       const next = getSafeNext(pathname, search);
       setLocation(`/login?next=${encodeURIComponent(next)}`);
     }
-  }, [loading, user, setLocation]);
+  }, [loading, user, pathname, search, setLocation]);
 
   if (loading) {
     return (

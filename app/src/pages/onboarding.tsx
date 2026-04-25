@@ -365,7 +365,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
-      case "details": return true;
+      case "details": return data.struggle !== null;
       case "disclaimer": return data.hasAcceptedDisclaimer;
       case "first_win": return true;
       default: return true;

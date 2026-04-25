@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
@@ -352,6 +353,7 @@ export default function AlcoholScenarioPage() {
               </PageInfoDialog>
             }
           />
+          <Disclaimer className="text-xs border border-border/60 rounded-lg p-3 bg-muted/20 mt-4" />
         </div>
 
         {profile?.insulinDeliveryMethod === "pump" && (
