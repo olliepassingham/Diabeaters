@@ -2,6 +2,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 
 import { getSupabase } from "@/lib/supabase";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
+import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 
 export async function createSickDayMedInAppNotification(params: {
   title: string;
@@ -43,6 +44,13 @@ export async function createSickDayMedInAppNotification(params: {
     if (import.meta.env.DEV) console.warn("[sick-day-med-inapp] insert failed:", error.message);
     return { ok: false, error: error.message };
   }
+
+  void showIosSystemNotificationNow({
+    title: params.title,
+    body: dueLabel ? `${params.body} (${dueLabel})` : params.body,
+    deepLink: "/sick-day#sickday-checklist",
+    tag: `inapp:sickday:${subtype}:${params.reminderId}:${params.dueAtIso}`,
+  });
 
   notifyInAppNotificationsChanged({ skipPageRefresh: true });
   return { ok: true };

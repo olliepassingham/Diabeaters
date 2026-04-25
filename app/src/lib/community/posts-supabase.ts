@@ -172,6 +172,14 @@ export async function togglePostLike(
     user_id: uid,
   });
   if (error) return { error: new Error(error.message) };
+
+  // Mirror in-app trigger notification with iOS push (when enabled).
+  void supabase.functions
+    .invoke("notify_feed_push", { body: { kind: "feed_post_like", post_id: postId } })
+    .then(({ error: fnErr }) => {
+      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push like:", fnErr.message);
+    });
+
   return { error: null };
 }
 
@@ -433,7 +441,15 @@ export async function insertFeedPost(
 
     if (error) return { data: null, error: new Error(error.message) };
     if (!data) return { data: null, error: new Error("No row returned") };
-    return { data: mapPost(data as Record<string, unknown>), error: null };
+    const out = mapPost(data as Record<string, unknown>);
+    for (const mentionId of mentioned_user_ids) {
+      void supabase.functions
+        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
+        .then(({ error: fnErr }) => {
+          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+        });
+    }
+    return { data: out, error: null };
   }
 
   if (input.kind === "event") {
@@ -466,7 +482,15 @@ export async function insertFeedPost(
 
     if (error) return { data: null, error: new Error(error.message) };
     if (!data) return { data: null, error: new Error("No row returned") };
-    return { data: mapPost(data as Record<string, unknown>), error: null };
+    const out = mapPost(data as Record<string, unknown>);
+    for (const mentionId of mentioned_user_ids) {
+      void supabase.functions
+        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
+        .then(({ error: fnErr }) => {
+          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+        });
+    }
+    return { data: out, error: null };
   }
 
   const trimmed = input.body.trim();
@@ -498,7 +522,15 @@ export async function insertFeedPost(
 
     if (error) return { data: null, error: new Error(error.message) };
     if (!data) return { data: null, error: new Error("No row returned") };
-    return { data: mapPost(data as Record<string, unknown>), error: null };
+    const out = mapPost(data as Record<string, unknown>);
+    for (const mentionId of mentioned_user_ids) {
+      void supabase.functions
+        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
+        .then(({ error: fnErr }) => {
+          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+        });
+    }
+    return { data: out, error: null };
   }
 
   const pendingId = crypto.randomUUID();
@@ -568,7 +600,15 @@ export async function insertFeedPost(
 
     if (updErr) throw new Error(updErr.message);
     if (!updated) throw new Error("Update returned no row");
-    return { data: mapPost(updated as Record<string, unknown>), error: null };
+    const out = mapPost(updated as Record<string, unknown>);
+    for (const mentionId of mentioned_user_ids) {
+      void supabase.functions
+        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
+        .then(({ error: fnErr }) => {
+          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+        });
+    }
+    return { data: out, error: null };
   } catch (e) {
     if (postId) {
       await supabase.from("community_posts").delete().eq("id", postId);
@@ -641,7 +681,15 @@ export async function insertCommunityComment(postId: string, body: string): Prom
 
   if (error) return { data: null, error: new Error(error.message) };
   if (!data) return { data: null, error: new Error("No row returned") };
-  return { data: mapComment(data as Record<string, unknown>), error: null };
+  const out = mapComment(data as Record<string, unknown>);
+
+  void supabase.functions
+    .invoke("notify_feed_push", { body: { kind: "feed_post_comment", post_id: postId, comment_id: out.id } })
+    .then(({ error: fnErr }) => {
+      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push comment:", fnErr.message);
+    });
+
+  return { data: out, error: null };
 }
 
 /** Single post for permalink page (RLS applies). */

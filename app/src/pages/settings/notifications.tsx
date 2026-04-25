@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,19 +8,19 @@ import { Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SettingsBackLink } from "./shared";
+import { Capacitor } from "@capacitor/core";
+import { readPushDiag } from "@/lib/push-tokens";
 
 export function NotificationsTab({
   notifSettings,
   onToggle,
   onThreshold,
-  onEnableBrowser,
   embedded = false,
   supporterMode = false,
 }: {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
-  onEnableBrowser: () => void;
   embedded?: boolean;
   /** Supporter Mode: only alerts for the supporter’s own account (e.g. feed and messages), not the person they support. */
   supporterMode?: boolean;
@@ -30,6 +29,9 @@ export function NotificationsTab({
   const scenarioOn = notifSettings.scenarioAlerts !== false;
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
+
+  const pushDiag = readPushDiag();
+  const isIosNative = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios";
 
   const inner = (
     <div className="space-y-6">
@@ -57,6 +59,21 @@ export function NotificationsTab({
           data-testid="switch-push-notifications"
         />
       </div>
+
+      {isIosNative ? (
+        <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label className="text-small text-muted-foreground">Push diagnostics</Label>
+            <span className="text-xs text-muted-foreground">iOS</span>
+          </div>
+          <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+            <div>State: {typeof pushDiag?.state === "string" ? pushDiag.state : "unknown"}</div>
+            <div>Token: {typeof pushDiag?.tokenPrefix === "string" ? pushDiag.tokenPrefix : "—"}</div>
+            <div>Save: {typeof pushDiag?.saveError === "string" && pushDiag.saveError ? pushDiag.saveError : "ok/unknown"}</div>
+            <div>Updated: {typeof pushDiag?.updatedAt === "string" ? pushDiag.updatedAt : "—"}</div>
+          </div>
+        </div>
+      ) : null}
 
       {!supporterMode && (
         <>
@@ -203,31 +220,6 @@ export function NotificationsTab({
           />
         </div>
       )}
-
-      <div className="flex items-center justify-between py-3">
-        <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Browser notifications</Label>
-          <p className="text-small text-muted-foreground">Alerts when the app is in the background</p>
-        </div>
-        {notifSettings.browserNotifications ? (
-          <Switch
-            checked
-            onCheckedChange={(checked) => onToggle("browserNotifications", checked)}
-            disabled={!notifSettings.enabled}
-            data-testid="switch-browser-notifications"
-          />
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEnableBrowser}
-            disabled={!notifSettings.enabled}
-            data-testid="button-enable-browser-notifications"
-          >
-            Enable
-          </Button>
-        )}
-      </div>
     </div>
   );
 
@@ -258,7 +250,6 @@ type SettingsNotificationsRouteProps = {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
-  onEnableBrowser: () => void;
   supporterMode?: boolean;
 };
 
@@ -267,7 +258,6 @@ export function SettingsNotificationsRoute({
   notifSettings,
   onToggle,
   onThreshold,
-  onEnableBrowser,
   supporterMode = false,
 }: SettingsNotificationsRouteProps) {
   return (
@@ -290,7 +280,6 @@ export function SettingsNotificationsRoute({
             notifSettings={notifSettings}
             onToggle={onToggle}
             onThreshold={onThreshold}
-            onEnableBrowser={onEnableBrowser}
             embedded
             supporterMode={supporterMode}
           />

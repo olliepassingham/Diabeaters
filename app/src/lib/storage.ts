@@ -637,6 +637,8 @@ export {
   communityTopicLabel,
   isCommunityTopicId,
 } from "./community/topics";
+
+import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 export type { CommunityTopicId } from "./community/topics";
 
 export interface CommunityPost {
@@ -704,7 +706,6 @@ export interface NotificationSettings {
   supplyAlerts: boolean;
   criticalThresholdDays: number;
   lowThresholdDays: number;
-  browserNotifications: boolean;
   /** Appointment reminder notifications (in-app + push where available). */
   appointmentReminders: boolean;
   hypoAlerts?: boolean;
@@ -2593,7 +2594,6 @@ export const storage = {
       supplyAlerts: true,
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
-      browserNotifications: false,
       appointmentReminders: true,
       hypoAlerts: true,
       scenarioAlerts: true,
@@ -2651,6 +2651,16 @@ export const storage = {
     }
     
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications));
+
+    // Mirror local (non-Supabase) notifications to iOS system notifications when possible.
+    // This cannot run when the app is closed; it only mirrors events generated while running.
+    void showIosSystemNotificationNow({
+      title: newNotification.title,
+      body: newNotification.message,
+      deepLink: (newNotification.actionUrl as string | undefined) ?? null,
+      tag: `local:${newNotification.type}:${newNotification.supplyId ?? ""}:${newNotification.id}`,
+    });
+
     return newNotification;
   },
 

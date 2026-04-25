@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { getSupabase } from "@/lib/supabase";
 import { getAppointmentsStorageKeyForUserId, storage, type Appointment } from "@/lib/storage";
+import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 
 const SENT_KEYS_STORAGE = "diabeater_appt_inapp_reminder_sent_v1";
 const MAX_KEYS = 400;
@@ -112,6 +113,13 @@ export async function ensureAppointmentInAppRemindersForUser(userId: string): Pr
       }
       continue;
     }
+
+    void showIosSystemNotificationNow({
+      title,
+      body,
+      deepLink: "/appointments",
+      tag: `inapp:appointment:${key}`,
+    });
 
     sent.add(key);
     saveSentKeys(sent);

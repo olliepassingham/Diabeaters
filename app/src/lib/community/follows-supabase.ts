@@ -14,6 +14,14 @@ export async function followUser(followeeId: string): Promise<{ error: Error | n
 
   const { error } = await supabase.from("user_follows").insert({ follower_id: uid, followee_id: followeeId });
   if (error) return { error: new Error(error.message) };
+
+  // The DB trigger inserts the in-app notification; this edge call sends iOS push when enabled.
+  void supabase.functions
+    .invoke("notify_feed_push", { body: { kind: "new_follower", followee_id: followeeId } })
+    .then(({ error: fnErr }) => {
+      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push follow:", fnErr.message);
+    });
+
   return { error: null };
 }
 

@@ -1,5 +1,6 @@
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { getSupabase } from "@/lib/supabase";
+import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 
 export async function createAlcoholInAppNotification(params: {
   userId: string;
@@ -34,6 +35,13 @@ export async function createAlcoholInAppNotification(params: {
     }
     return { ok: false };
   }
+
+  void showIosSystemNotificationNow({
+    title: params.title,
+    body: params.body,
+    deepLink: "/scenarios/alcohol",
+    tag: `inapp:alcohol:${params.kind}:${params.sessionId}`,
+  });
 
   notifyInAppNotificationsChanged({ skipPageRefresh: true });
   return { ok: true };

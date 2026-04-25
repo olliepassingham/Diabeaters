@@ -1,5 +1,6 @@
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { getSupabase } from "@/lib/supabase";
+import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 
 export async function createPumpFailureInAppNotification(params: {
   userId: string;
@@ -34,6 +35,13 @@ export async function createPumpFailureInAppNotification(params: {
     }
     return { ok: false };
   }
+
+  void showIosSystemNotificationNow({
+    title: params.title,
+    body: params.body,
+    deepLink: "/scenarios/pump-failure",
+    tag: `inapp:pumpfailure:${params.kind}:${params.sessionId}`,
+  });
 
   notifyInAppNotificationsChanged({ skipPageRefresh: true });
   return { ok: true };

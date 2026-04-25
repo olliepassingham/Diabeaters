@@ -17,9 +17,12 @@ import { AppTopBar } from "@/components/app-top-bar";
 import { OfflineBanner } from "@/components/offline-banner";
 import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import { KeyboardInsets } from "@/components/keyboard-insets";
 import { AlcoholReminderPoller } from "@/components/alcohol-reminder-poller";
 import { PumpFailureReminderPoller } from "@/components/pump-failure-reminder-poller";
+import { LocalNotifications } from "@capacitor/local-notifications";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -174,6 +177,37 @@ function useNativeDeepLinks() {
       } else {
         handle = h;
       }
+    });
+
+    return () => {
+      removed = true;
+      if (handle) void handle.remove();
+    };
+  }, [setLocation]);
+}
+
+function useNativeLocalNotificationDeepLinks() {
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform?.()) return;
+
+    let removed = false;
+    let handle: { remove: () => Promise<void> } | null = null;
+
+    void LocalNotifications.addListener(
+      "localNotificationActionPerformed",
+      (event: { notification?: { extra?: Record<string, unknown> } }) => {
+        const extra = event?.notification?.extra ?? null;
+        const raw = extra && typeof extra.deep_link === "string" ? extra.deep_link : "";
+        const next = raw.trim();
+        if (!next) return;
+        if (!next.startsWith("/") || next.startsWith("//")) return;
+        setLocation(next);
+      },
+    ).then((h: { remove: () => Promise<void> }) => {
+      if (removed) void h.remove();
+      else handle = h;
     });
 
     return () => {
@@ -674,6 +708,82 @@ function InnerRouter() {
   );
 }
 
+function useIosLocalNotificationPermissionPrompt(visible: boolean) {
+  const { toast } = useToast();
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (!Capacitor.isNativePlatform?.() || Capacitor.getPlatform?.() !== "ios") return;
+
+    let dismissed = false;
+    try {
+      dismissed = localStorage.getItem("diabeater_ios_local_notif_prompt_dismissed_v1") === "true";
+    } catch {
+      dismissed = false;
+    }
+    if (dismissed) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        // Prefer checkPermissions so we don't trigger a system prompt just by opening the app.
+        const perm = await (LocalNotifications as any).checkPermissions?.();
+        if (cancelled) return;
+        if (perm?.display === "granted") {
+          try {
+            localStorage.setItem("diabeater_ios_local_notif_prompt_dismissed_v1", "true");
+          } catch {
+            // ignore
+          }
+          setShow(false);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      if (!cancelled) setShow(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
+  const dismiss = () => {
+    try {
+      localStorage.setItem("diabeater_ios_local_notif_prompt_dismissed_v1", "true");
+    } catch {
+      // ignore
+    }
+    setShow(false);
+  };
+
+  const enable = async () => {
+    try {
+      const perm = await LocalNotifications.requestPermissions();
+      if (perm.display === "granted") {
+        toast({ title: "Notifications enabled", description: "You’ll now get reminder pop-ups and lock-screen alerts." });
+        dismiss();
+      } else {
+        toast({
+          title: "Notifications not enabled",
+          description: "You can enable them later in iPhone Settings → Notifications → Diabeaters.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Could not request notifications",
+        description: "Try again later, or enable in iPhone Settings → Notifications → Diabeaters.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return { show, dismiss, enable };
+}
+
 function AuthenticatedShell() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
@@ -681,6 +791,7 @@ function AuthenticatedShell() {
   const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const iosNotifPrompt = useIosLocalNotificationPermissionPrompt(!isCarerMode);
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -796,6 +907,25 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
+      {!isCarerMode && iosNotifPrompt.show ? (
+        <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">
+          <Alert className="border-border/60 bg-background/55 backdrop-blur">
+            <AlertDescription className="text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-foreground/90">
+                Enable notifications to get medication and safety reminders as iPhone pop‑ups and on your lock screen.
+              </span>
+              <span className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={() => void iosNotifPrompt.enable()}>
+                  Enable
+                </Button>
+                <Button size="sm" variant="outline" onClick={iosNotifPrompt.dismiss}>
+                  Not now
+                </Button>
+              </span>
+            </AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
       {!isCarerMode ? <AppStatusStrip /> : null}
       <main
         className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
@@ -901,6 +1031,7 @@ function MainRouter() {
 
 function AppContent() {
   useNativeDeepLinks();
+  useNativeLocalNotificationDeepLinks();
   const [location, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
   const [appGateReady, setAppGateReady] = useState(false);

@@ -28,7 +28,6 @@ import {
   AtSign,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { requestNotificationPermission } from "@/hooks/use-offline";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureIosPushRegistered, resetIosPushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -620,7 +619,6 @@ export default function Settings() {
     supplyAlerts: true,
     criticalThresholdDays: 3,
     lowThresholdDays: 7,
-    browserNotifications: false,
     appointmentReminders: true,
     hypoAlerts: true,
     scenarioAlerts: true,
@@ -934,16 +932,6 @@ export default function Settings() {
     void syncNotificationPreferences(updated);
   };
 
-  const handleEnableBrowserNotifications = async () => {
-    const granted = await requestNotificationPermission();
-    if (granted) {
-      handleNotifToggle("browserNotifications", true);
-      toast({ title: "Notifications enabled", description: "You'll receive browser notifications for important alerts." });
-    } else {
-      toast({ title: "Permission denied", description: "Please enable notifications in your browser settings.", variant: "destructive" });
-    }
-  };
-
   const settingsInfoDialog = (
     <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
       <InfoSection title="Personal information and usage">
@@ -954,8 +942,7 @@ export default function Settings() {
       </InfoSection>
       <InfoSection title="Notifications">
         <p>
-          Hypo alerts, supply trend alerts, scenario alerts, community feed likes and comments, and optional browser
-          notifications.
+          Hypo alerts, supply trend alerts, scenario alerts, community feed likes and comments.
         </p>
       </InfoSection>
       <InfoSection title="About">
@@ -1135,7 +1122,7 @@ export default function Settings() {
             description={
               isCarer
                 ? "Feed, messages, and device alerts for your supporter account"
-                : "Hypo, trends, scenarios, browser notifications"
+                : "Hypo, trends, scenarios"
             }
             icon={Bell}
           />
@@ -1172,7 +1159,6 @@ export default function Settings() {
         notifSettings={notifSettings}
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
-        onEnableBrowser={handleEnableBrowserNotifications}
         supporterMode={isCarer}
       />
     );
