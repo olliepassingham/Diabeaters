@@ -71,6 +71,16 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         return;
       }
 
+      const sc = storage.getScenarioState();
+      if (sc.sickDayActive) {
+        toast({
+          title: "Sick Day Mode is active",
+          description: "Exercise may not be recommended when unwell. End Sick Day Mode or follow your care team's guidance.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       storage.useExerciseRoutine(exercise.id);
       const session = storage.startExerciseSession({
         routineId: exercise.id,

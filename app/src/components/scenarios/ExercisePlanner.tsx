@@ -260,6 +260,15 @@ export function ExercisePlanner() {
         return;
       }
 
+      if (scenarioState.sickDayActive) {
+        toast({
+          title: "Sick Day Mode is active",
+          description: "Exercise may not be recommended when unwell. End Sick Day Mode or follow your care team's guidance.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const duration = parseInt(exerciseDuration, 10);
       if (!exerciseDuration || Number.isNaN(duration) || duration < 1) return;
 

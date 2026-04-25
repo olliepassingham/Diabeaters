@@ -99,7 +99,7 @@ export function AppStatusStrip() {
 
   return (
     <div
-      className="relative z-40 -mt-2 mb-2 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
+      className="relative z-40 -mt-2 mb-2 flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/60 bg-background/55 px-2.5 py-1.5 backdrop-blur sm:gap-2 sm:px-3 sm:py-2 [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
       data-testid="app-status-strip"
     >
       {!online ? (
@@ -149,13 +149,13 @@ export function AppStatusStrip() {
         {sc.sickDayActive ? (
           <>
             <Link href="/scenarios/sick-day#sickday-checklist">
-              <Button size="sm" variant="outline" className="h-7 px-2" data-testid="status-sick-view">
-                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-sick-view">
+                View sick day <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
               </Button>
             </Link>
-            <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleEndSick} data-testid="status-sick-end">
-              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-              End
+            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndSick} data-testid="status-sick-end">
+              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              End sick day
             </Button>
           </>
         ) : null}
@@ -163,34 +163,41 @@ export function AppStatusStrip() {
         {sc.travelModeActive ? (
           <>
             <Link href="/scenarios?tab=travel">
-              <Button size="sm" variant="outline" className="h-7 px-2" data-testid="status-travel-view">
-                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-travel-view">
+                View travel <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
               </Button>
             </Link>
-            <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleEndTravel} data-testid="status-travel-end">
-              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-              End
+            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndTravel} data-testid="status-travel-end">
+              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              End travel
             </Button>
           </>
         ) : null}
 
         {ex ? (
-          <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleEndExercise} data-testid="status-exercise-end">
-            <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-            End
-          </Button>
+          <>
+            <Link href="/scenarios/exercise?sync=active" data-testid="status-exercise-view">
+              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs">
+                View exercise <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndExercise} data-testid="status-exercise-end">
+              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              End exercise
+            </Button>
+          </>
         ) : null}
 
         {sc.pumpFailureActive ? (
           <>
             <Link href="/scenarios/pump-failure">
-              <Button size="sm" variant="outline" className="h-7 px-2" data-testid="status-pumpfailure-view">
-                View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
+              <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" data-testid="status-pumpfailure-view">
+                View pump <ChevronRight className="h-3 w-3 ml-1 sm:h-3.5 sm:w-3.5" aria-hidden />
               </Button>
             </Link>
-            <Button size="sm" variant="outline" className="h-7 px-2" onClick={handleEndPumpFailure} data-testid="status-pumpfailure-end">
-              <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-              End
+            <Button size="sm" variant="outline" className="h-5.5 px-1.5 text-[10px] sm:h-7 sm:px-2 sm:text-xs" onClick={handleEndPumpFailure} data-testid="status-pumpfailure-end">
+              <Power className="h-3 w-3 mr-1 sm:h-3.5 sm:w-3.5" aria-hidden />
+              End pump
             </Button>
           </>
         ) : null}
