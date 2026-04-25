@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getProfile } from "@/lib/profile";
-import { getPrimaryAppRole, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { getOnboardingAccountPath, getPrimaryAppRole, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
 
@@ -28,7 +28,11 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/welcome");
         return;
       }
-      if (isCarer || hasCarerIntent() || hasPendingCarer()) {
+      const accountPath = getOnboardingAccountPath();
+      const shouldSkipPatientOnboardingForCarerFlow =
+        accountPath !== "both" && (isCarer || hasCarerIntent() || hasPendingCarer());
+
+      if (shouldSkipPatientOnboardingForCarerFlow) {
         setLocation("/carer-setup");
         return;
       }

@@ -37,6 +37,7 @@ import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { PageShell } from "@/components/layout/page-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getOnboardingSecondaryCta, getPostOnboardingPath } from "@/lib/onboarding-routes";
+import { getOnboardingAccountPath } from "@/lib/carer-session";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -1003,6 +1004,7 @@ function FirstWinStep({
   onFinish: (pathOverride?: string) => void | Promise<void>;
 }) {
   const struggle = data.struggle;
+  const wantsSupporterSetupNext = getOnboardingAccountPath() === "both";
 
   const getContent = () => {
     if (struggle === "supplies") {
@@ -1089,7 +1091,7 @@ function FirstWinStep({
   const content = getContent();
   const Icon = content.icon;
   const hasRatios = !!(data.breakfastRatio || data.lunchRatio || data.dinnerRatio);
-  const secondaryRaw = struggle ? getOnboardingSecondaryCta(struggle, hasRatios) : null;
+  const secondaryRaw = getOnboardingSecondaryCta(struggle, hasRatios, { wantsSupporterSetupNext });
   const secondary =
     secondaryRaw && secondaryRaw.path !== content.ctaPath ? secondaryRaw : null;
 

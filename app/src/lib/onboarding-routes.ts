@@ -21,7 +21,11 @@ export type SecondaryCta = { label: string; path: string };
 export function getOnboardingSecondaryCta(
   struggle: OnboardingStruggleKey | null,
   hasMealRatios: boolean,
+  opts?: { wantsSupporterSetupNext?: boolean },
 ): SecondaryCta | null {
+  if (opts?.wantsSupporterSetupNext) {
+    return { label: "Set up Supporter linking", path: "/carer-setup" };
+  }
   if (!struggle) return null;
   if (struggle === "supplies") {
     return { label: "Go to dashboard", path: "/" };

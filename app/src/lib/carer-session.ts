@@ -5,11 +5,15 @@ const CARER_LINK_JUST_COMPLETED_AT_KEY = "diabeater_carer_link_just_completed_at
 const ACTIVE_CARER_PATIENT_ID_KEY = "diabeater_active_carer_patient_id";
 const ACTIVE_APP_MODE_KEY = "diabeater_active_app_mode";
 const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
+/** Chosen on /welcome: patient-only, supporter-only, or both (patient tools + supporter linking). */
+const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
 
 export type ActiveAppMode = "patient" | "carer";
 
 /** Chosen on /welcome: drives default session mode when the account can use both User and Supporter. */
 export type PrimaryAppRole = "patient" | "carer";
+
+export type OnboardingAccountPath = "patient" | "supporter" | "both";
 
 function emitModeChanged(mode: ActiveAppMode | null) {
   try {
@@ -27,7 +31,55 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
   sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
+  try {
+    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+  } catch {
+    // ignore
+  }
+  // Legacy location (older builds); safe to clear if present.
+  try {
+    sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+  } catch {
+    // ignore
+  }
   emitModeChanged(null);
+}
+
+export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
+  try {
+    localStorage.setItem(ONBOARDING_ACCOUNT_PATH_KEY, path);
+  } catch {
+    // ignore
+  }
+}
+
+export function getOnboardingAccountPath(): OnboardingAccountPath | null {
+  try {
+    const raw = localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
+    if (raw === "patient" || raw === "supporter" || raw === "both") return raw;
+  } catch {
+    // ignore
+  }
+  try {
+    const legacy = sessionStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
+    if (legacy === "patient" || legacy === "supporter" || legacy === "both") return legacy;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function clearOnboardingAccountPath(): void {
+  try {
+    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export function setPrimaryAppRole(role: PrimaryAppRole): void {
