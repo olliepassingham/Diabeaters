@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play, CircleDot } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
 
 export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
+  const [, setLocation] = useLocation();
   const [exercises, setExercises] = useState<ExerciseRoutine[] | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,11 +64,8 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     try {
       const existing = storage.getActiveExercise?.();
       if (existing) {
-        toast({
-          title: "Exercise already active",
-          description: `You have "${existing.exerciseName}" in progress. Finish it first.`,
-          variant: "destructive",
-        });
+        const href = buildExerciseScenarioPlannerHrefFromSession(existing, { syncActive: true, from: "widget" });
+        setLocation(href);
         return;
       }
 
