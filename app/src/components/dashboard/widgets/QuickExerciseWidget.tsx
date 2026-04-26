@@ -92,10 +92,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
       toast({
         title: "Exercise mode started",
-        description: `${exercise.name} — use the banner for BG, readiness, and tips.`,
+        description: `${exercise.name} — opening readiness check.`,
       });
 
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      const href = buildExerciseScenarioPlannerHrefFromSession(session, { syncActive: true, from: "widget" });
+      setLocation(href);
     } catch {
       toast({
         title: "Something went wrong",
