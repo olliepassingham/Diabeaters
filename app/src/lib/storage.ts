@@ -862,6 +862,9 @@ export type ExercisePhase = "pre" | "active" | "recovery";
 /** Optional CGM-style direction; fingerstick users often pick not_sure. */
 export type ExerciseBgTrend = "rising" | "flat" | "falling" | "not_sure";
 
+/** Quick bar: any rapid-acting meal or correction dose in the last ~2 hours. */
+export type PreRapidInsulin2h = "yes" | "no" | "not_sure";
+
 export interface ActiveExerciseSession {
   id: string;
   routineId?: string;
@@ -886,6 +889,7 @@ export interface ActiveExerciseSession {
   preTrend?: ExerciseBgTrend;
   preBgAt?: string;
   preBgSkipped?: boolean;
+  preRapidInsulin2h?: PreRapidInsulin2h;
   /** Mid-session reading (often at timed check-in). */
   midBg?: number;
   midTrend?: ExerciseBgTrend;

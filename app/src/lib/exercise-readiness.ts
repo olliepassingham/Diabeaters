@@ -4,7 +4,7 @@
  */
 
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
-import type { ExerciseBgTrend, ExerciseIntensity } from "@/lib/storage";
+import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h } from "@/lib/storage";
 
 export type ExerciseReadinessVerdict = "ready" | "caution" | "not_recommended";
 
@@ -35,6 +35,8 @@ export interface ExerciseReadinessInput {
   bgTrend?: ExerciseBgTrend | null;
   /** For type+trend nuance (e.g. rising before lifting applies in pre) */
   phase?: "pre" | "active" | "recovery";
+  /** Pre-session strip: any rapid-acting dose in the last ~2 h (affects plan + quick verdict). */
+  preRapidInsulin2h?: PreRapidInsulin2h | null;
 }
 
 function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
@@ -186,18 +188,152 @@ function refineWithExerciseTypeAndTrend(
   return base;
 }
 
+const IOB_QUICK_DETAIL =
+  "Rapid-acting insulin in the last ~2 hours may still be working — activity can move glucose more than you expect. Keep fast carbs within reach, and only stack extra insulin around exercise if your care team has taught you how.";
+
+/**
+ * Post-workout strip: same red / amber / green idea as other phases, tuned for delayed lows and BG+trend.
+ * Rule-based; not medical advice.
+ */
+export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
+  const { exercisePlanResult, bgUnits, sickDayActive, sickDaySeverity } = input;
+
+  if (!exercisePlanResult) {
+    return { verdict: "caution", title: "Caution", detail: "Plan data missing — add BG for clearer recovery guidance." };
+  }
+
+  if (sickDayActive && sickDaySeverity === "severe") {
+    return {
+      verdict: "not_recommended",
+      title: "Not recommended",
+      detail: "Severe illness increases risk. Focus on rest and monitoring with your care team.",
+    };
+  }
+
+  const lowThreshold = parseNumericMaybe(exercisePlanResult.pre.lowThreshold);
+  const bg =
+    input.currentBg != null && Number.isFinite(input.currentBg)
+      ? input.currentBg
+      : parseNumericMaybe(input.currentBgInput);
+
+  if (bg == null || lowThreshold == null) {
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail: "Add your current BG — recovery colours and tips depend on level and trend.",
+    };
+  }
+
+  const highThreshold = bgUnits === "mmol/L" ? 13.9 : 250;
+  const trend = input.bgTrend ?? "not_sure";
+  /** Below range but not yet under formal low threshold — still falling → treat like a high-risk window. */
+  const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
+  const approachLowCeiling = lowThreshold + approachMargin;
+
+  if (bg < lowThreshold) {
+    const grams = exercisePlanResult.pre.carbsIfLow;
+    return {
+      verdict: "not_recommended",
+      title: "Not recommended (low BG)",
+      detail:
+        grams > 0
+          ? `Low after exercise — treat first (~${grams}g fast carbs), then re-check per your hypo plan.`
+          : "Low after exercise — treat per your hypo plan, then re-check.",
+    };
+  }
+
+  if (trend === "falling" && bg < approachLowCeiling) {
+    return {
+      verdict: "not_recommended",
+      title: "Not recommended (low + falling)",
+      detail:
+        "BG is borderline low and dropping — treat per your hypo plan if your team uses these bands; delayed lows after activity are common.",
+    };
+  }
+
+  if (bg > highThreshold) {
+    return {
+      verdict: "caution",
+      title: "Caution (high BG)",
+      detail:
+        "BG is elevated after exercise — follow your team’s correction and ketone plan; delayed lows can still appear later.",
+    };
+  }
+
+  if (trend === "falling") {
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail:
+        "Trend is down after exercise — delayed lows are still common. Keep fast carbs within reach and re-check if anything feels off.",
+    };
+  }
+
+  if (trend === "rising") {
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail:
+        "BG is rising for now — some people swing after effort; still plan for possible drops later and follow your team’s targets.",
+    };
+  }
+
+  if (trend === "flat") {
+    return {
+      verdict: "ready",
+      title: "Ready",
+      detail:
+        "Comfortable range with a flat trend after exercise — still watch for delayed lows over the next hours per your team.",
+    };
+  }
+
+  return {
+    verdict: "ready",
+    title: "Ready",
+    detail:
+      "In range after exercise — if direction is unclear, a quick check beats guessing while muscles are still refuelling.",
+  };
+}
+
+function refineWithPreRapidInsulin(result: ExerciseReadinessResult, input: ExerciseReadinessInput): ExerciseReadinessResult {
+  if (input.phase !== "pre") return result;
+  const r = input.preRapidInsulin2h;
+  if (r == null) return result;
+  if (result.verdict === "not_recommended" && (result.title.includes("low") || result.title.includes("Low"))) {
+    return result;
+  }
+  if (r === "no") return result;
+  if (r === "not_sure") {
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail:
+        "If you are unsure about rapid-acting insulin in the last ~2 hours, expect glucose to move more with activity. Extra checks and fast carbs on hand are sensible until you are certain.",
+    };
+  }
+  if (r === "yes" && result.title.startsWith("Caution (high BG)")) {
+    return { ...result, detail: `${result.detail} If you have taken rapid insulin recently, follow your team’s high-BG and ketone plan before intense effort.` };
+  }
+  if (r === "yes" && (result.verdict === "ready" || result.verdict === "caution")) {
+    const mergedDetail =
+      result.verdict === "caution" && result.detail ? `${result.detail} ${IOB_QUICK_DETAIL}` : IOB_QUICK_DETAIL;
+    return {
+      verdict: "caution",
+      title: "Caution (insulin on board)",
+      detail: mergedDetail,
+    };
+  }
+  return result;
+}
+
 /** Planner and active banner: shared go / caution / not recommended copy. */
 export function getExerciseReadinessVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
   if (input.phase === "recovery") {
-    return {
-      verdict: "caution",
-      title: "Recovery",
-      detail:
-        "Post-workout window — delayed lows can happen for hours afterward. Follow your care team's plan for bolus, basal, and snacks.",
-    };
+    return getRecoveryReadinessVerdict(input);
   }
   const base = baseVerdict(input);
-  return refineWithExerciseTypeAndTrend(base, input);
+  const withTrends = refineWithExerciseTypeAndTrend(base, input);
+  return refineWithPreRapidInsulin(withTrends, input);
 }
 
 export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): string {
