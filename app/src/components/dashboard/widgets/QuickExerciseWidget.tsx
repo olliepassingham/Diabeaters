@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play, CircleDot } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +24,6 @@ const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
 
 export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
-  const [, setLocation] = useLocation();
   const [exercises, setExercises] = useState<ExerciseRoutine[] | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +63,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     try {
       const existing = storage.getActiveExercise?.();
       if (existing) {
-        const href = buildExerciseScenarioPlannerHrefFromSession(existing, { syncActive: true, from: "widget" });
-        setLocation(href);
+        toast({
+          title: "Exercise already active",
+          description: `You're in ${existing.phase} for "${existing.exerciseName}". Use the bar at the top to View or End.`,
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
@@ -92,11 +94,10 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
       toast({
         title: "Exercise mode started",
-        description: `${exercise.name} — opening readiness check.`,
+        description: `${exercise.name} — check the bar at the top to see if you're ready.`,
       });
 
-      const href = buildExerciseScenarioPlannerHrefFromSession(session, { syncActive: true, from: "widget" });
-      setLocation(href);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       toast({
         title: "Something went wrong",
