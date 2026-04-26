@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, AlertTriangle, Play, CircleDot } from "lucide-react";
+import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot } from "lucide-react";
 import { Link } from "wouter";
 import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
@@ -162,10 +162,10 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         </Link>
         <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">Start a saved workout</p>
       </CardHeader>
-      <CardContent className="space-y-2 p-4 pt-0 md:px-6 md:pb-6">
+      <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {activeSession && (
           <div
-            className="flex items-center gap-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-2 text-sm mb-1"
+            className="flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2.5 text-sm"
             data-testid="text-active-session-notice"
           >
             <Play className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -182,7 +182,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
 
         {exercises.length > 0 ? (
           <>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
               {exercises.map((exercise) => {
                 const Icon = EXERCISE_ICONS[exercise.exerciseType] || Dumbbell;
                 const isActive = activeSession?.routineId === exercise.id;
@@ -192,36 +192,36 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
                     type="button"
                     onClick={() => handleQuickStart(exercise)}
                     className={cn(
-                      "pressable card-interactive flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left shadow-sm",
+                      "pressable card-interactive flex w-full min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+                      "hover:border-emerald-500/35 hover:bg-emerald-500/[0.06] dark:hover:border-emerald-500/25 dark:hover:bg-emerald-950/25",
                       isActive && "border-emerald-500/60 dark:border-emerald-500/50 opacity-50 pointer-events-none"
                     )}
                     disabled={isActive}
                     data-testid={`button-quick-exercise-${exercise.id}`}
                   >
-                    <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">{exercise.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {exercise.durationMinutes}min · {exercise.intensity}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
+                    <span className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15">
+                        <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      </span>
+                      <span className="min-w-0 text-left">
+                        <span className="block text-sm font-semibold text-foreground truncate">{exercise.name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {exercise.durationMinutes} min · {exercise.intensity}
+                        </span>
+                      </span>
+                    </span>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   </button>
                 );
               })}
             </div>
 
             {exercises.some((e) => e.timesUsed > 0) && !compact && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
-                <Clock className="h-3.5 w-3.5 shrink-0" />
-                <span>Tap to activate exercise decision support mode</span>
+              <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                <span>Tap a routine to start quick checks in the top bar</span>
               </div>
             )}
-
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              <span>Not medical advice</span>
-            </div>
           </>
         ) : (
           <div className="text-center py-2 space-y-1">
@@ -230,16 +230,21 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
           </div>
         )}
 
-        <Link href={plannerCtaHref}>
-          <Button variant="outline" size="sm" className="w-full gap-1" data-testid="button-exercise-action">
+        <Link href={plannerCtaHref} className="mt-auto">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
+            data-testid="button-exercise-action"
+          >
             {exercises.length > 0 || activeSession ? (
               <>
                 {plannerCtaLabel}
-                <ArrowRight className="h-3.5 w-3.5" />
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
               </>
             ) : (
               <>
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" aria-hidden />
                 Add exercises
               </>
             )}
