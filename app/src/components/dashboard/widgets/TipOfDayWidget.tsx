@@ -28,7 +28,7 @@ export function TipOfDayWidget(_props: DashboardWidgetLayoutProps) {
   };
 
   return (
-    <WidgetCard data-testid="widget-tip-of-day">
+    <WidgetCard className="overflow-visible" data-testid="widget-tip-of-day">
       <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">

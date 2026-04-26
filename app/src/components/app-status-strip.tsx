@@ -15,6 +15,8 @@ import {
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
+import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
+import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function exercisePhaseLabel(phase: ExercisePhase): string {
@@ -173,12 +175,18 @@ export function AppStatusStrip() {
         : "bg-amber-500/15 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200 border-amber-500/25";
 
   const handleEndSick = () => {
+    const pre = storage.getScenarioState();
+    const startedAt = pre.sickDayActivatedAt ?? null;
+    for (const m of storage.getSickDayMedicationLog()) {
+      void cancelSickDayMedReminder(m.id);
+    }
     storage.deactivateSickDay();
     try {
       localStorage.removeItem("diabeater_sick_day_session");
     } catch {
       // ignore
     }
+    void syncSickDayDeactivatedToCloud({ startedAt });
     toast({ title: "Sick Day Mode Deactivated", description: "Glad you're feeling better!" });
   };
 

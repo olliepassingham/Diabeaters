@@ -22,6 +22,7 @@ import {
   carerSnoozeSickDayMedicationReminder,
   carerStopSickDayMedicationReminder,
   carerLogSickDayMedicationTaken,
+  carerDeactivateSickDayScenarioForPatient,
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
@@ -40,6 +41,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 function SectionHeading({
   title,
@@ -217,7 +219,7 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
     const checkedAt = toIsoString(rawState?.checked_at);
 
     if (scenarioKey === "sick_day") {
-      const active = rawState?.sick_day_active === true || rawState?.sickDayActive === true;
+      const active = isSickDayScenarioActive(rawState);
       const severity = typeof rawState?.severity === "string" ? rawState?.severity.trim() : null;
       const sevLabel = severity ? ` (${severity})` : "";
       if (active) {
@@ -335,6 +337,26 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
   return lines;
 }
 
+/**
+ * Sick day is "active" for supporter UI only when flags say so and the episode is not already ended in state.
+ * Some older flows left `sick_day_active` true in Supabase after the patient ended locally; `ended_at` / `deactivated_at`
+ * in the past must win so temps / med notes do not stay visible.
+ */
+function isSickDayScenarioActive(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw) return false;
+  const endedIso =
+    (typeof raw.ended_at === "string" && raw.ended_at.trim() ? raw.ended_at : null) ??
+    (typeof raw.deactivated_at === "string" && raw.deactivated_at.trim() ? raw.deactivated_at : null);
+  if (endedIso) {
+    const endMs = new Date(endedIso).getTime();
+    if (!Number.isNaN(endMs) && endMs <= Date.now()) {
+      return false;
+    }
+  }
+  const flagOn = raw.sick_day_active === true || raw.sickDayActive === true;
+  return flagOn;
+}
+
 function sickDayScenarioState(rows: Record<string, unknown>[]): Record<string, unknown> | null {
   for (const row of rows) {
     const scenarioKey =
@@ -425,6 +447,8 @@ function SickDaySupporterCareCard(props: {
   onUpdated: () => Promise<void>;
 }) {
   const { patientId, sickState, onUpdated } = props;
+  const { toast } = useToast();
+  const [closingSickDay, setClosingSickDay] = useState(false);
   const [tempVal, setTempVal] = useState("");
   const [tempUnit, setTempUnit] = useState<"c" | "f">("c");
   const [medName, setMedName] = useState("");
@@ -444,16 +468,16 @@ function SickDaySupporterCareCard(props: {
   const [takenAtLocal, setTakenAtLocal] = useState("");
 
   const tempsCombined = useMemo(() => {
-    if (!sickState || sickState.sick_day_active !== true) return [];
+    if (!sickState || !isSickDayScenarioActive(sickState)) return [];
     return combinedSickDayTemperatureRows(sickState);
   }, [sickState]);
 
   const episodeTimeline = useMemo(() => {
-    if (!sickState || sickState.sick_day_active !== true) return [];
+    if (!sickState || !isSickDayScenarioActive(sickState)) return [];
     return combinedSickDayEpisodeTimeline(sickState);
   }, [sickState]);
 
-  if (!sickState || sickState.sick_day_active !== true) return null;
+  if (!sickState || !isSickDayScenarioActive(sickState)) return null;
 
   const medsActive = Array.isArray(sickState.meds_active)
     ? (sickState.meds_active as Record<string, unknown>[])
@@ -655,6 +679,26 @@ function SickDaySupporterCareCard(props: {
     }
   };
 
+  const handleSupporterMarkSickDayEnded = async () => {
+    setFormError(null);
+    setClosingSickDay(true);
+    try {
+      const res = await carerDeactivateSickDayScenarioForPatient(patientId);
+      if (res.error) {
+        setFormError(res.error.message);
+        toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
+        return;
+      }
+      toast({
+        title: "Sick day marked as ended",
+        description: "Shared status is updated for everyone. Ask them to open the app in User mode if it still shows sick day there.",
+      });
+      await onUpdated();
+    } finally {
+      setClosingSickDay(false);
+    }
+  };
+
   return (
     <Card className="border-orange-200/60 dark:border-orange-900/40" data-testid="carer-sick-day-care">
       <CardHeader className="pb-2">
@@ -666,6 +710,24 @@ function SickDaySupporterCareCard(props: {
           Shared from their app when Sick Day mode is on. You can add readings and notes here; they sync to their
           scenario for both of you.
         </CardDescription>
+        <Alert className="mt-3 border-border/60 bg-muted/30 py-3">
+          <AlertDescription className="text-sm space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+            <span className="text-muted-foreground block sm:inline">
+              If they have already recovered but this section is still open, you can mark sick day as ended (updates
+              their shared scenario).
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 w-full sm:w-auto"
+              disabled={busy || closingSickDay}
+              onClick={() => void handleSupporterMarkSickDayEnded()}
+            >
+              {closingSickDay ? "Updating…" : "Mark sick day as ended"}
+            </Button>
+          </AlertDescription>
+        </Alert>
       </CardHeader>
       <CardContent className="space-y-4">
         {formError ? (
@@ -1590,7 +1652,7 @@ export default function CarerViewPage() {
               </Card>
             )}
 
-            {(scopes.scenarios ?? false) && sickDayState?.sick_day_active === true && activeLink?.patientId ? (
+            {(scopes.scenarios ?? false) && isSickDayScenarioActive(sickDayState) && activeLink?.patientId ? (
               <SickDaySupporterCareCard
                 patientId={activeLink.patientId}
                 sickState={sickDayState}

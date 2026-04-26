@@ -3,7 +3,6 @@ import type { WidgetSize, WidgetType } from "@/lib/storage";
 import {
   AppointmentsWidget,
   SettingsCompletionWidget,
-  SupplyDepletionWidget,
   SupplySummaryWidget,
   RatioAdviserWidget,
   QuickExerciseWidget,
@@ -41,12 +40,12 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     component: CommunityQuickPostWidget,
   },
   {
-    id: "supply-depletion",
-    label: "Depletion forecast",
-    description: "Timeline of when your supplies are likely to run out.",
+    id: "supply-summary",
+    label: "Supplies",
+    description: "Stock on hand and how long each item is expected to last (run-out bars).",
     defaultEnabled: true,
     defaultSize: "full",
-    component: SupplyDepletionWidget,
+    component: SupplySummaryWidget,
   },
   {
     id: "quick-exercise",
@@ -79,14 +78,6 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: RoutinesWidget,
-  },
-  {
-    id: "supply-summary",
-    label: "Supply summary",
-    description: "Stock levels and days remaining for your supplies.",
-    defaultEnabled: true,
-    defaultSize: "full",
-    component: SupplySummaryWidget,
   },
   {
     id: "tip-of-day",

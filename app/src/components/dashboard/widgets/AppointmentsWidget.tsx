@@ -116,10 +116,10 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
 
   if (error) {
     return (
-      <WidgetCard data-testid="widget-appointments">
+      <WidgetCard className="overflow-visible" data-testid="widget-appointments">
         <CardHeader className="p-4 pb-2 md:p-6 md:pb-3">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary shrink-0" />
+            <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
             <CardTitle className="text-h3 text-foreground">Appointments</CardTitle>
           </div>
         </CardHeader>
@@ -132,7 +132,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
 
   if (appointments === null) {
     return (
-      <WidgetCard data-testid="widget-appointments">
+      <WidgetCard className="overflow-visible" data-testid="widget-appointments">
         <CardContent className="p-4 md:p-6">
           <p className="text-body text-muted-foreground">Loading…</p>
         </CardContent>
@@ -143,24 +143,34 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
   const list = compact ? appointments.slice(0, 2) : appointments;
 
   return (
-    <WidgetCard data-testid="widget-appointments">
-      <CardHeader className="p-4 pb-2 md:p-6 md:pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
-        <Link href="/appointments">
-          <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
-            <Calendar className="h-5 w-5 text-primary shrink-0" />
-            <CardTitle className="text-h3 text-foreground">
-              {compact ? "Appts" : "Appointments"}
-            </CardTitle>
-          </div>
-        </Link>
+    <WidgetCard className="overflow-visible" data-testid="widget-appointments">
+      <CardHeader className="p-4 pb-2 md:p-6 md:pb-3 flex flex-col gap-1 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <Link href="/appointments">
+            <div className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer">
+              <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <CardTitle className="text-h3 text-foreground">
+                {compact ? "Appts" : "Appointments"}
+              </CardTitle>
+            </div>
+          </Link>
+          <p className="text-small text-muted-foreground uppercase tracking-wide mt-1 pl-0 sm:pl-7">
+            Upcoming visits
+          </p>
+        </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 md:px-6 md:pb-6">
+      <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {appointments.length === 0 ? (
-          <div className="text-center py-2 space-y-3">
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
             <p className="text-body text-muted-foreground">No upcoming appointments.</p>
-            <Link href="/appointments">
-              <Button variant="outline" size="sm" data-testid="button-add-appointment-widget">
-                <Plus className="h-4 w-4 mr-2" />
+            <Link href="/appointments" className="w-full max-w-xs">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
+                data-testid="button-add-appointment-widget"
+              >
+                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Add appointment
               </Button>
             </Link>
@@ -172,7 +182,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
               return (
                 <div
                   key={appointment.id}
-                  className="pressable card-interactive flex gap-3 rounded-xl border border-border bg-muted/20 p-3"
+                  className="pressable card-interactive flex gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-colors hover:border-blue-500/30 hover:bg-blue-500/[0.04] dark:hover:border-blue-500/20 dark:hover:bg-blue-950/20"
                   data-testid={`widget-appointment-${appointment.id}`}
                 >
                   <div

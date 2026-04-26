@@ -479,7 +479,6 @@ export interface ActivityLog {
 
 export type WidgetType =
   | "supply-summary"
-  | "supply-depletion"
   | "settings-completion"
   | "ratio-adviser"
   | "welcome"
@@ -937,29 +936,27 @@ export const DEFAULT_QUICK_ACTIONS: QuickActionConfig[] = [
 
 // Legacy seed for `getDashboardWidgets` — keep aligned with DASHBOARD_WIDGET_REGISTRY defaults (useDashboardWidgets is primary).
 export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
-  "supply-depletion": "full",
+  "community-quick-post": "half",
+  "supply-summary": "full",
   "quick-exercise": "half",
   "ratio-adviser": "half",
   "appointments": "half",
   "routines": "half",
-  "supply-summary": "full",
   "tip-of-day": "full",
   "settings-completion": "half",
   "welcome": "full",
-  "community-quick-post": "half",
 };
 
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "community-quick-post", type: "community-quick-post", enabled: true, order: 0, size: "half" },
-  { id: "supply-depletion", type: "supply-depletion", enabled: true, order: 1, size: "full" },
+  { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "full" },
   { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 2, size: "half" },
   { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
   { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
   { id: "routines", type: "routines", enabled: true, order: 5, size: "half" },
-  { id: "supply-summary", type: "supply-summary", enabled: true, order: 6, size: "full" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 7, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
-  { id: "welcome", type: "welcome", enabled: false, order: 9, size: "full" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
+  { id: "welcome", type: "welcome", enabled: false, order: 8, size: "full" },
 ];
 
 function generateId(): string {

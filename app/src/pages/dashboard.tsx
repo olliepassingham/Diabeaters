@@ -42,6 +42,7 @@ import { DashboardWidgetSettings } from "@/components/dashboard/DashboardWidgetS
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
+import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
@@ -692,11 +693,17 @@ export default function Dashboard() {
     };
     
     refreshData();
+    if (getSupabase()) {
+      void repairSickDayCloudIfLocalInactive();
+    }
     const timer = setTimeout(() => setIsLoading(false), 400);
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshData();
+        if (getSupabase()) {
+          void repairSickDayCloudIfLocalInactive();
+        }
       }
     };
     

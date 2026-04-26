@@ -25,7 +25,12 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { upsertScenario, fetchScenarioStateForUser } from "@/lib/scenarios-supabase";
+import {
+  upsertScenario,
+  fetchScenarioStateForUser,
+  syncSickDayDeactivatedToCloud,
+  repairSickDayCloudIfLocalInactive,
+} from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -488,6 +493,10 @@ export default function SickDay() {
     } else {
       localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    void repairSickDayCloudIfLocalInactive();
   }, []);
 
   useEffect(() => {
@@ -1005,21 +1014,11 @@ export default function SickDay() {
     setKetoneLevel("");
     const endedAt = new Date().toISOString();
     const startedAt = sickDayActivatedAt || null;
-    void pushSickDayScenario(
-      {
-        sick_day_active: false,
-        started_at: startedAt,
-        ended_at: endedAt,
-        inputs_summary: null,
-        last_check_at: lastCheckAtIso,
-        meds_next_due: null,
-        meds_active: [],
-        temp_recent: [],
-        temp_latest: null,
-        medication_dose_log: [],
-      },
-      "Sick day mode (off)",
-    );
+    void syncSickDayDeactivatedToCloud({
+      endedAt,
+      startedAt,
+      lastCheckAt: lastCheckAtIso,
+    });
     toast({
       title: "Sick Day Mode Deactivated",
       description: "Glad you're feeling better! Status removed from dashboard.",

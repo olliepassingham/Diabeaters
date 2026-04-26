@@ -1172,6 +1172,43 @@ export async function carerLogSickDayMedicationTaken(
   return await updateSickDayScenarioStateForCarer(patientId, nextState);
 }
 
+/**
+ * Supporter: mark the linked person's sick day scenario inactive in Supabase (same shape as patient "end sick day").
+ * Use when the cloud row is still "active" but they have already recovered — e.g. their app did not sync the end.
+ */
+export async function carerDeactivateSickDayScenarioForPatient(patientId: string): Promise<{ error: Error | null }> {
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error) return { error };
+
+  const base = prev && typeof prev === "object" ? prev : {};
+  const preservedCarerTemps = Array.isArray(base.carer_temp_recent) ? base.carer_temp_recent : [];
+  const preservedCarerNotes = Array.isArray(base.carer_med_notes) ? base.carer_med_notes : [];
+  const endedAt = new Date().toISOString();
+  const startedAt =
+    (typeof base.started_at === "string" ? base.started_at : null) ??
+    (typeof base.activated_at === "string" ? base.activated_at : null) ??
+    null;
+  const lastCheckAt = typeof base.last_check_at === "string" ? base.last_check_at : null;
+
+  const nextState: Record<string, unknown> = {
+    sick_day_active: false,
+    sickDayActive: false,
+    started_at: startedAt,
+    ended_at: endedAt,
+    inputs_summary: null,
+    meds_next_due: null,
+    meds_active: [],
+    temp_recent: [],
+    temp_latest: null,
+    medication_dose_log: [],
+    last_check_at: lastCheckAt,
+    carer_temp_recent: preservedCarerTemps,
+    carer_med_notes: preservedCarerNotes,
+  };
+
+  return updateSickDayScenarioStateForCarer(patientId, nextState);
+}
+
 /** @deprecated Use {@link carerLogSickDayMedicationTaken} — kept for any external callers; only appends a dose log row. */
 export async function carerMarkSickDayMedicationTakenNow(
   patientId: string,

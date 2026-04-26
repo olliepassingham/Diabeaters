@@ -62,6 +62,7 @@ import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
 import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
 import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
+import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { getProfile } from "@/lib/profile";
@@ -952,6 +953,7 @@ function AuthenticatedShell() {
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
+      <SickDayCloudRepairSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
@@ -1025,6 +1027,7 @@ function AccountShell() {
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
+      <SickDayCloudRepairSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}

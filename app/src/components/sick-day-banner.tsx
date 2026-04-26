@@ -4,6 +4,8 @@ import { Thermometer, ChevronRight, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { storage, ScenarioState } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
+import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
+import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 
 export function SickDayBanner() {
   const { toast } = useToast();
@@ -38,9 +40,14 @@ export function SickDayBanner() {
   }, [scenarioState.sickDayActive]);
 
   const handleDeactivate = () => {
+    const startedAt = scenarioState.sickDayActivatedAt ?? null;
+    for (const m of storage.getSickDayMedicationLog()) {
+      void cancelSickDayMedReminder(m.id);
+    }
     storage.deactivateSickDay();
     localStorage.removeItem("diabeater_sick_day_session");
     setScenarioState({ ...scenarioState, sickDayActive: false });
+    void syncSickDayDeactivatedToCloud({ startedAt });
     toast({
       title: "Sick Day Mode Deactivated",
       description: "Glad you're feeling better!",

@@ -31,7 +31,6 @@ import {
   Cookie,
   Target,
   TrendingDown,
-  TrendingUp,
   ArrowRight,
   Pencil,
   Save,
@@ -167,16 +166,6 @@ function getMealIcon(meal: string) {
     case "Dinner": return Moon;
     case "Snack": return Cookie;
     default: return UtensilsCrossed;
-  }
-}
-
-function getMealTime(meal: string) {
-  switch (meal) {
-    case "Breakfast": return "Morning";
-    case "Lunch": return "Midday";
-    case "Dinner": return "Evening";
-    case "Snack": return "Any time";
-    default: return "";
   }
 }
 
@@ -472,17 +461,42 @@ export default function Ratios() {
             {meals.map((meal) => {
               const Icon = getMealIcon(meal.name);
               const stored = settings[meal.key];
-              const draft = editValues[meal.key];
-              let primary: string | null = null;
-              let showStrike = false;
               if (editing) {
-                const gpu = parseInputToGramsPerUnit(draft, ratioFormat, cpSize);
-                primary = gpu ? formatRatioForDisplay(gpu, ratioFormat, cpSize) : draft.trim() || null;
-              } else {
-                const baseGpu = parseRatioToGramsPerUnit(stored);
-                primary = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : stored || null;
-                showStrike = Boolean(hasAnyAdjustment && stored && getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize));
+                return (
+                  <div
+                    key={meal.key}
+                    className="rounded-lg border border-border/80 bg-background/60 dark:bg-background/40 px-3 py-3 text-center sm:text-left"
+                    data-testid={`at-a-glance-${meal.name.toLowerCase()}`}
+                  >
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground mb-1 sm:justify-start">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      <span className="font-medium text-foreground/90">{meal.name}</span>
+                    </div>
+                    <div className="space-y-1 mt-1 text-left">
+                      <Label
+                        htmlFor={`ratio-${meal.key}`}
+                        className="text-[10px] text-muted-foreground sm:text-xs"
+                        data-testid={`label-ratio-${meal.name.toLowerCase()}`}
+                      >
+                        {formatRatioInputLabel(ratioFormat, cpSize)}
+                      </Label>
+                      <Input
+                        id={`ratio-${meal.key}`}
+                        placeholder={formatRatioInputPlaceholder(ratioFormat)}
+                        value={editValues[meal.key]}
+                        onChange={(e) => setEditValues((prev) => ({ ...prev, [meal.key]: e.target.value }))}
+                        data-testid={`input-ratio-${meal.name.toLowerCase()}`}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                );
               }
+              const baseGpu = parseRatioToGramsPerUnit(stored);
+              const primary = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : stored || null;
+              const showStrike = Boolean(
+                hasAnyAdjustment && stored && getAdjustedRatio(stored, combinedFactor, ratioFormat, cpSize),
+              );
               return (
                 <div
                   key={meal.key}
@@ -507,32 +521,98 @@ export default function Ratios() {
               );
             })}
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border/60 pt-3 text-sm">
-            <div>
-              <span className="text-muted-foreground">ISF </span>
-              <span className="font-semibold tabular-nums" data-testid="at-a-glance-isf">
-                {editing
-                  ? editValues.correctionFactor.trim()
-                    ? `${editValues.correctionFactor} ${bgUnit}`
-                    : "Not set"
-                  : settings.correctionFactor
-                    ? `${settings.correctionFactor} ${bgUnit}`
-                    : <span className="text-muted-foreground italic font-normal">Not set</span>}
-              </span>
+          {editing ? (
+            <div className="space-y-4 border-t border-border/60 pt-3">
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <TrendingDown className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span className="text-sm font-medium text-foreground">Correction factor</span>
+                  <InfoTooltip
+                    term="Correction Factor"
+                    explanation="How much 1 unit of insulin drops your blood glucose. For example, if your factor is 2.5, then 1 unit will lower your BG by approximately 2.5 mmol/L."
+                  />
+                </div>
+                <Label htmlFor="correction-factor" className="text-xs text-muted-foreground">
+                  {bgUnit} per unit
+                </Label>
+                <Input
+                  id="correction-factor"
+                  type="number"
+                  step="0.1"
+                  placeholder="e.g. 2.5"
+                  value={editValues.correctionFactor}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, correctionFactor: e.target.value }))}
+                  data-testid="input-correction-factor"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Target className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span className="text-sm font-medium text-foreground">Target range</span>
+                  <InfoTooltip
+                    term="Target Range"
+                    explanation="Your target blood glucose range. This is the range you aim to keep your blood sugar within."
+                  />
+                </div>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label htmlFor="target-low" className="text-xs text-muted-foreground">
+                      Low
+                    </Label>
+                    <Input
+                      id="target-low"
+                      type="number"
+                      step="0.1"
+                      placeholder="4.0"
+                      value={editValues.targetBgLow}
+                      onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgLow: e.target.value }))}
+                      data-testid="input-target-low"
+                    />
+                  </div>
+                  <span className="shrink-0 pb-2 text-muted-foreground" aria-hidden>
+                    —
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Label htmlFor="target-high" className="text-xs text-muted-foreground">
+                      High
+                    </Label>
+                    <Input
+                      id="target-high"
+                      type="number"
+                      step="0.1"
+                      placeholder="8.0"
+                      value={editValues.targetBgHigh}
+                      onChange={(e) => setEditValues((prev) => ({ ...prev, targetBgHigh: e.target.value }))}
+                      data-testid="input-target-high"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Target </span>
-              <span className="font-semibold tabular-nums" data-testid="at-a-glance-target">
-                {editing
-                  ? editValues.targetBgLow.trim() && editValues.targetBgHigh.trim()
-                    ? `${editValues.targetBgLow}–${editValues.targetBgHigh} ${bgUnit}`
-                    : "Not set"
-                  : settings.targetBgLow != null && settings.targetBgHigh != null
-                    ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
-                    : <span className="text-muted-foreground italic font-normal">Not set</span>}
-              </span>
+          ) : (
+            <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-border/60 pt-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">ISF </span>
+                <span className="font-semibold tabular-nums" data-testid="at-a-glance-isf">
+                  {settings.correctionFactor ? (
+                    `${settings.correctionFactor} ${bgUnit}`
+                  ) : (
+                    <span className="text-muted-foreground italic font-normal">Not set</span>
+                  )}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Target </span>
+                <span className="font-semibold tabular-nums" data-testid="at-a-glance-target">
+                  {settings.targetBgLow != null && settings.targetBgHigh != null ? (
+                    `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
+                  ) : (
+                    <span className="text-muted-foreground italic font-normal">Not set</span>
+                  )}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
@@ -555,143 +635,7 @@ export default function Ratios() {
             </Button>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {meals.map((meal) => {
-            const Icon = getMealIcon(meal.name);
-            const baseRatio = meal.ratio;
-            const baseGpu = parseRatioToGramsPerUnit(baseRatio);
-            const displayRatio = baseGpu ? formatRatioForDisplay(baseGpu, ratioFormat, cpSize) : baseRatio;
-            const adjustedRatio = hasAnyAdjustment ? getAdjustedRatio(baseRatio, combinedFactor, ratioFormat, cpSize) : null;
-            const strikeBase = Boolean(hasAnyAdjustment && adjustedRatio);
-
-            return (
-              <Card key={meal.name} data-testid={`card-ratio-${meal.name.toLowerCase()}`}>
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="font-medium">{meal.name}</p>
-                        <p className="text-xs text-muted-foreground">{getMealTime(meal.name)}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {editing ? (
-                    <div className="space-y-1">
-                      <Label htmlFor={`ratio-${meal.key}`} className="text-xs text-muted-foreground" data-testid={`label-ratio-${meal.name.toLowerCase()}`}>
-                        {formatRatioInputLabel(ratioFormat, cpSize)}
-                      </Label>
-                      <Input
-                        id={`ratio-${meal.key}`}
-                        placeholder={formatRatioInputPlaceholder(ratioFormat)}
-                        value={editValues[meal.key]}
-                        onChange={(e) => setEditValues(prev => ({ ...prev, [meal.key]: e.target.value }))}
-                        data-testid={`input-ratio-${meal.name.toLowerCase()}`}
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-1">
-                      {baseRatio ? (
-                        <p
-                          className={`text-2xl font-bold ${strikeBase ? "text-muted-foreground line-through text-lg" : ""}`}
-                          data-testid={`display-ratio-${meal.name.toLowerCase()}`}
-                        >
-                          {displayRatio}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">Not set</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card data-testid="card-correction-factor">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-primary" />
-              <div className="flex items-center gap-1">
-                <p className="font-medium">Correction Factor</p>
-                <InfoTooltip term="Correction Factor" explanation="How much 1 unit of insulin drops your blood glucose. For example, if your factor is 2.5, then 1 unit will lower your BG by approximately 2.5 mmol/L." />
-              </div>
-            </div>
-            {editing ? (
-              <div className="space-y-1">
-                <Label htmlFor="correction-factor" className="text-xs text-muted-foreground">
-                  {bgUnit} per unit
-                </Label>
-                <Input
-                  id="correction-factor"
-                  type="number"
-                  step="0.1"
-                  placeholder="e.g. 2.5"
-                  value={editValues.correctionFactor}
-                  onChange={(e) => setEditValues(prev => ({ ...prev, correctionFactor: e.target.value }))}
-                  data-testid="input-correction-factor"
-                />
-              </div>
-            ) : (
-              <p className="text-2xl font-bold">
-                {settings.correctionFactor ? `${settings.correctionFactor} ${bgUnit}` : <span className="text-sm text-muted-foreground italic font-normal">Not set</span>}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card data-testid="card-target-range">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <div className="flex items-center gap-1">
-                <p className="font-medium">Target Range</p>
-                <InfoTooltip term="Target Range" explanation="Your target blood glucose range. This is the range you aim to keep your blood sugar within." />
-              </div>
-            </div>
-            {editing ? (
-              <div className="flex items-center gap-2">
-                <div className="space-y-1 flex-1">
-                  <Label htmlFor="target-low" className="text-xs text-muted-foreground">Low</Label>
-                  <Input
-                    id="target-low"
-                    type="number"
-                    step="0.1"
-                    placeholder="4.0"
-                    value={editValues.targetBgLow}
-                    onChange={(e) => setEditValues(prev => ({ ...prev, targetBgLow: e.target.value }))}
-                    data-testid="input-target-low"
-                  />
-                </div>
-                <span className="text-muted-foreground mt-5">—</span>
-                <div className="space-y-1 flex-1">
-                  <Label htmlFor="target-high" className="text-xs text-muted-foreground">High</Label>
-                  <Input
-                    id="target-high"
-                    type="number"
-                    step="0.1"
-                    placeholder="8.0"
-                    value={editValues.targetBgHigh}
-                    onChange={(e) => setEditValues(prev => ({ ...prev, targetBgHigh: e.target.value }))}
-                    data-testid="input-target-high"
-                  />
-                </div>
-              </div>
-            ) : (
-              <p className="text-2xl font-bold">
-                {settings.targetBgLow && settings.targetBgHigh
-                  ? `${settings.targetBgLow} — ${settings.targetBgHigh} ${bgUnit}`
-                  : <span className="text-sm text-muted-foreground italic font-normal">Not set</span>}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      ) : null}
 
       <Card data-testid="card-quick-actions">
         <CardContent className="p-4 space-y-3">
