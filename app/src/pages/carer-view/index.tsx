@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,7 +21,7 @@ import {
   carerUpsertSickDayMedicationReminder,
   carerSnoozeSickDayMedicationReminder,
   carerStopSickDayMedicationReminder,
-  carerMarkSickDayMedicationTakenNow,
+  carerLogSickDayMedicationTaken,
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
@@ -379,6 +380,45 @@ function combinedSickDayTemperatureRows(state: Record<string, unknown>): Array<{
   return out;
 }
 
+function combinedSickDayEpisodeTimeline(state: Record<string, unknown>): Array<{
+  at: string;
+  id: string;
+  kind: "dose" | "temp";
+  title: string;
+  subtitle: string;
+}> {
+  const rows: Array<{ at: string; id: string; kind: "dose" | "temp"; title: string; subtitle: string }> = [];
+  const doses = Array.isArray(state.medication_dose_log) ? (state.medication_dose_log as Record<string, unknown>[]) : [];
+  for (const raw of doses) {
+    if (!raw || typeof raw !== "object") continue;
+    const id = typeof raw.id === "string" ? raw.id : "";
+    const name = typeof raw.name === "string" ? raw.name : "Medication";
+    const takenAt = typeof raw.taken_at === "string" ? raw.taken_at : "";
+    if (!id || !takenAt) continue;
+    const dose = typeof raw.dose_label === "string" ? raw.dose_label : null;
+    const src = raw.source === "carer" ? "Supporter" : "Patient";
+    rows.push({
+      at: takenAt,
+      id: `dose-${id}`,
+      kind: "dose",
+      title: `${name}${dose ? ` · ${dose}` : ""}`,
+      subtitle: src,
+    });
+  }
+  const temps = combinedSickDayTemperatureRows(state);
+  temps.forEach((t, idx) => {
+    rows.push({
+      at: t.at,
+      id: `temp-${t.at}-${t.source}-${idx}`,
+      kind: "temp",
+      title: `${t.value}°${t.unit.toUpperCase()}`,
+      subtitle: t.source === "carer" ? "Supporter" : "Patient",
+    });
+  });
+  rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return rows.slice(0, 80);
+}
+
 function SickDaySupporterCareCard(props: {
   patientId: string;
   sickState: Record<string, unknown> | null;
@@ -397,6 +437,21 @@ function SickDaySupporterCareCard(props: {
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [takenDialogOpen, setTakenDialogOpen] = useState(false);
+  const [takenReminderId, setTakenReminderId] = useState<string | null>(null);
+  const [takenReminderName, setTakenReminderName] = useState("");
+  const [takenReminderDose, setTakenReminderDose] = useState<string | null>(null);
+  const [takenAtLocal, setTakenAtLocal] = useState("");
+
+  const tempsCombined = useMemo(() => {
+    if (!sickState || sickState.sick_day_active !== true) return [];
+    return combinedSickDayTemperatureRows(sickState);
+  }, [sickState]);
+
+  const episodeTimeline = useMemo(() => {
+    if (!sickState || sickState.sick_day_active !== true) return [];
+    return combinedSickDayEpisodeTimeline(sickState);
+  }, [sickState]);
 
   if (!sickState || sickState.sick_day_active !== true) return null;
 
@@ -406,7 +461,6 @@ function SickDaySupporterCareCard(props: {
   const carerNotes = Array.isArray(sickState.carer_med_notes)
     ? (sickState.carer_med_notes as Record<string, unknown>[])
     : [];
-  const tempsCombined = combinedSickDayTemperatureRows(sickState);
 
   const resolvedRepeatMinutes = (repeatKey: string, customMins: string): number | null => {
     if (repeatKey === "custom") {
@@ -558,15 +612,43 @@ function SickDaySupporterCareCard(props: {
     }
   };
 
-  const markTakenNow = async (id: string) => {
+  const openTakenDialog = (id: string, name: string, doseLabel: string | null) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setTakenReminderId(id);
+    setTakenReminderName(name);
+    setTakenReminderDose(doseLabel);
+    setTakenAtLocal(`${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
+    setTakenDialogOpen(true);
+  };
+
+  const submitTakenMedication = async () => {
+    if (!takenReminderId) return;
     setFormError(null);
+    const raw = takenAtLocal.trim();
+    const takenAt = raw ? new Date(raw) : null;
+    if (!takenAt || Number.isNaN(takenAt.getTime())) {
+      setFormError("Choose a valid date and time.");
+      return;
+    }
+    if (takenAt.getTime() > Date.now() + 60_000) {
+      setFormError("Time cannot be in the future.");
+      return;
+    }
     setBusy(true);
     try {
-      const res = await carerMarkSickDayMedicationTakenNow(patientId, { id });
+      const res = await carerLogSickDayMedicationTaken(patientId, {
+        reminderId: takenReminderId,
+        takenAtIso: takenAt.toISOString(),
+        name: takenReminderName,
+        doseLabel: takenReminderDose,
+      });
       if (res.error) {
         setFormError(res.error.message);
         return;
       }
+      setTakenDialogOpen(false);
+      setTakenReminderId(null);
       await onUpdated();
     } finally {
       setBusy(false);
@@ -591,6 +673,38 @@ function SickDaySupporterCareCard(props: {
             <AlertDescription className="text-sm">{formError}</AlertDescription>
           </Alert>
         ) : null}
+
+        <Dialog
+          open={takenDialogOpen}
+          onOpenChange={(open) => {
+            setTakenDialogOpen(open);
+            if (!open) setTakenReminderId(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Log dose taken</DialogTitle>
+              <DialogDescription>
+                When did they take {takenReminderName || "this"}? This updates the shared next reminder to that time plus
+                the repeat interval, and adds a row to the activity log.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-xs">Taken at</Label>
+                <Input type="datetime-local" step={60} value={takenAtLocal} onChange={(e) => setTakenAtLocal(e.target.value)} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setTakenDialogOpen(false)} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button type="button" size="sm" onClick={() => void submitTakenMedication()} disabled={busy}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="rounded-xl border border-border/60 p-3 space-y-3">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -659,7 +773,12 @@ function SickDaySupporterCareCard(props: {
                       <div className="min-w-0 flex-1">
                         <p className="font-medium truncate">{name}</p>
                         {dose ? <p className="text-xs text-muted-foreground">{dose}</p> : null}
-                        {when ? <p className="text-xs text-muted-foreground">Next due {when}</p> : null}
+                        {when ? (
+                          <p className="text-xs text-muted-foreground">
+                            Next due {when}{" "}
+                            <span className="block sm:inline">(patient schedule)</span>
+                          </p>
+                        ) : null}
                       </div>
                       <Badge variant="secondary" className="text-xs">
                         {typeof m.repeat_mins === "number" ? `${m.repeat_mins >= 60 ? `${Math.round(m.repeat_mins / 60)}h` : `${m.repeat_mins}m`}` : "repeat"}
@@ -670,8 +789,14 @@ function SickDaySupporterCareCard(props: {
                         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => openEdit(m)}>
                           Edit
                         </Button>
-                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void markTakenNow(m.id as string)}>
-                          Taken now
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => openTakenDialog(m.id as string, name, dose)}
+                        >
+                          Taken
                         </Button>
                         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void snoozeReminder(m.id as string, 30)}>
                           Snooze 30m
@@ -749,6 +874,44 @@ function SickDaySupporterCareCard(props: {
             </div>
           ) : null}
         </div>
+
+        {episodeTimeline.length > 0 ? (
+          <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              This sick day — activity
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Doses logged as taken (patient or supporter) and all temperature readings for this sick day.
+            </p>
+            <ul className="space-y-2 max-h-56 overflow-y-auto">
+              {episodeTimeline.map((row) => (
+                <li
+                  key={row.id}
+                  className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-2 text-sm"
+                >
+                  {row.kind === "dose" ? (
+                    <Pill className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                  ) : (
+                    <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium leading-snug">{row.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(row.at).toLocaleString(undefined, {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {row.subtitle}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {tempsCombined.length > 0 && (
           <div>

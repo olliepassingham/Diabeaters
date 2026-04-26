@@ -1,28 +1,11 @@
 import { Capacitor } from "@capacitor/core";
 
+import { computeNextDueAfterReminderFired } from "@/lib/sick-day-med-schedule";
 import { storage } from "@/lib/storage";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
 import { rescheduleAllSickDayNativeMedReminders, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 
 let runLock = false;
-
-function advanceNextDueAtIso(currentDueIso: string, repeatEveryMinutes: number, nowMs: number): string {
-  const base = new Date(currentDueIso).getTime();
-  const stepMs = Math.max(1, Math.round(repeatEveryMinutes)) * 60_000;
-  if (!Number.isFinite(base) || !Number.isFinite(stepMs) || stepMs <= 0) {
-    return new Date(nowMs + 60_000).toISOString();
-  }
-
-  // Find the first due time strictly after now, starting from the current due.
-  let next = base;
-  if (next <= nowMs) {
-    const steps = Math.floor((nowMs - next) / stepMs) + 1;
-    next = next + steps * stepMs;
-  } else {
-    next = next + stepMs;
-  }
-  return new Date(next).toISOString();
-}
 
 /**
  * While sick day mode is on, watch active medication reminders and:
@@ -63,7 +46,7 @@ export async function runSickDayMedDueNotifier(): Promise<void> {
 
       if (!res.ok) continue;
 
-      const nextDueAtIso = advanceNextDueAtIso(dueIso, entry.repeatEveryMinutes, now);
+      const nextDueAtIso = computeNextDueAfterReminderFired(dueIso, entry.repeatEveryMinutes, now);
       storage.updateSickDayMedicationEntry(entry.id, { lastInAppNotifiedDueAtIso: dueIso, nextDueAtIso });
       const updated = storage.getSickDayMedicationLog().find((e) => e.id === entry.id);
       if (updated) {

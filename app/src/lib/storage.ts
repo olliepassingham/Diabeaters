@@ -187,6 +187,16 @@ function getSickDayTempsStorageKey(): string {
   }
 }
 
+function getSickDayMedDosesStorageKey(): string {
+  if (typeof window === "undefined") return "diabeater_sick_day_med_doses";
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    return uid ? `diabeater_sick_day_med_doses_u_${uid}` : "diabeater_sick_day_med_doses";
+  } catch {
+    return "diabeater_sick_day_med_doses";
+  }
+}
+
 const LEGACY_WELCOME_STRUGGLE_DISMISSED_KEY = "diabeater_welcome_dismissed";
 
 /** Per-user key so another account on the same browser does not inherit dismiss state. */
@@ -604,6 +614,20 @@ export interface SickDayTemperatureEntry {
   value: number;
   unit: "c" | "f";
   loggedAtIso: string;
+  notes?: string;
+  /** Who logged the reading when synced from sick day scenario (supporter entries). */
+  loggedBy?: "user" | "carer";
+}
+
+/** One logged dose during the current sick day episode (patient or supporter). */
+export interface SickDayMedicationDoseLogEntry {
+  id: string;
+  /** Active reminder id when the dose was logged from a reminder; optional for free-text doses. */
+  reminderId?: string;
+  name: string;
+  doseLabel?: string;
+  takenAtIso: string;
+  source: "user" | "carer";
   notes?: string;
 }
 
@@ -2059,6 +2083,7 @@ export const storage = {
       try {
         localStorage.removeItem(getSickDayMedsStorageKey());
         localStorage.removeItem(getSickDayTempsStorageKey());
+        localStorage.removeItem(getSickDayMedDosesStorageKey());
       } catch {
         /* ignore */
       }
@@ -2315,6 +2340,35 @@ export const storage = {
   deleteSickDayTemperatureEntry(id: string): void {
     const items = this.getSickDayTemperatureLog().filter((e) => e.id !== id);
     this.saveSickDayTemperatureLog(items);
+  },
+
+  getSickDayMedicationDoseLog(): SickDayMedicationDoseLogEntry[] {
+    const key = getSickDayMedDosesStorageKey();
+    const data = (() => {
+      try {
+        return localStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    })();
+    const parsed = data ? (JSON.parse(data) as unknown) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((x): x is SickDayMedicationDoseLogEntry => x && typeof x === "object") as SickDayMedicationDoseLogEntry[];
+  },
+
+  saveSickDayMedicationDoseLog(entries: SickDayMedicationDoseLogEntry[]): void {
+    const key = getSickDayMedDosesStorageKey();
+    try {
+      localStorage.setItem(key, JSON.stringify(entries));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  addSickDayMedicationDoseEntry(entry: SickDayMedicationDoseLogEntry): void {
+    const items = this.getSickDayMedicationDoseLog();
+    items.unshift(entry);
+    this.saveSickDayMedicationDoseLog(items.slice(0, 200));
   },
 
   getScenarioHistory(): ScenarioHistoryEntry[] {

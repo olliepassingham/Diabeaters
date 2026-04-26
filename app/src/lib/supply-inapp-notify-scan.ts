@@ -1,5 +1,6 @@
 import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
+import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
 
 const SUPPLY_ALERT_STATE_KEY = "diabeater_supply_alert_state_v1";
@@ -32,11 +33,21 @@ export type SupplyInAppNotifyScanResult = {
 };
 
 /**
- * When supply levels cross low/critical thresholds, call the cloud notify function so the in-app inbox * (and carers) receive the same alerts as on the Supplies screen. Updates persisted threshold state.
+ * When supply levels cross low/critical thresholds, call the cloud notify function so the in-app inbox
+ * (and carers) receive the same alerts as on the Supplies screen. Updates persisted threshold state.
  */
 export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifyScanResult> {
   const s = storage.getNotificationSettings();
   if (!s.enabled || !s.supplyAlerts) {
+    return { notified: false, edgeFailure: null };
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    return { notified: false, edgeFailure: null };
+  }
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.user) {
     return { notified: false, edgeFailure: null };
   }
 
@@ -85,8 +96,11 @@ export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifySc
     if (res.success) {
       notified = true;
       notifyInAppNotificationsChanged({ skipPageRefresh: true });
-    } else if (!edgeFailure) {
-      edgeFailure = { success: false, error: res.error, detail: res.detail };
+    } else {
+      nextState[item.id] = prev;
+      if (!edgeFailure) {
+        edgeFailure = { success: false, error: res.error, detail: res.detail };
+      }
     }
   }
 

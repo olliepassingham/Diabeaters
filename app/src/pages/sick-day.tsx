@@ -11,7 +11,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
-import { storage, UserSettings, Supply, SickDayJournalEntry, RatioFormat, SickDayMedicationLogEntry, SickDayTemperatureEntry } from "@/lib/storage";
+import {
+  storage,
+  UserSettings,
+  Supply,
+  SickDayJournalEntry,
+  RatioFormat,
+  SickDayMedicationLogEntry,
+  SickDayMedicationDoseLogEntry,
+  SickDayTemperatureEntry,
+} from "@/lib/storage";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -24,7 +33,12 @@ import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-out
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  mergeMedicationDoseLogs,
+  medicationDoseLogToScenarioRows,
+  parseMedicationDoseLogFromScenario,
+} from "@/lib/sick-day-dose-log";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -380,6 +394,7 @@ export default function SickDay() {
   const [isPumpUser, setIsPumpUser] = useState(false);
   const [journalEntries, setJournalEntries] = useState<SickDayJournalEntry[]>([]);
   const [medEntries, setMedEntries] = useState<SickDayMedicationLogEntry[]>([]);
+  const [medDoseLog, setMedDoseLog] = useState<SickDayMedicationDoseLogEntry[]>([]);
   const [tempEntries, setTempEntries] = useState<SickDayTemperatureEntry[]>([]);
   const [medTakenAtOpen, setMedTakenAtOpen] = useState(false);
   const [medTakenAtId, setMedTakenAtId] = useState<string | null>(null);
@@ -392,6 +407,12 @@ export default function SickDay() {
   const [medRepeat, setMedRepeat] = useState<string>("4h");
   const [medRepeatCustomMins, setMedRepeatCustomMins] = useState<string>("");
   const [medNotes, setMedNotes] = useState("");
+  /** Local `datetime-local` value — when the last dose was (or is) taken; next reminder = this + repeat interval. */
+  const [medClockStartLocal, setMedClockStartLocal] = useState(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
   const [journalBg, setJournalBg] = useState("");
   const [journalKetone, setJournalKetone] = useState<string>("");
   const [journalCorrection, setJournalCorrection] = useState("");
@@ -446,6 +467,7 @@ export default function SickDay() {
 
     setJournalEntries(storage.getSickDayJournal());
     setMedEntries(storage.getSickDayMedicationLog());
+    setMedDoseLog(storage.getSickDayMedicationDoseLog());
     setTempEntries(storage.getSickDayTemperatureLog());
 
     if (scenarioState.sickDayActive) {
@@ -473,6 +495,55 @@ export default function SickDay() {
     const hash = window.location.hash;
     if (hash === "#sickday-checklist") setActiveModeTab("checklist");
     else if (hash === "#sickday-log") setActiveModeTab("log");
+  }, [isSickDayActive]);
+
+  /** Merge supporter-logged doses & temperatures from cloud when sick day is active. */
+  useEffect(() => {
+    if (!isSickDayActive) return;
+    let cancelled = false;
+    void (async () => {
+      const remote = await fetchScenarioStateForUser("sick_day");
+      if (cancelled || !remote) return;
+
+      const remoteDoses = parseMedicationDoseLogFromScenario(remote.medication_dose_log);
+      const localDoses = storage.getSickDayMedicationDoseLog();
+      const mergedDoses = mergeMedicationDoseLogs(localDoses, remoteDoses);
+      const localIds = new Set(localDoses.map((d) => d.id));
+      const hasNewDose = mergedDoses.some((d) => !localIds.has(d.id));
+      if (mergedDoses.length !== localDoses.length || hasNewDose) {
+        storage.saveSickDayMedicationDoseLog(mergedDoses);
+        setMedDoseLog(mergedDoses);
+      }
+
+      const localTemps = storage.getSickDayTemperatureLog();
+      const tempIds = new Set(localTemps.map((t) => t.id));
+      const carerTemps = Array.isArray(remote.carer_temp_recent) ? remote.carer_temp_recent : [];
+      let addedTemp = false;
+      for (const raw of carerTemps as Record<string, unknown>[]) {
+        if (!raw || typeof raw !== "object") continue;
+        const id = typeof raw.id === "string" ? raw.id.trim() : "";
+        if (!id || tempIds.has(id)) continue;
+        const value = typeof raw.value === "number" ? raw.value : Number(raw.value);
+        const unit = raw.unit === "c" || raw.unit === "f" ? raw.unit : null;
+        const at = typeof raw.at === "string" ? raw.at.trim() : "";
+        if (!Number.isFinite(value) || !unit || !at || Number.isNaN(new Date(at).getTime())) continue;
+        storage.addSickDayTemperatureEntry({
+          id,
+          value,
+          unit,
+          loggedAtIso: at,
+          loggedBy: "carer",
+        });
+        tempIds.add(id);
+        addedTemp = true;
+      }
+      if (addedTemp) {
+        setTempEntries(storage.getSickDayTemperatureLog());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [isSickDayActive]);
 
   const scrollToId = (id: string) => {
@@ -540,6 +611,36 @@ export default function SickDay() {
       .sort((a, b) => a.dueMs - b.dueMs);
   }, [medEntries, nowTick]);
 
+  const medTakenPendingEntry = useMemo(
+    () => (medTakenAtId ? medEntries.find((e) => e.id === medTakenAtId) ?? null : null),
+    [medEntries, medTakenAtId],
+  );
+
+  const sickDayEpisodeRows = useMemo(() => {
+    type Row = { at: string; kind: "dose" | "temp"; id: string; title: string; subtitle: string };
+    const rows: Row[] = [];
+    for (const d of medDoseLog) {
+      rows.push({
+        at: d.takenAtIso,
+        kind: "dose",
+        id: `dose-${d.id}`,
+        title: `${d.name}${d.doseLabel ? ` · ${d.doseLabel}` : ""}`,
+        subtitle: d.source === "carer" ? "Supporter" : "You",
+      });
+    }
+    for (const t of tempEntries) {
+      rows.push({
+        at: t.loggedAtIso,
+        kind: "temp",
+        id: `temp-${t.id}`,
+        title: `${t.value}°${t.unit.toUpperCase()}`,
+        subtitle: t.loggedBy === "carer" ? "Supporter" : "You",
+      });
+    }
+    rows.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+    return rows.slice(0, 80);
+  }, [medDoseLog, tempEntries]);
+
   const resolvedRepeatMinutes = (repeatKey: string, customMins: string): number | null => {
     if (repeatKey === "custom") {
       const n = parseInt(customMins, 10);
@@ -566,6 +667,7 @@ export default function SickDay() {
       unit: e.unit,
       at: e.loggedAtIso,
     }));
+    const doseRows = medicationDoseLogToScenarioRows(storage.getSickDayMedicationDoseLog());
     return {
       sick_day_active: !!sc.sickDayActive,
       severity: sc.sickDaySeverity ?? severity ?? null,
@@ -588,6 +690,7 @@ export default function SickDay() {
       })),
       temp_latest: temps[0] ? { value: temps[0].value, unit: temps[0].unit, at: temps[0].at } : null,
       temp_recent: temps,
+      medication_dose_log: doseRows,
     };
   }, [severity, sickDayActivatedAt]);
 
@@ -597,6 +700,13 @@ export default function SickDay() {
       const preservedCarerTemps = Array.isArray(remote?.carer_temp_recent) ? remote!.carer_temp_recent : [];
       const preservedCarerNotes = Array.isArray(remote?.carer_med_notes) ? remote!.carer_med_notes : [];
       const off = overrides.sick_day_active === false;
+      if (!off) {
+        const remoteDoses = parseMedicationDoseLogFromScenario(remote?.medication_dose_log);
+        const localDoses = storage.getSickDayMedicationDoseLog();
+        const mergedDoses = mergeMedicationDoseLogs(localDoses, remoteDoses);
+        storage.saveSickDayMedicationDoseLog(mergedDoses);
+        setMedDoseLog(mergedDoses);
+      }
       const localBase = off ? {} : buildLocalSickDayScenarioState();
       await upsertScenario({
         scenarioKey: "sick_day",
@@ -631,8 +741,23 @@ export default function SickDay() {
       toast({ title: "Choose a reminder interval", description: "Select how long until the next reminder.", variant: "destructive" });
       return;
     }
-    const takenAtIso = new Date().toISOString();
-    const nextDue = new Date(Date.now() + repeatMins * 60_000).toISOString();
+    const anchorRaw = medClockStartLocal.trim();
+    const anchor = anchorRaw ? new Date(anchorRaw) : new Date();
+    if (anchorRaw && Number.isNaN(anchor.getTime())) {
+      toast({ title: "Invalid time", description: "Check “When did you take it?” — use a valid date and time.", variant: "destructive" });
+      return;
+    }
+    if (anchor.getTime() > Date.now() + 60_000) {
+      toast({ title: "Time is in the future", description: "Use a dose time up to now (or leave as now).", variant: "destructive" });
+      return;
+    }
+    const takenAtIso = anchor.toISOString();
+    const stepAdd = repeatMins * 60_000;
+    let nextMs = anchor.getTime() + stepAdd;
+    while (nextMs <= Date.now()) {
+      nextMs += stepAdd;
+    }
+    const nextDue = new Date(nextMs).toISOString();
     const entry: SickDayMedicationLogEntry = {
       id: crypto.randomUUID(),
       name,
@@ -649,6 +774,11 @@ export default function SickDay() {
     setMedDoseLabel("");
     setMedNotes("");
     if (medPreset === "custom") setMedCustomName("");
+    {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setMedClockStartLocal(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    }
     void (async () => {
       const res = await scheduleSickDayMedReminder(entry);
       if (res.permission === "denied") {
@@ -678,7 +808,7 @@ export default function SickDay() {
     })();
     toast({
       title: "Reminder added",
-      description: `We’ll remind you again in ${repeatMins >= 60 ? `${Math.round(repeatMins / 60)}h` : `${repeatMins}m`}.`,
+      description: `Next reminder ${new Date(nextDue).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} (${repeatMins >= 60 ? `${Math.round(repeatMins / 60)}h` : `${repeatMins}m`} after your dose time).`,
     });
   };
 
@@ -721,29 +851,7 @@ export default function SickDay() {
     }
   };
 
-  const handleMedicationTakenNow = (id: string) => {
-    const entry = medEntries.find((e) => e.id === id);
-    if (!entry) return;
-    const takenAtIso = new Date().toISOString();
-    storage.updateSickDayMedicationEntry(id, {
-      takenAtIso,
-    });
-    const next = storage.getSickDayMedicationLog();
-    setMedEntries(next);
-    const updated = next.find((e) => e.id === id);
-    if (updated) {
-      void createSickDayMedInAppNotification({
-        title: "Medication logged",
-        body: `${updated.name} taken`,
-        reminderId: updated.id,
-        dueAtIso: takenAtIso,
-        name: updated.name,
-      });
-      void pushSickDayScenario({});
-    }
-  };
-
-  const openMedicationTakenAt = (id: string) => {
+  const openMedicationTakenDialog = (id: string) => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -752,7 +860,7 @@ export default function SickDay() {
     setMedTakenAtOpen(true);
   };
 
-  const handleMedicationTakenAtSave = () => {
+  const handleMedicationTakenSave = () => {
     const id = medTakenAtId;
     if (!id) return;
     const entry = medEntries.find((e) => e.id === id);
@@ -770,18 +878,39 @@ export default function SickDay() {
     }
 
     const takenAtIso = takenAt.toISOString();
+    const stepMs = Math.max(1, Math.round(entry.repeatEveryMinutes)) * 60_000;
+    let nextMs = takenAt.getTime() + stepMs;
+    while (nextMs <= Date.now()) {
+      nextMs += stepMs;
+    }
+    const nextDueAtIso = new Date(nextMs).toISOString();
+
+    const dose: SickDayMedicationDoseLogEntry = {
+      id: crypto.randomUUID(),
+      reminderId: id,
+      name: entry.name,
+      doseLabel: entry.doseLabel,
+      takenAtIso,
+      source: "user",
+    };
+    storage.addSickDayMedicationDoseEntry(dose);
+    setMedDoseLog(storage.getSickDayMedicationDoseLog());
+
     storage.updateSickDayMedicationEntry(id, {
       takenAtIso,
+      nextDueAtIso,
+      lastInAppNotifiedDueAtIso: undefined,
     });
     const next = storage.getSickDayMedicationLog();
     setMedEntries(next);
     const updated = next.find((e) => e.id === id);
     if (updated) {
+      void scheduleSickDayMedReminder(updated);
       void createSickDayMedInAppNotification({
         title: "Medication logged",
-        body: `${updated.name} taken`,
+        body: `${updated.name} · taken ${new Date(takenAtIso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} · next reminder ${new Date(nextDueAtIso).toLocaleString(undefined, { timeStyle: "short" })}`,
         reminderId: updated.id,
-        dueAtIso: takenAtIso,
+        dueAtIso: nextDueAtIso,
         name: updated.name,
       });
       void pushSickDayScenario({});
@@ -806,6 +935,7 @@ export default function SickDay() {
       value: Math.round(n * 10) / 10,
       unit: tempUnit,
       loggedAtIso: new Date().toISOString(),
+      loggedBy: "user",
     };
     storage.addSickDayTemperatureEntry(entry);
     setTempEntries(storage.getSickDayTemperatureLog());
@@ -867,6 +997,7 @@ export default function SickDay() {
       void cancelSickDayMedReminder(m.id);
     }
     storage.deactivateSickDay();
+    setMedDoseLog([]);
     setIsSickDayActive(false);
     localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     setResults(null);
@@ -885,6 +1016,7 @@ export default function SickDay() {
         meds_active: [],
         temp_recent: [],
         temp_latest: null,
+        medication_dose_log: [],
       },
       "Sick day mode (off)",
     );
@@ -1515,7 +1647,10 @@ export default function SickDay() {
                       <Pill className="h-4 w-4 text-primary" />
                       Medication reminders
                     </CardTitle>
-                    <CardDescription>Reminders keep running while Sick Day mode is on. Logging is optional.</CardDescription>
+                    <CardDescription>
+                      Set when you took the medicine — the next reminder is that time plus your repeat interval. You can
+                      change the time when you tap Taken.
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Dialog
@@ -1527,22 +1662,39 @@ export default function SickDay() {
                     >
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Log medication time</DialogTitle>
+                          <DialogTitle>Log dose taken</DialogTitle>
+                          <DialogDescription>
+                            {medTakenPendingEntry
+                              ? (() => {
+                                  const rm = medTakenPendingEntry.repeatEveryMinutes;
+                                  const every =
+                                    rm >= 60 ? `${Math.round(rm / 60)} hour${Math.round(rm / 60) === 1 ? "" : "s"}` : `${rm} minutes`;
+                                  return `Enter when you had this dose. Your next reminder is that time plus every ${every}.`;
+                                })()
+                              : "Enter when you had this dose. Your next reminder follows from that time plus your repeat interval."}
+                          </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-3">
+                          {medTakenPendingEntry ? (
+                            <p className="text-sm font-medium text-foreground">
+                              {medTakenPendingEntry.name}
+                              {medTakenPendingEntry.doseLabel ? ` · ${medTakenPendingEntry.doseLabel}` : null}
+                            </p>
+                          ) : null}
                           <div className="space-y-2">
                             <Label htmlFor="input-med-taken-at" className="text-sm">
-                              Taken at
+                              When did you take it?
                             </Label>
                             <Input
                               id="input-med-taken-at"
                               type="datetime-local"
+                              step={60}
                               value={medTakenAtLocal}
                               onChange={(e) => setMedTakenAtLocal(e.target.value)}
                               data-testid="input-med-taken-at"
                             />
                             <p className="text-xs text-muted-foreground">
-                              This is for your record only — reminders continue on their interval.
+                              On some phones, use the system date and time picker if the field looks blank.
                             </p>
                           </div>
                           <div className="flex items-center justify-end gap-2">
@@ -1554,7 +1706,7 @@ export default function SickDay() {
                             >
                               Cancel
                             </Button>
-                            <Button type="button" onClick={handleMedicationTakenAtSave} data-testid="button-med-taken-at-save">
+                            <Button type="button" onClick={handleMedicationTakenSave} data-testid="button-med-taken-at-save">
                               Save
                             </Button>
                           </div>
@@ -1637,6 +1789,24 @@ export default function SickDay() {
                       </div>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="input-med-clock-start" className="text-sm">
+                        When did you take it? (starts the reminder clock)
+                      </Label>
+                      <Input
+                        id="input-med-clock-start"
+                        type="datetime-local"
+                        step={60}
+                        value={medClockStartLocal}
+                        onChange={(e) => setMedClockStartLocal(e.target.value)}
+                        data-testid="input-med-clock-start"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        First reminder is this time plus the interval above. You can edit it later with Taken on an active
+                        reminder.
+                      </p>
+                    </div>
+
                     <Button type="button" className="w-full" onClick={handleAddMedicationReminder} data-testid="button-add-med-reminder">
                       Add reminder
                     </Button>
@@ -1661,8 +1831,9 @@ export default function SickDay() {
                                     {e.doseLabel ? <span className="text-muted-foreground font-normal"> · {e.doseLabel}</span> : null}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    {formatCountdownMs(dueMs)} · next at{" "}
-                                    {new Date(e.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                                    {formatCountdownMs(dueMs)} · next due{" "}
+                                    {new Date(e.nextDueAtIso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}{" "}
+                                    <span className="block sm:inline sm:ml-1">(dose time + repeat)</span>
                                   </p>
                                 </div>
                                 <Badge variant="secondary" className="text-xs">
@@ -1671,11 +1842,8 @@ export default function SickDay() {
                               </div>
                               {e.notes ? <p className="text-xs text-muted-foreground">{e.notes}</p> : null}
                               <div className="flex flex-wrap gap-2">
-                                <Button size="sm" onClick={() => handleMedicationTakenNow(e.id)} data-testid={`button-med-taken-${e.id}`}>
-                                  Taken now
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => openMedicationTakenAt(e.id)} data-testid={`button-med-taken-at-${e.id}`}>
-                                  Log time
+                                <Button size="sm" onClick={() => openMedicationTakenDialog(e.id)} data-testid={`button-med-taken-${e.id}`}>
+                                  Taken
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={() => handleSnoozeMedicationReminder(e.id, 30)} data-testid={`button-med-snooze-${e.id}`}>
                                   Snooze 30m
@@ -1691,6 +1859,42 @@ export default function SickDay() {
                     ) : (
                       <p className="text-xs text-muted-foreground">No active reminders yet.</p>
                     )}
+
+                    {sickDayEpisodeRows.length > 0 ? (
+                      <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3 space-y-2" data-testid="sickday-episode-log">
+                        <p className="text-sm font-medium">This sick day — activity</p>
+                        <p className="text-xs text-muted-foreground">
+                          Medication doses you mark as taken and every temperature logged during this sick day period.
+                        </p>
+                        <ul className="space-y-2 max-h-64 overflow-y-auto">
+                          {sickDayEpisodeRows.map((row) => (
+                            <li
+                              key={row.id}
+                              className="flex items-start gap-2 rounded-lg border border-border/50 bg-background/80 px-2 py-2 text-sm"
+                            >
+                              {row.kind === "dose" ? (
+                                <Pill className="h-4 w-4 shrink-0 mt-0.5 text-primary" aria-hidden />
+                              ) : (
+                                <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" aria-hidden />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium leading-snug">{row.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(row.at).toLocaleString(undefined, {
+                                    weekday: "short",
+                                    day: "numeric",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}{" "}
+                                  · {row.subtitle}
+                                </p>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
 
                     <div className="border-t border-border/60 pt-4 space-y-3" data-testid="sickday-temperature-log">
                       <div className="flex items-center justify-between gap-2">
@@ -1745,7 +1949,9 @@ export default function SickDay() {
                                     {t.value}°{t.unit.toUpperCase()}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    {new Date(t.loggedAtIso).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })} · {getTimeAgo(t.loggedAtIso)}
+                                    {new Date(t.loggedAtIso).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })} ·{" "}
+                                    {t.loggedBy === "carer" ? "Supporter · " : ""}
+                                    {getTimeAgo(t.loggedAtIso)}
                                   </p>
                                 </div>
                                 <Button

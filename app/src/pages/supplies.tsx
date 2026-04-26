@@ -18,8 +18,8 @@ import { formatDistanceToNow, format, differenceInDays, addDays } from "date-fns
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
+import { runSupplyLowInAppNotifyScan } from "@/lib/supply-inapp-notify-scan";
 import { ToastAction } from "@/components/ui/toast";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 import {
@@ -68,27 +68,6 @@ function PumpOnlySupplySelectItems() {
       <SelectItem value="reservoir">Reservoirs/Cartridges (Pump)</SelectItem>
     </>
   );
-}
-
-const SUPPLY_ALERT_STATE_KEY = "diabeater_supply_alert_state_v1";
-type SupplyAlertLevel = "ok" | "low" | "critical";
-
-function getSupplyAlertState(): Record<string, SupplyAlertLevel> {
-  try {
-    const raw = localStorage.getItem(SUPPLY_ALERT_STATE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as Record<string, SupplyAlertLevel>) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function setSupplyAlertState(state: Record<string, SupplyAlertLevel>) {
-  try {
-    localStorage.setItem(SUPPLY_ALERT_STATE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore
-  }
 }
 
 function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; onSupplyClick?: (id: string) => void }) {
@@ -2227,60 +2206,14 @@ export default function Supplies() {
   };
 
   const maybeNotifyLowSupplies = async () => {
-    const s = storage.getNotificationSettings();
-    if (!s.enabled || !s.supplyAlerts) return;
-
-    const criticalDays = Math.max(0, Number(s.criticalThresholdDays || 0));
-    const lowDays = Math.max(criticalDays, Number(s.lowThresholdDays || 0));
-    if (lowDays <= 0) return;
-
-    const state = getSupplyAlertState();
-    const nextState: Record<string, SupplyAlertLevel> = { ...state };
-
-    const all = storage.getSupplies();
-    let notifyInvokeFailed = false;
-    for (const item of all) {
-      // Manual/emergency items (e.g. Glycogen) with no daily usage should not generate
-      // forecast-based low-supply notifications unless they are empty.
-      const adjustedQty = storage.getAdjustedQuantity(item);
-      const effectiveUsage = storage.getEffectiveDailyUsage(item);
-      const isIntervalType = item.type === "cgm" || item.type === "infusion_set" || item.type === "reservoir";
-      const isManualOnly = effectiveUsage <= 0 && !isIntervalType;
-      const isGlycogen = /glycogen/i.test(item.name || "");
-      if ((isManualOnly || isGlycogen) && adjustedQty > 0) {
-        continue;
-      }
-
-      const days = storage.getDaysRemaining(item);
-      const rounded = !Number.isFinite(days) ? 999 : Math.round(days);
-      const level: SupplyAlertLevel =
-        rounded <= criticalDays ? "critical" : rounded <= lowDays ? "low" : "ok";
-
-      const prev = state[item.id] ?? "ok";
-      nextState[item.id] = level;
-
-      const shouldSend =
-        (prev === "ok" && (level === "low" || level === "critical")) ||
-        (prev === "low" && level === "critical");
-      if (!shouldSend) continue;
-
-      const res = await invokeNotifySupplyLow({
-        supplyId: item.id,
-        supplyName: item.name,
-        level: level === "critical" ? "critical" : "low",
-        daysRemaining: rounded,
+    const { edgeFailure } = await runSupplyLowInAppNotifyScan();
+    if (edgeFailure) {
+      toast({
+        title: NOTIFY_EDGE_FAILURE_TITLE,
+        description: notifyEdgeFailureDescription(edgeFailure),
+        variant: "destructive",
       });
-      if (!res.success && !notifyInvokeFailed) {
-        notifyInvokeFailed = true;
-        toast({
-          title: NOTIFY_EDGE_FAILURE_TITLE,
-          description: notifyEdgeFailureDescription(res),
-          variant: "destructive",
-        });
-      }
     }
-
-    setSupplyAlertState(nextState);
   };
 
   const saveStateForUndo = () => {

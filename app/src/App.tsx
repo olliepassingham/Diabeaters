@@ -63,6 +63,7 @@ import { CommunityFeatureGate } from "@/components/community-feature-gate";
 import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
 import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
+import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -953,6 +954,7 @@ function AuthenticatedShell() {
       <ClinicalPrefsCloudSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
+      {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
@@ -1025,6 +1027,7 @@ function AccountShell() {
       <ClinicalPrefsCloudSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
+      {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />

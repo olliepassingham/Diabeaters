@@ -1101,16 +1101,38 @@ export async function carerStopSickDayMedicationReminder(
   return await updateSickDayScenarioStateForCarer(patientId, nextState);
 }
 
-/** Carer: mark taken now (reset due to now + repeat). */
-export async function carerMarkSickDayMedicationTakenNow(
+/**
+ * Carer: log that a dose was taken at a specific time, and advance the shared next due from that time + repeat interval.
+ */
+export async function carerLogSickDayMedicationTaken(
   patientId: string,
-  params: { id: string },
+  params: { reminderId: string; takenAtIso: string; name: string; doseLabel?: string | null },
 ): Promise<{ error: Error | null }> {
-  const id = params.id.trim();
-  if (!id) return { error: new Error("Invalid reminder.") };
+  const reminderId = params.reminderId.trim();
+  if (!reminderId) return { error: new Error("Invalid reminder.") };
+  const name = params.name.trim();
+  if (!name) return { error: new Error("Invalid medication name.") };
+
+  const takenAt = normaliseIso(params.takenAtIso);
+  if (!takenAt) return { error: new Error("Choose a valid time.") };
+  if (new Date(takenAt).getTime() > Date.now() + 60_000) {
+    return { error: new Error("Time cannot be in the future.") };
+  }
 
   const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
   if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+
+  const prevDoses = Array.isArray(prev.medication_dose_log) ? (prev.medication_dose_log as unknown[]) : [];
+  const entry = {
+    id: crypto.randomUUID(),
+    reminder_id: reminderId,
+    name,
+    dose_label: params.doseLabel?.trim() ? params.doseLabel.trim() : null,
+    taken_at: takenAt,
+    source: "carer" as const,
+    notes: null as string | null,
+  };
+  const medication_dose_log = [entry, ...prevDoses].slice(0, 100);
 
   const nowIso = new Date().toISOString();
   const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
@@ -1126,20 +1148,50 @@ export async function carerMarkSickDayMedicationTakenNow(
       return { id: rid, name: rname, due_at: due, repeat_mins: rm, dose_label: dose, updated_by: "carer", updated_at: nowIso };
     });
 
-  const idx = mapped.findIndex((m) => m.id === id);
-  if (idx < 0) return { error: new Error("Reminder not found.") };
-  const repeat = mapped[idx]!.repeat_mins;
-  mapped[idx] = {
-    ...mapped[idx]!,
-    due_at: new Date(Date.now() + repeat * 60_000).toISOString(),
-    updated_by: "carer",
-    updated_at: nowIso,
-  };
+  const idx = mapped.findIndex((m) => m.id === reminderId);
+  if (idx >= 0) {
+    const repeat = mapped[idx]!.repeat_mins;
+    const stepMs = repeat * 60_000;
+    const takenMs = new Date(takenAt).getTime();
+    let nextMs = takenMs + stepMs;
+    while (nextMs <= Date.now()) {
+      nextMs += stepMs;
+    }
+    const nextDue = new Date(nextMs).toISOString();
+    mapped[idx] = {
+      ...mapped[idx]!,
+      due_at: nextDue,
+      updated_by: "carer",
+      updated_at: nowIso,
+    };
+  }
 
   const nextActive = mapped.sort((a, b) => isoTimeMs(a.due_at) - isoTimeMs(b.due_at));
   const meds_next_due = computeMedsNextDue(nextActive);
-  const nextState = { ...prev, meds_active: nextActive, meds_next_due };
+  const nextState = { ...prev, medication_dose_log, meds_active: nextActive, meds_next_due };
   return await updateSickDayScenarioStateForCarer(patientId, nextState);
+}
+
+/** @deprecated Use {@link carerLogSickDayMedicationTaken} — kept for any external callers; only appends a dose log row. */
+export async function carerMarkSickDayMedicationTakenNow(
+  patientId: string,
+  params: { id: string },
+): Promise<{ error: Error | null }> {
+  const { prev, error } = await fetchSickDayScenarioStateForCarer(patientId);
+  if (error || !prev) return { error: error ?? new Error("Could not load sick day state.") };
+  const id = params.id.trim();
+  const prevActive = Array.isArray(prev.meds_active) ? (prev.meds_active as unknown[]) : [];
+  const row = prevActive
+    .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : null))
+    .find((r) => (typeof r?.id === "string" ? r.id : "") === id);
+  const name = row && typeof row.name === "string" ? row.name : "Medication";
+  const dose = row && typeof row.dose_label === "string" ? row.dose_label : null;
+  return carerLogSickDayMedicationTaken(patientId, {
+    reminderId: id,
+    takenAtIso: new Date().toISOString(),
+    name,
+    doseLabel: dose,
+  });
 }
 
 export { useLinkedPatient } from "../hooks/use-linked-patient";
