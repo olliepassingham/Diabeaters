@@ -1027,7 +1027,6 @@ function AccountShell() {
       <ClinicalPrefsCloudSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
-      {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />

@@ -5,6 +5,9 @@ import { storage } from "@/lib/storage";
 
 const SUPPLY_ALERT_STATE_KEY = "diabeater_supply_alert_state_v1";
 
+/** Prevents overlapping scans (mount + visibility + resume) from each firing the same threshold edge. */
+let supplyLowScanLock = false;
+
 export type SupplyAlertLevel = "ok" | "low" | "critical";
 
 function getSupplyAlertState(): Record<string, SupplyAlertLevel> {
@@ -37,26 +40,36 @@ export type SupplyInAppNotifyScanResult = {
  * (and carers) receive the same alerts as on the Supplies screen. Updates persisted threshold state.
  */
 export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifyScanResult> {
+  if (supplyLowScanLock) {
+    return { notified: false, edgeFailure: null };
+  }
+  supplyLowScanLock = true;
+
   const s = storage.getNotificationSettings();
   if (!s.enabled || !s.supplyAlerts) {
+    supplyLowScanLock = false;
     return { notified: false, edgeFailure: null };
   }
 
   const supabase = getSupabase();
   if (!supabase) {
+    supplyLowScanLock = false;
     return { notified: false, edgeFailure: null };
   }
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData?.session?.user) {
+    supplyLowScanLock = false;
     return { notified: false, edgeFailure: null };
   }
 
   const criticalDays = Math.max(0, Number(s.criticalThresholdDays || 0));
   const lowDays = Math.max(criticalDays, Number(s.lowThresholdDays || 0));
   if (lowDays <= 0) {
+    supplyLowScanLock = false;
     return { notified: false, edgeFailure: null };
   }
 
+  try {
   const state = getSupplyAlertState();
   const nextState: Record<string, SupplyAlertLevel> = { ...state };
   const all = storage.getSupplies();
@@ -106,4 +119,7 @@ export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifySc
 
   setSupplyAlertState(nextState);
   return { notified, edgeFailure };
+  } finally {
+    supplyLowScanLock = false;
+  }
 }
