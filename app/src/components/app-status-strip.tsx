@@ -307,18 +307,6 @@ export function AppStatusStrip() {
                 <Button
                   type="button"
                   size="sm"
-                  variant={ex.preChecklist.bgChecked ? "default" : "outline"}
-                  className={btnClass}
-                  onClick={() => {
-                    storage.updateActiveExercise({ preChecklist: { ...ex.preChecklist, bgChecked: !ex.preChecklist.bgChecked } });
-                    setEx(storage.getActiveExercise());
-                  }}
-                >
-                  BG checked
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
                   variant={ex.preChecklist.carbsConsidered ? "default" : "outline"}
                   className={btnClass}
                   onClick={() => {
@@ -340,7 +328,7 @@ export function AppStatusStrip() {
                     setEx(storage.getActiveExercise());
                   }}
                 >
-                  Basal checked
+                  Insulin considered
                 </Button>
               </div>
 
