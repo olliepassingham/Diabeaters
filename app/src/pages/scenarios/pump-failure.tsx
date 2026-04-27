@@ -14,6 +14,7 @@ import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { storage, type PumpFailureSession } from "@/lib/storage";
 import { schedulePumpFailureReminders, cancelPumpFailureReminders } from "@/lib/pump-failure-reminders";
+import { useToast } from "@/hooks/use-toast";
 
 const STEPS = [
   {
@@ -42,11 +43,15 @@ function minutesUntil(iso: string): number | null {
 }
 
 export default function PumpFailurePage() {
+  const { toast } = useToast();
   const [sc, setSc] = useState(() => storage.getScenarioState());
   const [session, setSession] = useState<PumpFailureSession | null>(() => storage.getPumpFailureSession());
 
   const [bgInput, setBgInput] = useState("");
-  const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
+  const bgUnits = useMemo<"mmol/L" | "mg/dL">(() => {
+    const u = storage.getProfile()?.bgUnits;
+    return u === "mg/dL" ? "mg/dL" : "mmol/L";
+  }, []);
   const [ketones, setKetones] = useState<PumpFailureSession["ketonesLevel"]>("unknown");
   const [checklist, setChecklist] = useState({
     checkedKetones: false,
@@ -87,12 +92,23 @@ export default function PumpFailurePage() {
     });
     setSession(created);
     setSc(storage.getScenarioState());
-    await schedulePumpFailureReminders(created);
+    try {
+      await schedulePumpFailureReminders(created);
+    } catch {
+      toast({
+        title: "Pump failure mode started",
+        description: "Couldn’t schedule reminder notifications, but mode is active.",
+      });
+    }
   };
 
   const endActive = async () => {
     const s = storage.getPumpFailureSession();
-    if (s) await cancelPumpFailureReminders(s.id);
+    try {
+      if (s) await cancelPumpFailureReminders(s.id);
+    } catch {
+      // non-blocking
+    }
     storage.endPumpFailureMode();
     setSession(null);
     setSc(storage.getScenarioState());
@@ -184,15 +200,9 @@ export default function PumpFailurePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Units</Label>
-                  <Select value={bgUnits} onValueChange={(v) => setBgUnits(v as any)}>
-                    <SelectTrigger data-testid="select-pumpfailure-bg-units">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mmol/L">mmol/L</SelectItem>
-                      <SelectItem value="mg/dL">mg/dL</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="h-9 rounded-xl border border-input bg-muted/30 px-3 flex items-center text-sm text-muted-foreground">
+                    {bgUnits}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Ketones (if known)</Label>

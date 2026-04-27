@@ -33,45 +33,49 @@ export async function cancelPumpFailureReminders(sessionId: string): Promise<voi
 }
 
 export async function schedulePumpFailureReminders(session: PumpFailureSession): Promise<void> {
-  const settings = storage.getNotificationSettings();
-  if (!settings.enabled) return;
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+  try {
+    const settings = storage.getNotificationSettings();
+    if (!settings.enabled) return;
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
-  const perm = await LocalNotifications.requestPermissions();
-  if (perm.display !== "granted") return;
+    const perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== "granted") return;
 
-  const nowMs = Date.now();
-  const upcoming = session.reminders.filter((r) => {
-    const t = new Date(r.atIso).getTime();
-    return Number.isFinite(t) && t > nowMs;
-  });
-  if (upcoming.length === 0) return;
+    const nowMs = Date.now();
+    const upcoming = session.reminders.filter((r) => {
+      const t = new Date(r.atIso).getTime();
+      return Number.isFinite(t) && t > nowMs;
+    });
+    if (upcoming.length === 0) return;
 
-  await cancelPumpFailureReminders(session.id);
+    await cancelPumpFailureReminders(session.id);
 
-  const notifications = upcoming
-    .map((r) => {
-      const at = new Date(r.atIso);
-      const t = at.getTime();
-      if (!Number.isFinite(t) || t <= nowMs) return null;
-      const copy = copyFor(r.kind);
-      return {
-        id: notificationId(session.id, r.kind),
-        title: copy.title,
-        body: copy.body,
-        schedule: { at },
-        extra: { pump_failure_session_id: session.id, kind: r.kind },
-      };
-    })
-    .filter(Boolean) as Array<{
-      id: number;
-      title: string;
-      body: string;
-      schedule: { at: Date };
-      extra: { pump_failure_session_id: string; kind: PumpFailureReminderKind };
-    }>;
+    const notifications = upcoming
+      .map((r) => {
+        const at = new Date(r.atIso);
+        const t = at.getTime();
+        if (!Number.isFinite(t) || t <= nowMs) return null;
+        const copy = copyFor(r.kind);
+        return {
+          id: notificationId(session.id, r.kind),
+          title: copy.title,
+          body: copy.body,
+          schedule: { at },
+          extra: { pump_failure_session_id: session.id, kind: r.kind },
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: number;
+        title: string;
+        body: string;
+        schedule: { at: Date };
+        extra: { pump_failure_session_id: string; kind: PumpFailureReminderKind };
+      }>;
 
-  if (notifications.length === 0) return;
-  await LocalNotifications.schedule({ notifications });
+    if (notifications.length === 0) return;
+    await LocalNotifications.schedule({ notifications });
+  } catch {
+    // Non-blocking: pump failure mode should still start/end even if scheduling fails.
+  }
 }
 
