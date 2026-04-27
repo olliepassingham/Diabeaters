@@ -32,14 +32,6 @@ export default function Welcome() {
     setLocation(alreadySignedIn ? "/carer-setup" : "/login");
   };
 
-  const onBoth = () => {
-    clearOnboardingAccountPath();
-    setOnboardingAccountPath("both");
-    setPrimaryAppRole("patient");
-    setPendingPatient();
-    setLocation(alreadySignedIn ? "/onboarding" : "/login");
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-background text-foreground">
       <div className="flex flex-col items-center gap-3 mb-10">
@@ -66,15 +58,6 @@ export default function Welcome() {
           data-testid="welcome-supporter"
         >
           I am a Family Member / Supporter
-        </Button>
-        <Button
-          size="lg"
-          variant="secondary"
-          className="w-full h-auto min-h-14 py-4 text-base font-medium"
-          onClick={onBoth}
-          data-testid="welcome-both"
-        >
-          I have Type 1 Diabetes and I support someone too
         </Button>
       </div>
     </div>

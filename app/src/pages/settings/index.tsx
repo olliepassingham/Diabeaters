@@ -109,7 +109,7 @@ function ProfileTab({
             {deliveryMethod === "pump" ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
           </p>
         </div>
-          <div className="flex justify-end">
+          <div className="hidden md:flex justify-end">
             <Button onClick={onSave} data-testid="button-save-profile">
               <Save className="h-4 w-4 mr-2" />
               Save Profile
@@ -165,7 +165,7 @@ function InsulinTab({
             Configure your insulin ratios and targets for calculations.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pb-28 md:pb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tdd" className="flex items-center">
@@ -290,7 +290,7 @@ function InsulinTab({
           </div>
         </div>
 
-          <div className="flex justify-end">
+          <div className="hidden md:flex justify-end">
             <Button onClick={onSave} data-testid="button-save-insulin">
               <Save className="h-4 w-4 mr-2" />
               Save Insulin Settings
@@ -545,7 +545,7 @@ function UsageTab({
           </div>
         </div>
 
-          <div className="flex justify-end">
+          <div className="hidden md:flex justify-end">
             <Button onClick={onSave} data-testid="button-save-usage">
               <Save className="h-4 w-4 mr-2" />
               Save Usage Settings

@@ -446,10 +446,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-foreground">
       <PageShell
         variant="narrow"
-        className={`px-4 pt-6 md:pt-8 sm:pb-10 ${
+        className={`px-4 pt-6 md:pt-8 pb-0 sm:pb-0 ${
           currentStep === "first_win" || currentStep === "details" || currentStep === "disclaimer"
             ? "pb-44 sm:pb-10"
             : "pb-28"
@@ -481,10 +481,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       {(showBackButton || showNextButton) && (
         <div
-          className="fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
+          className="fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
           data-testid="onboarding-sticky-actions"
         >
-          <PageShell variant="narrow" className="flex justify-between gap-3 items-center">
+          <div className="mx-auto w-full max-w-lg flex justify-between gap-3 items-center">
             {showBackButton ? (
               <Button variant="outline" size="sm" onClick={handleBack} data-testid="button-onboarding-back">
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -507,7 +507,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 </Button>
               )}
             </div>
-          </PageShell>
+          </div>
         </div>
       )}
     </div>
@@ -1403,7 +1403,7 @@ function FirstWinStep({
           { icon: ClipboardList, text: "Log usage so forecasts match how you treat day to day" },
         ],
         ctaText: "Go to Supply Tracker",
-        ctaPath: getPostOnboardingPath("supplies"),
+        ctaPath: "/supplies",
       };
     }
     if (struggle === "meals") {
@@ -1421,7 +1421,7 @@ function FirstWinStep({
             { icon: TrendingDown, text: "Exercise adjustments built right in" },
           ],
           ctaText: "Try a Meal Calculation",
-          ctaPath: getPostOnboardingPath("meals"),
+          ctaPath: "/adviser?tab=meal",
         };
       }
       return {
@@ -1452,7 +1452,7 @@ function FirstWinStep({
           { icon: TrendingDown, text: "Recovery recommendations to avoid late lows" },
         ],
         ctaText: "Plan an Activity",
-        ctaPath: getPostOnboardingPath("exercise"),
+        ctaPath: "/scenarios/exercise",
       };
     }
     return {
@@ -1467,7 +1467,7 @@ function FirstWinStep({
         { icon: Dumbbell, text: "Exercise planning with carb and insulin guidance" },
       ],
       ctaText: "Go to Dashboard",
-      ctaPath: getPostOnboardingPath("overview"),
+      ctaPath: "/",
     };
   };
 

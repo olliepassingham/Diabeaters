@@ -339,7 +339,7 @@ export default function Account() {
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
-  const canSwitchModes = hasCarerLink && primaryRole !== "carer";
+  const canOpenModeChooser = primaryRole !== "carer";
 
   useEffect(() => {
     if (!showPublicProfilePreview) {
@@ -468,7 +468,7 @@ export default function Account() {
                 </div>
               )}
 
-              <div className="min-w-0 flex-1 space-y-1 pr-[7.25rem] text-left sm:pr-24">
+              <div className="min-w-0 flex-1 space-y-1 pr-20 text-left sm:pr-24">
                 {showPublicProfilePreview ? (
                   <div className="min-w-0">
                     <Link
@@ -479,49 +479,49 @@ export default function Account() {
                     >
                       <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
                     </Link>
-                    {publicHandle ? (
-                      <p className="text-sm text-muted-foreground">@{publicHandle}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No handle set.{" "}
-                        <a href="#profile" className="text-primary underline-offset-4 hover:underline">
-                          Add one
-                        </a>
-                      </p>
-                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-0.5">
+                      {publicHandle ? (
+                        <p className="text-sm text-muted-foreground">@{publicHandle}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No handle set.{" "}
+                          <a href="#profile" className="text-primary underline-offset-4 hover:underline">
+                            Add one
+                          </a>
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          className="text-sm text-foreground hover:underline underline-offset-4"
+                          data-testid="link-my-public-profile-followers"
+                          onClick={() => void openFollowList("followers")}
+                        >
+                          <span className="font-semibold tabular-nums">{publicCounts?.followers ?? 0}</span>{" "}
+                          <span className="text-muted-foreground">followers</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="text-sm text-foreground hover:underline underline-offset-4"
+                          data-testid="link-my-public-profile-following"
+                          onClick={() => void openFollowList("following")}
+                        >
+                          <span className="font-semibold tabular-nums">{publicCounts?.following ?? 0}</span>{" "}
+                          <span className="text-muted-foreground">following</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
                 )}
 
                 {showPublicProfilePreview ? (
-                  <div className="pt-1 space-y-1">
-                    <p className="text-sm text-muted-foreground italic">
+                  <div className="pt-1 space-y-0.5 min-w-0">
+                    <p className="text-sm text-muted-foreground italic truncate">
                       {bioPreview ? bioPreview : "No bio yet."}
                     </p>
-                    {livingWithLine ? (
-                      <p className="text-sm text-muted-foreground">{livingWithLine}</p>
-                    ) : null}
-                    <div className="flex items-center gap-4 pt-1">
-                      <button
-                        type="button"
-                        className="text-sm text-foreground hover:underline underline-offset-4"
-                        data-testid="link-my-public-profile-followers"
-                        onClick={() => void openFollowList("followers")}
-                      >
-                        <span className="font-semibold tabular-nums">{publicCounts?.followers ?? 0}</span>{" "}
-                        <span className="text-muted-foreground">followers</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="text-sm text-foreground hover:underline underline-offset-4"
-                        data-testid="link-my-public-profile-following"
-                        onClick={() => void openFollowList("following")}
-                      >
-                        <span className="font-semibold tabular-nums">{publicCounts?.following ?? 0}</span>{" "}
-                        <span className="text-muted-foreground">following</span>
-                      </button>
-                    </div>
+                    {livingWithLine ? <p className="text-sm text-muted-foreground">{livingWithLine}</p> : null}
                   </div>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-start gap-2 pt-1">
@@ -538,62 +538,60 @@ export default function Account() {
                 </div>
               </div>
             </div>
-            <div className="flex w-full flex-wrap items-center justify-start gap-2 pt-2 pb-0.5 [&_a]:shrink-0 [&_button]:shrink-0">
-              {carerLinkLoading ? (
-                <Skeleton
-                  className="h-11 min-w-[7.25rem] shrink-0 rounded-md"
-                  data-testid="account-carer-link-loading"
-                  aria-label="Loading supporter options"
-                  role="status"
-                />
-              ) : (
-                canSwitchModes && (
-                  <Button variant="outline" size="sm" className="min-h-11" asChild>
-                    <Link href="/mode" data-testid="link-change-view">
-                      Change mode
-                    </Link>
-                  </Button>
-                )
-              )}
-              {isCarer && (
-                <Button variant="outline" size="sm" className="min-h-11" asChild>
-                  <Link href="/carer-view" data-testid="link-back-to-carer-view">
-                    Back to Supporter Mode
-                  </Link>
-                </Button>
-              )}
-              {(
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    id="avatar-file"
-                    onChange={handleAvatarUpload}
-                    disabled={uploadSubmitting}
-                    aria-label="Choose profile photo"
-                  />
+            <div className="pt-2 pb-0.5">
+              <div className="grid w-full grid-cols-2 gap-2 [&_a]:w-full [&_button]:w-full">
+                {canOpenModeChooser && (
                   <Button
-                    type="button"
                     variant="outline"
                     size="sm"
-                    disabled={uploadSubmitting}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    data-testid="avatar-upload"
+                    className="min-h-11"
+                    asChild
+                    data-testid="link-change-view"
+                    aria-busy={carerLinkLoading ? "true" : "false"}
+                    title={carerLinkLoading ? "Loading supporter link…" : undefined}
                   >
-                    {uploadSubmitting ? "Uploading…" : "Upload new photo"}
+                    <Link href="/mode">Change mode</Link>
                   </Button>
-                </>
-              )}
-              {!isCarer && (
-                <Button variant="outline" size="sm" className="min-h-11" asChild>
-                  <Link href="/family-carers" data-testid="link-manage-carers">
-                    Manage supporters
-                  </Link>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  id="avatar-file"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadSubmitting}
+                  aria-label="Choose profile photo"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadSubmitting}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  data-testid="avatar-upload"
+                >
+                  {uploadSubmitting ? "Uploading…" : "Upload photo"}
                 </Button>
-              )}
+
+                {!isCarer && (
+                  <Button variant="outline" size="sm" className="min-h-11 col-span-2" asChild>
+                    <Link href="/family-carers" data-testid="link-manage-carers">
+                      Manage supporters
+                    </Link>
+                  </Button>
+                )}
+
+                {isCarer && (
+                  <Button variant="outline" size="sm" className="min-h-11 col-span-2" asChild>
+                    <Link href="/carer-view" data-testid="link-back-to-carer-view">
+                      Back to Supporter Mode
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

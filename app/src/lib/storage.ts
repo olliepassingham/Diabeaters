@@ -1997,10 +1997,24 @@ export const storage = {
   },
 
   getScenarioState(): ScenarioState {
+    const fallback: ScenarioState = {
+      travelModeActive: false,
+      sickDayActive: false,
+      alcoholModeActive: false,
+      pumpFailureActive: false,
+    };
     const data = localStorage.getItem(STORAGE_KEYS.SCENARIO_STATE);
-    return data
-      ? JSON.parse(data)
-      : { travelModeActive: false, sickDayActive: false, alcoholModeActive: false, pumpFailureActive: false };
+    if (!data) return fallback;
+    try {
+      const parsed = JSON.parse(data) as ScenarioState;
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return {
+        ...fallback,
+        ...parsed,
+      };
+    } catch {
+      return fallback;
+    }
   },
 
   saveScenarioState(state: ScenarioState): void {
@@ -3316,7 +3330,13 @@ export const storage = {
   getActiveExercise(): ActiveExerciseSession | null {
     const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EXERCISE);
     if (!data) return null;
-    const session: ActiveExerciseSession = JSON.parse(data);
+    let session: ActiveExerciseSession;
+    try {
+      session = JSON.parse(data) as ActiveExerciseSession;
+    } catch {
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
+      return null;
+    }
     const m = migrateExerciseType(session.exerciseType as string);
     if (m !== session.exerciseType) {
       const updated = { ...session, exerciseType: m };
