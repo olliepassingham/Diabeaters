@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -2672,9 +2672,18 @@ export default function Supplies() {
         open={planningOpen}
         onToggle={(e) => setPlanningOpen((e.currentTarget as HTMLDetailsElement).open)}
       >
-        <summary className="cursor-pointer select-none flex items-center justify-between gap-3">
-          <span className="font-medium">Planning</span>
-          <span className="text-xs text-muted-foreground">
+        <summary
+          className="group cursor-pointer select-none flex items-center justify-between gap-3 rounded-lg -mx-1 px-1 py-1.5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label="Planning"
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="font-medium">Planning</span>
+            <ChevronDown
+              className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+              aria-hidden
+            />
+          </span>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
             Timeline, prescription cycle, travel & sick day impact
           </span>
         </summary>
