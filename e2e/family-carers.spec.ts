@@ -19,15 +19,34 @@ test.describe("Family & Carers MVP", () => {
     });
   });
 
+  async function seedSupabaseSession(page: import("@playwright/test").Page, kind: "patient" | "carer") {
+    await page.addInitScript((k) => {
+      const user =
+        k === "patient"
+          ? {
+              id: "patient-user-1",
+              email: "patient@example.com",
+              email_confirmed_at: new Date().toISOString(),
+            }
+          : {
+              id: "carer-user-1",
+              email: "carer@example.com",
+              email_confirmed_at: new Date().toISOString(),
+            };
+      localStorage.setItem("diabeater_e2e_user", JSON.stringify(user));
+    }, kind);
+  }
+
   test("patient: generate invite shows code and privacy toggles when a link exists", async ({
     page,
     context,
   }) => {
+    await seedSupabaseSession(page, "patient");
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(patientUser),
+        body: JSON.stringify({ user: patientUser }),
       });
     });
 
@@ -127,11 +146,12 @@ test.describe("Family & Carers MVP", () => {
   test("carer: redeem code then sees patient header on Supporter Mode", async ({ page, context }) => {
     let hasLink = false;
 
+    await seedSupabaseSession(page, "carer");
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(carerUser),
+        body: JSON.stringify({ user: carerUser }),
       });
     });
 

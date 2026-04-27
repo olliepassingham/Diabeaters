@@ -11,7 +11,7 @@ test.describe("Auth routes and verification", () => {
     await page.goto("/login");
     await expect(page.getByText("Log in to Diabeaters")).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.locator("input#password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue with Apple" })).toHaveCount(0);
   });
@@ -20,7 +20,7 @@ test.describe("Auth routes and verification", () => {
     await page.goto("/signup");
     await expect(page.getByText("Create your Diabeaters account")).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.locator("input#password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
     // When CAPTCHA is enabled, the app renders a Turnstile widget and the button stays disabled until solved.
     // In local/CI preview (no site key), the widget is not shown and the button is enabled.

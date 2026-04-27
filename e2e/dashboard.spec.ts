@@ -7,20 +7,34 @@ test.describe("Dashboard page", () => {
     });
   });
 
+  async function seedSupabaseSession(page: import("@playwright/test").Page) {
+    await page.addInitScript(() => {
+      const user = {
+        id: "test-user-1",
+        email: "test@example.com",
+        email_confirmed_at: new Date().toISOString(),
+      };
+      localStorage.setItem("diabeater_e2e_user", JSON.stringify(user));
+    });
+  }
+
   test("redirects to login when not signed in", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/login/, { timeout: 5000 });
   });
 
   test("renders dashboard when authenticated", async ({ page, context }) => {
+    await seedSupabaseSession(page);
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: "test-user-1",
-          email: "test@example.com",
-          email_confirmed_at: new Date().toISOString(),
+          user: {
+            id: "test-user-1",
+            email: "test@example.com",
+            email_confirmed_at: new Date().toISOString(),
+          },
         }),
       });
     });
@@ -52,14 +66,17 @@ test.describe("Dashboard page", () => {
   });
 
   test("customise button opens widget library", async ({ page, context }) => {
+    await seedSupabaseSession(page);
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: "test-user-1",
-          email: "test@example.com",
-          email_confirmed_at: new Date().toISOString(),
+          user: {
+            id: "test-user-1",
+            email: "test@example.com",
+            email_confirmed_at: new Date().toISOString(),
+          },
         }),
       });
     });
@@ -91,14 +108,17 @@ test.describe("Dashboard page", () => {
     page,
     context,
   }) => {
+    await seedSupabaseSession(page);
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: "test-user-1",
-          email: "test@example.com",
-          email_confirmed_at: new Date().toISOString(),
+          user: {
+            id: "test-user-1",
+            email: "test@example.com",
+            email_confirmed_at: new Date().toISOString(),
+          },
         }),
       });
     });
@@ -128,14 +148,17 @@ test.describe("Dashboard page", () => {
     page,
     context,
   }) => {
+    await seedSupabaseSession(page);
     await context.route("**/auth/v1/user**", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: "test-user-1",
-          email: "test@example.com",
-          email_confirmed_at: new Date().toISOString(),
+          user: {
+            id: "test-user-1",
+            email: "test@example.com",
+            email_confirmed_at: new Date().toISOString(),
+          },
         }),
       });
     });

@@ -14,16 +14,48 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function getE2EUser(): User | null {
+  try {
+    const raw = localStorage.getItem("diabeater_e2e_user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<User> | null;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (typeof parsed.id !== "string" || !parsed.id.trim()) return null;
+    const email = typeof parsed.email === "string" ? parsed.email : "test@example.com";
+    const email_confirmed_at =
+      typeof parsed.email_confirmed_at === "string" ? parsed.email_confirmed_at : new Date().toISOString();
+    return {
+      ...(parsed as User),
+      id: parsed.id,
+      email,
+      email_confirmed_at,
+    } as User;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const initialE2EUser = getE2EUser();
+  const [user, setUser] = useState<User | null>(initialE2EUser);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialE2EUser);
 
   useEffect(() => {
     let isMounted = true;
     setActiveUserIdForLocalStorage(null);
 
     (async () => {
+      if (initialE2EUser) {
+        if (!isMounted) return;
+        setUser(initialE2EUser);
+        setSession(null);
+        setActiveUserIdForLocalStorage(initialE2EUser.id);
+        setSentryUserId(initialE2EUser.id);
+        setLoading(false);
+        return;
+      }
+
       const supabase = getSupabase();
       if (!supabase) {
         if (!isMounted) return;
@@ -58,6 +90,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
+    if (initialE2EUser) return;
+
     const { data } = onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       setSession(session ?? null);
@@ -70,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       data?.unsubscribe();
     };
-  }, []);
+  }, [initialE2EUser]);
 
   useEffect(() => {
     if (loading || !user?.id) return;

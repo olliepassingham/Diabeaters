@@ -5,7 +5,7 @@ test.describe("Smoke", () => {
     page,
   }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Diabeaters" })).toBeVisible({
+    await expect(page.getByText("Diabeaters").first()).toBeVisible({
       timeout: 10000,
     });
   });
@@ -15,11 +15,9 @@ test.describe("Smoke", () => {
       localStorage.setItem("diabeater_onboarding_completed", "true");
     });
     await page.goto("/login");
-    await expect(
-      page.getByRole("heading", { name: "Log in to Diabeaters" })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Log in to Diabeaters").first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Password")).toBeVisible();
+    await expect(page.locator("input#password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
   });
 });

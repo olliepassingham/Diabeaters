@@ -34,7 +34,7 @@ describe("ToolsHubPage", () => {
 
     expect(screen.queryByTestId("resource-preview-dialog")).toBeNull();
 
-    fireEvent.click(screen.getByTestId("resource-nhs-type1"));
+    fireEvent.click(screen.getAllByTestId("resource-nhs-type1")[0]!);
 
     expect(screen.getByTestId("resource-preview-dialog")).not.toBeNull();
     expect(screen.getByRole("heading", { name: /type 1 diabetes: overview/i })).not.toBeNull();
@@ -45,7 +45,7 @@ describe("ToolsHubPage", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
 
     render(<ToolsHubPage />);
-    fireEvent.click(screen.getByTestId("resource-nhs-type1"));
+    fireEvent.click(screen.getAllByTestId("resource-nhs-type1")[0]!);
     fireEvent.click(screen.getByTestId("resource-open-external"));
 
     expect(openSpy).toHaveBeenCalledWith(
