@@ -18,6 +18,7 @@ import { CommunityPostImageGrid } from "@/components/community/community-post-im
 import { FeedLinkPreview } from "@/components/community/feed-link-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -268,6 +269,7 @@ type FeedPostCardProps = {
   post: CommunityPostRow;
   viewerId: string | undefined;
   authorDisplayName: string;
+  authorLoading?: boolean;
   /** Shown under the display name when set (community public handle). */
   authorPublicHandle?: string | null;
   authorAvatarPath: string | null;
@@ -301,6 +303,7 @@ export function FeedPostCard({
   post,
   viewerId,
   authorDisplayName,
+  authorLoading,
   authorPublicHandle,
   authorAvatarPath,
   expanded,
@@ -532,15 +535,24 @@ export function FeedPostCard({
           <div className="min-w-0 flex-1">
             <div className="flex justify-between gap-2 text-xs text-muted-foreground items-start">
               <div className="min-w-0">
-                <Link
-                  href={`/community/profile/${post.author_id}`}
-                  className="font-medium text-foreground truncate hover:underline underline-offset-2 block"
-                >
-                  {authorDisplayName}
-                </Link>
-                {authorPublicHandle?.trim() ? (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
-                ) : null}
+                {authorLoading ? (
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                ) : (
+                  <>
+                    <Link
+                      href={`/community/profile/${post.author_id}`}
+                      className="font-medium text-foreground truncate hover:underline underline-offset-2 block"
+                    >
+                      {authorDisplayName}
+                    </Link>
+                    {authorPublicHandle?.trim() ? (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
+                    ) : null}
+                  </>
+                )}
               </div>
               <span className="flex shrink-0 items-center gap-1">
                 {canReportPost && (

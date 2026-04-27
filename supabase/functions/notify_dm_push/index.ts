@@ -191,10 +191,25 @@ Deno.serve(async (req: Request) => {
       (prefsRows ?? []).map((r: { user_id: string; prefs: unknown }) => [String(r.user_id), r.prefs]),
     );
 
+    // Per-user thread settings (mute/hide) override push delivery for this thread.
+    const { data: settingsRows } = await admin
+      .from("dm_thread_user_settings")
+      .select("user_id, muted, hidden")
+      .eq("thread_id", threadId)
+      .in("user_id", recipientIds);
+    const settingsByUserId = new Map<string, { muted: boolean; hidden: boolean }>(
+      (settingsRows ?? []).map((r: { user_id: string; muted: boolean; hidden: boolean }) => [
+        String(r.user_id),
+        { muted: Boolean(r.muted), hidden: Boolean(r.hidden) },
+      ]),
+    );
+
     let pushDelivered = 0;
 
     for (const rid of recipientIds) {
       if (!shouldDeliverDmPush(prefsById.get(rid))) continue;
+      const st = settingsByUserId.get(rid);
+      if (st?.muted || st?.hidden) continue;
       if (!iosPushDeliveryConfigured()) continue;
 
       const { data: tokenRows } = await admin

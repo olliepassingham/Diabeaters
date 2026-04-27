@@ -8,6 +8,12 @@ import type { DmMessageRow, DmThreadMemberRow, DmThreadRow } from "./types";
 
 const MAX_DM_IMAGE_BYTES = 5 * 1024 * 1024;
 
+export type DmThreadUserSettingsRow = {
+  thread_id: string;
+  muted: boolean;
+  hidden: boolean;
+};
+
 function extFromFile(f: File): string {
   const name = f.name.toLowerCase();
   if (name.endsWith(".png")) return "png";
@@ -165,6 +171,45 @@ export async function fetchDmThreadsForCurrentUser(): Promise<{
   }
 
   return { data: withMembers, error: null };
+}
+
+export async function fetchDmThreadUserSettings(threadIds: string[]): Promise<{
+  data: Map<string, DmThreadUserSettingsRow>;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: new Map(), error: new Error("Supabase not configured") };
+  if (threadIds.length === 0) return { data: new Map(), error: null };
+
+  const { data, error } = await supabase
+    .from("dm_thread_user_settings")
+    .select("thread_id, muted, hidden")
+    .in("thread_id", threadIds);
+
+  if (error) return { data: new Map(), error: new Error(error.message) };
+  const map = new Map<string, DmThreadUserSettingsRow>();
+  for (const row of data ?? []) {
+    const r = row as { thread_id: string; muted: boolean; hidden: boolean };
+    map.set(String(r.thread_id), { thread_id: String(r.thread_id), muted: Boolean(r.muted), hidden: Boolean(r.hidden) });
+  }
+  return { data: map, error: null };
+}
+
+export async function upsertDmThreadUserSettings(
+  threadId: string,
+  updates: { muted?: boolean; hidden?: boolean },
+): Promise<{ data: DmThreadUserSettingsRow | null; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+  const { data, error } = await supabase.rpc("upsert_dm_thread_user_settings", {
+    p_thread_id: threadId,
+    p_muted: updates.muted ?? null,
+    p_hidden: updates.hidden ?? null,
+  });
+  if (error) return { data: null, error: new Error(error.message) };
+  if (!data) return { data: null, error: new Error("No row returned") };
+  const r = data as { thread_id: string; muted: boolean; hidden: boolean };
+  return { data: { thread_id: String(r.thread_id), muted: Boolean(r.muted), hidden: Boolean(r.hidden) }, error: null };
 }
 
 export async function fetchDmMessages(threadId: string): Promise<{

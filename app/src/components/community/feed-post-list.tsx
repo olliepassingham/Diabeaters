@@ -51,7 +51,7 @@ import {
 } from "@/lib/community";
 import { getProfilesByIds } from "@/lib/profile";
 
-type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null };
+type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null; loading?: boolean };
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -84,6 +84,7 @@ export function FeedPostList(props: {
   const [refreshing, setRefreshing] = useState(false);
 
   const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
+  const [authorMetaPending, setAuthorMetaPending] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommunityPostCommentRow[]>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -207,9 +208,11 @@ export function FeedPostList(props: {
     const list = [...ids];
     if (list.length === 0) {
       setAuthorMeta({});
+      setAuthorMetaPending(false);
       return;
     }
     let cancelled = false;
+    setAuthorMetaPending(true);
     void (async () => {
       const map = await getProfilesByIds(list);
       if (cancelled) return;
@@ -223,6 +226,7 @@ export function FeedPostList(props: {
         };
       }
       setAuthorMeta(next);
+      setAuthorMetaPending(false);
     })();
     return () => {
       cancelled = true;
@@ -230,7 +234,10 @@ export function FeedPostList(props: {
   }, [posts, commentsByPost]);
 
   function metaFor(authorId: string): AuthorMeta {
-    return authorMeta[authorId] ?? { name: shortId(authorId), avatar_url: null, public_handle: null };
+    const m = authorMeta[authorId];
+    if (m) return m;
+    if (authorMetaPending) return { name: "", avatar_url: null, public_handle: null, loading: true };
+    return { name: shortId(authorId), avatar_url: null, public_handle: null };
   }
 
   const filteredPosts = useMemo(() => {
@@ -431,6 +438,7 @@ export function FeedPostList(props: {
                 post={post}
                 viewerId={props.viewerId}
                 authorDisplayName={m.name}
+                authorLoading={Boolean(m.loading)}
                 authorPublicHandle={m.public_handle}
                 authorAvatarPath={m.avatar_url}
                 expanded={Boolean(expanded[post.id])}
