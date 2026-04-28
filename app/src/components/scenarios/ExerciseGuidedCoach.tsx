@@ -632,57 +632,81 @@ export function ExerciseGuidedCoach() {
             </div>
 
             <TabsContent value="pre" className="space-y-4 pt-2">
-              <PreQuestions
-                session={activeSession}
-                bgUnits={bgUnits}
-                bgInput={bgInput}
-                onBgChange={onBgChange}
-                onTrendChange={onTrendChange}
-                update={update}
-              />
+              <div
+                className={cn(
+                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
+                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
+                )}
+                data-testid="coach-input-panel-pre"
+              >
+                <PreQuestions
+                  session={activeSession}
+                  bgUnits={bgUnits}
+                  bgInput={bgInput}
+                  onBgChange={onBgChange}
+                  onTrendChange={onTrendChange}
+                  update={update}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="active" className="space-y-4 pt-2">
-              <DuringQuestions
-                session={activeSession}
-                bgUnits={bgUnits}
-                bgInput={bgInput}
-                onBgChange={onBgChange}
-                onTrendChange={onTrendChange}
-                update={update}
-              />
-              {exercisePlan ? (
-                <p className="text-xs text-muted-foreground leading-snug">
-                  {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
-                    ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
-                    : "Fuel: keep fast carbs within reach."}
-                </p>
-              ) : null}
+              <div
+                className={cn(
+                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
+                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
+                )}
+                data-testid="coach-input-panel-active"
+              >
+                <DuringQuestions
+                  session={activeSession}
+                  bgUnits={bgUnits}
+                  bgInput={bgInput}
+                  onBgChange={onBgChange}
+                  onTrendChange={onTrendChange}
+                  update={update}
+                />
+                {exercisePlan ? (
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
+                      ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
+                      : "Fuel: keep fast carbs within reach."}
+                  </p>
+                ) : null}
+              </div>
             </TabsContent>
 
             <TabsContent value="recovery" className="space-y-4 pt-2">
-              <RecoveryQuestions
-                session={activeSession}
-                bgUnits={bgUnits}
-                bgInput={bgInput}
-                onBgChange={onBgChange}
-                onTrendChange={onTrendChange}
-                update={update}
-              />
-              {exercisePlan ? (
-                <p className="text-xs text-muted-foreground leading-snug">
-                  Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
-                </p>
-              ) : null}
-              {(activeSession.intensity === "intense" || activeSession.intensity === "moderate") ? (
-                <Link href="/scenarios/bedtime">
-                  <Button variant="outline" size="sm" className="w-full" data-testid="button-coach-recovery-bedtime">
-                    <Moon className="h-3.5 w-3.5 mr-2" />
-                    Open Bedtime tool
-                    <ArrowRight className="h-3.5 w-3.5 ml-auto" />
-                  </Button>
-                </Link>
-              ) : null}
+              <div
+                className={cn(
+                  "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-4",
+                  readiness ? getReadinessToneClasses(readiness.verdict) : null,
+                )}
+                data-testid="coach-input-panel-recovery"
+              >
+                <RecoveryQuestions
+                  session={activeSession}
+                  bgUnits={bgUnits}
+                  bgInput={bgInput}
+                  onBgChange={onBgChange}
+                  onTrendChange={onTrendChange}
+                  update={update}
+                />
+                {exercisePlan ? (
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
+                  </p>
+                ) : null}
+                {(activeSession.intensity === "intense" || activeSession.intensity === "moderate") ? (
+                  <Link href="/scenarios/bedtime">
+                    <Button variant="outline" size="sm" className="w-full" data-testid="button-coach-recovery-bedtime">
+                      <Moon className="h-3.5 w-3.5 mr-2" />
+                      Open Bedtime tool
+                      <ArrowRight className="h-3.5 w-3.5 ml-auto" />
+                    </Button>
+                  </Link>
+                ) : null}
+              </div>
             </TabsContent>
           </Tabs>
 

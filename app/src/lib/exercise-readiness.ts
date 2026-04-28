@@ -195,7 +195,7 @@ function refineWithExerciseTypeAndTrend(
 }
 
 const IOB_QUICK_DETAIL =
-  "Rapid-acting insulin in the last ~2 hours may still be working — activity can move glucose more than you expect. Keep fast carbs within reach, and only stack extra insulin around exercise if your care team has taught you how.";
+  "Recent rapid insulin can drop BG faster. Keep fast carbs handy; avoid extra insulin unless your plan says so.";
 
 /**
  * Post-workout strip: same red / amber / green idea as other phases, tuned for delayed lows and BG+trend.
