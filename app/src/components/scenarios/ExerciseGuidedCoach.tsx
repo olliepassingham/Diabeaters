@@ -532,34 +532,62 @@ export function ExerciseGuidedCoach() {
   return (
     <div className="space-y-4" data-testid="exercise-guided-coach">
       <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 space-y-1">
-              <CardTitle className="text-h3 flex items-center gap-2">
+        <CardHeader className="pb-2">
+          <div className="space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-h3 flex items-center gap-2">
                 <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 {activeSession.exerciseName}
-              </CardTitle>
-              <p className="text-xs text-muted-foreground truncate">
-                {activeSession.durationMinutes} min · {activeSession.intensity} · {activeSession.exerciseType}
-              </p>
+                </CardTitle>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
+                    {activeSession.durationMinutes} min
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
+                    {activeSession.intensity}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 py-0.5">
+                    {activeSession.exerciseType}
+                  </span>
+                </div>
+              </div>
+              <div className="shrink-0">
+                {phase === "pre" ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={onStartWorkout}
+                    className="whitespace-nowrap"
+                    data-testid="button-coach-start-workout"
+                  >
+                    <Play className="h-3.5 w-3.5 mr-1" />
+                    Start
+                  </Button>
+                ) : phase === "active" ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={onFinishWorkout}
+                    className="whitespace-nowrap"
+                    data-testid="button-coach-finish-workout"
+                  >
+                    <CircleCheck className="h-3.5 w-3.5 mr-1" />
+                    Done
+                  </Button>
+                ) : null}
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {phase === "pre" ? (
-                <Button size="sm" variant="default" onClick={onStartWorkout} data-testid="button-coach-start-workout">
-                  <Play className="h-3.5 w-3.5 mr-1" />
-                  Start workout
+
+            {/* Only show in-page End once the workout has started. The top bar still offers End anytime. */}
+            {phase !== "pre" ? (
+              <div className="flex justify-end">
+                <Button size="sm" variant="outline" onClick={onEndSession} data-testid="button-coach-end">
+                  <Power className="h-3.5 w-3.5 mr-1" />
+                  End
                 </Button>
-              ) : phase === "active" ? (
-                <Button size="sm" variant="default" onClick={onFinishWorkout} data-testid="button-coach-finish-workout">
-                  <CircleCheck className="h-3.5 w-3.5 mr-1" />
-                  Workout done
-                </Button>
-              ) : null}
-              <Button size="sm" variant="outline" onClick={onEndSession} data-testid="button-coach-end">
-                <Power className="h-3.5 w-3.5 mr-1" />
-                End
-              </Button>
-            </div>
+              </div>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
