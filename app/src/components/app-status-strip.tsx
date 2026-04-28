@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Plane, Thermometer, WifiOff, Power, ChevronRight, Dumbbell, Syringe, Play, Info, CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,7 @@ export function AppStatusStrip() {
   const online = useOnline();
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
   const [ex, setEx] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
+  const [pathname] = useLocation();
   const exercisedRecently24h = storage.didExerciseRecently(24);
   const [exerciseExpanded, setExerciseExpanded] = useState(false);
   const [exerciseBgInput, setExerciseBgInput] = useState<string>("");
@@ -175,6 +176,8 @@ export function AppStatusStrip() {
   const show =
     sc.sickDayActive || sc.travelModeActive || Boolean(ex) || exercisedRecently24h || sc.pumpFailureActive || !online;
   if (!show) return null;
+
+  const isExerciseScenarioPage = pathname === "/scenarios/exercise";
 
   const sickTone =
     sc.sickDaySeverity === "severe"
@@ -461,24 +464,32 @@ export function AppStatusStrip() {
               <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
               Exercise · {exercisePhaseLabel(ex.phase)}
             </Badge>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                variant="outline"
-                className={btnClass}
-                onClick={() => setExerciseExpanded((v) => !v)}
-                data-testid="status-exercise-check"
-              >
-                {exerciseExpanded ? "Hide" : "Check"}
-              </Button>
-              <Button size="sm" variant="outline" className={btnClass} onClick={handleEndExercise} data-testid="status-exercise-end">
-                <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-                End
-              </Button>
-            </div>
+            {!isExerciseScenarioPage ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={btnClass}
+                  onClick={() => setExerciseExpanded((v) => !v)}
+                  data-testid="status-exercise-check"
+                >
+                  {exerciseExpanded ? "Hide" : "Check"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={btnClass}
+                  onClick={handleEndExercise}
+                  data-testid="status-exercise-end"
+                >
+                  <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+                  End
+                </Button>
+              </div>
+            ) : null}
           </div>
 
-          {exerciseExpanded ? (
+          {exerciseExpanded && !isExerciseScenarioPage ? (
             <div
               className={cn(
                 "rounded-2xl border border-border/60 bg-background/55 px-3 py-3 backdrop-blur space-y-2",
