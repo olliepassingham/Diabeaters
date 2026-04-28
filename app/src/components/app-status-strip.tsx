@@ -275,14 +275,20 @@ export function AppStatusStrip() {
 
   const bgUnits = storage.getProfile?.()?.bgUnits || "mg/dL";
   const isPump = storage.getProfile?.()?.insulinDeliveryMethod === "pump";
-  const exerciseElapsedLabel =
+  const exercisePhaseTimerLabel =
     ex?.phase === "active" && ex.exerciseStartedAt
       ? (() => {
           const started = new Date(ex.exerciseStartedAt).getTime();
           if (!Number.isFinite(started)) return null;
           return formatElapsedShort(Date.now() - started);
         })()
-      : null;
+      : ex?.phase === "recovery" && ex.exerciseEndedAt
+        ? (() => {
+            const ended = new Date(ex.exerciseEndedAt).getTime();
+            if (!Number.isFinite(ended)) return null;
+            return formatElapsedShort(Date.now() - ended);
+          })()
+        : null;
 
   const exercisePlan = useMemo(() => {
     if (!ex) return null;
@@ -519,9 +525,13 @@ export function AppStatusStrip() {
                 <p className="text-xs font-medium text-foreground/90">
                   {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
                 </p>
-                {exerciseElapsedLabel ? (
-                  <span className="text-xs tabular-nums text-muted-foreground" data-testid="status-exercise-elapsed">
-                    {exerciseElapsedLabel}
+                {exercisePhaseTimerLabel ? (
+                  <span
+                    className="text-xs tabular-nums text-muted-foreground"
+                    data-testid={ex.phase === "active" ? "status-exercise-elapsed" : "status-exercise-recovery-elapsed"}
+                    title={ex.phase === "active" ? "Workout elapsed" : "Time since workout ended"}
+                  >
+                    {exercisePhaseTimerLabel}
                   </span>
                 ) : null}
                 <Tooltip>
@@ -571,22 +581,20 @@ export function AppStatusStrip() {
                   </div>
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {ex.phase === "active" ? "BG now" : "BG now"}
-                    </p>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-muted-foreground">BG now</p>
+                    <p className="text-xs font-medium text-muted-foreground">Trend</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Input
                       inputMode="decimal"
                       placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
                       value={exerciseBgInput}
                       onChange={(e) => onExerciseBgInputChange(e.target.value)}
-                      className="h-9"
+                      className="h-9 min-w-[10rem] flex-1"
                       data-testid="status-exercise-bg"
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">Trend</p>
                     <div className="flex flex-wrap gap-2">
                       {(["flat", "rising", "falling"] as const).map((t) => (
                         <Button
@@ -704,16 +712,20 @@ export function AppStatusStrip() {
 
               {ex.phase === "recovery" && exercisePlan && readiness?.verdict ? (
                 <div className="space-y-2 pt-1">
-                  <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 space-y-2">
-                    <p className="text-lg font-semibold leading-tight">{readiness.verdict.title}</p>
-                    <p className="text-sm sm:text-[15px] leading-snug text-foreground/90">{readiness.verdict.detail}</p>
-                    {recoveryInsulinLine ? (
-                      <p className="text-sm sm:text-[15px] leading-snug text-muted-foreground">{recoveryInsulinLine}</p>
-                    ) : null}
-                    <p className="text-sm sm:text-[15px] leading-snug text-muted-foreground">
-                      Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
-                    </p>
+                  <div
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
+                      getReadinessToneClasses(readiness.verdict.verdict),
+                    )}
+                  >
+                    <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                    <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
                   </div>
+
+                  {recoveryInsulinLine ? <p className="text-xs text-muted-foreground leading-snug">{recoveryInsulinLine}</p> : null}
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
+                  </p>
                 </div>
               ) : null}
 
