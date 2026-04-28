@@ -9,6 +9,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   isClearing: boolean;
+  componentStack: string | null;
 }
 
 async function clearAllCachesAndReload() {
@@ -42,6 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
     hasError: false,
     error: null,
     isClearing: false,
+    componentStack: null,
   };
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
@@ -51,6 +53,9 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
     captureException(error);
+    if (errorInfo?.componentStack) {
+      this.setState({ componentStack: errorInfo.componentStack });
+    }
 
     if (isCacheRelatedError(error)) {
       this.setState({ isClearing: true });
@@ -84,8 +89,11 @@ export class ErrorBoundary extends Component<Props, State> {
               If the problem keeps happening, try closing and reopening the app.
             </p>
             {import.meta.env.DEV && this.state.error ? (
-              <pre className="mt-2 max-h-32 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                {this.state.error.stack ? this.state.error.stack : this.state.error.message}
+              <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
+                {[
+                  this.state.error.stack ? this.state.error.stack : this.state.error.message,
+                  this.state.componentStack ? `\n\nComponent stack:\n${this.state.componentStack}` : "",
+                ].join("")}
               </pre>
             ) : null}
             <div className="flex justify-center">
