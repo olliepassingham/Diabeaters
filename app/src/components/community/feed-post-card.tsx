@@ -58,7 +58,7 @@ import {
   type CommunityPostRow,
 } from "@/lib/community";
 
-const RECENT_DM_PEERS_LIMIT = 10;
+const RECENT_DM_PEERS_LIMIT = 20;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -336,6 +336,16 @@ export function FeedPostCard({
   const [shareHandle, setShareHandle] = useState("");
   const [shareNote, setShareNote] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
+  const [shareSelectedPeer, setShareSelectedPeer] = useState<{
+    user_id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null>(null);
+  const [shareLookupPeer, setShareLookupPeer] = useState<{
+    user_id: string;
+    name: string;
+    avatar_url: string | null;
+  } | null>(null);
   const [shareRecentPeers, setShareRecentPeers] = useState<
     { user_id: string; name: string; avatar_url: string | null }[]
   >([]);
@@ -460,18 +470,20 @@ export function FeedPostCard({
     setShareOpen(false);
     setShareHandle("");
     setShareNote("");
+    setShareSelectedPeer(null);
+    setShareLookupPeer(null);
     toast({ title: "Message sent", description: "Opening your conversation…" });
     if (res.data) setLocation(`/community/messages/${res.data.threadId}`);
   }
 
-  async function handleShareToMessages(e: React.FormEvent) {
+  async function lookupShareHandle(e: React.FormEvent) {
     e.preventDefault();
     if (!viewerId) return;
     const raw = shareHandle.trim().replace(/^@/, "");
     if (!raw) {
       toast({
         title: "Enter a handle",
-        description: "Use their public @handle from Feed profile settings.",
+        description: "Type their @handle.",
         variant: "destructive",
       });
       return;
@@ -498,6 +510,7 @@ export function FeedPostCard({
     }
 
     setShareBusy(true);
+    setShareLookupPeer(null);
     const { userId, error: lookupError } = await getProfileIdByPublicHandle(normalized);
     if (lookupError) {
       setShareBusy(false);
@@ -519,8 +532,25 @@ export function FeedPostCard({
       return;
     }
 
-    await sendShareToPeer(userId);
+    const profiles = await getProfilesByIds([userId]);
+    const p = profiles.get(userId);
+    setShareLookupPeer({
+      user_id: userId,
+      name: p?.full_name?.trim() || shortPeerId(userId),
+      avatar_url: p?.avatar_url ?? null,
+    });
     setShareBusy(false);
+  }
+
+  async function handleSendSelectedPeer() {
+    if (!viewerId || !shareSelectedPeer?.user_id) return;
+    if (shareSelectedPeer.user_id === viewerId) return;
+    setShareBusy(true);
+    try {
+      await sendShareToPeer(shareSelectedPeer.user_id);
+    } finally {
+      setShareBusy(false);
+    }
   }
 
   return (
@@ -890,17 +920,24 @@ export function FeedPostCard({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+      <Dialog
+        open={shareOpen}
+        onOpenChange={(open) => {
+          setShareOpen(open);
+          if (!open) {
+            setShareHandle("");
+            setShareNote("");
+            setShareSelectedPeer(null);
+            setShareLookupPeer(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Send in Messages</DialogTitle>
-            <DialogDescription>
-              Send a link to this post in a private chat. Tap someone you&apos;ve messaged recently, or enter a @handle
-              below.
-            </DialogDescription>
+            <DialogDescription className="sr-only">Send this post to someone in Messages.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-foreground">Recent</p>
+          <div className="space-y-3">
             {shareRecentLoading ? (
               <div className="flex justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
@@ -908,25 +945,22 @@ export function FeedPostCard({
             ) : shareRecentError ? (
               <p className="text-sm text-muted-foreground">{shareRecentError}</p>
             ) : shareRecentPeers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No conversations yet — use @handle below.</p>
+              <p className="text-sm text-muted-foreground">No recent chats yet.</p>
             ) : (
-              <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-border/60 p-1">
+              <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border/60 p-1">
                 {shareRecentPeers.map((peer) => (
                   <li key={peer.user_id}>
                     <button
                       type="button"
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/60 min-h-11 disabled:opacity-50"
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm min-h-11 disabled:opacity-50 ${
+                        shareSelectedPeer?.user_id === peer.user_id
+                          ? "bg-primary/10 ring-1 ring-primary/25"
+                          : "hover:bg-muted/60"
+                      }`}
                       disabled={shareBusy || !viewerId}
                       onClick={() => {
-                        void (async () => {
-                          if (!viewerId || peer.user_id === viewerId) return;
-                          setShareBusy(true);
-                          try {
-                            await sendShareToPeer(peer.user_id);
-                          } finally {
-                            setShareBusy(false);
-                          }
-                        })();
+                        setShareSelectedPeer(peer);
+                        setShareLookupPeer(null);
                       }}
                     >
                       <CommunityAuthorAvatar
@@ -941,49 +975,86 @@ export function FeedPostCard({
               </ul>
             )}
           </div>
-          <form onSubmit={(e) => void handleShareToMessages(e)} className="space-y-3">
-            <div className="space-y-2">
-              <FieldLabelWithInfo
-                htmlFor="share-post-handle"
-                info="Same as starting a chat from Messages: enter their public handle."
-              >
-                Their @handle
-              </FieldLabelWithInfo>
-              <Input
-                id="share-post-handle"
-                value={shareHandle}
-                onChange={(e) => setShareHandle(e.target.value)}
-                placeholder="e.g. neil or @neil"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoComplete="off"
-                disabled={shareBusy || !viewerId}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="share-post-note" className="text-sm font-medium text-foreground">
-                Note (optional)
-              </label>
-              <Textarea
-                id="share-post-note"
-                value={shareNote}
-                onChange={(e) => setShareNote(e.target.value)}
-                placeholder="Add a short note above the link…"
-                rows={2}
-                maxLength={2000}
-                disabled={shareBusy}
-              />
-            </div>
+          <div className="space-y-3">
+            {!shareSelectedPeer ? (
+              <>
+                <form onSubmit={(e) => void lookupShareHandle(e)} className="space-y-2">
+                  <label htmlFor="share-post-handle" className="text-sm font-medium text-foreground">
+                    Search
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="share-post-handle"
+                      value={shareHandle}
+                      onChange={(e) => setShareHandle(e.target.value)}
+                      placeholder="Type a @handle"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      autoComplete="off"
+                      disabled={shareBusy || !viewerId}
+                    />
+                    <Button type="submit" variant="outline" disabled={shareBusy || !shareHandle.trim() || !viewerId}>
+                      {shareBusy ? "…" : "Search"}
+                    </Button>
+                  </div>
+                </form>
+
+                {shareLookupPeer ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-md border border-border/60 px-2 py-2 text-left text-sm hover:bg-muted/60 min-h-11"
+                    disabled={shareBusy || !viewerId}
+                    onClick={() => {
+                      setShareRecentPeers((prev) => {
+                        const next = [shareLookupPeer, ...prev.filter((p) => p.user_id !== shareLookupPeer.user_id)];
+                        return next.slice(0, RECENT_DM_PEERS_LIMIT);
+                      });
+                      setShareSelectedPeer(shareLookupPeer);
+                      setShareHandle("");
+                    }}
+                  >
+                    <CommunityAuthorAvatar
+                      size="sm"
+                      displayName={shareLookupPeer.name}
+                      avatarPath={shareLookupPeer.avatar_url}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium text-foreground">{shareLookupPeer.name}</span>
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+
+            {shareSelectedPeer ? (
+              <div className="space-y-2">
+                <label htmlFor="share-post-note" className="text-sm font-medium text-foreground">
+                  Note (optional)
+                </label>
+                <Textarea
+                  id="share-post-note"
+                  value={shareNote}
+                  onChange={(e) => setShareNote(e.target.value)}
+                  placeholder="Add a short note…"
+                  rows={2}
+                  maxLength={2000}
+                  disabled={shareBusy}
+                />
+              </div>
+            ) : null}
+
             <DialogFooter className="gap-2 sm:gap-0">
               <Button type="button" variant="outline" onClick={() => setShareOpen(false)} disabled={shareBusy}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={shareBusy || !shareHandle.trim() || !viewerId}>
+              <Button
+                type="button"
+                onClick={() => void handleSendSelectedPeer()}
+                disabled={shareBusy || !shareSelectedPeer || !viewerId}
+              >
                 {shareBusy ? "Sending…" : "Send"}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

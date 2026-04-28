@@ -123,6 +123,27 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
   };
 }
 
+async function fetchCommentCountsForPostIds(postIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (postIds.length === 0) return out;
+  const supabase = getSupabase();
+  if (!supabase) return out;
+
+  // Fallback for older DBs without denormalized `community_posts.comment_count`.
+  // We count comment rows for the current page of posts.
+  const { data, error } = await supabase
+    .from("community_post_comments")
+    .select("post_id")
+    .in("post_id", postIds);
+
+  if (error) return out;
+  for (const row of (data ?? []) as Array<{ post_id: string }>) {
+    const pid = String(row.post_id);
+    out.set(pid, (out.get(pid) ?? 0) + 1);
+  }
+  return out;
+}
+
 /** Which of these post IDs the current user has liked (for merging into feed rows). */
 export async function fetchMyLikesForPostIds(postIds: string[]): Promise<Set<string>> {
   if (postIds.length === 0) return new Set();
@@ -260,10 +281,20 @@ export async function fetchCommunityPostsPage(
   });
 
   if (error) return { data: null, error: wrapFeedRpcError(error) };
-  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
-  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
+  const raw = (data ?? []) as Record<string, unknown>[];
+  const posts = raw.map((row) => mapPost(row));
+
+  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
+  const withCounts = commentCountMissing
+    ? await (async () => {
+        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
+        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
+      })()
+    : posts;
+
+  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
   return {
-    data: mergeLikedIntoPosts(rows, liked),
+    data: mergeLikedIntoPosts(withCounts, liked),
     error: null,
   };
 }
@@ -299,10 +330,20 @@ export async function fetchCommunityPostsFromFollowingPage(
   });
 
   if (error) return { data: null, error: wrapFeedRpcError(error) };
-  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
-  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
+  const raw = (data ?? []) as Record<string, unknown>[];
+  const posts = raw.map((row) => mapPost(row));
+
+  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
+  const withCounts = commentCountMissing
+    ? await (async () => {
+        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
+        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
+      })()
+    : posts;
+
+  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
   return {
-    data: mergeLikedIntoPosts(rows, liked),
+    data: mergeLikedIntoPosts(withCounts, liked),
     error: null,
   };
 }
@@ -331,10 +372,20 @@ export async function fetchCommunityPostsByAuthorPage(
   });
 
   if (error) return { data: null, error: wrapFeedRpcError(error) };
-  const rows = (data ?? []).map((row: Record<string, unknown>) => mapPost(row));
-  const liked = await fetchMyLikesForPostIds(rows.map((p: CommunityPostRow) => p.id));
+  const raw = (data ?? []) as Record<string, unknown>[];
+  const posts = raw.map((row) => mapPost(row));
+
+  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
+  const withCounts = commentCountMissing
+    ? await (async () => {
+        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
+        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
+      })()
+    : posts;
+
+  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
   return {
-    data: mergeLikedIntoPosts(rows, liked),
+    data: mergeLikedIntoPosts(withCounts, liked),
     error: null,
   };
 }
@@ -709,9 +760,22 @@ export async function fetchCommunityPostById(postId: string): Promise<{
   if (error) return { data: null, error: new Error(error.message) };
   if (!data) return { data: null, error: null };
 
-  const row = mapPost(data as Record<string, unknown>);
+  const raw = data as Record<string, unknown>;
+  const row = mapPost(raw);
+
+  const commentCountMissing = !Object.prototype.hasOwnProperty.call(raw, "comment_count");
+  const withCount = commentCountMissing
+    ? await (async () => {
+        const { count } = await supabase
+          .from("community_post_comments")
+          .select("id", { count: "exact", head: true })
+          .eq("post_id", row.id);
+        return { ...row, comment_count: Number.isFinite(count) ? Math.max(0, count ?? 0) : 0 };
+      })()
+    : row;
+
   const liked = await fetchMyLikesForPostIds([row.id]);
-  return { data: mergeLikedIntoPosts([row], liked)[0]!, error: null };
+  return { data: mergeLikedIntoPosts([withCount], liked)[0]!, error: null };
 }
 
 /** Remove post row and storage objects for the author. */

@@ -1061,7 +1061,6 @@ function AccountShell() {
  */
 function MainRouter() {
   return (
-    <AnimatedRouteOutlet>
     <Switch>
       <Route path="/welcome" component={Welcome} />
       <Route path="/login" component={Login} />
@@ -1086,7 +1085,6 @@ function MainRouter() {
         </ProtectedLayout>
       </Route>
     </Switch>
-    </AnimatedRouteOutlet>
   );
 }
 

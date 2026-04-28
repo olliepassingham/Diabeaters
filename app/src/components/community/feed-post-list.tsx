@@ -261,7 +261,11 @@ export function FeedPostList(props: {
       toast({ title: "Could not load comments", description: res.error.message, variant: "destructive" });
       return;
     }
-    setCommentsByPost((m) => ({ ...m, [postId]: res.data ?? [] }));
+    const loaded = res.data ?? [];
+    setCommentsByPost((m) => ({ ...m, [postId]: loaded }));
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, comment_count: Math.max(p.comment_count, loaded.length) } : p)),
+    );
   }
 
   async function onToggleComments(postId: string) {

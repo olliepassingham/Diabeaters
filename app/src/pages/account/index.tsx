@@ -339,7 +339,7 @@ export default function Account() {
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
-  const canOpenModeChooser = primaryRole !== "carer";
+  const canOpenModeChooser = hasCarerLink;
 
   useEffect(() => {
     if (!showPublicProfilePreview) {
@@ -540,19 +540,23 @@ export default function Account() {
             </div>
             <div className="pt-2 pb-0.5">
               <div className="grid w-full grid-cols-2 gap-2 [&_a]:w-full [&_button]:w-full">
-                {canOpenModeChooser && (
+                {carerLinkLoading ? (
                   <Button
                     variant="outline"
                     size="sm"
                     className="min-h-11"
-                    asChild
+                    disabled
                     data-testid="link-change-view"
-                    aria-busy={carerLinkLoading ? "true" : "false"}
-                    title={carerLinkLoading ? "Loading supporter link…" : undefined}
+                    aria-busy="true"
+                    title="Loading supporter link…"
                   >
+                    Change mode
+                  </Button>
+                ) : canOpenModeChooser ? (
+                  <Button variant="outline" size="sm" className="min-h-11" asChild data-testid="link-change-view">
                     <Link href="/mode">Change mode</Link>
                   </Button>
-                )}
+                ) : null}
 
                 <input
                   ref={fileInputRef}

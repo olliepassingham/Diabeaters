@@ -52,7 +52,7 @@ export default function ModeChooserPage() {
     <PageShell variant="narrow" className="space-y-6 py-4 md:py-8">
       <PageHeader
         title="Choose your mode"
-        description="User Mode is for your own diabetes tools. Supporter Mode is read-only information about someone you support. You can change this later from Account."
+        description="User Mode is for your own diabetes tools. Supporter Mode is read-only information about someone you support. If your account supports someone, you can change this later from Account."
       />
 
       <Card className="shadow-sm border-border/60 rounded-2xl">

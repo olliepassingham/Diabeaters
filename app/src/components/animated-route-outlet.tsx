@@ -12,8 +12,18 @@ export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
   const [pathname] = useLocation();
   const search = useSearch();
   const reduceMotion = useReducedMotion();
-  const routeKey = `${pathname}${search ? `?${search}` : ""}`;
-  const duration = reduceMotion ? 0 : 0.18;
+  // For the bottom-tab "main" pages, avoid forcing a remount on every navigation.
+  // Remounting here causes all child route trees to reset and refetch, which makes tab switching feel slow.
+  const isBottomTabRoute =
+    pathname === "/" ||
+    pathname.startsWith("/scenarios") ||
+    pathname.startsWith("/community") ||
+    pathname.startsWith("/tools") ||
+    pathname.startsWith("/education") ||
+    pathname.startsWith("/carer-view");
+
+  const routeKey = isBottomTabRoute ? "bottom-tabs" : `${pathname}${search ? `?${search}` : ""}`;
+  const duration = reduceMotion || isBottomTabRoute ? 0 : 0.18;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
