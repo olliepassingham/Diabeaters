@@ -865,6 +865,17 @@ export type ExerciseBgTrend = "rising" | "flat" | "falling" | "not_sure";
 /** Quick bar: any rapid-acting meal or correction dose in the last ~2 hours. */
 export type PreRapidInsulin2h = "yes" | "no" | "not_sure";
 
+/** Environment selected on the deeper coach. */
+export type ExerciseEnvironmentChoice =
+  | "indoor"
+  | "outdoor_normal"
+  | "outdoor_hot"
+  | "outdoor_cold"
+  | "altitude";
+
+/** Symptom flag set logged during the active phase. */
+export type ExerciseSymptomFlag = "lightheaded" | "shaky" | "tingly" | "sweaty" | "tired" | "fine";
+
 export interface ActiveExerciseSession {
   id: string;
   routineId?: string;
@@ -900,6 +911,50 @@ export interface ActiveExerciseSession {
   recoveryTrend?: ExerciseBgTrend;
   recoveryBgAt?: string;
   recoveryBgSkipped?: boolean;
+
+  // ----- Deeper guided coach inputs (all optional; legacy sessions ignore) -----
+  /** Pre: hours of sleep last night. */
+  preSleepHours?: number;
+  /** Pre: minutes since last meal/snack. */
+  prefuelMinutesAgo?: number;
+  /** Pre: approximate carbs in last meal/snack. */
+  prefuelGrams?: number;
+  /** Pre: hydration self-assessment. */
+  preHydration?: "ok" | "low";
+  /** Pre: feeling off / stressed flag. */
+  preFeelingOff?: boolean;
+  /** Pre: training fasted. */
+  preFasted?: boolean;
+  /** Pre: environment for the session. */
+  preEnvironment?: ExerciseEnvironmentChoice;
+  /** Pre: competitive / group session. */
+  preCompetitive?: boolean;
+  /** Pre: caffeine in last ~2h. */
+  preCaffeine2h?: boolean;
+  /** Pre: alcohol last night. */
+  preAlcoholLastNight?: boolean;
+  /** Pre: GLP-1 medication in last 24h. */
+  preGlp1Last24h?: boolean;
+  /** Pre: beta-blocker today. */
+  preBetaBlockerToday?: boolean;
+  /** Pre: known IOB units (pump or mental tally). */
+  preIobUnits?: number;
+
+  /** Active: carbs the user has actually consumed during the session. */
+  midCarbsGramsSoFar?: number;
+  /** Active: rate of perceived effort 1-10. */
+  midRpe?: number;
+  /** Active: symptom flags (multi-select). */
+  midSymptoms?: ExerciseSymptomFlag[];
+
+  /** Recovery: carbs eaten since stopping. */
+  recoveryCarbsGrams?: number;
+  /** Recovery: bolus units already given for recovery meal/snack. */
+  recoveryBolusUnits?: number;
+  /** Recovery: hours until planned bedtime. */
+  bedtimeInHours?: number;
+  /** Recovery: alcohol planned tonight. */
+  alcoholTonight?: boolean;
 }
 
 export type LastExerciseSummary = {
@@ -908,6 +963,20 @@ export type LastExerciseSummary = {
   intensity: ExerciseIntensity;
   durationMinutes: number;
   exerciseName: string;
+  /** Optional richer recall of session signals so other tools (Bedtime, Meal planner) can react. */
+  context?: {
+    environment?: ExerciseEnvironmentChoice;
+    competitive?: boolean;
+    sleepHoursLastNight?: number;
+    fasted?: boolean;
+    alcoholLastNight?: boolean;
+    glp1Last24h?: boolean;
+    betaBlockerToday?: boolean;
+    midRpe?: number;
+    feltSymptomsDuring?: boolean;
+    recoveryCarbsGrams?: number;
+    alcoholTonight?: boolean;
+  };
 };
 
 export interface ExerciseOutcome {
@@ -972,6 +1041,25 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
+/** Build the optional `context` payload of LastExerciseSummary from the just-finished session. */
+function buildLastExerciseContextFromSession(session: ActiveExerciseSession): NonNullable<LastExerciseSummary["context"]> | undefined {
+  const ctx: NonNullable<LastExerciseSummary["context"]> = {};
+  if (session.preEnvironment) ctx.environment = session.preEnvironment;
+  if (session.preCompetitive != null) ctx.competitive = session.preCompetitive;
+  if (session.preSleepHours != null) ctx.sleepHoursLastNight = session.preSleepHours;
+  if (session.preFasted != null) ctx.fasted = session.preFasted;
+  if (session.preAlcoholLastNight != null) ctx.alcoholLastNight = session.preAlcoholLastNight;
+  if (session.preGlp1Last24h != null) ctx.glp1Last24h = session.preGlp1Last24h;
+  if (session.preBetaBlockerToday != null) ctx.betaBlockerToday = session.preBetaBlockerToday;
+  if (session.midRpe != null) ctx.midRpe = session.midRpe;
+  if (session.midSymptoms && session.midSymptoms.length > 0 && session.midSymptoms.some((s) => s !== "fine")) {
+    ctx.feltSymptomsDuring = true;
+  }
+  if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
+  if (session.alcoholTonight != null) ctx.alcoholTonight = session.alcoholTonight;
+  return Object.keys(ctx).length > 0 ? ctx : undefined;
+}
+
 export const storage = {
   getLastExerciseSummary(): LastExerciseSummary | null {
     try {
@@ -984,6 +1072,16 @@ export const storage = {
       if (!parsed.intensity || typeof parsed.intensity !== "string") return null;
       if (typeof parsed.durationMinutes !== "number" || !Number.isFinite(parsed.durationMinutes)) return null;
       if (!parsed.exerciseName || typeof parsed.exerciseName !== "string") return null;
+      if (parsed.context != null && typeof parsed.context !== "object") {
+        // Drop malformed context but keep core summary.
+        return {
+          endedAt: parsed.endedAt,
+          exerciseType: parsed.exerciseType,
+          intensity: parsed.intensity,
+          durationMinutes: parsed.durationMinutes,
+          exerciseName: parsed.exerciseName,
+        };
+      }
       return parsed as LastExerciseSummary;
     } catch {
       return null;
@@ -1013,7 +1111,8 @@ export const storage = {
   /** Record exercise end timestamp for “next 24h” educational nudges. */
   recordExerciseEndedAt(
     endedAtIso: string,
-    meta?: Pick<LastExerciseSummary, "exerciseType" | "intensity" | "durationMinutes" | "exerciseName">,
+    meta?: Pick<LastExerciseSummary, "exerciseType" | "intensity" | "durationMinutes" | "exerciseName"> &
+      Partial<Pick<LastExerciseSummary, "context">>,
   ): void {
     try {
       localStorage.setItem(STORAGE_KEYS.LAST_EXERCISE_ENDED_AT, endedAtIso);
@@ -3448,6 +3547,7 @@ export const storage = {
       exerciseType: session.exerciseType,
       intensity: session.intensity,
       durationMinutes: session.durationMinutes,
+      context: buildLastExerciseContextFromSession(session),
     });
     return this.updateActiveExercise({
       phase: "recovery",
@@ -3466,6 +3566,7 @@ export const storage = {
         exerciseType: session.exerciseType,
         intensity: session.intensity,
         durationMinutes: session.durationMinutes,
+        context: buildLastExerciseContextFromSession(session),
       });
     }
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);

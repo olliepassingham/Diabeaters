@@ -37,6 +37,14 @@ export interface ExerciseReadinessInput {
   phase?: "pre" | "active" | "recovery";
   /** Pre-session strip: any rapid-acting dose in the last ~2 h (affects plan + quick verdict). */
   preRapidInsulin2h?: PreRapidInsulin2h | null;
+
+  // ----- Deeper guided coach context (all optional) -----
+  sleepHoursLastNight?: number | null;
+  feelingOff?: boolean;
+  alcoholLastNight?: boolean;
+  betaBlockerToday?: boolean;
+  glp1Last24h?: boolean;
+  hypoProneHistory?: boolean;
 }
 
 function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
@@ -326,14 +334,49 @@ function refineWithPreRapidInsulin(result: ExerciseReadinessResult, input: Exerc
   return result;
 }
 
+/**
+ * Layered "deeper context" caution refiners (sleep, feeling off, alcohol, beta-blocker, GLP-1, history).
+ * Never upgrades a verdict — only escalates ready→caution where the combined risk warrants it.
+ * Preserves not_recommended verdicts unchanged.
+ */
+function refineWithDeeperContext(result: ExerciseReadinessResult, input: ExerciseReadinessInput): ExerciseReadinessResult {
+  if (result.verdict === "not_recommended") return result;
+
+  const triggers: string[] = [];
+  if (input.feelingOff) triggers.push("you noted feeling off");
+  if (input.sleepHoursLastNight != null && input.sleepHoursLastNight < 6) {
+    triggers.push("low sleep last night");
+  }
+  if (input.alcoholLastNight) triggers.push("alcohol last night raises delayed-low risk");
+  if (input.betaBlockerToday) triggers.push("beta-blocker can mute hypo symptoms");
+  if (input.glp1Last24h) triggers.push("GLP-1 medication can shift carb absorption");
+  if (input.hypoProneHistory) triggers.push("your history shows hypos for this routine");
+
+  if (triggers.length === 0) return result;
+
+  if (result.verdict === "ready") {
+    return {
+      verdict: "caution",
+      title: "Caution",
+      detail: `${result.detail} Also: ${triggers[0]}${triggers.length > 1 ? ` (+${triggers.length - 1} more factor${triggers.length - 1 === 1 ? "" : "s"})` : ""}. Plan extra checks and keep fast carbs nearby.`,
+    };
+  }
+
+  return {
+    ...result,
+    detail: `${result.detail} Plus: ${triggers[0]}${triggers.length > 1 ? ` (+${triggers.length - 1} more)` : ""}.`,
+  };
+}
+
 /** Planner and active banner: shared go / caution / not recommended copy. */
 export function getExerciseReadinessVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
   if (input.phase === "recovery") {
-    return getRecoveryReadinessVerdict(input);
+    return refineWithDeeperContext(getRecoveryReadinessVerdict(input), input);
   }
   const base = baseVerdict(input);
   const withTrends = refineWithExerciseTypeAndTrend(base, input);
-  return refineWithPreRapidInsulin(withTrends, input);
+  const withInsulin = refineWithPreRapidInsulin(withTrends, input);
+  return refineWithDeeperContext(withInsulin, input);
 }
 
 export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): string {

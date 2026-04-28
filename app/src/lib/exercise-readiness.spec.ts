@@ -84,6 +84,46 @@ describe("getRecoveryReadinessVerdict", () => {
   });
 });
 
+describe("getExerciseReadinessVerdict deeper context modifiers", () => {
+  it("downgrades ready to caution when low sleep + alcohol last night", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 7,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      bgTrend: "flat",
+      phase: "pre",
+      sleepHoursLastNight: 4,
+      alcoholLastNight: true,
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.detail.toLowerCase()).toContain("low sleep");
+  });
+
+  it("preserves not_recommended low BG verdict regardless of deeper context", () => {
+    const lowPlan = calculateExercisePlan({
+      exerciseType: "cardio",
+      durationMinutes: 45,
+      intensity: "moderate",
+      minutesUntilStart: 0,
+      bgUnits: "mmol/L",
+      currentBg: 4,
+    });
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: lowPlan,
+      currentBg: 4,
+      bgUnits: "mmol/L",
+      exerciseType: "cardio",
+      intensity: "moderate",
+      phase: "pre",
+      feelingOff: true,
+      hypoProneHistory: true,
+    });
+    expect(r.verdict).toBe("not_recommended");
+  });
+});
+
 describe("getExerciseReadinessVerdict rapid insulin (pre strip)", () => {
   it("shifts ready to caution when rapid insulin in last 2h is yes", () => {
     const r = getExerciseReadinessVerdict({

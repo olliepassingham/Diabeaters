@@ -55,6 +55,19 @@ export type LastInsulinTiming = "none" | "lt_1h" | "h1_2" | "h2_4" | "gt_4h";
 /** Planned snack/meal with bolus before the session starts (optional). */
 export type PlannedPreExerciseFuel = "none" | "snack_bolus" | "meal_bolus";
 
+/** Environment for the planned session. */
+export type ExerciseEnvironment = "indoor" | "outdoor_normal" | "outdoor_hot" | "outdoor_cold" | "altitude";
+
+/** Past response of the same routine, summarised for biasing fuel and bolus. */
+export type ExerciseHistoryBias = {
+  /** Number of prior outcomes considered. */
+  totalSessions: number;
+  /** Direction of typical BG response. */
+  typicalResponse: "dropped" | "stable" | "rose";
+  /** Whether hypos were common in those outcomes. */
+  hypoProne: boolean;
+};
+
 export interface ExercisePlanContext {
   /** Planner keys: cardio, strength, hiit, yoga, walking, court, field, swimming */
   exerciseType: string;
@@ -80,6 +93,30 @@ export interface ExercisePlanContext {
   bgTrend?: ExerciseBgTrend;
   /** Local hour 0–23 for evening / overnight recovery copy. */
   hourOfDay?: number;
+
+  // ----- Deeper guided coach context (all optional; defaults preserve legacy behaviour) -----
+  /** Hours of sleep last night; <6 is treated as a caution amplifier. */
+  sleepHoursLastNight?: number;
+  /** Subjective hydration ok/low. */
+  hydration?: "ok" | "low";
+  /** Generic feeling-off / stress flag. */
+  feelingOff?: boolean;
+  /** Environmental context (heat/cold/altitude shift fuel + caution). */
+  environment?: ExerciseEnvironment;
+  /** Group / competitive sessions tend to push harder than solo workouts. */
+  competitive?: boolean;
+  /** Caffeine in last ~2h (small alertness/glucose effect, mostly noted in tips). */
+  caffeineLast2h?: boolean;
+  /** Alcohol last night (delayed-low risk for many people). */
+  alcoholLastNight?: boolean;
+  /** GLP-1 medication taken in last 24h (slower digestion / different fuel response). */
+  glp1Last24h?: boolean;
+  /** Beta-blocker today (blunted hypo awareness). */
+  betaBlockerToday?: boolean;
+  /** Known IOB units (pump or mental tally) for caution copy only. */
+  iobUnits?: number;
+  /** Bias from prior outcomes for the same routine. */
+  historyBias?: ExerciseHistoryBias;
 }
 
 const EXERCISE_LABELS: Record<string, string> = {
@@ -129,6 +166,61 @@ function roundCarbsGrams(raw: number, mult: number): number {
   if (mult < 1) return Math.floor(raw / 5) * 5;
   if (mult > 1) return Math.ceil(raw / 5) * 5;
   return Math.round(raw / 5) * 5;
+}
+
+/**
+ * Environmental + history multipliers applied on top of intensity/type adjustments.
+ * Conservative — never below 0.7 or above 1.6 in aggregate.
+ */
+function deeperContextCarbMultipliers(context: ExercisePlanContext): { pre: number; during: number; post: number } {
+  let pre = 1;
+  let during = 1;
+  let post = 1;
+
+  if (context.environment === "outdoor_hot") {
+    during *= 1.15;
+    post *= 1.05;
+  } else if (context.environment === "outdoor_cold") {
+    pre *= 1.05;
+  } else if (context.environment === "altitude") {
+    during *= 1.1;
+    post *= 1.05;
+  }
+
+  if (context.competitive) {
+    during *= 1.05;
+    post *= 1.05;
+  }
+
+  if (context.alcoholLastNight) {
+    post *= 1.1;
+  }
+
+  if (context.sleepHoursLastNight != null && context.sleepHoursLastNight < 6) {
+    during *= 1.05;
+    post *= 1.05;
+  }
+
+  if (context.glp1Last24h) {
+    pre *= 0.9;
+    during *= 0.95;
+  }
+
+  const hist = context.historyBias;
+  if (hist && hist.totalSessions >= 2) {
+    if (hist.typicalResponse === "dropped" || hist.hypoProne) {
+      pre *= 1.1;
+      during *= 1.1;
+      post *= 1.05;
+    } else if (hist.typicalResponse === "rose") {
+      pre *= 0.95;
+    }
+  }
+
+  pre = Math.min(1.6, Math.max(0.7, pre));
+  during = Math.min(1.6, Math.max(0.7, during));
+  post = Math.min(1.6, Math.max(0.7, post));
+  return { pre, during, post };
 }
 
 /**
@@ -236,6 +328,21 @@ function baseCarbsAndBolus(
   return { preExerciseCarbs, duringCarbs, postExerciseCarbs, bolusReduction };
 }
 
+/**
+ * Bias a bolus-reduction range string toward its higher end (clamped at 50%).
+ * Examples: "15-25%" → "20-30%", "25-35%" → "30-45%", "35-50%" → "40-50%".
+ */
+function biasBolusReductionHigher(range: string): string {
+  const m = range.match(/^(\d+)-(\d+)%$/);
+  if (!m) return range;
+  const lo = parseInt(m[1]!, 10);
+  const hi = parseInt(m[2]!, 10);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return range;
+  const newLo = Math.min(50, lo + 5);
+  const newHi = Math.min(50, hi + 5);
+  return `${newLo}-${newHi}%`;
+}
+
 function pumpTipsForIntensity(intensity: "light" | "moderate" | "intense"): ExercisePlanResult["pumpTips"] {
   if (intensity === "light") {
     return {
@@ -295,6 +402,19 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
   preExerciseCarbs = typeAdjusted.pre;
   duringCarbs = typeAdjusted.during;
   postExerciseCarbs = typeAdjusted.post;
+
+  // Deeper context (environment / sleep / alcohol / history) applied on top of type adjustments.
+  const deeperMult = deeperContextCarbMultipliers(context);
+  if (deeperMult.pre !== 1 || deeperMult.during !== 1 || deeperMult.post !== 1) {
+    preExerciseCarbs = roundCarbsGrams(preExerciseCarbs * deeperMult.pre, deeperMult.pre);
+    duringCarbs = roundCarbsGrams(duringCarbs * deeperMult.during, deeperMult.during);
+    postExerciseCarbs = roundCarbsGrams(postExerciseCarbs * deeperMult.post, deeperMult.post);
+  }
+
+  // History-aware bolus reduction nudge: hypo-prone routines bias toward the higher end.
+  if (context.historyBias?.hypoProne || context.historyBias?.typicalResponse === "dropped") {
+    bolusReduction = biasBolusReductionHigher(bolusReduction);
+  }
 
   const idealStart = bgUnits === "mmol/L" ? "7-10" : "126-180";
   const lowThreshold = bgUnits === "mmol/L" ? "5.6" : "100";
@@ -407,6 +527,61 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     );
   }
 
+  if (context.environment === "outdoor_hot") {
+    preTips.push("Hot environment — sweating increases hypo risk for some people. Sip fluids and keep extra fast carbs handy.");
+  } else if (context.environment === "outdoor_cold") {
+    preTips.push("Cold weather can blunt hypo symptoms — set extra check reminders, especially if you train alone.");
+  } else if (context.environment === "altitude") {
+    preTips.push("Altitude shifts insulin needs for some people — start gentler and build, and confirm any adjustments with your team.");
+  }
+
+  if (context.competitive) {
+    preTips.push("Competitive sessions often run harder than planned — assume more carbs than a solo workout of the same length.");
+  }
+
+  if (context.sleepHoursLastNight != null && context.sleepHoursLastNight < 6) {
+    preTips.push(`Only ${context.sleepHoursLastNight}h sleep last night — ease into intensity and watch for unusual lows.`);
+  }
+
+  if (context.hydration === "low") {
+    preTips.push("Hydration noted as low — dehydration can make BG readings less reliable; sip fluids before and during.");
+  }
+
+  if (context.feelingOff) {
+    preTips.push("You noted feeling off — consider a lighter session or a postponement; activity stress can amplify highs and lows.");
+  }
+
+  if (context.caffeineLast2h) {
+    preTips.push("Caffeine on board — small BG bumps are common at the start; keep watching for the usual exercise drop later.");
+  }
+
+  if (context.alcoholLastNight) {
+    preTips.push("Alcohol last night — delayed lows risk is higher today, especially after harder effort. Plan extra checks.");
+  }
+
+  if (context.glp1Last24h) {
+    preTips.push("GLP-1 medication on board — digestion is slower, so pre-fuel may absorb later than usual. Keep fast carbs nearby.");
+  }
+
+  if (context.betaBlockerToday) {
+    preTips.push("Beta-blocker today — heart-rate symptoms of a low can be muted. Set extra checks rather than relying on how you feel.");
+  }
+
+  if (context.iobUnits != null && context.iobUnits > 0) {
+    preTips.push(`~${context.iobUnits}u insulin on board — activity can amplify its effect; keep treatment carbs within reach.`);
+  }
+
+  const hist = context.historyBias;
+  if (hist && hist.totalSessions >= 2) {
+    if (hist.hypoProne) {
+      preTips.push("Your past sessions like this often led to hypos — start with a slightly higher BG and have treatment ready.");
+    } else if (hist.typicalResponse === "dropped") {
+      preTips.push("Your history shows BG often drops with this routine — extra carbs ready and an earlier check usually pays off.");
+    } else if (hist.typicalResponse === "rose") {
+      preTips.push("Your history shows BG often rises during this routine — plan for a possible delayed dip rather than only watching for highs.");
+    }
+  }
+
   const duringTips: string[] = [];
   if (duringCarbs > 0) {
     duringTips.push(`Have ${duringCarbs}g fast-acting carbs ready`);
@@ -451,6 +626,22 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
 
   if (hasRecentInsulin(context.lastInsulinTiming) || intensity === "intense") {
     recoveryTips.push("IOB and muscle uptake can interact for many hours — err on the side of more checks after hard or insulin-heavy days.");
+  }
+
+  if (context.alcoholLastNight) {
+    recoveryTips.push("Alcohol last night already increases delayed-low risk — pair with exercise recovery, plan a snack and an alarm if you feel unsure.");
+  }
+
+  if (context.environment === "outdoor_hot") {
+    recoveryTips.push("After heat: rehydrate steadily — recheck BG after fluids, since dehydrated readings can mislead recovery decisions.");
+  }
+
+  if (context.glp1Last24h) {
+    recoveryTips.push("GLP-1 + exercise can mean later carb absorption — small frequent recovery snacks may suit better than a single large meal.");
+  }
+
+  if (context.historyBias?.hypoProne) {
+    recoveryTips.unshift("Your routine has caused hypos before — keep treatment within reach for the next several hours, not just immediately after.");
   }
 
   const pumpTips = pumpTipsForIntensity(intensity);

@@ -150,6 +150,50 @@ describe("calculateExercisePlan", () => {
   });
 });
 
+describe("calculateExercisePlan deeper context modifiers", () => {
+  it("adds heat-related caution and bumps during carbs in hot outdoor sessions", () => {
+    const baseline = calculateExercisePlan({ ...baseCtx, durationMinutes: 60 });
+    const hot = calculateExercisePlan({
+      ...baseCtx,
+      durationMinutes: 60,
+      environment: "outdoor_hot",
+    });
+    expect(hot.during.carbsNeeded).toBeGreaterThanOrEqual(baseline.during.carbsNeeded);
+    expect(hot.pre.contextualNotes?.some((n) => n.toLowerCase().includes("hot"))).toBe(true);
+  });
+
+  it("warns about low sleep and beta-blockers in pre tips", () => {
+    const r = calculateExercisePlan({
+      ...baseCtx,
+      sleepHoursLastNight: 4,
+      betaBlockerToday: true,
+    });
+    expect(r.pre.contextualNotes?.some((n) => n.includes("4h sleep"))).toBe(true);
+    expect(r.pre.contextualNotes?.some((n) => n.toLowerCase().includes("beta-blocker"))).toBe(true);
+  });
+
+  it("biases bolus reduction higher when history is hypo-prone", () => {
+    const baseline = calculateExercisePlan({ ...baseCtx });
+    const biased = calculateExercisePlan({
+      ...baseCtx,
+      historyBias: { totalSessions: 5, typicalResponse: "dropped", hypoProne: true },
+    });
+    const baselineLo = parseInt(baseline.pre.bolusReduction.match(/^(\d+)/)?.[1] ?? "0", 10);
+    const biasedLo = parseInt(biased.pre.bolusReduction.match(/^(\d+)/)?.[1] ?? "0", 10);
+    expect(biasedLo).toBeGreaterThan(baselineLo);
+    expect(biased.pre.contextualNotes?.some((n) => n.toLowerCase().includes("past sessions"))).toBe(true);
+  });
+
+  it("flags alcohol last night in pre and recovery tips", () => {
+    const r = calculateExercisePlan({
+      ...baseCtx,
+      alcoholLastNight: true,
+    });
+    expect(r.pre.contextualNotes?.some((n) => n.toLowerCase().includes("alcohol last night"))).toBe(true);
+    expect(r.recovery.tips.some((t) => t.toLowerCase().includes("alcohol"))).toBe(true);
+  });
+});
+
 describe("calculateExercisePlanFromMessage", () => {
   it("parses legacy message", () => {
     const r = calculateExercisePlanFromMessage("moderate cardio for 30 minutes", "mmol/L");
