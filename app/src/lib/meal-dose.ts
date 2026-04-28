@@ -1,5 +1,6 @@
 import type { UserSettings } from "@/lib/storage";
 import { calculateDoseFromCarbs } from "@/lib/ratio-utils";
+import type { ExerciseIntensity, ExerciseType } from "@/lib/storage";
 
 /** Round insulin units to whole numbers (pen-friendly). */
 export function roundInsulinUnits(value: number): number {
@@ -40,6 +41,31 @@ export type MealDoseResult = {
   error?: string;
 };
 
+export type MealExerciseMeta = {
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  durationMinutes: number;
+};
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, n));
+}
+
+function exerciseReductionModifier(meta: MealExerciseMeta | undefined): number {
+  if (!meta) return 0;
+  const byIntensity = meta.intensity === "intense" ? 5 : meta.intensity === "light" ? -5 : 0;
+  const byType =
+    meta.exerciseType === "strength"
+      ? -10
+      : meta.exerciseType === "hiit"
+        ? 5
+        : meta.exerciseType === "walking" || meta.exerciseType === "yoga"
+          ? -5
+          : 0;
+  const byDuration = meta.durationMinutes >= 90 ? 5 : meta.durationMinutes <= 30 ? -5 : 0;
+  return byIntensity + byType + byDuration;
+}
+
 export function calculateMealDose(
   carbs: number,
   mealType: string,
@@ -47,6 +73,7 @@ export function calculateMealDose(
   bgUnits: string,
   exerciseContext?: "before" | "after" | "during",
   hoursAway?: number,
+  exerciseMeta?: MealExerciseMeta,
 ): MealDoseResult {
   const ratioMap: Record<string, string | undefined> = {
     breakfast: settings.breakfastRatio,
@@ -114,7 +141,9 @@ export function calculateMealDose(
           ? 25
           : 15;
 
-  const adjustedExact = exactBaseUnits * (1 - reductionPercent / 100);
+  const reductionAdjusted = clamp(reductionPercent + exerciseReductionModifier(exerciseMeta), 0, 60);
+
+  const adjustedExact = exactBaseUnits * (1 - reductionAdjusted / 100);
   const rounded = roundInsulinUnits(adjustedExact);
   const stdDose = roundInsulinUnits(exactBaseUnits);
 
@@ -138,7 +167,7 @@ export function calculateMealDose(
     exactDose: Math.round(adjustedExact * 10) / 10,
     roundingAdvice: getRoundingAdvice(adjustedExact, rounded, bgUnits),
     exerciseContext,
-    exerciseReduction: reductionPercent,
+    exerciseReduction: reductionAdjusted,
     standardDose: stdDose,
     tips,
   };

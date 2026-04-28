@@ -55,6 +55,7 @@ const STORAGE_KEYS = {
   ALCOHOL_SESSION: "diabeater_alcohol_session",
   PUMP_FAILURE_SESSION: "diabeater_pump_failure_session",
   LAST_EXERCISE_ENDED_AT: "diabeater_last_exercise_ended_at",
+  LAST_EXERCISE_SUMMARY: "diabeater_last_exercise_summary",
 } as const;
 
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
@@ -901,6 +902,14 @@ export interface ActiveExerciseSession {
   recoveryBgSkipped?: boolean;
 }
 
+export type LastExerciseSummary = {
+  endedAt: string;
+  exerciseType: ExerciseType;
+  intensity: ExerciseIntensity;
+  durationMinutes: number;
+  exerciseName: string;
+};
+
 export interface ExerciseOutcome {
   id: string;
   exerciseType: ExerciseType;
@@ -964,6 +973,23 @@ function generateId(): string {
 }
 
 export const storage = {
+  getLastExerciseSummary(): LastExerciseSummary | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.LAST_EXERCISE_SUMMARY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as Partial<LastExerciseSummary>;
+      if (!parsed || typeof parsed !== "object") return null;
+      if (!parsed.endedAt || typeof parsed.endedAt !== "string") return null;
+      if (!parsed.exerciseType || typeof parsed.exerciseType !== "string") return null;
+      if (!parsed.intensity || typeof parsed.intensity !== "string") return null;
+      if (typeof parsed.durationMinutes !== "number" || !Number.isFinite(parsed.durationMinutes)) return null;
+      if (!parsed.exerciseName || typeof parsed.exerciseName !== "string") return null;
+      return parsed as LastExerciseSummary;
+    } catch {
+      return null;
+    }
+  },
+
   getLastExerciseEndedAt(): string | null {
     try {
       return localStorage.getItem(STORAGE_KEYS.LAST_EXERCISE_ENDED_AT);
@@ -977,7 +1003,7 @@ export const storage = {
    * Used for educational risk nudges (e.g. Bedtime: “exercise today”).
    */
   didExerciseRecently(hours = 24): boolean {
-    const iso = this.getLastExerciseEndedAt();
+    const iso = this.getLastExerciseSummary()?.endedAt ?? this.getLastExerciseEndedAt();
     if (!iso) return false;
     const t = new Date(iso).getTime();
     if (!Number.isFinite(t)) return false;
@@ -985,9 +1011,16 @@ export const storage = {
   },
 
   /** Record exercise end timestamp for “next 24h” educational nudges. */
-  recordExerciseEndedAt(endedAtIso: string): void {
+  recordExerciseEndedAt(
+    endedAtIso: string,
+    meta?: Pick<LastExerciseSummary, "exerciseType" | "intensity" | "durationMinutes" | "exerciseName">,
+  ): void {
     try {
       localStorage.setItem(STORAGE_KEYS.LAST_EXERCISE_ENDED_AT, endedAtIso);
+      if (meta) {
+        const summary: LastExerciseSummary = { endedAt: endedAtIso, ...meta };
+        localStorage.setItem(STORAGE_KEYS.LAST_EXERCISE_SUMMARY, JSON.stringify(summary));
+      }
     } catch {
       /* ignore */
     }
@@ -3410,7 +3443,12 @@ export const storage = {
     const now = new Date();
     const recoveryEnds = new Date(now.getTime() + session.recoveryMinutes * 60 * 1000);
     // Mark “exercise ended” for next-24h educational nudges (e.g. Bedtime).
-    this.recordExerciseEndedAt(now.toISOString());
+    this.recordExerciseEndedAt(now.toISOString(), {
+      exerciseName: session.exerciseName,
+      exerciseType: session.exerciseType,
+      intensity: session.intensity,
+      durationMinutes: session.durationMinutes,
+    });
     return this.updateActiveExercise({
       phase: "recovery",
       exerciseEndedAt: now.toISOString(),
@@ -3423,7 +3461,12 @@ export const storage = {
     // If a session actually started (active/recovery), record an end time for next-24h nudges.
     if (session?.exerciseStartedAt) {
       const endedIso = session.exerciseEndedAt || new Date().toISOString();
-      this.recordExerciseEndedAt(endedIso);
+      this.recordExerciseEndedAt(endedIso, {
+        exerciseName: session.exerciseName,
+        exerciseType: session.exerciseType,
+        intensity: session.intensity,
+        durationMinutes: session.durationMinutes,
+      });
     }
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
     return session;

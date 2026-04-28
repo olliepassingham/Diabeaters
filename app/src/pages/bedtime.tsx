@@ -113,6 +113,7 @@ export default function Bedtime() {
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
   const [hoursUntilSleep, setHoursUntilSleep] = useState("");
   const [exercisedToday, setExercisedToday] = useState(false);
+  const [lastExerciseLabel, setLastExerciseLabel] = useState<string | null>(null);
   const [hadAlcohol, setHadAlcohol] = useState(false);
   const [recentHypos, setRecentHypos] = useState(false);
   const [result, setResult] = useState<ReadinessResult | null>(null);
@@ -144,7 +145,14 @@ export default function Bedtime() {
     setScenarioState(storage.getScenarioState());
     setBedtimeLogs(storage.getBedtimeLogs());
     // Auto-nudge based on recent exercise sessions (within last 24h).
-    setExercisedToday(storage.didExerciseRecently(24));
+    const did = storage.didExerciseRecently(24);
+    setExercisedToday(did);
+    const last = storage.getLastExerciseSummary();
+    if (did && last) {
+      setLastExerciseLabel(`${last.exerciseName} · ${last.intensity} · ${last.durationMinutes} min`);
+    } else {
+      setLastExerciseLabel(null);
+    }
   }, []);
 
   useEffect(() => {
@@ -1224,7 +1232,10 @@ export default function Bedtime() {
                   </div>
                   <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
                     {exercisedToday && (
-                      <p>Consider a temporary basal rate at 80-90% for 4-6 hours overnight to reduce post-exercise hypo risk.</p>
+                      <p>
+                        Consider a temporary basal rate at 80-90% for 4-6 hours overnight to reduce post-exercise hypo risk
+                        {lastExerciseLabel ? ` (${lastExerciseLabel})` : ""}.
+                      </p>
                     )}
                     {hadAlcohol && (
                       <p>Alcohol can cause delayed lows. Consider reducing basal by 10-20% overnight and setting an alarm.</p>

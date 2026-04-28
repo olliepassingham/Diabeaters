@@ -41,6 +41,28 @@ describe("calculateMealDose before exercise", () => {
   });
 });
 
+describe("calculateMealDose exercise meta modifiers", () => {
+  it("increases post-exercise reduction for intense long cardio", () => {
+    const r = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "after", 1, {
+      exerciseType: "cardio",
+      intensity: "intense",
+      durationMinutes: 120,
+    });
+    expect(r.exerciseContext).toBe("after");
+    expect(r.exerciseReduction).toBeGreaterThanOrEqual(40);
+  });
+
+  it("decreases post-exercise reduction for strength", () => {
+    const r = calculateMealDose(60, "snack", settingsWithSnackRatio, "mmol/L", "after", 1, {
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+    });
+    expect(r.exerciseContext).toBe("after");
+    expect(r.exerciseReduction).toBeLessThanOrEqual(30);
+  });
+});
+
 describe("getExerciseMealBolusPreview", () => {
   it("delegates to calculateMealDose with hours from minutes", () => {
     const fromHelper = getExerciseMealBolusPreview(60, "snack", settingsWithSnackRatio, "mmol/L", 45);

@@ -116,6 +116,26 @@ export default function Adviser() {
   }, []);
 
   useEffect(() => {
+    // If a workout just finished, default the meal planner to post-exercise.
+    // Skip when an explicit deep-link prefill was applied.
+    if (didPrefillFromExerciseLink.current || didPrefillFromAlcoholLink.current) return;
+    try {
+      const last = storage.getLastExerciseSummary();
+      if (!last) return;
+      const ended = new Date(last.endedAt).getTime();
+      if (!Number.isFinite(ended)) return;
+      const hoursSince = Math.max(0, Math.ceil((Date.now() - ended) / 3_600_000));
+      if (hoursSince > 6) return;
+      setActiveTab("meal");
+      setPlanningAroundExercise(true);
+      setExerciseTiming("after");
+      setExerciseWithin(String(Math.min(24, hoursSince)));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
     // Deep-link prefill from Alcohol scenario: /adviser?tab=meal&from=alcohol&carbs=60&mealTime=dinner
     if (didPrefillFromAlcoholLink.current) return;
     try {
@@ -253,7 +273,13 @@ export default function Adviser() {
     const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
     const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
     
-    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway);
+    const lastEx = storage.getLastExerciseSummary();
+    const exerciseMeta =
+      exerciseContext && lastEx && storage.didExerciseRecently(24)
+        ? { exerciseType: lastEx.exerciseType, intensity: lastEx.intensity, durationMinutes: lastEx.durationMinutes }
+        : undefined;
+
+    const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway, exerciseMeta);
     setMealResult(result);
     
     try {
