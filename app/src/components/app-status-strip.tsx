@@ -702,6 +702,23 @@ export function AppStatusStrip() {
                   >
                     <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
+                    {(() => {
+                      const needsCarbPrompt = !ex.preChecklist.carbsConsidered;
+                      const needsInsulinPrompt = !ex.preChecklist.basalAdjusted;
+                      const show = needsCarbPrompt || needsInsulinPrompt;
+                      if (!show) return null;
+                      return (
+                        <div className="pt-2 border-t border-border/50 space-y-1.5">
+                          <p className="text-xs font-medium text-muted-foreground">Before you start</p>
+                          <ul className="space-y-1 text-xs text-muted-foreground">
+                            {needsCarbPrompt ? <li>Have fast carbs within reach.</li> : null}
+                            {needsInsulinPrompt ? (
+                              <li>Consider insulin on board / recent bolus before you push intensity.</li>
+                            ) : null}
+                          </ul>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ) : null}
