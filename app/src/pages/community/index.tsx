@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
+import { Capacitor } from "@capacitor/core";
+import { Camera, type GalleryPhoto } from "@capacitor/camera";
 import {
   BarChart2,
   Calendar,
@@ -338,6 +340,45 @@ export default function CommunityHomePage() {
     }
     setComposerFiles(next);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function pickImagesFromLibraryOnly() {
+    // On native (Capacitor), use Photos-only picker to avoid "Take Photo" (camera) which is crashing.
+    if (!Capacitor.isNativePlatform()) {
+      fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const remaining = Math.max(0, MAX_POST_IMAGES - composerFiles.length);
+      if (remaining <= 0) return;
+
+      const res = await Camera.pickImages({ limit: remaining });
+      const photos: GalleryPhoto[] = res?.photos ?? [];
+      if (photos.length === 0) return;
+
+      const newFiles: File[] = [];
+      for (const p of photos) {
+        const webPath = p.webPath?.trim();
+        if (!webPath) continue;
+        const r = await fetch(webPath);
+        const blob = await r.blob();
+        if (!blob.type.startsWith("image/")) continue;
+        const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
+        newFiles.push(new File([blob], name, { type: blob.type }));
+        if (composerFiles.length + newFiles.length >= MAX_POST_IMAGES) break;
+      }
+      if (newFiles.length > 0) setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
+    } catch (e) {
+      // If the plugin isn't available (web) or permission denied, fall back to file input.
+      fileInputRef.current?.click();
+      toast({
+        title: "Could not open Photos",
+        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
+        variant: "destructive",
+      });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   function removeComposerImage(index: number) {
@@ -987,7 +1028,7 @@ export default function CommunityHomePage() {
                   composerFiles.length >= MAX_POST_IMAGES ||
                   composerPostKind !== "standard"
                 }
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => void pickImagesFromLibraryOnly()}
                 aria-label="Add photos to post"
               >
                 <ImagePlus className="h-4 w-4 mr-1.5" />
