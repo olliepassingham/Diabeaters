@@ -355,20 +355,22 @@ export function AppStatusStrip() {
     setEx(storage.getActiveExercise());
   };
 
-  const onExerciseTrendPick = (t: "flat" | "rising" | "falling" | "not_sure") => {
+  const onExerciseTrendPick = (t: "flat" | "rising" | "falling") => {
     if (!ex) return;
-    const next: ExerciseBgTrend | undefined = t === "not_sure" ? undefined : t;
+    const current =
+      ex.phase === "pre" ? ex.preTrend : ex.phase === "active" ? ex.midTrend : ex.recoveryTrend;
+    const next: ExerciseBgTrend | undefined = current === t ? undefined : t;
     if (ex.phase === "pre") storage.updateActiveExercise({ preTrend: next });
     else if (ex.phase === "active") storage.updateActiveExercise({ midTrend: next });
     else storage.updateActiveExercise({ recoveryTrend: next });
     setEx(storage.getActiveExercise());
   };
 
-  const trendButtonSelected = (t: "flat" | "rising" | "falling" | "not_sure") => {
+  const trendButtonSelected = (t: "flat" | "rising" | "falling") => {
     if (!ex) return false;
     const current =
       ex.phase === "pre" ? ex.preTrend : ex.phase === "active" ? ex.midTrend : ex.recoveryTrend;
-    return current === t || (current == null && t === "not_sure");
+    return current === t;
   };
 
   return (
@@ -500,39 +502,70 @@ export function AppStatusStrip() {
                 {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
               </p>
 
-              <div className="grid gap-2 sm:grid-cols-2">
+              {ex.phase === "pre" ? (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {ex.phase === "pre" ? "Current BG" : ex.phase === "active" ? "BG now" : "BG now"}
-                  </p>
-                  <Input
-                    inputMode="decimal"
-                    placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
-                    value={exerciseBgInput}
-                    onChange={(e) => onExerciseBgInputChange(e.target.value)}
-                    className="h-9"
-                    data-testid="status-exercise-bg"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Trend</p>
-                  <div className="flex flex-wrap gap-2">
-                    {(["flat", "rising", "falling", "not_sure"] as const).map((t) => (
-                      <Button
-                        key={t}
-                        type="button"
-                        size="sm"
-                        variant={trendButtonSelected(t) ? "default" : "outline"}
-                        className={btnClass}
-                        onClick={() => onExerciseTrendPick(t)}
-                        data-testid={`status-exercise-trend-${t}`}
-                      >
-                        {t === "not_sure" ? "Not sure" : t}
-                      </Button>
-                    ))}
+                  <p className="text-xs font-medium text-muted-foreground">Current BG</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      inputMode="decimal"
+                      placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
+                      value={exerciseBgInput}
+                      onChange={(e) => onExerciseBgInputChange(e.target.value)}
+                      className="h-9 min-w-[10rem] flex-1"
+                      data-testid="status-exercise-bg"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {(["flat", "rising", "falling"] as const).map((t) => (
+                        <Button
+                          key={t}
+                          type="button"
+                          size="sm"
+                          variant={trendButtonSelected(t) ? "default" : "outline"}
+                          className={btnClass}
+                          onClick={() => onExerciseTrendPick(t)}
+                          data-testid={`status-exercise-trend-${t}`}
+                        >
+                          {t}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {ex.phase === "active" ? "BG now" : "BG now"}
+                    </p>
+                    <Input
+                      inputMode="decimal"
+                      placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
+                      value={exerciseBgInput}
+                      onChange={(e) => onExerciseBgInputChange(e.target.value)}
+                      className="h-9"
+                      data-testid="status-exercise-bg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">Trend</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(["flat", "rising", "falling"] as const).map((t) => (
+                        <Button
+                          key={t}
+                          type="button"
+                          size="sm"
+                          variant={trendButtonSelected(t) ? "default" : "outline"}
+                          className={btnClass}
+                          onClick={() => onExerciseTrendPick(t)}
+                          data-testid={`status-exercise-trend-${t}`}
+                        >
+                          {t}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {ex.phase === "pre" ? (
                 <>
@@ -643,7 +676,7 @@ export function AppStatusStrip() {
                 </div>
               ) : null}
 
-              {ex.phase === "pre" && readiness?.verdict ? (
+              {ex.phase === "pre" && readiness?.verdict && readiness.verdict.verdict !== "ok" ? (
                 <div className="pt-1 border-t border-border/50 space-y-1">
                   <p className="text-sm font-semibold text-foreground">{readiness.verdict.title}</p>
                   <p className="text-sm leading-snug text-muted-foreground">{readiness.verdict.detail}</p>
@@ -664,13 +697,11 @@ export function AppStatusStrip() {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-snug">
-                    This panel is a short summary. For meal timing, pump temp-basal ideas, and longer recovery text, open{" "}
-                    <span className="font-medium">Scenarios → Exercise</span>.
+                    Short summary only — always follow your care team for targets and doses. For meal timing, pump temp-basal
+                    ideas, and longer recovery text, open <span className="font-medium">Scenarios → Exercise</span>.
                   </TooltipContent>
                 </Tooltip>
-                <p className="text-sm leading-snug text-foreground min-w-0">
-                  Short summary only — always follow your care team for targets and doses.
-                </p>
+                <p className="text-sm leading-snug text-foreground min-w-0">Quick summary</p>
               </div>
             </div>
           ) : null}
