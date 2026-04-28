@@ -91,8 +91,10 @@ export class ErrorBoundary extends Component<Props, State> {
             {import.meta.env.DEV && this.state.error ? (
               <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
                 {[
+                  this.state.componentStack
+                    ? `Component stack:\n${this.state.componentStack}\n\n`
+                    : "Component stack:\n(loading…)\n\n",
                   this.state.error.stack ? this.state.error.stack : this.state.error.message,
-                  this.state.componentStack ? `\n\nComponent stack:\n${this.state.componentStack}` : "",
                 ].join("")}
               </pre>
             ) : null}
