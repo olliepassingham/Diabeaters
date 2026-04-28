@@ -498,9 +498,26 @@ export function AppStatusStrip() {
                 ) : null}
               </div>
 
-              <p className="text-xs font-medium text-foreground/90">
-                {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-foreground/90">
+                  {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
+                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label="About this quick check"
+                    >
+                      <Info className="h-4 w-4" aria-hidden />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-snug">
+                    Short summary only — always follow your care team for targets and doses. For meal timing, pump temp-basal
+                    ideas, and longer recovery text, open <span className="font-medium">Scenarios → Exercise</span>.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
 
               {ex.phase === "pre" ? (
                 <div className="space-y-1">
@@ -576,7 +593,6 @@ export function AppStatusStrip() {
                         [
                           { id: "yes" as const, label: "Yes" },
                           { id: "no" as const, label: "No" },
-                          { id: "not_sure" as const, label: "Not sure" },
                         ] as const
                       ).map((o) => (
                         <Button
@@ -586,7 +602,7 @@ export function AppStatusStrip() {
                           variant={ex.preRapidInsulin2h === o.id ? "default" : "outline"}
                           className={btnClass}
                           onClick={() => {
-                            storage.updateActiveExercise({ preRapidInsulin2h: o.id });
+                            storage.updateActiveExercise({ preRapidInsulin2h: ex.preRapidInsulin2h === o.id ? undefined : o.id });
                             setEx(storage.getActiveExercise());
                           }}
                           data-testid={`status-exercise-rapid-insulin-${o.id}`}
@@ -685,24 +701,7 @@ export function AppStatusStrip() {
 
               {preCarbHintLine ? <p className="text-sm text-foreground/90 leading-snug">{preCarbHintLine}</p> : null}
 
-              <div className="flex items-start gap-2.5 rounded-xl border border-border/50 bg-muted/30 px-3 py-2.5 mt-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="mt-0.5 shrink-0 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label="About this quick check"
-                    >
-                      <Info className="h-4 w-4" aria-hidden />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-snug">
-                    Short summary only — always follow your care team for targets and doses. For meal timing, pump temp-basal
-                    ideas, and longer recovery text, open <span className="font-medium">Scenarios → Exercise</span>.
-                  </TooltipContent>
-                </Tooltip>
-                <p className="text-sm leading-snug text-foreground min-w-0">Quick summary</p>
-              </div>
+              {/* Info tooltip moved up next to the section label to save space. */}
             </div>
           ) : null}
         </div>

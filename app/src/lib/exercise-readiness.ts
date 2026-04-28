@@ -64,7 +64,7 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
     return {
       verdict: "caution",
       title: "Caution",
-      detail: "Add your current BG for a clearer go/no-go decision.",
+      detail: "Add your current BG to refine this.",
     };
   }
 
@@ -369,5 +369,5 @@ export function getExerciseCarbPlanHintLine(
   if (during > 0) {
     parts.push(`~${during}g during if BG drops (${plan.during.carbFrequency})`);
   }
-  return `${parts.join(" · ")}. Confirm amounts with your care team.`;
+  return `${parts.join(" · ")}.`;
 }
