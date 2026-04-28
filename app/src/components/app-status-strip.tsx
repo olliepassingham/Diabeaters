@@ -92,6 +92,15 @@ function daysRemaining(endIsoOrDate: string | undefined): number | null {
   return Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function formatElapsedShort(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 /**
  * Compact status strip shown under the top bar.
  * One row per active context so actions are unambiguous on phones.
@@ -266,6 +275,14 @@ export function AppStatusStrip() {
 
   const bgUnits = storage.getProfile?.()?.bgUnits || "mg/dL";
   const isPump = storage.getProfile?.()?.insulinDeliveryMethod === "pump";
+  const exerciseElapsedLabel =
+    ex?.phase === "active" && ex.exerciseStartedAt
+      ? (() => {
+          const started = new Date(ex.exerciseStartedAt).getTime();
+          if (!Number.isFinite(started)) return null;
+          return formatElapsedShort(Date.now() - started);
+        })()
+      : null;
 
   const exercisePlan = useMemo(() => {
     if (!ex) return null;
@@ -502,6 +519,11 @@ export function AppStatusStrip() {
                 <p className="text-xs font-medium text-foreground/90">
                   {ex.phase === "pre" ? "Before you start" : ex.phase === "active" ? "During" : "Recovery"}
                 </p>
+                {exerciseElapsedLabel ? (
+                  <span className="text-xs tabular-nums text-muted-foreground" data-testid="status-exercise-elapsed">
+                    {exerciseElapsedLabel}
+                  </span>
+                ) : null}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -646,7 +668,7 @@ export function AppStatusStrip() {
               ) : null}
 
               {ex.phase === "active" && exercisePlan && readiness?.verdict ? (
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2 pt-1">
                   {(() => {
                     const v = readiness.verdict;
                     const isCaution = v.verdict === "caution";
@@ -655,22 +677,25 @@ export function AppStatusStrip() {
                     const showFuelLineAbove = !mergedCarbCaution;
                     return (
                       <>
-                        {showFuelLineAbove ? (
-                          <p className="text-[15px] sm:text-base font-medium leading-snug text-foreground">
-                            {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
-                              ? `~${exercisePlan.during.carbsNeeded}g quick carbs if BG falls · ${exercisePlan.during.carbFrequency}.`
-                              : "Keep fast-acting carbs within reach."}
-                          </p>
-                        ) : null}
-                        {exercisePlan.during.checkBg ? (
-                          <p className="text-sm text-muted-foreground">Long session — one glucose check around halfway is plenty.</p>
-                        ) : null}
-                        <div className="rounded-xl border border-border/60 bg-background/80 px-3 py-3 space-y-1.5">
-                          <p className="text-lg font-semibold leading-tight tracking-tight">{v.title}</p>
-                          <p className="text-sm sm:text-[15px] leading-snug text-foreground/90">
+                        <div className={cn("rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75", getReadinessToneClasses(v.verdict))}>
+                          <p className="text-base font-semibold leading-tight text-foreground">{v.title}</p>
+                          <p className="text-sm leading-snug text-foreground/90">
                             {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
                           </p>
                         </div>
+
+                        {showFuelLineAbove ? (
+                          <p className="text-xs text-muted-foreground leading-snug">
+                            {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
+                              ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
+                              : "Fuel: keep fast carbs within reach."}
+                          </p>
+                        ) : null}
+                        {exercisePlan.during.checkBg ? (
+                          <p className="text-xs text-muted-foreground leading-snug">
+                            Long session: one glucose check around halfway is plenty.
+                          </p>
+                        ) : null}
                       </>
                     );
                   })()}
