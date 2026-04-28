@@ -10,7 +10,6 @@ export default function ScenarioExercisePage() {
       <PageHeader
         leading={<PageBackButton />}
         title="Exercise"
-        description="A guided pre / during / recovery coach. Deeper questions feed into the recommendations — always confirm with your care team."
         actions={
           <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
             <Link href="/routines?section=exercise" data-testid="link-exercise-routines-header">
@@ -19,8 +18,8 @@ export default function ScenarioExercisePage() {
           </Button>
         }
       />
-      <ScenarioToolDisclaimer />
       <ExerciseGuidedCoach />
+      <ScenarioToolDisclaimer className="mt-2" />
     </PageShell>
   );
 }

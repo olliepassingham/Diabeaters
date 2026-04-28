@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 
 export const DISCLAIMER_TEXT =
-  "Diabeaters provides general lifestyle organization for people living with Type 1 diabetes. It does not provide medical advice and is not a medical device. Always follow guidance from your healthcare professional.";
+  "Educational only — not medical advice. Follow your care team’s guidance.";
 
 /** Reusable disclaimer for onboarding and Settings/About. */
 export function Disclaimer({ className }: { className?: string }) {
