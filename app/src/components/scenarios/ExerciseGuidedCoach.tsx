@@ -1270,11 +1270,13 @@ function DeeperContextSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const headerRef = useRef<HTMLButtonElement | null>(null);
   return (
     <div className="rounded-xl border border-border/60 bg-muted/20">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        ref={headerRef}
         className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
         data-testid={`button-coach-section-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
       >
@@ -1284,7 +1286,26 @@ function DeeperContextSection({
         </span>
         <span className="text-xs text-muted-foreground">{open ? "Hide" : "Add"}</span>
       </button>
-      {open ? <div className="px-3 pb-3 space-y-2 border-t border-border/40 pt-3">{children}</div> : null}
+      {open ? (
+        <div className="px-3 pb-3 space-y-2 border-t border-border/40 pt-3">
+          {children}
+          <div className="pt-1 flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              onClick={() => {
+                setOpen(false);
+                headerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+              }}
+              data-testid={`button-coach-section-close-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
