@@ -692,14 +692,23 @@ export function AppStatusStrip() {
                 </div>
               ) : null}
 
-              {ex.phase === "pre" && readiness?.verdict && readiness.verdict.verdict !== "ok" ? (
-                <div className="pt-1 border-t border-border/50 space-y-1">
-                  <p className="text-sm font-semibold text-foreground">{readiness.verdict.title}</p>
-                  <p className="text-sm leading-snug text-muted-foreground">{readiness.verdict.detail}</p>
+              {ex.phase === "pre" && readiness?.verdict ? (
+                <div className="pt-1">
+                  <div
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
+                      getReadinessToneClasses(readiness.verdict.verdict),
+                    )}
+                  >
+                    <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                    <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
+                  </div>
                 </div>
               ) : null}
 
-              {preCarbHintLine ? <p className="text-sm text-foreground/90 leading-snug">{preCarbHintLine}</p> : null}
+              {preCarbHintLine && ex.phase !== "pre" ? (
+                <p className="text-sm text-foreground/90 leading-snug">{preCarbHintLine}</p>
+              ) : null}
 
               {/* Info tooltip moved up next to the section label to save space. */}
             </div>
