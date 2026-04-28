@@ -85,7 +85,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
             {import.meta.env.DEV && this.state.error ? (
               <pre className="mt-2 max-h-32 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                {this.state.error.message}
+                {this.state.error.stack ? this.state.error.stack : this.state.error.message}
               </pre>
             ) : null}
             <div className="flex justify-center">
