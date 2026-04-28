@@ -42,8 +42,6 @@ export interface ExerciseReadinessInput {
   sleepHoursLastNight?: number | null;
   feelingOff?: boolean;
   alcoholLastNight?: boolean;
-  betaBlockerToday?: boolean;
-  glp1Last24h?: boolean;
   hypoProneHistory?: boolean;
 }
 
@@ -348,8 +346,6 @@ function refineWithDeeperContext(result: ExerciseReadinessResult, input: Exercis
     triggers.push("low sleep last night");
   }
   if (input.alcoholLastNight) triggers.push("alcohol last night raises delayed-low risk");
-  if (input.betaBlockerToday) triggers.push("beta-blocker can mute hypo symptoms");
-  if (input.glp1Last24h) triggers.push("GLP-1 medication can shift carb absorption");
   if (input.hypoProneHistory) triggers.push("your history shows hypos for this routine");
 
   if (triggers.length === 0) return result;

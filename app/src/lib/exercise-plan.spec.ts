@@ -166,10 +166,8 @@ describe("calculateExercisePlan deeper context modifiers", () => {
     const r = calculateExercisePlan({
       ...baseCtx,
       sleepHoursLastNight: 4,
-      betaBlockerToday: true,
     });
     expect(r.pre.contextualNotes?.some((n) => n.includes("4h sleep"))).toBe(true);
-    expect(r.pre.contextualNotes?.some((n) => n.toLowerCase().includes("beta-blocker"))).toBe(true);
   });
 
   it("biases bolus reduction higher when history is hypo-prone", () => {

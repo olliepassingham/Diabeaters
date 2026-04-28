@@ -156,8 +156,6 @@ function applyCoachDefaultsFromLastExercise(session: ActiveExerciseSession): Act
   if (session.preEnvironment == null && ctx.environment) updates.preEnvironment = ctx.environment;
   if (session.preCompetitive == null && ctx.competitive != null) updates.preCompetitive = ctx.competitive;
   if (session.preFasted == null && ctx.fasted != null) updates.preFasted = ctx.fasted;
-  if (session.preGlp1Last24h == null && ctx.glp1Last24h != null) updates.preGlp1Last24h = ctx.glp1Last24h;
-  if (session.preBetaBlockerToday == null && ctx.betaBlockerToday != null) updates.preBetaBlockerToday = ctx.betaBlockerToday;
 
   // If we have a sleep hint from last session and user hasn’t set it for this one yet.
   if (session.preSleepHours == null && ctx.sleepHoursLastNight != null) updates.preSleepHours = ctx.sleepHoursLastNight;
@@ -288,8 +286,6 @@ export function ExerciseGuidedCoach() {
     if (activeSession.preCompetitive != null) ctx.competitive = activeSession.preCompetitive;
     if (activeSession.preCaffeine2h != null) ctx.caffeineLast2h = activeSession.preCaffeine2h;
     if (activeSession.preAlcoholLastNight != null) ctx.alcoholLastNight = activeSession.preAlcoholLastNight;
-    if (activeSession.preGlp1Last24h != null) ctx.glp1Last24h = activeSession.preGlp1Last24h;
-    if (activeSession.preBetaBlockerToday != null) ctx.betaBlockerToday = activeSession.preBetaBlockerToday;
     if (activeSession.preIobUnits != null) ctx.iobUnits = activeSession.preIobUnits;
     if (historyBias) ctx.historyBias = historyBias;
 
@@ -310,8 +306,6 @@ export function ExerciseGuidedCoach() {
       sleepHoursLastNight: activeSession.preSleepHours ?? null,
       feelingOff: activeSession.preFeelingOff,
       alcoholLastNight: activeSession.preAlcoholLastNight,
-      betaBlockerToday: activeSession.preBetaBlockerToday,
-      glp1Last24h: activeSession.preGlp1Last24h,
       hypoProneHistory: historyBias?.hypoProne === true,
     });
   }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
@@ -1008,18 +1002,6 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
           checked={!!session.preAlcoholLastNight}
           onChange={(v) => update({ preAlcoholLastNight: v })}
           testId="toggle-coach-alcohol-last-night"
-        />
-        <ToggleField
-          label="GLP-1 medication in last 24h"
-          checked={!!session.preGlp1Last24h}
-          onChange={(v) => update({ preGlp1Last24h: v })}
-          testId="toggle-coach-glp1"
-        />
-        <ToggleField
-          label="Beta-blocker today"
-          checked={!!session.preBetaBlockerToday}
-          onChange={(v) => update({ preBetaBlockerToday: v })}
-          testId="toggle-coach-beta-blocker"
         />
         <Field label="Insulin on board (units, optional)">
           <Input

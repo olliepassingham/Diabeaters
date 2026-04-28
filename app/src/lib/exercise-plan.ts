@@ -201,11 +201,6 @@ function deeperContextCarbMultipliers(context: ExercisePlanContext): { pre: numb
     post *= 1.05;
   }
 
-  if (context.glp1Last24h) {
-    pre *= 0.9;
-    during *= 0.95;
-  }
-
   const hist = context.historyBias;
   if (hist && hist.totalSessions >= 2) {
     if (hist.typicalResponse === "dropped" || hist.hypoProne) {
@@ -559,14 +554,6 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     preTips.push("Alcohol last night — delayed lows risk is higher today, especially after harder effort. Plan extra checks.");
   }
 
-  if (context.glp1Last24h) {
-    preTips.push("GLP-1 medication on board — digestion is slower, so pre-fuel may absorb later than usual. Keep fast carbs nearby.");
-  }
-
-  if (context.betaBlockerToday) {
-    preTips.push("Beta-blocker today — heart-rate symptoms of a low can be muted. Set extra checks rather than relying on how you feel.");
-  }
-
   if (context.iobUnits != null && context.iobUnits > 0) {
     preTips.push(`~${context.iobUnits}u insulin on board — activity can amplify its effect; keep treatment carbs within reach.`);
   }
@@ -634,10 +621,6 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
 
   if (context.environment === "outdoor_hot") {
     recoveryTips.push("After heat: rehydrate steadily — recheck BG after fluids, since dehydrated readings can mislead recovery decisions.");
-  }
-
-  if (context.glp1Last24h) {
-    recoveryTips.push("GLP-1 + exercise can mean later carb absorption — small frequent recovery snacks may suit better than a single large meal.");
   }
 
   if (context.historyBias?.hypoProne) {
