@@ -97,8 +97,8 @@ const SYMPTOM_OPTIONS: Array<{ value: ExerciseSymptomFlag; label: string }> = [
   { value: "lightheaded", label: "Lightheaded" },
   { value: "shaky", label: "Shaky" },
   { value: "tingly", label: "Tingly" },
-  { value: "sweaty", label: "Sweaty (more than usual)" },
-  { value: "tired", label: "Unusually tired" },
+  { value: "sweaty", label: "Sweaty" },
+  { value: "tired", label: "Tired" },
 ];
 
 // ----- Helpers -----
@@ -1284,7 +1284,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         <p className="text-xs text-muted-foreground pt-1">Optional — helps tailor prompts.</p>
       </Field>
 
-      <Field label="Symptoms (tap any that apply)">
+      <Field label="Symptoms">
         <div className="flex flex-wrap gap-2">
           {SYMPTOM_OPTIONS.map((o) => {
             const selected = session.midSymptoms?.includes(o.value) ?? false;
@@ -1324,11 +1324,14 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
       </Field>
 
       {hasSymptoms ? (
-        <div className="rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-3 space-y-2" data-testid="panel-coach-symptoms-action">
+        <div
+          className="rounded-xl border border-amber-300/70 bg-amber-50/45 dark:border-amber-800/50 dark:bg-amber-950/20 px-2.5 py-2.5 space-y-2"
+          data-testid="panel-coach-symptoms-action"
+        >
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hypo symptoms</p>
-              <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
+              <p className="text-[11px] text-amber-900/80 dark:text-amber-100/80 leading-snug">
                 {symptomSelected.slice(0, 3).join(", ")}
                 {symptomSelected.length > 3 ? ` +${symptomSelected.length - 3} more` : ""}
               </p>
@@ -1340,7 +1343,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
                   type="button"
                   size="sm"
                   variant={severity === s ? "default" : "outline"}
-                  className="h-7 px-2 text-[11px]"
+                  className="h-7 px-2 text-[11px] rounded-full"
                   onClick={() => update({ midSymptomSeverity: s })}
                   data-testid={`button-coach-symptom-severity-${s}`}
                 >
@@ -1350,35 +1353,28 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
             </div>
           </div>
 
-          <div className="text-xs text-amber-900/85 dark:text-amber-100/85 leading-snug">
+          <div className="text-[11px] text-amber-900/85 dark:text-amber-100/85 leading-snug">
             {recommendTreatNow ? (
               <p>
-                <span className="font-medium">Do now:</span> pause and take fast carbs per your plan, then re-check in 15 min.
+                <span className="font-medium">Do now:</span> treat with fast carbs, then re-check in 15 min.
               </p>
             ) : recommendPauseAndCheckNow ? (
               <p>
-                <span className="font-medium">Do now:</span> pause and check BG. If you’re low or trending down, take fast carbs per your plan.
+                <span className="font-medium">Do now:</span> pause + check BG. Treat if low or falling.
               </p>
             ) : (
               <p>
-                <span className="font-medium">Do now:</span> slow down and keep carbs within reach. Re-check if symptoms persist.
+                <span className="font-medium">Do now:</span> slow down, keep carbs within reach, re-check if it persists.
               </p>
-            )}
-            {bgNow != null ? (
-              <p className="pt-1">
-                Context: BG {bgNow} {bgUnits}{trendDown ? " and falling." : trend === "rising" ? " and rising." : trend === "flat" ? " and flat." : "."}
-              </p>
-            ) : (
-              <p className="pt-1">Tip: add a BG reading for more specific guidance.</p>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button
               type="button"
               size="sm"
               variant="secondary"
-              className="h-8 px-3 text-xs"
+              className="h-8 px-3 text-xs flex-1"
               onClick={() => {
                 addCarbs(15);
                 startHypoRecheckTimer();
@@ -1395,13 +1391,13 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
               onClick={startHypoRecheckTimer}
               data-testid="button-coach-symptom-start-timer"
             >
-              Start 15‑min timer
+              15‑min timer
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 px-3 text-xs"
+              className="h-8 px-2 text-xs"
               onClick={() => update({ midSymptoms: undefined, midSymptomSeverity: undefined })}
               data-testid="button-coach-symptom-clear"
             >
