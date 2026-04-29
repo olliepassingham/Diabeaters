@@ -323,6 +323,61 @@ function baseCarbsAndBolus(
   return { preExerciseCarbs, duringCarbs, postExerciseCarbs, bolusReduction };
 }
 
+function parseBolusReductionRange(range: string): { lo: number; hi: number } | null {
+  const m = range.match(/^(\d+)-(\d+)%$/);
+  if (!m) return null;
+  const lo = parseInt(m[1]!, 10);
+  const hi = parseInt(m[2]!, 10);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  if (lo < 0 || hi < 0) return null;
+  if (hi < lo) return null;
+  return { lo, hi };
+}
+
+/** Shift a reduction range by deltas; clamps to [0, 60]. */
+function shiftBolusReductionRange(range: string, deltaLo: number, deltaHi: number): string {
+  const parsed = parseBolusReductionRange(range);
+  if (!parsed) return range;
+  const lo = Math.min(60, Math.max(0, parsed.lo + deltaLo));
+  const hi = Math.min(60, Math.max(0, parsed.hi + deltaHi));
+  const outLo = Math.min(lo, hi);
+  const outHi = Math.max(lo, hi);
+  return `${outLo}-${outHi}%`;
+}
+
+/**
+ * Exercise-type adjustment for post-exercise bolus reduction guidance.\n
+ * Aerobic-heavy sessions tend to increase insulin sensitivity more than anaerobic-heavy sessions.\n
+ * This only adjusts the educational range string; users must follow care-team rules.\n
+ */
+function applyExerciseTypeBolusAdjustments(
+  typeKey: string,
+  intensity: "light" | "moderate" | "intense",
+  bolusReduction: string,
+): string {
+  const k = typeKey.toLowerCase();
+
+  // Strength/anaerobic dominant: typically *less* reduction vs cardio at same intensity.
+  if (k === "strength") {
+    return shiftBolusReductionRange(bolusReduction, -10, -10);
+  }
+  // HIIT: mixed; many people still see a delayed dip, but often less than steady cardio.
+  if (k === "hiit") {
+    return shiftBolusReductionRange(bolusReduction, -5, -5);
+  }
+  // Yoga/walking: generally lighter aerobic load → smaller reduction.
+  if (k === "yoga" || k === "walking") {
+    return shiftBolusReductionRange(bolusReduction, -5, -5);
+  }
+  // Court/field sports: mixed aerobic/anaerobic; keep baseline but avoid overstating for light sessions.
+  if ((k === "court" || k === "field") && intensity === "light") {
+    return shiftBolusReductionRange(bolusReduction, -5, -5);
+  }
+
+  // Cardio / swimming: baseline.
+  return bolusReduction;
+}
+
 /**
  * Bias a bolus-reduction range string toward its higher end (clamped at 50%).
  * Examples: "15-25%" → "20-30%", "25-35%" → "30-45%", "35-50%" → "40-50%".
@@ -397,6 +452,7 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
   preExerciseCarbs = typeAdjusted.pre;
   duringCarbs = typeAdjusted.during;
   postExerciseCarbs = typeAdjusted.post;
+  bolusReduction = applyExerciseTypeBolusAdjustments(typeKey, intensity, bolusReduction);
 
   // Deeper context (environment / sleep / alcohol / history) applied on top of type adjustments.
   const deeperMult = deeperContextCarbMultipliers(context);
@@ -690,7 +746,7 @@ export function getRecoveryInsulinHeadline(plan: ExercisePlanResult, isPump: boo
     }
     return postLine || plan.pumpTips.recovery[0] || "";
   }
-  return `Many care teams discuss cutting the next meal bolus by about ${plan.post.bolusReduction} after this intensity — confirm with your team.`;
+  return `Many care teams discuss cutting the next meal bolus by about ${plan.post.bolusReduction} after this type of session — confirm with your team.`;
 }
 
 /** Planner-backed bullets for recovery education dialogs; dedupes exact duplicates. */

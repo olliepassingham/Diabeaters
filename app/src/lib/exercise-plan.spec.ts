@@ -91,6 +91,15 @@ describe("calculateExercisePlan", () => {
     expect(cardio.pre.contextualNotes?.some((n) => n.includes("activity type"))).toBe(true);
   });
 
+  it("adjusts post-exercise bolus reduction by exercise type (strength < cardio)", () => {
+    const ctx = { ...baseCtx, durationMinutes: 60, intensity: "moderate" as const };
+    const cardio = calculateExercisePlan({ ...ctx, exerciseType: "cardio" });
+    const strength = calculateExercisePlan({ ...ctx, exerciseType: "strength" });
+    const cardioLo = parseInt(cardio.post.bolusReduction.match(/^(\d+)/)?.[1] ?? "0", 10);
+    const strengthLo = parseInt(strength.post.bolusReduction.match(/^(\d+)/)?.[1] ?? "0", 10);
+    expect(strengthLo).toBeLessThanOrEqual(cardioLo);
+  });
+
   it("adds contextual notes for planned pre-exercise snack with bolus", () => {
     const r = calculateExercisePlan({
       ...baseCtx,
