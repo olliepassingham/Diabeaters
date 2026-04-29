@@ -106,6 +106,7 @@ describe("ExerciseGuidedCoach", () => {
     expect(queryByTestId("button-coach-quick-addcarbs-15")).not.toBeNull();
     expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
     expect(queryByTestId("panel-coach-during-at-a-glance")).not.toBeNull();
+    expect(queryByTestId("button-coach-symptom-shaky")).not.toBeNull();
   });
 
   it("renders recovery phase with recovery inputs", () => {

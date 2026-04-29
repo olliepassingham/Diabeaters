@@ -876,6 +876,9 @@ export type ExerciseEnvironmentChoice =
 /** Symptom flag set logged during the active phase. */
 export type ExerciseSymptomFlag = "lightheaded" | "shaky" | "tingly" | "sweaty" | "tired" | "fine";
 
+/** Rough intensity of the symptom episode (used to tune prompts; not medical). */
+export type ExerciseSymptomSeverity = "mild" | "moderate" | "severe";
+
 export interface ActiveExerciseSession {
   id: string;
   routineId?: string;
@@ -946,6 +949,8 @@ export interface ActiveExerciseSession {
   midRpe?: number;
   /** Active: symptom flags (multi-select). */
   midSymptoms?: ExerciseSymptomFlag[];
+  /** Active: subjective severity of symptom episode (optional). */
+  midSymptomSeverity?: ExerciseSymptomSeverity;
 
   /** Recovery: carbs eaten since stopping. */
   recoveryCarbsGrams?: number;

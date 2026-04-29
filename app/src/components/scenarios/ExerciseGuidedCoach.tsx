@@ -1073,6 +1073,13 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   }, [session.id]);
 
   const carbsSoFar = session.midCarbsGramsSoFar ?? 0;
+  const trend =
+    session.phase === "active"
+      ? (session.midTrend ?? session.preTrend ?? "not_sure")
+      : ("not_sure" as const);
+  const symptomSelected = (session.midSymptoms ?? []).filter((s) => s !== "fine");
+  const hasSymptoms = symptomSelected.length > 0;
+  const severity = session.midSymptomSeverity ?? "moderate";
   const addCarbs = (g: number) => {
     const next = Math.min(400, Math.max(0, carbsSoFar + g));
     update({ midCarbsGramsSoFar: next });
@@ -1081,6 +1088,13 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   const startHypoRecheckTimer = () => {
     setHypoRecheckEndsAt(Date.now() + 15 * 60_000);
   };
+
+  const bgNow = parseFloatOrNull(bgInput);
+  const isLowish = bgNow != null ? (bgUnits === "mmol/L" ? bgNow < 5.6 : bgNow < 100) : null;
+  const isVeryLow = bgNow != null ? (bgUnits === "mmol/L" ? bgNow < 4.0 : bgNow < 72) : null;
+  const trendDown = trend === "falling";
+  const recommendTreatNow = isVeryLow === true || (isLowish === true && trendDown) || (severity === "severe" && trendDown);
+  const recommendPauseAndCheckNow = severity !== "mild" || trendDown;
 
   const hypoRemainingSec = hypoRecheckEndsAt != null ? Math.max(0, Math.floor((hypoRecheckEndsAt - nowMs) / 1000)) : null;
   const hypoRemainingLabel =
@@ -1294,7 +1308,11 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
                     if (selected) current.delete(o.value);
                     else current.add(o.value);
                   }
-                  update({ midSymptoms: current.size === 0 ? undefined : (Array.from(current) as ExerciseSymptomFlag[]) });
+                  const next = current.size === 0 ? undefined : (Array.from(current) as ExerciseSymptomFlag[]);
+                  update({
+                    midSymptoms: next,
+                    midSymptomSeverity: next && next.some((s) => s !== "fine") ? (session.midSymptomSeverity ?? "moderate") : undefined,
+                  });
                 }}
                 data-testid={`button-coach-symptom-${o.value}`}
               >
@@ -1305,12 +1323,91 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         </div>
       </Field>
 
-      {session.midSymptoms && session.midSymptoms.some((s) => s !== "fine") ? (
-        <div className="rounded-xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-2 text-sm flex gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
-          <span className="text-amber-900 dark:text-amber-100">
-            Possible hypo signs noted — pause and treat per your hypo plan if anything feels off, then re-check.
-          </span>
+      {hasSymptoms ? (
+        <div className="rounded-2xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-3 space-y-2" data-testid="panel-coach-symptoms-action">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hypo symptoms</p>
+              <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug">
+                {symptomSelected.slice(0, 3).join(", ")}
+                {symptomSelected.length > 3 ? ` +${symptomSelected.length - 3} more` : ""}
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              {(["mild", "moderate", "severe"] as const).map((s) => (
+                <Button
+                  key={s}
+                  type="button"
+                  size="sm"
+                  variant={severity === s ? "default" : "outline"}
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => update({ midSymptomSeverity: s })}
+                  data-testid={`button-coach-symptom-severity-${s}`}
+                >
+                  {s}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className="text-xs text-amber-900/85 dark:text-amber-100/85 leading-snug">
+            {recommendTreatNow ? (
+              <p>
+                <span className="font-medium">Do now:</span> pause and take fast carbs per your plan, then re-check in 15 min.
+              </p>
+            ) : recommendPauseAndCheckNow ? (
+              <p>
+                <span className="font-medium">Do now:</span> pause and check BG. If you’re low or trending down, take fast carbs per your plan.
+              </p>
+            ) : (
+              <p>
+                <span className="font-medium">Do now:</span> slow down and keep carbs within reach. Re-check if symptoms persist.
+              </p>
+            )}
+            {bgNow != null ? (
+              <p className="pt-1">
+                Context: BG {bgNow} {bgUnits}{trendDown ? " and falling." : trend === "rising" ? " and rising." : trend === "flat" ? " and flat." : "."}
+              </p>
+            ) : (
+              <p className="pt-1">Tip: add a BG reading for more specific guidance.</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-8 px-3 text-xs"
+              onClick={() => {
+                addCarbs(15);
+                startHypoRecheckTimer();
+              }}
+              data-testid="button-coach-symptom-treat-15"
+            >
+              +15g & start timer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              onClick={startHypoRecheckTimer}
+              data-testid="button-coach-symptom-start-timer"
+            >
+              Start 15‑min timer
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 px-3 text-xs"
+              onClick={() => update({ midSymptoms: undefined, midSymptomSeverity: undefined })}
+              data-testid="button-coach-symptom-clear"
+            >
+              Clear
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>
