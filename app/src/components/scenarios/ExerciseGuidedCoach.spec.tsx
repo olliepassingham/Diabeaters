@@ -102,7 +102,7 @@ describe("ExerciseGuidedCoach", () => {
     mockSession = makeSession("active");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
-    expect(queryByTestId("button-coach-rpe-5")).not.toBeNull();
+    expect(queryByTestId("button-coach-rpe-moderate")).not.toBeNull();
     expect(queryByTestId("button-coach-quick-addcarbs-15")).not.toBeNull();
     expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
     expect(queryByTestId("panel-coach-during-at-a-glance")).not.toBeNull();

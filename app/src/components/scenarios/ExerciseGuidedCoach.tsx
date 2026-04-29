@@ -1103,8 +1103,6 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
           <p className="text-xs font-medium text-muted-foreground">Workout</p>
           <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
             <span data-testid="text-coach-elapsed">{elapsedLabel}</span>
-            {remainingLabel ? <span className="text-muted-foreground/70">·</span> : null}
-            {remainingLabel ? <span data-testid="text-coach-remaining">{remainingLabel} left</span> : null}
           </div>
         </div>
         {progress != null ? (
@@ -1182,7 +1180,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {[5, 10, 15, 20].map((g) => (
+          {[10, 20].map((g) => (
             <Button
               key={g}
               type="button"
@@ -1246,22 +1244,30 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         ) : null}
       </div>
 
-      <Field label="How hard does it feel? (1–10 RPE)">
-        <div className="flex flex-wrap gap-1.5">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+      <Field label="How hard does it feel?">
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { id: "easy", label: "Easy", value: 3 },
+              { id: "moderate", label: "Moderate", value: 5 },
+              { id: "hard", label: "Hard", value: 7 },
+              { id: "max", label: "Max", value: 9 },
+            ] as const
+          ).map((o) => (
             <Button
-              key={n}
+              key={o.id}
               type="button"
               size="sm"
-              variant={session.midRpe === n ? "default" : "outline"}
-              className="h-8 w-8 p-0 text-xs"
-              onClick={() => update({ midRpe: session.midRpe === n ? undefined : n })}
-              data-testid={`button-coach-rpe-${n}`}
+              variant={session.midRpe === o.value ? "default" : "outline"}
+              className="h-9 justify-start"
+              onClick={() => update({ midRpe: session.midRpe === o.value ? undefined : o.value })}
+              data-testid={`button-coach-rpe-${o.id}`}
             >
-              {n}
+              {o.label}
             </Button>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground pt-1">Optional — helps tailor prompts.</p>
       </Field>
 
       <Field label="Symptoms (tap any that apply)">
