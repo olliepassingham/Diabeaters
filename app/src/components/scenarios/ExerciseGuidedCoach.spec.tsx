@@ -98,7 +98,7 @@ describe("ExerciseGuidedCoach", () => {
     expect(queryByTestId("button-coach-lastmeal-60")).not.toBeNull();
   });
 
-  it("renders during phase with workout-done CTA and RPE buttons", () => {
+  it("renders during phase with recovery CTA and RPE buttons", () => {
     mockSession = makeSession("active");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
@@ -112,6 +112,7 @@ describe("ExerciseGuidedCoach", () => {
   it("renders recovery phase with recovery inputs", () => {
     mockSession = makeSession("recovery");
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    expect(queryByTestId("button-coach-finish-session")).not.toBeNull();
     expect(queryByTestId("input-coach-recovery-carbs")).not.toBeNull();
     expect(queryByTestId("input-coach-bedtime-hours")).not.toBeNull();
     expect(queryByTestId("button-coach-recovery-bedtime")).not.toBeNull();

@@ -566,22 +566,23 @@ export function ExerciseGuidedCoach() {
                     className="whitespace-nowrap"
                     data-testid="button-coach-finish-workout"
                   >
+                    <ArrowRight className="h-3.5 w-3.5 mr-1" />
+                    Recovery
+                  </Button>
+                ) : phase === "recovery" ? (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={onEndSession}
+                    className="whitespace-nowrap"
+                    data-testid="button-coach-finish-session"
+                  >
                     <CircleCheck className="h-3.5 w-3.5 mr-1" />
-                    Done
+                    Finish
                   </Button>
                 ) : null}
               </div>
             </div>
-
-            {/* Only show in-page End once the workout has started. The top bar still offers End anytime. */}
-            {phase !== "pre" ? (
-              <div className="flex justify-end">
-                <Button size="sm" variant="outline" onClick={onEndSession} data-testid="button-coach-end">
-                  <Power className="h-3.5 w-3.5 mr-1" />
-                  End
-                </Button>
-              </div>
-            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1073,6 +1074,13 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   }, [session.id]);
 
   const carbsSoFar = session.midCarbsGramsSoFar ?? 0;
+  const last = storage.getLastExerciseSummary?.();
+  const lastCarbs = last?.context?.midCarbsGramsTotal;
+  const lastIsSimilar =
+    !!last &&
+    last.exerciseType === session.exerciseType &&
+    last.intensity === session.intensity &&
+    Math.abs(last.durationMinutes - session.durationMinutes) <= 15;
   const trend =
     session.phase === "active"
       ? (session.midTrend ?? session.preTrend ?? "not_sure")
@@ -1112,12 +1120,9 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-border/60 bg-muted/10 px-3 py-3 space-y-2" data-testid="panel-coach-during-at-a-glance">
+      <div className="rounded-2xl border border-border/40 bg-transparent px-3 py-2.5 space-y-2" data-testid="panel-coach-during-at-a-glance">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground">Workout</p>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground tabular-nums">
-            <span data-testid="text-coach-elapsed">{elapsedLabel}</span>
-          </div>
         </div>
         {progress != null ? (
           <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden" aria-hidden>
@@ -1128,7 +1133,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="default"
             className="h-9"
             onClick={() => addCarbs(15)}
             data-testid="button-coach-quick-addcarbs-15"
@@ -1186,20 +1191,53 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         inputRef={bgRef}
       />
 
-      <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 space-y-2" data-testid="panel-coach-carbs">
+      <div className="border-t border-border/40 pt-3 space-y-2" data-testid="panel-coach-carbs">
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-muted-foreground">Carbs during workout</p>
-          <p className="text-sm font-semibold tabular-nums text-foreground" data-testid="text-coach-carbs-total">
-            {carbsSoFar}g
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold tabular-nums text-foreground" data-testid="text-coach-carbs-total">
+              {carbsSoFar}g
+            </p>
+            {carbsSoFar > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => update({ midCarbsGramsSoFar: 0 })}
+                data-testid="button-coach-carbs-reset"
+              >
+                Reset
+              </Button>
+            ) : null}
+          </div>
         </div>
+        {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Last time: <span className="tabular-nums">{Math.round(lastCarbs)}g</span>
+            </p>
+            {carbsSoFar === 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
+                data-testid="button-coach-carbs-use-last"
+              >
+                Use
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-2">
-          {[10, 20].map((g) => (
+          {[15, 25].map((g) => (
             <Button
               key={g}
               type="button"
               size="sm"
-              variant="outline"
+              variant="secondary"
               className="h-8 px-2.5 text-xs"
               onClick={() => addCarbs(g)}
               data-testid={`button-coach-addcarbs-${g}`}
@@ -1217,18 +1255,6 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
           >
             Custom
           </Button>
-          {carbsSoFar > 0 ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 px-2.5 text-xs"
-              onClick={() => update({ midCarbsGramsSoFar: 0 })}
-              data-testid="button-coach-carbs-reset"
-            >
-              Reset
-            </Button>
-          ) : null}
         </div>
         {customCarbsOpen ? (
           <div className="flex items-center gap-2">
@@ -1259,7 +1285,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
       </div>
 
       <Field label="How hard does it feel?">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-4 rounded-xl border border-border/60 overflow-hidden">
           {(
             [
               { id: "easy", label: "Easy", value: 3 },
@@ -1272,8 +1298,11 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
               key={o.id}
               type="button"
               size="sm"
-              variant={session.midRpe === o.value ? "default" : "outline"}
-              className="h-9 justify-start"
+              variant={session.midRpe === o.value ? "default" : "ghost"}
+              className={cn(
+                "h-9 rounded-none px-2 text-xs",
+                o.id !== "max" ? "border-r border-border/60" : null,
+              )}
               onClick={() => update({ midRpe: session.midRpe === o.value ? undefined : o.value })}
               data-testid={`button-coach-rpe-${o.id}`}
             >
@@ -1281,7 +1310,6 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
             </Button>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground pt-1">Optional — helps tailor prompts.</p>
       </Field>
 
       <Field label="Symptoms">
@@ -1328,7 +1356,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
           className="rounded-xl border border-amber-300/70 bg-amber-50/45 dark:border-amber-800/50 dark:bg-amber-950/20 px-2.5 py-2.5 space-y-2"
           data-testid="panel-coach-symptoms-action"
         >
-          <div className="flex items-start justify-between gap-2">
+          <div className="space-y-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Hypo symptoms</p>
               <p className="text-[11px] text-amber-900/80 dark:text-amber-100/80 leading-snug">
@@ -1336,7 +1364,7 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
                 {symptomSelected.length > 3 ? ` +${symptomSelected.length - 3} more` : ""}
               </p>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {(["mild", "moderate", "severe"] as const).map((s) => (
                 <Button
                   key={s}

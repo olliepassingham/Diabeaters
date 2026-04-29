@@ -978,6 +978,8 @@ export type LastExerciseSummary = {
     glp1Last24h?: boolean;
     betaBlockerToday?: boolean;
     midRpe?: number;
+    /** Total carbs logged during the workout (active phase). */
+    midCarbsGramsTotal?: number;
     feltSymptomsDuring?: boolean;
     recoveryCarbsGrams?: number;
     alcoholTonight?: boolean;
@@ -1057,6 +1059,9 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   if (session.preGlp1Last24h != null) ctx.glp1Last24h = session.preGlp1Last24h;
   if (session.preBetaBlockerToday != null) ctx.betaBlockerToday = session.preBetaBlockerToday;
   if (session.midRpe != null) ctx.midRpe = session.midRpe;
+  if (session.midCarbsGramsSoFar != null && Number.isFinite(session.midCarbsGramsSoFar)) {
+    ctx.midCarbsGramsTotal = Math.max(0, Math.round(session.midCarbsGramsSoFar));
+  }
   if (session.midSymptoms && session.midSymptoms.length > 0 && session.midSymptoms.some((s) => s !== "fine")) {
     ctx.feltSymptomsDuring = true;
   }
