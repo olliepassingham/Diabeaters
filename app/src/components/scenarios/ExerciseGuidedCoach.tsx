@@ -773,7 +773,14 @@ type PhaseProps = {
   update: (updates: Parameters<typeof storage.updateActiveExercise>[0]) => void;
 };
 
-function BgAndTrendRow({ bgUnits, bgInput, session, onBgChange, onTrendChange }: Omit<PhaseProps, "update">) {
+function BgAndTrendRow({
+  bgUnits,
+  bgInput,
+  session,
+  onBgChange,
+  onTrendChange,
+  inputRef,
+}: Omit<PhaseProps, "update"> & { inputRef?: React.RefObject<HTMLInputElement | null> }) {
   const trend =
     session.phase === "pre"
       ? session.preTrend
@@ -788,6 +795,7 @@ function BgAndTrendRow({ bgUnits, bgInput, session, onBgChange, onTrendChange }:
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Input
+          ref={inputRef as any}
           inputMode="decimal"
           value={bgInput}
           onChange={(e) => onBgChange(e.target.value)}
@@ -1045,28 +1053,211 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
 }
 
 function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, update }: PhaseProps) {
+  const bgRef = useRef<HTMLInputElement | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [hypoRecheckEndsAt, setHypoRecheckEndsAt] = useState<number | null>(null);
+  const [nextCheckEndsAt, setNextCheckEndsAt] = useState<number | null>(null);
+  const [customCarbsOpen, setCustomCarbsOpen] = useState(false);
+  const [customCarbs, setCustomCarbs] = useState("");
+
+  useEffect(() => {
+    if (hypoRecheckEndsAt == null && nextCheckEndsAt == null) return;
+    const t = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [hypoRecheckEndsAt, nextCheckEndsAt]);
+
+  useEffect(() => {
+    // Reset in-panel timers when session id changes
+    setHypoRecheckEndsAt(null);
+    setNextCheckEndsAt(null);
+    setCustomCarbsOpen(false);
+    setCustomCarbs("");
+  }, [session.id]);
+
+  const carbsSoFar = session.midCarbsGramsSoFar ?? 0;
+  const addCarbs = (g: number) => {
+    const next = Math.min(400, Math.max(0, carbsSoFar + g));
+    update({ midCarbsGramsSoFar: next });
+  };
+
+  const startHypoRecheckTimer = () => {
+    setHypoRecheckEndsAt(Date.now() + 15 * 60_000);
+  };
+
+  const hypoRemainingSec = hypoRecheckEndsAt != null ? Math.max(0, Math.floor((hypoRecheckEndsAt - nowMs) / 1000)) : null;
+  const hypoRemainingLabel =
+    hypoRemainingSec == null ? null : `${Math.floor(hypoRemainingSec / 60)}:${String(hypoRemainingSec % 60).padStart(2, "0")}`;
+
+  const nextCheckRemainingSec = nextCheckEndsAt != null ? Math.max(0, Math.floor((nextCheckEndsAt - nowMs) / 1000)) : null;
+  const nextCheckRemainingLabel =
+    nextCheckRemainingSec == null ? null : `${Math.floor(nextCheckRemainingSec / 60)}:${String(nextCheckRemainingSec % 60).padStart(2, "0")}`;
+
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-9"
+          onClick={() => bgRef.current?.focus()}
+          data-testid="button-coach-focus-bg"
+        >
+          Log BG
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-9"
+          onClick={() => addCarbs(15)}
+          data-testid="button-coach-quick-addcarbs-15"
+        >
+          +15g
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-9"
+          onClick={startHypoRecheckTimer}
+          data-testid="button-coach-feel-low"
+        >
+          I feel low
+        </Button>
+      </div>
+
+      {hypoRecheckEndsAt != null ? (
+        <div
+          className="rounded-xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-2.5 text-sm"
+          data-testid="panel-coach-hypo-recheck"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-medium text-amber-900 dark:text-amber-100">Treat & re-check</p>
+            <span className="text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">
+              {hypoRemainingLabel}
+            </span>
+          </div>
+          <p className="text-xs text-amber-900/80 dark:text-amber-100/80 leading-snug pt-1">
+            If your plan uses it: take fast carbs now, then re-check when the timer ends.
+          </p>
+          <div className="pt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs"
+              onClick={() => setHypoRecheckEndsAt(null)}
+              data-testid="button-coach-hypo-clear"
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <BgAndTrendRow
         session={session}
         bgUnits={bgUnits}
         bgInput={bgInput}
         onBgChange={onBgChange}
         onTrendChange={onTrendChange}
+        inputRef={bgRef}
       />
 
-      <Field label="Carbs eaten so far this session (g)">
-        <Input
-          inputMode="numeric"
-          value={session.midCarbsGramsSoFar != null ? String(session.midCarbsGramsSoFar) : ""}
-          onChange={(e) => {
-            const n = parseInt(e.target.value, 10);
-            update({ midCarbsGramsSoFar: Number.isFinite(n) ? Math.min(300, Math.max(0, n)) : undefined });
+      <div className="rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5 space-y-2" data-testid="panel-coach-carbs">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium text-muted-foreground">Carbs during workout</p>
+          <p className="text-sm font-semibold tabular-nums text-foreground" data-testid="text-coach-carbs-total">
+            {carbsSoFar}g
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[5, 10, 15, 20].map((g) => (
+            <Button
+              key={g}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 px-2.5 text-xs"
+              onClick={() => addCarbs(g)}
+              data-testid={`button-coach-addcarbs-${g}`}
+            >
+              +{g}g
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant={customCarbsOpen ? "default" : "outline"}
+            className="h-8 px-2.5 text-xs"
+            onClick={() => setCustomCarbsOpen((v) => !v)}
+            data-testid="button-coach-addcarbs-custom"
+          >
+            Custom
+          </Button>
+          {carbsSoFar > 0 ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2.5 text-xs"
+              onClick={() => update({ midCarbsGramsSoFar: 0 })}
+              data-testid="button-coach-carbs-reset"
+            >
+              Reset
+            </Button>
+          ) : null}
+        </div>
+        {customCarbsOpen ? (
+          <div className="flex items-center gap-2">
+            <Input
+              inputMode="numeric"
+              value={customCarbs}
+              onChange={(e) => setCustomCarbs(e.target.value.replace(/\D/g, ""))}
+              placeholder="e.g. 12"
+              className="h-9"
+              data-testid="input-coach-addcarbs-custom"
+            />
+            <Button
+              type="button"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                const n = parseInt(customCarbs, 10);
+                if (Number.isFinite(n) && n > 0) addCarbs(n);
+                setCustomCarbs("");
+                setCustomCarbsOpen(false);
+              }}
+              data-testid="button-coach-addcarbs-apply"
+            >
+              Add
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted-foreground">Next check</p>
+          <p className="text-sm text-foreground/90">
+            {nextCheckEndsAt == null ? "Optional reminder" : `In ${nextCheckRemainingLabel}`}
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant={nextCheckEndsAt == null ? "outline" : "default"}
+          className="h-8 px-3 text-xs whitespace-nowrap"
+          onClick={() => {
+            if (nextCheckEndsAt == null) setNextCheckEndsAt(Date.now() + 20 * 60_000);
+            else setNextCheckEndsAt(null);
           }}
-          className="h-9"
-          data-testid="input-coach-mid-carbs"
-        />
-      </Field>
+          data-testid="button-coach-next-check-toggle"
+        >
+          {nextCheckEndsAt == null ? "Start" : "Stop"}
+        </Button>
+      </div>
 
       <Field label="How hard does it feel? (1–10 RPE)">
         <div className="flex flex-wrap gap-1.5">

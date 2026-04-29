@@ -103,6 +103,8 @@ describe("ExerciseGuidedCoach", () => {
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("button-coach-finish-workout")).not.toBeNull();
     expect(queryByTestId("button-coach-rpe-5")).not.toBeNull();
+    expect(queryByTestId("button-coach-quick-addcarbs-15")).not.toBeNull();
+    expect(queryByTestId("button-coach-feel-low")).not.toBeNull();
   });
 
   it("renders recovery phase with recovery inputs", () => {
