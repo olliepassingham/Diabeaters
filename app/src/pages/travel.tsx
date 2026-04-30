@@ -498,6 +498,40 @@ function truncateOneLine(text: string, maxLen: number): string {
   return `${t.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
+function parseISODateOrNull(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+function formatGBDateOrEmpty(
+  value: string | null | undefined,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  const d = parseISODateOrNull(value);
+  if (!d) return "";
+  return d.toLocaleDateString("en-GB", options);
+}
+
+function getDefaultISOTripDates(): { start: string; end: string } {
+  const today = new Date();
+  const start = today.toISOString().split("T")[0];
+  const end = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  return { start, end };
+}
+
+function withDefaultTripDates(plan: TravelPlan): TravelPlan {
+  const start = parseISODateOrNull(plan.startDate);
+  const end = parseISODateOrNull(plan.endDate);
+  if (start && end) return plan;
+  const defaults = getDefaultISOTripDates();
+  return {
+    ...plan,
+    startDate: start ? plan.startDate : defaults.start,
+    endDate: end ? plan.endDate : defaults.end,
+  };
+}
+
 function CompactRiskConsiderations({ warnings }: { warnings: RiskWarning[] }) {
   if (warnings.length === 0) return null;
   const sorted = [...warnings].sort((a, b) => riskSeverityRank(a.severity) - riskSeverityRank(b.severity));
@@ -767,24 +801,28 @@ export default function Travel() {
       const savedPlan = storage.getTravelPlan();
       const savedList = storage.getTravelPackingList();
       if (savedPlan) {
-        setPlan(savedPlan);
+        setPlan(withDefaultTripDates(savedPlan as TravelPlan));
       }
       if (savedList && savedList.length > 0) {
         setPackingList(savedList);
-        const warnings = calculateRiskWarnings((savedPlan || plan) as TravelPlan, p?.insulinDeliveryMethod === "pump");
+        const warnings = calculateRiskWarnings(
+          withDefaultTripDates((savedPlan || plan) as TravelPlan),
+          p?.insulinDeliveryMethod === "pump",
+        );
         setRiskWarnings(warnings);
       }
     } else {
       const draft = storage.getTravelWizardDraft();
       if (draft && (draft.step === "inputs" || draft.step === "results")) {
-        setPlan(draft.plan as TravelPlan);
+        const nextPlan = withDefaultTripDates(draft.plan as TravelPlan);
+        setPlan(nextPlan);
         if (draft.step === "results") {
           const list =
             draft.packingList.length > 0
               ? (draft.packingList as PackingItem[])
-              : calculatePackingList(draft.plan as TravelPlan, s, st, p?.insulinDeliveryMethod === "pump");
+              : calculatePackingList(nextPlan as TravelPlan, s, st, p?.insulinDeliveryMethod === "pump");
           setPackingList(list);
-          setRiskWarnings(calculateRiskWarnings(draft.plan as TravelPlan, p?.insulinDeliveryMethod === "pump"));
+          setRiskWarnings(calculateRiskWarnings(nextPlan as TravelPlan, p?.insulinDeliveryMethod === "pump"));
         } else {
           setPackingList([]);
           setRiskWarnings([]);
@@ -944,7 +982,9 @@ export default function Travel() {
     });
     toast({
       title: "Travel Mode Activated",
-      description: `You'll see travel reminders until ${new Date(plan.endDate).toLocaleDateString()}`,
+      description: `You'll see travel reminders until ${
+        formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "your return date"
+      }`,
     });
     void (async () => {
       const res = await invokeNotifyScenarioStarted({
@@ -997,7 +1037,7 @@ export default function Travel() {
   };
   
   const updateDuration = (days: number) => {
-    const start = new Date(plan.startDate);
+    const start = parseISODateOrNull(plan.startDate) ?? new Date(getDefaultISOTripDates().start);
     const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
     setPlan(prev => ({
       ...prev,
@@ -1089,8 +1129,8 @@ export default function Travel() {
   };
 
   if (step === "entry" && isTravelModeActive && packingList.length > 0) {
-    const startDate = new Date(plan.startDate);
-    const endDate = new Date(plan.endDate);
+    const startDate = parseISODateOrNull(plan.startDate) ?? new Date(getDefaultISOTripDates().start);
+    const endDate = parseISODateOrNull(plan.endDate) ?? new Date(getDefaultISOTripDates().end);
     const today = new Date();
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
@@ -1149,7 +1189,8 @@ export default function Travel() {
           <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span className="text-muted-foreground">
-                {new Date(plan.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — {new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} —{" "}
+                {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
               </span>
               <span className="font-medium" data-testid="text-trip-progress">
                 {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? "s" : ""}`}
@@ -2149,8 +2190,8 @@ export default function Travel() {
           </h1>
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <p className="text-xs text-muted-foreground min-w-0">
-              {new Date(plan.startDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} –{" "}
-              {new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} –{" "}
+              {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
             </p>
             <Badge variant="outline" className="shrink-0 text-xs">
               {plan.travelType === "international" ? "International" : "Domestic"}
@@ -2185,7 +2226,8 @@ export default function Travel() {
               <p className="text-xs text-muted-foreground leading-snug">
                 Turn on for reminders until{" "}
                 <span className="text-foreground font-medium">
-                  {new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) ||
+                    "your return date"}
                 </span>
                 .
               </p>
