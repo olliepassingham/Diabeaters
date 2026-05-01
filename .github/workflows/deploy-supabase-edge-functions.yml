@@ -1,5 +1,6 @@
 # Browser-only deploy: GitHub → Actions → "Deploy Supabase notify functions" → Run workflow.
 # One-time secret: SUPABASE_ACCESS_TOKEN (https://supabase.com/dashboard/account/tokens)
+# Optional: SUPABASE_PROJECT_REF overrides ffgcivxvbtdlmfnttwjm from config.toml.
 name: Deploy Supabase notify functions
 
 on:
@@ -33,3 +34,5 @@ jobs:
           supabase functions deploy notify_scenario_started --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_dm_push --project-ref "$REF" --no-verify-jwt
+          # JWT verified at gateway + in handler (see supabase/config.toml). Do not pass --no-verify-jwt.
+          supabase functions deploy ai_coach --project-ref "$REF"
