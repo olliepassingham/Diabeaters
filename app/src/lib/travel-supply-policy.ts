@@ -18,6 +18,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 export function tripCalendarDaysBetween(startDateStr: string, endDateStr: string): number {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return 1;
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
   const diffDays = Math.ceil((end.getTime() - start.getTime()) / MS_PER_DAY);

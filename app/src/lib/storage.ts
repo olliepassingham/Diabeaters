@@ -40,6 +40,8 @@ const STORAGE_KEYS = {
   CARER_INVITE_CODE: "diabeater_carer_invite_code",
   TRAVEL_PLAN: "diabeater_travel_plan",
   TRAVEL_PACKING_LIST: "diabeater_travel_packing_list",
+  /** In-progress travel wizard (inputs / generated plan) when travel mode is not active yet. */
+  TRAVEL_WIZARD_DRAFT: "diabeater_travel_wizard_draft",
   BACKUP_REMINDER_DISMISSED: "diabeater_backup_reminder_dismissed",
   LAST_BACKUP_DATE: "diabeater_last_backup_date",
   HOLIDAY_PREP: "diabeater_holiday_prep",
@@ -842,7 +844,15 @@ export function migrateExerciseType(raw: string): ExerciseType {
   if (allowed.includes(raw as ExerciseType)) return raw as ExerciseType;
   return "cardio";
 }
+
 export type ExerciseIntensity = "light" | "moderate" | "intense";
+
+/** Normalise legacy or corrupted intensity values from localStorage. */
+export function migrateExerciseIntensity(raw: string | undefined | null): ExerciseIntensity {
+  const allowed: ExerciseIntensity[] = ["light", "moderate", "intense"];
+  if (raw && (allowed as readonly string[]).includes(raw)) return raw as ExerciseIntensity;
+  return "moderate";
+}
 
 export interface ExerciseRoutine {
   id: string;
@@ -2195,6 +2205,7 @@ export const storage = {
     this.saveScenarioState(state);
     localStorage.removeItem(STORAGE_KEYS.TRAVEL_PLAN);
     localStorage.removeItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
+    localStorage.removeItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
   },
 
   saveTravelPlan(plan: any): void {
@@ -2213,6 +2224,66 @@ export const storage = {
   getTravelPackingList(): any[] {
     const data = localStorage.getItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
     return data ? JSON.parse(data) : [];
+  },
+
+  saveTravelWizardDraft(draft: {
+    step: "inputs" | "results";
+    plan: unknown;
+    packingList: unknown[];
+    resultsTab?: "packing" | "emergency" | "climate";
+    savedAt: string;
+  }): void {
+    try {
+      localStorage.setItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT, JSON.stringify(draft));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  getTravelWizardDraft(): {
+    step: "inputs" | "results";
+    plan: unknown;
+    packingList: unknown[];
+    resultsTab?: "packing" | "emergency" | "climate";
+    savedAt: string;
+  } | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
+      if (!raw) return null;
+      const d = JSON.parse(raw) as Record<string, unknown>;
+      if (!d || typeof d !== "object") return null;
+      if (d.step !== "inputs" && d.step !== "results") return null;
+      if (!d.plan || typeof d.plan !== "object") return null;
+      const savedAt = typeof d.savedAt === "string" ? d.savedAt : "";
+      if (savedAt) {
+        const t = new Date(savedAt).getTime();
+        if (Number.isFinite(t) && Date.now() - t > 90 * 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
+          return null;
+        }
+      }
+      const packingList = Array.isArray(d.packingList) ? d.packingList : [];
+      const resultsTab = d.resultsTab;
+      const rt =
+        resultsTab === "packing" || resultsTab === "emergency" || resultsTab === "climate" ? resultsTab : undefined;
+      return {
+        step: d.step as "inputs" | "results",
+        plan: d.plan,
+        packingList,
+        resultsTab: rt,
+        savedAt: savedAt || new Date().toISOString(),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  clearTravelWizardDraft(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TRAVEL_WIZARD_DRAFT);
+    } catch {
+      /* ignore */
+    }
   },
 
   activateSickDay(severity: string): void {
@@ -3395,11 +3466,17 @@ export const storage = {
     let dirty = false;
     const migrated = parsed.map((r) => {
       const m = migrateExerciseType(r.exerciseType as string);
-      if (m !== r.exerciseType) {
+      const inten = migrateExerciseIntensity(r.intensity as string);
+      const rawDur = Number(r.durationMinutes);
+      const dur = Number.isFinite(rawDur) ? Math.max(5, Math.min(300, Math.round(rawDur))) : 45;
+      const next = { ...r, exerciseType: m, intensity: inten, durationMinutes: dur };
+      if (m !== r.exerciseType || inten !== r.intensity || !Number.isFinite(rawDur) || dur !== rawDur) dirty = true;
+      const tu = Number(r.timesUsed);
+      if (!Number.isFinite(tu) || tu < 0) {
         dirty = true;
-        return { ...r, exerciseType: m };
+        next.timesUsed = 0;
       }
-      return r;
+      return next;
     });
     if (dirty) {
       localStorage.setItem(STORAGE_KEYS.EXERCISE_ROUTINES, JSON.stringify(migrated));
@@ -3448,7 +3525,7 @@ export const storage = {
     if (index === -1) return null;
     routines[index] = {
       ...routines[index],
-      timesUsed: routines[index].timesUsed + 1,
+      timesUsed: (Number(routines[index].timesUsed) || 0) + 1,
       lastUsed: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -3468,6 +3545,60 @@ export const storage = {
       .slice(0, limit);
   },
 
+  /**
+   * Coerce a parsed active session so banner / reminders never see missing fields
+   * (corrupt storage previously crashed renders when midCheckTiming ran).
+   */
+  normalizeActiveExerciseSession(session: ActiveExerciseSession): ActiveExerciseSession {
+    const exerciseType = migrateExerciseType(String(session.exerciseType ?? ""));
+    const intensity = migrateExerciseIntensity(session.intensity as string);
+
+    let durationMinutes = Number(session.durationMinutes);
+    if (!Number.isFinite(durationMinutes)) durationMinutes = 45;
+    durationMinutes = Math.max(5, Math.min(300, Math.round(durationMinutes)));
+
+    let recoveryMinutes = Number(session.recoveryMinutes);
+    if (!Number.isFinite(recoveryMinutes) || recoveryMinutes <= 0) {
+      recoveryMinutes = this.getDefaultRecoveryMinutes(exerciseType, intensity);
+    }
+
+    const phase: ExercisePhase =
+      session.phase === "pre" || session.phase === "active" || session.phase === "recovery" ? session.phase : "pre";
+
+    const pc = session.preChecklist;
+    const preChecklist =
+      pc && typeof pc === "object"
+        ? {
+            bgChecked: Boolean(pc.bgChecked),
+            carbsConsidered: Boolean(pc.carbsConsidered),
+            basalAdjusted: Boolean(pc.basalAdjusted),
+          }
+        : { bgChecked: false, carbsConsidered: false, basalAdjusted: false };
+
+    const id = typeof session.id === "string" && session.id.trim() ? session.id : generateId();
+    const exerciseName =
+      typeof session.exerciseName === "string" && session.exerciseName.trim() ? session.exerciseName : "Exercise";
+
+    const startedAtRaw = session.startedAt;
+    const startedAt =
+      typeof startedAtRaw === "string" && Number.isFinite(new Date(startedAtRaw).getTime())
+        ? startedAtRaw
+        : new Date().toISOString();
+
+    return {
+      ...session,
+      id,
+      exerciseName,
+      exerciseType,
+      intensity,
+      durationMinutes,
+      recoveryMinutes,
+      phase,
+      midCheckDone: Boolean(session.midCheckDone),
+      preChecklist,
+      startedAt,
+    };
+  },
 
   getActiveExercise(): ActiveExerciseSession | null {
     const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_EXERCISE);
@@ -3479,13 +3610,16 @@ export const storage = {
       localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
       return null;
     }
-    const m = migrateExerciseType(session.exerciseType as string);
-    if (m !== session.exerciseType) {
-      const updated = { ...session, exerciseType: m };
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(updated));
-      return updated;
+    const normalized = this.normalizeActiveExerciseSession(session);
+    try {
+      const normStr = JSON.stringify(normalized);
+      if (normStr !== data) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, normStr);
+      }
+    } catch {
+      /* ignore quota / private mode */
     }
-    return session;
+    return normalized;
   },
 
   startExerciseSession(params: {
@@ -3496,16 +3630,22 @@ export const storage = {
     durationMinutes: number;
     recoveryMinutes?: number;
   }): ActiveExerciseSession {
+    const exerciseType = migrateExerciseType(String(params.exerciseType ?? ""));
+    const intensity = migrateExerciseIntensity(params.intensity as string);
+    let durationMinutes = Number(params.durationMinutes);
+    if (!Number.isFinite(durationMinutes)) durationMinutes = 45;
+    durationMinutes = Math.max(5, Math.min(300, Math.round(durationMinutes)));
+
     const session: ActiveExerciseSession = {
       id: generateId(),
       routineId: params.routineId,
-      exerciseName: params.exerciseName,
-      exerciseType: params.exerciseType,
-      intensity: params.intensity,
-      durationMinutes: params.durationMinutes,
+      exerciseName: String(params.exerciseName ?? "").trim() || "Exercise",
+      exerciseType,
+      intensity,
+      durationMinutes,
       phase: "pre",
       startedAt: new Date().toISOString(),
-      recoveryMinutes: params.recoveryMinutes ?? this.getDefaultRecoveryMinutes(params.exerciseType, params.intensity),
+      recoveryMinutes: params.recoveryMinutes ?? this.getDefaultRecoveryMinutes(exerciseType, intensity),
       midCheckDone: false,
       preChecklist: {
         bgChecked: false,
@@ -3852,8 +3992,35 @@ export const storage = {
   },
 
   getHolidayPrep(): HolidayPrep | null {
-    const data = localStorage.getItem(STORAGE_KEYS.HOLIDAY_PREP);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.HOLIDAY_PREP);
+      if (!data) return null;
+      const prep = JSON.parse(data) as HolidayPrep;
+      if (!prep || typeof prep !== "object" || typeof prep.returnDate !== "string") {
+        localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+        return null;
+      }
+      const ret = new Date(prep.returnDate);
+      if (!Number.isFinite(ret.getTime())) {
+        localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+        return null;
+      }
+      ret.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (ret < today) {
+        localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+        return null;
+      }
+      return prep;
+    } catch {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.HOLIDAY_PREP);
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
   },
 
   saveHolidayPrep(prep: HolidayPrep): void {

@@ -932,9 +932,10 @@ export default function Travel() {
 
   const getPrepDaysUntilDeparture = (): number | null => {
     if (!holidayPrep) return null;
+    const dep = parseISODateOrNull(holidayPrep.departureDate);
+    if (!dep) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dep = new Date(holidayPrep.departureDate);
     dep.setHours(0, 0, 0, 0);
     return Math.ceil((dep.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
@@ -1380,7 +1381,11 @@ export default function Travel() {
                     <div>
                       <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
                       <p className="text-xs text-green-600 dark:text-green-400">
-                        {hasEnded ? "Your trip has ended" : `Until ${new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                        {hasEnded
+                          ? "Your trip has ended"
+                          : `Until ${
+                              formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"
+                            }`}
                       </p>
                     </div>
                   </div>
@@ -1447,7 +1452,11 @@ export default function Travel() {
                 <div>
                   <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
                   <p className="text-xs text-green-600 dark:text-green-400">
-                    {hasEnded ? "Your trip has ended" : `Until ${new Date(plan.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                    {hasEnded
+                      ? "Your trip has ended"
+                      : `Until ${
+                          formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"
+                        }`}
                   </p>
                 </div>
               </div>
@@ -1612,9 +1621,14 @@ export default function Travel() {
                     <div>
                       <h3 className="font-semibold text-base">{holidayPrep.destination}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(holidayPrep.departureDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} 
+                        {formatGBDateOrEmpty(holidayPrep.departureDate, { day: "numeric", month: "short" }) ||
+                          "Departure"} 
                         {" — "}
-                        {new Date(holidayPrep.returnDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatGBDateOrEmpty(holidayPrep.returnDate, {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        }) || "Return"}
                         {" "}({tripDays} days)
                       </p>
                       {holidayPrep.notes && (
@@ -1702,12 +1716,16 @@ export default function Travel() {
                     const lastPickup = sortedPickups[0];
                     if (!lastPickup) return null;
                     const lastDate = new Date(lastPickup.pickupDate);
+                    if (!Number.isFinite(lastDate.getTime())) return null;
                     lastDate.setHours(0, 0, 0, 0);
                     const nextDue = new Date(lastDate);
                     nextDue.setDate(nextDue.getDate() + interval);
+                    if (!Number.isFinite(nextDue.getTime())) return null;
                     const departure = new Date(holidayPrep.departureDate);
+                    if (!Number.isFinite(departure.getTime())) return null;
                     departure.setHours(0, 0, 0, 0);
                     const daysBeforeDeparture = Math.ceil((departure.getTime() - nextDue.getTime()) / (1000 * 60 * 60 * 24));
+                    if (!Number.isFinite(daysBeforeDeparture)) return null;
                     
                     if (daysBeforeDeparture >= -7 && daysBeforeDeparture <= 14) {
                       return (
@@ -1954,7 +1972,8 @@ export default function Travel() {
                   value={plan.startDate}
                   onChange={(e) => {
                     const newStart = e.target.value;
-                    const startDate = new Date(newStart);
+                    const startDate = parseISODateOrNull(newStart);
+                    if (!startDate || !Number.isFinite(startDate.getTime())) return;
                     const endDate = new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000);
                     setPlan(prev => ({ 
                       ...prev, 
@@ -1974,8 +1993,9 @@ export default function Travel() {
                   min={plan.startDate}
                   onChange={(e) => {
                     const newEnd = e.target.value;
-                    const startDate = new Date(plan.startDate);
-                    const endDate = new Date(newEnd);
+                    const startDate = parseISODateOrNull(plan.startDate) ?? new Date(getDefaultISOTripDates().start);
+                    const endDate = parseISODateOrNull(newEnd);
+                    if (!endDate || !Number.isFinite(endDate.getTime())) return;
                     const diffDays = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
                     setPlan(prev => ({ 
                       ...prev, 

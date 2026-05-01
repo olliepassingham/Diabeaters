@@ -289,7 +289,11 @@ export function ExerciseGuidedCoach() {
     if (activeSession.preIobUnits != null) ctx.iobUnits = activeSession.preIobUnits;
     if (historyBias) ctx.historyBias = historyBias;
 
-    return calculateExercisePlan(ctx);
+    try {
+      return calculateExercisePlan(ctx);
+    } catch {
+      return null;
+    }
   }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness]);
 
   const readiness: ExerciseReadinessResult | null = useMemo(() => {

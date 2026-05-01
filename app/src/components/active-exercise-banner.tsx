@@ -567,12 +567,13 @@ function ExerciseEducationDialog({
 }
 
 function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean): string[] {
-  const config = EXERCISE_TYPE_CONFIG[session.exerciseType];
-  return config.preTips(isPump, session.durationMinutes);
+  const config = EXERCISE_TYPE_CONFIG[session.exerciseType] ?? EXERCISE_TYPE_CONFIG.cardio;
+  const dur = Number.isFinite(session.durationMinutes) ? session.durationMinutes : 45;
+  return config.preTips(isPump, dur);
 }
 
 function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {
-  return EXERCISE_TYPE_CONFIG[type];
+  return EXERCISE_TYPE_CONFIG[type] ?? EXERCISE_TYPE_CONFIG.cardio;
 }
 
 export function ActiveExerciseBanner() {
