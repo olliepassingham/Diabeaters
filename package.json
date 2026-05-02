@@ -31,10 +31,12 @@
     "version:minor": "tsx scripts/bump-version.ts minor",
     "version:major": "tsx scripts/bump-version.ts major",
     "preflight": "npm run web:build && (npm run test:e2e || echo 'e2e skipped') && npm run icons:validate",
-    "supabase:deploy-notify-functions": "npx supabase functions deploy notify_carers_on_hypo --no-verify-jwt && npx supabase functions deploy notify_scenario_started --no-verify-jwt && npx supabase functions deploy notify_supply_low --no-verify-jwt && npx supabase functions deploy notify_dm_push --no-verify-jwt"
+    "supabase:deploy-notify-functions": "npx supabase functions deploy notify_carers_on_hypo --no-verify-jwt && npx supabase functions deploy notify_scenario_started --no-verify-jwt && npx supabase functions deploy notify_supply_low --no-verify-jwt && npx supabase functions deploy notify_dm_push --no-verify-jwt",
+    "supabase:deploy-ai-coach": "npx supabase functions deploy ai_coach"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8.2.0",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@capacitor/haptics": "^8.0.2",
