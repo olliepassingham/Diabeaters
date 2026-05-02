@@ -50,6 +50,10 @@ import {
 } from "@/lib/support";
 import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
 
+function shortId(id: string) {
+  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
 function getInitial(email: string): string {
   const first = email.trim().charAt(0).toUpperCase();
   return first || "?";

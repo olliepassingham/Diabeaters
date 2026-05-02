@@ -370,7 +370,7 @@ export function ExerciseGuidedCoach() {
     const withDefaults = applyCoachDefaultsFromLastExercise(session);
     setActiveSession(withDefaults);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
-    void scheduleExercisePreReminders(session);
+    void scheduleExercisePreReminders(session, 0);
   };
 
   const onStartFromRoutine = (routine: ExerciseRoutine) => {
@@ -386,7 +386,7 @@ export function ExerciseGuidedCoach() {
     const withDefaults = applyCoachDefaultsFromLastExercise(session);
     setActiveSession(withDefaults);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
-    void scheduleExercisePreReminders(session);
+    void scheduleExercisePreReminders(session, 0);
   };
 
   const onStartWorkout = () => {

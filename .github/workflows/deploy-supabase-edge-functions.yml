@@ -6,7 +6,7 @@ name: Deploy Supabase notify functions
 on:
   workflow_dispatch:
   push:
-    branches: [develop]
+    branches: [main, develop]
     paths:
       - "supabase/functions/**"
       - "supabase/config.toml"

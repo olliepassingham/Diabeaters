@@ -33,7 +33,7 @@ function parseExercisePlanningLog(details: string): {
   const exerciseType = m[2]?.toLowerCase();
   const duration = parseInt(m[3] ?? "", 10);
   if (!intensity || !exerciseType || !Number.isFinite(duration)) return null;
-  return { intensity, exerciseType, duration };
+  return { intensity, type: exerciseType, duration };
 }
 
 function matchesSessionShape(
