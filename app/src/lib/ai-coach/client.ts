@@ -111,8 +111,11 @@ export async function sendCoachMessage(args: {
   if (parsed && typeof parsed === "object" && parsed !== null) {
     const o = parsed as Record<string, unknown>;
     const msg = o.message;
+    const det = o.detail;
     if (typeof msg === "string" && msg.trim().length > 0) {
       detail = msg.trim();
+    } else if (typeof det === "string" && det.trim().length > 0) {
+      detail = det.trim();
     } else if ("error" in o) {
       detail = String(o.error);
     }
