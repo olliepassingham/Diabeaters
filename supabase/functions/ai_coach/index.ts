@@ -60,6 +60,59 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
+/** PostgREST / Postgres when a selected column is not in the exposed schema or table. */
+function isMissingColumnOrSchemaCacheError(err: { message?: string; code?: string }): boolean {
+  const m = (err.message ?? "").toLowerCase();
+  const c = String(err.code ?? "");
+  if (c === "PGRST204" || c === "42703") return true;
+  if (m.includes("schema cache") && m.includes("column")) return true;
+  if (m.includes("could not find") && m.includes("column")) return true;
+  if (m.includes("column") && m.includes("does not exist")) return true;
+  return false;
+}
+
+type CoachProfileRow = {
+  ai_coach_consent_at?: string | null;
+  ai_coach_consent_version?: string | null;
+  diabetes_onset_date?: string | null;
+  insulin_delivery_method?: string | null;
+};
+
+async function loadCoachProfile(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ data: CoachProfileRow | null; error: { message?: string; code?: string } | null }> {
+  const full = await admin
+    .from("profiles")
+    .select(
+      "ai_coach_consent_at, ai_coach_consent_version, diabetes_onset_date, insulin_delivery_method",
+    )
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!full.error) {
+    return { data: full.data as CoachProfileRow | null, error: null };
+  }
+  if (!isMissingColumnOrSchemaCacheError(full.error)) {
+    return { data: null, error: full.error };
+  }
+
+  const narrow = await admin
+    .from("profiles")
+    .select("ai_coach_consent_at, diabetes_onset_date, insulin_delivery_method")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (narrow.error) {
+    return { data: null, error: narrow.error };
+  }
+  const base = (narrow.data ?? {}) as CoachProfileRow;
+  return {
+    data: { ...base, ai_coach_consent_version: base.ai_coach_consent_version ?? null },
+    error: null,
+  };
+}
+
 function isCoachTurn(x: unknown): x is CoachTurn {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
@@ -194,13 +247,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(200, { success: true, ...out });
     }
 
-    const { data: profile, error: profErr } = await admin
-      .from("profiles")
-      .select(
-        "ai_coach_consent_at, ai_coach_consent_version, diabetes_onset_date, insulin_delivery_method",
-      )
-      .eq("id", userId)
-      .maybeSingle();
+    const { data: profile, error: profErr } = await loadCoachProfile(admin, userId);
 
     if (profErr) {
       console.error("[ai_coach] profile select", profErr);

@@ -107,9 +107,15 @@ export async function sendCoachMessage(args: {
     }
   }
 
-  const detail =
-    parsed && typeof parsed === "object" && parsed !== null && "error" in parsed
-      ? String((parsed as { error?: unknown }).error)
-      : text || res.statusText;
+  let detail = text || res.statusText;
+  if (parsed && typeof parsed === "object" && parsed !== null) {
+    const o = parsed as Record<string, unknown>;
+    const msg = o.message;
+    if (typeof msg === "string" && msg.trim().length > 0) {
+      detail = msg.trim();
+    } else if ("error" in o) {
+      detail = String(o.error);
+    }
+  }
   throw new AiCoachHttpError(detail, res.status, parsed);
 }
