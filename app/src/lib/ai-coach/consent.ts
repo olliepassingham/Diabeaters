@@ -14,13 +14,18 @@ export async function fetchAiCoachConsentAt(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("profiles")
-    .select("ai_coach_consent_at")
+    .select("ai_coach_consent_at, ai_coach_consent_version")
     .eq("id", userId)
     .maybeSingle();
 
   if (error || !data) return null;
-  const raw = (data as { ai_coach_consent_at?: string | null }).ai_coach_consent_at;
-  return typeof raw === "string" && raw.length > 0 ? raw : null;
+  const row = data as { ai_coach_consent_at?: string | null; ai_coach_consent_version?: string | null };
+  const raw = row.ai_coach_consent_at;
+  const version = row.ai_coach_consent_version;
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  // Re-show “Before you start” when the in-app consent copy version bumps.
+  if (typeof version !== "string" || version.trim() !== AI_COACH_CONSENT_VERSION) return null;
+  return raw;
 }
 
 export async function acceptAiCoachConsent(

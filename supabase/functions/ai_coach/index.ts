@@ -27,6 +27,9 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Must match `AI_COACH_CONSENT_VERSION` in `app/src/lib/ai-coach/consent.ts`. */
+const AI_COACH_CONSENT_VERSION = "2026-05-01";
+
 const CONSENT_REQUIRED_REPLY: CoachReply = {
   reply:
     "To use the Diabeaters coach, please accept the consent screen in the app first. That tells you how your messages are processed and that this is educational support only, not medical advice.",
@@ -193,7 +196,9 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile, error: profErr } = await admin
       .from("profiles")
-      .select("ai_coach_consent_at, diabetes_onset_date, insulin_delivery_method")
+      .select(
+        "ai_coach_consent_at, ai_coach_consent_version, diabetes_onset_date, insulin_delivery_method",
+      )
       .eq("id", userId)
       .maybeSingle();
 
@@ -208,7 +213,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const consentAt = profile?.ai_coach_consent_at ?? null;
-    if (!consentAt) {
+    const consentVer =
+      typeof profile?.ai_coach_consent_version === "string"
+        ? profile.ai_coach_consent_version.trim()
+        : "";
+    if (!consentAt || consentVer !== AI_COACH_CONSENT_VERSION) {
       const out: CoachResponse = {
         ...CONSENT_REQUIRED_REPLY,
         category: "consent_required",

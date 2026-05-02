@@ -90,7 +90,9 @@ export default function CoachPage() {
     queryKey: coachConsentQueryKey(user?.id),
     enabled: Boolean(supabase && user?.id),
     staleTime: 0,
-    refetchOnMount: "always",
+    // Avoid showing the main chat from stale cache while a refetch is in flight (e.g. after
+    // `refetchOnMount: "always"` we could briefly treat old consent as still valid).
+    gcTime: 0,
     refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!supabase || !user?.id) return null;
