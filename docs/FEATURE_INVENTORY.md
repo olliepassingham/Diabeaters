@@ -12,7 +12,7 @@
 | `/supplies` | `client/src/pages/supplies.tsx` | Supply tracker: local supplies CRUD, expiry/days remaining, pickup history; cloud supplies (Supabase) add/adjust/delete |
 | `/scenarios` | `client/src/pages/scenarios.tsx` | Scenario hub: links to Bedtime, Travel, Sick Day |
 | `/adviser` | `client/src/pages/adviser.tsx` | Activity Adviser: meal/exercise/bedtime tabs, AI advice via server |
-| `/ai-coach` (beta) | `client/src/pages/ai-coach.tsx` | AI Coach chat; server `/api/ai-coach/chat` |
+| `/coach` | `app/src/pages/coach.tsx` | Diabeaters coach; Tools tile + route unless `VITE_FEATURE_AI_COACH=false`; Edge `ai_coach` + consent |
 | `/community` (beta) | `client/src/pages/community.tsx` | Community: posts, replies, reels (local storage) |
 | `/appointments` | `client/src/pages/appointments.tsx` | Appointments list (local); add/edit/delete |
 | `/emergency-card` | `client/src/pages/emergency-card.tsx` | Emergency card view (profile + contacts) |
@@ -99,7 +99,9 @@
 | `VITE_SUPABASE_ANON_KEY` | Client (same) | Supabase anon key |
 | `VITE_APP_ENV` | Client (flags, staging banner, robots) | `development` / `staging` / `production` |
 | `VITE_RELEASE_MODE` | Client (release-mode.ts) | Beta features (e.g. AI Coach, Community, Shop, Family carers) |
-| `OPENAI_API_KEY` | Server (routes.ts) | Activity Adviser + AI Coach; 503 if missing |
+| `OPENAI_API_KEY` | Server (`routes.ts`) + Edge secret (`ai_coach`) | Activity Adviser (Node). Coach: Edge Function only. |
+| `VITE_FEATURE_AI_COACH` | Client (`flags.ts`) | Set to `false` to hide `/coach` and Tools tile; otherwise visible (default). |
+| `ENABLE_AI_COACH` | Edge Function secret | When `true`, LLM path runs; otherwise 503 after consent/rate-limit checks. |
 | `NEWS_API_KEY` | Server (routes.ts) | Live news; fallback curated list if missing |
 | `DATABASE_URL` | Server (db.ts), Drizzle config | Postgres (server-side; not used for client Supabase flows) |
 | `PORT` | Server (index.ts) | Default 5000 |
