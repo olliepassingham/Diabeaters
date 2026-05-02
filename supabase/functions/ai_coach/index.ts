@@ -71,29 +71,26 @@ function isMissingColumnOrSchemaCacheError(err: { message?: string; code?: strin
   return false;
 }
 
-type CoachProfileRow = {
+type CoachConsentRow = {
   ai_coach_consent_at?: string | null;
   ai_coach_consent_version?: string | null;
-  diabetes_onset_date?: string | null;
-  insulin_delivery_method?: string | null;
 };
 
-async function loadCoachProfile(
+/** Consent gate only — never selects clinical columns so partial migrations cannot break the coach. */
+async function loadCoachConsentProfile(
   admin: ReturnType<typeof createClient>,
   userId: string,
-): Promise<{ data: CoachProfileRow | null; error: { message?: string; code?: string } | null }> {
+): Promise<{ data: CoachConsentRow | null; error: { message?: string; code?: string } | null }> {
   const errMsg = (e: { message?: string } | null) => (e?.message ?? "").toLowerCase();
 
   const full = await admin
     .from("profiles")
-    .select(
-      "ai_coach_consent_at, ai_coach_consent_version, diabetes_onset_date, insulin_delivery_method",
-    )
+    .select("ai_coach_consent_at, ai_coach_consent_version")
     .eq("id", userId)
     .maybeSingle();
 
   if (!full.error) {
-    return { data: full.data as CoachProfileRow | null, error: null };
+    return { data: full.data as CoachConsentRow | null, error: null };
   }
 
   const tryNarrow =
@@ -104,24 +101,19 @@ async function loadCoachProfile(
 
   const narrow = await admin
     .from("profiles")
-    .select("ai_coach_consent_at, diabetes_onset_date, insulin_delivery_method")
+    .select("ai_coach_consent_at")
     .eq("id", userId)
     .maybeSingle();
 
   if (!narrow.error) {
-    const base = (narrow.data ?? {}) as CoachProfileRow;
+    const base = (narrow.data ?? {}) as CoachConsentRow;
     return {
       data: { ...base, ai_coach_consent_version: base.ai_coach_consent_version ?? null },
       error: null,
     };
   }
 
-  // Coach columns may be missing entirely (migration not applied). Older columns usually exist.
-  const legacy = await admin
-    .from("profiles")
-    .select("id, diabetes_onset_date, insulin_delivery_method")
-    .eq("id", userId)
-    .maybeSingle();
+  const legacy = await admin.from("profiles").select("id").eq("id", userId).maybeSingle();
 
   if (!legacy.error && legacy.data) {
     return {
@@ -135,6 +127,45 @@ async function loadCoachProfile(
   }
 
   return { data: null, error: narrow.error };
+}
+
+/** Optional clinical fields for LLM context — fetched separately so missing columns never 503 the coach. */
+async function loadCoachClinicalExtras(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<{ diabetes_onset_date: string | null; insulin_delivery_method: string | null }> {
+  const out = {
+    diabetes_onset_date: null as string | null,
+    insulin_delivery_method: null as string | null,
+  };
+
+  const combined = await admin
+    .from("profiles")
+    .select("diabetes_onset_date, insulin_delivery_method")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!combined.error && combined.data) {
+    const d = combined.data as Record<string, unknown>;
+    out.diabetes_onset_date = typeof d.diabetes_onset_date === "string" ? d.diabetes_onset_date : null;
+    out.insulin_delivery_method =
+      typeof d.insulin_delivery_method === "string" ? d.insulin_delivery_method : null;
+    return out;
+  }
+
+  const dOnly = await admin.from("profiles").select("diabetes_onset_date").eq("id", userId).maybeSingle();
+  if (!dOnly.error && dOnly.data) {
+    const v = (dOnly.data as { diabetes_onset_date?: unknown }).diabetes_onset_date;
+    out.diabetes_onset_date = typeof v === "string" ? v : null;
+  }
+
+  const iOnly = await admin.from("profiles").select("insulin_delivery_method").eq("id", userId).maybeSingle();
+  if (!iOnly.error && iOnly.data) {
+    const v = (iOnly.data as { insulin_delivery_method?: unknown }).insulin_delivery_method;
+    out.insulin_delivery_method = typeof v === "string" ? v : null;
+  }
+
+  return out;
 }
 
 function isCoachTurn(x: unknown): x is CoachTurn {
@@ -271,7 +302,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(200, { success: true, ...out });
     }
 
-    const { data: profile, error: profErr } = await loadCoachProfile(admin, userId);
+    const { data: consentRow, error: profErr } = await loadCoachConsentProfile(admin, userId);
 
     if (profErr) {
       console.error("[ai_coach] profile select", profErr);
@@ -286,10 +317,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const consentAt = profile?.ai_coach_consent_at ?? null;
+    const consentAt = consentRow?.ai_coach_consent_at ?? null;
     const consentVer =
-      typeof profile?.ai_coach_consent_version === "string"
-        ? profile.ai_coach_consent_version.trim()
+      typeof consentRow?.ai_coach_consent_version === "string"
+        ? consentRow.ai_coach_consent_version.trim()
         : "";
     if (!consentAt || consentVer !== AI_COACH_CONSENT_VERSION) {
       const out: CoachResponse = {
@@ -406,15 +437,13 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(503, { success: false, error: "openai_not_configured" });
     }
 
-    const row = profile as Record<string, unknown> | null | undefined;
+    const clinical = await loadCoachClinicalExtras(admin, userId);
     const context = packContext({
       profile: {
         dateOfBirth: null,
-        insulinDeliveryMethod:
-          typeof row?.insulin_delivery_method === "string" ? row.insulin_delivery_method : null,
+        insulinDeliveryMethod: clinical.insulin_delivery_method,
         bgUnits: bgUnitsClient,
-        diabetesOnsetDate:
-          typeof row?.diabetes_onset_date === "string" ? row.diabetes_onset_date : null,
+        diabetesOnsetDate: clinical.diabetes_onset_date,
       },
       lastFortnight: lf,
       ratiosAreSet,
