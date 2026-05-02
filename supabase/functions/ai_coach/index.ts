@@ -199,6 +199,12 @@ Deno.serve(async (req: Request) => {
 
     if (profErr) {
       console.error("[ai_coach] profile select", profErr);
+      return jsonResponse(503, {
+        success: false,
+        error: "profile_unavailable",
+        message:
+          "Could not read your profile for coach consent. Apply the AI coach migration on this project, then Dashboard → Settings → API → Reload schema, and try again.",
+      });
     }
 
     const consentAt = profile?.ai_coach_consent_at ?? null;
