@@ -27,3 +27,7 @@ verify_jwt = false
 
 [functions.notify_dm_push]
 verify_jwt = false
+
+# AI Coach: user JWT verified at the gateway (default). Handler also validates with auth.getUser.
+[functions.ai_coach]
+verify_jwt = true

@@ -1,0 +1,144 @@
+/**
+ * Context packer (§3 of docs/regulatory/ai_coach_system_prompt.md).
+ *
+ * Builds the privacy-minimised JSON document that the Edge Function prepends
+ * to the LLM prompt under the role/marker `context`. PII is never included:
+ * no name, email, postcode, raw timestamps with times, or free-text notes.
+ *
+ * v1 reads only what we need from `profiles` (age band derived from DOB,
+ * delivery method, BG units, diagnosed years ago) and trusts a client-built
+ * `lastFortnight` summary (numbers + booleans only).
+ *
+ * Pure logic — runs under both Deno and Vitest.
+ */
+
+import type { CoachContext } from "./types.ts";
+
+const SPARSE_BG_THRESHOLD = 14;
+const SPARSE_EXERCISE_THRESHOLD = 1;
+
+export interface ProfileInput {
+  /** ISO date string `YYYY-MM-DD` from `profiles.date_of_birth`. */
+  dateOfBirth?: string | null;
+  /** `mdi` | `pump` | other; from `profiles.insulin_delivery_method`. */
+  insulinDeliveryMethod?: string | null;
+  /** `mmol/L` | `mg/dL`; from `profiles.bg_units` (or local default). */
+  bgUnits?: string | null;
+  /** ISO date `YYYY-MM-DD` from `profiles.diabetes_onset_date`. */
+  diabetesOnsetDate?: string | null;
+}
+
+export interface LastFortnightInput {
+  bgReadings: number;
+  estimatedTimeInRangePct: number | null;
+  hypoCount: number;
+  severeHypoCount: number;
+  highCount: number;
+  exerciseSessions: number;
+  sickDayActive: boolean;
+  travelModeActive: boolean;
+}
+
+export interface PackContextInput {
+  profile: ProfileInput;
+  lastFortnight: LastFortnightInput;
+  ratiosAreSet: boolean;
+  /** Optional: override "now" for deterministic tests. */
+  now?: Date;
+}
+
+function ageBandFromDob(
+  dob: string | null | undefined,
+  now: Date,
+): CoachContext["profile"]["ageBand"] {
+  if (!dob) return "unknown";
+  const dobDate = new Date(`${dob}T00:00:00Z`);
+  if (!Number.isFinite(dobDate.getTime())) return "unknown";
+  const ageYears = (now.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  if (!Number.isFinite(ageYears) || ageYears < 0) return "unknown";
+  if (ageYears < 30) return "18-29";
+  if (ageYears < 40) return "30-39";
+  if (ageYears < 50) return "40-49";
+  if (ageYears < 60) return "50-59";
+  return "60+";
+}
+
+function deliveryMethodFrom(
+  raw: string | null | undefined,
+): CoachContext["profile"]["deliveryMethod"] {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "mdi" || v === "pen") return "mdi";
+  if (v === "pump") return "pump";
+  return "unknown";
+}
+
+function bgUnitsFrom(raw: string | null | undefined): CoachContext["profile"]["bgUnits"] {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "mmol/l" || v === "mmol") return "mmol/L";
+  if (v === "mg/dl" || v === "mg/dl" || v === "mg") return "mg/dL";
+  return "unknown";
+}
+
+function diagnosedYearsAgoFrom(
+  raw: string | null | undefined,
+  now: Date,
+): number | null {
+  if (!raw) return null;
+  const onset = new Date(`${raw}T00:00:00Z`);
+  if (!Number.isFinite(onset.getTime())) return null;
+  const years = (now.getTime() - onset.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  if (!Number.isFinite(years) || years < 0) return null;
+  return Math.floor(years);
+}
+
+function clampNonNegative(n: unknown): number {
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 0;
+  return v < 0 ? 0 : Math.floor(v);
+}
+
+function clampPercent(n: unknown): number | null {
+  if (typeof n !== "number" || !Number.isFinite(n)) return null;
+  if (n < 0) return 0;
+  if (n > 100) return 100;
+  return Math.round(n);
+}
+
+/**
+ * Build the §3 context block. Only fields explicitly listed in `CoachContext`
+ * are included; any extra keys on the inputs are dropped silently to prevent
+ * accidental PII leakage.
+ */
+export function packContext(input: PackContextInput): CoachContext {
+  const now = input.now ?? new Date();
+  const profile: CoachContext["profile"] = {
+    ageBand: ageBandFromDob(input.profile.dateOfBirth, now),
+    deliveryMethod: deliveryMethodFrom(input.profile.insulinDeliveryMethod),
+    bgUnits: bgUnitsFrom(input.profile.bgUnits),
+    diagnosedYearsAgo: diagnosedYearsAgoFrom(input.profile.diabetesOnsetDate, now),
+  };
+
+  const lf = input.lastFortnight;
+  const lastFortnight: CoachContext["lastFortnight"] = {
+    bgReadings: clampNonNegative(lf.bgReadings),
+    estimatedTimeInRangePct: clampPercent(lf.estimatedTimeInRangePct),
+    hypoCount: clampNonNegative(lf.hypoCount),
+    severeHypoCount: clampNonNegative(lf.severeHypoCount),
+    highCount: clampNonNegative(lf.highCount),
+    exerciseSessions: clampNonNegative(lf.exerciseSessions),
+    sickDayActive: Boolean(lf.sickDayActive),
+    travelModeActive: Boolean(lf.travelModeActive),
+  };
+
+  // Sparse-data flag tells the model to admit when it cannot answer pattern
+  // questions honestly.
+  const dataSparse =
+    lastFortnight.bgReadings < SPARSE_BG_THRESHOLD &&
+    lastFortnight.exerciseSessions <= SPARSE_EXERCISE_THRESHOLD;
+
+  return {
+    profile,
+    lastFortnight,
+    ratiosAreSet: Boolean(input.ratiosAreSet),
+    dataSparse,
+  };
+}
