@@ -9,7 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DevBanner } from "@/components/DevBanner";
 import { DevSupabaseDiagnostics } from "@/components/DevSupabaseDiagnostics";
 import { StagingBanner } from "@/components/StagingBanner";
-import { isStaging } from "@/lib/flags";
+import { isAiCoachEnabled, isStaging } from "@/lib/flags";
 
 import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
@@ -81,6 +81,7 @@ const CommunitySettings = lazy(() => import("@/pages/community/settings"));
 const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
+const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
@@ -661,6 +662,15 @@ function InnerRouter() {
       <Route path="/tools/education">
         <Redirect to="/education" replace />
       </Route>
+      {isAiCoachEnabled ? (
+        <Route path="/coach">
+          <PatientRouteGuard>
+            <Suspense fallback={<RouteFallback />}>
+              <CoachPage />
+            </Suspense>
+          </PatientRouteGuard>
+        </Route>
+      ) : null}
       <Route path="/education/:slug">
         <Suspense fallback={<RouteFallback />}>
           <GlossaryDetail />

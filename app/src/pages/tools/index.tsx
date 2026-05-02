@@ -12,6 +12,7 @@ import {
   HeartPulse,
   Map as MapIcon,
   ChevronRight,
+  MessageCircle,
   Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +33,7 @@ import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CURATED_RESOURCES, type CuratedResource } from "@/lib/curated-resources.ts";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { cn } from "@/lib/utils";
+import { isAiCoachEnabled } from "@/lib/flags";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 type ToolDef = {
@@ -103,6 +105,19 @@ const PATIENT_TOOLS: ToolDef[] = [
     description: "Tip of the day and a bigger library of practical reminders.",
   },
 ];
+
+function patientToolsForHub(): ToolDef[] {
+  if (!isAiCoachEnabled) return PATIENT_TOOLS;
+  const coach: ToolDef = {
+    id: "ai-coach",
+    href: "/coach",
+    icon: MessageCircle,
+    title: "Diabeaters coach",
+    description:
+      "Educational coaching for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.",
+  };
+  return [coach, ...PATIENT_TOOLS];
+}
 
 export const CARER_TOOLS: ToolDef[] = [
   {
@@ -284,8 +299,14 @@ export function ToolsHubPage({
   const [previewResource, setPreviewResource] = useState<CuratedResource | null>(null);
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
-  const actNowIds =
-    hubVariant === "carer" ? (["hypo-help"] as const) : (["insulin-calculator", "hypo-help", "correction-helper"] as const);
+  // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` when the
+  // feature is on. It must be included here — otherwise the tile exists in `tools` but never renders.
+  const actNowIds: readonly string[] =
+    hubVariant === "carer"
+      ? ["hypo-help"]
+      : byId.has("ai-coach")
+        ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
+        : ["insulin-calculator", "hypo-help", "correction-helper"];
   const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
   const plan = (["routines", "appointments", "supply-tracker"] as const)
@@ -450,7 +471,7 @@ export default function ToolsPage() {
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
-  const tileCount = isCarerMode ? CARER_TOOLS.length : PATIENT_TOOLS.length;
+  const tileCount = isCarerMode ? CARER_TOOLS.length : patientToolsForHub().length;
 
   useEffect(() => {
     if (loading) return;
@@ -481,5 +502,5 @@ export default function ToolsPage() {
   }
   if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
   if (isCarerMode) return <ToolsHubPage tools={CARER_TOOLS} hubVariant="carer" />;
-  return <ToolsHubPage tools={PATIENT_TOOLS} hubVariant="patient" />;
+  return <ToolsHubPage tools={patientToolsForHub()} hubVariant="patient" />;
 }

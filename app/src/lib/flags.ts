@@ -17,3 +17,12 @@ export const isDev = APP_ENV === "development";
 export const isCommunityEnabled =
   import.meta.env.VITE_FEATURE_COMMUNITY === "true" ||
   (import.meta.env.DEV && import.meta.env.VITE_FEATURE_COMMUNITY !== "false");
+
+/**
+ * Diabeaters Coach (Edge Function + OpenAI). **Visible by default** — `/coach` and the
+ * Tools tile register unless you explicitly set `VITE_FEATURE_AI_COACH=false`.
+ *
+ * LLM calls remain gated server-side by `ENABLE_AI_COACH` + `OPENAI_API_KEY`; consent
+ * and rate limits still apply when those are configured.
+ */
+export const isAiCoachEnabled = import.meta.env.VITE_FEATURE_AI_COACH !== "false";

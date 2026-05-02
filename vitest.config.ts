@@ -22,7 +22,10 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: [path.resolve(rootDir, "app", "src", "test", "setup.ts")],
-    include: ["app/src/**/*.spec.{ts,tsx}"],
+    include: [
+      "app/src/**/*.spec.{ts,tsx}",
+      "supabase/functions/_shared/**/*.spec.ts",
+    ],
     clearMocks: true,
     restoreMocks: true,
   },
