@@ -82,6 +82,8 @@ async function loadCoachProfile(
   admin: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<{ data: CoachProfileRow | null; error: { message?: string; code?: string } | null }> {
+  const errMsg = (e: { message?: string } | null) => (e?.message ?? "").toLowerCase();
+
   const full = await admin
     .from("profiles")
     .select(
@@ -93,7 +95,10 @@ async function loadCoachProfile(
   if (!full.error) {
     return { data: full.data as CoachProfileRow | null, error: null };
   }
-  if (!isMissingColumnOrSchemaCacheError(full.error)) {
+
+  const tryNarrow =
+    isMissingColumnOrSchemaCacheError(full.error) || errMsg(full.error).includes("ai_coach");
+  if (!tryNarrow) {
     return { data: null, error: full.error };
   }
 
@@ -103,14 +108,33 @@ async function loadCoachProfile(
     .eq("id", userId)
     .maybeSingle();
 
-  if (narrow.error) {
-    return { data: null, error: narrow.error };
+  if (!narrow.error) {
+    const base = (narrow.data ?? {}) as CoachProfileRow;
+    return {
+      data: { ...base, ai_coach_consent_version: base.ai_coach_consent_version ?? null },
+      error: null,
+    };
   }
-  const base = (narrow.data ?? {}) as CoachProfileRow;
-  return {
-    data: { ...base, ai_coach_consent_version: base.ai_coach_consent_version ?? null },
-    error: null,
-  };
+
+  // Coach columns may be missing entirely (migration not applied). Older columns usually exist.
+  const legacy = await admin
+    .from("profiles")
+    .select("id, diabetes_onset_date, insulin_delivery_method")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!legacy.error && legacy.data) {
+    return {
+      data: null,
+      error: {
+        code: "coach_columns_missing",
+        message:
+          "AI Coach columns are missing on public.profiles. In SQL Editor, run the full contents of supabase/migrations/20260501120000_ai_coach.sql for this project, then run: NOTIFY pgrst, 'reload schema';",
+      },
+    };
+  }
+
+  return { data: null, error: narrow.error };
 }
 
 function isCoachTurn(x: unknown): x is CoachTurn {
@@ -251,11 +275,14 @@ Deno.serve(async (req: Request) => {
 
     if (profErr) {
       console.error("[ai_coach] profile select", profErr);
+      const hint =
+        typeof profErr.message === "string" && profErr.message.trim().length > 0
+          ? profErr.message.trim()
+          : "Profile lookup failed. Apply supabase/migrations/20260501120000_ai_coach.sql, then run NOTIFY pgrst, 'reload schema'; in the SQL Editor.";
       return jsonResponse(503, {
         success: false,
         error: "profile_unavailable",
-        message:
-          "Could not read your profile for coach consent. Apply the AI coach migration on this project, then Dashboard → Settings → API → Reload schema, and try again.",
+        message: hint,
       });
     }
 
