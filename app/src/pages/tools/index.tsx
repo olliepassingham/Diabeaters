@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Calculator,
@@ -36,6 +36,11 @@ import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
+
+function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
+  return `${Math.min(index * stepMs, capMs)}ms`;
+}
 
 type ToolDef = {
   id: string;
@@ -161,6 +166,7 @@ function ToolCard({
   description,
   layout = "default",
 }: Omit<ToolDef, "id"> & { layout?: "default" | "compact" }) {
+  const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
   const cardClass =
     layout === "compact"
       ? "pressable card-interactive flex h-full min-h-[9.5rem] w-full cursor-pointer flex-col gap-2 rounded-2xl sm:min-h-[10.5rem]"
@@ -170,6 +176,9 @@ function ToolCard({
     <Link
       href={href}
       className="pressable group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onPointerEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
     >
       <Card variant="glass" className={cardClass}>
         <CardContent className={cn("flex h-full flex-col gap-3", pad)}>
@@ -190,10 +199,14 @@ function ToolCard({
 
 /** Full-width horizontal strip for a single “Learn” tool on patient hub. */
 function LearnToolRow({ href, icon: Icon, title, description }: Omit<ToolDef, "id">) {
+  const warm = useCallback(() => prefetchToolsDestinationHref(href), [href]);
   return (
     <Link
       href={href}
       className="pressable group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onPointerEnter={warm}
+      onFocus={warm}
+      onTouchStart={warm}
     >
       <Card variant="glass" className="pressable card-interactive cursor-pointer rounded-2xl border border-border/50">
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
@@ -317,6 +330,16 @@ export function ToolsHubPage({
   const [previewResource, setPreviewResource] = useState<CuratedResource | null>(null);
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
+  useEffect(() => {
+    const run = () => prefetchToolsHubLinkedChunks();
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(run, { timeout: 900 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = window.setTimeout(run, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` /
   // `carerToolsForHub()` when the feature is on. It must be included here — otherwise the tile
   // exists in `tools` but never renders.
@@ -350,7 +373,11 @@ export function ToolsHubPage({
           </div>
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
-              <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 40}ms` }}>
+              <li
+                key={t.id}
+                className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
+                style={{ animationDelay: tileEnterDelay(idx, 10, 56) }}
+              >
                 <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} layout="compact" />
               </li>
             ))}
@@ -388,7 +415,11 @@ export function ToolsHubPage({
                 aria-label="Plan"
               >
                 {plan.map((t, idx) => (
-                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+                  <li
+                    key={t.id}
+                    className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
+                    style={{ animationDelay: tileEnterDelay(idx) }}
+                  >
                     <ToolCard href={t.href} icon={t.icon} title={t.title} description={t.description} />
                   </li>
                 ))}
@@ -404,7 +435,11 @@ export function ToolsHubPage({
               </div>
               <ul className="list-none space-y-4" aria-label="Learn">
                 {learn.map((t, idx) => (
-                  <li key={t.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 30}ms` }}>
+                  <li
+                    key={t.id}
+                    className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
+                    style={{ animationDelay: tileEnterDelay(idx) }}
+                  >
                     <LearnToolRow href={t.href} icon={t.icon} title={t.title} description={t.description} />
                   </li>
                 ))}
@@ -423,7 +458,11 @@ export function ToolsHubPage({
 
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2" aria-label="News & resources">
             {CURATED_RESOURCES.slice(0, 6).map((r, idx) => (
-              <li key={r.id} className="min-h-0 animate-soft-in" style={{ animationDelay: `${idx * 25}ms` }}>
+              <li
+                key={r.id}
+                className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
+                style={{ animationDelay: tileEnterDelay(idx, 10, 50) }}
+              >
                 <button
                   type="button"
                   onClick={() => setPreviewResource(r)}
@@ -493,6 +532,10 @@ export default function ToolsPage() {
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
   const tileCount = isCarerMode ? carerToolsForHub().length : patientToolsForHub().length;
+
+  useEffect(() => {
+    prefetchToolsHubLinkedChunks();
+  }, []);
 
   useEffect(() => {
     if (loading) return;

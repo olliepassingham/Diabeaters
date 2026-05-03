@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
+import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
@@ -39,6 +40,7 @@ function prefetchTools(): void {
   if (prefetchedTools) return;
   prefetchedTools = true;
   void import("@/pages/tools/index");
+  prefetchToolsHubLinkedChunks();
 }
 
 function prefetchScenarios(): void {
