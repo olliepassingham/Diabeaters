@@ -5,14 +5,13 @@ import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-u
 
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { MessageCircle, Settings, Sparkles, User as UserIcon, LogOut } from "lucide-react";
+import { MessageCircle, Settings, User as UserIcon, LogOut } from "lucide-react";
 import { Link } from "wouter";
 
 import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
-import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
-import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
+import { isCommunityEnabled } from "@/lib/flags";
 import { prefetchAccount, prefetchCommunityMessages } from "@/components/bottom-nav";
 import {
   DropdownMenu,
@@ -135,9 +134,7 @@ function HeaderProfileDropdown({ onLogout }: { onLogout: () => void | Promise<vo
 }
 
 export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopBarProps) {
-  const { openAskModal } = useAskAnything();
   const homeActive = isCarer ? pathOnly === "/carer-view" : pathOnly === "/";
-  const showAsk = isAiCoachEnabled && pathOnly !== "/coach";
 
   return (
     <header className="surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
@@ -181,20 +178,6 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
               </Link>
             </Button>
           )}
-          {showAsk ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Ask Diabeaters"
-              data-testid="button-topbar-ask"
-              onClick={() =>
-                openAskModal("topbar", { audience: isCarer ? "supporter" : "patient" })
-              }
-            >
-              <Sparkles className="h-5 w-5" />
-            </Button>
-          ) : null}
           <NotificationBell />
         </div>
       </div>
