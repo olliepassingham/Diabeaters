@@ -25,6 +25,7 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { isAiCoachEnabled } from "@/lib/flags";
+import { askAssistantMidSentence } from "@/lib/ai-coach/persona";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import {
   upsertScenario,
@@ -2535,7 +2536,7 @@ export default function SickDay() {
             className="text-foreground underline underline-offset-2 hover:text-primary"
             data-testid="link-sick-day-coach"
           >
-            ask the coach
+            {askAssistantMidSentence()}
           </Link>
           .
         </p>

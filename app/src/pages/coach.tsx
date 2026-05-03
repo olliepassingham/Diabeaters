@@ -14,6 +14,7 @@ import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt }
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
+import { AI_ASSISTANT_NAME, coachPageTitle } from "@/lib/ai-coach/persona";
 import { recordLastInteraction } from "@/lib/last-interaction";
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
@@ -65,7 +66,7 @@ function coachSendErrorMessage(e: unknown): string {
   }
   if (e instanceof Error && e.message === "Failed to fetch") {
     return [
-      "Could not reach the coach service (network).",
+      "Could not reach the chat service (network).",
       "Deploy the ai_coach Edge Function to this Supabase project.",
       "If VITE_SUPABASE_URL uses localhost, use your computer's LAN IP when testing on a phone or some simulators.",
     ].join(" ");
@@ -91,7 +92,7 @@ export default function CoachPage() {
   const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
   const effectiveTopic = topicSlug ?? (isSupporter ? "supporter" : "general");
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
-  const pageTitle = isSupporter ? "Diabeaters coach – Supporter" : "Diabeaters coach";
+  const pageTitle = coachPageTitle(isSupporter ? "supporter" : "patient");
 
   const [messages, setMessages] = useState<CoachTurn[]>(() =>
     typeof window !== "undefined" ? loadStoredTurns() : [],
@@ -189,7 +190,7 @@ export default function CoachPage() {
         queryClient.setQueryData(coachConsentQueryKey(user?.id), null);
         void queryClient.invalidateQueries({ queryKey: coachConsentQueryKey(user?.id) });
         setSendError(
-          "The server has no coach consent on file for your account. Complete “Before you start” again — this is normal right after the coach database migration, or if consent never saved.",
+          `The server has no ${AI_ASSISTANT_NAME} consent on file for your account. Complete “Before you start” again — this is normal right after the coach database migration, or if consent never saved.`,
         );
         return;
       }
@@ -214,7 +215,7 @@ export default function CoachPage() {
 
   const intro = useMemo(
     () =>
-      "This is an educational coach for adults with type 1 diabetes in the UK. It is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the coach is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.",
+      `${AI_ASSISTANT_NAME} is an educational guide for adults with type 1 diabetes in the UK. This is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`,
     [],
   );
 
@@ -252,7 +253,9 @@ export default function CoachPage() {
             {consentStep === 0 ? (
               <>
                 <ul className="list-disc space-y-2 pl-5">
-                  <li>The coach explains concepts and helps you prepare questions for your care team.</li>
+                  <li>
+                    {AI_ASSISTANT_NAME} explains concepts and helps you prepare questions for your care team.
+                  </li>
                   <li>It does not diagnose, prescribe, or recommend medication or device changes.</li>
                   <li>Your chat is stored on this device only. Each message is sent to our API and may be processed by OpenAI when enabled for this deployment.</li>
                   <li>For urgent symptoms, use Help Now or emergency services.</li>

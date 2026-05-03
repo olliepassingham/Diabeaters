@@ -32,6 +32,7 @@ import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import { coachTopicForInAppNotification } from "@/lib/ai-coach/notification-topic-map";
+import { askAssistantAboutThisAriaLabel } from "@/lib/ai-coach/persona";
 
 export function NotificationBell() {
   try {
@@ -311,7 +312,7 @@ export function NotificationBell() {
                           <Button variant="ghost" size="icon" className="h-auto shrink-0 self-stretch px-2" asChild>
                             <Link
                               href={askHref}
-                              aria-label="Ask the coach about this"
+                              aria-label={askAssistantAboutThisAriaLabel()}
                               data-testid={`bell-notif-ask-${n.id}`}
                               onClick={(e) => {
                                 e.stopPropagation();

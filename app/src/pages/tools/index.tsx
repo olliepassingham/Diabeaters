@@ -34,6 +34,7 @@ import { CURATED_RESOURCES, type CuratedResource } from "@/lib/curated-resources
 import { openExternalUrl } from "@/lib/open-external-url";
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 
 type ToolDef = {
@@ -112,9 +113,9 @@ function patientToolsForHub(): ToolDef[] {
     id: "ai-coach",
     href: "/coach",
     icon: MessageCircle,
-    title: "Diabeaters coach",
+    title: AI_ASSISTANT_NAME,
     description:
-      "Educational coaching for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.",
+      `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.`,
   };
   return [coach, ...PATIENT_TOOLS];
 }
@@ -146,9 +147,9 @@ export function carerToolsForHub(): ToolDef[] {
     id: "ai-coach",
     href: "/coach?audience=supporter",
     icon: MessageCircle,
-    title: "Diabeaters coach",
+    title: AI_ASSISTANT_NAME,
     description:
-      "Educational coach for partners, family, friends, or carers of an adult with type 1 diabetes in the UK. Not medical advice.",
+      `${AI_ASSISTANT_NAME} is an educational guide for partners, family, friends, or carers of an adult with type 1 diabetes in the UK. Not medical advice.`,
   };
   return [coach, ...CARER_TOOLS];
 }

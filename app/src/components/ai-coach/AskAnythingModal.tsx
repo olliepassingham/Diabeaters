@@ -15,6 +15,7 @@ import { buildCoachHref } from "@/lib/ai-coach/links";
 import type { CoachTopicSlug } from "@/lib/ai-coach/topics";
 import type { CoachAudience } from "@/lib/ai-coach/types";
 import { isAiCoachEnabled } from "@/lib/flags";
+import { askAssistantModalTitle } from "@/lib/ai-coach/persona";
 
 const MAX_LEN = 500;
 
@@ -64,7 +65,7 @@ export function AskAnythingModal({ open, onOpenChange, audience, source }: AskAn
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="dialog-ask-anything">
         <DialogHeader>
-          <DialogTitle>Ask Diabeaters</DialogTitle>
+          <DialogTitle>{askAssistantModalTitle()}</DialogTitle>
           <DialogDescription>
             Anything about type 1 diabetes — clinic prep, sick day, supplies, travel, exercise.
           </DialogDescription>

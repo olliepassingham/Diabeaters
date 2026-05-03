@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { isAiCoachEnabled } from "@/lib/flags";
 import type { CoachTopicSlug } from "@/lib/ai-coach/topics";
 import { buildCoachHref } from "@/lib/ai-coach/links";
+import { scenarioAskAssistantLinkLabel } from "@/lib/ai-coach/persona";
 
 type Props = {
   topic: CoachTopicSlug;
@@ -12,7 +13,7 @@ type Props = {
   className?: string;
 };
 
-export function ScenarioCoachLink({ topic, label = "Ask coach", className }: Props) {
+export function ScenarioCoachLink({ topic, label = scenarioAskAssistantLinkLabel(), className }: Props) {
   if (!isAiCoachEnabled) return null;
   return (
     <Button variant="outline" size="sm" className={className ?? "min-h-11 whitespace-nowrap"} asChild>

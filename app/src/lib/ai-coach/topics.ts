@@ -1,3 +1,5 @@
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
+
 export const COACH_TOPIC_SLUGS = [
   "general",
   "exercise",
@@ -21,7 +23,7 @@ const TOPIC_CONFIG: Record<
   general: {
     label: "General",
     emptyHint:
-      "Ask a general question about type 1 diabetes, or ask how to prepare for a clinic visit. The coach cannot suggest doses or interpret CGM trends as treatment instructions.",
+      `Ask a general question about type 1 diabetes, or ask how to prepare for a clinic visit. ${AI_ASSISTANT_NAME} cannot suggest doses or interpret CGM trends as treatment instructions.`,
     starters: [
       "What should I bring to a routine diabetes clinic appointment?",
       "How can I describe glucose patterns to my team without focusing on exact numbers?",

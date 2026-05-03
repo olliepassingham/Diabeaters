@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { isAiCoachEnabled } from "@/lib/flags";
+import { openAssistantCtaLabel } from "@/lib/ai-coach/persona";
 
 export function CoachEntryCard() {
   if (!isAiCoachEnabled) return null;
@@ -9,7 +10,7 @@ export function CoachEntryCard() {
     <div className="animate-fade-in-up" style={{ animationDelay: "60ms" }} data-testid="dashboard-coach-entry">
       <Button asChild className="min-h-11 w-full sm:w-auto">
         <Link href="/coach" data-testid="link-dashboard-coach-open">
-          Open coach
+          {openAssistantCtaLabel()}
         </Link>
       </Button>
     </div>

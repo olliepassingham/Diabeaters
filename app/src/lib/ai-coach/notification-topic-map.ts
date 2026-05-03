@@ -10,7 +10,7 @@ function kindFromRow(row: InAppNotificationRow): string {
 }
 
 /**
- * Maps an in-app notification payload kind to a coach topic for "Ask the coach" handoffs.
+ * Maps an in-app notification payload kind to a coach topic for handoffs into the Dee chat flow.
  * Unknown kinds default to general (safe, educational).
  */
 export function coachTopicForInAppNotification(row: InAppNotificationRow): CoachTopicSlug {

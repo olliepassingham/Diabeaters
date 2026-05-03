@@ -67,6 +67,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageShell } from "@/components/layout";
 import { isAiCoachEnabled } from "@/lib/flags";
+import { scenarioAskAssistantLinkLabel } from "@/lib/ai-coach/persona";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
@@ -1217,7 +1218,7 @@ export default function Travel() {
                   className="text-foreground underline underline-offset-2 hover:text-primary"
                   data-testid="link-travel-active-coach"
                 >
-                  Ask the coach
+                  {scenarioAskAssistantLinkLabel()}
                 </Link>{" "}
                 for educational travel prompts — not medical advice.
               </p>
@@ -1511,7 +1512,7 @@ export default function Travel() {
                   className="text-foreground underline underline-offset-2 hover:text-primary"
                   data-testid="link-travel-entry-coach"
                 >
-                  Ask the coach
+                  {scenarioAskAssistantLinkLabel()}
                 </Link>{" "}
                 for travel-related educational prompts — not medical advice.
               </p>
