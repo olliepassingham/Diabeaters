@@ -8,6 +8,7 @@ import {
   Calendar,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Moon,
 } from "lucide-react";
 import { Link } from "wouter";
@@ -20,6 +21,7 @@ import {
   type Supply,
   type ScenarioState,
 } from "@/lib/storage";
+import { getTodayGlanceLine } from "@/lib/dashboard-health-status";
 
 export function SupplyTrackerTodaySection() {
   const { user } = useAuth();
@@ -288,10 +290,8 @@ export function SupplyTrackerEntryCard() {
 }
 
 export function TodayAtAGlanceCard() {
-  const { user } = useAuth();
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
-  const [appointmentsTick, setAppointmentsTick] = useState(0);
 
   useEffect(() => {
     const refresh = () => {
@@ -302,25 +302,29 @@ export function TodayAtAGlanceCard() {
     const onVis = () => {
       if (document.visibilityState === "visible") refresh();
     };
-    const onAppt = () => setAppointmentsTick((t) => t + 1);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refresh);
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
-    window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
-      window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
     };
-  }, [user?.id]);
+  }, []);
 
-  const upcomingAppointments: Appointment[] = useMemo(
-    () => (user?.id ? storage.getUpcomingAppointmentsForUser(user.id) : []),
-    [user?.id, appointmentsTick],
+  const suppliesNeedingAttention = useMemo(
+    () =>
+      supplies
+        .filter((s) => {
+          const st = storage.getSupplyStatus(s);
+          return st === "critical" || st === "low";
+        })
+        .sort((a, b) => {
+          const o = (x: Supply) => (storage.getSupplyStatus(x) === "critical" ? 0 : 1);
+          return o(a) - o(b);
+        }),
+    [supplies],
   );
-
-  const criticalSupplies = supplies.filter((s) => storage.getSupplyStatus(s) === "critical");
   const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
   const hour = new Date().getHours();
   const isEvening = hour >= 19 || hour < 6;
@@ -341,27 +345,7 @@ export function TodayAtAGlanceCard() {
     return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getStatusMessage = () => {
-    if (criticalSupplies.length > 0) {
-      return { type: "warning" as const, message: "Critical supplies need attention" };
-    }
-    if (scenarioState.sickDayActive) {
-      return { type: "info" as const, message: "Sick day mode active" };
-    }
-    if (scenarioState.travelModeActive) {
-      return {
-        type: "info" as const,
-        message: `Travel mode active${scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}`,
-      };
-    }
-    return { type: "ok" as const, message: "All clear for now" };
-  };
-
-  const status = getStatusMessage();
-
-  const nextAppointment = upcomingAppointments.find((a) => daysUntil(a.date) !== null) ?? null;
-  const nextAppointmentDays = nextAppointment ? daysUntil(nextAppointment.date) : null;
-  const showNextAppointment = nextAppointment && nextAppointmentDays !== null && nextAppointmentDays >= 0 && nextAppointmentDays <= 7;
+  const status = useMemo(() => getTodayGlanceLine(supplies, scenarioState), [supplies, scenarioState]);
 
   const holidayPrep: HolidayPrep | null = storage.getHolidayPrep?.() ?? null;
   const departDays = holidayPrep ? daysUntil(holidayPrep.departureDate) : null;
@@ -376,27 +360,6 @@ export function TodayAtAGlanceCard() {
       ((travelPlan as { travelType?: unknown }).travelType as string) === "international")
       ? ((travelPlan as { travelType?: unknown }).travelType as "domestic" | "international")
       : null;
-
-  const nextAppointmentMeta =
-    showNextAppointment && nextAppointment
-      ? (() => {
-          const d = parseISODateOnly(nextAppointment.date);
-          if (!d) return "";
-          return `${d.toLocaleDateString("en-GB", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-          })}${nextAppointment.time ? ` · ${String(nextAppointment.time)}` : ""}${
-            typeof nextAppointmentDays === "number"
-              ? nextAppointmentDays === 0
-                ? " · today"
-                : nextAppointmentDays === 1
-                  ? " · in 1d"
-                  : ` · in ${nextAppointmentDays}d`
-              : ""
-          }`;
-        })()
-      : "";
 
   return (
     <Card
@@ -424,12 +387,14 @@ export function TodayAtAGlanceCard() {
             status.type === "warning"
               ? "bg-red-500/10 dark:bg-red-950/20"
               : status.type === "info"
-                ? "bg-muted/50 dark:bg-muted/20"
+                ? "bg-amber-500/12 dark:bg-amber-950/25"
                 : "bg-green-500/10 dark:bg-green-950/25"
           }`}
         >
           {status.type === "warning" ? (
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" aria-hidden />
+          ) : status.type === "info" ? (
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" aria-hidden />
           ) : (
             <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-500" aria-hidden />
           )}
@@ -438,34 +403,8 @@ export function TodayAtAGlanceCard() {
           </span>
         </div>
 
-        <div className="mt-3 space-y-2 pl-0.5" data-testid="dashboard-today-extras">
-          {showNextAppointment ? (
-            <Link href="/appointments" className="block">
-              <div
-                className="cursor-pointer rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/40 dark:bg-muted/10 dark:hover:bg-muted/20"
-                data-testid="dashboard-today-next-appointment"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Next appointment
-                </p>
-                <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-                  {nextAppointment!.title || "Appointment"}
-                </p>
-                {nextAppointmentMeta ? (
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{nextAppointmentMeta}</p>
-                ) : null}
-              </div>
-            </Link>
-          ) : (
-            <div
-              className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-sm text-muted-foreground"
-              data-testid="dashboard-today-no-appointments"
-            >
-              No appointments this week
-            </div>
-          )}
-
-          {showTripCountdown ? (
+        {showTripCountdown ? (
+          <div className="mt-3 pl-0.5" data-testid="dashboard-today-extras">
             <Link href="/scenarios/travel" className="block">
               <div
                 className="cursor-pointer rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/40 dark:bg-muted/10 dark:hover:bg-muted/20"
@@ -482,10 +421,10 @@ export function TodayAtAGlanceCard() {
                 </p>
               </div>
             </Link>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        {(hasActiveScenario || criticalSupplies.length > 0 || isEvening) && (
+        {(hasActiveScenario || suppliesNeedingAttention.length > 0 || isEvening) && (
           <div className="mt-3 space-y-3">
             {hasActiveScenario && (
               <div className="space-y-2">
@@ -503,17 +442,23 @@ export function TodayAtAGlanceCard() {
               </div>
             )}
 
-            {criticalSupplies.length > 0 && (
+            {suppliesNeedingAttention.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Running low</p>
-                {criticalSupplies.slice(0, 3).map((supply) => (
-                  <div key={supply.id} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="truncate text-muted-foreground">{supply.name}</span>
-                    <Badge variant="destructive" className="shrink-0 text-xs">
-                      {storage.getDaysRemaining(supply)}d left
-                    </Badge>
-                  </div>
-                ))}
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supplies</p>
+                {suppliesNeedingAttention.slice(0, 4).map((supply) => {
+                  const st = storage.getSupplyStatus(supply);
+                  return (
+                    <div key={supply.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate text-muted-foreground">{supply.name}</span>
+                      <Badge
+                        variant={st === "critical" ? "destructive" : "secondary"}
+                        className="shrink-0 text-xs"
+                      >
+                        {storage.getDaysRemaining(supply)}d left
+                      </Badge>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

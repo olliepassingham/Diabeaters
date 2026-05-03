@@ -52,8 +52,7 @@ import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerT
 import { isCommunityEnabled } from "@/lib/flags";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
-
-type HealthStatus = "stable" | "watch" | "action";
+import { getHealthStatus, type HealthStatus } from "@/lib/dashboard-health-status";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
@@ -131,32 +130,6 @@ async function runHypoTreatmentPipeline(
       variant: "destructive",
     });
   }
-}
-
-function getHealthStatus(supplies: LocalSupply[], scenarioState: ScenarioState): HealthStatus {
-  const supplyStatuses = supplies.map(s => storage.getSupplyStatus(s));
-  const hasCritical = supplyStatuses.includes("critical");
-  const hasLow = supplyStatuses.includes("low");
-  
-  const bothActive = scenarioState.sickDayActive && scenarioState.travelModeActive;
-  
-  if (bothActive) {
-    return "action";
-  }
-  
-  if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") {
-    return "action";
-  }
-  
-  if (hasCritical) {
-    return "action";
-  }
-  
-  if (hasLow || scenarioState.sickDayActive || scenarioState.travelModeActive) {
-    return "watch";
-  }
-  
-  return "stable";
 }
 
 function StatusPill({ status }: { status: HealthStatus }) {
