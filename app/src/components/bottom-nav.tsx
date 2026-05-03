@@ -1,8 +1,9 @@
 import { Home, Shapes, Users, Wrench, User } from "lucide-react";
 import { isCommunityEnabled } from "@/lib/flags";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { navigateWithViewTransition } from "@/lib/nav-view-transition";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
@@ -146,7 +147,7 @@ function carerTabs(showCommunityTab: boolean): TabDef[] {
 }
 
 export function BottomNav() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const pathname = location.split("?")[0] ?? location;
   const [hash, setHash] = useState(() =>
     typeof window !== "undefined" ? window.location.hash.slice(1) : "",
@@ -238,53 +239,50 @@ export function BottomNav() {
     >
       {tabs.map((tab) => {
         const active = tab.isActive(pathname, hash);
+        const warmPrefetch = () => {
+          if (tab.href === "/community") {
+            prefetchCommunity();
+            prefetchCommunityMessages();
+          }
+          if (tab.href === "/account") prefetchAccount();
+          if (tab.href === "/tools") prefetchTools();
+          if (tab.href === "/scenarios") prefetchScenarios();
+        };
         return (
-          <Link
+          <motion.a
             key={tab.testId}
             href={tab.href}
-            className="flex w-full justify-center min-w-0"
-            onPointerEnter={() => {
-              if (tab.href === "/community") {
-                prefetchCommunity();
-                prefetchCommunityMessages();
+            whileTap={{ scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 520, damping: 28 }}
+            className={`flex min-h-11 w-full min-w-0 max-w-[6.5rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 no-underline transition-colors duration-150 ease-out ${
+              active
+                ? "bg-primary/[0.14] text-primary shadow-sm dark:bg-primary/20"
+                : "text-muted-foreground hover:bg-muted/55"
+            }`}
+            data-testid={tab.testId}
+            onPointerEnter={warmPrefetch}
+            onTouchStart={warmPrefetch}
+            onClick={(e) => {
+              if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              if (tab.href === pathname) {
+                e.preventDefault();
+                return;
               }
-              if (tab.href === "/account") prefetchAccount();
-              if (tab.href === "/tools") prefetchTools();
-              if (tab.href === "/scenarios") prefetchScenarios();
-            }}
-            onTouchStart={() => {
-              if (tab.href === "/community") {
-                prefetchCommunity();
-                prefetchCommunityMessages();
-              }
-              if (tab.href === "/account") prefetchAccount();
-              if (tab.href === "/tools") prefetchTools();
-              if (tab.href === "/scenarios") prefetchScenarios();
+              e.preventDefault();
+              navigateWithViewTransition(setLocation, tab.href);
             }}
           >
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.94 }}
-              transition={{ type: "spring", stiffness: 520, damping: 28 }}
-              className={`flex min-h-11 max-w-[6.5rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 transition-colors duration-150 ease-out ${
-                active
-                  ? "bg-primary/[0.14] text-primary shadow-sm dark:bg-primary/20"
-                  : "text-muted-foreground hover:bg-muted/55"
+            <tab.icon
+              className={`${iconClass} shrink-0 ${active ? "stroke-[2]" : "stroke-[1.5] opacity-90"}`}
+            />
+            <span
+              className={`text-[11px] font-medium leading-none text-center whitespace-nowrap ${
+                active ? "text-primary" : "text-muted-foreground"
               }`}
-              data-testid={tab.testId}
             >
-              <tab.icon
-                className={`${iconClass} shrink-0 ${active ? "stroke-[2]" : "stroke-[1.5] opacity-90"}`}
-              />
-              <span
-                className={`text-[11px] font-medium leading-none text-center whitespace-nowrap ${
-                  active ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                {tab.title}
-              </span>
-            </motion.button>
-          </Link>
+              {tab.title}
+            </span>
+          </motion.a>
         );
       })}
     </nav>
