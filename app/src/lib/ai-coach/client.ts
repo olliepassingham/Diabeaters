@@ -4,7 +4,7 @@
 
 import { getBearerAuthHeadersForEdgeFunctions } from "@/lib/edge-function-invoke-auth";
 import { getSupabase } from "@/lib/supabase";
-import type { CoachResponse, CoachTurn } from "./types";
+import type { CoachAudience, CoachResponse, CoachTurn } from "./types";
 import { buildAiCoachClientPayload } from "./contextSummary";
 
 export class AiCoachHttpError extends Error {
@@ -26,6 +26,8 @@ function isCoachResponseShape(o: Record<string, unknown>): o is Record<string, u
 export async function sendCoachMessage(args: {
   message: string;
   history: CoachTurn[];
+  /** Defaults to `"patient"` when omitted (matches server default). */
+  audience?: CoachAudience;
 }): Promise<CoachResponse> {
   const supabase = getSupabase();
   if (!supabase) {
@@ -44,12 +46,14 @@ export async function sendCoachMessage(args: {
   }
 
   const payload = buildAiCoachClientPayload();
+  const audience: CoachAudience = args.audience === "supporter" ? "supporter" : "patient";
   const body = {
     message: args.message.trim(),
     history: args.history.slice(-12),
     lastFortnight: payload.lastFortnight,
     ratiosAreSet: payload.ratiosAreSet,
     bgUnits: payload.bgUnits,
+    audience,
   };
 
   const endpoint = `${url.replace(/\/$/, "")}/functions/v1/ai_coach`;

@@ -9,6 +9,18 @@ export type CoachTurn = {
   content: string;
 };
 
+/**
+ * Who the coach is talking to.
+ *
+ * - `patient`  — default; the signed-in user who has T1D themselves.
+ * - `supporter` — Supporter Mode (carer / partner / family). The same hard
+ *                 rules apply, but the prompt is reworded to address the
+ *                 supporter, not the person with diabetes.
+ *
+ * Client-asserted only for now; safety guardrails do not depend on this.
+ */
+export type CoachAudience = "patient" | "supporter";
+
 export type CoachAction = {
   label: string;
   href: string;

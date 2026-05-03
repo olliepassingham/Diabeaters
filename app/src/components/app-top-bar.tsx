@@ -12,6 +12,7 @@ import { FaceLogo } from "@/components/face-logo";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { isCommunityEnabled } from "@/lib/flags";
+import { prefetchAccount, prefetchCommunityMessages } from "@/components/bottom-nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,6 +84,8 @@ function HeaderProfileDropdown({ onLogout }: { onLogout: () => void | Promise<vo
           className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border bg-card p-0 shadow-sm outline-none transition-opacity hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           data-testid="button-profile-menu"
           aria-label="Account menu"
+          onPointerEnter={prefetchAccount}
+          onTouchStart={prefetchAccount}
         >
           {showImg ? (
             <img
@@ -103,8 +106,10 @@ function HeaderProfileDropdown({ onLogout }: { onLogout: () => void | Promise<vo
         <DropdownMenuItem
           className="cursor-pointer"
           data-testid="menu-item-account"
+          onPointerEnter={prefetchAccount}
           onSelect={(e) => {
             e.preventDefault();
+            prefetchAccount();
             setLocation("/account");
           }}
         >
@@ -162,7 +167,13 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
           {isCommunityEnabled && (
             <Button variant="ghost" size="icon" asChild>
-              <Link href="/community/messages" aria-label="Messages" data-testid="button-messages">
+              <Link
+                href="/community/messages"
+                aria-label="Messages"
+                data-testid="button-messages"
+                onPointerEnter={prefetchCommunityMessages}
+                onTouchStart={prefetchCommunityMessages}
+              >
                 <MessageCircle className="h-5 w-5" />
               </Link>
             </Button>

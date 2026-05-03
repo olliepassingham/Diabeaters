@@ -3,8 +3,13 @@ import {
   extractRefusalFromMessage,
   normalizeAssistantContent,
   parseCoachLlmJson,
+  pickSystemPromptForAudience,
   stripMarkdownJsonFence,
 } from "./llmClient.ts";
+import {
+  AI_COACH_SUPPORTER_SYSTEM_PROMPT,
+  AI_COACH_SYSTEM_PROMPT,
+} from "./systemPrompt.ts";
 
 describe("normalizeAssistantContent", () => {
   it("passes through strings", () => {
@@ -99,5 +104,19 @@ describe("parseCoachLlmJson", () => {
 
   it("rejects missing reply", () => {
     expect(parseCoachLlmJson('{"suggestedQuestions":[]}')).toBeNull();
+  });
+});
+
+describe("pickSystemPromptForAudience", () => {
+  it("returns the patient prompt by default", () => {
+    expect(pickSystemPromptForAudience("patient")).toBe(AI_COACH_SYSTEM_PROMPT);
+  });
+
+  it("returns the supporter prompt when audience is supporter", () => {
+    expect(pickSystemPromptForAudience("supporter")).toBe(AI_COACH_SUPPORTER_SYSTEM_PROMPT);
+  });
+
+  it("supporter and patient prompts differ", () => {
+    expect(AI_COACH_SUPPORTER_SYSTEM_PROMPT).not.toBe(AI_COACH_SYSTEM_PROMPT);
   });
 });

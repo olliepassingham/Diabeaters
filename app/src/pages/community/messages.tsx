@@ -122,6 +122,8 @@ export default function CommunityMessagesPage() {
   const { toast } = useToast();
   const [threads, setThreads] = useState<ThreadWithMembers[]>([]);
   const [loading, setLoading] = useState(true);
+  /** After thread rows render, last-message previews + avatars still loading. */
+  const [threadDetailsLoading, setThreadDetailsLoading] = useState(false);
   const [handleInput, setHandleInput] = useState("");
   const [starting, setStarting] = useState(false);
   /** Other user id -> display name (until profile batch loads) */
@@ -316,6 +318,8 @@ export default function CommunityMessagesPage() {
   );
 
   const refresh = useCallback(async () => {
+    setThreadDetailsLoading(false);
+    setLoading(true);
     const res = await fetchDmThreadsForCurrentUser();
     if (res.error) {
       toast({
@@ -342,6 +346,10 @@ export default function CommunityMessagesPage() {
       return;
     }
 
+    // Show conversation rows immediately; fill previews + avatars in a follow-up (faster first paint).
+    setLoading(false);
+    setThreadDetailsLoading(true);
+
     const threadIds = list.map((t) => t.id);
     const otherIds = user?.id
       ? [
@@ -353,51 +361,53 @@ export default function CommunityMessagesPage() {
         ]
       : [];
 
-    const [lastRes, profileMap, settingsRes] = await Promise.all([
-      fetchLatestDmMessageForThreads(threadIds),
-      otherIds.length > 0 ? getProfilesByIds(otherIds) : Promise.resolve(new Map()),
-      isSupabaseConfigured() ? fetchDmThreadUserSettings(threadIds) : Promise.resolve({ data: new Map(), error: null }),
-    ]);
+    try {
+      const [lastRes, profileMap, settingsRes] = await Promise.all([
+        fetchLatestDmMessageForThreads(threadIds),
+        otherIds.length > 0 ? getProfilesByIds(otherIds) : Promise.resolve(new Map()),
+        isSupabaseConfigured() ? fetchDmThreadUserSettings(threadIds) : Promise.resolve({ data: new Map(), error: null }),
+      ]);
 
-    if (lastRes.error) {
-      toast({
-        title: "Could not load last messages",
-        description: lastRes.error.message,
-        variant: "destructive",
-      });
-    }
-
-    const lastRecord: Record<string, DmMessageRow | null> = {};
-    for (const [tid, row] of lastRes.data) {
-      lastRecord[tid] = row;
-    }
-    setLastByThreadId(lastRecord);
-
-    const av: Record<string, string | null> = {};
-    const lbl: Record<string, string> = {};
-    const hdl: Record<string, string> = {};
-    for (const id of otherIds) {
-      const p = profileMap.get(id);
-      av[id] = p?.avatar_url ?? null;
-      lbl[id] = p?.full_name?.trim() || shortId(id);
-      hdl[id] = (p?.public_handle ?? "").trim();
-    }
-    setAvatarByUserId(av);
-    setLabels(lbl);
-    setHandleByUserId(hdl);
-
-    if (settingsRes?.data) {
-      const muted: Record<string, boolean> = {};
-      const hidden: Record<string, boolean> = {};
-      for (const [tid, row] of settingsRes.data.entries()) {
-        muted[tid] = Boolean(row.muted);
-        hidden[tid] = Boolean(row.hidden);
+      if (lastRes.error) {
+        toast({
+          title: "Could not load last messages",
+          description: lastRes.error.message,
+          variant: "destructive",
+        });
       }
-      setServerMutedByThreadId(muted);
-      setServerHiddenByThreadId(hidden);
-    }
 
-    setLoading(false);
+      const lastRecord: Record<string, DmMessageRow | null> = {};
+      for (const [tid, row] of lastRes.data) {
+        lastRecord[tid] = row;
+      }
+      setLastByThreadId(lastRecord);
+
+      const av: Record<string, string | null> = {};
+      const lbl: Record<string, string> = {};
+      const hdl: Record<string, string> = {};
+      for (const id of otherIds) {
+        const p = profileMap.get(id);
+        av[id] = p?.avatar_url ?? null;
+        lbl[id] = p?.full_name?.trim() || shortId(id);
+        hdl[id] = (p?.public_handle ?? "").trim();
+      }
+      setAvatarByUserId(av);
+      setLabels(lbl);
+      setHandleByUserId(hdl);
+
+      if (settingsRes?.data) {
+        const muted: Record<string, boolean> = {};
+        const hidden: Record<string, boolean> = {};
+        for (const [tid, row] of settingsRes.data.entries()) {
+          muted[tid] = Boolean(row.muted);
+          hidden[tid] = Boolean(row.hidden);
+        }
+        setServerMutedByThreadId(muted);
+        setServerHiddenByThreadId(hidden);
+      }
+    } finally {
+      setThreadDetailsLoading(false);
+    }
   }, [toast, user?.id]);
 
   useEffect(() => {
@@ -719,7 +729,11 @@ export default function CommunityMessagesPage() {
                           ) : null}
                         </p>
                         <p className={`text-sm truncate ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
-                          {preview}
+                          {threadDetailsLoading ? (
+                            <Skeleton className="mt-0.5 h-4 w-[min(14rem,72%)] rounded-md" aria-hidden />
+                          ) : (
+                            preview
+                          )}
                         </p>
                       </div>
                       <DropdownMenu>

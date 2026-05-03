@@ -16,6 +16,7 @@ export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
   // Remounting here causes all child route trees to reset and refetch, which makes tab switching feel slow.
   const isBottomTabRoute =
     pathname === "/" ||
+    pathname === "/account" ||
     pathname.startsWith("/scenarios") ||
     pathname.startsWith("/community") ||
     pathname.startsWith("/tools") ||

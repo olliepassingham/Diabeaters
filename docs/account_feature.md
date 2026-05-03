@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Account page (`/account`) provides profile management: display name, avatar upload, password reset, and sign out. It is protected by `requireAuth` (via `AuthOnlyLayout`): unauthenticated users are redirected to `/login`. Unverified users can still use the page; an inline banner prompts them to verify.
+The Account page (`/account`) provides profile management: display name, avatar upload, password reset, and sign out. It sits under `ProtectedLayout` in `App.tsx`: unauthenticated users are redirected to `/login`. Unverified users may open `/account` only (to resend verification and manage basics); other routes redirect them to `/check-email`. While unverified on `/account`, the app uses `UnverifiedAccountShell` (top bar + account content, no full dashboard chrome or bottom tab bar). Verified users see the same page inside the main shell with bottom navigation.
 
 ## Full feature behaviour
 

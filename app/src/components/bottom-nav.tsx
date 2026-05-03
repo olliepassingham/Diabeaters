@@ -9,6 +9,7 @@ import { useProfile } from "@/lib/profile";
 const iconClass = "h-[23px] w-[23px]";
 
 let prefetchedCommunity = false;
+let prefetchedCommunityMessages = false;
 let prefetchedAccount = false;
 let prefetchedTools = false;
 let prefetchedScenarios = false;
@@ -19,7 +20,14 @@ function prefetchCommunity(): void {
   void import("@/pages/community/index");
 }
 
-function prefetchAccount(): void {
+/** DM inbox; separate chunk from feed — warm when community is enabled. */
+export function prefetchCommunityMessages(): void {
+  if (prefetchedCommunityMessages) return;
+  prefetchedCommunityMessages = true;
+  void import("@/pages/community/messages");
+}
+
+export function prefetchAccount(): void {
   if (prefetchedAccount) return;
   prefetchedAccount = true;
   void import("@/pages/account");
@@ -165,15 +173,26 @@ export function BottomNav() {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
-  /** Warm lazy chunks for bottom-nav targets so first taps feel instant (after idle / short delay). */
+  /**
+   * Warm lazy chunks for bottom-nav targets so first taps feel instant.
+   * Supporters mostly hop Supporter ↔ Feed ↔ Account ↔ Messages — start those chunks immediately
+   * instead of waiting for idle (patient mode still defers to idle to avoid competing with LCP).
+   */
   useEffect(() => {
     if (typeof window === "undefined") return;
     const run = () => {
       prefetchTools();
       prefetchAccount();
       if (!isCarerMode) prefetchScenarios();
-      if (showCommunityTab) prefetchCommunity();
+      if (showCommunityTab) {
+        prefetchCommunity();
+        prefetchCommunityMessages();
+      }
     };
+    if (isCarerMode) {
+      run();
+      return;
+    }
     if (typeof window.requestIdleCallback === "function") {
       const idleId = window.requestIdleCallback(run, { timeout: 4500 });
       return () => window.cancelIdleCallback(idleId);
@@ -224,13 +243,19 @@ export function BottomNav() {
             href={tab.href}
             className="flex w-full justify-center min-w-0"
             onPointerEnter={() => {
-              if (tab.href === "/community") prefetchCommunity();
+              if (tab.href === "/community") {
+                prefetchCommunity();
+                prefetchCommunityMessages();
+              }
               if (tab.href === "/account") prefetchAccount();
               if (tab.href === "/tools") prefetchTools();
               if (tab.href === "/scenarios") prefetchScenarios();
             }}
             onTouchStart={() => {
-              if (tab.href === "/community") prefetchCommunity();
+              if (tab.href === "/community") {
+                prefetchCommunity();
+                prefetchCommunityMessages();
+              }
               if (tab.href === "/account") prefetchAccount();
               if (tab.href === "/tools") prefetchTools();
               if (tab.href === "/scenarios") prefetchScenarios();

@@ -136,6 +136,23 @@ export const CARER_TOOLS: ToolDef[] = [
   },
 ];
 
+/**
+ * Carer tools list used by the live hub. Prepends the supporter-mode coach
+ * tile when the AI coach feature flag is on, mirroring `patientToolsForHub`.
+ */
+export function carerToolsForHub(): ToolDef[] {
+  if (!isAiCoachEnabled) return CARER_TOOLS;
+  const coach: ToolDef = {
+    id: "ai-coach",
+    href: "/coach?audience=supporter",
+    icon: MessageCircle,
+    title: "Diabeaters coach",
+    description:
+      "Educational coach for partners, family, friends, or carers of an adult with type 1 diabetes in the UK. Not medical advice.",
+  };
+  return [coach, ...CARER_TOOLS];
+}
+
 function ToolCard({
   href,
   icon: Icon,
@@ -299,11 +316,14 @@ export function ToolsHubPage({
   const [previewResource, setPreviewResource] = useState<CuratedResource | null>(null);
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
-  // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` when the
-  // feature is on. It must be included here — otherwise the tile exists in `tools` but never renders.
+  // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` /
+  // `carerToolsForHub()` when the feature is on. It must be included here — otherwise the tile
+  // exists in `tools` but never renders.
   const actNowIds: readonly string[] =
     hubVariant === "carer"
-      ? ["hypo-help"]
+      ? byId.has("ai-coach")
+        ? ["ai-coach", "hypo-help"]
+        : ["hypo-help"]
       : byId.has("ai-coach")
         ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
         : ["insulin-calculator", "hypo-help", "correction-helper"];
@@ -471,7 +491,7 @@ export default function ToolsPage() {
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
-  const tileCount = isCarerMode ? CARER_TOOLS.length : patientToolsForHub().length;
+  const tileCount = isCarerMode ? carerToolsForHub().length : patientToolsForHub().length;
 
   useEffect(() => {
     if (loading) return;
@@ -501,6 +521,6 @@ export default function ToolsPage() {
     );
   }
   if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
-  if (isCarerMode) return <ToolsHubPage tools={CARER_TOOLS} hubVariant="carer" />;
+  if (isCarerMode) return <ToolsHubPage tools={carerToolsForHub()} hubVariant="carer" />;
   return <ToolsHubPage tools={patientToolsForHub()} hubVariant="patient" />;
 }

@@ -9,6 +9,7 @@ export const COACH_TOPIC_SLUGS = [
   "driving",
   "alcohol",
   "pump-failure",
+  "supporter",
 ] as const;
 
 export type CoachTopicSlug = (typeof COACH_TOPIC_SLUGS)[number];
@@ -115,6 +116,16 @@ const TOPIC_CONFIG: Record<
       "What should a written pump-failure or infusion-set backup plan typically cover?",
       "What supplies are worth keeping accessible every day if I use a pump?",
       "How can I rehearse or review these steps with my care team before something goes wrong?",
+    ],
+  },
+  supporter: {
+    label: "Supporter",
+    emptyHint:
+      "General education for someone supporting an adult with type 1 diabetes in the UK. Not personal medical advice for them — never override their plan or care team.",
+    starters: [
+      "How can I support someone going through a hypo without taking over their plan?",
+      "What questions could I prepare for a clinic visit on their behalf?",
+      "What signs would mean I should call urgent care or emergency services for them?",
     ],
   },
 };

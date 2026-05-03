@@ -22,7 +22,7 @@
 | `/family-carers` (beta) | `client/src/pages/family-carers.tsx` | Carer links, permissions, privacy, activity log (local) |
 | `/carer-view` (beta) | `client/src/pages/carer-view.tsx` | Carer dashboard view |
 | `/ratios` | `client/src/pages/ratios.tsx` | Insulin ratios by meal, correction factor, target range, history/snapshots |
-| `/account` | `client/src/pages/account.tsx` | Account: email, verification pill, display name, avatar upload, reset password, logout, request deletion (mailto) |
+| `/account` | `app/src/pages/account/index.tsx` | Account: email, verification pill, display name, avatar upload, reset password, logout, request deletion (mailto) |
 | `/login` | `client/src/pages/login.tsx` | Login: email/password, OAuth (Apple, Google, Microsoft) |
 | `/signup` | `client/src/pages/signup.tsx` | Signup: email/password, OAuth; redirect to `/check-email` |
 | `/auth/callback` | `client/src/pages/auth-callback.tsx` | OAuth callback; redirect to `/` or `/check-email` |
@@ -78,8 +78,8 @@
 | Feature | Key user flows | Tables / storage | Env / TODOs |
 |--------|----------------|------------------|--------------|
 | **Onboarding** | Multi-step flow; struggle choice; completion stored; redirect to `/`, `/supplies`, `/adviser?tab=meal|exercise` by struggle | Supabase: `profiles.onboarding_complete`; fallback `diabeater_onboarding_completed` in localStorage. `client/src/lib/onboarding.ts`: getOrCreateProfile, setOnboardingComplete. | — |
-| **Protected routes** | All app routes under `ProtectedLayout`: require auth + verified; else redirect to `/login` or `/check-email`. | Auth session. | — |
-| **Account route** | `AuthOnlyLayout`: requires auth only (unverified can access /account). | — | — |
+| **Protected routes** | `ProtectedLayout`: require auth; unverified users redirect to `/check-email` except on `/account`. | Auth session. | — |
+| **Account route** | `/account` under `AuthenticatedShell`; unverified users get `UnverifiedAccountShell` (slim chrome, no bottom nav). | — | — |
 | **Verification** | requireVerified(user); check-email resend link; auth callback handles post-verify redirect. | Supabase Auth. | — |
 
 ### 2.4 UI / components

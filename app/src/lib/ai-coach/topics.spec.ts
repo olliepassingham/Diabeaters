@@ -14,6 +14,11 @@ describe("normalizeCoachTopicParam", () => {
     expect(normalizeCoachTopicParam(" sick-day ")).toBe("sick-day");
   });
 
+  it("accepts the supporter slug", () => {
+    expect(normalizeCoachTopicParam("supporter")).toBe("supporter");
+    expect(normalizeCoachTopicParam("Supporter")).toBe("supporter");
+  });
+
   it("every slug has config", () => {
     for (const slug of COACH_TOPIC_SLUGS) {
       const c = getCoachTopicConfig(slug);
@@ -21,5 +26,12 @@ describe("normalizeCoachTopicParam", () => {
       expect(c.emptyHint.length).toBeGreaterThan(0);
       expect(c.starters.length).toBeGreaterThan(0);
     }
+  });
+
+  it("supporter config has supporter-flavoured copy", () => {
+    const c = getCoachTopicConfig("supporter");
+    expect(c.label).toMatch(/Supporter/i);
+    expect(c.emptyHint.toLowerCase()).toContain("supporting");
+    expect(c.starters.length).toBeGreaterThanOrEqual(3);
   });
 });

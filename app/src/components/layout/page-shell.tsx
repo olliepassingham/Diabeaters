@@ -30,7 +30,7 @@ const densityClass = {
  * Primary page container: centered max-width + consistent vertical rhythm between sections.
  *
  * **Width & spacing contract**
- * - Horizontal inset + clearance above the fixed BottomNav come from `AuthenticatedShell` / `AccountShell`
+ * - Horizontal inset + clearance above the fixed BottomNav come from `AuthenticatedShell`
  *   `<main>` in `App.tsx` — avoid stacking another full nav-height padding here.
  * - Default `pb-4` is light rhythm only; override via `className` when a screen needs more tail space.
  */

@@ -113,6 +113,10 @@ const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
 const MAIN_BOTTOM_SCROLL_PADDING =
   "calc(var(--bottom-nav-height, 7.5rem) + env(safe-area-inset-bottom, 0px) + 1rem)";
 
+/** When BottomNav is hidden (e.g. unverified `/account` slim shell). */
+const MAIN_BOTTOM_SCROLL_PADDING_NO_NAV =
+  "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)";
+
 function RouteFallback() {
   return (
     <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
@@ -289,12 +293,17 @@ function SessionLoadingSkeleton() {
   );
 }
 
-/** Protects the main app layout: redirects to /login when not authenticated, /check-email when not verified. */
+/**
+ * Protects the main app layout: redirects to /login when not authenticated.
+ * Unverified users are sent to /check-email except on `/account`, where they can resend verification.
+ * `/account` uses `AuthenticatedShell` with a slimmer inner shell (no bottom nav) until verified.
+ */
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const { loading: linkedPatientLoading } = useLinkedPatient();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
+  const pathOnly = (pathname || "/").split("?")[0] ?? pathname;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -303,6 +312,9 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!loading && user && !isUserVerified(user)) {
+      if (pathOnly === "/account") {
+        return;
+      }
       const next = getSafeNext(pathname, search);
       try {
         sessionStorage.setItem("diabeater_post_verify_next", next);
@@ -311,7 +323,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
       }
       setLocation(`/check-email?message=${encodeURIComponent("Please verify your email to continue.")}`);
     }
-  }, [loading, user, pathname, search, setLocation]);
+  }, [loading, user, pathname, search, setLocation, pathOnly]);
 
   if (loading || linkedPatientLoading) {
     return (
@@ -323,31 +335,16 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user || !isUserVerified(user)) {
+  if (!user) {
     return null;
   }
 
-  return <>{children}</>;
-}
-
-/** Requires user only (not verification). Used for /account so unverified users can resend verification. */
-function AuthOnlyLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const [pathname, setLocation] = useLocation();
-  const search = useSearch();
-
-  useEffect(() => {
-    if (!loading && !user) {
-      const next = getSafeNext(pathname, search);
-      setLocation(`/login?next=${encodeURIComponent(next)}`);
+  if (!isUserVerified(user)) {
+    if (pathOnly === "/account") {
+      return <>{children}</>;
     }
-  }, [loading, user, pathname, search, setLocation]);
-
-  if (loading) {
-    return <SessionLoadingSkeleton />;
+    return null;
   }
-
-  if (!user) return null;
 
   return <>{children}</>;
 }
@@ -379,6 +376,12 @@ function isCommunityPath(pathOnly: string): boolean {
   return p === "/community" || p.startsWith("/community/");
 }
 
+/** /coach is allowed in Supporter Mode (with `?audience=supporter` for prompt fork). */
+function isCoachPath(pathOnly: string): boolean {
+  const p = (pathOnly || "/").split("?")[0] ?? "/";
+  return p === "/coach";
+}
+
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [location, setLocation] = useLocation();
@@ -397,7 +400,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (isCarerMode && !isCommunityPath(pathOnly)) {
+    if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) {
       setLocation("/carer-view");
       return;
     }
@@ -411,7 +414,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCarerMode && !isCommunityPath(pathOnly)) return null;
+  if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) return null;
   if (hasCarerIntent() || hasPendingCarer()) return null;
   return <>{children}</>;
 }
@@ -421,6 +424,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/carer-view" || p.startsWith("/carer-view/")) return true;
   if (p === "/tools" || p.startsWith("/tools/")) return true;
   if (p === "/education" || p.startsWith("/education/")) return true;
+  if (p === "/coach") return true;
   if (p === "/notifications") return true;
   if (p === "/account") return true;
   if (p === "/settings") return true;
@@ -503,6 +507,11 @@ function InnerRouter() {
       <Route path="/carer-view" component={CarerView} />
       <Route path="/supporter-profile">
         <Redirect to="/account" replace />
+      </Route>
+      <Route path="/account">
+        <Suspense fallback={<RouteFallback />}>
+          <Account />
+        </Suspense>
       </Route>
       <Route path="/family-carers" component={FamilyCarersGate} />
       <Route path="/notifications" component={NotificationsPage} />
@@ -859,8 +868,48 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
   return { show, dismiss, enable };
 }
 
+/**
+ * Minimal chrome for signed-in but unverified users on `/account` only (resend verification, profile basics).
+ * Omits offline banner, status strip, supply/low-stock pollers, iOS notification upsell, and BottomNav
+ * (other tabs would redirect unverified users to check-email).
+ */
+function UnverifiedAccountShell({
+  isCarerMode,
+  onBrandClick,
+  onLogout,
+}: {
+  isCarerMode: boolean;
+  onBrandClick: () => void;
+  onLogout: () => void | Promise<void>;
+}) {
+  return (
+    <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
+      <ClinicalPrefsCloudSync />
+      <SickDayCloudRepairSync />
+      <KeyboardInsets />
+      {!isCarerMode ? <SickDayMedDuePoller /> : null}
+      {!isCarerMode ? <AlcoholReminderPoller /> : null}
+      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
+      <AppShellBackdrop tone="rich" />
+      <AppTopBar isCarer={isCarerMode} pathOnly="/account" onBrandClick={onBrandClick} onLogout={onLogout} />
+      <main
+        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        style={{
+          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING_NO_NAV,
+          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING_NO_NAV,
+        }}
+      >
+        <Suspense fallback={<RouteFallback />}>
+          <Account />
+        </Suspense>
+      </main>
+    </div>
+  );
+}
+
 function AuthenticatedShell() {
   const [location, setLocation] = useLocation();
+  const { user } = useAuth();
   const { toast } = useToast();
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const pathOnly = location.split("?")[0] ?? location;
@@ -967,6 +1016,14 @@ function AuthenticatedShell() {
     return () => window.removeEventListener("online", flush);
   }, [toast]);
 
+  const slimUnverifiedAccount = Boolean(user && !isUserVerified(user) && pathOnly === "/account");
+
+  if (slimUnverifiedAccount) {
+    return (
+      <UnverifiedAccountShell isCarerMode={isCarerMode} onBrandClick={goBrandHome} onLogout={handleLogout} />
+    );
+  }
+
   return (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
@@ -1020,61 +1077,9 @@ function AuthenticatedShell() {
   );
 }
 
-function AccountShell() {
-  const [, setLocation] = useLocation();
-  const { isCarer: hasCarerLink } = useLinkedCarer();
-  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
-
-  useEffect(() => {
-    const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
-      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
-    };
-    window.addEventListener("diabeater:app-mode", onMode);
-    return () => window.removeEventListener("diabeater:app-mode", onMode);
-  }, []);
-
-  const handleLogout = async () => {
-    clearCarerClientSessionKeys();
-    await logout();
-    setLocation("/welcome");
-  };
-
-  return (
-    <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
-      <ClinicalPrefsCloudSync />
-      <SickDayCloudRepairSync />
-      <KeyboardInsets />
-      {!isCarerMode ? <SickDayMedDuePoller /> : null}
-      {!isCarerMode ? <AlcoholReminderPoller /> : null}
-      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
-      <AppShellBackdrop tone="rich" />
-      <AppTopBar
-        isCarer={isCarerMode}
-        pathOnly="/account"
-        onBrandClick={() => setLocation(isCarerMode ? "/carer-view" : "/")}
-        onLogout={handleLogout}
-      />
-      <main
-        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
-        style={{
-          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
-          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
-        }}
-      >
-        <Suspense fallback={<RouteFallback />}>
-          <Account />
-        </Suspense>
-      </main>
-      <BottomNav />
-    </div>
-  );
-}
-
 /**
  * Top-level shell (auth, public pages). Catch-all path="*" → ProtectedLayout + app chrome.
- * Login, signup, account, privacy, etc. are matched before *.
+ * `/account` is handled inside AuthenticatedShell (InnerRouter) so bottom-tab switches do not remount a second shell.
  */
 function MainRouter() {
   return (
@@ -1091,11 +1096,6 @@ function MainRouter() {
       <Route path="/carer-setup" component={CarerSetup} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
-      <Route path="/account">
-        <AuthOnlyLayout>
-          <AccountShell />
-        </AuthOnlyLayout>
-      </Route>
       <Route path="*">
         <ProtectedLayout>
           <AuthenticatedShell />
@@ -1179,7 +1179,7 @@ function AppContent() {
     if (linkedCarer) return;
     if (hasCarerIntent() || hasPendingCarer()) return;
     if (patientOnboardingSatisfied) return;
-    if (pathOnly === "/onboarding") return;
+    if (pathOnly === "/onboarding" || pathOnly === "/account") return;
     const role = getPrimaryAppRole();
     if (role === null) {
       if (pathOnly !== "/welcome") setLocation("/welcome");
@@ -1237,7 +1237,8 @@ function AppContent() {
     !hasCarerIntent() &&
     !hasPendingCarer() &&
     !patientOnboardingSatisfied &&
-    pathOnly !== "/onboarding"
+    pathOnly !== "/onboarding" &&
+    pathOnly !== "/account"
   ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">

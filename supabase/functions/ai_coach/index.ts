@@ -16,6 +16,7 @@ import { applyPostFilter } from "../_shared/ai-coach/postFilter.ts";
 import { deterministicResponse } from "../_shared/ai-coach/responses.ts";
 import type {
   AuditCategory,
+  CoachAudience,
   CoachReply,
   CoachResponse,
   CoachTurn,
@@ -28,7 +29,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Must match `AI_COACH_CONSENT_VERSION` in `app/src/lib/ai-coach/consent.ts`. */
-const AI_COACH_CONSENT_VERSION = "2026-05-01";
+const AI_COACH_CONSENT_VERSION = "2026-05-03";
 
 const CONSENT_REQUIRED_REPLY: CoachReply = {
   reply:
@@ -174,6 +175,11 @@ function isCoachTurn(x: unknown): x is CoachTurn {
   return (o.role === "user" || o.role === "assistant") && typeof o.content === "string";
 }
 
+function normalizeAudience(raw: unknown): CoachAudience {
+  if (typeof raw !== "string") return "patient";
+  return raw.trim().toLowerCase() === "supporter" ? "supporter" : "patient";
+}
+
 function normalizeBgUnits(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const v = raw.trim();
@@ -281,6 +287,7 @@ Deno.serve(async (req: Request) => {
     const lf = normalizeLastFortnight(b.lastFortnight);
     const ratiosAreSet = Boolean(b.ratiosAreSet);
     const bgUnitsClient = normalizeBgUnits(b.bgUnits ?? b.bg_units);
+    const audience: CoachAudience = normalizeAudience(b.audience);
 
     if (!message || message.length > 8000 || !lf) {
       const out: CoachResponse = {
@@ -458,6 +465,7 @@ Deno.serve(async (req: Request) => {
         context,
         history,
         userMessage: message,
+        audience,
       });
       llmReply = llm.reply;
       tokensIn = llm.usage.prompt_tokens;

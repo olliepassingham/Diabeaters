@@ -36,6 +36,7 @@ import {
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
 import { DevNote } from "@/components/dev/DevNote";
+import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -1511,6 +1512,8 @@ export default function CarerViewPage() {
               </div>
             </CardContent>
           </Card>
+
+          <CarerCoachEntryCard />
 
           {linkedPatients.length > 1 ? (
             <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">

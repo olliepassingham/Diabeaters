@@ -12,8 +12,14 @@ import { useAuth } from "@/lib/auth-context";
 import { getSupabase } from "@/lib/supabase";
 import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
-import type { CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
+import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
+
+function normalizeAudience(raw: string | null | undefined): CoachAudience {
+  if (raw == null) return "patient";
+  const v = raw.trim().toLowerCase();
+  return v === "supporter" ? "supporter" : "patient";
+}
 
 const CHAT_STORAGE_KEY = "diabeater_ai_coach_history_v1";
 const MAX_STORED_TURNS = 40;
@@ -76,9 +82,15 @@ export default function CoachPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const search = useSearch();
 
+  const audience = useMemo<CoachAudience>(
+    () => normalizeAudience(new URLSearchParams(search).get("audience")),
+    [search],
+  );
+  const isSupporter = audience === "supporter";
   const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
-  const effectiveTopic = topicSlug ?? "general";
+  const effectiveTopic = topicSlug ?? (isSupporter ? "supporter" : "general");
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
+  const pageTitle = isSupporter ? "Diabeaters coach – Supporter" : "Diabeaters coach";
 
   const [messages, setMessages] = useState<CoachTurn[]>(() =>
     typeof window !== "undefined" ? loadStoredTurns() : [],
@@ -120,7 +132,7 @@ export default function CoachPage() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (payload: { message: string; history: CoachTurn[] }) => {
+    mutationFn: async (payload: { message: string; history: CoachTurn[]; audience: CoachAudience }) => {
       return sendCoachMessage(payload);
     },
     onSuccess: (data) => {
@@ -150,7 +162,7 @@ export default function CoachPage() {
     setLastReply(null);
 
     try {
-      const data = await sendMutation.mutateAsync({ message: text, history: historyForApi });
+      const data = await sendMutation.mutateAsync({ message: text, history: historyForApi, audience });
       if (data.category === "consent_required") {
         setMessages((m) => m.slice(0, -1));
         setDraft(text);
@@ -167,7 +179,7 @@ export default function CoachPage() {
       setMessages((m) => m.slice(0, -1));
       setDraft(text);
     }
-  }, [draft, hasConsent, messages, queryClient, sendMutation, user?.id]);
+  }, [audience, draft, hasConsent, messages, queryClient, sendMutation, user?.id]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
@@ -189,7 +201,7 @@ export default function CoachPage() {
   if (!supabase || !user) {
     return (
       <PageShell>
-        <PageHeader title="Coach" leading={<PageBackButton />} />
+        <PageHeader title={pageTitle} leading={<PageBackButton />} />
         <p className="text-sm text-muted-foreground">Sign in to use the coach.</p>
       </PageShell>
     );
@@ -198,7 +210,7 @@ export default function CoachPage() {
   if (consentQuery.isLoading) {
     return (
       <PageShell>
-        <PageHeader title="Coach" leading={<PageBackButton />} />
+        <PageHeader title={pageTitle} leading={<PageBackButton />} />
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading…
@@ -210,7 +222,7 @@ export default function CoachPage() {
   if (!hasConsent) {
     return (
       <PageShell>
-        <PageHeader title="Coach" leading={<PageBackButton />} />
+        <PageHeader title={pageTitle} leading={<PageBackButton />} />
         <Card className="max-w-lg">
           <CardHeader>
             <CardTitle>Before you start</CardTitle>
@@ -224,6 +236,12 @@ export default function CoachPage() {
                   <li>It does not diagnose, prescribe, or recommend medication or device changes.</li>
                   <li>Your chat is stored on this device only. Each message is sent to our API and may be processed by OpenAI when enabled for this deployment.</li>
                   <li>For urgent symptoms, use Help Now or emergency services.</li>
+                  {isSupporter ? (
+                    <li>
+                      This is general education for someone supporting an adult with T1D in the UK; it is
+                      not personal medical advice for them.
+                    </li>
+                  ) : null}
                 </ul>
                 <Button type="button" onClick={() => setConsentStep(1)}>
                   Continue
@@ -271,7 +289,7 @@ export default function CoachPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Diabeaters coach" leading={<PageBackButton />} />
+      <PageHeader title={pageTitle} leading={<PageBackButton />} />
       <div className="space-y-4">
         <Alert>
           <AlertTitle>Educational only</AlertTitle>

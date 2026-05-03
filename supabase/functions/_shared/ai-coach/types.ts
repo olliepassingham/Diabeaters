@@ -26,6 +26,21 @@ export type AuditCategory =
 
 export type PostFilterStatus = "pass" | "rewritten" | "refused" | "n/a";
 
+/**
+ * Who the coach is talking to — selects which canonical system prompt is used
+ * (see docs/regulatory/ai_coach_system_prompt.md §2 vs §2b).
+ *
+ * - `patient`   — default; the signed-in user has T1D themselves.
+ * - `supporter` — Supporter Mode (carer / partner / family / friend). Same hard
+ *                 rules and href allow-list, but the prompt is reworded to
+ *                 address the supporter and never recommend overriding the
+ *                 supported person's plan.
+ *
+ * Client-asserted today; server-side detection (e.g. via `linked_carers`) is a
+ * follow-up. Safety guardrails do not depend on this flag.
+ */
+export type CoachAudience = "patient" | "supporter";
+
 export type AllowedHref =
   | "/adviser"
   | "/adviser?tab=meal"
@@ -122,6 +137,8 @@ export interface CoachRequest {
   lastFortnight: CoachContext["lastFortnight"];
   /** Whether the user has any saved meal ratios. */
   ratiosAreSet: boolean;
+  /** Optional. Defaults to `patient`. Selects patient vs supporter system prompt. */
+  audience?: CoachAudience;
 }
 
 /**
