@@ -16,7 +16,7 @@ export default function CommunitySettingsPage() {
   return (
     <PageShell
       variant="standard"
-      className="max-w-lg mx-auto space-y-4 pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
+      className="max-w-lg mx-auto space-y-4 pb-4"
     >
       <PageHeader
         leading={<PageBackButton />}

@@ -38,6 +38,7 @@
     height: 100%;
     overflow-x: clip;
     min-width: 0;
+    overscroll-behavior-x: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

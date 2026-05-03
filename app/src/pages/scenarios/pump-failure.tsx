@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { storage, type PumpFailureSession } from "@/lib/storage";
@@ -120,6 +121,7 @@ export default function PumpFailurePage() {
         leading={<PageBackButton />}
         title="Pump or infusion failure"
         description="Emergency-style steps when delivery stops unexpectedly. This is educational — always follow your clinic's written backup plan."
+        actions={<ScenarioCoachLink topic="pump-failure" />}
       />
 
       <ScenarioToolDisclaimer />

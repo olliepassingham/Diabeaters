@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { ExerciseGuidedCoach } from "@/components/scenarios/ExerciseGuidedCoach";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 
 export default function ScenarioExercisePage() {
   return (
@@ -11,11 +12,14 @@ export default function ScenarioExercisePage() {
         leading={<PageBackButton />}
         title="Exercise"
         actions={
-          <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
-            <Link href="/routines?section=exercise" data-testid="link-exercise-routines-header">
-              Exercise routines
-            </Link>
-          </Button>
+          <>
+            <ScenarioCoachLink topic="exercise" />
+            <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
+              <Link href="/routines?section=exercise" data-testid="link-exercise-routines-header">
+                Exercise routines
+              </Link>
+            </Button>
+          </>
         }
       />
       <ExerciseGuidedCoach />

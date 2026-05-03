@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
@@ -712,6 +713,7 @@ export default function Bedtime() {
         leading={<PageBackButton />}
         title="Bedtime"
         description="A quick check to reduce overnight surprises. Not medical advice."
+        actions={<ScenarioCoachLink topic="bedtime" />}
       />
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">

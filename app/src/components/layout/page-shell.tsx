@@ -30,9 +30,9 @@ const densityClass = {
  * Primary page container: centered max-width + consistent vertical rhythm between sections.
  *
  * **Width & spacing contract**
- * - Horizontal inset comes from `AuthenticatedShell` / `AccountShell` `<main className="… p-4 md:p-6 …">` in `App.tsx`.
- * - Reserve space above the fixed BottomNav via that same `<main>`’s `pb-24` — do not add another full `pb-24` on page roots.
- * - Override max width per page with `className` (tailwind-merge wins), e.g. `className="max-w-5xl"` for Tools.
+ * - Horizontal inset + clearance above the fixed BottomNav come from `AuthenticatedShell` / `AccountShell`
+ *   `<main>` in `App.tsx` — avoid stacking another full nav-height padding here.
+ * - Default `pb-4` is light rhythm only; override via `className` when a screen needs more tail space.
  */
 export function PageShell({
   variant = "standard",
@@ -44,7 +44,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        "mx-auto w-full min-w-0 max-w-full pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]",
+        "mx-auto w-full min-w-0 max-w-full pb-4",
         variantClass[variant],
         densityClass[density],
         className,

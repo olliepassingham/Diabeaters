@@ -49,6 +49,7 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
+import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -821,6 +822,8 @@ export default function Dashboard() {
         <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
           <WelcomeWidget />
         </section>
+
+        <CoachEntryCard />
 
         <SupplyTrackerTodaySection />
 

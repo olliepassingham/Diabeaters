@@ -190,7 +190,7 @@ export default function CommunityThreadPage() {
   return (
     <PageShell
       variant="standard"
-      className="max-w-lg mx-auto flex flex-col min-h-[70vh] pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
+      className="max-w-lg mx-auto flex min-h-[70vh] flex-col pb-4"
     >
       <PageHeader
         leading={

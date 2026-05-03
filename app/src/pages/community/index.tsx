@@ -531,7 +531,7 @@ export default function CommunityHomePage() {
   return (
     <PageShell
       variant="standard"
-      className="mx-auto max-w-lg space-y-6 pb-[calc(var(--bottom-nav-height,7.5rem)+2.5rem)]"
+      className="mx-auto max-w-lg space-y-6 pb-4"
     >
       <PageHeader
         title="Feed"

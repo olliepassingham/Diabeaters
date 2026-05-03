@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Send } from "lucide-react";
+import { ChevronRight, Loader2, Send } from "lucide-react";
 
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,6 +13,7 @@ import { getSupabase } from "@/lib/supabase";
 import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import type { CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
+import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
 
 const CHAT_STORAGE_KEY = "diabeater_ai_coach_history_v1";
 const MAX_STORED_TURNS = 40;
@@ -73,6 +74,11 @@ export default function CoachPage() {
   const supabase = getSupabase();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const search = useSearch();
+
+  const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
+  const effectiveTopic = topicSlug ?? "general";
+  const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
 
   const [messages, setMessages] = useState<CoachTurn[]>(() =>
     typeof window !== "undefined" ? loadStoredTurns() : [],
@@ -291,10 +297,25 @@ export default function CoachPage() {
           aria-live="polite"
         >
           {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Ask a general question about type 1 diabetes, or ask how to prepare for a clinic visit. The coach
-              cannot suggest doses or interpret your CGM arrows as treatment instructions.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{topicCfg.emptyHint}</p>
+              {topicCfg.starters.length > 0 ? (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Suggested prompts">
+                  {topicCfg.starters.map((q) => (
+                    <Button
+                      key={q}
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs font-normal"
+                      onClick={() => setDraft(q)}
+                    >
+                      {q}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
           {messages.map((m, i) => (
             <div
@@ -317,6 +338,33 @@ export default function CoachPage() {
           <div ref={bottomRef} />
         </div>
 
+        {lastReply && lastReply.suggestedNextActions.length > 0 ? (
+          <div
+            className="rounded-xl border border-border bg-muted/30 p-3 dark:bg-muted/20"
+            data-testid="coach-suggested-actions"
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Open in the app
+            </p>
+            <div className="flex flex-col gap-2">
+              {lastReply.suggestedNextActions.map((a) => (
+                <Button
+                  key={`${a.href}-${a.label}`}
+                  type="button"
+                  variant="default"
+                  className="h-auto min-h-11 w-full justify-between gap-3 px-4 py-3 text-left text-sm font-normal"
+                  asChild
+                >
+                  <Link href={a.href} className="flex w-full min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 leading-snug">{a.label}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {lastReply && lastReply.suggestedQuestions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {lastReply.suggestedQuestions.map((q) => (
@@ -329,16 +377,6 @@ export default function CoachPage() {
                 onClick={() => setDraft(q)}
               >
                 {q}
-              </Button>
-            ))}
-          </div>
-        ) : null}
-
-        {lastReply && lastReply.suggestedNextActions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {lastReply.suggestedNextActions.map((a) => (
-              <Button key={a.href + a.label} type="button" size="sm" variant="outline" asChild>
-                <Link href={a.href}>{a.label}</Link>
               </Button>
             ))}
           </div>

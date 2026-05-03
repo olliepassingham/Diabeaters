@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -338,19 +339,22 @@ export default function AlcoholScenarioPage() {
             title="Alcohol"
             description="Pick your situation — estimates use your saved ratios (like Meal Adviser). Not medical advice."
             actions={
-              <PageInfoDialog title="About this tool" description="Alcohol and glucose — read before you rely on estimates">
-                <InfoSection title="Delayed lows">
-                  <p>
-                    Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
-                  </p>
-                </InfoSection>
-                <InfoSection title="Estimates">
-                  <p>
-                    Carb coverage numbers use the same ratio logic as Meal Adviser in this app. They do not replace your
-                    clinic&apos;s plan.
-                  </p>
-                </InfoSection>
-              </PageInfoDialog>
+              <>
+                <ScenarioCoachLink topic="alcohol" />
+                <PageInfoDialog title="About this tool" description="Alcohol and glucose — read before you rely on estimates">
+                  <InfoSection title="Delayed lows">
+                    <p>
+                      Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
+                    </p>
+                  </InfoSection>
+                  <InfoSection title="Estimates">
+                    <p>
+                      Carb coverage numbers use the same ratio logic as Meal Adviser in this app. They do not replace your
+                      clinic&apos;s plan.
+                    </p>
+                  </InfoSection>
+                </PageInfoDialog>
+              </>
             }
           />
           <ScenarioToolDisclaimer className="mt-4" />

@@ -109,6 +109,10 @@ const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
 const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
 const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
 
+/** Single bottom inset above fixed BottomNav + home-indicator safe area. PageShell adds content rhythm only — no second nav-height pad. */
+const MAIN_BOTTOM_SCROLL_PADDING =
+  "calc(var(--bottom-nav-height, 7.5rem) + env(safe-area-inset-bottom, 0px) + 1rem)";
+
 function RouteFallback() {
   return (
     <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
@@ -261,8 +265,11 @@ function SessionLoadingSkeleton() {
         </div>
       </header>
       <main
-        className="relative z-[1] flex-1 space-y-4 overflow-x-hidden p-4 md:p-6"
-        style={{ paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 0.5rem)" }}
+        className="relative z-[1] min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        style={{
+          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
+          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
+        }}
       >
         <Skeleton className="h-8 w-52 max-w-full rounded-lg skeleton-shimmer" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -998,10 +1005,10 @@ function AuthenticatedShell() {
       ) : null}
       {!isCarerMode ? <AppStatusStrip /> : null}
       <main
-        className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
-          paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
-          scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
+          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
         <AnimatedRouteOutlet>
@@ -1050,10 +1057,10 @@ function AccountShell() {
         onLogout={handleLogout}
       />
       <main
-        className="relative z-[1] w-full min-w-0 flex-1 overflow-x-hidden p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
-          paddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
-          scrollPaddingBottom: "calc(var(--bottom-nav-height, 7.5rem) + 10rem)",
+          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
+          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
         <Suspense fallback={<RouteFallback />}>

@@ -22,12 +22,14 @@ export function PageHeader({ title, description, actions, leading, className, sc
     <div className={cn("flex min-w-0 items-start gap-2 sm:gap-3", className)}>
       {leading ? <div className="flex shrink-0 items-start pt-0.5 sm:pt-1">{leading}</div> : null}
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex w-full min-w-0 flex-wrap items-start gap-2">
-          <h1 className="min-w-0 grow basis-0 font-display text-xl font-semibold tracking-tight text-foreground sm:text-h1 sm:tracking-tight">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+          <h1 className="min-w-0 w-full font-display text-xl font-semibold tracking-tight text-foreground sm:w-auto sm:flex-1 sm:basis-0 sm:text-h1 sm:tracking-tight">
             {title}
           </h1>
           {actions ? (
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-start gap-1.5 sm:w-auto sm:justify-end">
+              {actions}
+            </div>
           ) : null}
         </div>
         {description ? (

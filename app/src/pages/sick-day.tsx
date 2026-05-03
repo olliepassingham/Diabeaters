@@ -24,6 +24,7 @@ import {
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { isAiCoachEnabled } from "@/lib/flags";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import {
   upsertScenario,
@@ -2518,6 +2519,20 @@ export default function SickDay() {
           </div>
         </CardHeader>
       </Card>
+
+      {isAiCoachEnabled ? (
+        <p className="text-xs text-muted-foreground" data-testid="link-sick-day-coach-wrap">
+          For plain-language background (educational only),{" "}
+          <Link
+            href="/coach?topic=sick-day"
+            className="text-foreground underline underline-offset-2 hover:text-primary"
+            data-testid="link-sick-day-coach"
+          >
+            ask the coach
+          </Link>
+          .
+        </p>
+      ) : null}
 
       <div className="grid gap-6">
         <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">

@@ -19,6 +19,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
@@ -269,20 +270,23 @@ export default function DrivingScenarioPage() {
               </>
             }
             actions={
-              <PageInfoDialog title="About this check" description="How to use this tool safely">
-                <InfoSection title="Legal and medical limits">
-                  <p>
-                    This app does not state legal blood-glucose limits for driving. Follow local licensing rules, road
-                    authority guidance, and your diabetes clinic.
-                  </p>
-                </InfoSection>
-                <InfoSection title="What you get">
-                  <p>
-                    A short checklist-based suggestion from your answers. It does not replace professional advice or
-                    confirm you are safe to drive.
-                  </p>
-                </InfoSection>
-              </PageInfoDialog>
+              <>
+                <ScenarioCoachLink topic="driving" />
+                <PageInfoDialog title="About this check" description="How to use this tool safely">
+                  <InfoSection title="Legal and medical limits">
+                    <p>
+                      This app does not state legal blood-glucose limits for driving. Follow local licensing rules, road
+                      authority guidance, and your diabetes clinic.
+                    </p>
+                  </InfoSection>
+                  <InfoSection title="What you get">
+                    <p>
+                      A short checklist-based suggestion from your answers. It does not replace professional advice or
+                      confirm you are safe to drive.
+                    </p>
+                  </InfoSection>
+                </PageInfoDialog>
+              </>
             }
           />
         </div>

@@ -65,6 +65,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageShell } from "@/components/layout";
+import { isAiCoachEnabled } from "@/lib/flags";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
@@ -1202,6 +1203,18 @@ export default function Travel() {
               <span>{daysElapsed} days elapsed</span>
               <span>{daysRemaining} days remaining</span>
             </div>
+            {isAiCoachEnabled ? (
+              <p className="border-t border-green-200/60 pt-2 text-xs text-muted-foreground dark:border-green-800/60">
+                <Link
+                  href="/coach?topic=travel"
+                  className="text-foreground underline underline-offset-2 hover:text-primary"
+                  data-testid="link-travel-active-coach"
+                >
+                  Ask the coach
+                </Link>{" "}
+                for educational travel prompts — not medical advice.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -1484,6 +1497,18 @@ export default function Travel() {
             <p className="text-sm text-muted-foreground">
               Build a packing list from your supplies, or track holiday prep before you go.
             </p>
+            {isAiCoachEnabled ? (
+              <p className="text-xs text-muted-foreground">
+                <Link
+                  href="/coach?topic=travel"
+                  className="text-foreground underline underline-offset-2 hover:text-primary"
+                  data-testid="link-travel-entry-coach"
+                >
+                  Ask the coach
+                </Link>{" "}
+                for travel-related educational prompts — not medical advice.
+              </p>
+            ) : null}
           </div>
         </div>
 

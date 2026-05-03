@@ -23,24 +23,114 @@ export interface LlmCallResult {
 }
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
+/** Supports Structured Outputs (`json_schema` + `strict`) per OpenAI docs. */
 const MODEL = "gpt-4o-mini";
 
+/**
+ * OpenAI Structured Outputs schema (strict). Ensures `reply` and arrays are always present.
+ * @see https://platform.openai.com/docs/guides/structured-outputs
+ */
+export const COACH_REPLY_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    reply: { type: "string" },
+    suggestedQuestions: {
+      type: "array",
+      items: { type: "string" },
+    },
+    suggestedNextActions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          label: { type: "string" },
+          href: { type: "string" },
+        },
+        required: ["label", "href"],
+      },
+    },
+    deferToTeam: { type: "boolean" },
+  },
+  required: ["reply", "suggestedQuestions", "suggestedNextActions", "deferToTeam"],
+} as const;
+
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+/**
+ * Chat Completions `message.content` may be a string or (on some models) an array
+ * of `{ type: "text", text: "..." }` parts. Normalise to a single string.
+ */
+export function normalizeAssistantContent(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (!Array.isArray(raw)) return "";
+  const chunks: string[] = [];
+  for (const part of raw) {
+    if (!part || typeof part !== "object") continue;
+    const p = part as Record<string, unknown>;
+    // Only concatenate text parts — refusal parts are handled separately (they are not JSON).
+    if (p.type === "text" && typeof p.text === "string") chunks.push(p.text);
+  }
+  return chunks.join("");
+}
+
+/** Refusal may appear as `message.refusal` or as a sole `{ type: "refusal", refusal: "..." }` content part. */
+export function extractRefusalFromMessage(msg: Record<string, unknown> | undefined): string {
+  if (!msg) return "";
+  const top = typeof msg.refusal === "string" ? msg.refusal.trim() : "";
+  if (top) return top;
+  const raw = msg.content;
+  if (!Array.isArray(raw)) return "";
+  for (const part of raw) {
+    if (!part || typeof part !== "object") continue;
+    const p = part as Record<string, unknown>;
+    if (p.type === "refusal" && typeof p.refusal === "string" && p.refusal.trim()) {
+      return p.refusal.trim();
+    }
+  }
+  return "";
+}
+
+/** Strip markdown code fences (e.g. json) some models still emit despite json_object mode. */
+export function stripMarkdownJsonFence(s: string): string {
+  let t = s.trim();
+  if (!t.startsWith("```")) return t;
+  const firstNl = t.indexOf("\n");
+  if (firstNl >= 0) t = t.slice(firstNl + 1);
+  const close = t.lastIndexOf("```");
+  if (close >= 0) t = t.slice(0, close);
+  return t.trim();
+}
+
+function tryParseJsonObject(raw: string): unknown | null {
+  const stripped = stripMarkdownJsonFence(raw).trim();
+  if (!stripped) return null;
+  try {
+    return JSON.parse(stripped) as unknown;
+  } catch {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(stripped.slice(start, end + 1)) as unknown;
+    } catch {
+      return null;
+    }
+  }
+}
 
 /**
  * Parse and validate the JSON object returned by the model into a `CoachReply`.
  * Returns null if the payload is not usable (caller should treat as LLM error).
  */
 export function parseCoachLlmJson(content: string): CoachReply | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content.trim()) as unknown;
-  } catch {
-    return null;
-  }
+  const parsed = tryParseJsonObject(content);
+  if (parsed == null) return null;
   if (!parsed || typeof parsed !== "object") return null;
   const o = parsed as Record<string, unknown>;
-  if (typeof o.reply !== "string" || o.reply.length === 0) return null;
+  const replyRaw = typeof o.reply === "string" ? o.reply.trim() : "";
+  if (replyRaw.length === 0) return null;
   const sq = Array.isArray(o.suggestedQuestions)
     ? (o.suggestedQuestions as unknown[]).filter((x) => typeof x === "string").slice(0, 4)
     : [];
@@ -55,7 +145,7 @@ export function parseCoachLlmJson(content: string): CoachReply | null {
     if (actions.length >= 3) break;
   }
   return {
-    reply: o.reply,
+    reply: replyRaw,
     suggestedQuestions: sq as string[],
     suggestedNextActions: actions,
     deferToTeam: Boolean(o.deferToTeam),
@@ -85,9 +175,20 @@ function buildMessages(
   return msgs;
 }
 
+function refusalFallbackCoachReply(refusal: string): CoachReply {
+  const safe = refusal.replace(/\s+/g, " ").trim().slice(0, 400);
+  return {
+    reply:
+      `${safe} If you need urgent medical advice, use Help Now in this app or contact your diabetes team or emergency services as appropriate.`,
+    suggestedQuestions: [],
+    suggestedNextActions: [{ label: "Open Help Now", href: "/help-now" }],
+    deferToTeam: true,
+  };
+}
+
 /**
- * Calls OpenAI Chat Completions with `response_format: json_object` and returns
- * a validated `CoachReply`, or throws on HTTP / parse / validation failure.
+ * Calls OpenAI Chat Completions with Structured Outputs (`json_schema` + strict)
+ * when supported, with a one-time fallback to JSON mode if the API rejects the schema.
  */
 export async function callOpenAiChatJson(args: {
   apiKey: string;
@@ -97,21 +198,51 @@ export async function callOpenAiChatJson(args: {
 }): Promise<LlmCallResult> {
   const messages = buildMessages(args.context, args.history, args.userMessage);
 
-  const res = await fetch(OPENAI_CHAT_URL, {
+  const base = {
+    model: MODEL,
+    messages,
+    temperature: 0.4,
+    max_tokens: 2048,
+  };
+
+  const structuredBody = {
+    ...base,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "diabeater_coach_reply",
+        strict: true,
+        schema: COACH_REPLY_JSON_SCHEMA,
+      },
+    },
+  };
+
+  let res = await fetch(OPENAI_CHAT_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${args.apiKey}`,
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature: 0.4,
-      response_format: { type: "json_object" },
-    }),
+    body: JSON.stringify(structuredBody),
   });
 
-  const text = await res.text();
+  let text = await res.text();
+  // Any 400 on structured-output request: retry once with plain JSON mode (schema quirks, model/policy).
+  if (!res.ok && res.status === 400) {
+    res = await fetch(OPENAI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${args.apiKey}`,
+      },
+      body: JSON.stringify({
+        ...base,
+        response_format: { type: "json_object" },
+      }),
+    });
+    text = await res.text();
+  }
+
   if (!res.ok) {
     throw new Error(`openai_http_${res.status}: ${text.slice(0, 500)}`);
   }
@@ -129,10 +260,23 @@ export async function callOpenAiChatJson(args: {
   }
   const c0 = choices[0] as Record<string, unknown>;
   const msg = c0.message as Record<string, unknown> | undefined;
-  const content = typeof msg?.content === "string" ? msg.content : "";
-  const parsed = parseCoachLlmJson(content);
+  const finishReason = typeof c0.finish_reason === "string" ? c0.finish_reason : "";
+  const refusal = extractRefusalFromMessage(msg);
+  const content = normalizeAssistantContent(msg?.content);
+
+  let parsed = parseCoachLlmJson(content);
+  if (!parsed && refusal.length > 0) {
+    parsed = refusalFallbackCoachReply(refusal);
+  }
   if (!parsed) {
-    throw new Error("openai_invalid_coach_json");
+    if (finishReason === "length") {
+      throw new Error(
+        "openai_truncated_response: completion hit max_tokens; try a shorter question or raise max_tokens server-side",
+      );
+    }
+    throw new Error(
+      `openai_invalid_coach_json (finish_reason=${finishReason || "unknown"}, content_len=${content.length})`,
+    );
   }
 
   const usageRaw = o.usage as Record<string, unknown> | undefined;
