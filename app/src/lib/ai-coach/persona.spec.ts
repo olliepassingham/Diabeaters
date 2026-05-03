@@ -16,8 +16,8 @@ describe("ai-coach persona", () => {
     expect(coachPageTitle("supporter")).toContain(AI_ASSISTANT_NAME);
   });
 
-  it("open CTA includes the name", () => {
-    expect(openAssistantCtaLabel()).toContain(AI_ASSISTANT_NAME);
+  it("open CTA is Ask {name}", () => {
+    expect(openAssistantCtaLabel()).toBe(`Ask ${AI_ASSISTANT_NAME}`);
   });
 
   it("mid-sentence phrase is lowercase ask + name", () => {
