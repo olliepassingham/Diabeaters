@@ -37,6 +37,7 @@ import {
 } from "@/lib/carer-session";
 import { DevNote } from "@/components/dev/DevNote";
 import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
+import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -1169,6 +1170,7 @@ export default function CarerViewPage() {
         scenarios: false,
         hypo_alerts: false,
         emergency_info: false,
+        clinical_settings: false,
       };
     }
     const n = normaliseScopes(activeLink.scopes);
@@ -1178,6 +1180,7 @@ export default function CarerViewPage() {
       scenarios: !!n.scenarios,
       hypo_alerts: !!n.hypo_alerts,
       emergency_info: !!n.emergency_info,
+      clinical_settings: !!n.clinical_settings,
     };
   }, [activeLink]);
 
@@ -1514,6 +1517,10 @@ export default function CarerViewPage() {
           </Card>
 
           <CarerCoachEntryCard />
+
+          {activeLink?.patientId ? (
+            <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
+          ) : null}
 
           {linkedPatients.length > 1 ? (
             <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">

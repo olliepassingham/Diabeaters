@@ -47,15 +47,32 @@ export interface PackContextInput {
   now?: Date;
 }
 
+/** Whole years since DOB using UTC calendar dates (no PII beyond what DOB implies). */
+export function ageInWholeYearsUtc(dobIso: string | null | undefined, now: Date): number | null {
+  if (!dobIso || typeof dobIso !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dobIso.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+
+  const ny = now.getUTCFullYear();
+  const nm = now.getUTCMonth() + 1;
+  const nd = now.getUTCDate();
+  let age = ny - y;
+  if (nm < mo || (nm === mo && nd < d)) age -= 1;
+  if (!Number.isFinite(age) || age < 0 || age > 120) return null;
+  return age;
+}
+
 function ageBandFromDob(
   dob: string | null | undefined,
   now: Date,
 ): CoachContext["profile"]["ageBand"] {
-  if (!dob) return "unknown";
-  const dobDate = new Date(`${dob}T00:00:00Z`);
-  if (!Number.isFinite(dobDate.getTime())) return "unknown";
-  const ageYears = (now.getTime() - dobDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-  if (!Number.isFinite(ageYears) || ageYears < 0) return "unknown";
+  const ageYears = ageInWholeYearsUtc(dob, now);
+  if (ageYears == null) return "unknown";
+  if (ageYears < 18) return "under18";
   if (ageYears < 30) return "18-29";
   if (ageYears < 40) return "30-39";
   if (ageYears < 50) return "40-49";
@@ -110,8 +127,10 @@ function clampPercent(n: unknown): number | null {
  */
 export function packContext(input: PackContextInput): CoachContext {
   const now = input.now ?? new Date();
+  const dob = input.profile.dateOfBirth;
   const profile: CoachContext["profile"] = {
-    ageBand: ageBandFromDob(input.profile.dateOfBirth, now),
+    ageBand: ageBandFromDob(dob, now),
+    ageYears: ageInWholeYearsUtc(dob, now),
     deliveryMethod: deliveryMethodFrom(input.profile.insulinDeliveryMethod),
     bgUnits: bgUnitsFrom(input.profile.bgUnits),
     diagnosedYearsAgo: diagnosedYearsAgoFrom(input.profile.diabetesOnsetDate, now),

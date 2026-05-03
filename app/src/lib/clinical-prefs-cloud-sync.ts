@@ -1,6 +1,17 @@
 import { profileQueryKey, updateProfile, type ProfileRow, type ProfileUpdatePayload } from "@/lib/profile";
 import { queryClient } from "@/lib/queryClient";
 import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { normalizeDateOfBirthInput } from "@/lib/user-age";
+
+/** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
+export function isMissingProfileColumnSchemaError(message: string, column: string): boolean {
+  const m = message.toLowerCase();
+  const c = column.toLowerCase();
+  return (
+    m.includes(c) &&
+    (m.includes("schema cache") || m.includes("could not find") || m.includes("column"))
+  );
+}
 
 function normalizeDeliveryFromCloud(raw: unknown): "pen" | "pump" | null {
   if (raw === "pen" || raw === "pump") return raw;
@@ -40,9 +51,18 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
 
   const cloudDelivery = normalizeDeliveryFromCloud(row.insulin_delivery_method);
   const cloudTdd = normalizeTddFromCloud(row.tdd);
+  const cloudDob = normalizeDateOfBirthInput(row.date_of_birth ?? null);
 
   const localProfile = storage.getProfile();
   const localSettings = storage.getSettings();
+
+  if (cloudDob && (!localProfile?.dateOfBirth || !String(localProfile.dateOfBirth).trim())) {
+    if (!localProfile) {
+      storage.saveProfile({ ...defaultProfileSkeleton(cloudDelivery ?? "pen"), dateOfBirth: cloudDob });
+    } else {
+      storage.saveProfile({ ...localProfile, dateOfBirth: cloudDob });
+    }
+  }
 
   if (cloudDelivery != null) {
     if (!localProfile) {
@@ -63,32 +83,136 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
   }
 }
 
+export type ClinicalPrefsCloudSyncResult = {
+  error: Error | null;
+  /** Field was omitted on a later attempt because PostgREST reported the column missing from `profiles`. */
+  dateOfBirthCloudSkipped?: boolean;
+  insulinDeliveryMethodCloudSkipped?: boolean;
+  tddCloudSkipped?: boolean;
+};
+
+/** User-facing second line when some clinical prefs could not be written to Supabase. */
+export function describePartialClinicalPrefsCloudSync(result: ClinicalPrefsCloudSyncResult): string | null {
+  if (result.error) return null;
+  const bits: string[] = [];
+  if (result.dateOfBirthCloudSkipped) bits.push("date of birth");
+  if (result.insulinDeliveryMethodCloudSkipped) bits.push("insulin delivery (pen/pump)");
+  if (result.tddCloudSkipped) bits.push("TDD");
+  if (bits.length === 0) return null;
+  const listed =
+    bits.length === 1
+      ? bits[0]
+      : bits.length === 2
+        ? `${bits[0]} and ${bits[1]}`
+        : `${bits.slice(0, -1).join(", ")}, and ${bits.at(-1)}`;
+  const verb = bits.length === 1 ? "is" : "are";
+  return `${listed} ${verb} on this device only until those columns exist on your Supabase project—run all migrations from the repo, then reload the API schema cache.`;
+}
+
+function buildClinicalPrefsPayload(
+  userId: string,
+  opts: { includeDelivery: boolean; includeTdd: boolean; includeDob: boolean },
+  values: {
+    insulin_delivery_method: "pen" | "pump" | undefined;
+    tdd: number | null;
+    dobNorm: string | null;
+  },
+): ProfileUpdatePayload {
+  const payload: ProfileUpdatePayload = { id: userId };
+  if (opts.includeDelivery && values.insulin_delivery_method !== undefined) {
+    payload.insulin_delivery_method = values.insulin_delivery_method;
+  }
+  if (opts.includeTdd && values.tdd != null) {
+    payload.tdd = values.tdd;
+  }
+  if (opts.includeDob && values.dobNorm != null) {
+    payload.date_of_birth = values.dobNorm;
+  }
+  return payload;
+}
+
+function payloadHasClinicalFields(payload: ProfileUpdatePayload): boolean {
+  return (
+    payload.insulin_delivery_method !== undefined ||
+    payload.tdd !== undefined ||
+    payload.date_of_birth !== undefined
+  );
+}
+
 /**
- * Push local insulin delivery method + TDD to Supabase `profiles` (signed-in patient).
+ * Push local insulin delivery method + TDD (+ optional DOB) to Supabase `profiles` (signed-in patient).
+ * Retries with fewer fields when PostgREST reports a column missing (migrations not applied or stale schema cache).
  */
-export async function syncClinicalPrefsToCloud(userId: string): Promise<{ error: Error | null }> {
+export async function syncClinicalPrefsToCloud(userId: string): Promise<ClinicalPrefsCloudSyncResult> {
   const p = storage.getProfile();
   const s = storage.getSettings();
 
   const insulin_delivery_method: "pen" | "pump" | undefined =
     p?.insulinDeliveryMethod === "pump" ? "pump" : p?.insulinDeliveryMethod === "pen" ? "pen" : undefined;
   const tdd = typeof s.tdd === "number" && s.tdd > 0 && Number.isFinite(s.tdd) ? s.tdd : null;
+  const dobNorm = normalizeDateOfBirthInput(p?.dateOfBirth ?? null);
 
-  if (insulin_delivery_method === undefined && tdd == null) {
+  if (insulin_delivery_method === undefined && tdd == null && !dobNorm && !String(p?.dateOfBirth ?? "").trim()) {
     return { error: null };
   }
 
-  const payload: ProfileUpdatePayload = { id: userId };
-  if (insulin_delivery_method !== undefined) {
-    payload.insulin_delivery_method = insulin_delivery_method;
-  }
-  if (tdd != null) {
-    payload.tdd = tdd;
+  const values = { insulin_delivery_method, tdd, dobNorm };
+  let includeDelivery = insulin_delivery_method !== undefined;
+  let includeTdd = tdd != null;
+  let includeDob = dobNorm != null;
+
+  const skipped = {
+    dateOfBirth: false,
+    insulinDeliveryMethod: false,
+    tdd: false,
+  };
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const payload = buildClinicalPrefsPayload(
+      userId,
+      { includeDelivery, includeTdd, includeDob },
+      values,
+    );
+    if (!payloadHasClinicalFields(payload)) {
+      await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+      return {
+        error: null,
+        dateOfBirthCloudSkipped: skipped.dateOfBirth,
+        insulinDeliveryMethodCloudSkipped: skipped.insulinDeliveryMethod,
+        tddCloudSkipped: skipped.tdd,
+      };
+    }
+
+    const { error } = await updateProfile(payload);
+    if (!error) {
+      await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+      return {
+        error: null,
+        dateOfBirthCloudSkipped: skipped.dateOfBirth,
+        insulinDeliveryMethodCloudSkipped: skipped.insulinDeliveryMethod,
+        tddCloudSkipped: skipped.tdd,
+      };
+    }
+
+    const msg = error.message;
+    if (includeDob && isMissingProfileColumnSchemaError(msg, "date_of_birth")) {
+      includeDob = false;
+      skipped.dateOfBirth = true;
+      continue;
+    }
+    if (includeDelivery && isMissingProfileColumnSchemaError(msg, "insulin_delivery_method")) {
+      includeDelivery = false;
+      skipped.insulinDeliveryMethod = true;
+      continue;
+    }
+    if (includeTdd && isMissingProfileColumnSchemaError(msg, "tdd")) {
+      includeTdd = false;
+      skipped.tdd = true;
+      continue;
+    }
+
+    return { error };
   }
 
-  const { error } = await updateProfile(payload);
-  if (!error) {
-    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
-  }
-  return { error };
+  return { error: new Error("Clinical prefs sync: too many retries") };
 }

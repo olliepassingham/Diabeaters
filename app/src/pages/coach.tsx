@@ -23,33 +23,71 @@ function normalizeAudience(raw: string | null | undefined): CoachAudience {
   return v === "supporter" ? "supporter" : "patient";
 }
 
-const CHAT_STORAGE_KEY = "diabeater_ai_coach_history_v1";
+const CHAT_STORAGE_KEY_V1 = "diabeater_ai_coach_history_v1";
+const CHAT_STORAGE_KEY_V2 = "diabeater_ai_coach_history_v2";
 const MAX_STORED_TURNS = 40;
+/** Clear thread after this long with no new messages (local device clock). */
+const CHAT_IDLE_RESET_MS = 2 * 60 * 60 * 1000;
 
-function loadStoredTurns(): CoachTurn[] {
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (t): t is CoachTurn =>
-          !!t &&
-          typeof t === "object" &&
-          (t as CoachTurn).role !== undefined &&
-          ((t as CoachTurn).role === "user" || (t as CoachTurn).role === "assistant") &&
-          typeof (t as CoachTurn).content === "string",
-      )
-      .slice(-MAX_STORED_TURNS);
-  } catch {
-    return [];
-  }
+type CoachStoredState = { lastActiveAt: number; turns: CoachTurn[] };
+
+function normalizeTurns(raw: unknown): CoachTurn[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (t): t is CoachTurn =>
+        !!t &&
+        typeof t === "object" &&
+        (t as CoachTurn).role !== undefined &&
+        ((t as CoachTurn).role === "user" || (t as CoachTurn).role === "assistant") &&
+        typeof (t as CoachTurn).content === "string",
+    )
+    .slice(-MAX_STORED_TURNS);
 }
 
-function saveStoredTurns(turns: CoachTurn[]) {
+function loadInitialMessages(): CoachTurn[] {
+  if (typeof window === "undefined") return [];
+  const now = Date.now();
   try {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(turns.slice(-MAX_STORED_TURNS)));
+    const v2raw = localStorage.getItem(CHAT_STORAGE_KEY_V2);
+    if (v2raw) {
+      const parsed = JSON.parse(v2raw) as unknown;
+      if (parsed && typeof parsed === "object") {
+        const lastActiveAt = Number((parsed as CoachStoredState).lastActiveAt);
+        const turns = normalizeTurns((parsed as CoachStoredState).turns);
+        if (Number.isFinite(lastActiveAt) && now - lastActiveAt > CHAT_IDLE_RESET_MS && turns.length > 0) {
+          const cleared: CoachStoredState = { turns: [], lastActiveAt: now };
+          localStorage.setItem(CHAT_STORAGE_KEY_V2, JSON.stringify(cleared));
+          return [];
+        }
+        if (Number.isFinite(lastActiveAt)) return turns;
+      }
+    }
+    const v1raw = localStorage.getItem(CHAT_STORAGE_KEY_V1);
+    if (v1raw) {
+      const turns = normalizeTurns(JSON.parse(v1raw) as unknown);
+      try {
+        localStorage.removeItem(CHAT_STORAGE_KEY_V1);
+      } catch {
+        /* ignore */
+      }
+      const migrated: CoachStoredState = { turns, lastActiveAt: now };
+      localStorage.setItem(CHAT_STORAGE_KEY_V2, JSON.stringify(migrated));
+      return turns;
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
+function saveStoredCoachState(turns: CoachTurn[]) {
+  try {
+    const state: CoachStoredState = {
+      lastActiveAt: Date.now(),
+      turns: turns.slice(-MAX_STORED_TURNS),
+    };
+    localStorage.setItem(CHAT_STORAGE_KEY_V2, JSON.stringify(state));
   } catch {
     /* ignore */
   }
@@ -94,9 +132,7 @@ export default function CoachPage() {
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
   const pageTitle = coachPageTitle(isSupporter ? "supporter" : "patient");
 
-  const [messages, setMessages] = useState<CoachTurn[]>(() =>
-    typeof window !== "undefined" ? loadStoredTurns() : [],
-  );
+  const [messages, setMessages] = useState<CoachTurn[]>(() => loadInitialMessages());
   const [draft, setDraft] = useState("");
   const qSeededRef = useRef(false);
   const [lastReply, setLastReply] = useState<CoachResponse | null>(null);
@@ -169,7 +205,7 @@ export default function CoachPage() {
   });
 
   useEffect(() => {
-    saveStoredTurns(messages);
+    saveStoredCoachState(messages);
   }, [messages]);
 
   const onSend = useCallback(async () => {
@@ -207,7 +243,8 @@ export default function CoachPage() {
     setLastReply(null);
     setSendError(null);
     try {
-      localStorage.removeItem(CHAT_STORAGE_KEY);
+      localStorage.removeItem(CHAT_STORAGE_KEY_V2);
+      localStorage.removeItem(CHAT_STORAGE_KEY_V1);
     } catch {
       /* ignore */
     }
@@ -215,7 +252,7 @@ export default function CoachPage() {
 
   const intro = useMemo(
     () =>
-      `${AI_ASSISTANT_NAME} is an educational guide for adults with type 1 diabetes in the UK. This is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`,
+      `${AI_ASSISTANT_NAME} is an educational guide for people with type 1 diabetes in the UK, including teenagers when they use the app with their team and family. This is not medical advice and it cannot suggest insulin doses, ratios, or targets. Messages are sent to our servers and, when the guide is enabled for your environment, to OpenAI to generate a reply. Do not type anything you would not want a third party to see.`,
     [],
   );
 
@@ -257,11 +294,15 @@ export default function CoachPage() {
                     {AI_ASSISTANT_NAME} explains concepts and helps you prepare questions for your care team.
                   </li>
                   <li>It does not diagnose, prescribe, or recommend medication or device changes.</li>
-                  <li>Your chat is stored on this device only. Each message is sent to our API and may be processed by OpenAI when enabled for this deployment.</li>
+                  <li>
+                    Your chat is stored on this device only and clears automatically after about 2 hours with no new
+                    messages. Each message is sent to our API and may be processed by OpenAI when enabled for this
+                    deployment.
+                  </li>
                   <li>For urgent symptoms, use Help Now or emergency services.</li>
                   {isSupporter ? (
                     <li>
-                      This is general education for someone supporting an adult with T1D in the UK; it is
+                      This is general education for someone supporting a person with T1D in the UK; it is
                       not personal medical advice for them.
                     </li>
                   ) : null}
@@ -311,77 +352,72 @@ export default function CoachPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell density="compact" className="flex min-h-0 flex-col pb-2">
       <PageHeader title={pageTitle} leading={<PageBackButton />} />
-      <div className="space-y-4">
-        <Alert>
-          <AlertTitle>Educational only</AlertTitle>
-          <AlertDescription className="text-xs leading-relaxed">
-            Not medical advice. For urgent symptoms,{" "}
-            <Link href="/help-now" className="underline underline-offset-2">
-              open Help Now
-            </Link>
-            .
-          </AlertDescription>
-        </Alert>
-
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
         {sendError ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="shrink-0">
             <AlertTitle>Could not send</AlertTitle>
             <AlertDescription className="text-xs">{sendError}</AlertDescription>
           </Alert>
         ) : null}
 
         <div
-          className="max-h-[min(28rem,55vh)] space-y-3 overflow-y-auto rounded-xl border border-border/60 bg-muted/20 p-3"
-          role="log"
-          aria-live="polite"
+          className="flex min-h-0 max-h-[min(32rem,calc(100dvh-14rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
+          role="region"
+          aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
         >
-          {messages.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">{topicCfg.emptyHint}</p>
-              {topicCfg.starters.length > 0 ? (
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Suggested prompts">
-                  {topicCfg.starters.map((q) => (
-                    <Button
-                      key={q}
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs font-normal"
-                      onClick={() => setDraft(q)}
-                    >
-                      {q}
-                    </Button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {messages.map((m, i) => (
-            <div
-              key={`${i}-${m.role}`}
-              className={
-                m.role === "user"
-                  ? "ml-8 rounded-lg bg-primary/15 px-3 py-2 text-sm"
-                  : "mr-8 rounded-lg bg-background px-3 py-2 text-sm shadow-sm"
-              }
-            >
-              <p className="whitespace-pre-wrap text-foreground">{m.content}</p>
-            </div>
-          ))}
-          {sendMutation.isPending ? (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Thinking…
-            </div>
-          ) : null}
-          <div ref={bottomRef} />
+          <div
+            className="flex min-h-0 flex-1 flex-col space-y-3 overflow-y-auto overscroll-contain p-4"
+            role="log"
+            aria-live="polite"
+          >
+            {messages.length === 0 ? (
+              <div className="space-y-4 py-1">
+                <p className="text-sm leading-relaxed text-muted-foreground">{topicCfg.emptyHint}</p>
+                {topicCfg.starters.length > 0 ? (
+                  <div className="flex flex-wrap gap-2" role="group" aria-label="Suggested prompts">
+                    {topicCfg.starters.map((q) => (
+                      <Button
+                        key={q}
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-auto min-h-10 max-w-full rounded-xl whitespace-normal border border-border/60 bg-background/80 text-left text-xs font-normal shadow-sm backdrop-blur-sm"
+                        onClick={() => setDraft(q)}
+                      >
+                        {q}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {messages.map((m, i) => (
+              <div
+                key={`${i}-${m.role}`}
+                className={
+                  m.role === "user"
+                    ? "ml-6 max-w-[92%] self-end rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-sm text-primary-foreground shadow-sm sm:ml-12 sm:max-w-[85%]"
+                    : "mr-6 max-w-[92%] self-start rounded-2xl rounded-bl-md border border-border/50 bg-card/90 px-3.5 py-2.5 text-sm text-card-foreground shadow-sm backdrop-blur-sm sm:mr-12 sm:max-w-[85%]"
+                }
+              >
+                <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+              </div>
+            ))}
+            {sendMutation.isPending ? (
+              <div className="mr-8 flex items-center gap-2 rounded-2xl border border-border/40 bg-card/60 px-3 py-2 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                <span>{AI_ASSISTANT_NAME} is thinking…</span>
+              </div>
+            ) : null}
+            <div ref={bottomRef} />
+          </div>
         </div>
 
         {lastReply && lastReply.suggestedNextActions.length > 0 ? (
           <div
-            className="rounded-xl border border-border bg-muted/30 p-3 dark:bg-muted/20"
+            className="rounded-2xl border border-border/60 bg-muted/25 p-3 shadow-sm dark:bg-muted/15"
             data-testid="coach-suggested-actions"
           >
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -429,7 +465,7 @@ export default function CoachPage() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type your question…"
             rows={3}
-            className="min-h-[5.5rem] flex-1 resize-none"
+            className="min-h-[5.5rem] flex-1 resize-none rounded-xl border-border/60 bg-background shadow-sm"
             disabled={sendMutation.isPending}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -440,7 +476,7 @@ export default function CoachPage() {
           />
           <Button
             type="button"
-            className="shrink-0"
+            className="h-11 shrink-0 rounded-xl sm:h-auto sm:self-stretch"
             onClick={() => void onSend()}
             disabled={sendMutation.isPending || !draft.trim()}
           >
@@ -455,15 +491,32 @@ export default function CoachPage() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <button type="button" className="underline underline-offset-2" onClick={clearChat}>
-            Delete chat history on this device
-          </button>
-          <span aria-hidden>·</span>
-          <Link href="/privacy" className="underline underline-offset-2">
-            Privacy
-          </Link>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <p>After 2 hours without a new message, this thread clears on this device.</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <button type="button" className="underline underline-offset-2" onClick={clearChat}>
+              Delete chat history now
+            </button>
+            <span aria-hidden>·</span>
+            <Link href="/privacy" className="underline underline-offset-2">
+              Privacy
+            </Link>
+          </div>
         </div>
+
+        <aside
+          className="mt-4 rounded-xl border border-border/60 bg-muted/15 px-3 py-3 text-center sm:text-left dark:bg-muted/10"
+          aria-label="Educational disclaimer"
+        >
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Educational only</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Not medical advice. For urgent symptoms,{" "}
+            <Link href="/help-now" className="font-medium text-foreground underline underline-offset-2">
+              open Help Now
+            </Link>
+            .
+          </p>
+        </aside>
       </div>
     </PageShell>
   );

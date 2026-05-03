@@ -69,6 +69,9 @@ export const DIABEATER_ACTIVE_USER_CHANGED_EVENT = "diabeater-active-user-change
 /** Dispatched when `saveSettings` updates local storage (same-tab; settings completion UI can refresh). */
 export const DIABEATER_SETTINGS_CHANGED_EVENT = "diabeater-settings-changed";
 
+/** Dispatched when `saveProfile` updates local profile JSON (same-tab). */
+export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
+
 const ONBOARDING_FINISHED_AT_KEY = "diabeater_onboarding_finished_at";
 
 /** Persist when the onboarding wizard finishes so the dashboard can show a lighter first week. */
@@ -891,6 +894,15 @@ export type ExerciseEnvironmentChoice =
 /** Symptom flag set logged during the active phase. */
 export type ExerciseSymptomFlag = "lightheaded" | "shaky" | "tingly" | "sweaty" | "tired" | "fine";
 
+const EXERCISE_SYMPTOM_FLAGS: readonly ExerciseSymptomFlag[] = [
+  "fine",
+  "lightheaded",
+  "shaky",
+  "tingly",
+  "sweaty",
+  "tired",
+];
+
 /** Rough intensity of the symptom episode (used to tune prompts; not medical). */
 export type ExerciseSymptomSeverity = "mild" | "moderate" | "severe";
 
@@ -1077,7 +1089,8 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   if (session.midCarbsGramsSoFar != null && Number.isFinite(session.midCarbsGramsSoFar)) {
     ctx.midCarbsGramsTotal = Math.max(0, Math.round(session.midCarbsGramsSoFar));
   }
-  if (session.midSymptoms && session.midSymptoms.length > 0 && session.midSymptoms.some((s) => s !== "fine")) {
+  const symptoms = Array.isArray(session.midSymptoms) ? session.midSymptoms : [];
+  if (symptoms.length > 0 && symptoms.some((s) => s !== "fine")) {
     ctx.feltSymptomsDuring = true;
   }
   if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
@@ -1157,6 +1170,9 @@ export const storage = {
   saveProfile(profile: UserProfile): void {
     localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
     localStorage.setItem(STORAGE_KEYS.ONBOARDING, "true");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(DIABEATER_PROFILE_CHANGED_EVENT));
+    }
   },
 
   isOnboardingCompleted(): boolean {
@@ -3595,6 +3611,14 @@ export const storage = {
         ? startedAtRaw
         : new Date().toISOString();
 
+    const rawSymptoms = session.midSymptoms;
+    const midSymptoms: ExerciseSymptomFlag[] | undefined = Array.isArray(rawSymptoms)
+      ? (rawSymptoms.filter(
+          (s): s is ExerciseSymptomFlag =>
+            typeof s === "string" && (EXERCISE_SYMPTOM_FLAGS as readonly string[]).includes(s),
+        ) as ExerciseSymptomFlag[])
+      : undefined;
+
     return {
       ...session,
       id,
@@ -3607,6 +3631,7 @@ export const storage = {
       midCheckDone: Boolean(session.midCheckDone),
       preChecklist,
       startedAt,
+      midSymptoms: midSymptoms && midSymptoms.length > 0 ? midSymptoms : undefined,
     };
   },
 

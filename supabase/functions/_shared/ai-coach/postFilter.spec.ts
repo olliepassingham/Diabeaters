@@ -156,6 +156,37 @@ describe("filterActions — href allow-list", () => {
     expect(cleaned).toHaveLength(3);
     expect(dropped).toBe(1);
   });
+
+  it("drops alcohol and driving for under-16 when profileGate is set", () => {
+    const { cleaned } = filterActions(
+      [
+        { label: "Alcohol", href: "/scenarios/alcohol" },
+        { label: "Driving", href: "/scenarios/driving" },
+        { label: "Exercise", href: "/scenarios/exercise" },
+      ],
+      { ageBand: "under18", ageYears: 15 },
+    );
+    expect(cleaned.map((c) => c.href)).toEqual(["/scenarios/exercise"]);
+  });
+
+  it("keeps driving at 17 but still drops alcohol", () => {
+    const { cleaned } = filterActions(
+      [
+        { label: "Alcohol", href: "/scenarios/alcohol" },
+        { label: "Driving", href: "/scenarios/driving" },
+      ],
+      { ageBand: "under18", ageYears: 17 },
+    );
+    expect(cleaned.map((c) => c.href)).toEqual(["/scenarios/driving"]);
+  });
+
+  it("drops driving when under18 but ageYears is unknown (conservative)", () => {
+    const { cleaned } = filterActions(
+      [{ label: "Driving", href: "/scenarios/driving" }],
+      { ageBand: "under18", ageYears: null },
+    );
+    expect(cleaned).toHaveLength(0);
+  });
 });
 
 describe("applyPostFilter", () => {

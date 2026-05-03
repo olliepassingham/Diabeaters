@@ -54,6 +54,7 @@ export async function sendCoachMessage(args: {
     ratiosAreSet: payload.ratiosAreSet,
     bgUnits: payload.bgUnits,
     audience,
+    ...(payload.dateOfBirth ? { dateOfBirth: payload.dateOfBirth } : {}),
   };
 
   const endpoint = `${url.replace(/\/$/, "")}/functions/v1/ai_coach`;

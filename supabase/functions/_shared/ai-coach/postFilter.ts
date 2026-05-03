@@ -13,9 +13,26 @@ import {
   ALLOWED_HREFS,
   type AllowedHref,
   type CoachAction,
+  type CoachContext,
   type CoachReply,
   type PostFilterStatus,
 } from "./types.ts";
+
+export type PostFilterProfileGate = Pick<CoachContext["profile"], "ageBand" | "ageYears">;
+
+function isHrefBlockedByAge(href: string, profile: PostFilterProfileGate): boolean {
+  if (href === "/scenarios/alcohol") {
+    if (profile.ageBand === "under18") return true;
+    if (profile.ageYears != null && profile.ageYears < 18) return true;
+    return false;
+  }
+  if (href === "/scenarios/driving") {
+    if (profile.ageYears != null) return profile.ageYears < 17;
+    if (profile.ageBand === "under18") return true;
+    return false;
+  }
+  return false;
+}
 
 export interface PostFilterResult {
   status: PostFilterStatus;
@@ -135,7 +152,10 @@ function isAllowedHref(href: string): href is AllowedHref {
   return (ALLOWED_HREFS as readonly string[]).includes(href);
 }
 
-function filterActions(actions: CoachAction[] | undefined): {
+function filterActions(
+  actions: CoachAction[] | undefined,
+  profileGate?: PostFilterProfileGate,
+): {
   cleaned: CoachAction[];
   dropped: number;
 } {
@@ -145,11 +165,19 @@ function filterActions(actions: CoachAction[] | undefined): {
   const cleaned: CoachAction[] = [];
   let dropped = 0;
   for (const a of actions) {
-    if (a && typeof a.label === "string" && typeof a.href === "string" && isAllowedHref(a.href)) {
-      cleaned.push({ label: a.label, href: a.href });
-    } else {
+    if (!a || typeof a.label !== "string" || typeof a.href !== "string") {
       dropped += 1;
+      continue;
     }
+    if (!isAllowedHref(a.href)) {
+      dropped += 1;
+      continue;
+    }
+    if (profileGate && isHrefBlockedByAge(a.href, profileGate)) {
+      dropped += 1;
+      continue;
+    }
+    cleaned.push({ label: a.label, href: a.href });
   }
   // Cap at 3 per §4.
   if (cleaned.length > 3) {
@@ -176,8 +204,12 @@ const REFUSAL_REPLY: CoachReply = {
  * - Hard refuses (returns REFUSAL_REPLY) when a clinical-numeric pattern fires.
  * - Rewrites by truncating when reply is too long.
  * - Always strips any `suggestedNextActions` whose href isn't in the allow-list.
+ * - Optionally strips age-gated scenario routes when `profileGate` is set.
  */
-export function applyPostFilter(reply: CoachReply): PostFilterResult {
+export function applyPostFilter(
+  reply: CoachReply,
+  profileGate?: PostFilterProfileGate,
+): PostFilterResult {
   const reasons: string[] = [];
 
   if (typeof reply?.reply !== "string") {
@@ -206,7 +238,7 @@ export function applyPostFilter(reply: CoachReply): PostFilterResult {
     reasons.push("length_cap");
   }
 
-  const { cleaned: cleanedActions, dropped } = filterActions(reply.suggestedNextActions);
+  const { cleaned: cleanedActions, dropped } = filterActions(reply.suggestedNextActions, profileGate);
   if (dropped > 0) {
     rewritten = true;
     reasons.push(`dropped_${dropped}_action${dropped === 1 ? "" : "s"}`);

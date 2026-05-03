@@ -16,7 +16,14 @@ import {
   getDefaultCorrectionTargetHigh,
   type BgUnits,
 } from "@/lib/correction-dose";
-import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, type UserProfile, type UserSettings } from "@/lib/storage";
+import {
+  storage,
+  DIABEATER_SETTINGS_CHANGED_EVENT,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  type UserProfile,
+  type UserSettings,
+} from "@/lib/storage";
+import { ageInWholeYearsUtc } from "@/lib/user-age";
 
 function parseBgInput(raw: string): number | null {
   const n = parseFloat(raw.replace(",", "."));
@@ -43,7 +50,11 @@ export default function CorrectionHelpPage() {
     load();
     if (typeof window === "undefined") return;
     window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, load);
-    return () => window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, load);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, load);
+    return () => {
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, load);
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, load);
+    };
   }, [load]);
 
   const defaultTarget = useMemo(() => {
@@ -80,6 +91,11 @@ export default function CorrectionHelpPage() {
     return hypoTreatmentsInRollingHours(storage.getHypoTreatments(), 7 * 24).length;
   }, []);
 
+  const showUnder18IsfCopy = useMemo(() => {
+    const a = ageInWholeYearsUtc(profile?.dateOfBirth);
+    return a !== null && a < 18;
+  }, [profile?.dateOfBirth]);
+
   return (
     <PageShell variant="standard" className="space-y-6">
       <PageHeader
@@ -94,6 +110,15 @@ export default function CorrectionHelpPage() {
           </PageInfoDialog>
         }
       />
+
+      {showUnder18IsfCopy && (
+        <Alert className="border-sky-200 dark:border-sky-900/50 bg-sky-50/80 dark:bg-sky-950/25" data-testid="alert-correction-under18">
+          <AlertDescription className="text-sm">
+            For children and young people, correction factors and targets should come from your diabetes team. Enter the
+            values they give you in Ratios — this tool only does the arithmetic.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {isPump && (
         <Alert data-testid="alert-correction-pump-iob">

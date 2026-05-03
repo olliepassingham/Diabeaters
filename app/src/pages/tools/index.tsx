@@ -14,6 +14,7 @@ import {
   ChevronRight,
   MessageCircle,
   Users,
+  GraduationCap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,6 +38,8 @@ import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
+import { storage } from "@/lib/storage";
+import { ageInWholeYearsUtc } from "@/lib/user-age";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -112,17 +115,36 @@ const PATIENT_TOOLS: ToolDef[] = [
   },
 ];
 
-function patientToolsForHub(): ToolDef[] {
-  if (!isAiCoachEnabled) return PATIENT_TOOLS;
-  const coach: ToolDef = {
-    id: "ai-coach",
-    href: "/coach",
-    icon: MessageCircle,
-    title: AI_ASSISTANT_NAME,
-    description:
-      `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.`,
+function schoolEmergencyTileForPatientHub(): ToolDef | null {
+  const dob = storage.getProfile()?.dateOfBirth;
+  const age = ageInWholeYearsUtc(dob);
+  if (age == null || age >= 18) return null;
+  return {
+    id: "school-hypo-plan",
+    href: "/emergency-card",
+    icon: GraduationCap,
+    title: "School & hypo plan",
+    description: "Keep your kit list and what to tell school or college on your Emergency Card.",
   };
-  return [coach, ...PATIENT_TOOLS];
+}
+
+function patientToolsForHub(): ToolDef[] {
+  const coach: ToolDef | undefined = isAiCoachEnabled
+    ? {
+        id: "ai-coach",
+        href: "/coach",
+        icon: MessageCircle,
+        title: AI_ASSISTANT_NAME,
+        description:
+          `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.`,
+      }
+    : undefined;
+  const core = coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
+  const school = schoolEmergencyTileForPatientHub();
+  if (!school) return core;
+  const hypoIdx = core.findIndex((t) => t.id === "hypo-help");
+  if (hypoIdx < 0) return [school, ...core];
+  return [...core.slice(0, hypoIdx + 1), school, ...core.slice(hypoIdx + 1)];
 }
 
 export const CARER_TOOLS: ToolDef[] = [
@@ -154,7 +176,7 @@ export function carerToolsForHub(): ToolDef[] {
     icon: MessageCircle,
     title: AI_ASSISTANT_NAME,
     description:
-      `${AI_ASSISTANT_NAME} is an educational guide for partners, family, friends, or carers of an adult with type 1 diabetes in the UK. Not medical advice.`,
+      `${AI_ASSISTANT_NAME} is an educational guide for partners, family, friends, or carers of someone with type 1 diabetes in the UK. Not medical advice.`,
   };
   return [coach, ...CARER_TOOLS];
 }
@@ -343,14 +365,26 @@ export function ToolsHubPage({
   // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` /
   // `carerToolsForHub()` when the feature is on. It must be included here — otherwise the tile
   // exists in `tools` but never renders.
+  const patientActNowBase: readonly string[] =
+    byId.has("ai-coach")
+      ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
+      : ["insulin-calculator", "hypo-help", "correction-helper"];
+  const patientActNowIds: readonly string[] = byId.has("school-hypo-plan")
+    ? (() => {
+        const ids = [...patientActNowBase];
+        const hi = ids.indexOf("hypo-help");
+        if (hi >= 0) ids.splice(hi + 1, 0, "school-hypo-plan");
+        else ids.push("school-hypo-plan");
+        return ids;
+      })()
+    : patientActNowBase;
+
   const actNowIds: readonly string[] =
     hubVariant === "carer"
       ? byId.has("ai-coach")
         ? ["ai-coach", "hypo-help"]
         : ["hypo-help"]
-      : byId.has("ai-coach")
-        ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
-        : ["insulin-calculator", "hypo-help", "correction-helper"];
+      : patientActNowIds;
   const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
   const plan = (["routines", "appointments", "supply-tracker"] as const)

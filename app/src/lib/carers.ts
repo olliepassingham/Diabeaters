@@ -215,6 +215,7 @@ export function normaliseScopes(raw: unknown): CarerScopes {
     scenarios: Boolean(o.scenarios),
     hypo_alerts: Boolean(o.hypo_alerts),
     emergency_info: Boolean(o.emergency_info),
+    clinical_settings: Boolean(o.clinical_settings),
   };
 }
 
@@ -1229,6 +1230,79 @@ export async function carerMarkSickDayMedicationTakenNow(
     name,
     doseLabel: dose,
   });
+}
+
+/** Cloud profile fields a carer may read/update when `clinical_settings` scope is true. */
+export type PatientClinicalPrefsForCarer = {
+  date_of_birth: string | null;
+  insulin_delivery_method: string | null;
+  tdd: number | null;
+};
+
+function parsePatientClinicalPrefsRpc(raw: unknown): PatientClinicalPrefsForCarer | null {
+  if (raw == null || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const dob = o.date_of_birth;
+  const date_of_birth =
+    dob === null || dob === undefined ? null : typeof dob === "string" ? dob.trim() || null : null;
+  const idm = o.insulin_delivery_method;
+  let insulin_delivery_method: string | null = null;
+  if (idm === "pen" || idm === "pump") insulin_delivery_method = idm;
+  else if (idm === null || idm === undefined || idm === "") insulin_delivery_method = null;
+  const tddRaw = o.tdd;
+  let tdd: number | null = null;
+  if (typeof tddRaw === "number" && Number.isFinite(tddRaw) && tddRaw > 0) tdd = tddRaw;
+  else if (typeof tddRaw === "string" && tddRaw.trim()) {
+    const n = parseFloat(tddRaw);
+    if (Number.isFinite(n) && n > 0) tdd = n;
+  }
+  return { date_of_birth, insulin_delivery_method, tdd };
+}
+
+/** Carer: load patient's clinical prefs when `clinical_settings` scope is granted (RPC). */
+export async function getPatientClinicalPrefsForCarer(patientId: string): Promise<{
+  data: PatientClinicalPrefsForCarer | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: NOT_CONFIGURED };
+
+  const { data, error } = await supabase.rpc("get_patient_clinical_prefs_for_carer", {
+    p_patient_id: patientId,
+  });
+  if (error) return { data: null, error: new Error(error.message) };
+  if (data == null) return { data: null, error: null };
+  return { data: parsePatientClinicalPrefsRpc(data), error: null };
+}
+
+/** Carer: patch patient's cloud clinical prefs (delivery, TDD, DOB). Requires `clinical_settings` scope. */
+export async function updatePatientClinicalPrefsForCarer(
+  patientId: string,
+  fields: Partial<{
+    date_of_birth: string | null;
+    insulin_delivery_method: "pen" | "pump" | null;
+    tdd: number | null;
+  }>,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: NOT_CONFIGURED };
+
+  const p_fields: Record<string, unknown> = {};
+  if ("date_of_birth" in fields) p_fields.date_of_birth = fields.date_of_birth ?? "";
+  if ("insulin_delivery_method" in fields) {
+    p_fields.insulin_delivery_method = fields.insulin_delivery_method ?? "";
+  }
+  if ("tdd" in fields) {
+    p_fields.tdd = fields.tdd == null ? null : fields.tdd;
+  }
+  if (Object.keys(p_fields).length === 0) return { error: null };
+
+  const { error } = await supabase.rpc("update_patient_clinical_prefs_for_carer", {
+    p_patient_id: patientId,
+    p_fields,
+  });
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
 }
 
 export { useLinkedPatient } from "../hooks/use-linked-patient";

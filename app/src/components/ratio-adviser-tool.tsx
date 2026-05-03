@@ -26,7 +26,8 @@ import {
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { storage, UserSettings, RatioFormat } from "@/lib/storage";
+import { storage, UserSettings, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { ageInWholeYearsUtc } from "@/lib/user-age";
 import {
   formatRatioForStorage,
   formatRatioForDisplay,
@@ -34,6 +35,7 @@ import {
   calculateDoseFromCarbs,
 } from "@/lib/ratio-utils";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -180,6 +182,22 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   const [previewMeal, setPreviewMeal] = useState<MealKey>("lunch");
   const [previewCarbs, setPreviewCarbs] = useState("");
+  const [minorKnown, setMinorKnown] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      const a = ageInWholeYearsUtc(storage.getProfile()?.dateOfBirth);
+      setMinorKnown(a !== null && a < 18);
+    };
+    sync();
+    if (typeof window === "undefined") return;
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    if (minorKnown && mode === "scratch_tdd") setMode("scratch_intro");
+  }, [minorKnown, mode]);
 
   useEffect(() => {
     const profile = storage.getProfile();
@@ -255,6 +273,17 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   };
 
   const handleCalculateFromTDD = () => {
+    const dob = storage.getProfile()?.dateOfBirth;
+    const ageYears = ageInWholeYearsUtc(dob);
+    if (ageYears !== null && ageYears < 18) {
+      toast({
+        title: "Not available for your age group",
+        description:
+          "The 500-rule estimate is for adults. Ask your diabetes team for starting carb ratios and enter them in Settings.",
+        variant: "destructive",
+      });
+      return;
+    }
     const tdd = parseFloat(tddInput);
     if (!tdd || tdd <= 0) return;
 
@@ -410,20 +439,30 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           <div className="space-y-3">
             <p className="text-sm font-medium">How would you like to estimate your ratios?</p>
 
-            <Button
-              variant="outline"
-              className="w-full h-auto py-3 justify-start text-left"
-              onClick={() => setMode("scratch_tdd")}
-              data-testid="button-estimate-from-tdd"
-            >
-              <div className="flex items-start gap-3">
-                <Calculator className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium text-sm">I know my Total Daily Dose (TDD)</p>
-                  <p className="text-xs text-muted-foreground">Estimate using the 500 rule</p>
+            {minorKnown ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  The <strong>500 rule</strong> estimate is aimed at adults. Use ratios from your diabetes team and save
+                  them in Settings, or use the starting-point option below and review with your team before relying on it.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full h-auto py-3 justify-start text-left"
+                onClick={() => setMode("scratch_tdd")}
+                data-testid="button-estimate-from-tdd"
+              >
+                <div className="flex items-start gap-3">
+                  <Calculator className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-sm">I know my Total Daily Dose (TDD)</p>
+                    <p className="text-xs text-muted-foreground">Estimate using the 500 rule</p>
+                  </div>
                 </div>
-              </div>
-            </Button>
+              </Button>
+            )}
 
             <Button
               variant="outline"

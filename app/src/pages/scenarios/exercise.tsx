@@ -18,14 +18,20 @@ export default function ScenarioExercisePage() {
   return (
     <PageShell variant="standard" className="space-y-6">
       <PageHeader
+        stackActionsMaxSm
         leading={<PageBackButton />}
         title="Exercise"
         actions={
           <>
             <ScenarioCoachLink topic="exercise" />
             <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
-              <Link href="/routines?section=exercise" data-testid="link-exercise-routines-header">
-                Exercise routines
+              <Link
+                href="/routines?section=exercise"
+                data-testid="link-exercise-routines-header"
+                aria-label="Exercise routines"
+              >
+                <span className="sm:hidden">Routines</span>
+                <span className="hidden sm:inline">Exercise routines</span>
               </Link>
             </Button>
           </>

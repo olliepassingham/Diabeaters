@@ -44,6 +44,14 @@ function AvatarBubble({
 
 function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
   if (links.length === 0) return { ...DEFAULT_CARER_SCOPES };
+  const allOn: CarerScopes = {
+    supplies: true,
+    appointments: true,
+    scenarios: true,
+    hypo_alerts: true,
+    emergency_info: true,
+    clinical_settings: true,
+  };
   return links.reduce(
     (acc, l) => ({
       supplies: acc.supplies && l.scopes.supplies,
@@ -51,8 +59,9 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
       scenarios: acc.scenarios && l.scopes.scenarios,
       hypo_alerts: acc.hypo_alerts && l.scopes.hypo_alerts,
       emergency_info: acc.emergency_info && l.scopes.emergency_info,
+      clinical_settings: acc.clinical_settings && l.scopes.clinical_settings,
     }),
-    { ...DEFAULT_CARER_SCOPES },
+    allOn,
   );
 }
 
@@ -365,6 +374,13 @@ export default function FamilyCarersPage() {
               label: "Emergency details",
               description: "The contact and notes you save under Account or Settings — only if you want them visible.",
               testId: "privacy-toggle-emergency",
+            },
+            {
+              key: "clinical_settings" as const,
+              label: "Clinical basics on their profile",
+              description:
+                "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default.",
+              testId: "privacy-toggle-clinical-settings",
             },
           ].map((item) => (
             <div key={item.key} className="flex items-center justify-between gap-4">

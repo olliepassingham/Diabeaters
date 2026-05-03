@@ -4,6 +4,7 @@
  * destinations.
  */
 
+import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { storage } from "@/lib/storage";
 
 const FORTNIGHT_MS = 14 * 24 * 60 * 60 * 1000;
@@ -33,6 +34,8 @@ export interface AiCoachClientPayload {
   lastFortnight: AiCoachLastFortnightWire;
   ratiosAreSet: boolean;
   bgUnits: string | null;
+  /** `YYYY-MM-DD` when stored locally; omitted when unset or invalid. */
+  dateOfBirth?: string;
 }
 
 /**
@@ -65,6 +68,8 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
         ? "mg/dL"
         : null;
 
+  const dateOfBirth = normalizeDateOfBirthInput(profile?.dateOfBirth) ?? undefined;
+
   return {
     lastFortnight: {
       bgReadings,
@@ -78,5 +83,6 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
     },
     ratiosAreSet,
     bgUnits,
+    ...(dateOfBirth ? { dateOfBirth } : {}),
   };
 }

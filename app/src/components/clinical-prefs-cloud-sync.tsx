@@ -18,7 +18,14 @@ export function ClinicalPrefsCloudSync() {
     if (!user?.id || !profile) return;
     if (hasCarerLink && getActiveAppMode() === "carer") return;
     applyClinicalPrefsFromCloudRow(profile);
-  }, [user?.id, hasCarerLink, profile?.id, profile?.insulin_delivery_method, profile?.tdd]);
+  }, [
+    user?.id,
+    hasCarerLink,
+    profile?.id,
+    profile?.insulin_delivery_method,
+    profile?.tdd,
+    profile?.date_of_birth,
+  ]);
 
   return null;
 }

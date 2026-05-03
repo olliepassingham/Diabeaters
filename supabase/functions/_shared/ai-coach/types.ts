@@ -107,7 +107,13 @@ export interface CoachReply {
  */
 export interface CoachContext {
   profile: {
-    ageBand: "18-29" | "30-39" | "40-49" | "50-59" | "60+" | "unknown";
+    /**
+     * Decade band for adults (≥ 18), or `under18` when DOB implies the account
+     * holder is under 18, or `unknown` when DOB is missing or invalid.
+     */
+    ageBand: "under18" | "18-29" | "30-39" | "40-49" | "50-59" | "60+" | "unknown";
+    /** Whole years since DOB in UTC; null when DOB is unknown or invalid. */
+    ageYears: number | null;
     deliveryMethod: "mdi" | "pump" | "unknown";
     bgUnits: "mmol/L" | "mg/dL" | "unknown";
     diagnosedYearsAgo: number | null;
@@ -139,6 +145,11 @@ export interface CoachRequest {
   ratiosAreSet: boolean;
   /** Optional. Defaults to `patient`. Selects patient vs supporter system prompt. */
   audience?: CoachAudience;
+  /**
+   * Optional `YYYY-MM-DD` from the device when `profiles.date_of_birth` is not
+   * synced yet; server prefers the cloud value when both exist.
+   */
+  dateOfBirth?: string | null;
 }
 
 /**

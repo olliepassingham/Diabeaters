@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-context";
 import { getSupabase } from "./supabase";
+import { normalizeDateOfBirthInput } from "./user-age";
 
 export type ProfileRow = {
   id: string;
@@ -24,6 +25,8 @@ export type ProfileRow = {
   insulin_delivery_method?: string | null;
   /** Total daily insulin (units); optional owner sync from app settings. */
   tdd?: number | null;
+  /** Optional YYYY-MM-DD; owner or linked supporter (when permitted) may set on cloud profile. */
+  date_of_birth?: string | null;
 };
 
 /** Safe fields for community public profile pages (never include emergency_*). */
@@ -52,6 +55,12 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
   else if (idm === undefined) insulin_delivery_method = undefined;
   else insulin_delivery_method = null;
 
+  const rawDob = data.date_of_birth;
+  let date_of_birth: string | null | undefined;
+  if (rawDob === null) date_of_birth = null;
+  else if (rawDob === undefined) date_of_birth = undefined;
+  else date_of_birth = normalizeDateOfBirthInput(String(rawDob)) ?? null;
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -67,6 +76,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     diabetes_onset_date: (data.diabetes_onset_date as string | null) ?? null,
     insulin_delivery_method,
     tdd,
+    date_of_birth,
   };
 }
 
@@ -263,6 +273,7 @@ export type ProfileUpdatePayload = {
     | "diabetes_onset_date"
     | "insulin_delivery_method"
     | "tdd"
+    | "date_of_birth"
   >
 >;
 
@@ -282,6 +293,7 @@ export async function updateProfile(
     diabetes_onset_date,
     insulin_delivery_method,
     tdd,
+    date_of_birth,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -311,6 +323,14 @@ export async function updateProfile(
     if (tdd === null) update.tdd = null;
     else if (typeof tdd === "number" && Number.isFinite(tdd) && tdd > 0) update.tdd = tdd;
     else update.tdd = null;
+  }
+  if (date_of_birth !== undefined) {
+    if (date_of_birth === null) {
+      update.date_of_birth = null;
+    } else {
+      const n = normalizeDateOfBirthInput(date_of_birth);
+      update.date_of_birth = n ?? null;
+    }
   }
 
   try {

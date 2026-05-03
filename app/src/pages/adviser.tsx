@@ -25,6 +25,7 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
+import { ageInWholeYearsUtc } from "@/lib/user-age";
 
 
 function getInitialTab(): string {
@@ -219,6 +220,17 @@ export default function Adviser() {
         ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt, cpSize)})`;
       }
     } else if (settings.tdd) {
+      const ageYears = ageInWholeYearsUtc(profile.dateOfBirth ?? storage.getProfile()?.dateOfBirth);
+      if (ageYears !== null && ageYears < 18) {
+        toast({
+          title: "Meal ratio needed",
+          description:
+            "For under-18 users we do not estimate doses from TDD alone. Add the meal ratio from your diabetes team in Settings, then try again.",
+          variant: "destructive",
+        });
+        setSplitResult(null);
+        return;
+      }
       const estimatedRatio = Math.round(500 / settings.tdd);
       totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
       ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt, cpSize)})`;

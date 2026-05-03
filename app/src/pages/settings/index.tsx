@@ -15,7 +15,6 @@ import {
   UK_DEFAULT_UNITS_PER_INSULIN_PEN,
 } from "@/lib/storage";
 import {
-  User,
   Syringe,
   Activity,
   Save,
@@ -41,8 +40,9 @@ import { ClinicalWarningHint } from "@/components/clinical-warning";
 import appPackage from "../../../package.json";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
-import { profileQueryKey, updateProfile, useProfile } from "@/lib/profile";
-import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { profileQueryKey, useProfile } from "@/lib/profile";
+import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
@@ -52,82 +52,96 @@ import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
-function ProfileTab({ 
-  bgUnits, setBgUnits, 
-  carbUnits, setCarbUnits, deliveryMethod, setDeliveryMethod, 
-  onSave 
+
+/** Mobile save bars must sit above `BottomNav` (z-50); `bottom-0` + lower z-index left them untappable behind the tabs. */
+const SETTINGS_MOBILE_STICKY_FOOTER =
+  "md:hidden fixed left-0 right-0 z-[60] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
+
+function ProfileTab({
+  bgUnits,
+  setBgUnits,
+  carbUnits,
+  setCarbUnits,
+  deliveryMethod,
+  setDeliveryMethod,
+  dateOfBirth,
+  setDateOfBirth,
+  onSave,
 }: {
-  bgUnits: string; setBgUnits: (v: string) => void;
-  carbUnits: string; setCarbUnits: (v: string) => void;
-  deliveryMethod: "pen" | "pump"; setDeliveryMethod: (v: "pen" | "pump") => void;
+  bgUnits: string;
+  setBgUnits: (v: string) => void;
+  carbUnits: string;
+  setCarbUnits: (v: string) => void;
+  deliveryMethod: "pen" | "pump";
+  setDeliveryMethod: (v: "pen" | "pump") => void;
+  dateOfBirth: string;
+  setDateOfBirth: (v: string) => void;
   onSave: () => void;
 }) {
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            <CardTitle className="text-h3 font-semibold">Personal information</CardTitle>
-          </div>
-          <CardDescription className="text-body text-muted-foreground">Your personal details and preferences.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="bg-units">Blood Glucose Units</Label>
-            <Select value={bgUnits} onValueChange={setBgUnits}>
-              <SelectTrigger id="bg-units" data-testid="select-bg-units"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mmol/L">mmol/L</SelectItem>
-                <SelectItem value="mg/dL">mg/dL</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="carb-units">Carbohydrate Units</Label>
-            <Select value={carbUnits} onValueChange={setCarbUnits}>
-              <SelectTrigger id="carb-units" data-testid="select-carb-units"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="grams">Grams</SelectItem>
-                <SelectItem value="portions-10g">Carb Portion (10g)</SelectItem>
-                <SelectItem value="portions-15g">Carb Portion (15g)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
         <div className="space-y-2">
-          <Label htmlFor="delivery-method">Insulin Delivery Method</Label>
-          <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
-            <SelectTrigger id="delivery-method" data-testid="select-delivery-method"><SelectValue /></SelectTrigger>
+          <Label htmlFor="bg-units">Blood Glucose Units</Label>
+          <Select value={bgUnits} onValueChange={setBgUnits}>
+            <SelectTrigger id="bg-units" data-testid="select-bg-units">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pen">MDI (Multiple Daily Injections)</SelectItem>
-              <SelectItem value="pump">Insulin Pump</SelectItem>
+              <SelectItem value="mmol/L">mmol/L</SelectItem>
+              <SelectItem value="mg/dL">mg/dL</SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            {deliveryMethod === "pump" ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
-          </p>
         </div>
-          <div className="hidden md:flex justify-end">
-            <Button onClick={onSave} data-testid="button-save-profile">
-              <Save className="h-4 w-4 mr-2" />
-              Save Profile
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button onClick={onSave} className="w-full" data-testid="button-save-profile-sticky">
-            <Save className="h-4 w-4 mr-2" />
-            Save Profile
-          </Button>
+        <div className="space-y-2">
+          <Label htmlFor="carb-units">Carbohydrate Units</Label>
+          <Select value={carbUnits} onValueChange={setCarbUnits}>
+            <SelectTrigger id="carb-units" data-testid="select-carb-units">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="grams">Grams</SelectItem>
+              <SelectItem value="portions-10g">Carb Portion (10g)</SelectItem>
+              <SelectItem value="portions-15g">Carb Portion (15g)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
-    </>
+      <div className="space-y-2">
+        <Label htmlFor="delivery-method">Insulin Delivery Method</Label>
+        <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
+          <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pen">MDI (Multiple Daily Injections)</SelectItem>
+            <SelectItem value="pump">Insulin Pump</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {deliveryMethod === "pump" ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="settings-dob">
+          Date of birth <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Input
+          id="settings-dob"
+          type="date"
+          value={dateOfBirth}
+          onChange={(e) => setDateOfBirth(e.target.value)}
+          data-testid="input-settings-dob"
+        />
+        <p className="text-xs text-muted-foreground">YYYY-MM-DD. Used for age-appropriate guidance; syncs when signed in.</p>
+      </div>
+      <div className="hidden justify-end pt-1 md:flex">
+        <Button onClick={onSave} data-testid="button-save-profile">
+          <Save className="h-4 w-4 mr-2" />
+          Save profile
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -300,8 +314,8 @@ function InsulinTab({
       </Card>
 
       {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
+        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-3">
           <Button onClick={onSave} className="w-full" data-testid="button-save-insulin-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Insulin Settings
@@ -352,19 +366,7 @@ function UsageTab({
   onSave: () => void;
 }) {
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
-            <CardTitle className="text-h3 font-semibold">Usual Habits</CardTitle>
-          </div>
-          <CardDescription className="text-body text-muted-foreground">
-            Help estimate when you'll need to reorder supplies.
-            {isPumpUser && <span className="ml-1 text-primary">(Pump user settings)</span>}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="space-y-4">
         <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/30 p-3">
           <div className="space-y-0.5">
             <p className="text-sm font-medium">Smarter supply forecast</p>
@@ -545,25 +547,13 @@ function UsageTab({
           </div>
         </div>
 
-          <div className="hidden md:flex justify-end">
-            <Button onClick={onSave} data-testid="button-save-usage">
-              <Save className="h-4 w-4 mr-2" />
-              Save Usage Settings
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Mobile-only sticky action bar for long forms */}
-      <div className="md:hidden fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-40 border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button onClick={onSave} className="w-full" data-testid="button-save-usage-sticky">
-            <Save className="h-4 w-4 mr-2" />
-            Save Usage Settings
-          </Button>
-        </div>
+      <div className="hidden justify-end pt-1 md:flex">
+        <Button onClick={onSave} data-testid="button-save-usage">
+          <Save className="h-4 w-4 mr-2" />
+          Save usage
+        </Button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -628,6 +618,17 @@ export default function Settings() {
     communityDmAlerts: true,
   });
   
+  useEffect(() => {
+    const nd = normalizeDateOfBirthInput(cloudProfile?.date_of_birth ?? null);
+    if (!nd) return;
+    setProfile((prev) => {
+      const base = prev ?? storage.getProfile();
+      if (!base) return prev;
+      if (base.dateOfBirth?.trim()) return prev;
+      return { ...base, dateOfBirth: nd };
+    });
+  }, [cloudProfile?.date_of_birth]);
+
   useEffect(() => {
     const storedProfile = storage.getProfile();
     const storedSettings = storage.getSettings();
@@ -776,25 +777,54 @@ export default function Settings() {
     return () => clearTimeout(t);
   }, [location, pathOnly]);
 
-  const handleSaveProfile = async () => {
-    if (!profile) return;
-    const updatedProfile = { ...profile, bgUnits, carbUnits, insulinDeliveryMethod: deliveryMethod };
+  const handleSaveProfile = async (opts?: { quietSuccess?: boolean }): Promise<{
+    ok: boolean;
+    dateOfBirthCloudSkipped?: boolean;
+    insulinDeliveryMethodCloudSkipped?: boolean;
+    tddCloudSkipped?: boolean;
+  }> => {
+    const base = profile ?? storage.getProfile();
+    if (!base) return { ok: false };
+    const normalizedDob = normalizeDateOfBirthInput(base.dateOfBirth?.trim() || null);
+    const updatedProfile = {
+      ...base,
+      bgUnits,
+      carbUnits,
+      insulinDeliveryMethod: deliveryMethod,
+      dateOfBirth: normalizedDob ?? "",
+    };
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
 
+    let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
-      const { error } = await syncClinicalPrefsToCloud(user.id);
-      if (error) {
+      cloud = await syncClinicalPrefsToCloud(user.id);
+      if (cloud.error) {
         toast({
           title: "Saved on this device",
-          description: `Could not sync delivery method to your account: ${error.message}`,
+          description: `Could not sync to your account: ${cloud.error.message}`,
           variant: "destructive",
         });
-        return;
+        return { ok: false };
       }
     }
 
-    toast({ title: "Saved", description: "Your personal settings have been updated." });
+    if (!opts?.quietSuccess) {
+      const partial = describePartialClinicalPrefsCloudSync(cloud);
+      toast({
+        title: "Saved",
+        description: partial
+          ? `Your personal settings have been updated. ${partial}`
+          : "Your personal settings have been updated.",
+      });
+    }
+
+    return {
+      ok: true,
+      dateOfBirthCloudSkipped: cloud.dateOfBirthCloudSkipped,
+      insulinDeliveryMethodCloudSkipped: cloud.insulinDeliveryMethodCloudSkipped,
+      tddCloudSkipped: cloud.tddCloudSkipped,
+    };
   };
 
   const handleRatioFormatChange = (newFormat: RatioFormat) => {
@@ -856,21 +886,28 @@ export default function Settings() {
       storage.saveProfile(updatedProfile);
       setProfile(updatedProfile);
     }
+    let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
-      const { error } = await syncClinicalPrefsToCloud(user.id);
-      if (error) {
+      cloud = await syncClinicalPrefsToCloud(user.id);
+      if (cloud.error) {
         toast({
           title: "Insulin settings saved on this device",
-          description: `Could not sync TDD to your account: ${error.message}`,
+          description: `Could not sync TDD to your account: ${cloud.error.message}`,
           variant: "destructive",
         });
         return;
       }
     }
-    toast({ title: "Insulin settings saved", description: "Your insulin settings have been updated." });
+    const partial = describePartialClinicalPrefsCloudSync(cloud);
+    toast({
+      title: "Insulin settings saved",
+      description: partial
+        ? `Your insulin settings have been updated. ${partial}`
+        : "Your insulin settings have been updated.",
+    });
   };
 
-  const handleSaveUsage = () => {
+  const handleSaveUsage = (opts?: { quietSuccess?: boolean }) => {
     const newSettings: UserSettings = {
       ...settings,
       shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
@@ -905,7 +942,27 @@ export default function Settings() {
         storage.syncSettingsToSupplyUsage(key, val);
       }
     }
-    toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
+    if (!opts?.quietSuccess) {
+      toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
+    }
+  };
+
+  const handleSaveUsagePage = async () => {
+    const save = await handleSaveProfile({ quietSuccess: true });
+    if (!save.ok) return;
+    handleSaveUsage({ quietSuccess: true });
+    const partial = describePartialClinicalPrefsCloudSync({
+      error: null,
+      dateOfBirthCloudSkipped: save.dateOfBirthCloudSkipped,
+      insulinDeliveryMethodCloudSkipped: save.insulinDeliveryMethodCloudSkipped,
+      tddCloudSkipped: save.tddCloudSkipped,
+    });
+    toast({
+      title: "Saved",
+      description: partial
+        ? `Profile and usage settings are updated on this device. ${partial}`
+        : "Profile and usage settings are updated on this device.",
+    });
   };
 
   const isPumpUser = deliveryMethod === "pump";
@@ -935,8 +992,8 @@ export default function Settings() {
 
   const settingsInfoDialog = (
     <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
-      <InfoSection title="Personal information and usage">
-        <p>Your units, insulin habits, and supply pack sizes for forecasts.</p>
+      <InfoSection title="Personal & usage">
+        <p>Your units, insulin habits, supply pack sizes, and backup.</p>
       </InfoSection>
       <InfoSection title="Appearance">
         <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
@@ -949,17 +1006,16 @@ export default function Settings() {
       <InfoSection title="About">
         <p>
           Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is at
-          the bottom of Personal information and usage.
+          the bottom of Personal & usage.
         </p>
       </InfoSection>
     </PageInfoDialog>
   );
 
   const usageToolsInner = (
-    <CardContent className="pt-6 pb-6 space-y-8">
-      <div id="settings-personal" className="scroll-mt-28 space-y-3">
-        <h3 className="text-h3 font-semibold text-foreground">Personal information</h3>
-        <p className="text-small text-muted-foreground">Glucose units, carbs, and delivery method.</p>
+    <CardContent className="space-y-6 px-4 py-4 sm:px-5 sm:py-5 md:space-y-8 md:px-6 md:py-6 pb-36 md:pb-6">
+      <section id="settings-personal" className="scroll-mt-24 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</p>
         <ProfileTab
           bgUnits={bgUnits}
           setBgUnits={setBgUnits}
@@ -967,13 +1023,30 @@ export default function Settings() {
           setCarbUnits={setCarbUnits}
           deliveryMethod={deliveryMethod}
           setDeliveryMethod={setDeliveryMethod}
-          onSave={handleSaveProfile}
+          dateOfBirth={profile?.dateOfBirth ?? ""}
+          setDateOfBirth={(v) =>
+            setProfile((p) => {
+              const cur = p ?? storage.getProfile();
+              if (cur) return { ...cur, dateOfBirth: v };
+              return {
+                name: "",
+                email: "",
+                dateOfBirth: v,
+                bgUnits,
+                carbUnits,
+                diabetesType: "type1",
+                insulinDeliveryMethod: deliveryMethod,
+                usingInsulin: true,
+                hasAcceptedDisclaimer: true,
+              };
+            })
+          }
+          onSave={() => void handleSaveProfile()}
         />
-      </div>
+      </section>
 
-      <div id="settings-usage" className="scroll-mt-28 space-y-3">
-        <h3 className="text-h3 font-semibold text-foreground">Usage</h3>
-        <p className="text-small text-muted-foreground">Typical insulin use and supply pack sizes for forecasts.</p>
+      <section id="settings-usage" className="scroll-mt-24 space-y-3 border-t border-border/50 pt-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Usage &amp; supplies</p>
         <UsageTab
           isPumpUser={isPumpUser}
           tdd={tdd}
@@ -1009,20 +1082,33 @@ export default function Settings() {
           setInsulinCartridgeUnits={setInsulinCartridgeUnits}
           suppliesSmarterForecastEnabled={suppliesSmarterForecastEnabled}
           setSuppliesSmarterForecastEnabled={setSuppliesSmarterForecastEnabled}
-          onSave={handleSaveUsage}
+          onSave={() => handleSaveUsage()}
         />
-      </div>
+      </section>
 
-      <div id="settings-backup" className="scroll-mt-28" data-testid="card-account-backup">
+      <div id="settings-backup" className="scroll-mt-24 border-t border-border/50 pt-5" data-testid="card-account-backup">
         <SettingsDataBackupSection embedded />
       </div>
 
+      <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
+        <div className="mx-auto w-full max-w-screen-md px-4 pt-2.5 pb-2.5">
+          <Button
+            type="button"
+            className="w-full"
+            data-testid="button-save-usage-page-sticky"
+            onClick={() => void handleSaveUsagePage()}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+        </div>
+      </div>
     </CardContent>
   );
 
   const ratiosToolsInner = (
     <CardContent className="pt-6 pb-6 space-y-8">
-      <div id="settings-ratios" className="scroll-mt-28 space-y-3">
+      <div id="settings-ratios" className="scroll-mt-28 space-y-3 pb-28 md:pb-0">
         <h3 className="text-h3 font-semibold text-foreground">Ratios</h3>
         <p className="text-small text-muted-foreground">TDD, correction factor, targets, and meal ratios.</p>
         <InsulinTab

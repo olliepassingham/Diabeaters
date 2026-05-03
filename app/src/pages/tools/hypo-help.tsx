@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { storage, type UserProfile } from "@/lib/storage";
+import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
 import {
   formatTargetBgInput,
   lastHypoWithDetail,
@@ -18,7 +19,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 export default function HypoHelpPage() {
-  const [profile, setProfile] = useState<Partial<UserProfile>>({});
+  const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
   const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
   const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
   const [currentBg, setCurrentBg] = useState("");
@@ -31,9 +32,11 @@ export default function HypoHelpPage() {
     juiceMl: number;
     jellyBabies: number;
   } | null>(null);
+  const [hypoCalcError, setHypoCalcError] = useState<string | null>(null);
 
   const bgUnits = profile.bgUnits || "mmol/L";
   const exercisedRecently24h = storage.didExerciseRecently(24);
+  const weightRequired = hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth);
 
   useEffect(() => {
     const p = storage.getProfile();
@@ -49,11 +52,18 @@ export default function HypoHelpPage() {
   }, []);
 
   const calculateHypoTreatment = () => {
+    setHypoCalcError(null);
     if (!currentBg || !targetBg) return;
     const current = parseFloat(currentBg);
     const target = parseFloat(targetBg);
-    const parsedWeight = userWeight ? parseFloat(userWeight) : 70;
-    const rawWeight = Number.isNaN(parsedWeight) || parsedWeight <= 0 ? 70 : parsedWeight;
+    const parsedFromInput = userWeight.trim() ? parseFloat(userWeight) : Number.NaN;
+    const hasValidInputWeight = Number.isFinite(parsedFromInput) && parsedFromInput > 0;
+    if (weightRequired && !hasValidInputWeight) {
+      setHypoCalcError("Add your weight in kg or lbs so we do not assume an adult default.");
+      setHypoResult(null);
+      return;
+    }
+    const rawWeight = hasValidInputWeight ? parsedFromInput : 70;
     const weight = weightUnit === "lbs" ? rawWeight * 0.4536 : rawWeight;
     if (Number.isNaN(current) || Number.isNaN(target)) return;
     const currentMmol = bgUnits === "mg/dL" ? current / 18 : current;
@@ -126,6 +136,14 @@ export default function HypoHelpPage() {
               </AlertDescription>
             </Alert>
           )}
+          {weightRequired && (
+            <Alert data-testid="alert-hypo-minor-weight">
+              <AlertDescription className="text-sm">
+                For under-18s we need your real weight to size this estimate — we will not guess from a typical adult
+                weight. Follow your hypo plan from your diabetes team first.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
             <p className="text-small text-red-800 dark:text-red-200">
               This supports more precise treatment than a fixed 15g rule. If in doubt, use your usual hypo plan.
@@ -163,7 +181,7 @@ export default function HypoHelpPage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="user-weight">Your weight (optional)</Label>
+              <Label htmlFor="user-weight">Your weight {weightRequired ? "(required)" : "(optional)"}</Label>
               <div className="flex gap-2">
                 <Input
                   id="user-weight"
@@ -200,7 +218,18 @@ export default function HypoHelpPage() {
             </div>
           </div>
 
-          <Button onClick={calculateHypoTreatment} disabled={!currentBg || !targetBg} className="w-full" data-testid="button-calculate-hypo">
+          {hypoCalcError && (
+            <Alert variant="destructive" data-testid="alert-hypo-calc-error">
+              <AlertDescription className="text-sm">{hypoCalcError}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button
+            onClick={calculateHypoTreatment}
+            disabled={!currentBg || !targetBg || (weightRequired && !userWeight.trim())}
+            className="w-full"
+            data-testid="button-calculate-hypo"
+          >
             <Calculator className="h-4 w-4 mr-2" />
             Calculate treatment
           </Button>

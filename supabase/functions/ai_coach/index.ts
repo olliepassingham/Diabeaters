@@ -134,15 +134,20 @@ async function loadCoachConsentProfile(
 async function loadCoachClinicalExtras(
   admin: ReturnType<typeof createClient>,
   userId: string,
-): Promise<{ diabetes_onset_date: string | null; insulin_delivery_method: string | null }> {
+): Promise<{
+  diabetes_onset_date: string | null;
+  insulin_delivery_method: string | null;
+  date_of_birth: string | null;
+}> {
   const out = {
     diabetes_onset_date: null as string | null,
     insulin_delivery_method: null as string | null,
+    date_of_birth: null as string | null,
   };
 
   const combined = await admin
     .from("profiles")
-    .select("diabetes_onset_date, insulin_delivery_method")
+    .select("diabetes_onset_date, insulin_delivery_method, date_of_birth")
     .eq("id", userId)
     .maybeSingle();
 
@@ -151,6 +156,7 @@ async function loadCoachClinicalExtras(
     out.diabetes_onset_date = typeof d.diabetes_onset_date === "string" ? d.diabetes_onset_date : null;
     out.insulin_delivery_method =
       typeof d.insulin_delivery_method === "string" ? d.insulin_delivery_method : null;
+    out.date_of_birth = typeof d.date_of_birth === "string" ? d.date_of_birth : null;
     return out;
   }
 
@@ -164,6 +170,12 @@ async function loadCoachClinicalExtras(
   if (!iOnly.error && iOnly.data) {
     const v = (iOnly.data as { insulin_delivery_method?: unknown }).insulin_delivery_method;
     out.insulin_delivery_method = typeof v === "string" ? v : null;
+  }
+
+  const dobOnly = await admin.from("profiles").select("date_of_birth").eq("id", userId).maybeSingle();
+  if (!dobOnly.error && dobOnly.data) {
+    const v = (dobOnly.data as { date_of_birth?: unknown }).date_of_birth;
+    out.date_of_birth = typeof v === "string" ? v : null;
   }
 
   return out;
@@ -186,6 +198,14 @@ function normalizeBgUnits(raw: unknown): string | null {
   if (v === "mmol/L" || v.toLowerCase() === "mmol/l") return "mmol/L";
   if (v === "mg/dL" || v.toLowerCase() === "mg/dl") return "mg/dL";
   return null;
+}
+
+/** Optional client-supplied DOB when the profile row has not synced yet (YYYY-MM-DD only). */
+function normalizeClientDateOfBirth(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  return t;
 }
 
 function normalizeLastFortnight(raw: unknown): LastFortnightInput | null {
@@ -445,9 +465,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const clinical = await loadCoachClinicalExtras(admin, userId);
+    const dobFromClient = normalizeClientDateOfBirth(b.dateOfBirth ?? b.date_of_birth);
+    const dobFromCloud =
+      typeof clinical.date_of_birth === "string" && clinical.date_of_birth.trim().length > 0
+        ? clinical.date_of_birth.trim()
+        : null;
+    const dateOfBirth = dobFromCloud ?? dobFromClient;
     const context = packContext({
       profile: {
-        dateOfBirth: null,
+        dateOfBirth,
         insulinDeliveryMethod: clinical.insulin_delivery_method,
         bgUnits: bgUnitsClient,
         diabetesOnsetDate: clinical.diabetes_onset_date,
@@ -490,7 +516,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const filtered = applyPostFilter(llmReply);
+    const filtered = applyPostFilter(llmReply, context.profile);
     const finalReply = filtered.reply;
     const cat: AuditCategory =
       filtered.status === "refused" ? "post_filter_refused" : "llm";

@@ -214,6 +214,7 @@ export function AppStatusStrip() {
 
   const handleEndExercise = () => {
     storage.endExerciseSession();
+    setEx(null);
     toast({ title: "Exercise ended", description: "Session cleared." });
   };
 

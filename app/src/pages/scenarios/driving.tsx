@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import {
   Car,
   Droplet,
@@ -24,6 +24,7 @@ import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile } from "@/lib/storage";
+import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import {
   buildDrivingReadinessOutcome,
@@ -121,7 +122,7 @@ function OutcomeBadge({ outcome }: { outcome: DrivingReadinessOutcome }) {
 }
 
 export default function DrivingScenarioPage() {
-  const [profile, setProfile] = useState<Partial<UserProfile>>({});
+  const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
   const [phase, setPhase] = useState<Phase>("form");
   const [outcome, setOutcome] = useState<DrivingReadinessOutcome | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -253,6 +254,10 @@ export default function DrivingScenarioPage() {
       resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [phase, outcome]);
+
+  if (!canShowDrivingReadiness(profile.dateOfBirth)) {
+    return <Redirect to="/scenarios" replace />;
+  }
 
   return (
     <div className="min-h-[50vh]">

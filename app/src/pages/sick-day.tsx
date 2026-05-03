@@ -47,12 +47,18 @@ import {
 } from "@/lib/sick-day-dose-log";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { recordLastInteraction } from "@/lib/last-interaction";
+import { ageInWholeYearsUtc } from "@/lib/user-age";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
 const mmolToMgdl = (mmol: number) => Math.round(mmol * 18);
 
 type KetoneLevel = "none" | "trace" | "small" | "moderate" | "large";
+
+type SickDayCalcOptions = {
+  /** When true, do not use the adult 1800÷TDD default if no correction factor is saved (under-18 with known age). */
+  minorKnownAgeNoSavedIsf?: boolean;
+};
 
 interface SickDayResults {
   correctionDose: number;
@@ -109,17 +115,29 @@ function calculateSickDayRecommendations(
   severity: string,
   ketoneLevel: KetoneLevel,
   settings: UserSettings,
-  bgUnits: string
+  bgUnits: string,
+  opts: SickDayCalcOptions = {},
 ): SickDayResults {
-  // Default correction factor uses the 1800 rule (for mg/dL)
-  let correctionFactor = settings.correctionFactor || Math.round(1800 / tdd);
-  
+  const hasTeamIsf =
+    typeof settings.correctionFactor === "number" &&
+    Number.isFinite(settings.correctionFactor) &&
+    settings.correctionFactor > 0;
+
+  let correctionFactor: number;
+  if (hasTeamIsf) {
+    correctionFactor = settings.correctionFactor as number;
+  } else if (opts.minorKnownAgeNoSavedIsf) {
+    correctionFactor = Number.POSITIVE_INFINITY;
+  } else {
+    correctionFactor = Math.round(1800 / tdd);
+  }
+
   // Default target is 120 mg/dL (6.7 mmol/L)
   let targetBg = 120;
   if (settings.targetBgHigh) {
     targetBg = bgUnits === "mmol/L" ? mmolToMgdl(settings.targetBgHigh) : settings.targetBgHigh;
   }
-  
+
   // Convert correction factor if stored in mmol/L terms
   if (settings.correctionFactor && bgUnits === "mmol/L" && settings.correctionFactor < 10) {
     correctionFactor = settings.correctionFactor * 18;
@@ -202,9 +220,12 @@ function calculateSickDayRecommendations(
   baseCorrectionDose = Math.round(baseCorrectionDose);
 
   // Build explanation
-  const correctionExplanation = baseCorrectionDose > 0 
-    ? `Base: ${baseCorrectionDose}u × ${severityModifier} (safety) × ${bgZoneModifier} (BG zone) = ${correctionDose}u`
-    : "No correction needed - blood glucose is within target";
+  const correctionExplanation =
+    opts.minorKnownAgeNoSavedIsf && !hasTeamIsf
+      ? "Correction dose is not estimated here: under-18 users should use the correction factor (ISF) from their diabetes team. Add it in Settings → Ratios, then run this planner again."
+      : baseCorrectionDose > 0
+        ? `Base: ${baseCorrectionDose}u × ${severityModifier} (safety) × ${bgZoneModifier} (BG zone) = ${correctionDose}u`
+        : "No correction needed - blood glucose is within target";
 
   // === RATIO AND OTHER ADJUSTMENTS ===
   
@@ -1067,7 +1088,22 @@ export default function SickDay() {
 
     // Convert to mg/dL for internal calculations if user uses mmol/L
     const bgInMgdl = bgUnits === "mmol/L" ? mmolToMgdl(bgNum) : bgNum;
-    const recommendations = calculateSickDayRecommendations(tddNum, bgInMgdl, severity, ketoneLevel as KetoneLevel, settings, bgUnits);
+    const dob = storage.getProfile()?.dateOfBirth;
+    const ageYears = ageInWholeYearsUtc(dob);
+    const hasTeamIsf =
+      typeof settings.correctionFactor === "number" &&
+      Number.isFinite(settings.correctionFactor) &&
+      settings.correctionFactor > 0;
+    const minorKnownAgeNoSavedIsf = ageYears !== null && ageYears < 18 && !hasTeamIsf;
+    const recommendations = calculateSickDayRecommendations(
+      tddNum,
+      bgInMgdl,
+      severity,
+      ketoneLevel as KetoneLevel,
+      settings,
+      bgUnits,
+      { minorKnownAgeNoSavedIsf },
+    );
     
     if (isNaN(recommendations.correctionDose)) {
       toast({

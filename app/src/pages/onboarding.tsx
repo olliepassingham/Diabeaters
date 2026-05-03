@@ -34,7 +34,8 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile } from "@/lib/profile";
-import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { PageShell } from "@/components/layout/page-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getOnboardingSecondaryCta, getPostOnboardingPath } from "@/lib/onboarding-routes";
@@ -205,6 +206,8 @@ interface OnboardingData {
   careContext: CareContext;
   struggle: Struggle;
   insulinDeliveryMethod: string;
+  /** Optional YYYY-MM-DD for age-aware tools. */
+  dateOfBirth: string;
   bgUnits: string;
   carbUnits: string;
   hasAcceptedDisclaimer: boolean;
@@ -283,6 +286,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     careContext: null,
     struggle: null,
     insulinDeliveryMethod: "",
+    dateOfBirth: "",
     bgUnits: "mmol/L",
     carbUnits: "grams",
     hasAcceptedDisclaimer: false,
@@ -314,7 +318,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       insulinDeliveryMethod: data.insulinDeliveryMethod === "injections" ? "pen" : data.insulinDeliveryMethod,
       usingInsulin: true,
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
-      dateOfBirth: "",
+      dateOfBirth: normalizeDateOfBirthInput(data.dateOfBirth) ?? "",
     });
 
     const settings: Record<string, number | string | undefined> = {};
@@ -389,6 +393,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             description: syncRes.error.message,
             variant: "destructive",
           });
+        } else {
+          const partial = describePartialClinicalPrefsCloudSync(syncRes);
+          if (partial) {
+            toast({
+              title: "Clinical prefs partially synced",
+              description: partial,
+            });
+          }
         }
       }
     }
@@ -842,6 +854,23 @@ function EssentialsStep({
                 </div>
               </div>
             </RadioGroup>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ob-dob" className="text-sm font-medium">
+              Date of birth <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="ob-dob"
+              type="date"
+              value={data.dateOfBirth}
+              onChange={(e) => updateData("dateOfBirth", e.target.value)}
+              data-testid="input-onboarding-dob"
+            />
+            <p className="text-xs text-muted-foreground">
+              Lets the app tailor guidance (for example tools aimed at adults). You can add or change this later in
+              Settings.
+            </p>
           </div>
 
           <div className="space-y-3">

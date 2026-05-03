@@ -68,7 +68,9 @@ test.describe("Family & Carers MVP", () => {
               supplies: true,
               appointments: true,
               scenarios: true,
+              hypo_alerts: true,
               emergency_info: true,
+              clinical_settings: false,
             },
             linked_at: new Date().toISOString(),
           },
@@ -138,9 +140,11 @@ test.describe("Family & Carers MVP", () => {
     await expect(page.getByTestId("invite-code")).toContainText("MOCKCODE", { timeout: 5000 });
 
     await expect(page.getByTestId("privacy-toggle-supplies")).toBeVisible();
+    await expect(page.getByTestId("privacy-toggle-hypo-alerts")).toBeVisible();
     await expect(page.getByTestId("privacy-toggle-appointments")).toBeVisible();
     await expect(page.getByTestId("privacy-toggle-scenarios")).toBeVisible();
     await expect(page.getByTestId("privacy-toggle-emergency")).toBeVisible();
+    await expect(page.getByTestId("privacy-toggle-clinical-settings")).toBeVisible();
   });
 
   test("carer: redeem code then sees patient header on Supporter Mode", async ({ page, context }) => {
@@ -190,7 +194,9 @@ test.describe("Family & Carers MVP", () => {
               supplies: true,
               appointments: true,
               scenarios: true,
+              hypo_alerts: true,
               emergency_info: true,
+              clinical_settings: false,
             },
             linked_at: new Date().toISOString(),
           },

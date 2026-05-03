@@ -42,27 +42,32 @@ function input(overrides?: Partial<PackContextInput>): PackContextInput {
 }
 
 describe("packContext — profile derivation", () => {
-  it("derives age band from DOB", () => {
-    expect(packContext(input()).profile.ageBand).toBe("30-39");
-    expect(
-      packContext(input({ profile: { ...input().profile, dateOfBirth: "2000-01-01" } }))
-        .profile.ageBand,
-    ).toBe("18-29");
+  it("derives age band and whole years from DOB", () => {
+    const adult = packContext(input());
+    expect(adult.profile.ageBand).toBe("30-39");
+    expect(adult.profile.ageYears).toBe(35);
+
+    const twentys = packContext(input({ profile: { ...input().profile, dateOfBirth: "2000-01-01" } }));
+    expect(twentys.profile.ageBand).toBe("18-29");
+    expect(twentys.profile.ageYears).toBe(26);
+
     expect(
       packContext(input({ profile: { ...input().profile, dateOfBirth: "1955-01-01" } }))
         .profile.ageBand,
     ).toBe("60+");
+
+    const minor = packContext(input({ profile: { ...input().profile, dateOfBirth: "2012-06-15" } }));
+    expect(minor.profile.ageBand).toBe("under18");
+    expect(minor.profile.ageYears).toBe(13);
   });
 
   it("returns 'unknown' age band for missing or malformed DOB", () => {
-    expect(
-      packContext(input({ profile: { ...input().profile, dateOfBirth: null } })).profile
-        .ageBand,
-    ).toBe("unknown");
-    expect(
-      packContext(input({ profile: { ...input().profile, dateOfBirth: "not-a-date" } }))
-        .profile.ageBand,
-    ).toBe("unknown");
+    const missing = packContext(input({ profile: { ...input().profile, dateOfBirth: null } })).profile;
+    expect(missing.ageBand).toBe("unknown");
+    expect(missing.ageYears).toBeNull();
+    const bad = packContext(input({ profile: { ...input().profile, dateOfBirth: "not-a-date" } })).profile;
+    expect(bad.ageBand).toBe("unknown");
+    expect(bad.ageYears).toBeNull();
   });
 
   it("normalises delivery method to mdi/pump/unknown", () => {

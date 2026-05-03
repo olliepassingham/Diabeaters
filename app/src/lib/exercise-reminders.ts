@@ -48,11 +48,15 @@ function copyFor(kind: ExerciseReminderKind, exerciseName: string): { title: str
 }
 
 async function ensureIosPerm(): Promise<boolean> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return false;
-  const settings = storage.getNotificationSettings();
-  if (!settings.enabled) return false;
-  const perm = await LocalNotifications.requestPermissions();
-  return perm.display === "granted";
+  try {
+    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return false;
+    const settings = storage.getNotificationSettings();
+    if (!settings.enabled) return false;
+    const perm = await LocalNotifications.requestPermissions();
+    return perm.display === "granted";
+  } catch {
+    return false;
+  }
 }
 
 export async function cancelExerciseReminders(sessionId: string): Promise<void> {
@@ -105,8 +109,12 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
   }
 
   if (notifications.length === 0) return;
-  await cancelExerciseReminders(session.id);
-  await LocalNotifications.schedule({ notifications });
+  try {
+    await cancelExerciseReminders(session.id);
+    await LocalNotifications.schedule({ notifications });
+  } catch {
+    // Native plugin failures must not surface as unhandled rejections from void fire-and-forget callers.
+  }
 }
 
 export async function scheduleExerciseActiveReminders(session: ActiveExerciseSession): Promise<void> {
@@ -143,6 +151,10 @@ export async function scheduleExerciseActiveReminders(session: ActiveExerciseSes
     });
 
   if (notifications.length === 0) return;
-  await LocalNotifications.schedule({ notifications });
+  try {
+    await LocalNotifications.schedule({ notifications });
+  } catch {
+    // ignore
+  }
 }
 

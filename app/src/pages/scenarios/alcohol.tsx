@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import {
   Wine,
   AlertTriangle,
@@ -29,6 +29,7 @@ import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
+import { canShowAlcoholScenarios } from "@/lib/user-age";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   normalizeBgUnits,
@@ -176,7 +177,7 @@ const RED_FLAG_ROWS: [keyof AlcoholRedFlags, string][] = [
 ];
 
 export default function AlcoholScenarioPage() {
-  const [profile, setProfile] = useState<Partial<UserProfile>>({});
+  const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
   const [settings, setSettings] = useState<UserSettings>({});
   const [phase, setPhase] = useState<Phase>("situation");
   const [situation, setSituation] = useState<AlcoholSituationKind | null>(null);
@@ -333,6 +334,10 @@ export default function AlcoholScenarioPage() {
   }, [outcome]);
 
   const showSticky = phase !== "result";
+
+  if (!canShowAlcoholScenarios(profile.dateOfBirth)) {
+    return <Redirect to="/scenarios" replace />;
+  }
 
   return (
     <div className="min-h-[50vh]">
