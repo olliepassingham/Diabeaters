@@ -1,19 +1,22 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
+import { useLayoutEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 
-const easeApple = [0.25, 0.1, 0.25, 1] as const;
+/** Snappy ease-out — close to iOS system curves */
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 /**
- * Soft cross-fade when the wouter route key changes (main app chrome only).
+ * Cross-fade (and light vertical motion on non-tab routes) when the wouter
+ * route key changes. Bottom-tab cluster shares one key so lazy routes are not
+ * remounted on every tab tap — scroll is reset on pathname change instead.
  * Respects prefers-reduced-motion.
  */
 export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
   const [pathname] = useLocation();
   const search = useSearch();
   const reduceMotion = useReducedMotion();
-  // For the bottom-tab "main" pages, avoid forcing a remount on every navigation.
-  // Remounting here causes all child route trees to reset and refetch, which makes tab switching feel slow.
+
   const isBottomTabRoute =
     pathname === "/" ||
     pathname === "/account" ||
@@ -24,17 +27,35 @@ export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
     pathname.startsWith("/carer-view");
 
   const routeKey = isBottomTabRoute ? "bottom-tabs" : `${pathname}${search ? `?${search}` : ""}`;
-  const duration = reduceMotion || isBottomTabRoute ? 0 : 0.18;
+  const tabBucket = isBottomTabRoute;
+  const duration = reduceMotion ? 0 : tabBucket ? 0 : 0.14;
+
+  useLayoutEffect(() => {
+    const el = document.getElementById("app-scroll-main");
+    if (!el) return;
+    el.scrollTop = 0;
+  }, [pathname]);
+
+  const initial = reduceMotion
+    ? { opacity: 1, y: 0 }
+    : tabBucket
+      ? { opacity: 1, y: 0 }
+      : { opacity: 0, y: 8 };
+  const exit = reduceMotion
+    ? { opacity: 1, y: 0 }
+    : tabBucket
+      ? { opacity: 1, y: 0 }
+      : { opacity: 0, y: -5 };
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    <AnimatePresence initial={false} mode="sync">
       <motion.div
         key={routeKey}
         className="min-w-0 w-full"
-        initial={{ opacity: reduceMotion ? 1 : 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: reduceMotion ? 1 : 0 }}
-        transition={{ duration, ease: easeApple }}
+        initial={initial}
+        animate={{ opacity: 1, y: 0 }}
+        exit={exit}
+        transition={{ duration, ease: easeOut }}
       >
         {children}
       </motion.div>

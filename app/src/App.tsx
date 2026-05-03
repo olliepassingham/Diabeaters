@@ -121,8 +121,16 @@ const MAIN_BOTTOM_SCROLL_PADDING_NO_NAV =
 
 function RouteFallback() {
   return (
-    <div className="min-h-[40vh] flex items-center justify-center text-sm text-muted-foreground">
-      Loading…
+    <div
+      className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className="h-8 w-8 shrink-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin"
+        aria-hidden
+      />
+      <span>Loading…</span>
     </div>
   );
 }
@@ -271,6 +279,7 @@ function SessionLoadingSkeleton() {
         </div>
       </header>
       <main
+        id="app-scroll-main"
         className="relative z-[1] min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
           paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
@@ -895,6 +904,7 @@ function UnverifiedAccountShell({
       <AppShellBackdrop tone="rich" />
       <AppTopBar isCarer={isCarerMode} pathOnly="/account" onBrandClick={onBrandClick} onLogout={onLogout} />
       <main
+        id="app-scroll-main"
         className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
           paddingBottom: MAIN_BOTTOM_SCROLL_PADDING_NO_NAV,
@@ -1063,6 +1073,7 @@ function AuthenticatedShell() {
       ) : null}
       {!isCarerMode ? <AppStatusStrip /> : null}
       <main
+        id="app-scroll-main"
         className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
         style={{
           paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,

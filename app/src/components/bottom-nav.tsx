@@ -2,6 +2,7 @@ import { Home, Shapes, Users, Wrench, User } from "lucide-react";
 import { isCommunityEnabled } from "@/lib/flags";
 import { Link, useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
@@ -231,7 +232,7 @@ export function BottomNav() {
   return (
     <nav
       ref={navRef}
-      className="surface-chrome fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-50 grid place-items-center border-t border-border/40 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_28px_-10px_hsl(260_30%_40%_/_0.12)] dark:shadow-[0_-6px_28px_-10px_hsl(0_0%_0%_/_0.35)]"
+      className="surface-chrome fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-50 grid place-items-center border-t border-border/35 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_-12px_hsl(260_28%_38%_/_0.14)] dark:shadow-[0_-10px_36px_-12px_hsl(0_0%_0%_/_0.42)]"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       data-testid="nav-bottom"
     >
@@ -261,12 +262,14 @@ export function BottomNav() {
               if (tab.href === "/scenarios") prefetchScenarios();
             }}
           >
-            <button
+            <motion.button
               type="button"
-              className={`flex min-h-11 flex-col items-center justify-center gap-0.5 max-w-[6.5rem] px-2 py-2 rounded-2xl transition-all duration-200 ease-out ${
+              whileTap={{ scale: 0.94 }}
+              transition={{ type: "spring", stiffness: 520, damping: 28 }}
+              className={`flex min-h-11 max-w-[6.5rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 transition-colors duration-150 ease-out ${
                 active
-                  ? "text-primary bg-primary/[0.14] shadow-sm dark:bg-primary/20"
-                  : "text-muted-foreground hover:bg-muted/50"
+                  ? "bg-primary/[0.14] text-primary shadow-sm dark:bg-primary/20"
+                  : "text-muted-foreground hover:bg-muted/55"
               }`}
               data-testid={tab.testId}
             >
@@ -280,7 +283,7 @@ export function BottomNav() {
               >
                 {tab.title}
               </span>
-            </button>
+            </motion.button>
           </Link>
         );
       })}

@@ -4,8 +4,8 @@
 
 @layer base {
   :root {
-    --app-motion-duration: 240ms;
-    --app-motion-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+    --app-motion-duration: 185ms;
+    --app-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -41,6 +41,12 @@
     overscroll-behavior-x: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    #app-scroll-main {
+      scroll-behavior: smooth;
+    }
   }
 }
 
