@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,10 @@ import { useToast } from "@/hooks/use-toast";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { hypoTreatmentsInRollingHours } from "@/lib/hypo-context";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
+import {
+  getPostExerciseEducationalCopy,
+  inferPostExerciseLoadTier,
+} from "@/lib/post-exercise-nudge";
 
 
 function getInitialTab(): string {
@@ -47,7 +51,12 @@ export default function Adviser() {
   const [cameFromRatios, setCameFromRatios] = useState(false);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [recentHypoCount48h, setRecentHypoCount48h] = useState(0);
-  const exercisedRecently24h = storage.didExerciseRecently(24);
+  const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
+  const showPostExerciseBanner = useMemo(() => storage.shouldShowPostExerciseEducationalNudges(), [postExerciseNudgeRev]);
+  const postExerciseBannerCopy = useMemo(
+    () => getPostExerciseEducationalCopy(inferPostExerciseLoadTier(storage.getLastExerciseSummary())),
+    [postExerciseNudgeRev],
+  );
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
 
@@ -126,7 +135,7 @@ export default function Adviser() {
       const ended = new Date(last.endedAt).getTime();
       if (!Number.isFinite(ended)) return;
       const hoursSince = Math.max(0, Math.ceil((Date.now() - ended) / 3_600_000));
-      if (hoursSince > 6) return;
+      if (hoursSince > 12) return;
       setActiveTab("meal");
       setPlanningAroundExercise(true);
       setExerciseTiming("after");
@@ -367,12 +376,34 @@ export default function Adviser() {
         </Alert>
       )}
 
-      {exercisedRecently24h && (
-        <Alert className="mb-3 border-emerald-300/60 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20" data-testid="banner-recent-exercise-adviser">
+      {showPostExerciseBanner && (
+        <Alert
+          className="mb-3 border-emerald-300/60 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+          data-testid="banner-recent-exercise-adviser"
+        >
           <Dumbbell className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-          <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100">
-            <strong>Recent exercise:</strong> sensitivity can be higher for up to 24 hours. Be extra cautious with corrections and watch for delayed lows (especially overnight).
-          </AlertDescription>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100 sm:min-w-0 sm:flex-1">
+              <strong>{postExerciseBannerCopy.adviserLead}:</strong> {postExerciseBannerCopy.adviserDetail}
+            </AlertDescription>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 self-start border-emerald-600/30 text-emerald-900 dark:border-emerald-500/40 dark:text-emerald-100"
+              onClick={() => {
+                storage.snoozePostExerciseNudges(8);
+                setPostExerciseNudgeRev((n) => n + 1);
+                toast({
+                  title: "Reminders snoozed",
+                  description: "Post-exercise tips are hidden for 8 hours. Resume anytime from the home status strip.",
+                });
+              }}
+              data-testid="banner-post-exercise-snooze"
+            >
+              Snooze 8h
+            </Button>
+          </div>
         </Alert>
       )}
 

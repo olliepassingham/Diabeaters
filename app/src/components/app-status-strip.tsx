@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Plane, Thermometer, WifiOff, Power, ChevronRight, Dumbbell, Syringe, Play, Info, CircleCheck } from "lucide-react";
+import {
+  Plane,
+  Thermometer,
+  WifiOff,
+  Power,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Dumbbell,
+  Syringe,
+  Play,
+  Info,
+  CircleCheck,
+  Moon,
+  Utensils,
+  Droplet,
+  Calculator,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,6 +35,11 @@ import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  formatLastExerciseSummaryLine,
+  getPostExerciseEducationalCopy,
+  inferPostExerciseLoadTier,
+} from "@/lib/post-exercise-nudge";
 
 function exercisePhaseLabel(phase: ExercisePhase): string {
   if (phase === "active") return "during";
@@ -111,7 +133,17 @@ export function AppStatusStrip() {
   const [sc, setSc] = useState<ScenarioState>(() => storage.getScenarioState());
   const [ex, setEx] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
   const [pathname] = useLocation();
-  const exercisedRecently24h = storage.didExerciseRecently(24);
+  /** Bumps when post-exercise snooze/resume changes so we re-read localStorage. */
+  const [postExerciseRev, setPostExerciseRev] = useState(0);
+  const inPostExerciseWindow = useMemo(() => {
+    void postExerciseRev;
+    return storage.didExerciseRecently(24);
+  }, [postExerciseRev, ex]);
+  const showPostExerciseEducational = useMemo(() => {
+    void postExerciseRev;
+    return storage.shouldShowPostExerciseEducationalNudges();
+  }, [postExerciseRev, ex]);
+  const [postExerciseOpen, setPostExerciseOpen] = useState(false);
   const [exerciseExpanded, setExerciseExpanded] = useState(false);
   const [exerciseBgInput, setExerciseBgInput] = useState<string>("");
   const lastExPhaseKey = useRef<string>("");
@@ -124,6 +156,10 @@ export function AppStatusStrip() {
     }, 1000);
     return () => window.clearInterval(tick);
   }, []);
+
+  useEffect(() => {
+    if (ex) setPostExerciseOpen(false);
+  }, [ex]);
 
   useEffect(() => {
     if (!ex) {
@@ -174,7 +210,7 @@ export function AppStatusStrip() {
 
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
   const show =
-    sc.sickDayActive || sc.travelModeActive || Boolean(ex) || exercisedRecently24h || sc.pumpFailureActive || !online;
+    sc.sickDayActive || sc.travelModeActive || Boolean(ex) || inPostExerciseWindow || sc.pumpFailureActive || !online;
   if (!show) return null;
 
   const isExerciseScenarioPage = pathname === "/scenarios/exercise";
@@ -782,12 +818,135 @@ export function AppStatusStrip() {
         </div>
       ) : null}
 
-      {!ex && exercisedRecently24h ? (
-        <div className={rowClass}>
-          <Badge className="chip border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200" variant="secondary">
+      {!ex && inPostExerciseWindow && showPostExerciseEducational ? (
+        <div className="space-y-2" data-testid="status-post-exercise-nudge">
+          {(() => {
+            const last = storage.getLastExerciseSummary();
+            const tier = inferPostExerciseLoadTier(last);
+            const copy = getPostExerciseEducationalCopy(tier);
+            const summaryLine = formatLastExerciseSummaryLine(last);
+            return (
+              <>
+                <div className={cn(rowClass, "flex-col items-stretch gap-2 sm:flex-row sm:items-center")}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <Badge
+                      className="chip w-fit max-w-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                      variant="secondary"
+                    >
+                      <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      Post‑exercise · 24h
+                    </Badge>
+                    <p className="text-[11px] leading-snug text-muted-foreground">{copy.stripHint}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={btnClass}
+                      aria-expanded={postExerciseOpen}
+                      onClick={() => setPostExerciseOpen((o) => !o)}
+                      data-testid="status-post-exercise-toggle"
+                    >
+                      {postExerciseOpen ? (
+                        <ChevronUp className="h-3.5 w-3.5 mr-1" aria-hidden />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 mr-1" aria-hidden />
+                      )}
+                      Tips
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={btnClass}
+                      onClick={() => {
+                        storage.snoozePostExerciseNudges(8);
+                        setPostExerciseOpen(false);
+                        setPostExerciseRev((n) => n + 1);
+                        toast({
+                          title: "Reminders snoozed",
+                          description: "Post-exercise banners are hidden for 8 hours. You can resume from the status strip.",
+                        });
+                      }}
+                      data-testid="status-post-exercise-snooze"
+                    >
+                      Snooze 8h
+                    </Button>
+                  </div>
+                </div>
+                {postExerciseOpen ? (
+                  <div className="rounded-2xl border border-border/60 bg-muted/15 px-3 py-3 space-y-3 dark:bg-muted/10">
+                    {summaryLine ? (
+                      <p className="text-sm font-medium text-foreground" data-testid="status-post-exercise-summary">
+                        Last session: {summaryLine}
+                      </p>
+                    ) : null}
+                    <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground leading-relaxed">
+                      {copy.bullets.map((b) => (
+                        <li key={b}>{b}</li>
+                      ))}
+                    </ul>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Educational only — follow your diabetes team&apos;s written plan first.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
+                        <Link href="/tools/hypo-help" data-testid="status-post-ex-link-hypo">
+                          <Droplet className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                          Hypo help
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
+                        <Link href="/tools/correction-help" data-testid="status-post-ex-link-correction">
+                          <Calculator className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                          Corrections
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
+                        <Link href="/adviser?tab=meal" data-testid="status-post-ex-link-meal">
+                          <Utensils className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                          Meal planner
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
+                        <Link href="/scenarios/bedtime" data-testid="status-post-ex-link-bedtime">
+                          <Moon className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                          Bedtime
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
+        </div>
+      ) : null}
+
+      {!ex && inPostExerciseWindow && !showPostExerciseEducational ? (
+        <div className={rowClass} data-testid="status-post-exercise-snoozed">
+          <Badge
+            className="chip border border-emerald-500/20 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+            variant="secondary"
+          >
             <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Post‑exercise · 24h
+            Post‑exercise · reminders off
           </Badge>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className={btnClass}
+            onClick={() => {
+              storage.clearPostExerciseNudgeSnooze();
+              setPostExerciseRev((n) => n + 1);
+              toast({ title: "Reminders on", description: "Post-exercise tips are visible again." });
+            }}
+            data-testid="status-post-exercise-resume"
+          >
+            Resume
+          </Button>
         </div>
       ) : null}
 

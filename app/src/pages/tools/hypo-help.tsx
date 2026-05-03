@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Calculator, Droplet, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,8 +17,14 @@ import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getPostExerciseEducationalCopy,
+  inferPostExerciseLoadTier,
+} from "@/lib/post-exercise-nudge";
 
 export default function HypoHelpPage() {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
   const [lastHypoDetail, setLastHypoDetail] = useState<{ at: string; label: string } | null>(null);
   const [targetPrefilledFromRange, setTargetPrefilledFromRange] = useState(false);
@@ -33,9 +39,14 @@ export default function HypoHelpPage() {
     jellyBabies: number;
   } | null>(null);
   const [hypoCalcError, setHypoCalcError] = useState<string | null>(null);
+  const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
 
   const bgUnits = profile.bgUnits || "mmol/L";
-  const exercisedRecently24h = storage.didExerciseRecently(24);
+  const postExerciseHypoCopy = useMemo(() => {
+    void postExerciseNudgeRev;
+    if (!storage.shouldShowPostExerciseEducationalNudges()) return null;
+    return getPostExerciseEducationalCopy(inferPostExerciseLoadTier(storage.getLastExerciseSummary()));
+  }, [postExerciseNudgeRev]);
   const weightRequired = hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth);
 
   useEffect(() => {
@@ -112,11 +123,33 @@ export default function HypoHelpPage() {
           <CardDescription>How much glucose you may need from your current reading to your target</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {exercisedRecently24h && (
-            <Alert className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20" data-testid="alert-hypo-recent-exercise">
-              <AlertDescription className="text-sm">
-                <strong>Recent exercise:</strong> delayed lows are more likely for some people for up to 24 hours after. Keep fast carbs nearby and consider extra checks, especially overnight.
-              </AlertDescription>
+          {postExerciseHypoCopy && (
+            <Alert
+              className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20"
+              data-testid="alert-hypo-recent-exercise"
+            >
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <AlertDescription className="text-sm sm:min-w-0 sm:flex-1">
+                  <strong>Recent exercise:</strong> {postExerciseHypoCopy.hypoDetail}
+                </AlertDescription>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 self-start"
+                  onClick={() => {
+                    storage.snoozePostExerciseNudges(8);
+                    setPostExerciseNudgeRev((n) => n + 1);
+                    toast({
+                      title: "Reminders snoozed",
+                      description: "Post-exercise tips are hidden for 8 hours.",
+                    });
+                  }}
+                  data-testid="alert-hypo-post-ex-snooze"
+                >
+                  Snooze 8h
+                </Button>
+              </div>
             </Alert>
           )}
           {profile?.insulinDeliveryMethod === "pump" && (

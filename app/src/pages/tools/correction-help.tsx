@@ -24,6 +24,11 @@ import {
   type UserSettings,
 } from "@/lib/storage";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
+import { useToast } from "@/hooks/use-toast";
+import {
+  getPostExerciseEducationalCopy,
+  inferPostExerciseLoadTier,
+} from "@/lib/post-exercise-nudge";
 
 function parseBgInput(raw: string): number | null {
   const n = parseFloat(raw.replace(",", "."));
@@ -32,11 +37,13 @@ function parseBgInput(raw: string): number | null {
 }
 
 export default function CorrectionHelpPage() {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<Partial<UserProfile> | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [bgUnits, setBgUnits] = useState<BgUnits>("mmol/L");
   const [bgInput, setBgInput] = useState("");
   const [targetOverride, setTargetOverride] = useState("");
+  const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const load = useCallback(() => {
     setProfile(storage.getProfile());
     setSettings(storage.getSettings());
@@ -85,7 +92,11 @@ export default function CorrectionHelpPage() {
 
   const unitLabel = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
   const isPump = profile?.insulinDeliveryMethod === "pump";
-  const exercisedRecently24h = storage.didExerciseRecently(24);
+  const postExerciseCorrectionCopy = useMemo(() => {
+    void postExerciseNudgeRev;
+    if (!storage.shouldShowPostExerciseEducationalNudges()) return null;
+    return getPostExerciseEducationalCopy(inferPostExerciseLoadTier(storage.getLastExerciseSummary()));
+  }, [postExerciseNudgeRev]);
 
   const recentHypoCount = useMemo(() => {
     return hypoTreatmentsInRollingHours(storage.getHypoTreatments(), 7 * 24).length;
@@ -142,11 +153,33 @@ export default function CorrectionHelpPage() {
         </Alert>
       )}
 
-      {exercisedRecently24h && (
-        <Alert className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20" data-testid="alert-correction-recent-exercise">
-          <AlertDescription className="text-sm">
-            <strong>Recent exercise:</strong> you may be more insulin sensitive for up to 24 hours. Be cautious stacking corrections and watch for delayed lows (especially overnight).
-          </AlertDescription>
+      {postExerciseCorrectionCopy && (
+        <Alert
+          className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20"
+          data-testid="alert-correction-recent-exercise"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <AlertDescription className="text-sm sm:min-w-0 sm:flex-1">
+              <strong>Recent exercise:</strong> {postExerciseCorrectionCopy.correctionDetail}
+            </AlertDescription>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 self-start"
+              onClick={() => {
+                storage.snoozePostExerciseNudges(8);
+                setPostExerciseNudgeRev((n) => n + 1);
+                toast({
+                  title: "Reminders snoozed",
+                  description: "Post-exercise tips are hidden for 8 hours.",
+                });
+              }}
+              data-testid="alert-correction-post-ex-snooze"
+            >
+              Snooze 8h
+            </Button>
+          </div>
         </Alert>
       )}
 

@@ -58,6 +58,8 @@ const STORAGE_KEYS = {
   PUMP_FAILURE_SESSION: "diabeater_pump_failure_session",
   LAST_EXERCISE_ENDED_AT: "diabeater_last_exercise_ended_at",
   LAST_EXERCISE_SUMMARY: "diabeater_last_exercise_summary",
+  /** Epoch ms; when `Date.now()` is before this, post-exercise educational banners are hidden. */
+  POST_EXERCISE_NUDGE_SNOOZE_UNTIL: "diabeater_post_exercise_nudge_snooze_until",
 } as const;
 
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
@@ -1144,6 +1146,47 @@ export const storage = {
     const t = new Date(iso).getTime();
     if (!Number.isFinite(t)) return false;
     return Date.now() - t <= hours * 60 * 60 * 1000;
+  },
+
+  getPostExerciseNudgeSnoozeUntil(): number | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_SNOOZE_UNTIL);
+      if (!raw) return null;
+      const t = parseInt(raw, 10);
+      if (!Number.isFinite(t)) return null;
+      return t;
+    } catch {
+      return null;
+    }
+  },
+
+  arePostExerciseNudgesSnoozed(): boolean {
+    const t = this.getPostExerciseNudgeSnoozeUntil();
+    if (t == null) return false;
+    return Date.now() < t;
+  },
+
+  snoozePostExerciseNudges(hours = 8): void {
+    try {
+      const until = Date.now() + hours * 60 * 60 * 1000;
+      localStorage.setItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_SNOOZE_UNTIL, String(until));
+    } catch {
+      /* ignore */
+    }
+  },
+
+  clearPostExerciseNudgeSnooze(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_SNOOZE_UNTIL);
+    } catch {
+      /* ignore */
+    }
+  },
+
+  /** In the post-exercise window and not in an active snooze — drives hypo/correction/adviser banners. */
+  shouldShowPostExerciseEducationalNudges(): boolean {
+    if (!this.didExerciseRecently(24)) return false;
+    return !this.arePostExerciseNudgesSnoozed();
   },
 
   /** Record exercise end timestamp for “next 24h” educational nudges. */

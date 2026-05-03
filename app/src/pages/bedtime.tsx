@@ -21,6 +21,11 @@ import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-out
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
+import {
+  getMdiBedtimePostExerciseLine,
+  getPumpBedtimePostExerciseLine,
+  inferPostExerciseLoadTier,
+} from "@/lib/post-exercise-nudge";
 
 type ReadinessLevel = "steady" | "monitor" | "alert";
 
@@ -1233,17 +1238,46 @@ export default function Bedtime() {
                     <h4 className="font-medium text-sm">Pump Overnight Tips</h4>
                   </div>
                   <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
-                    {exercisedToday && (
-                      <p>
-                        Consider a temporary basal rate at 80-90% for 4-6 hours overnight to reduce post-exercise hypo risk
-                        {lastExerciseLabel ? ` (${lastExerciseLabel})` : ""}.
+                    {exercisedToday ? (
+                      <p data-testid="text-pump-post-exercise">
+                        {(() => {
+                          const last = storage.getLastExerciseSummary();
+                          const tier =
+                            last && storage.didExerciseRecently(24)
+                              ? inferPostExerciseLoadTier(last)
+                              : "moderate";
+                          const suffix = lastExerciseLabel ? ` (${lastExerciseLabel})` : "";
+                          return getPumpBedtimePostExerciseLine(tier, suffix);
+                        })()}
                       </p>
-                    )}
+                    ) : null}
                     {hadAlcohol && (
                       <p>Alcohol can cause delayed lows. Consider reducing basal by 10-20% overnight and setting an alarm.</p>
                     )}
                     <p>If your BG is trending down, a small temporary basal reduction (80-90%) may help prevent an overnight low.</p>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {!isPumpUser && result && (result.level === "monitor" || result.level === "alert") && exercisedToday && (
+              <Card
+                className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/15"
+                data-testid="card-mdi-post-exercise"
+              >
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <h4 className="font-medium text-sm">After exercise (MDI)</h4>
+                  </div>
+                  <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                    {(() => {
+                      const last = storage.getLastExerciseSummary();
+                      const tier =
+                        last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
+                      return getMdiBedtimePostExerciseLine(tier);
+                    })()}
+                  </p>
                 </CardContent>
               </Card>
             )}
