@@ -45,6 +45,7 @@ import {
   parseMedicationDoseLogFromScenario,
 } from "@/lib/sick-day-dose-log";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { recordLastInteraction } from "@/lib/last-interaction";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -433,6 +434,12 @@ export default function SickDay() {
     return "now";
   });
   const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (storage.getScenarioState().sickDayActive) {
+      recordLastInteraction("scenario:sick-day");
+    }
+  }, []);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 30_000);

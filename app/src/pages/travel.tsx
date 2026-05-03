@@ -50,6 +50,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
+import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   buildTravelWeatherRiskWarnings,
   travelAccessBufferMultiplier,
@@ -688,6 +689,12 @@ export default function Travel() {
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
   const showClimateTab =
     plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
+
+  useEffect(() => {
+    if (storage.getScenarioState().travelModeActive) {
+      recordLastInteraction("scenario:travel");
+    }
+  }, []);
 
   useEffect(() => {
     if (!showClimateTab && resultsTab === "climate") setResultsTab("packing");

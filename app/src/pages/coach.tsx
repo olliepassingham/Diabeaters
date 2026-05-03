@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Loader2, Send } from "lucide-react";
@@ -14,6 +14,7 @@ import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt }
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
+import { recordLastInteraction } from "@/lib/last-interaction";
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
   if (raw == null) return "patient";
@@ -96,6 +97,7 @@ export default function CoachPage() {
     typeof window !== "undefined" ? loadStoredTurns() : [],
   );
   const [draft, setDraft] = useState("");
+  const qSeededRef = useRef(false);
   const [lastReply, setLastReply] = useState<CoachResponse | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [consentStep, setConsentStep] = useState<0 | 1>(0);
@@ -103,6 +105,23 @@ export default function CoachPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, lastReply?.reply]);
+
+  const qParam = useMemo(() => {
+    const raw = new URLSearchParams(search).get("q");
+    if (raw == null) return "";
+    try {
+      return decodeURIComponent(raw).trim().slice(0, 500);
+    } catch {
+      return raw.trim().slice(0, 500);
+    }
+  }, [search]);
+
+  useLayoutEffect(() => {
+    if (qSeededRef.current) return;
+    if (!qParam) return;
+    setDraft(qParam);
+    qSeededRef.current = true;
+  }, [qParam]);
 
   const consentQuery = useQuery({
     queryKey: coachConsentQueryKey(user?.id),
@@ -174,6 +193,7 @@ export default function CoachPage() {
         );
         return;
       }
+      recordLastInteraction("coach");
       setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
     } catch {
       setMessages((m) => m.slice(0, -1));

@@ -14,6 +14,7 @@ import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { storage, type PumpFailureSession } from "@/lib/storage";
+import { recordLastInteraction } from "@/lib/last-interaction";
 import { schedulePumpFailureReminders, cancelPumpFailureReminders } from "@/lib/pump-failure-reminders";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +61,12 @@ export default function PumpFailurePage() {
     changedSetOrSite: false,
     contactedSupport: false,
   });
+
+  useEffect(() => {
+    if (storage.getScenarioState().pumpFailureActive) {
+      recordLastInteraction("scenario:pump-failure");
+    }
+  }, []);
 
   useEffect(() => {
     const tick = window.setInterval(() => {

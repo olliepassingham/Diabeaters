@@ -29,6 +29,7 @@ import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
+import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   normalizeBgUnits,
   type AlcoholIntensity,
@@ -198,6 +199,12 @@ export default function AlcoholScenarioPage() {
 
   const formTopRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (storage.getScenarioState().alcoholModeActive) {
+      recordLastInteraction("scenario:alcohol");
+    }
+  }, []);
 
   const refreshFromStorage = () => {
     const p = storage.getProfile();

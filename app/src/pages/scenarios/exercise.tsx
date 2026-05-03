@@ -1,11 +1,20 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { ExerciseGuidedCoach } from "@/components/scenarios/ExerciseGuidedCoach";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
+import { storage } from "@/lib/storage";
+import { recordLastInteraction } from "@/lib/last-interaction";
 
 export default function ScenarioExercisePage() {
+  useEffect(() => {
+    if (storage.getActiveExercise()) {
+      recordLastInteraction("scenario:exercise");
+    }
+  }, []);
+
   return (
     <PageShell variant="standard" className="space-y-6">
       <PageHeader

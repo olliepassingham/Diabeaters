@@ -76,6 +76,23 @@ export function NotificationsTab({
       ) : null}
 
       {!supporterMode && (
+        <div className="flex items-center justify-between py-3 border-b border-border">
+          <div className="space-y-0.5 pr-4">
+            <Label className="text-small text-muted-foreground">Helpful check-ins</Label>
+            <p className="text-small text-muted-foreground">
+              An optional reminder once a day that the app is here if you need it. No alerts about your glucose.
+            </p>
+          </div>
+          <Switch
+            checked={notifSettings.helpfulCheckInsEnabled === true}
+            onCheckedChange={(checked) => onToggle("helpfulCheckInsEnabled", checked)}
+            disabled={!notifSettings.enabled}
+            data-testid="switch-helpful-checkins"
+          />
+        </div>
+      )}
+
+      {!supporterMode && (
         <>
           <div id="notif-hypo" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
             <div className="space-y-0.5 pr-4">

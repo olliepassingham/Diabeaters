@@ -65,6 +65,8 @@ import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
 import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
+import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
+import { HelpfulCheckInScheduler } from "@/components/helpful-check-in-scheduler";
 import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -1018,19 +1020,18 @@ function AuthenticatedShell() {
 
   const slimUnverifiedAccount = Boolean(user && !isUserVerified(user) && pathOnly === "/account");
 
-  if (slimUnverifiedAccount) {
-    return (
-      <UnverifiedAccountShell isCarerMode={isCarerMode} onBrandClick={goBrandHome} onLogout={handleLogout} />
-    );
-  }
-
   return (
+    <AskAnythingProvider defaultAudience={isCarerMode ? "supporter" : "patient"}>
+      {slimUnverifiedAccount ? (
+        <UnverifiedAccountShell isCarerMode={isCarerMode} onBrandClick={goBrandHome} onLogout={handleLogout} />
+      ) : (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
+      {!isCarerMode ? <HelpfulCheckInScheduler /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
@@ -1074,6 +1075,8 @@ function AuthenticatedShell() {
       </main>
       <BottomNav />
     </div>
+      )}
+    </AskAnythingProvider>
   );
 }
 

@@ -52,6 +52,7 @@ import {
   Settings,
 } from "lucide-react";
 import { storage, UserSettings, ScenarioState, RatioHistoryEntry } from "@/lib/storage";
+import { recordLastInteraction } from "@/lib/last-interaction";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay, formatRatioForStorage, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -260,6 +261,9 @@ export default function Ratios() {
     storage.saveSettings(updated);
     setSettings(updated);
     setEditing(false);
+    if (hasChanged) {
+      recordLastInteraction("ratios");
+    }
   };
 
   const handleCancelEdit = () => {

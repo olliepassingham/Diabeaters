@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,6 +51,15 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
+import { TodayRail } from "@/components/dashboard/TodayRail";
+import { ResumeCard } from "@/components/dashboard/ResumeCard";
+import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
+import { buildTodayRailItems } from "@/lib/dashboard/today-rail";
+import { shouldHideResumeForTodayRail } from "@/lib/dashboard/resume-visibility";
+import { readLastInteraction } from "@/lib/last-interaction";
+import { INAPP_NOTIFICATIONS_CHANGED } from "@/lib/in-app-notifications-events";
+import { fetchInAppNotificationsForUser } from "@/lib/in-app-notifications-supabase";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 type HealthStatus = "stable" | "watch" | "action";
 
@@ -665,6 +675,9 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
 }
 
 export default function Dashboard() {
+  const { openAskModal } = useAskAnything();
+  const search = useSearch();
+  const [pathname, setLocation] = useLocation();
   const { profile: cloudProfile, loading: cloudProfileLoading } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
@@ -683,6 +696,7 @@ export default function Dashboard() {
   const [softSetupNudgeDismissed, setSoftSetupNudgeDismissed] = useState(() => isSoftSetupNudgeDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
+  const [unreadInAppCount, setUnreadInAppCount] = useState(0);
 
   useEffect(() => {
     const refreshData = () => {
@@ -692,8 +706,23 @@ export default function Dashboard() {
       setIsSettingsComplete(storage.isSettingsComplete());
       setSettingsCompletion(storage.getSettingsCompletion());
     };
+
+    const refreshUnread = () => {
+      if (!isSupabaseConfigured()) {
+        setUnreadInAppCount(0);
+        return;
+      }
+      void fetchInAppNotificationsForUser().then((res) => {
+        if (res.error || !res.data) {
+          setUnreadInAppCount(0);
+          return;
+        }
+        setUnreadInAppCount(res.data.filter((r) => !r.read).length);
+      });
+    };
     
     refreshData();
+    refreshUnread();
     if (getSupabase()) {
       void repairSickDayCloudIfLocalInactive();
     }
@@ -702,25 +731,32 @@ export default function Dashboard() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         refreshData();
+        refreshUnread();
         if (getSupabase()) {
           void repairSickDayCloudIfLocalInactive();
         }
       }
     };
     
-    const handleFocus = () => refreshData();
+    const handleFocus = () => {
+      refreshData();
+      refreshUnread();
+    };
     
     const onSettingsChanged = () => refreshData();
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
     window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+    const onInApp = () => refreshUnread();
+    window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, onInApp);
 
     return () => {
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+      window.removeEventListener(INAPP_NOTIFICATIONS_CHANGED, onInApp);
     };
   }, []);
 
@@ -751,6 +787,45 @@ export default function Dashboard() {
       // Ignore
     }
   }, []);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(search);
+    if (sp.get("ask") !== "1") return;
+    openAskModal("checkin-notification");
+    setLocation("/", { replace: true });
+  }, [search, setLocation, openAskModal]);
+
+  const todayItemsFull = useMemo(
+    () =>
+      buildTodayRailItems({
+        now: new Date(),
+        supplies,
+        getSupplyStatus: (s: LocalSupply) => storage.getSupplyStatus(s),
+        scenarioState,
+        activeExercise: storage.getActiveExercise(),
+        sickDayMeds: storage.getSickDayMedicationLog(),
+        appointments: storage.getAppointments(),
+        unreadInAppCount,
+      }),
+    [supplies, scenarioState, unreadInAppCount],
+  );
+
+  const lastInteraction = useMemo(
+    () => readLastInteraction(),
+    [pathname, supplies, scenarioState, unreadInAppCount],
+  );
+
+  const hideResume = useMemo(() => {
+    if (!lastInteraction) return true;
+    return shouldHideResumeForTodayRail(lastInteraction, todayItemsFull);
+  }, [lastInteraction, todayItemsFull]);
+
+  const onOpenAskToday = useCallback(
+    (source: string) => {
+      openAskModal(source);
+    },
+    [openAskModal],
+  );
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
@@ -822,6 +897,16 @@ export default function Dashboard() {
         <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
           <WelcomeWidget />
         </section>
+
+        <section className="animate-fade-in-up" style={{ animationDelay: "55ms" }}>
+          <TodayRail items={todayItemsFull} onOpenAsk={onOpenAskToday} />
+        </section>
+
+        {lastInteraction ? (
+          <section className="animate-fade-in-up" style={{ animationDelay: "58ms" }}>
+            <ResumeCard last={lastInteraction} hidden={hideResume} />
+          </section>
+        ) : null}
 
         <CoachEntryCard />
 

@@ -616,6 +616,7 @@ export default function Settings() {
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
     pushNotifications: true,
+    helpfulCheckInsEnabled: false,
     supplyAlerts: true,
     criticalThresholdDays: 3,
     lowThresholdDays: 7,

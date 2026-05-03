@@ -729,6 +729,11 @@ export interface NotificationSettings {
   enabled: boolean;
   /** iOS push notifications (Capacitor). */
   pushNotifications: boolean;
+  /**
+   * Optional once-a-day style local reminder (iOS) that the app is available for questions.
+   * Default off — user must opt in.
+   */
+  helpfulCheckInsEnabled?: boolean;
   supplyAlerts: boolean;
   criticalThresholdDays: number;
   lowThresholdDays: number;
@@ -2873,6 +2878,7 @@ export const storage = {
     const defaults: NotificationSettings = {
       enabled: true,
       pushNotifications: true,
+      helpfulCheckInsEnabled: false,
       supplyAlerts: true,
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
@@ -2893,11 +2899,15 @@ export const storage = {
       hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify !== false,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
       communityDmAlerts: parsed.communityDmAlerts !== false,
+      helpfulCheckInsEnabled: parsed.helpfulCheckInsEnabled === true,
     };
   },
 
   saveNotificationSettings(settings: NotificationSettings): void {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATION_SETTINGS, JSON.stringify(settings));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+    }
   },
 
   getNotifications(): AppNotification[] {

@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Trash2 } from "lucide-react";
-import { useLocation } from "wouter";
+import { Bell, MessageCircle, Trash2 } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import {
   deleteAllInAppNotificationsForUser,
@@ -29,6 +29,9 @@ import {
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import { isAiCoachEnabled } from "@/lib/flags";
+import { buildCoachHref } from "@/lib/ai-coach/links";
+import { coachTopicForInAppNotification } from "@/lib/ai-coach/notification-topic-map";
 
 export function NotificationBell() {
   try {
@@ -44,6 +47,10 @@ export function NotificationBell() {
     const [clearDialogOpen, setClearDialogOpen] = useState(false);
     const [clearBusy, setClearBusy] = useState(false);
     const unreadCount = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
+
+    const sortedRows = useMemo(() => {
+      return [...rows].sort((a, b) => Number(a.read) - Number(b.read));
+    }, [rows]);
 
     const load = useCallback(() => {
       if (!configured) {
@@ -264,33 +271,60 @@ export function NotificationBell() {
                 </div>
               ) : (
                 <div className="p-2 space-y-1">
-                  {rows.slice(0, 6).map((n) => (
-                    <button
-                      key={n.id}
-                      type="button"
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                        n.read ? "hover:bg-muted/60" : "bg-primary/5 hover:bg-primary/10"
-                      }`}
-                      data-testid={`bell-notif-row-${n.id}`}
-                      onClick={() => {
-                        void (async () => {
-                          if (!n.read) {
-                            const res = await markInAppNotificationRead(n.id);
-                            if (!res.error) {
-                              setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
-                              notifyInAppNotificationsChanged({ skipPageRefresh: true });
-                            }
-                          }
-                          setOpen(false);
-                          const path = getPathForInAppNotification(n) ?? "/notifications";
-                          setLocation(path);
-                        })();
-                      }}
-                    >
-                      <div className="font-medium truncate">{n.title}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">{n.body}</div>
-                    </button>
-                  ))}
+                  {sortedRows.slice(0, 6).map((n) => {
+                    const askHref = isAiCoachEnabled
+                      ? buildCoachHref({
+                          topic: coachTopicForInAppNotification(n),
+                          from: "notification-bell",
+                        })
+                      : null;
+                    return (
+                      <div
+                        key={n.id}
+                        className={`flex w-full items-stretch gap-1 rounded-lg text-sm transition-colors ${
+                          n.read ? "hover:bg-muted/60" : "bg-primary/5 hover:bg-primary/10"
+                        }`}
+                        data-testid={`bell-notif-row-${n.id}`}
+                      >
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 px-3 py-2 text-left"
+                          onClick={() => {
+                            void (async () => {
+                              if (!n.read) {
+                                const res = await markInAppNotificationRead(n.id);
+                                if (!res.error) {
+                                  setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
+                                  notifyInAppNotificationsChanged({ skipPageRefresh: true });
+                                }
+                              }
+                              setOpen(false);
+                              const path = getPathForInAppNotification(n) ?? "/notifications";
+                              setLocation(path);
+                            })();
+                          }}
+                        >
+                          <div className="font-medium truncate">{n.title}</div>
+                          <div className="text-xs text-muted-foreground line-clamp-1">{n.body}</div>
+                        </button>
+                        {!n.read && askHref ? (
+                          <Button variant="ghost" size="icon" className="h-auto shrink-0 self-stretch px-2" asChild>
+                            <Link
+                              href={askHref}
+                              aria-label="Ask the coach about this"
+                              data-testid={`bell-notif-ask-${n.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpen(false);
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
