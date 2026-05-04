@@ -223,6 +223,8 @@ export const COMMUNITY_TOPICS = [
   "mental-health",
   "tips-what-worked",
   "general-questions",
+  "school-college-life",
+  "family-supporters",
 ] as const;
 
 export type CommunityTopic = typeof COMMUNITY_TOPICS[number];

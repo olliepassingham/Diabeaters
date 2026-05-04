@@ -265,7 +265,7 @@ export default function CommunityThreadPage() {
                       <button
                         type="button"
                         className={cn(
-                          "shrink-0 rounded-md p-1 -mr-1 hover:opacity-100 opacity-70 transition-opacity",
+                          "shrink-0 rounded-md p-2 -mr-1 min-h-11 min-w-11 inline-flex items-center justify-center hover:opacity-100 opacity-70 transition-opacity",
                           likedByMe && "opacity-100",
                         )}
                         aria-label={likedByMe ? "Unlike message" : "Like message"}

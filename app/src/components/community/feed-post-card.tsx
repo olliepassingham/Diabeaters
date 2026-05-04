@@ -34,6 +34,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
@@ -351,6 +361,7 @@ export function FeedPostCard({
   >([]);
   const [shareRecentLoading, setShareRecentLoading] = useState(false);
   const [shareRecentError, setShareRecentError] = useState<string | null>(null);
+  const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
 
   /** Align card like_count with reaction rows the viewer can see (fixes stale feed totals). */
   useEffect(() => {
@@ -830,8 +841,9 @@ export function FeedPostCard({
                                     variant="ghost"
                                     size="sm"
                                     className="h-6 shrink-0 px-1 text-muted-foreground hover:text-destructive"
-                                    onClick={() => onDeleteComment(c.id)}
+                                    onClick={() => setPendingDeleteCommentId(c.id)}
                                     aria-label="Delete comment"
+                                    data-testid={`button-delete-comment-${c.id}`}
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -1057,6 +1069,36 @@ export function FeedPostCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingDeleteCommentId !== null}
+        onOpenChange={(o) => {
+          if (!o) setPendingDeleteCommentId(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-delete-comment-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove your comment. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-delete-comment-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const id = pendingDeleteCommentId;
+                setPendingDeleteCommentId(null);
+                if (id) onDeleteComment(id);
+              }}
+              data-testid="button-delete-comment-confirm"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
-  COMMUNITY_TOPICS,
   DEFAULT_COMMUNITY_TOPIC,
   isCommunityTopicId,
   fetchCommunityPostsFromFollowingPage,
@@ -55,6 +54,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, useProfile } from "@/lib/profile";
+import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -82,6 +82,7 @@ function initialFeedComposerOpen(): boolean {
 export default function CommunityHomePage() {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
+  const orderedTopics = useCommunityTopicOrder();
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
@@ -729,7 +730,7 @@ export default function CommunityHomePage() {
           >
             All topics
           </Button>
-          {COMMUNITY_TOPICS.map((t) => (
+          {orderedTopics.map((t) => (
             <Button
               key={t.id}
               type="button"
@@ -806,7 +807,7 @@ export default function CommunityHomePage() {
                   <SelectValue placeholder="Choose a topic" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMMUNITY_TOPICS.map((t) => (
+                  {orderedTopics.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
                       {t.label}
                     </SelectItem>
@@ -1083,6 +1084,7 @@ export default function CommunityHomePage() {
         viewerId={user?.id}
         searchQuery={feedSearch}
         pageSize={PAGE_SIZE}
+        topicsForSelect={orderedTopics}
         showRefreshButton
         emptyStateTitle="Nothing here yet"
         emptyStateDescription={

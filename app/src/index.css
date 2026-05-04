@@ -63,6 +63,28 @@
     ::view-transition-new(app-main) {
       animation-name: app-main-fade-in;
     }
+
+    /*
+      Bottom nav sits outside `#app-scroll-main` but View Transition snapshots can still
+      composite above fixed siblings during tab switches — give the nav its own named
+      transition group and stack it above `app-main`.
+    */
+    .bottom-nav-vt {
+      view-transition-name: bottom-nav;
+    }
+
+    ::view-transition-group(app-main) {
+      z-index: 1;
+    }
+
+    ::view-transition-group(bottom-nav) {
+      z-index: 100;
+    }
+
+    ::view-transition-old(bottom-nav),
+    ::view-transition-new(bottom-nav) {
+      animation-duration: 0s;
+    }
   }
 
   @keyframes app-main-fade-in {

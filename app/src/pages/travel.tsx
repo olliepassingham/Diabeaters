@@ -26,6 +26,7 @@ import {
   Syringe, 
   Activity,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   ArrowLeft,
   ChevronRight,
@@ -66,8 +67,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageShell } from "@/components/layout";
-import { isAiCoachEnabled } from "@/lib/flags";
-import { scenarioAskAssistantLinkLabel } from "@/lib/ai-coach/persona";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
@@ -100,6 +100,24 @@ interface RiskWarning {
   title: string;
   description: string;
   severity: "low" | "medium" | "high";
+}
+
+function TravelDisclaimerCard() {
+  return (
+    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
+            <p className="text-yellow-800 dark:text-yellow-200 mt-1">
+              Educational preparation only — not medical advice. Follow your care team for travel and insulin planning.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: UserSettings, isPumpUser: boolean): PackingItem[] {
@@ -1211,20 +1229,13 @@ export default function Travel() {
               <span>{daysElapsed} days elapsed</span>
               <span>{daysRemaining} days remaining</span>
             </div>
-            {isAiCoachEnabled ? (
-              <p className="border-t border-green-200/60 pt-2 text-xs text-muted-foreground dark:border-green-800/60">
-                <Link
-                  href="/coach?topic=travel"
-                  className="text-foreground underline underline-offset-2 hover:text-primary"
-                  data-testid="link-travel-active-coach"
-                >
-                  {scenarioAskAssistantLinkLabel()}
-                </Link>{" "}
-                for educational travel prompts — not medical advice.
-              </p>
-            ) : null}
+            <div className="border-t border-green-200/60 pt-3 dark:border-green-800/60">
+              <ScenarioCoachLink topic="travel" />
+            </div>
           </CardContent>
         </Card>
+
+        <TravelDisclaimerCard />
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
           <TabsList className="grid w-full grid-cols-3">
@@ -1497,7 +1508,7 @@ export default function Travel() {
       <PageShell variant="standard">
         <div className="flex items-start gap-3 mb-4">
           <PageBackButton />
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-center gap-2">
               <Plane className="h-5 w-5 shrink-0 text-purple-600 dark:text-purple-400" />
               <h1 className="text-xl font-semibold tracking-tight">Travel</h1>
@@ -1505,18 +1516,9 @@ export default function Travel() {
             <p className="text-sm text-muted-foreground">
               Build a packing list from your supplies, or track holiday prep before you go.
             </p>
-            {isAiCoachEnabled ? (
-              <p className="text-xs text-muted-foreground">
-                <Link
-                  href="/coach?topic=travel"
-                  className="text-foreground underline underline-offset-2 hover:text-primary"
-                  data-testid="link-travel-entry-coach"
-                >
-                  {scenarioAskAssistantLinkLabel()}
-                </Link>{" "}
-                for travel-related educational prompts — not medical advice.
-              </p>
-            ) : null}
+            <div data-testid="link-travel-entry-coach-wrap">
+              <ScenarioCoachLink topic="travel" />
+            </div>
           </div>
         </div>
 
@@ -1907,6 +1909,8 @@ export default function Travel() {
             </section>
           </CardContent>
         </Card>
+
+        <TravelDisclaimerCard />
 
       </PageShell>
     );
@@ -2452,7 +2456,7 @@ export default function Travel() {
               <AccordionContent className="pb-3">
                 <ul className="text-sm text-muted-foreground space-y-1.5 list-disc list-inside pl-0.5">
                   <li>Persistent high blood glucose with ketones</li>
-                  <li>Severe hypoglycemia requiring assistance</li>
+                  <li>Severe hypoglycaemia requiring assistance</li>
                   <li>Signs of diabetic ketoacidosis (DKA)</li>
                   <li>Vomiting or inability to keep fluids down</li>
                 </ul>

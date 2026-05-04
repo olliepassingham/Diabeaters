@@ -26,6 +26,7 @@ import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
+import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -302,6 +303,8 @@ export function ToolsHubPage({
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-10">
       <PageHeader className="max-w-2xl" title="Tools" actions={<ToolsAboutDialog hubVariant={hubVariant} />} />
+
+      <DobUnknownNotice hidden={hubVariant === "carer"} testId="tools-dob-unknown-notice" />
 
       {hubVariant === "carer" && supporterTools.length > 0 ? (
         <section className="space-y-4" aria-label="Supporter tools" data-testid="tools-section-supporter">

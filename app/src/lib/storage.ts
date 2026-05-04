@@ -63,6 +63,162 @@ const STORAGE_KEYS = {
   POST_EXERCISE_NUDGE_SNOOZE_UNTIL: "diabeater_post_exercise_nudge_snooze_until",
 } as const;
 
+type StorageLogicalKey = keyof typeof STORAGE_KEYS;
+
+/**
+ * Backup scopes (Phase 5 — scoped backup export/import).
+ *
+ * Each scope groups a set of `STORAGE_KEYS` entries. The settings UI exposes
+ * checkboxes for these so people can choose what their backup contains:
+ *
+ *  - `clinical`     — profile, ratios, supplies, hypos, appointments, scenarios.
+ *                     Default ON.
+ *  - `app_settings` — notification prefs, dashboard widgets, quick actions.
+ *                     Default ON (small, safe to share with yourself).
+ *  - `community`    — drafts of posts/replies/reels and follows.
+ *                     Default OFF.
+ *  - `messages`     — local DM history. Default OFF.
+ */
+export type BackupScope = "clinical" | "app_settings" | "community" | "messages";
+
+export const ALL_BACKUP_SCOPES: readonly BackupScope[] = [
+  "clinical",
+  "app_settings",
+  "community",
+  "messages",
+] as const;
+
+export const DEFAULT_EXPORT_SCOPES: readonly BackupScope[] = ["clinical", "app_settings"] as const;
+
+const BACKUP_SCOPE_LABELS: Record<BackupScope, string> = {
+  clinical: "Clinical data",
+  app_settings: "App settings",
+  community: "Community drafts & follows",
+  messages: "Messages",
+};
+
+const BACKUP_SCOPE_DESCRIPTIONS: Record<BackupScope, string> = {
+  clinical:
+    "Profile, ratios, supplies, hypo logs, appointments, sick-day, scenarios, routines.",
+  app_settings: "Notification prefs, dashboard widgets, quick actions, units.",
+  community: "Local drafts of posts, replies, reels, and follows.",
+  messages: "Local copies of direct messages and conversations.",
+};
+
+export function backupScopeLabel(scope: BackupScope): string {
+  return BACKUP_SCOPE_LABELS[scope];
+}
+
+export function backupScopeDescription(scope: BackupScope): string {
+  return BACKUP_SCOPE_DESCRIPTIONS[scope];
+}
+
+const BACKUP_SCOPE_KEYS: Record<BackupScope, readonly StorageLogicalKey[]> = {
+  community: ["COMMUNITY_POSTS", "COMMUNITY_REPLIES", "COMMUNITY_REELS", "FOLLOWING"],
+  messages: ["DIRECT_MESSAGES", "CONVERSATIONS"],
+  app_settings: [
+    "NOTIFICATION_SETTINGS",
+    "LAST_NOTIFICATION_CHECK",
+    "NOTIFICATIONS",
+    "DASHBOARD_WIDGETS",
+    "QUICK_ACTIONS",
+    "BACKUP_REMINDER_DISMISSED",
+    "LAST_BACKUP_DATE",
+  ],
+  // Anything that isn't already in a more specific bucket is "clinical" — see
+  // `clinicalKeys()` below for the source of truth so we never silently miss a
+  // newly-added key.
+  clinical: [],
+};
+
+function nonClinicalKeys(): Set<StorageLogicalKey> {
+  const out = new Set<StorageLogicalKey>();
+  for (const k of BACKUP_SCOPE_KEYS.community) out.add(k);
+  for (const k of BACKUP_SCOPE_KEYS.messages) out.add(k);
+  for (const k of BACKUP_SCOPE_KEYS.app_settings) out.add(k);
+  return out;
+}
+
+function clinicalKeys(): readonly StorageLogicalKey[] {
+  const non = nonClinicalKeys();
+  return (Object.keys(STORAGE_KEYS) as StorageLogicalKey[]).filter((k) => !non.has(k));
+}
+
+function keysForScopes(scopes: readonly BackupScope[]): Set<StorageLogicalKey> {
+  const out = new Set<StorageLogicalKey>();
+  for (const s of scopes) {
+    if (s === "clinical") {
+      for (const k of clinicalKeys()) out.add(k);
+    } else {
+      for (const k of BACKUP_SCOPE_KEYS[s]) out.add(k);
+    }
+  }
+  return out;
+}
+
+function dedupeScopes(scopes: readonly BackupScope[]): BackupScope[] {
+  const seen = new Set<BackupScope>();
+  const out: BackupScope[] = [];
+  for (const s of scopes) {
+    if (s === "clinical" || s === "app_settings" || s === "community" || s === "messages") {
+      if (!seen.has(s)) {
+        seen.add(s);
+        out.push(s);
+      }
+    }
+  }
+  return out;
+}
+
+const BACKUP_USER_HASH_PEPPER = "diabeaters-backup-user-v1";
+
+function fnv1a32(input: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/** Salted, non-reversible fingerprint so backups can be matched to a profile without storing a raw user id. */
+export function computeUserIdHash(profile: { email?: string } | null): string | null {
+  const email = profile?.email?.trim().toLowerCase();
+  if (!email) return null;
+  const material = `${BACKUP_USER_HASH_PEPPER}|${email}`;
+  const a = fnv1a32(material);
+  const b = fnv1a32(`${material}|${a.toString(16)}`);
+  return `${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
+}
+
+function clearStorageKeys(keys: Iterable<StorageLogicalKey>): void {
+  for (const logicalKey of keys) {
+    try {
+      if (logicalKey === "APPOINTMENTS") {
+        const apptKey = getAppointmentsStorageKey();
+        if (apptKey) localStorage.removeItem(apptKey);
+        continue;
+      }
+      localStorage.removeItem(STORAGE_KEYS[logicalKey]);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export function backupDeclaredScopesMismatchFile(
+  declared: BackupScope[] | null,
+  data: Record<string, unknown>,
+): boolean {
+  if (!declared || declared.length === 0) return false;
+  const allowed = keysForScopes(declared);
+  for (const k of Object.keys(STORAGE_KEYS) as StorageLogicalKey[]) {
+    if (data[k] === undefined) continue;
+    if (!allowed.has(k)) return true;
+  }
+  return false;
+}
+
 /** Tracks which Supabase user id local appointment rows belong to (browser localStorage is shared across accounts). */
 export const ACTIVE_USER_ID_KEY = "diabeater_active_user_id";
 
@@ -1103,10 +1259,37 @@ export type DiabeatersBackupPeek =
       backupFormatVersion: string | null;
       appVersion: string | null;
       keysRestored: number;
+      /**
+       * Scopes the file claims to contain (from `_scope` metadata).
+       * `null` means the file pre-dates scoped exports and we should
+       * treat it as "all scopes the keys actually represent".
+       */
+      declaredScopes: BackupScope[] | null;
+      /**
+       * Scopes we infer from the keys actually present in the file —
+       * used to warn at import time even for legacy files.
+       */
+      detectedScopes: BackupScope[];
+      userIdHash: string | null;
     }
   | { ok: false; error: string };
 
 export type ImportBackupMode = "merge" | "replace";
+
+function detectScopesFromRecord(rec: Record<string, unknown>): BackupScope[] {
+  const found = new Set<BackupScope>();
+  const scopes: BackupScope[] = ["clinical", "app_settings", "community", "messages"];
+  for (const scope of scopes) {
+    const keys = scope === "clinical" ? clinicalKeys() : BACKUP_SCOPE_KEYS[scope];
+    for (const k of keys) {
+      if (rec[k] !== undefined) {
+        found.add(scope);
+        break;
+      }
+    }
+  }
+  return scopes.filter((s) => found.has(s));
+}
 
 /** Read a JSON export before applying it — avoids wiping data with random files. */
 export function peekDiabeatersBackup(jsonString: string): DiabeatersBackupPeek {
@@ -1137,7 +1320,23 @@ export function peekDiabeatersBackup(jsonString: string): DiabeatersBackupPeek {
     const exportedAt = typeof rec._exportedAt === "string" ? rec._exportedAt : null;
     const backupFormatVersion = typeof rec._version === "string" ? rec._version : null;
     const appVersion = typeof rec._appVersion === "string" ? rec._appVersion : null;
-    return { ok: true, exportedAt, backupFormatVersion, appVersion, keysRestored };
+    const userIdHash = typeof rec._user_id_hash === "string" ? rec._user_id_hash : null;
+    let declaredScopes: BackupScope[] | null = null;
+    if (Array.isArray(rec._scope)) {
+      declaredScopes = dedupeScopes(rec._scope as readonly BackupScope[]);
+      if (declaredScopes.length === 0) declaredScopes = null;
+    }
+    const detectedScopes = detectScopesFromRecord(rec);
+    return {
+      ok: true,
+      exportedAt,
+      backupFormatVersion,
+      appVersion,
+      keysRestored,
+      declaredScopes,
+      detectedScopes,
+      userIdHash,
+    };
   } catch {
     return {
       ok: false,
@@ -3925,9 +4124,13 @@ export const storage = {
     return { totalSessions: total, droppedCount: dropped, stableCount: stable, roseCount: rose, hypoCount: hypo, avgPattern };
   },
 
-  exportAllData(): string {
+  exportAllData(options?: { scopes?: readonly BackupScope[] }): string {
+    const scopes = dedupeScopes(options?.scopes ?? ALL_BACKUP_SCOPES);
+    const finalScopes = scopes.length > 0 ? scopes : [...DEFAULT_EXPORT_SCOPES];
+    const allowed = keysForScopes(finalScopes);
     const data: Record<string, unknown> = {};
-    for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+    for (const [key, storageKey] of Object.entries(STORAGE_KEYS) as Array<[StorageLogicalKey, string]>) {
+      if (!allowed.has(key)) continue;
       if (key === "APPOINTMENTS") {
         const apptKey = getAppointmentsStorageKey();
         if (!apptKey) continue;
@@ -3951,8 +4154,17 @@ export const storage = {
       }
     }
     data._exportedAt = new Date().toISOString();
-    data._version = "1.0";
+    data._version = "1.1";
     data._appVersion = typeof appPkg?.version === "string" ? appPkg.version : null;
+    data._scope = finalScopes;
+    const profile = (() => {
+      try {
+        return this.getProfile();
+      } catch {
+        return null;
+      }
+    })();
+    data._user_id_hash = computeUserIdHash(profile);
     localStorage.setItem(STORAGE_KEYS.LAST_BACKUP_DATE, new Date().toISOString());
     localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED);
     localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED + "_at");
@@ -4241,8 +4453,14 @@ export const storage = {
 
   importAllData(
     jsonString: string,
-    options?: { mode?: ImportBackupMode },
-  ): { success: boolean; error?: string } {
+    options?: {
+      mode?: ImportBackupMode;
+      /** Only write keys in these scopes. Keys in the file from other scopes are skipped. */
+      importScopes?: readonly BackupScope[];
+      /** Tests only — skip `_user_id_hash` mismatch guard. */
+      skipUserHashCheck?: boolean;
+    },
+  ): { success: boolean; error?: string; skippedOutOfScopeKeys?: number } {
     try {
       const peek = peekDiabeatersBackup(jsonString);
       if (!peek.ok) {
@@ -4254,13 +4472,35 @@ export const storage = {
         return { success: false, error: "Invalid data format" };
       }
 
-      const mode = options?.mode ?? "merge";
-      if (mode === "replace") {
-        clearBackedUpDiabeatersStorage();
+      const currentHash = computeUserIdHash(this.getProfile());
+      const fileHash = typeof data._user_id_hash === "string" ? data._user_id_hash : null;
+      if (!options?.skipUserHashCheck && fileHash && currentHash && fileHash !== currentHash) {
+        return {
+          success: false,
+          error:
+            "This backup was created under a different signed-in profile (email) than this device. To avoid mixing two people's data, import it only on the same account, or sign in with the matching email first.",
+        };
       }
 
-      for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
+      const importScopes = options?.importScopes ? dedupeScopes(options.importScopes) : null;
+      const allowedImportKeys = importScopes && importScopes.length > 0 ? keysForScopes(importScopes) : null;
+
+      const mode = options?.mode ?? "merge";
+      if (mode === "replace") {
+        if (allowedImportKeys) {
+          clearStorageKeys(allowedImportKeys);
+        } else {
+          clearBackedUpDiabeatersStorage();
+        }
+      }
+
+      let skippedOutOfScopeKeys = 0;
+      for (const [key, storageKey] of Object.entries(STORAGE_KEYS) as Array<[StorageLogicalKey, string]>) {
         if (data[key] === undefined) continue;
+        if (allowedImportKeys && !allowedImportKeys.has(key)) {
+          skippedOutOfScopeKeys += 1;
+          continue;
+        }
         const value = typeof data[key] === "string" ? data[key] : JSON.stringify(data[key]);
         if (key === "APPOINTMENTS") {
           const apptKey = getAppointmentsStorageKey();
@@ -4270,7 +4510,7 @@ export const storage = {
         }
         localStorage.setItem(storageKey, value);
       }
-      return { success: true };
+      return { success: true, skippedOutOfScopeKeys };
     } catch {
       return { success: false, error: "Could not read the file. Please check it's a valid Diabeaters backup." };
     }

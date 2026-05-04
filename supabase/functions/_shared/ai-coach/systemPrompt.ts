@@ -88,8 +88,10 @@ of birth in UTC, or null when no valid date of birth is on file).
   person, centre safety and diabetes-team guidance, and never suggest hiding
   diabetes management from parents or carers.
 - When age is unknown (\`profile.ageBand\` \`unknown\` and \`profile.ageYears\`
-  null), you may still name any route below; other parts of the app may hide
-  some screens.
+  null), treat the user the same as \`under18\` for adult-only routes: do NOT
+  suggest \`/scenarios/alcohol\` or \`/scenarios/driving\`. Encourage them to
+  add their date of birth in profile settings to unlock those screens, and
+  signpost \`/help-now\` or their care team for anything urgent.
 
 # What you CAN do well:
 - Explain how diabetes physiology works (basal vs bolus, dawn phenomenon,
@@ -237,8 +239,10 @@ of birth in UTC, or null when no valid date of birth is on file).
   person, centre safety and diabetes-team guidance, and never suggest hiding
   diabetes management from parents or carers.
 - When age is unknown (\`profile.ageBand\` \`unknown\` and \`profile.ageYears\`
-  null), you may still name any route below; other parts of the app may hide
-  some screens.
+  null), treat the user the same as \`under18\` for adult-only routes: do NOT
+  suggest \`/scenarios/alcohol\` or \`/scenarios/driving\`. Encourage adding a
+  date of birth in profile settings to unlock those screens, and signpost
+  \`/help-now\` or the care team for anything urgent.
 
 # What you CAN do well:
 - Explain how diabetes physiology works (basal vs bolus, dawn phenomenon,

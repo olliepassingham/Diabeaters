@@ -9,6 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Calendar, Plus, Clock, MapPin, Check, Trash2, Eye, Stethoscope, Heart, Footprints, TestTube, Cpu } from "lucide-react";
 import { storage, Appointment, AppointmentType } from "@/lib/storage";
 import { format, isAfter, isBefore, addDays } from "date-fns";
@@ -46,6 +56,8 @@ export default function Appointments() {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     trackFeatureEngagement("appointments");
@@ -101,13 +113,27 @@ export default function Appointments() {
     await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
   };
 
-  const handleDelete = async (id: string) => {
-    if (!user?.id) return;
-    storage.deleteAppointment(id);
-    setAppointments(storage.getAppointmentsForUser(user.id));
-    await syncAppointments();
-    await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
+  const requestDelete = (id: string) => {
+    setPendingDeleteId(id);
   };
+
+  const confirmDelete = async () => {
+    if (!user?.id || !pendingDeleteId) return;
+    setDeleteBusy(true);
+    try {
+      storage.deleteAppointment(pendingDeleteId);
+      setAppointments(storage.getAppointmentsForUser(user.id));
+      await syncAppointments();
+      await rescheduleAppointmentReminders(storage.getAppointmentsForUser(user.id));
+    } finally {
+      setDeleteBusy(false);
+      setPendingDeleteId(null);
+    }
+  };
+
+  const pendingDeleteAppointment = pendingDeleteId
+    ? appointments.find((a) => a.id === pendingDeleteId) ?? null
+    : null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -329,8 +355,9 @@ export default function Appointments() {
                         <Button 
                           size="icon" 
                           variant="ghost" 
-                          onClick={() => handleDelete(appointment.id)}
+                          onClick={() => requestDelete(appointment.id)}
                           data-testid={`button-delete-${appointment.id}`}
+                          aria-label="Delete appointment"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -368,7 +395,9 @@ export default function Appointments() {
                       <Button 
                         size="icon" 
                         variant="ghost" 
-                        onClick={() => handleDelete(appointment.id)}
+                        onClick={() => requestDelete(appointment.id)}
+                        data-testid={`button-delete-past-${appointment.id}`}
+                        aria-label="Delete appointment"
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground" />
                       </Button>
@@ -392,6 +421,37 @@ export default function Appointments() {
           </ul>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(o) => {
+          if (!o && !deleteBusy) setPendingDeleteId(null);
+        }}
+      >
+        <AlertDialogContent data-testid="dialog-delete-appointment-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete appointment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDeleteAppointment
+                ? `This will remove "${pendingDeleteAppointment.title}" from your appointments. This cannot be undone.`
+                : "This will remove the appointment. This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteBusy} data-testid="button-delete-appointment-cancel">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteBusy}
+              onClick={() => void confirmDelete()}
+              data-testid="button-delete-appointment-confirm"
+            >
+              {deleteBusy ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

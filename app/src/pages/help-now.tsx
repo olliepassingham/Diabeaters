@@ -45,12 +45,12 @@ export default function HelpNow() {
       <div className="bg-red-600 text-white p-6 -mx-6 -mt-6 mb-6">
         <div className="flex items-center justify-center gap-3 mb-4">
           <Heart className="h-10 w-10" />
-          <h1 className="text-3xl font-bold">HELP NOW</h1>
+          <h1 className="text-3xl font-bold">Help Now</h1>
         </div>
         <div className="text-center">
-          <p className="text-xl font-semibold mb-1">This person has Type 1 Diabetes</p>
+          <p className="text-xl font-semibold mb-1">This person has Type 1 diabetes</p>
           {displayName && <p className="text-2xl font-bold">{displayName}</p>}
-          <p className="text-lg opacity-90 mt-2">Their blood sugar may be dangerously low (hypoglycemia)</p>
+          <p className="text-lg opacity-90 mt-2">Their blood sugar may be dangerously low (hypoglycaemia)</p>
         </div>
       </div>
 

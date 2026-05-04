@@ -49,6 +49,7 @@ import {
   isAccountDeletionTableUnavailableMessage,
 } from "@/lib/support";
 import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
+import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -398,6 +399,7 @@ export default function Account() {
         }
         className="max-w-xl"
       />
+      <DobUnknownNotice hidden={isCarer} testId="account-dob-unknown-notice" />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
         <CardContent className="relative p-4 sm:p-5 space-y-0">
           <Button

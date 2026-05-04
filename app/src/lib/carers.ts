@@ -2,6 +2,7 @@
  * Family & Carers — Supabase helpers (patient invites/links, carer redeem, scoped reads).
  * Requires tables/RPC from docs/sql/family_carers.sql (not executed from the app).
  */
+import { devWarn } from "./dev-log";
 import { getSupabase } from "./supabase";
 import type {
   CarerInviteRow,
@@ -569,7 +570,7 @@ export async function listLinkedPatientsForCarer(): Promise<{
   // Do not fail the whole supporter link load if profile names are blocked by RLS;
   // CarerView can still load patient data using patient_id + scopes.
   if (profErr) {
-    console.warn("[listLinkedPatientsForCarer] profiles join failed; continuing without names", profErr.message);
+    devWarn("[listLinkedPatientsForCarer] profiles join failed; continuing without names", profErr.message);
   }
 
   const profRows = ((profErr ? [] : profs) ?? []) as {

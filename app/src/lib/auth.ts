@@ -285,6 +285,20 @@ export async function logout(): Promise<AuthResult<{}>> {
   const supabase = getSupabase();
   if (!supabase) return { data: {}, error: NOT_CONFIGURED };
 
+  /**
+   * Best-effort: tear down the device's push registration BEFORE we sign out.
+   * After signOut the JWT no longer exists, so the RLS DELETE on
+   * `push_tokens` would fail silently. See
+   * `supabase/migrations/20260504200000_push_tokens_delete_self.sql` for the
+   * server-side policy.
+   */
+  try {
+    const mod = await import("@/lib/push-tokens");
+    await mod.cleanupPushRegistration();
+  } catch {
+    // Push cleanup is best-effort and must never block logout.
+  }
+
   try {
     const { error } = await supabase.auth.signOut();
     return { data: {}, error };

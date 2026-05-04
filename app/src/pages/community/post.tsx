@@ -32,9 +32,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 import { useAuth } from "@/lib/auth-context";
 import {
-  COMMUNITY_TOPICS,
   DEFAULT_COMMUNITY_TOPIC,
   deleteCommunityComment,
   deleteCommunityPost,
@@ -61,6 +61,7 @@ export default function CommunityPostPage() {
   const [, params] = useRoute("/community/post/:postId");
   const postId = params?.postId ?? null;
   const { user } = useAuth();
+  const orderedTopics = useCommunityTopicOrder();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -439,7 +440,7 @@ export default function CommunityPostPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {COMMUNITY_TOPICS.map((t) => (
+                {orderedTopics.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.label}
                   </SelectItem>

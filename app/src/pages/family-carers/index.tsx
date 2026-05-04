@@ -190,7 +190,7 @@ export default function FamilyCarersPage() {
         title={
           <span className="inline-flex items-center gap-2" data-testid="heading-family-carers">
             <Users className="h-7 w-7 text-primary shrink-0" />
-            Family &amp; Supporters
+            Family &amp; supporters
           </span>
         }
         description="Invite someone you trust to follow along. They only see what you allow — nothing here replaces professional care."

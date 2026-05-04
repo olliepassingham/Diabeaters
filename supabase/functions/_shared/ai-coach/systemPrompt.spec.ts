@@ -76,3 +76,25 @@ describe("AI_COACH_SUPPORTER_SYSTEM_PROMPT (#SP-2 drift guard)", () => {
     expect(AI_COACH_SUPPORTER_SYSTEM_PROMPT).not.toContain('to their team as "your team"');
   });
 });
+
+describe("Paediatric default-deny on unknown DOB", () => {
+  it("instructs the patient prompt to gate alcohol/driving when DOB is unknown", () => {
+    expect(AI_COACH_SYSTEM_PROMPT).toMatch(
+      /When age is unknown[\s\S]*treat the user the same as `under18`[\s\S]*do NOT[\s\S]*\/scenarios\/alcohol[\s\S]*\/scenarios\/driving/,
+    );
+    expect(AI_COACH_SYSTEM_PROMPT).toMatch(/date of birth in profile settings/);
+    expect(AI_COACH_SYSTEM_PROMPT).not.toMatch(
+      /you may still name any route below/,
+    );
+  });
+
+  it("instructs the supporter prompt to gate alcohol/driving when DOB is unknown", () => {
+    expect(AI_COACH_SUPPORTER_SYSTEM_PROMPT).toMatch(
+      /When age is unknown[\s\S]*treat the user the same as `under18`[\s\S]*do NOT[\s\S]*\/scenarios\/alcohol[\s\S]*\/scenarios\/driving/,
+    );
+    expect(AI_COACH_SUPPORTER_SYSTEM_PROMPT).toMatch(/date of birth in profile settings/);
+    expect(AI_COACH_SUPPORTER_SYSTEM_PROMPT).not.toMatch(
+      /you may still name any route below/,
+    );
+  });
+});

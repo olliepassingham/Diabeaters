@@ -24,8 +24,7 @@ import {
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { isAiCoachEnabled } from "@/lib/flags";
-import { askAssistantMidSentence } from "@/lib/ai-coach/persona";
+import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import {
   upsertScenario,
@@ -394,6 +393,25 @@ function calculateSickDayRecommendations(
     stackingWarning,
     stackingWarningBrief,
   };
+}
+
+function SickDayDisclaimerCard() {
+  return (
+    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
+            <p className="text-yellow-800 dark:text-yellow-200 mt-1">
+              Educational estimates only. Contact your healthcare team if you are unwell, especially with high glucose,
+              ketones, or worsening symptoms.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 const SICK_DAY_STORAGE_KEY = "diabeater_sick_day_session";
@@ -2546,54 +2564,21 @@ export default function SickDay() {
   }
 
   return (
-    <PageShell variant="standard">
-      <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-100 dark:border-orange-900">
-        <CardHeader>
-          <div className="flex items-center gap-3 flex-wrap">
-            <PageBackButton />
-            <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900">
-              <Activity className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <CardTitle className="text-xl">
-              Sick Day{" "}
-              <span className="text-sm font-normal text-muted-foreground">
-                — Calculate insulin adjustments when you're feeling unwell
-              </span>
-            </CardTitle>
+    <PageShell variant="standard" className="space-y-6">
+      <PageHeader
+        leading={<PageBackButton />}
+        title="Sick Day"
+        description="Calculate insulin adjustments when you're feeling unwell."
+        actions={
+          <div data-testid="link-sick-day-coach-wrap">
+            <ScenarioCoachLink topic="sick-day" />
           </div>
-        </CardHeader>
-      </Card>
-
-      {isAiCoachEnabled ? (
-        <p className="text-xs text-muted-foreground" data-testid="link-sick-day-coach-wrap">
-          For plain-language background (educational only),{" "}
-          <Link
-            href="/coach?topic=sick-day"
-            className="text-foreground underline underline-offset-2 hover:text-primary"
-            data-testid="link-sick-day-coach"
-          >
-            {askAssistantMidSentence()}
-          </Link>
-          .
-        </p>
-      ) : null}
+        }
+      />
 
       <div className="grid gap-6">
-        <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
-                <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-                  Educational estimates only. Contact your healthcare team if you are unwell, especially with high glucose, ketones, or worsening symptoms.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {!results ? (
+          <>
           <Card>
             <CardHeader>
               <CardTitle>Input Information</CardTitle>
@@ -2700,6 +2685,9 @@ export default function SickDay() {
               </Button>
             </CardContent>
           </Card>
+
+          <SickDayDisclaimerCard />
+          </>
         ) : (
           <>
           <Card className={isSickDayActive ? "border-orange-500/50 bg-orange-50/30 dark:bg-orange-950/20" : "border-primary/50"}>
@@ -2825,6 +2813,8 @@ export default function SickDay() {
               </Button>
             </CardContent>
           </Card>
+
+          <SickDayDisclaimerCard />
 
           <Card className="border-primary/50">
             <CardHeader>

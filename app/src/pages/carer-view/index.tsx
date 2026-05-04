@@ -35,6 +35,7 @@ import {
   getActiveCarerPatientId,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
+import { devWarn } from "@/lib/dev-log";
 import { DevNote } from "@/components/dev/DevNote";
 import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
@@ -1248,7 +1249,7 @@ export default function CarerViewPage() {
           }
         }
         if (rows.length === 0) {
-          console.warn("carer-view: no linked patients");
+          devWarn("carer-view: no linked patients");
           setLinkedPatients([]);
           setActivePatientIdState(null);
           setError("unlinked or load error");

@@ -54,9 +54,9 @@ import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
 
-/** Mobile save bars must sit above `BottomNav` (z-50); `bottom-0` + lower z-index left them untappable behind the tabs. */
+/** Mobile save bars must sit above `BottomNav` (z-[100]); `bottom-0` + lower z-index left them untappable behind the tabs. */
 const SETTINGS_MOBILE_STICKY_FOOTER =
-  "md:hidden fixed left-0 right-0 z-[60] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
+  "md:hidden fixed left-0 right-0 z-[110] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
 
 function ProfileTab({
   bgUnits,

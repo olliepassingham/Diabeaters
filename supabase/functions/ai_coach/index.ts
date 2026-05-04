@@ -9,11 +9,15 @@
  * @see docs/regulatory/ai_coach_system_prompt.md
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { packContext, type LastFortnightInput } from "../_shared/ai-coach/contextPacker.ts";
+import { packContext } from "../_shared/ai-coach/contextPacker.ts";
 import { intercept } from "../_shared/ai-coach/interceptor.ts";
 import { callOpenAiChatJson } from "../_shared/ai-coach/llmClient.ts";
 import { applyPostFilter } from "../_shared/ai-coach/postFilter.ts";
 import { deterministicResponse } from "../_shared/ai-coach/responses.ts";
+import {
+  deriveServerAudience,
+  serverPlaceholderLastFortnight,
+} from "../_shared/ai-coach/serverInputs.ts";
 import type {
   AuditCategory,
   CoachAudience,
@@ -200,38 +204,32 @@ function normalizeBgUnits(raw: unknown): string | null {
   return null;
 }
 
-/** Optional client-supplied DOB when the profile row has not synced yet (YYYY-MM-DD only). */
-function normalizeClientDateOfBirth(raw: unknown): string | null {
-  if (typeof raw !== "string") return null;
-  const t = raw.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  return t;
-}
-
-function normalizeLastFortnight(raw: unknown): LastFortnightInput | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const num = (k: string) => {
-    const v = r[k];
-    return typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && /^\d+$/.test(v) ? Number(v) : 0;
-  };
-  const pct = r.estimatedTimeInRangePct;
-  const tir =
-    pct === null || pct === undefined
-      ? null
-      : typeof pct === "number" && Number.isFinite(pct)
-        ? pct
-        : null;
-  return {
-    bgReadings: num("bgReadings"),
-    estimatedTimeInRangePct: tir,
-    hypoCount: num("hypoCount"),
-    severeHypoCount: num("severeHypoCount"),
-    highCount: num("highCount"),
-    exerciseSessions: num("exerciseSessions"),
-    sickDayActive: Boolean(r.sickDayActive),
-    travelModeActive: Boolean(r.travelModeActive),
-  };
+/**
+ * Returns true when the caller has at least one row in `public.carer_links`
+ * where they are the carer (i.e. they support someone). The Edge Function uses
+ * this to derive the trusted audience server-side rather than trusting the
+ * body's `audience` field.
+ */
+async function callerHasCarerLink(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<boolean> {
+  try {
+    const res = await admin
+      .from("carer_links")
+      .select("patient_id")
+      .eq("carer_id", userId)
+      .limit(1)
+      .maybeSingle();
+    if (res.error) {
+      console.warn("[ai_coach] carer_links lookup failed", res.error);
+      return false;
+    }
+    return Boolean(res.data);
+  } catch (e) {
+    console.warn("[ai_coach] carer_links lookup threw", e);
+    return false;
+  }
 }
 
 async function insertAudit(
@@ -304,12 +302,18 @@ Deno.serve(async (req: Request) => {
     const history: CoachTurn[] = Array.isArray(historyRaw)
       ? (historyRaw.filter(isCoachTurn) as CoachTurn[])
       : [];
-    const lf = normalizeLastFortnight(b.lastFortnight);
+    /**
+     * Server hardening (Phase 3): we no longer trust `lastFortnight`,
+     * `dateOfBirth`, or `audience` from the request body. They are either
+     * derived from server-trusted state (profile / carer_links) or replaced
+     * with a zeroed placeholder so the model cannot be steered by client-
+     * supplied "history".
+     */
     const ratiosAreSet = Boolean(b.ratiosAreSet);
     const bgUnitsClient = normalizeBgUnits(b.bgUnits ?? b.bg_units);
-    const audience: CoachAudience = normalizeAudience(b.audience);
+    const requestedAudience: CoachAudience = normalizeAudience(b.audience);
 
-    if (!message || message.length > 8000 || !lf) {
+    if (!message || message.length > 8000) {
       const out: CoachResponse = {
         ...INVALID_BODY_REPLY,
         category: "invalid_request",
@@ -465,12 +469,28 @@ Deno.serve(async (req: Request) => {
     }
 
     const clinical = await loadCoachClinicalExtras(admin, userId);
-    const dobFromClient = normalizeClientDateOfBirth(b.dateOfBirth ?? b.date_of_birth);
-    const dobFromCloud =
+    /**
+     * DOB is *only* read from the authenticated user's `profiles` row. When the
+     * row has no DOB on file, the context packer returns the `unknown` band and
+     * the system prompt treats the user as default-deny under-18 for adult-only
+     * routes (see Phase 2).
+     */
+    const dateOfBirth =
       typeof clinical.date_of_birth === "string" && clinical.date_of_birth.trim().length > 0
         ? clinical.date_of_birth.trim()
         : null;
-    const dateOfBirth = dobFromCloud ?? dobFromClient;
+    /**
+     * Audience is derived from `carer_links`: a caller who has not been linked
+     * as a carer for any patient cannot run as `supporter` even if they ask to.
+     */
+    const hasCarerLink = await callerHasCarerLink(admin, userId);
+    const audience = deriveServerAudience(requestedAudience, hasCarerLink);
+    /**
+     * `lastFortnight` is *not* read from the body. The model sees the zero
+     * placeholder and is instructed (system prompt) to admit when data is
+     * sparse rather than invent patterns.
+     */
+    const lastFortnight = serverPlaceholderLastFortnight();
     const context = packContext({
       profile: {
         dateOfBirth,
@@ -478,7 +498,7 @@ Deno.serve(async (req: Request) => {
         bgUnits: bgUnitsClient,
         diabetesOnsetDate: clinical.diabetes_onset_date,
       },
-      lastFortnight: lf,
+      lastFortnight,
       ratiosAreSet,
     });
 

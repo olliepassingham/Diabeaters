@@ -31,6 +31,16 @@ import {
 } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -113,7 +123,7 @@ async function runHypoTreatmentPipeline(
             eligible === 1 ? "Your supporter has been notified." : "Your supporters have been notified.";
         } else if (eligible > 0 && delivered === 0) {
           description =
-            "Hypo logged. No alerts were delivered — check push API env or in-app supporter user IDs in Family & Supporters.";
+            "Hypo logged. No alerts were delivered — check push API env or in-app supporter user IDs in Family & supporters.";
         }
       }
     }
@@ -286,6 +296,11 @@ function HeroCard({
   const [hypoNotes, setHypoNotes] = useState("");
   const [showHypoHistory, setShowHypoHistory] = useState(false);
   const [hypoHistory, setHypoHistory] = useState<HypoTreatment[]>([]);
+  const [quickHypoConfirmOpen, setQuickHypoConfirmOpen] = useState(false);
+  const bgUnitsLabel: "mmol/L" | "mg/dL" =
+    profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  const glucoseStep = bgUnitsLabel === "mg/dL" ? "1" : "0.1";
+  const glucosePlaceholder = bgUnitsLabel === "mg/dL" ? "e.g., 58" : "e.g., 3.2";
 
   useEffect(() => {
     if (hypoDialogOpen) {
@@ -313,13 +328,18 @@ function HeroCard({
 
   const handleTreatedHypoClick = () => {
     if (storage.getNotificationSettings().hypoDashboardQuickNotify === true) {
-      void runHypoTreatmentPipeline(
-        { glucoseInput: "", treatment: "", notes: "" },
-        { userId: user?.id, toast },
-      );
+      setQuickHypoConfirmOpen(true);
       return;
     }
     setHypoDialogOpen(true);
+  };
+
+  const confirmQuickHypo = () => {
+    setQuickHypoConfirmOpen(false);
+    void runHypoTreatmentPipeline(
+      { glucoseInput: "", treatment: "", notes: "" },
+      { userId: user?.id, toast },
+    );
   };
 
   const greeting = () => {
@@ -413,12 +433,12 @@ function HeroCard({
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label htmlFor="dash-hypo-glucose">Blood Glucose (mmol/L) - optional</Label>
+              <Label htmlFor="dash-hypo-glucose">{`Blood glucose (${bgUnitsLabel}) — optional`}</Label>
               <Input
                 id="dash-hypo-glucose"
                 type="number"
-                step="0.1"
-                placeholder="e.g., 3.2"
+                step={glucoseStep}
+                placeholder={glucosePlaceholder}
                 value={hypoGlucose}
                 onChange={(e) => setHypoGlucose(e.target.value)}
                 data-testid="input-dashboard-hypo-glucose"
@@ -487,7 +507,7 @@ function HeroCard({
                           <div className="flex items-center gap-2 flex-wrap">
                             {entry.treatment && <Badge variant="secondary" className="text-xs">{entry.treatment}</Badge>}
                             {entry.glucoseLevel !== undefined && (
-                              <span className="text-xs text-muted-foreground">{entry.glucoseLevel} mmol/L</span>
+                              <span className="text-xs text-muted-foreground">{entry.glucoseLevel} {bgUnitsLabel}</span>
                             )}
                           </div>
                           {entry.notes && <p className="text-xs text-muted-foreground mt-1 truncate">{entry.notes}</p>}
@@ -508,6 +528,28 @@ function HeroCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={quickHypoConfirmOpen} onOpenChange={setQuickHypoConfirmOpen}>
+        <AlertDialogContent data-testid="dialog-quick-hypo-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log treated hypo and tell supporters?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This logs a hypo treatment now and notifies any linked supporters. You can turn off
+              quick-notify in Settings → Notifications if you would rather add details first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-quick-hypo-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
+              onClick={confirmQuickHypo}
+              data-testid="button-quick-hypo-confirm"
+            >
+              Log + tell supporters
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -37,36 +37,50 @@ export function ageInWholeYearsUtc(
   return age;
 }
 
-export type UserAgeBand = "child" | "teen" | "adult";
+/**
+ * `unknown` is returned when DOB is not on file. Adult-only routes (alcohol,
+ * driving) and minor-aware tools (hypo calculator) treat `unknown` the same as
+ * `under-18` so we never expose adult content to a child whose DOB has not been
+ * captured.
+ */
+export type UserAgeBand = "child" | "teen" | "adult" | "unknown";
 
-/** `null` when DOB is unknown — callers should keep adult-default UI. */
-export function getAgeBand(dateOfBirth: string | null | undefined, now?: Date): UserAgeBand | null {
+export function getAgeBand(dateOfBirth: string | null | undefined, now?: Date): UserAgeBand {
   const age = ageInWholeYearsUtc(dateOfBirth, now ?? new Date());
-  if (age == null) return null;
+  if (age == null) return "unknown";
   if (age < 13) return "child";
   if (age < 18) return "teen";
   return "adult";
 }
 
-/** When DOB is unknown, allow (same as server coach context). */
+/** True only when we know the user is 18+. Unknown DOB → false (default-deny). */
 export function canShowAlcoholScenarios(dateOfBirth: string | null | undefined, now?: Date): boolean {
   const age = ageInWholeYearsUtc(dateOfBirth, now ?? new Date());
-  if (age == null) return true;
+  if (age == null) return false;
   return age >= 18;
 }
 
-/** UK learner car age 17; unknown DOB → allow. */
+/** UK learner car age 17. Unknown DOB → false (default-deny). */
 export function canShowDrivingReadiness(dateOfBirth: string | null | undefined, now?: Date): boolean {
   const age = ageInWholeYearsUtc(dateOfBirth, now ?? new Date());
-  if (age == null) return true;
+  if (age == null) return false;
   return age >= 17;
 }
 
-/** Under-18 with known age must not use an assumed adult weight in hypo math. */
+/**
+ * Hypo dose helpers must not assume an adult weight when the user is a known
+ * minor or when DOB is missing. Either case requires an explicit weight input.
+ */
 export function hypoCalculatorRequiresExplicitWeight(
   dateOfBirth: string | null | undefined,
   now?: Date,
 ): boolean {
   const age = ageInWholeYearsUtc(dateOfBirth, now ?? new Date());
-  return age != null && age < 18;
+  if (age == null) return true;
+  return age < 18;
+}
+
+/** True when the profile has no usable date of birth on file. */
+export function isDateOfBirthUnknown(dateOfBirth: string | null | undefined): boolean {
+  return ageInWholeYearsUtc(dateOfBirth) == null;
 }

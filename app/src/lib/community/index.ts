@@ -11,7 +11,10 @@ export {
   DEFAULT_COMMUNITY_TOPIC,
   communityTopicLabel,
   isCommunityTopicId,
+  orderedCommunityTopicsForViewer,
   type CommunityTopicId,
+  type OrderedTopicsInput,
+  type CommunityTopicRow,
 } from "./topics";
 export {
   COMMUNITY_CONTENT_NOTE_IDS,

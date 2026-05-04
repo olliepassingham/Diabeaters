@@ -7,6 +7,32 @@ import { storage } from "@/lib/storage";
 let initialised = false;
 
 const PUSH_DIAG_KEY = "diabeaters:push_diag:v1";
+/** Persists the most recent native push token so logout can DELETE it from `push_tokens`. */
+const PUSH_TOKEN_LAST_KEY = "diabeaters:push_token:last:v1";
+
+function rememberPushToken(token: string) {
+  try {
+    localStorage.setItem(PUSH_TOKEN_LAST_KEY, token);
+  } catch {
+    // ignore
+  }
+}
+
+function readRememberedPushToken(): string | null {
+  try {
+    return localStorage.getItem(PUSH_TOKEN_LAST_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function forgetPushToken() {
+  try {
+    localStorage.removeItem(PUSH_TOKEN_LAST_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 function writePushDiag(patch: Record<string, unknown>) {
   try {
@@ -84,6 +110,8 @@ export async function ensureIosPushRegistered(): Promise<void> {
     });
     if (!t) return;
 
+    rememberPushToken(t);
+
     const { data: sess } = await supabase.auth.getSession();
     const uid = sess.session?.user?.id;
     if (!uid) return;
@@ -118,4 +146,54 @@ export async function ensureIosPushRegistered(): Promise<void> {
   writePushDiag({ state: "permission_granted" });
   await PushNotifications.register();
   writePushDiag({ state: "register_called" });
+}
+
+/**
+ * Removes this device's push token from `public.push_tokens` (own-row DELETE
+ * via RLS) and resets the in-process listener state so the next sign-in starts
+ * clean. Safe to call from anywhere — every step is best-effort and silent on
+ * failure so logout is never blocked.
+ */
+export async function cleanupPushRegistration(): Promise<void> {
+  const supabase = getSupabase();
+  const token = readRememberedPushToken();
+
+  if (supabase && token) {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (uid) {
+        const { error } = await supabase
+          .from("push_tokens")
+          .delete()
+          .eq("user_id", uid)
+          .eq("token", token);
+        writePushDiag({
+          state: error ? "token_delete_failed" : "token_deleted",
+          deleteError: error?.message ?? null,
+        });
+        if (import.meta.env.DEV && error) {
+          console.warn("[push_tokens] delete failed:", error.message);
+        }
+      }
+    } catch (e) {
+      writePushDiag({
+        state: "token_delete_threw",
+        deleteError: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  forgetPushToken();
+
+  if (Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios") {
+    try {
+      await PushNotifications.removeAllListeners();
+    } catch {
+      // ignore
+    }
+  }
+
+  initialised = false;
+  writePushDiag({ state: "cleaned_up" });
 }

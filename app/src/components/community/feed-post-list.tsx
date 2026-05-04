@@ -48,6 +48,7 @@ import {
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
+  type CommunityTopicRow,
   type FeedCursor,
 } from "@/lib/community";
 import { getProfilesByIds } from "@/lib/profile";
@@ -88,10 +89,13 @@ export function FeedPostList(props: {
   emptyStateDescription?: string;
   className?: string;
   showRefreshButton?: boolean;
+  /** Topic dropdown order (edit post); defaults to canonical list. */
+  topicsForSelect?: readonly CommunityTopicRow[];
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
   const { fetchPage } = props;
+  const topicsForSelect = props.topicsForSelect ?? COMMUNITY_TOPICS;
 
   const [posts, setPosts] = useState<CommunityPostRow[]>([]);
   const postsRef = useRef(posts);
@@ -595,7 +599,7 @@ export function FeedPostList(props: {
                   <SelectValue placeholder="Choose a topic" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMMUNITY_TOPICS.map((t) => (
+                  {topicsForSelect.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
                       {t.label}
                     </SelectItem>

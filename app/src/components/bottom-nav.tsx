@@ -235,7 +235,7 @@ export function BottomNav() {
   return (
     <nav
       ref={navRef}
-      className="surface-chrome fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-50 grid place-items-center border-t border-border/35 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_-12px_hsl(260_28%_38%_/_0.14)] dark:shadow-[0_-10px_36px_-12px_hsl(0_0%_0%_/_0.42)]"
+      className="bottom-nav-vt surface-chrome fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-[100] grid place-items-center border-t border-border/35 px-1 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_32px_-12px_hsl(260_28%_38%_/_0.14)] dark:shadow-[0_-10px_36px_-12px_hsl(0_0%_0%_/_0.42)]"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       data-testid="nav-bottom"
     >
@@ -254,6 +254,7 @@ export function BottomNav() {
           <motion.a
             key={tab.testId}
             href={tab.href}
+            aria-current={active ? "page" : undefined}
             whileTap={{ scale: 0.94 }}
             transition={{ type: "spring", stiffness: 520, damping: 28 }}
             className={`flex min-h-11 w-full min-w-0 max-w-[6.5rem] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-2 no-underline transition-colors duration-150 ease-out ${

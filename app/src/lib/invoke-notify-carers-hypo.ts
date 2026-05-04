@@ -6,6 +6,7 @@ import {
   getBearerAuthHeadersForEdgeFunctions,
   invokeEdgeFunctionPost,
 } from "@/lib/edge-function-invoke-auth";
+import { devWarn } from "./dev-log";
 import { getSupabase, getSupabaseUrlAndAnonKey } from "./supabase";
 import type { NotifyCarersOnHypoResult } from "./carer-notify-types";
 
@@ -32,7 +33,7 @@ export async function invokeNotifyCarersOnHypo(params: {
   );
 
   if (error) {
-    console.warn("[invokeNotifyCarersOnHypo]", error.message);
+    devWarn("[invokeNotifyCarersOnHypo]", error.message);
     return { success: false, error: "invoke_failed", detail: error.message };
   }
 

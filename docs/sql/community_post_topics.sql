@@ -16,7 +16,9 @@ ALTER TABLE public.community_posts ADD CONSTRAINT community_posts_topic_check CH
     'food-eating-out',
     'mental-health',
     'tips-what-worked',
-    'general-questions'
+    'general-questions',
+    'school-college-life',
+    'family-supporters'
   )
 );
 

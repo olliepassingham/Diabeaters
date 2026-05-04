@@ -1,6 +1,6 @@
 import type { ChangeEvent, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -14,8 +14,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { peekDiabeatersBackup, storage, type ImportBackupMode } from "@/lib/storage";
+import {
+  ALL_BACKUP_SCOPES,
+  backupDeclaredScopesMismatchFile,
+  backupScopeDescription,
+  backupScopeLabel,
+  DEFAULT_EXPORT_SCOPES,
+  peekDiabeatersBackup,
+  storage,
+  type BackupScope,
+  type ImportBackupMode,
+} from "@/lib/storage";
 import { Link } from "wouter";
 import { Phone, ChevronRight, Upload, Download, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -144,7 +155,7 @@ export function SettingsEmergencySection({
         Used for <Link href="/help-now" className="text-primary underline-offset-2 hover:underline">Help now</Link>
         . Linked supporters only see this if you allow it under{" "}
         <Link href="/family-carers" className="text-primary underline-offset-2 hover:underline">
-          Family &amp; Supporters
+          Family &amp; supporters
         </Link>
         .
       </p>
@@ -156,7 +167,7 @@ export function SettingsEmergencySection({
         <Link href="/account#account-emergency" className="text-primary underline-offset-2 hover:underline">
           Account
         </Link>
-        . Supporters see it only if you enable it under Family &amp; Supporters.
+        . Supporters see it only if you enable it under Family &amp; supporters.
       </p>
     );
 
@@ -203,20 +214,55 @@ function formatBackupInstant(iso: string | null): string {
   }
 }
 
+function toggleScope(set: Set<BackupScope>, scope: BackupScope, checked: boolean): BackupScope[] {
+  const next = new Set(set);
+  if (checked) next.add(scope);
+  else next.delete(scope);
+  return ALL_BACKUP_SCOPES.filter((s) => next.has(s));
+}
+
 export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [pendingJson, setPendingJson] = useState<string | null>(null);
   const [restoreMode, setRestoreMode] = useState<ImportBackupMode>("merge");
+  const [exportScopes, setExportScopes] = useState<Set<BackupScope>>(
+    () => new Set<BackupScope>(DEFAULT_EXPORT_SCOPES),
+  );
+  const [restoreImportScopes, setRestoreImportScopes] = useState<Set<BackupScope>>(
+    () => new Set<BackupScope>(ALL_BACKUP_SCOPES),
+  );
+
+  const restoreScopeTamper = useMemo(() => {
+    if (!pendingJson) return false;
+    const p = peekDiabeatersBackup(pendingJson);
+    if (!p.ok) return false;
+    try {
+      const rec = JSON.parse(pendingJson) as Record<string, unknown>;
+      return backupDeclaredScopesMismatchFile(p.declaredScopes, rec);
+    } catch {
+      return false;
+    }
+  }, [pendingJson]);
 
   const resetRestoreFlow = () => {
     setPendingJson(null);
     setRestoreMode("merge");
+    setRestoreImportScopes(new Set(ALL_BACKUP_SCOPES));
     setRestoreOpen(false);
   };
 
-  const handleExport = () => {
-    const data = storage.exportAllData();
+  const runExportDownload = () => {
+    const scopes = ALL_BACKUP_SCOPES.filter((s) => exportScopes.has(s));
+    if (scopes.length === 0) {
+      toast({
+        title: "Choose at least one category",
+        description: "Select what to include before downloading.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const data = storage.exportAllData({ scopes });
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -248,6 +294,11 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
       }
       setPendingJson(content);
       setRestoreMode("merge");
+      if (peek.detectedScopes.length > 0) {
+        setRestoreImportScopes(new Set(peek.detectedScopes));
+      } else {
+        setRestoreImportScopes(new Set(ALL_BACKUP_SCOPES));
+      }
       setRestoreOpen(true);
       event.target.value = "";
     };
@@ -256,10 +307,26 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
 
   const runRestore = () => {
     if (!pendingJson) return;
-    const result = storage.importAllData(pendingJson, { mode: restoreMode });
+    const scopes = ALL_BACKUP_SCOPES.filter((s) => restoreImportScopes.has(s));
+    if (scopes.length === 0) {
+      toast({
+        title: "Choose at least one category",
+        description: "Select which parts of the backup to apply.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const result = storage.importAllData(pendingJson, { mode: restoreMode, importScopes: scopes });
     if (result.success) {
       resetRestoreFlow();
-      toast({ title: "Data restored", description: "The page will refresh in a moment." });
+      const skipped = result.skippedOutOfScopeKeys ?? 0;
+      toast({
+        title: "Data restored",
+        description:
+          skipped > 0
+            ? `The page will refresh in a moment. (${skipped} section${skipped === 1 ? "" : "s"} in the file were skipped because you didn’t select them.)`
+            : "The page will refresh in a moment.",
+      });
       setTimeout(() => window.location.reload(), 1500);
     } else {
       toast({
@@ -312,6 +379,33 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
             />
           </div>
 
+          <div className="mt-4 space-y-2.5 rounded-xl border border-border/50 bg-background/40 p-3 dark:bg-background/20">
+            <p className="text-xs font-medium text-foreground">Include in export</p>
+            <div className="grid gap-2.5">
+              {ALL_BACKUP_SCOPES.map((scope) => (
+                <div key={scope} className="flex items-start gap-2.5">
+                  <Checkbox
+                    id={`export-scope-${scope}`}
+                    checked={exportScopes.has(scope)}
+                    onCheckedChange={(c) =>
+                      setExportScopes(new Set(toggleScope(exportScopes, scope, c === true)))
+                    }
+                    className="mt-0.5"
+                    aria-describedby={`export-scope-desc-${scope}`}
+                  />
+                  <div className="min-w-0 space-y-0.5">
+                    <Label htmlFor={`export-scope-${scope}`} className="cursor-pointer text-xs font-medium leading-snug">
+                      {backupScopeLabel(scope)}
+                    </Label>
+                    <p id={`export-scope-desc-${scope}`} className="text-[11px] leading-snug text-muted-foreground">
+                      {backupScopeDescription(scope)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <input
             type="file"
             accept=".json,application/json"
@@ -325,7 +419,7 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
               type="button"
               variant="secondary"
               className="h-auto min-h-11 flex-col gap-1 rounded-xl border border-border/50 bg-background/80 px-2 py-2.5 text-xs font-medium shadow-sm hover:bg-background sm:flex-row sm:gap-2 sm:py-2"
-              onClick={handleExport}
+              onClick={runExportDownload}
               data-testid="button-export-data"
               aria-label="Download backup as JSON file"
             >
@@ -373,6 +467,52 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
                       . It contains <span className="text-foreground">{peekOk.keysRestored}</span> data sections we
                       recognise.
                     </p>
+                    <p>
+                      Categories detected in this file:{" "}
+                      <span className="text-foreground">
+                        {peekOk.detectedScopes.map(backupScopeLabel).join(", ") || "—"}
+                      </span>
+                      {peekOk.declaredScopes ? (
+                        <>
+                          . Declared export:{" "}
+                          <span className="text-foreground">{peekOk.declaredScopes.map(backupScopeLabel).join(", ")}</span>
+                        </>
+                      ) : null}
+                      .
+                    </p>
+                    {restoreScopeTamper ? (
+                      <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-950 dark:text-amber-100">
+                        The file lists a narrow export scope but includes extra sections. Treat this file with care — it
+                        may have been edited.
+                      </p>
+                    ) : null}
+                    <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                      <p className="font-medium text-foreground">Restore categories</p>
+                      <p className="text-xs text-muted-foreground">
+                        Uncheck anything you don’t want from this file. Other data on this device stays as-is (unless you
+                        choose replace below).
+                      </p>
+                      <div className="grid gap-2 pt-1">
+                        {ALL_BACKUP_SCOPES.map((scope) => (
+                          <div key={scope} className="flex items-start gap-2">
+                            <Checkbox
+                              id={`restore-scope-${scope}`}
+                              checked={restoreImportScopes.has(scope)}
+                              onCheckedChange={(c) =>
+                                setRestoreImportScopes(new Set(toggleScope(restoreImportScopes, scope, c === true)))
+                              }
+                              className="mt-0.5"
+                            />
+                            <Label
+                              htmlFor={`restore-scope-${scope}`}
+                              className="cursor-pointer text-xs font-normal leading-snug"
+                            >
+                              {backupScopeLabel(scope)}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
                       <p className="font-medium text-foreground">How should we apply it?</p>
                       <RadioGroup
@@ -391,9 +531,9 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
                         <div className="flex items-start gap-2">
                           <RadioGroupItem value="replace" id="restore-replace" className="mt-0.5" />
                           <Label htmlFor="restore-replace" className="cursor-pointer font-normal leading-snug">
-                            <span className="text-foreground font-medium">Replace then restore</span> — clear all
-                            Diabeaters data stored in this browser for backed-up sections, then import the file. Use only
-                            if you trust this file as a full snapshot (your sign-in is unchanged).
+                            <span className="text-foreground font-medium">Replace then restore</span> — clear local data
+                            for the categories you selected above, then import those categories from the file. Use only if
+                            you trust this file (your sign-in is unchanged).
                           </Label>
                         </div>
                       </RadioGroup>

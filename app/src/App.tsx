@@ -33,21 +33,21 @@ import { isUserVerified, logout } from "@/lib/auth";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
-import Login from "@/pages/login";
-import Signup from "@/pages/signup";
-import AuthCallback from "@/pages/auth-callback";
-import ResetRequest from "@/pages/reset-request";
-import ResetPassword from "@/pages/reset-password";
-import CheckEmail from "@/pages/check-email";
-import Dashboard from "@/pages/dashboard";
-import VerifiedSuccess from "@/pages/verified-success";
-import Welcome from "@/pages/welcome";
-import VerifiedReturn from "@/pages/verified-return";
-import FamilyCarers from "@/pages/family-carers";
-import CarerView from "@/pages/carer-view";
-import CarerSetup from "@/pages/carer-setup";
-import ModeChooser from "@/pages/mode";
-import NotificationsPage from "@/pages/notifications";
+const Login = lazy(() => import("@/pages/login"));
+const Signup = lazy(() => import("@/pages/signup"));
+const AuthCallback = lazy(() => import("@/pages/auth-callback"));
+const ResetRequest = lazy(() => import("@/pages/reset-request"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
+const CheckEmail = lazy(() => import("@/pages/check-email"));
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const VerifiedSuccess = lazy(() => import("@/pages/verified-success"));
+const Welcome = lazy(() => import("@/pages/welcome"));
+const VerifiedReturn = lazy(() => import("@/pages/verified-return"));
+const FamilyCarers = lazy(() => import("@/pages/family-carers"));
+const CarerView = lazy(() => import("@/pages/carer-view"));
+const CarerSetup = lazy(() => import("@/pages/carer-setup"));
+const ModeChooser = lazy(() => import("@/pages/mode"));
+const NotificationsPage = lazy(() => import("@/pages/notifications"));
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
 import {
@@ -501,7 +501,11 @@ function FamilyCarersGate() {
     );
   }
   if (isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
-  return <FamilyCarers />;
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <FamilyCarers />
+    </Suspense>
+  );
 }
 
 /**
@@ -512,9 +516,21 @@ function FamilyCarersGate() {
 function InnerRouter() {
   return (
     <Switch>
-      <Route path="/mode" component={ModeChooser} />
-      <Route path="/carer-view/:section" component={CarerView} />
-      <Route path="/carer-view" component={CarerView} />
+      <Route path="/mode">
+        <Suspense fallback={<RouteFallback />}>
+          <ModeChooser />
+        </Suspense>
+      </Route>
+      <Route path="/carer-view/:section">
+        <Suspense fallback={<RouteFallback />}>
+          <CarerView />
+        </Suspense>
+      </Route>
+      <Route path="/carer-view">
+        <Suspense fallback={<RouteFallback />}>
+          <CarerView />
+        </Suspense>
+      </Route>
       <Route path="/supporter-profile">
         <Redirect to="/account" replace />
       </Route>
@@ -524,7 +540,11 @@ function InnerRouter() {
         </Suspense>
       </Route>
       <Route path="/family-carers" component={FamilyCarersGate} />
-      <Route path="/notifications" component={NotificationsPage} />
+      <Route path="/notifications">
+        <Suspense fallback={<RouteFallback />}>
+          <NotificationsPage />
+        </Suspense>
+      </Route>
       <Route path="/community/messages/:threadId">
         <PatientRouteGuard>
           <CommunityFeatureGate>
@@ -595,7 +615,9 @@ function InnerRouter() {
       </Route>
       <Route path="/">
         <PatientRouteGuard>
-          <Dashboard />
+          <Suspense fallback={<RouteFallback />}>
+            <Dashboard />
+          </Suspense>
         </PatientRouteGuard>
       </Route>
       <Route path="/supplies">
@@ -719,7 +741,11 @@ function InnerRouter() {
           </Suspense>
         </PatientRouteGuard>
       </Route>
-      <Route path="/verified-success" component={VerifiedSuccess} />
+      <Route path="/verified-success">
+        <Suspense fallback={<RouteFallback />}>
+          <VerifiedSuccess />
+        </Suspense>
+      </Route>
       <Route path="/appointments">
         <PatientRouteGuard>
           <Suspense fallback={<RouteFallback />}>
@@ -896,7 +922,6 @@ function UnverifiedAccountShell({
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
-      <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
@@ -1045,7 +1070,6 @@ function AuthenticatedShell() {
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
-      <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
@@ -1098,28 +1122,88 @@ function AuthenticatedShell() {
 }
 
 /**
- * Top-level shell (auth, public pages). Catch-all path="*" → ProtectedLayout + app chrome.
- * `/account` is handled inside AuthenticatedShell (InnerRouter) so bottom-tab switches do not remount a second shell.
+ * Top-level shell (auth, public pages). The catch-all branches by auth state:
+ * signed-in users land in the protected app shell; signed-out users see the
+ * public `NotFound` page directly rather than being silently redirected to
+ * `/login`. Legitimate authenticated routes (`/`, `/dashboard`, `/tools`, …)
+ * still resolve through `InnerRouter` once the protected layout mounts.
  */
+function RootCatchAll() {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="animate-pulse text-muted-foreground">Checking session…</div>
+      </div>
+    );
+  }
+  if (!user) {
+    return <NotFound />;
+  }
+  return (
+    <ProtectedLayout>
+      <AuthenticatedShell />
+    </ProtectedLayout>
+  );
+}
+
 function MainRouter() {
   return (
     <Switch>
-      <Route path="/welcome" component={Welcome} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
-      <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/auth/email-verify" component={AuthCallback} />
-      <Route path="/verified-return" component={VerifiedReturn} />
-      <Route path="/reset-request" component={ResetRequest} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/check-email" component={CheckEmail} />
-      <Route path="/carer-setup" component={CarerSetup} />
+      <Route path="/welcome">
+        <Suspense fallback={<RouteFallback />}>
+          <Welcome />
+        </Suspense>
+      </Route>
+      <Route path="/login">
+        <Suspense fallback={<RouteFallback />}>
+          <Login />
+        </Suspense>
+      </Route>
+      <Route path="/signup">
+        <Suspense fallback={<RouteFallback />}>
+          <Signup />
+        </Suspense>
+      </Route>
+      <Route path="/auth/callback">
+        <Suspense fallback={<RouteFallback />}>
+          <AuthCallback />
+        </Suspense>
+      </Route>
+      <Route path="/auth/email-verify">
+        <Suspense fallback={<RouteFallback />}>
+          <AuthCallback />
+        </Suspense>
+      </Route>
+      <Route path="/verified-return">
+        <Suspense fallback={<RouteFallback />}>
+          <VerifiedReturn />
+        </Suspense>
+      </Route>
+      <Route path="/reset-request">
+        <Suspense fallback={<RouteFallback />}>
+          <ResetRequest />
+        </Suspense>
+      </Route>
+      <Route path="/reset-password">
+        <Suspense fallback={<RouteFallback />}>
+          <ResetPassword />
+        </Suspense>
+      </Route>
+      <Route path="/check-email">
+        <Suspense fallback={<RouteFallback />}>
+          <CheckEmail />
+        </Suspense>
+      </Route>
+      <Route path="/carer-setup">
+        <Suspense fallback={<RouteFallback />}>
+          <CarerSetup />
+        </Suspense>
+      </Route>
       <Route path="/privacy" component={Privacy} />
       <Route path="/support" component={Support} />
       <Route path="*">
-        <ProtectedLayout>
-          <AuthenticatedShell />
-        </ProtectedLayout>
+        <RootCatchAll />
       </Route>
     </Switch>
   );
@@ -1294,6 +1378,15 @@ export default function App() {
           <ThemeProvider>
             <AuthProvider>
               <EmergencyProfileProvider>
+                {/*
+                 * Mount once at the very top so the iOS keyboard helper covers
+                 * public auth pages (`/login`, `/signup`, `/reset-request`,
+                 * `/reset-password`, `/check-email`, `/welcome`) as well as the
+                 * authenticated shells. Previously this was only inside the
+                 * authed shells, which meant signup / login forms did not lift
+                 * above the on-screen keyboard on iOS.
+                 */}
+                <KeyboardInsets />
                 {import.meta.env.DEV ? <DevSupabaseDiagnostics /> : null}
                 <AppContent />
               </EmergencyProfileProvider>
