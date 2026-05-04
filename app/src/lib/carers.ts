@@ -847,7 +847,7 @@ async function fetchSickDayScenarioStateForCarer(
     return {
       prev: null,
       error: new Error(
-        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+        "No sick day record yet — ask them to open Sick day once while signed in so data can sync.",
       ),
     };
   }
@@ -890,7 +890,7 @@ export async function carerAppendSickDayTemperature(
   if (!row) {
     return {
       error: new Error(
-        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+        "No sick day record yet — ask them to open Sick day once while signed in so data can sync.",
       ),
     };
   }
@@ -943,7 +943,7 @@ export async function carerAppendSickDayMedNote(
   if (!row) {
     return {
       error: new Error(
-        "No sick day record yet — ask them to open Sick Day once while signed in so data can sync.",
+        "No sick day record yet — ask them to open Sick day once while signed in so data can sync.",
       ),
     };
   }

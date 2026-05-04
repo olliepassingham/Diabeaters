@@ -7,7 +7,7 @@ import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-r
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage } from "@/lib/storage";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
 
 type ScenarioCardDef = {
   href: string;
@@ -32,7 +32,7 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
   {
     href: "/scenarios/sick-day",
     icon: Thermometer,
-    title: "Sick Day",
+    title: "Sick day",
     description: "Track symptoms, ketones, and when to escalate.",
   },
   {
@@ -127,8 +127,8 @@ export default function Scenarios() {
             <InfoSection title="Bedtime Check">
               <p>A calm evening check to help you feel confident going to sleep.</p>
             </InfoSection>
-            <InfoSection title="Sick Day Mode">
-              <p>When you&apos;re unwell, diabetes management changes. Activate sick day mode for adjusted guidance. Past sick day sessions are listed at the bottom of the Sick Day page.</p>
+            <InfoSection title="Sick day mode">
+              <p>When you&apos;re unwell, diabetes management changes. Activate sick day mode for adjusted guidance. Past sick day sessions are listed at the bottom of the Sick day page.</p>
             </InfoSection>
             <InfoSection title="Travel & pump backup">
               <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
@@ -150,7 +150,9 @@ export default function Scenarios() {
         }
       />
 
-      <div className="mt-2 grid w-full grid-cols-1 gap-6 md:grid-cols-2">
+      <PageSectionLabel>Situation guides</PageSectionLabel>
+
+      <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
         {visibleScenarioCards.map((c, idx) => (
           <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
             <ScenarioCard {...c} />

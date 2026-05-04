@@ -123,7 +123,7 @@ export default function PumpFailurePage() {
   };
 
   return (
-    <PageShell variant="standard" className="space-y-6">
+    <PageShell variant="standard" className="space-y-7">
       <PageHeader
         leading={<PageBackButton />}
         title="Pump or infusion failure"
@@ -141,7 +141,7 @@ export default function PumpFailurePage() {
         </AlertDescription>
       </Alert>
 
-      <Card className="rounded-xl border-border/80">
+      <Card variant="glass">
         <CardHeader>
           <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
             <Clock className="h-5 w-5 text-primary" />
@@ -174,7 +174,7 @@ export default function PumpFailurePage() {
                   End mode
                 </Button>
                 <Button asChild variant="secondary" data-testid="button-pumpfailure-open-sickday">
-                  <Link href="/sick-day">Open Sick Day Mode</Link>
+                  <Link href="/sick-day">Open sick day mode</Link>
                 </Button>
               </div>
               {session ? (
@@ -241,7 +241,7 @@ export default function PumpFailurePage() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-xl border-border/80">
+      <Card variant="glass">
         <CardHeader>
           <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
             <Syringe className="h-6 w-6 text-primary" />

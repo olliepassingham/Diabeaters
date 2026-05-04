@@ -75,7 +75,7 @@ export function ScenarioPastHistoryCard({ kind }: { kind: ScenarioHistoryKind })
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium">{kind === "sick_day" ? "Sick Day" : "Travel"}</span>
+                          <span className="font-medium">{kind === "sick_day" ? "Sick day" : "Travel"}</span>
                           <span className="text-muted-foreground">
                             {formatDate(entry.startDate)}
                             {entry.endDate ? ` — ${formatDate(entry.endDate)}` : ""}

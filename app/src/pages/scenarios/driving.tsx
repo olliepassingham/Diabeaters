@@ -261,7 +261,7 @@ export default function DrivingScenarioPage() {
 
   return (
     <div className="min-h-[50vh]">
-      <PageShell variant="standard" className="space-y-6">
+      <PageShell variant="standard" className="space-y-7">
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}

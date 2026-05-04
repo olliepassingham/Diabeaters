@@ -16,11 +16,12 @@ export default function ScenarioExercisePage() {
   }, []);
 
   return (
-    <PageShell variant="standard" className="space-y-6">
+    <PageShell variant="standard" className="space-y-7">
       <PageHeader
         stackActionsMaxSm
         leading={<PageBackButton />}
         title="Exercise"
+        description="Guided steps for checks, carbs, and bolus timing around your activity."
         actions={
           <>
             <ScenarioCoachLink topic="exercise" />

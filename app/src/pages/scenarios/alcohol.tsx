@@ -343,7 +343,7 @@ export default function AlcoholScenarioPage() {
     <div className="min-h-[50vh]">
       <PageShell
         variant="standard"
-        className={cn("space-y-6", showSticky && "pb-28 sm:pb-6")}
+        className={cn("space-y-7", showSticky && "pb-28 sm:pb-6")}
       >
         <div ref={formTopRef}>
           <PageHeader

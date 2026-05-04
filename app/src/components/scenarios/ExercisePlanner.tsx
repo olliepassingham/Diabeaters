@@ -262,8 +262,8 @@ export function ExercisePlanner() {
 
       if (scenarioState.sickDayActive) {
         toast({
-          title: "Sick Day Mode is active",
-          description: "Exercise may not be recommended when unwell. End Sick Day Mode or follow your care team's guidance.",
+          title: "Sick day mode is active",
+          description: "Exercise may not be recommended when unwell. End sick day mode or follow your care team's guidance.",
           variant: "destructive",
         });
         return;

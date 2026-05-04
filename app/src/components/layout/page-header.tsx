@@ -64,7 +64,7 @@ export function PageHeader({
           ) : null}
         </div>
         {description ? (
-          <div className="text-sm leading-relaxed text-muted-foreground sm:text-body">
+          <div className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-[0.9375rem] sm:leading-relaxed">
             {description}
           </div>
         ) : null}

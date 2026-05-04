@@ -66,7 +66,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { PageBackButton, PageShell } from "@/components/layout";
+import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
@@ -1192,48 +1193,62 @@ export default function Travel() {
     const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
 
     return (
-      <PageShell variant="standard">
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
-          <CardHeader>
-            <div className="flex items-center gap-3 flex-wrap">
-              <PageBackButton />
-              <div className="p-2 rounded-full bg-green-100 dark:bg-green-900">
-                <Plane className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="flex-1">
-                <CardTitle className="text-xl" data-testid="text-travel-dashboard-title">
-                  {hasEnded ? "Trip Complete" : hasStarted ? "Travelling" : "Trip Starting Soon"}
-                </CardTitle>
-                <CardDescription>
-                  {plan.destination} — {plan.duration} days ({plan.travelType})
-                </CardDescription>
-              </div>
-              <Badge variant="secondary" className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Active
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <PageShell variant="standard" className="space-y-7">
+        <PageHeader
+          stackActionsMaxSm
+          leading={<PageBackButton />}
+          title={
+            <span className="inline-flex min-w-0 flex-wrap items-center gap-2.5" data-testid="text-travel-dashboard-title">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+                <Plane className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden />
+              </span>
+              <span className="min-w-0">
+                {hasEnded ? "Trip complete" : hasStarted ? "Travelling" : "Trip starting soon"}
+              </span>
+            </span>
+          }
+          description={
+            <>
+              <span className="font-medium text-foreground">{plan.destination}</span>
               <span className="text-muted-foreground">
-                {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} —{" "}
-                {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
+                {" "}
+                · {plan.duration} day{plan.duration === 1 ? "" : "s"} ({plan.travelType})
               </span>
-              <span className="font-medium" data-testid="text-trip-progress">
-                {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? "s" : ""}`}
-              </span>
-            </div>
-            <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
-            <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-              <span>{daysElapsed} days elapsed</span>
-              <span>{daysRemaining} days remaining</span>
-            </div>
-            <div className="border-t border-green-200/60 pt-3 dark:border-green-800/60">
-              <ScenarioCoachLink topic="travel" />
-            </div>
-          </CardContent>
-        </Card>
+            </>
+          }
+          actions={
+            <Badge variant="secondary" className="shrink-0 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" aria-hidden />
+              Active
+            </Badge>
+          }
+        />
+
+        <ScenarioToolHeroCard
+          className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800"
+          classNames={{ content: "space-y-3" }}
+          body={
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="text-muted-foreground">
+                  {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} —{" "}
+                  {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
+                </span>
+                <span className="font-medium" data-testid="text-trip-progress">
+                  {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+              <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
+              <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                <span>{daysElapsed} days elapsed</span>
+                <span>{daysRemaining} days remaining</span>
+              </div>
+              <div className="border-t border-green-200/60 pt-3 dark:border-green-800/60">
+                <ScenarioCoachLink topic="travel" />
+              </div>
+            </>
+          }
+        />
 
         <TravelDisclaimerCard />
 
@@ -1253,7 +1268,7 @@ export default function Travel() {
                       <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">Sick Day Mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
+                      <p className="text-sm font-medium">Sick day mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
                       </p>
@@ -1261,7 +1276,7 @@ export default function Travel() {
                         <Link href="/scenarios/sick-day">
                           <Button variant="outline" size="sm" className="min-h-11" data-testid="button-view-sick-day-from-travel">
                             <Thermometer className="h-3 w-3 mr-1" />
-                            View Sick Day Dashboard
+                            View sick day dashboard
                           </Button>
                         </Link>
                       </div>
@@ -1505,24 +1520,19 @@ export default function Travel() {
 
   if (step === "entry") {
     return (
-      <PageShell variant="standard">
-        <div className="flex items-start gap-3 mb-4">
-          <PageBackButton />
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <Plane className="h-5 w-5 shrink-0 text-purple-600 dark:text-purple-400" />
-              <h1 className="text-xl font-semibold tracking-tight">Travel</h1>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Build a packing list from your supplies, or track holiday prep before you go.
-            </p>
+      <PageShell variant="standard" className="space-y-7">
+        <PageHeader
+          leading={<PageBackButton />}
+          title="Travel"
+          description="Build a packing list from your supplies, or track holiday prep before you go."
+          actions={
             <div data-testid="link-travel-entry-coach-wrap">
               <ScenarioCoachLink topic="travel" />
             </div>
-          </div>
-        </div>
+          }
+        />
 
-        <Card data-testid="card-travel-entry-hub">
+        <Card variant="glass" data-testid="card-travel-entry-hub">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Get started</CardTitle>
             <CardDescription>
@@ -1918,7 +1928,7 @@ export default function Travel() {
 
   if (step === "inputs") {
     return (
-      <PageShell variant="standard">
+      <PageShell variant="standard" className="space-y-7">
         <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -2229,7 +2239,7 @@ export default function Travel() {
   const checkedCount = packingList.filter(i => i.checked).length;
 
   return (
-    <PageShell variant="standard">
+    <PageShell variant="standard" className="space-y-7">
       <div className="flex items-start gap-2 border-b border-border/60 pb-3 mb-3">
         <div className="flex shrink-0 items-center gap-1">
           <PageBackButton />

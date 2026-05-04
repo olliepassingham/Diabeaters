@@ -710,7 +710,7 @@ function SickDaySupporterCareCard(props: {
           Sick day — temperatures & medication notes
         </CardTitle>
         <CardDescription>
-          Shared from their app when Sick Day mode is on. You can add readings and notes here; they sync to their
+          Shared from their app when sick day mode is on. You can add readings and notes here; they sync to their
           scenario for both of you.
         </CardDescription>
         <Alert className="mt-3 border-border/60 bg-muted/30 py-3">

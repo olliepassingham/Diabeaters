@@ -49,7 +49,7 @@ export function SickDayBanner() {
     setScenarioState({ ...scenarioState, sickDayActive: false });
     void syncSickDayDeactivatedToCloud({ startedAt });
     toast({
-      title: "Sick Day Mode Deactivated",
+      title: "Sick day mode deactivated",
       description: "Glad you're feeling better!",
     });
   };
@@ -77,7 +77,7 @@ export function SickDayBanner() {
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <Thermometer className="h-4 w-4 flex-shrink-0" />
         <span className="text-[13px] font-medium truncate">
-          Sick Day Mode Active
+          Sick day mode active
           <span className="hidden sm:inline"> — {scenarioState.sickDaySeverity || "moderate"} severity</span>
         </span>
       </div>

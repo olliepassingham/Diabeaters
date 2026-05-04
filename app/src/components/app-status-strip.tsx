@@ -232,7 +232,7 @@ export function AppStatusStrip() {
       // ignore
     }
     void syncSickDayDeactivatedToCloud({ startedAt });
-    toast({ title: "Sick Day Mode Deactivated", description: "Glad you're feeling better!" });
+    toast({ title: "Sick day mode deactivated", description: "Glad you're feeling better!" });
   };
 
   const handleEndTravel = () => {
@@ -448,7 +448,7 @@ export function AppStatusStrip() {
         <div className={rowClass}>
           <Badge className={cn("chip border", sickTone)} variant="secondary">
             <Thermometer className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Sick Day{sc.sickDaySeverity ? ` · ${sc.sickDaySeverity}` : ""}
+            Sick day{sc.sickDaySeverity ? ` · ${sc.sickDaySeverity}` : ""}
           </Badge>
           <div className="flex items-center gap-2">
             <Link href="/scenarios/sick-day#sickday-checklist">

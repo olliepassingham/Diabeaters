@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
@@ -713,7 +714,7 @@ export default function Bedtime() {
   };
 
   return (
-    <PageShell variant="standard" className="space-y-6">
+    <PageShell variant="standard" className="space-y-7">
       <PageHeader
         leading={<PageBackButton />}
         title="Bedtime"
@@ -726,7 +727,7 @@ export default function Bedtime() {
             <Link href="/scenarios?tab=sick-day">
               <Badge variant="secondary" className="cursor-pointer" data-testid="badge-sick-day-active">
                 <Thermometer className="h-3 w-3 mr-1" />
-                Sick Day Active ({scenarioState.sickDaySeverity || "moderate"})
+                Sick day active ({scenarioState.sickDaySeverity || "moderate"})
               </Badge>
             </Link>
           )}
@@ -742,43 +743,51 @@ export default function Bedtime() {
       )}
 
       {result && (
-        <Card className={`${getLevelColors(result.level).bg} ${getLevelColors(result.level).border} border shadow-sm`} data-testid="card-bedtime-result-hero">
-          <CardContent className="p-5 md:p-6 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3 min-w-0">
-                <div className="mt-0.5">
-                  {result.level === "steady" ? (
-                    <CheckCircle2 className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                  ) : result.level === "monitor" ? (
-                    <AlertCircle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                  ) : (
-                    <AlertTriangle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className={`text-xl font-semibold ${getLevelColors(result.level).title}`} data-testid="text-bedtime-verdict">
-                      {verdictLabel(result.level)}
-                    </h2>
-                    <Badge variant="secondary" className="text-xs">
-                      {result.title}
-                    </Badge>
+        <ScenarioToolHeroCard
+          data-testid="card-bedtime-result-hero"
+          className={`${getLevelColors(result.level).bg} ${getLevelColors(result.level).border} border shadow-sm`}
+          classNames={{ content: "space-y-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6" }}
+          body={
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="mt-0.5">
+                    {result.level === "steady" ? (
+                      <CheckCircle2 className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                    ) : result.level === "monitor" ? (
+                      <AlertCircle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                    ) : (
+                      <AlertTriangle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{result.message}</p>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2
+                        className={`font-display text-xl font-semibold tracking-tight ${getLevelColors(result.level).title}`}
+                        data-testid="text-bedtime-verdict"
+                      >
+                        {verdictLabel(result.level)}
+                      </h2>
+                      <Badge variant="secondary" className="text-xs">
+                        {result.title}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {result.snack && (
-              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                <p className="text-sm">
-                  <span className="font-medium">Snack idea:</span> {result.snack.grams}g fast carbs{" "}
-                  <span className="text-muted-foreground">({result.snack.reason})</span>
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {result.snack && (
+                <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
+                  <p className="text-sm">
+                    <span className="font-medium">Snack idea:</span> {result.snack.grams}g fast carbs{" "}
+                    <span className="text-muted-foreground">({result.snack.reason})</span>
+                  </p>
+                </div>
+              )}
+            </>
+          }
+        />
       )}
 
       {result ? (

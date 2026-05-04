@@ -57,7 +57,7 @@ import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
@@ -355,7 +355,8 @@ function HeroCard({
   return (
     <>
       <Card
-        className="dashboard-card-hover animate-soft-in overflow-hidden border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card to-card shadow-sm ring-1 ring-border/30 hover:shadow-md dark:from-primary/[0.12] dark:via-card dark:to-card dark:ring-border/40"
+        variant="glass-strong"
+        className="dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 hover:shadow-lg hover:ring-primary/10 dark:border-primary/18 dark:from-primary/[0.09] dark:via-transparent dark:to-transparent dark:ring-border/35"
         data-testid="card-hero"
       >
         <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
@@ -363,7 +364,7 @@ function HeroCard({
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <span
-                  className="font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+                  className="font-display text-lg font-semibold tracking-tight text-foreground text-balance sm:text-xl"
                   data-testid="text-greeting"
                 >
                   {greeting()}
@@ -386,7 +387,7 @@ function HeroCard({
               </div>
             </div>
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+              <p className="min-w-0 flex-1 truncate text-sm leading-relaxed text-muted-foreground">
                 Here&apos;s your diabetes today
               </p>
               <div className="shrink-0" data-testid="wrap-dashboard-status-pill">
@@ -651,7 +652,7 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-600" />
-            <h3 className="font-semibold">Complete Your Setup</h3>
+            <h3 className="font-display text-h3 font-semibold tracking-tight">Complete Your Setup</h3>
           </div>
           <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
             {completion.completed}/{completion.total}
@@ -886,7 +887,8 @@ export default function Dashboard() {
         isSettingsComplete={isSettingsComplete}
       />
 
-      <section className="animate-stagger pt-2" data-testid="dashboard-widgets">
+      <section className="animate-stagger space-y-4 pt-2" data-testid="dashboard-widgets">
+        {widgetsToRender.length > 0 ? <PageSectionLabel>Your widgets</PageSectionLabel> : null}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
@@ -905,7 +907,7 @@ export default function Dashboard() {
       </section>
 
       {widgetsToRender.length === 0 && isSettingsComplete && (
-        <Card className="animate-fade-in border-border/70 shadow-sm">
+        <Card variant="glass-muted" className="animate-fade-in border border-border/50 shadow-sm">
           <CardContent className="py-8 text-center md:py-10">
             <p className="mb-4 text-sm text-muted-foreground max-w-sm mx-auto">
               No widgets on your dashboard yet. Use the layout button above or tap below to pick what you want to see.

@@ -715,7 +715,7 @@ function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; s
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            <CardTitle className="text-base">Sick Day Impact</CardTitle>
+            <CardTitle className="text-base">Sick day impact</CardTitle>
           </div>
           <Badge variant="secondary">
             {severity} severity
@@ -782,7 +782,7 @@ function SickDayImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; s
 
         <Link href="/scenarios?tab=sick-day">
           <Button variant="outline" size="sm" className="w-full" data-testid="button-view-sick-day">
-            View Sick Day Guidance
+            View sick day guidance
             <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         </Link>
@@ -2534,8 +2534,8 @@ export default function Supplies() {
             <InfoSection title="Prescription Cycle">
               <p>Set up your repeat prescription schedule to get reminders when it's time to reorder. The app will also warn you if any supply might run out before your next collection.</p>
             </InfoSection>
-            <InfoSection title="Travel & Sick Day Impact">
-              <p>When Travel Mode or Sick Day Mode is active, you'll see how your supply levels are affected — including extra supplies needed for travel and adjusted depletion forecasts when unwell.</p>
+            <InfoSection title="Travel & sick day impact">
+              <p>When travel mode or sick day mode is active, you&apos;ll see how your supply levels are affected — including extra supplies needed for travel and adjusted depletion forecasts when unwell.</p>
             </InfoSection>
           </PageInfoDialog>
         }

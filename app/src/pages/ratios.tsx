@@ -84,7 +84,7 @@ function getActiveAdjustments(scenarioState: ScenarioState): ScenarioAdjustment[
       desc = "Moderate illness — insulin resistance usually increases. You may need somewhat more insulin per gram of carb.";
     }
     adjustments.push({
-      label: `Sick Day (${severity})`,
+      label: `Sick day (${severity})`,
       description: desc,
       factor,
       icon: Pill,

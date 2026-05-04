@@ -412,11 +412,11 @@ export default function Adviser() {
           <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
             <span className="text-sm text-amber-800 dark:text-amber-200">
-              Sick Day Mode is active. Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
+              Sick day mode is active. Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
             </span>
             <Link href="/scenarios/sick-day">
               <Badge variant="outline" className="cursor-pointer text-amber-700 dark:text-amber-300 border-amber-400" data-testid="link-sick-day-scenarios">
-                Sick Day Settings
+                Sick day settings
               </Badge>
             </Link>
           </AlertDescription>
@@ -720,7 +720,7 @@ export default function Adviser() {
               <div className="flex items-start gap-2">
                 <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Sick Day Note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick Day tool has adjusted ratios for you.
+                  <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
                 </p>
               </div>
             </div>
