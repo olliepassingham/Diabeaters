@@ -32,6 +32,7 @@ import { ensureIosPushRegistered, resetIosPushRegistrationState } from "@/lib/pu
 import { Link, useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioForStorage, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
@@ -123,9 +124,30 @@ function ProfileTab({
         </p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="settings-dob">
+        <FieldLabelWithInfo
+          htmlFor="settings-dob"
+          info={
+            <div className="space-y-2">
+              <p>
+                Format: YYYY-MM-DD. We use this only to calculate age on this device for age-matched education (for
+                example hypo and correction tools, and which scenarios appear). It syncs with your profile when you are
+                signed in.
+              </p>
+              <p>
+                It is not used for advertising. You can clear this field anytime if you prefer not to keep it here.
+              </p>
+              <p>
+                How we handle personal data is summarised on our{" "}
+                <Link href="/privacy" className="text-primary underline-offset-2 hover:underline">
+                  Privacy
+                </Link>{" "}
+                page.
+              </p>
+            </div>
+          }
+        >
           Date of birth <span className="text-muted-foreground font-normal">(optional)</span>
-        </Label>
+        </FieldLabelWithInfo>
         <Input
           id="settings-dob"
           type="date"
@@ -133,7 +155,6 @@ function ProfileTab({
           onChange={(e) => setDateOfBirth(e.target.value)}
           data-testid="input-settings-dob"
         />
-        <p className="text-xs text-muted-foreground">YYYY-MM-DD. Used for age-appropriate guidance; syncs when signed in.</p>
       </div>
       <div className="hidden justify-end pt-1 md:flex">
         <Button onClick={onSave} data-testid="button-save-profile">
@@ -606,7 +627,6 @@ export default function Settings() {
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
     pushNotifications: true,
-    helpfulCheckInsEnabled: false,
     supplyAlerts: true,
     criticalThresholdDays: 3,
     lowThresholdDays: 7,

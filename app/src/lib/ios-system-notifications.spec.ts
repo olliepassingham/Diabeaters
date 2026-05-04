@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const cancelMock = vi.fn(() => Promise.resolve());
 const scheduleMock = vi.fn(() => Promise.resolve());
 
 vi.mock("@capacitor/core", () => ({
@@ -14,7 +13,6 @@ vi.mock("@capacitor/local-notifications", () => ({
   LocalNotifications: {
     checkPermissions: vi.fn(() => Promise.resolve({ display: "granted" })),
     requestPermissions: vi.fn(() => Promise.resolve({ display: "granted" })),
-    cancel: cancelMock,
     schedule: scheduleMock,
   },
 }));
@@ -23,25 +21,22 @@ vi.mock("@/lib/storage", () => ({
   storage: {
     getNotificationSettings: vi.fn(() => ({
       enabled: true,
-      helpfulCheckInsEnabled: true,
     })),
   },
 }));
 
-describe("ios-system-notifications helpful check-in", () => {
+describe("ios-system-notifications showIosSystemNotificationNow", () => {
   afterEach(() => {
-    cancelMock.mockClear();
     scheduleMock.mockClear();
   });
 
-  it("scheduleHelpfulCheckIn cancels then schedules when opted in", async () => {
-    const { scheduleHelpfulCheckIn, HELPFUL_CHECKIN_NOTIFICATION_ID } = await import("./ios-system-notifications");
-    const when = new Date(Date.now() + 120_000);
-    const res = await scheduleHelpfulCheckIn(when);
-    expect(res.scheduled).toBe(true);
-    expect(cancelMock).toHaveBeenCalledWith({
-      notifications: [{ id: HELPFUL_CHECKIN_NOTIFICATION_ID }],
-    });
-    expect(scheduleMock).toHaveBeenCalled();
+  it("schedules an immediate local notification when notifications are enabled", async () => {
+    const { showIosSystemNotificationNow } = await import("./ios-system-notifications");
+    const res = await showIosSystemNotificationNow({ title: "Test", body: "Hello", tag: "unit-test" });
+    expect(res.shown).toBe(true);
+    expect(scheduleMock).toHaveBeenCalledTimes(1);
+    const arg = scheduleMock.mock.calls[0]![0] as { notifications: Array<{ title: string; body: string }> };
+    expect(arg.notifications[0]?.title).toBe("Test");
+    expect(arg.notifications[0]?.body).toBe("Hello");
   });
 });

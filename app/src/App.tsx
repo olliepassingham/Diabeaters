@@ -66,7 +66,6 @@ import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync"
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
-import { HelpfulCheckInScheduler } from "@/components/helpful-check-in-scheduler";
 import { getProfile } from "@/lib/profile";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -953,6 +952,14 @@ function AuthenticatedShell() {
   }, []);
 
   useEffect(() => {
+    if (isCarerMode) return;
+    if (!Capacitor.isNativePlatform?.() || Capacitor.getPlatform?.() !== "ios") return;
+    void import("@/lib/ios-system-notifications").then((m) => {
+      void m.cancelLegacyHelpfulCheckInNotification();
+    });
+  }, [isCarerMode]);
+
+  useEffect(() => {
     if (!hasCarerLink) return;
     if (activeMode != null) return;
     if (pathOnly === "/mode") return;
@@ -1041,7 +1048,6 @@ function AuthenticatedShell() {
       <KeyboardInsets />
       {!isCarerMode ? <SickDayMedDuePoller /> : null}
       {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
-      {!isCarerMode ? <HelpfulCheckInScheduler /> : null}
       {!isCarerMode ? <AlcoholReminderPoller /> : null}
       {!isCarerMode ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />

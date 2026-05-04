@@ -27,6 +27,7 @@ import { FaceLogo } from "@/components/face-logo";
 import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
@@ -810,6 +811,7 @@ function EssentialsStep({
   pathCare?: CareContext | null;
 }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+  const isParentForOther = pathCare === "mostly_them";
 
   return (
     <div className="space-y-6">
@@ -817,8 +819,8 @@ function EssentialsStep({
         <h2 className="text-2xl font-bold">A few essentials</h2>
         <p className="text-muted-foreground">
           {supporterHeavy
-            ? "A few basics so dose planning and forecasts make sense — you can refine this later."
-            : "Just the basics so we can personalise your experience"}
+            ? "A few basics so dose planning and forecasts line up with real life — you can fine-tune everything later."
+            : "A few details so tips and safety checks can match how you live with diabetes. Nothing here is set in stone — you can change it all later."}
         </p>
       </div>
 
@@ -857,9 +859,55 @@ function EssentialsStep({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="ob-dob" className="text-sm font-medium">
-              Date of birth <span className="text-muted-foreground font-normal">(optional)</span>
-            </Label>
+            <FieldLabelWithInfo
+              htmlFor="ob-dob"
+              className="[&_label]:text-sm [&_label]:font-medium"
+              info={
+                <div className="space-y-2">
+                  {isParentForOther ? (
+                    <>
+                      <p>
+                        We only use this to estimate their age on this device so education and calculators can stay
+                        appropriate for a child or teenager (for example hypo help and which scenarios appear). It is not
+                        sold and it is not used for advertising.
+                      </p>
+                      <p>
+                        It stays with this signed-in account and you can edit or clear it anytime in Settings. If you
+                        skip it, some tools stay generic.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        We only use this to work out your age here so guidance can stay age-appropriate (for example hypo
+                        tools and which scenarios you see). It is not sold and it is not used for advertising.
+                      </p>
+                      <p>
+                        It stays with your signed-in account and you can edit or clear it whenever you like in Settings.
+                        If you skip it, a few features stay generic instead of tailored.
+                      </p>
+                    </>
+                  )}
+                  <p>
+                    More detail:{" "}
+                    <Link href="/privacy" className="text-primary underline-offset-2 hover:underline">
+                      Privacy
+                    </Link>
+                    .
+                  </p>
+                </div>
+              }
+            >
+              {isParentForOther ? (
+                <>
+                  Their date of birth <span className="text-muted-foreground font-normal">(optional)</span>
+                </>
+              ) : (
+                <>
+                  Date of birth <span className="text-muted-foreground font-normal">(optional)</span>
+                </>
+              )}
+            </FieldLabelWithInfo>
             <Input
               id="ob-dob"
               type="date"
@@ -867,10 +915,6 @@ function EssentialsStep({
               onChange={(e) => updateData("dateOfBirth", e.target.value)}
               data-testid="input-onboarding-dob"
             />
-            <p className="text-xs text-muted-foreground">
-              Lets the app tailor guidance (for example tools aimed at adults). You can add or change this later in
-              Settings.
-            </p>
           </div>
 
           <div className="space-y-3">

@@ -14,32 +14,18 @@ import {
   ChevronRight,
   MessageCircle,
   Users,
-  GraduationCap,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
-import { CURATED_RESOURCES, type CuratedResource } from "@/lib/curated-resources.ts";
-import { openExternalUrl } from "@/lib/open-external-url";
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
-import { storage } from "@/lib/storage";
-import { ageInWholeYearsUtc } from "@/lib/user-age";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -115,19 +101,6 @@ const PATIENT_TOOLS: ToolDef[] = [
   },
 ];
 
-function schoolEmergencyTileForPatientHub(): ToolDef | null {
-  const dob = storage.getProfile()?.dateOfBirth;
-  const age = ageInWholeYearsUtc(dob);
-  if (age == null || age >= 18) return null;
-  return {
-    id: "school-hypo-plan",
-    href: "/emergency-card",
-    icon: GraduationCap,
-    title: "School & hypo plan",
-    description: "Keep your kit list and what to tell school or college on your Emergency Card.",
-  };
-}
-
 function patientToolsForHub(): ToolDef[] {
   const coach: ToolDef | undefined = isAiCoachEnabled
     ? {
@@ -139,12 +112,7 @@ function patientToolsForHub(): ToolDef[] {
           `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.`,
       }
     : undefined;
-  const core = coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
-  const school = schoolEmergencyTileForPatientHub();
-  if (!school) return core;
-  const hypoIdx = core.findIndex((t) => t.id === "hypo-help");
-  if (hypoIdx < 0) return [school, ...core];
-  return [...core.slice(0, hypoIdx + 1), school, ...core.slice(hypoIdx + 1)];
+  return coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
 }
 
 export const CARER_TOOLS: ToolDef[] = [
@@ -270,9 +238,6 @@ function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" }) {
           <InfoSection title="Supporter tools">
             <p>General education and hypo guidance. Always follow the care team’s plan for the person you support.</p>
           </InfoSection>
-          <InfoSection title="News & resources">
-            <p>Curated updates and trusted reading — preview here, then open the official site.</p>
-          </InfoSection>
         </>
       ) : (
         <>
@@ -285,60 +250,9 @@ function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" }) {
           <InfoSection title="Learn">
             <p>Clear explanations you can come back to anytime.</p>
           </InfoSection>
-          <InfoSection title="News & resources">
-            <p>Curated updates and trusted reading — preview here, then open the official site.</p>
-          </InfoSection>
         </>
       )}
     </PageInfoDialog>
-  );
-}
-
-function ResourcePreviewDialog({
-  resource,
-  open,
-  onOpenChange,
-}: {
-  resource: CuratedResource | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {resource ? (
-        <DialogContent className="max-h-[min(90vh,36rem)] overflow-y-auto sm:max-w-lg" data-testid="resource-preview-dialog">
-          <DialogHeader>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{resource.source}</p>
-            <DialogTitle className="text-left text-base leading-snug sm:text-lg">{resource.title}</DialogTitle>
-            {resource.tag ? (
-              <span className="inline-flex w-fit rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                {resource.tag}
-              </span>
-            ) : null}
-            <DialogDescription className="text-left text-sm text-muted-foreground">{resource.dateLabel}</DialogDescription>
-          </DialogHeader>
-          <p className="text-sm leading-relaxed text-foreground">{resource.description}</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Opens the official site in your browser. You can return to Diabeaters anytime.
-          </p>
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                openExternalUrl(resource.href);
-                onOpenChange(false);
-              }}
-              data-testid="resource-open-external"
-            >
-              Open on {resource.source}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
-    </Dialog>
   );
 }
 
@@ -349,7 +263,6 @@ export function ToolsHubPage({
   tools?: ToolDef[];
   hubVariant?: "patient" | "carer";
 }) {
-  const [previewResource, setPreviewResource] = useState<CuratedResource | null>(null);
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
   useEffect(() => {
@@ -365,19 +278,10 @@ export function ToolsHubPage({
   // "Act now" is a fixed id list; `ai-coach` is prepended by `patientToolsForHub()` /
   // `carerToolsForHub()` when the feature is on. It must be included here — otherwise the tile
   // exists in `tools` but never renders.
-  const patientActNowBase: readonly string[] =
+  const patientActNowIds: readonly string[] =
     byId.has("ai-coach")
       ? ["ai-coach", "insulin-calculator", "hypo-help", "correction-helper"]
       : ["insulin-calculator", "hypo-help", "correction-helper"];
-  const patientActNowIds: readonly string[] = byId.has("school-hypo-plan")
-    ? (() => {
-        const ids = [...patientActNowBase];
-        const hi = ids.indexOf("hypo-help");
-        if (hi >= 0) ids.splice(hi + 1, 0, "school-hypo-plan");
-        else ids.push("school-hypo-plan");
-        return ids;
-      })()
-    : patientActNowBase;
 
   const actNowIds: readonly string[] =
     hubVariant === "carer"
@@ -482,61 +386,6 @@ export function ToolsHubPage({
           ) : null}
         </>
       )}
-
-      {CURATED_RESOURCES.length > 0 && (
-        <section className="space-y-4" aria-label="News and resources" data-testid="tools-section-resources">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title="News & resources" />
-          </div>
-
-          <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2" aria-label="News & resources">
-            {CURATED_RESOURCES.slice(0, 6).map((r, idx) => (
-              <li
-                key={r.id}
-                className="min-h-0 animate-soft-in motion-safe:[animation-duration:0.2s]"
-                style={{ animationDelay: tileEnterDelay(idx, 10, 50) }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setPreviewResource(r)}
-                  className="group block h-full w-full rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  aria-label={`Preview ${r.title} (${r.source})`}
-                  data-testid={`resource-${r.id}`}
-                >
-                  <Card
-                    variant="glass"
-                    className="pressable card-interactive flex h-full min-h-[9.5rem] flex-col gap-2 rounded-2xl"
-                  >
-                    <CardContent className="flex h-full flex-col gap-2 p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{r.source}</p>
-                          <h3 className="mt-1 text-sm font-semibold text-foreground leading-snug">{r.title}</h3>
-                        </div>
-                        {r.tag ? <span className="chip chip-muted shrink-0">{r.tag}</span> : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">{r.description}</p>
-                      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-                        <p className="text-xs text-muted-foreground">{r.dateLabel}</p>
-                        <span className="text-xs font-medium text-primary">Preview</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <ResourcePreviewDialog
-        resource={previewResource}
-        open={previewResource != null}
-        onOpenChange={(o) => {
-          if (!o) setPreviewResource(null);
-        }}
-      />
     </PageShell>
   );
 }

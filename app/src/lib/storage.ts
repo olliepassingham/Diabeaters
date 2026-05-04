@@ -5,6 +5,7 @@ import {
   travelWeatherSupplyShortfallMultiplier,
   tripCalendarDaysBetween,
 } from "./travel-supply-policy";
+import appPkg from "../../package.json";
 
 const STORAGE_KEYS = {
   PROFILE: "diabeater_profile",
@@ -734,11 +735,6 @@ export interface NotificationSettings {
   enabled: boolean;
   /** iOS push notifications (Capacitor). */
   pushNotifications: boolean;
-  /**
-   * Optional once-a-day style local reminder (iOS) that the app is available for questions.
-   * Default off — user must opt in.
-   */
-  helpfulCheckInsEnabled?: boolean;
   supplyAlerts: boolean;
   criticalThresholdDays: number;
   lowThresholdDays: number;
@@ -1098,6 +1094,71 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
   if (session.alcoholTonight != null) ctx.alcoholTonight = session.alcoholTonight;
   return Object.keys(ctx).length > 0 ? ctx : undefined;
+}
+
+export type DiabeatersBackupPeek =
+  | {
+      ok: true;
+      exportedAt: string | null;
+      backupFormatVersion: string | null;
+      appVersion: string | null;
+      keysRestored: number;
+    }
+  | { ok: false; error: string };
+
+export type ImportBackupMode = "merge" | "replace";
+
+/** Read a JSON export before applying it — avoids wiping data with random files. */
+export function peekDiabeatersBackup(jsonString: string): DiabeatersBackupPeek {
+  try {
+    const data = JSON.parse(jsonString) as unknown;
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return { ok: false, error: "This file is not valid JSON or is not a Diabeaters backup." };
+    }
+    const rec = data as Record<string, unknown>;
+    const logicalKeys = Object.keys(STORAGE_KEYS) as Array<keyof typeof STORAGE_KEYS>;
+    let keysRestored = 0;
+    for (const k of logicalKeys) {
+      if (rec[k] !== undefined) keysRestored += 1;
+    }
+    if (keysRestored === 0) {
+      return { ok: false, error: "This file does not contain any Diabeaters data we recognise." };
+    }
+    const hasExportMarker =
+      typeof rec._exportedAt === "string" || typeof rec._version === "string" || typeof rec._appVersion === "string";
+    const hasStrongSection = rec.PROFILE !== undefined || rec.SETTINGS !== undefined;
+    if (!hasExportMarker && keysRestored < 2 && !hasStrongSection) {
+      return {
+        ok: false,
+        error:
+          "This file does not look like a Diabeaters backup (missing export date and too few known sections). Use a file from Download backup here, or check the file is not corrupted.",
+      };
+    }
+    const exportedAt = typeof rec._exportedAt === "string" ? rec._exportedAt : null;
+    const backupFormatVersion = typeof rec._version === "string" ? rec._version : null;
+    const appVersion = typeof rec._appVersion === "string" ? rec._appVersion : null;
+    return { ok: true, exportedAt, backupFormatVersion, appVersion, keysRestored };
+  } catch {
+    return {
+      ok: false,
+      error: "Could not read this file. Choose a .json file created with Download backup in Settings.",
+    };
+  }
+}
+
+function clearBackedUpDiabeatersStorage(): void {
+  for (const logicalKey of Object.keys(STORAGE_KEYS) as Array<keyof typeof STORAGE_KEYS>) {
+    try {
+      if (logicalKey === "APPOINTMENTS") {
+        const apptKey = getAppointmentsStorageKey();
+        if (apptKey) localStorage.removeItem(apptKey);
+        continue;
+      }
+      localStorage.removeItem(STORAGE_KEYS[logicalKey]);
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export const storage = {
@@ -2937,7 +2998,6 @@ export const storage = {
     const defaults: NotificationSettings = {
       enabled: true,
       pushNotifications: true,
-      helpfulCheckInsEnabled: false,
       supplyAlerts: true,
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
@@ -2950,7 +3010,8 @@ export const storage = {
     };
     const data = localStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
     if (!data) return defaults;
-    const parsed = JSON.parse(data) as Partial<NotificationSettings>;
+    const parsed = JSON.parse(data) as Partial<NotificationSettings> & Record<string, unknown>;
+    if ("helpfulCheckInsEnabled" in parsed) delete parsed.helpfulCheckInsEnabled;
     return {
       ...defaults,
       ...parsed,
@@ -2958,7 +3019,6 @@ export const storage = {
       hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify !== false,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
       communityDmAlerts: parsed.communityDmAlerts !== false,
-      helpfulCheckInsEnabled: parsed.helpfulCheckInsEnabled === true,
     };
   },
 
@@ -3892,6 +3952,7 @@ export const storage = {
     }
     data._exportedAt = new Date().toISOString();
     data._version = "1.0";
+    data._appVersion = typeof appPkg?.version === "string" ? appPkg.version : null;
     localStorage.setItem(STORAGE_KEYS.LAST_BACKUP_DATE, new Date().toISOString());
     localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED);
     localStorage.removeItem(STORAGE_KEYS.BACKUP_REMINDER_DISMISSED + "_at");
@@ -4178,11 +4239,24 @@ export const storage = {
     this.addRatioHistoryEntry(entry);
   },
 
-  importAllData(jsonString: string): { success: boolean; error?: string } {
+  importAllData(
+    jsonString: string,
+    options?: { mode?: ImportBackupMode },
+  ): { success: boolean; error?: string } {
     try {
-      const data = JSON.parse(jsonString);
+      const peek = peekDiabeatersBackup(jsonString);
+      if (!peek.ok) {
+        return { success: false, error: peek.error };
+      }
+
+      const data = JSON.parse(jsonString) as Record<string, unknown>;
       if (!data || typeof data !== "object") {
         return { success: false, error: "Invalid data format" };
+      }
+
+      const mode = options?.mode ?? "merge";
+      if (mode === "replace") {
+        clearBackedUpDiabeatersStorage();
       }
 
       for (const [key, storageKey] of Object.entries(STORAGE_KEYS)) {
