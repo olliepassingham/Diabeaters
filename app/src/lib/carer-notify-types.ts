@@ -46,6 +46,8 @@ export type InAppNotificationRow = {
   data: InAppNotificationPayload;
   created_at: string;
   read: boolean;
+  /** Server-set idempotency key for some kinds (e.g. supplies_low); omitted on older rows. */
+  dedupe_key?: string | null;
 };
 
 /** Alias matching product language (“in-app notification”). */

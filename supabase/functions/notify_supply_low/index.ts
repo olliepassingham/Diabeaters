@@ -39,6 +39,23 @@ function prefsAllowSupply(prefs: unknown): { enabled: boolean; inapp: boolean; p
   };
 }
 
+/** UTC YYYY-MM-DD for daily idempotency buckets. */
+function utcDateKey(d = new Date()): string {
+  return d.toISOString().slice(0, 10);
+}
+
+/** One in-app row per recipient per patient supply threshold per UTC day. */
+function supplyLowDedupeKey(patientUserId: string, supplyId: string, level: "low" | "critical"): string {
+  return `supplies_low:${patientUserId}:${supplyId}:${level}:${utcDateKey()}`;
+}
+
+function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  const code = String(err.code ?? "");
+  const msg = (err.message ?? "").toLowerCase();
+  return code === "23505" || msg.includes("duplicate key") || msg.includes("unique constraint");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -135,6 +152,8 @@ Deno.serve(async (req: Request) => {
     const title =
       level === "critical" ? "Supplies critical" : "Supplies running low";
 
+    const dedupeKey = supplyLowDedupeKey(callerId, supplyId, level);
+
     let inappDelivered = 0;
     let pushDelivered = 0;
 
@@ -157,19 +176,33 @@ Deno.serve(async (req: Request) => {
         deep_link: isPatient ? "/supplies" : "/carer-view",
       };
 
+      let inappInsertedFresh = false;
+
       if (prefs.inapp) {
         const { error: insErr } = await admin.from("notifications").insert({
           user_id: rid,
           title,
           body: bodyText,
           data,
+          dedupe_key: dedupeKey,
           read: false,
         });
-        if (!insErr) inappDelivered += 1;
-        else console.error("[notify_supply_low] notification insert", insErr);
+        if (!insErr) {
+          inappDelivered += 1;
+          inappInsertedFresh = true;
+        } else if (isUniqueViolation(insErr)) {
+          /* duplicate same-day notify — expected when multiple clients poll */
+        } else {
+          console.error("[notify_supply_low] notification insert", insErr);
+        }
       }
 
-      if (prefs.push && iosPushDeliveryConfigured()) {
+      const shouldSendPush =
+        prefs.push &&
+        iosPushDeliveryConfigured() &&
+        (inappInsertedFresh || !prefs.inapp);
+
+      if (shouldSendPush) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
           .select("token")

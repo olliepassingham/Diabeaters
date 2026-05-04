@@ -17,7 +17,7 @@ import {
   parsePostExtra,
   type CommunityPostKind,
 } from "./post-kinds";
-import type { CommunityPostCommentRow, CommunityPostRow } from "./types";
+import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
   DEFAULT_COMMUNITY_TOPIC,
   isCommunityTopicId,
@@ -167,6 +167,38 @@ function mergeLikedIntoPosts(posts: CommunityPostRow[], likedIds: Set<string>): 
   return posts.map((p) => ({ ...p, liked_by_me: likedIds.has(p.id) }));
 }
 
+async function attachAuthorPreviews(posts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
+  const ids = [...new Set(posts.map((p) => p.author_id).filter(Boolean))];
+  if (ids.length === 0) return posts;
+  const map = await getProfilesByIds(ids);
+  return posts.map((p) => {
+    const prof = map.get(p.author_id);
+    if (!prof) return { ...p, author_preview: undefined };
+    const author_preview: CommunityPostAuthorPreview = {
+      full_name: prof.full_name?.trim() ?? null,
+      avatar_url: prof.avatar_url ?? null,
+      public_handle: prof.public_handle?.trim() ?? null,
+    };
+    return { ...p, author_preview };
+  });
+}
+
+/** Merge like flags + author profile snippets in parallel (was sequential: likes then client-only profiles). */
+async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
+  if (withCounts.length === 0) return withCounts;
+  const postIds = withCounts.map((p) => p.id);
+  const [liked, withAuthors] = await Promise.all([
+    fetchMyLikesForPostIds(postIds),
+    attachAuthorPreviews(withCounts),
+  ]);
+  return mergeLikedIntoPosts(withAuthors, liked);
+}
+
+async function finalizeSinglePostRow(row: CommunityPostRow): Promise<CommunityPostRow> {
+  const out = await finalizePostRowsForFeed([row]);
+  return out[0]!;
+}
+
 export async function togglePostLike(
   postId: string,
   currentlyLiked: boolean,
@@ -292,11 +324,8 @@ export async function fetchCommunityPostsPage(
       })()
     : posts;
 
-  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
-  return {
-    data: mergeLikedIntoPosts(withCounts, liked),
-    error: null,
-  };
+  const dataOut = await finalizePostRowsForFeed(withCounts);
+  return { data: dataOut, error: null };
 }
 
 /** Posts from people you follow plus your own (RLS still applies for blocks). */
@@ -341,11 +370,8 @@ export async function fetchCommunityPostsFromFollowingPage(
       })()
     : posts;
 
-  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
-  return {
-    data: mergeLikedIntoPosts(withCounts, liked),
-    error: null,
-  };
+  const dataOut = await finalizePostRowsForFeed(withCounts);
+  return { data: dataOut, error: null };
 }
 
 /** Posts for a specific author (RLS applies for blocks). */
@@ -383,11 +409,8 @@ export async function fetchCommunityPostsByAuthorPage(
       })()
     : posts;
 
-  const liked = await fetchMyLikesForPostIds(withCounts.map((p: CommunityPostRow) => p.id));
-  return {
-    data: mergeLikedIntoPosts(withCounts, liked),
-    error: null,
-  };
+  const dataOut = await finalizePostRowsForFeed(withCounts);
+  return { data: dataOut, error: null };
 }
 
 export type FeedPostMentions = {
@@ -500,7 +523,7 @@ export async function insertFeedPost(
           if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
         });
     }
-    return { data: out, error: null };
+    return { data: await finalizeSinglePostRow(out), error: null };
   }
 
   if (input.kind === "event") {
@@ -541,7 +564,7 @@ export async function insertFeedPost(
           if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
         });
     }
-    return { data: out, error: null };
+    return { data: await finalizeSinglePostRow(out), error: null };
   }
 
   const trimmed = input.body.trim();
@@ -581,7 +604,7 @@ export async function insertFeedPost(
           if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
         });
     }
-    return { data: out, error: null };
+    return { data: await finalizeSinglePostRow(out), error: null };
   }
 
   const pendingId = crypto.randomUUID();
@@ -659,7 +682,7 @@ export async function insertFeedPost(
           if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
         });
     }
-    return { data: out, error: null };
+    return { data: await finalizeSinglePostRow(out), error: null };
   } catch (e) {
     if (postId) {
       await supabase.from("community_posts").delete().eq("id", postId);
@@ -774,8 +797,8 @@ export async function fetchCommunityPostById(postId: string): Promise<{
       })()
     : row;
 
-  const liked = await fetchMyLikesForPostIds([row.id]);
-  return { data: mergeLikedIntoPosts([withCount], liked)[0]!, error: null };
+  const finalized = await finalizePostRowsForFeed([withCount]);
+  return { data: finalized[0] ?? null, error: null };
 }
 
 /** Remove post row and storage objects for the author. */

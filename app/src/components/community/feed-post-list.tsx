@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
@@ -44,6 +44,7 @@ import {
   submitContentReport,
   togglePostLike,
   updateCommunityPost,
+  type CommunityPostAuthorPreview,
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
@@ -52,6 +53,24 @@ import {
 import { getProfilesByIds } from "@/lib/profile";
 
 type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null; loading?: boolean };
+
+function authorMetaFromPostPreview(post: CommunityPostRow): AuthorMeta | null {
+  const prev = post.author_preview;
+  if (!prev) return null;
+  return authorMetaFromPreviewFields(post.author_id, prev);
+}
+
+function authorMetaFromPreviewFields(authorId: string, prev: CommunityPostAuthorPreview): AuthorMeta {
+  const name =
+    prev.full_name?.trim() ||
+    (prev.public_handle ? `@${prev.public_handle}` : "") ||
+    shortId(authorId);
+  return {
+    name,
+    avatar_url: prev.avatar_url,
+    public_handle: prev.public_handle,
+  };
+}
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -199,6 +218,31 @@ export function FeedPostList(props: {
     return () => obs.disconnect();
   }, [hasMore, loadMore, loading, posts.length]);
 
+  /** Seed author rows from post payload so names/avatar paths paint with the feed (not after a second fetch). */
+  useLayoutEffect(() => {
+    setAuthorMeta((old) => {
+      let touched = false;
+      const next = { ...old };
+      for (const p of posts) {
+        const seeded = authorMetaFromPostPreview(p);
+        if (!seeded) continue;
+        const cur = next[p.author_id];
+        if (
+          cur &&
+          !cur.loading &&
+          cur.name === seeded.name &&
+          cur.avatar_url === seeded.avatar_url &&
+          cur.public_handle === seeded.public_handle
+        ) {
+          continue;
+        }
+        next[p.author_id] = seeded;
+        touched = true;
+      }
+      return touched ? next : old;
+    });
+  }, [posts]);
+
   useEffect(() => {
     const ids = new Set<string>();
     for (const p of posts) ids.add(p.author_id);
@@ -219,11 +263,14 @@ export function FeedPostList(props: {
       const next: Record<string, AuthorMeta> = {};
       for (const id of list) {
         const prof = map.get(id);
-        next[id] = {
-          name: prof?.full_name?.trim() || shortId(id),
-          avatar_url: prof?.avatar_url ?? null,
-          public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
-        };
+        const postPreview = postsRef.current.find((p) => p.author_id === id)?.author_preview;
+        next[id] = postPreview
+          ? authorMetaFromPreviewFields(id, postPreview)
+          : {
+              name: prof?.full_name?.trim() || shortId(id),
+              avatar_url: prof?.avatar_url ?? null,
+              public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
+            };
       }
       setAuthorMeta(next);
       setAuthorMetaPending(false);

@@ -1,5 +1,6 @@
 export type {
   CommunityPostRow,
+  CommunityPostAuthorPreview,
   CommunityPostCommentRow,
   DmThreadRow,
   DmThreadMemberRow,

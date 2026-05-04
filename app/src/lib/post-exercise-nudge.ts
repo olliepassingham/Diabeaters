@@ -161,3 +161,87 @@ export function getMdiBedtimePostExerciseLine(tier: PostExerciseLoadTier): strin
   }
   return "Be cautious stacking meal and correction doses after exercise — keep fast carbs nearby for a possible delayed low.";
 }
+
+/** Profile insulin mode for post-exercise tips (status strip / banners). */
+export type InsulinDeliveryForTips = "pump" | "pen" | "unknown";
+
+export function insulinDeliveryForPostExerciseTips(
+  profile: { insulinDeliveryMethod?: string } | null | undefined,
+): InsulinDeliveryForTips {
+  const m = String(profile?.insulinDeliveryMethod ?? "").toLowerCase();
+  if (m === "pump") return "pump";
+  if (m === "pen") return "pen";
+  return "unknown";
+}
+
+function exerciseTailTip(summary: LastExerciseSummary | null): string | null {
+  if (!summary) return null;
+  switch (summary.exerciseType) {
+    case "hiit":
+    case "cardio":
+      return "Sustained or high-intensity cardio often raises the chance of delayed lows — an extra check before bed can help.";
+    case "strength":
+      return "After strength work, glucose can drift unpredictably while muscles refuel — respond to trends rather than chasing numbers quickly.";
+    case "yoga":
+    case "walking":
+      return "Lower-impact sessions disturb glucose less for many people, but a late-day downward trend still deserves your usual caution.";
+    case "court":
+    case "field":
+    case "swimming":
+      return "Mixed bursts and endurance can both affect sensitivity — watch for a delayed dip later on.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Tips for the home status strip (expanded). Uses last session + load tier + pump vs pen vs unknown.
+ */
+export function getPostExercisePersonalizedTipBullets(
+  tier: PostExerciseLoadTier,
+  summary: LastExerciseSummary | null,
+  delivery: InsulinDeliveryForTips,
+  opts?: { mentionOvernight?: boolean },
+): string[] {
+  const overnight =
+    opts?.mentionOvernight ??
+    (() => {
+      const h = new Date().getHours();
+      return h >= 17 || h < 5;
+    })();
+
+  const primary = (() => {
+    if (tier === "light") {
+      if (delivery === "pump") {
+        return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still check IOB before stacking boluses on your pump.";
+      }
+      if (delivery === "pen") {
+        return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still go easy stacking meal and correction doses the same day.";
+      }
+      return "Hydrate and refuel as your BG allows. Lighter sessions usually shift sensitivity only a little — still be careful stacking extra insulin the same day.";
+    }
+    if (tier === "moderate") {
+      if (delivery === "pump") {
+        return "For several hours you may run more insulin-sensitive than usual — spread corrections and weigh IOB or your pump bolus calculator before topping up.";
+      }
+      if (delivery === "pen") {
+        return "For several hours you may run more insulin-sensitive than usual — space correction and meal doses rather than stacking injections.";
+      }
+      return "For several hours you may run more insulin-sensitive than usual — avoid stacking extra insulin doses without your team’s plan.";
+    }
+    if (delivery === "pump") {
+      return "Hard or long sessions can extend the hypo risk window — favour gradual corrections, watch IOB, and ask your team about temporary basal changes on heavy training days.";
+    }
+    if (delivery === "pen") {
+      return "Hard or long sessions can extend the hypo risk window — avoid aggressive correction or meal dose stacking; keep fast carbs within reach for many hours.";
+    }
+    return "Hard or long sessions can extend the hypo risk window — be cautious with extra insulin and keep fast carbs within reach for many hours.";
+  })();
+
+  const secondary = overnight
+    ? "If glucose is trending down toward bedtime, follow your hypo plan and any overnight guidance from your diabetes team."
+    : "Keep fast carbs within reach for several hours, and repeat your usual pre-exercise checks if you train again today.";
+
+  const tail = exerciseTailTip(summary);
+  return tail ? [primary, secondary, tail] : [primary, secondary];
+}

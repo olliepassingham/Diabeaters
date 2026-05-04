@@ -21,7 +21,11 @@ export function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <div className="bg-amber-500 text-amber-950 px-3 py-1.5 text-[13px] leading-5 flex items-center justify-center gap-2">
+    <div
+      className="flex items-center justify-center gap-2 bg-amber-500 py-1.5 text-[13px] leading-5 text-amber-950 [padding-left:max(0.75rem,env(safe-area-inset-left,0px))] [padding-right:max(0.75rem,env(safe-area-inset-right,0px))] pt-[max(0.375rem,env(safe-area-inset-top,0px))] pb-1.5"
+      role="status"
+      aria-live="polite"
+    >
       <WifiOff className="h-4 w-4" />
       <span>You&apos;re offline. Some features may be limited.</span>
       {queuedCount > 0 && (

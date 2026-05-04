@@ -13,10 +13,6 @@ import {
   Play,
   Info,
   CircleCheck,
-  Moon,
-  Utensils,
-  Droplet,
-  Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +33,9 @@ import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   formatLastExerciseSummaryLine,
-  getPostExerciseEducationalCopy,
+  getPostExercisePersonalizedTipBullets,
   inferPostExerciseLoadTier,
+  insulinDeliveryForPostExerciseTips,
 } from "@/lib/post-exercise-nudge";
 
 function exercisePhaseLabel(phase: ExercisePhase): string {
@@ -823,57 +820,37 @@ export function AppStatusStrip() {
           {(() => {
             const last = storage.getLastExerciseSummary();
             const tier = inferPostExerciseLoadTier(last);
-            const copy = getPostExerciseEducationalCopy(tier);
             const summaryLine = formatLastExerciseSummaryLine(last);
+            const delivery = insulinDeliveryForPostExerciseTips(storage.getProfile());
+            const tipBullets = getPostExercisePersonalizedTipBullets(tier, last, delivery);
             return (
               <>
-                <div className={cn(rowClass, "flex-col items-stretch gap-2 sm:flex-row sm:items-center")}>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <div className={rowClass} data-testid="status-post-exercise-header-row">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <Badge
-                      className="chip w-fit max-w-full border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                      className="chip max-w-full shrink border border-emerald-500/25 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
                       variant="secondary"
                     >
                       <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                      Post‑exercise · 24h
+                      <span className="truncate">Post‑exercise · 24h</span>
                     </Badge>
-                    <p className="text-[11px] leading-snug text-muted-foreground">{copy.stripHint}</p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className={btnClass}
-                      aria-expanded={postExerciseOpen}
-                      onClick={() => setPostExerciseOpen((o) => !o)}
-                      data-testid="status-post-exercise-toggle"
-                    >
-                      {postExerciseOpen ? (
-                        <ChevronUp className="h-3.5 w-3.5 mr-1" aria-hidden />
-                      ) : (
-                        <ChevronDown className="h-3.5 w-3.5 mr-1" aria-hidden />
-                      )}
-                      Tips
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className={btnClass}
-                      onClick={() => {
-                        storage.snoozePostExerciseNudges(8);
-                        setPostExerciseOpen(false);
-                        setPostExerciseRev((n) => n + 1);
-                        toast({
-                          title: "Reminders snoozed",
-                          description: "Post-exercise banners are hidden for 8 hours. You can resume from the status strip.",
-                        });
-                      }}
-                      data-testid="status-post-exercise-snooze"
-                    >
-                      Snooze 8h
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={cn(btnClass, "shrink-0")}
+                    aria-expanded={postExerciseOpen}
+                    onClick={() => setPostExerciseOpen((o) => !o)}
+                    data-testid="status-post-exercise-toggle"
+                  >
+                    {postExerciseOpen ? (
+                      <ChevronUp className="h-3.5 w-3.5 mr-1" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5 mr-1" aria-hidden />
+                    )}
+                    Tips
+                  </Button>
                 </div>
                 {postExerciseOpen ? (
                   <div className="rounded-2xl border border-border/60 bg-muted/15 px-3 py-3 space-y-3 dark:bg-muted/10">
@@ -883,39 +860,13 @@ export function AppStatusStrip() {
                       </p>
                     ) : null}
                     <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground leading-relaxed">
-                      {copy.bullets.map((b) => (
+                      {tipBullets.map((b) => (
                         <li key={b}>{b}</li>
                       ))}
                     </ul>
                     <p className="text-[11px] text-muted-foreground leading-snug">
                       Educational only — follow your diabetes team&apos;s written plan first.
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-                        <Link href="/tools/hypo-help" data-testid="status-post-ex-link-hypo">
-                          <Droplet className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                          Hypo help
-                        </Link>
-                      </Button>
-                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-                        <Link href="/tools/correction-help" data-testid="status-post-ex-link-correction">
-                          <Calculator className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                          Corrections
-                        </Link>
-                      </Button>
-                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-                        <Link href="/adviser?tab=meal" data-testid="status-post-ex-link-meal">
-                          <Utensils className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                          Meal planner
-                        </Link>
-                      </Button>
-                      <Button size="sm" variant="secondary" className="h-8 text-xs" asChild>
-                        <Link href="/scenarios/bedtime" data-testid="status-post-ex-link-bedtime">
-                          <Moon className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                          Bedtime
-                        </Link>
-                      </Button>
-                    </div>
                   </div>
                 ) : null}
               </>

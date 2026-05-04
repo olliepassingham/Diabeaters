@@ -2,6 +2,13 @@ import type { CommunityContentNoteId } from "./content-notes";
 import type { CommunityEventExtra, CommunityPollExtra, CommunityPostKind } from "./post-kinds";
 import type { CommunityTopicId } from "./topics";
 
+/** Public profile fields merged into feed rows so headers can render without a second round-trip. */
+export type CommunityPostAuthorPreview = {
+  full_name: string | null;
+  avatar_url: string | null;
+  public_handle: string | null;
+};
+
 /** Rows from public.community_posts / community_post_comments. */
 export type CommunityPostRow = {
   id: string;
@@ -25,6 +32,8 @@ export type CommunityPostRow = {
   /** Whether the current user has liked this post (client merges from reactions). */
   liked_by_me: boolean;
   created_at: string;
+  /** Set by feed fetchers together with `liked_by_me` so avatars/names load with the post payload. */
+  author_preview?: CommunityPostAuthorPreview;
 };
 
 export type CommunityPostCommentRow = {

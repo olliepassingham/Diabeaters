@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { inferPostExerciseLoadTier } from "./post-exercise-nudge";
+import {
+  getPostExercisePersonalizedTipBullets,
+  inferPostExerciseLoadTier,
+  insulinDeliveryForPostExerciseTips,
+} from "./post-exercise-nudge";
 import type { LastExerciseSummary } from "./storage";
 
 function sum(partial: Partial<LastExerciseSummary>): LastExerciseSummary {
@@ -41,5 +45,37 @@ describe("inferPostExerciseLoadTier", () => {
         }),
       ),
     ).toBe("heavy");
+  });
+});
+
+describe("insulinDeliveryForPostExerciseTips", () => {
+  it("maps pump and pen", () => {
+    expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "pump" })).toBe("pump");
+    expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "pen" })).toBe("pen");
+    expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "" })).toBe("unknown");
+  });
+});
+
+describe("getPostExercisePersonalizedTipBullets", () => {
+  it("mentions IOB for pump users on moderate load", () => {
+    const bullets = getPostExercisePersonalizedTipBullets("moderate", sum({}), "pump", {
+      mentionOvernight: false,
+    });
+    expect(bullets.some((b) => /IOB|pump/i.test(b))).toBe(true);
+  });
+
+  it("mentions injections for pen users on moderate load", () => {
+    const bullets = getPostExercisePersonalizedTipBullets("moderate", sum({}), "pen", {
+      mentionOvernight: false,
+    });
+    expect(bullets.some((b) => /injections/i.test(b))).toBe(true);
+  });
+
+  it("adds a type-specific line when summary is present", () => {
+    const bullets = getPostExercisePersonalizedTipBullets("moderate", sum({ exerciseType: "cardio" }), "unknown", {
+      mentionOvernight: false,
+    });
+    expect(bullets.length).toBeGreaterThanOrEqual(2);
+    expect(bullets.some((b) => /cardio|high-intensity|delayed lows/i.test(b))).toBe(true);
   });
 });
