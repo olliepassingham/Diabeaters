@@ -10,7 +10,11 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { packContext } from "../_shared/ai-coach/contextPacker.ts";
-import { loadCoachSuppliesSummary, loadCoachTrustedLastFortnight } from "../_shared/ai-coach/trustedContextFromDb.ts";
+import {
+  loadCoachScenarioFlags,
+  loadCoachSuppliesSummary,
+  loadCoachTrustedLastFortnight,
+} from "../_shared/ai-coach/trustedContextFromDb.ts";
 import { intercept } from "../_shared/ai-coach/interceptor.ts";
 import { callOpenAiChatJson } from "../_shared/ai-coach/llmClient.ts";
 import { applyPostFilter } from "../_shared/ai-coach/postFilter.ts";
@@ -31,7 +35,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Must match `AI_COACH_CONSENT_VERSION` in `app/src/lib/ai-coach/consent.ts`. */
-const AI_COACH_CONSENT_VERSION = "2026-05-06";
+const AI_COACH_CONSENT_VERSION = "2026-05-07";
 
 const CONSENT_REQUIRED_REPLY: CoachReply = {
   reply:
@@ -553,10 +557,16 @@ Deno.serve(async (req: Request) => {
      * `lastFortnight` is not read from the body (anti-tamper). Counts come from
      * server-side `hypo_logs` in the last 14 days; supply shape from `supplies`.
      */
-    const [lastFortnight, suppliesSummary] = await Promise.all([
+    const [lastFortnightBase, suppliesSummary, scenarioFlags] = await Promise.all([
       loadCoachTrustedLastFortnight(admin, userId),
       loadCoachSuppliesSummary(admin, userId),
+      loadCoachScenarioFlags(admin, userId),
     ]);
+    const lastFortnight = {
+      ...lastFortnightBase,
+      sickDayActive: scenarioFlags.sickDayActive,
+      travelModeActive: scenarioFlags.travelModeActive,
+    };
     const context = packContext({
       profile: {
         dateOfBirth,

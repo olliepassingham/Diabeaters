@@ -1,5 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { buildSuppliesCoachSummary } from "./trustedContextFromDb.ts";
+import {
+  buildSuppliesCoachSummary,
+  deriveScenarioFlagsFromRows,
+  scenarioStateFlag,
+} from "./trustedContextFromDb.ts";
+
+describe("scenarioStateFlag / deriveScenarioFlagsFromRows", () => {
+  it("detects sick day from snake or camel case", () => {
+    expect(scenarioStateFlag({ sick_day_active: true }, ["sick_day_active", "sickDayActive"])).toBe(true);
+    expect(scenarioStateFlag({ sickDayActive: "true" }, ["sick_day_active", "sickDayActive"])).toBe(true);
+    expect(scenarioStateFlag({ sick_day_active: false }, ["sick_day_active", "sickDayActive"])).toBe(false);
+  });
+
+  it("merges rows for sick_day and travel keys", () => {
+    expect(
+      deriveScenarioFlagsFromRows([
+        { scenario_key: "sick_day", state: { sick_day_active: true } },
+        { scenario_key: "travel", state: { travel_active: true } },
+      ]),
+    ).toEqual({ sickDayActive: true, travelModeActive: true });
+    expect(deriveScenarioFlagsFromRows([{ scenario_key: "travel", state: { travelModeActive: 1 } }])).toEqual({
+      sickDayActive: false,
+      travelModeActive: true,
+    });
+  });
+});
 
 describe("buildSuppliesCoachSummary", () => {
   it("returns undefined for empty rows", () => {

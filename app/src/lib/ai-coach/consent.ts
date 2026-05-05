@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Bump when in-app consent copy materially changes (re-prompt users). */
-export const AI_COACH_CONSENT_VERSION = "2026-05-06";
+export const AI_COACH_CONSENT_VERSION = "2026-05-07";
 
 export async function fetchAiCoachConsentAt(
   supabase: SupabaseClient,

@@ -64,6 +64,65 @@ function sinceIsoFortnight(): string {
   return new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 }
 
+/** True when `state[key]` is a JSON boolean/scalar the app uses as “on”. */
+export function scenarioStateFlag(state: unknown, keys: readonly string[]): boolean {
+  if (!state || typeof state !== "object") return false;
+  const o = state as Record<string, unknown>;
+  for (const k of keys) {
+    const v = o[k];
+    if (v === true) return true;
+    if (v === 1) return true;
+    if (typeof v === "string" && (v === "true" || v === "1")) return true;
+  }
+  return false;
+}
+
+export type ScenarioFlagRow = { scenario_key: string; state: unknown };
+
+/**
+ * Derive sick-day / travel mode booleans from `public.scenarios` rows only.
+ * Reads known boolean keys inside `state` — never passes titles, labels, or arbitrary JSON to the LLM.
+ */
+export function deriveScenarioFlagsFromRows(rows: ReadonlyArray<ScenarioFlagRow>): {
+  sickDayActive: boolean;
+  travelModeActive: boolean;
+} {
+  let sickDayActive = false;
+  let travelModeActive = false;
+  for (const row of rows) {
+    const key = typeof row.scenario_key === "string" ? row.scenario_key.trim() : "";
+    if (key === "sick_day") {
+      if (scenarioStateFlag(row.state, ["sick_day_active", "sickDayActive"])) sickDayActive = true;
+    } else if (key === "travel") {
+      if (scenarioStateFlag(row.state, ["travel_active", "travelModeActive"])) travelModeActive = true;
+    }
+  }
+  return { sickDayActive, travelModeActive };
+}
+
+export async function loadCoachScenarioFlags(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<{ sickDayActive: boolean; travelModeActive: boolean }> {
+  try {
+    const { data, error } = await admin
+      .from("scenarios")
+      .select("scenario_key, state")
+      .eq("user_id", userId)
+      .in("scenario_key", ["sick_day", "travel"]);
+    if (error) throw error;
+    if (!Array.isArray(data)) return { sickDayActive: false, travelModeActive: false };
+    const rows: ScenarioFlagRow[] = data.map((r: Record<string, unknown>) => ({
+      scenario_key: typeof r.scenario_key === "string" ? r.scenario_key : "",
+      state: r.state,
+    }));
+    return deriveScenarioFlagsFromRows(rows);
+  } catch (e) {
+    console.warn("[ai_coach] loadCoachScenarioFlags fallback", e);
+    return { sickDayActive: false, travelModeActive: false };
+  }
+}
+
 export async function loadCoachTrustedLastFortnight(
   admin: SupabaseClient,
   userId: string,
