@@ -69,6 +69,7 @@ import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { getProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
@@ -427,9 +428,15 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (isCommunityMode && !isCommunityMemberAllowedPath(pathOnly)) {
-      setLocation("/tools");
-      return;
+    if (isCommunityMode) {
+      if (pathOnly === "/" || pathOnly === "") {
+        setLocation(getCommunityMemberLandingPath());
+        return;
+      }
+      if (!isCommunityMemberAllowedPath(pathOnly)) {
+        setLocation(getCommunityMemberLandingPath());
+        return;
+      }
     }
     if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) {
       setLocation("/carer-view");
@@ -522,7 +529,7 @@ function FamilyCarersGate() {
   useEffect(() => {
     if (loading) return;
     if (isCommunityMode) {
-      setLocation("/tools");
+      setLocation(getCommunityMemberLandingPath());
       return;
     }
     if (isCarerMode) {
@@ -1015,7 +1022,8 @@ function AuthenticatedShell() {
       return;
     }
     if (isCommunityMode) {
-      if (location.split("?")[0] !== "/tools") setLocation("/tools");
+      const home = getCommunityMemberLandingPath();
+      if (location.split("?")[0] !== home) setLocation(home);
       return;
     }
     if (location.split("?")[0] !== "/") setLocation("/");
@@ -1073,7 +1081,7 @@ function AuthenticatedShell() {
   useEffect(() => {
     if (!isCommunityMode) return;
     if (!isCommunityMemberAllowedPath(pathOnly) && pathOnly !== "/mode") {
-      setLocation("/tools");
+      setLocation(getCommunityMemberLandingPath());
     }
   }, [isCommunityMode, pathOnly, setLocation]);
 

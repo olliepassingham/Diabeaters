@@ -5,6 +5,7 @@ import {
   hasPendingCarer,
   setActiveAppMode,
 } from "@/lib/carer-session";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 
 /**
  * Shared navigation after a successful password or OAuth session (login or signup when confirmations are off).
@@ -42,7 +43,7 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
   }
   if (role === "community") {
     setActiveAppMode("community");
-    setLocation("/tools");
+    setLocation(getCommunityMemberLandingPath());
     return;
   }
   setLocation("/");

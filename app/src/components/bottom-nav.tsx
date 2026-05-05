@@ -110,14 +110,13 @@ function patientTabs(showCommunityTab: boolean): TabDef[] {
 function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
-      title: "Home",
+      title: "Tools",
       href: "/tools",
-      icon: Home,
-      testId: "bottomnav-home",
+      icon: Wrench,
+      testId: "bottomnav-tools",
       isActive: (pathname) =>
         pathname === "/tools" ||
         pathname.startsWith("/tools/") ||
-        pathname === "/" ||
         pathname === "/education" ||
         pathname.startsWith("/education/"),
     },

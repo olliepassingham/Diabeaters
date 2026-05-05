@@ -6,6 +6,7 @@ import { getProfile } from "@/lib/profile";
 import { getOnboardingAccountPath, getPrimaryAppRole, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 
 const ONBOARDING_LS = "diabeater_onboarding_completed";
 
@@ -54,7 +55,7 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         (typeof localStorage !== "undefined" && localStorage.getItem(ONBOARDING_LS) === "true");
       if (done) {
         if (profile?.account_type === "community") {
-          setLocation("/tools");
+          setLocation(getCommunityMemberLandingPath());
         } else {
           setLocation("/");
         }

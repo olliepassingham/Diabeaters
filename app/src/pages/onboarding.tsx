@@ -51,6 +51,7 @@ import {
   setActiveAppMode,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -463,12 +464,12 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       description: "Explore Tools for education and tips, or open the feed when your profile is public.",
     });
     if (onComplete) {
-      onComplete(pathOverride ?? "/tools");
+      onComplete(pathOverride ?? getCommunityMemberLandingPath());
     }
   };
 
   const handleFinish = async (pathOverride?: string) => {
-    if (showCommunityPath) {
+    if (showCommunityPath && !upgradeFlow) {
       await handleFinishCommunity(pathOverride);
       return;
     }
@@ -573,7 +574,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "disclaimer":
         return <DisclaimerStep data={data} updateData={updateData} />;
       case "first_win":
-        return showCommunityPath ? (
+        return showCommunityPath && !upgradeFlow ? (
           <CommunityMemberFirstWinStep onFinish={handleFinish} />
         ) : (
           <FirstWinStep data={data} onFinish={handleFinish} />
@@ -661,6 +662,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 }
 
 function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) => void | Promise<void> }) {
+  const land = getCommunityMemberLandingPath();
+  const openLabel = land === "/community" ? "Open feed" : "Open Tools";
   return (
     <div className="space-y-8 pb-4 sm:pb-0">
       <div className="text-center space-y-4">
@@ -684,10 +687,10 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
         <Button
           className="w-full"
           size="lg"
-          onClick={() => void onFinish("/tools")}
+          onClick={() => void onFinish(land)}
           data-testid="button-onboarding-community-complete"
         >
-          Open Tools
+          {openLabel}
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
         <p className="text-center text-xs text-muted-foreground">

@@ -20,6 +20,7 @@ import { FaceLogo } from "@/components/face-logo";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { useProfile } from "@/lib/profile";
 import {
@@ -117,7 +118,7 @@ export function AppSidebar() {
     ] as const;
   }, [isCarer, isCarerMode, isCommunityMode, showCommunity]);
 
-  const homeHref = isCarer ? "/carer-view" : isCommunityMode ? "/tools" : "/";
+  const homeHref = isCarer ? "/carer-view" : isCommunityMode ? getCommunityMemberLandingPath() : "/";
 
   return (
     <Sidebar>
