@@ -118,6 +118,17 @@ export interface CoachContext {
     bgUnits: "mmol/L" | "mg/dL" | "unknown";
     diagnosedYearsAgo: number | null;
   };
+  /**
+   * Optional client-computed pharmacy opening status.
+   * v1 cannot safely derive this server-side because `profiles.pharmacy` hours
+   * are stored as local-time `HH:mm` without an IANA timezone.
+   */
+  pharmacy?: {
+    configured: boolean;
+    openNow: boolean | null;
+    nextOpensInMinutes: number | null;
+    closesInMinutes: number | null;
+  };
   lastFortnight: {
     bgReadings: number;
     estimatedTimeInRangePct: number | null;
@@ -150,6 +161,11 @@ export interface CoachRequest {
    * synced yet; server prefers the cloud value when both exist.
    */
   dateOfBirth?: string | null;
+  /**
+   * Optional client-computed pharmacy status; see `CoachContext.pharmacy`.
+   * Server sanitises but does not attempt timezone conversion in v1.
+   */
+  pharmacyStatus?: CoachContext["pharmacy"];
 }
 
 /**

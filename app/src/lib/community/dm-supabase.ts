@@ -2,6 +2,7 @@
  * Direct messages: dm_threads, dm_thread_members, dm_messages (Supabase + RLS).
  * Optional images use bucket `community_post_images` (paths `{uid}/dm/{thread_id}/…`).
  */
+import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase } from "@/lib/supabase";
 import { COMMUNITY_POST_IMAGES_BUCKET } from "./posts-supabase";
 import type { DmMessageRow, DmThreadMemberRow, DmThreadRow } from "./types";
@@ -326,7 +327,7 @@ export async function insertDmMessage(
   void supabase.functions
     .invoke("notify_dm_push", { body: { thread_id: threadId, message_id: out.id } })
     .then(({ error: fnErr }) => {
-      if (fnErr && import.meta.env.DEV) console.warn("[dm] notify_dm_push:", fnErr.message);
+      if (fnErr) logEdgeInvokeFailure("notify_dm_push", fnErr.message);
     });
 
   return { data: out, error: null };

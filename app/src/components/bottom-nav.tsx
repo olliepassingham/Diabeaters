@@ -1,5 +1,5 @@
-import { Home, Shapes, Users, Wrench, User } from "lucide-react";
-import { isCommunityEnabled } from "@/lib/flags";
+import { Home, MessageCircle, Shapes, Users, Wrench, User } from "lucide-react";
+import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -8,6 +8,7 @@ import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
 const iconClass = "h-[23px] w-[23px]";
 
@@ -106,6 +107,49 @@ function patientTabs(showCommunityTab: boolean): TabDef[] {
   return tabs;
 }
 
+function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
+  const tabs: TabDef[] = [
+    {
+      title: "Home",
+      href: "/tools",
+      icon: Home,
+      testId: "bottomnav-home",
+      isActive: (pathname) =>
+        pathname === "/tools" ||
+        pathname.startsWith("/tools/") ||
+        pathname === "/" ||
+        pathname === "/education" ||
+        pathname.startsWith("/education/"),
+    },
+  ];
+  if (isCommunityEnabled && showCommunityTab) {
+    tabs.push({
+      title: "Feed",
+      href: "/community",
+      icon: Users,
+      testId: "bottomnav-community",
+      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+    });
+  }
+  if (isAiCoachEnabled) {
+    tabs.push({
+      title: "Coach",
+      href: "/coach",
+      icon: MessageCircle,
+      testId: "bottomnav-coach",
+      isActive: (pathname) => pathname === "/coach",
+    });
+  }
+  tabs.push({
+    title: "Account",
+    href: "/account",
+    icon: User,
+    testId: "bottomnav-account",
+    isActive: (pathname) => pathname === "/account",
+  });
+  return tabs;
+}
+
 function carerTabs(showCommunityTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
@@ -158,6 +202,11 @@ export function BottomNav() {
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCommunityMode =
+    !hasCarerLink &&
+    activeMode !== "patient" &&
+    activeMode !== "carer" &&
+    (activeMode === "community" || (activeMode == null && isCommunityAccountProfile(storage.getProfile())));
   const showCommunityTab =
     isCommunityEnabled && !profileLoading && profile?.is_public === true;
 
@@ -170,7 +219,7 @@ export function BottomNav() {
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);
@@ -187,13 +236,13 @@ export function BottomNav() {
     const run = () => {
       prefetchTools();
       prefetchAccount();
-      if (!isCarerMode) prefetchScenarios();
+      if (!isCarerMode && !isCommunityMode) prefetchScenarios();
       if (showCommunityTab) {
         prefetchCommunity();
         prefetchCommunityMessages();
       }
     };
-    if (isCarerMode) {
+    if (isCarerMode || isCommunityMode) {
       run();
       return;
     }
@@ -203,9 +252,13 @@ export function BottomNav() {
     }
     const timeoutId = window.setTimeout(run, 1200);
     return () => window.clearTimeout(timeoutId);
-  }, [isCarerMode, showCommunityTab]);
+  }, [isCarerMode, isCommunityMode, showCommunityTab]);
 
-  const tabs = isCarerMode ? carerTabs(showCommunityTab) : patientTabs(showCommunityTab);
+  const tabs = isCarerMode
+    ? carerTabs(showCommunityTab)
+    : isCommunityMode
+      ? communityMemberTabs(showCommunityTab)
+      : patientTabs(showCommunityTab);
 
   const cols = tabs.length;
   const navRef = useRef<HTMLElement | null>(null);

@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { runSupplyLowInAppNotifyScan } from "@/lib/supply-inapp-notify-scan";
+import { PharmacyCard } from "@/components/pharmacy-card";
 import { ToastAction } from "@/components/ui/toast";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 import {
@@ -2692,6 +2693,8 @@ export default function Supplies() {
             {supplies.length > 0 && (
               <DepletionTimeline supplies={supplies} onSupplyClick={handleTimelineClick} />
             )}
+
+            <PharmacyCard />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <PrescriptionCyclePanel 

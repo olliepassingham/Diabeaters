@@ -1,6 +1,22 @@
-import { profileQueryKey, updateProfile, type ProfileRow, type ProfileUpdatePayload } from "@/lib/profile";
+import {
+  profileQueryKey,
+  updateProfile,
+  type PharmacyJson,
+  type ProfileRow,
+  type ProfileUpdatePayload,
+} from "@/lib/profile";
 import { queryClient } from "@/lib/queryClient";
-import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import {
+  DIABEATER_SETTINGS_CHANGED_EVENT,
+  emptyPharmacyHours,
+  PHARMACY_DAY_KEYS,
+  isCommunityAccountProfile,
+  storage,
+  type Pharmacy,
+  type PharmacyDayKey,
+  type PharmacyHoursDay,
+  type UserProfile,
+} from "@/lib/storage";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 
 /** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
@@ -27,6 +43,70 @@ function normalizeTddFromCloud(raw: unknown): number | null {
   return null;
 }
 
+function pharmacyHoursDayFromCloud(raw: unknown): PharmacyHoursDay {
+  if (!raw || typeof raw !== "object") return {};
+  const r = raw as Record<string, unknown>;
+  const out: PharmacyHoursDay = {};
+  if (r.closed === true) out.closed = true;
+  if (typeof r.open === "string") out.open = r.open;
+  if (typeof r.close === "string") out.close = r.close;
+  if (r.break && typeof r.break === "object") {
+    const br = r.break as Record<string, unknown>;
+    if (typeof br.start === "string" && typeof br.end === "string") {
+      out.break = { start: br.start, end: br.end };
+    }
+  }
+  return out;
+}
+
+function pharmacyFromCloud(raw: PharmacyJson | null | undefined): Pharmacy | null {
+  if (!raw || typeof raw !== "object") return null;
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!name) return null;
+  const hours = emptyPharmacyHours();
+  const inHours = (raw.hours ?? {}) as Record<string, unknown>;
+  for (const key of PHARMACY_DAY_KEYS) {
+    hours[key] = pharmacyHoursDayFromCloud(inHours[key]);
+  }
+  return {
+    name,
+    phone: typeof raw.phone === "string" && raw.phone.trim() ? raw.phone.trim() : undefined,
+    addressLine: typeof raw.addressLine === "string" && raw.addressLine.trim() ? raw.addressLine.trim() : undefined,
+    notes: typeof raw.notes === "string" && raw.notes.trim() ? raw.notes.trim() : undefined,
+    hours,
+    updatedAt:
+      typeof raw.updatedAt === "string" && raw.updatedAt.trim()
+        ? raw.updatedAt
+        : new Date(0).toISOString(),
+  };
+}
+
+function pharmacyToCloud(p: Pharmacy): PharmacyJson {
+  const hours: PharmacyJson["hours"] = {};
+  for (const key of PHARMACY_DAY_KEYS) {
+    const day = p.hours[key];
+    if (!day) continue;
+    const cloudDay: { open?: string; close?: string; closed?: boolean; break?: { start?: string; end?: string } } = {};
+    if (day.closed) cloudDay.closed = true;
+    if (day.open) cloudDay.open = day.open;
+    if (day.close) cloudDay.close = day.close;
+    if (day.break?.start && day.break?.end) {
+      cloudDay.break = { start: day.break.start, end: day.break.end };
+    }
+    if (Object.keys(cloudDay).length > 0) {
+      (hours as Record<PharmacyDayKey, unknown>)[key] = cloudDay;
+    }
+  }
+  return {
+    name: p.name,
+    phone: p.phone,
+    addressLine: p.addressLine,
+    notes: p.notes,
+    hours,
+    updatedAt: p.updatedAt,
+  };
+}
+
 function defaultProfileSkeleton(insulinDeliveryMethod: "pen" | "pump"): UserProfile {
   return {
     name: "",
@@ -48,6 +128,37 @@ function defaultProfileSkeleton(insulinDeliveryMethod: "pen" | "pump"): UserProf
  */
 export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
   if (!row?.id) return;
+
+  if (row.account_type === "community") {
+    const localProfile = storage.getProfile();
+    storage.saveProfile({
+      name: localProfile?.name ?? "",
+      email: localProfile?.email ?? "",
+      dateOfBirth: localProfile?.dateOfBirth ?? "",
+      bgUnits: localProfile?.bgUnits ?? "mmol/L",
+      carbUnits: localProfile?.carbUnits ?? "grams",
+      diabetesType: "none",
+      insulinDeliveryMethod: localProfile?.insulinDeliveryMethod ?? "pen",
+      usingInsulin: false,
+      hasAcceptedDisclaimer: localProfile?.hasAcceptedDisclaimer ?? true,
+      ratioFormat: localProfile?.ratioFormat,
+      carbPortionSize: localProfile?.carbPortionSize,
+      accountType: "community",
+    });
+    return;
+  }
+
+  if (row.account_type === "patient") {
+    const lp = storage.getProfile();
+    if (lp?.accountType === "community") {
+      storage.saveProfile({
+        ...lp,
+        accountType: "patient",
+        usingInsulin: true,
+        diabetesType: lp.diabetesType === "none" ? "type1" : lp.diabetesType,
+      });
+    }
+  }
 
   const cloudDelivery = normalizeDeliveryFromCloud(row.insulin_delivery_method);
   const cloudTdd = normalizeTddFromCloud(row.tdd);
@@ -80,6 +191,17 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
 
   if (wroteSettings && typeof window !== "undefined") {
     window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+  }
+
+  if (row.pharmacy !== undefined) {
+    const cloudPharmacy = pharmacyFromCloud(row.pharmacy);
+    const localPharmacy = storage.getPharmacy();
+    if (!cloudPharmacy && row.pharmacy === null && localPharmacy) {
+      // Server explicitly cleared pharmacy elsewhere; mirror to this device.
+      storage.savePharmacy(null);
+    } else if (cloudPharmacy && (!localPharmacy || (cloudPharmacy.updatedAt > (localPharmacy.updatedAt ?? "")))) {
+      storage.savePharmacy(cloudPharmacy);
+    }
   }
 }
 
@@ -215,4 +337,41 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
   }
 
   return { error: new Error("Clinical prefs sync: too many retries") };
+}
+
+/**
+ * Push the local primary pharmacy (or `null` to clear) to `profiles.pharmacy`.
+ * If the column is missing on the linked Supabase project (migration not applied),
+ * we treat this as a no-op so the local save still succeeds without raising an error.
+ */
+/** Push `profiles.account_type` from local profile (patient vs community). Tolerates missing column. */
+export async function syncAccountTypeToCloud(userId: string): Promise<{ error: Error | null; skipped?: boolean }> {
+  const p = storage.getProfile();
+  const account_type: "patient" | "community" = isCommunityAccountProfile(p) ? "community" : "patient";
+  const { error } = await updateProfile({ id: userId, account_type });
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (isMissingProfileColumnSchemaError(error.message, "account_type")) {
+    return { error: null, skipped: true };
+  }
+  return { error };
+}
+
+export async function syncPharmacyToCloud(userId: string): Promise<{ error: Error | null; pharmacyCloudSkipped?: boolean }> {
+  const local = storage.getPharmacy();
+  const payload: ProfileUpdatePayload = {
+    id: userId,
+    pharmacy: local ? pharmacyToCloud(local) : null,
+  };
+  const { error } = await updateProfile(payload);
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (isMissingProfileColumnSchemaError(error.message, "pharmacy")) {
+    return { error: null, pharmacyCloudSkipped: true };
+  }
+  return { error };
 }

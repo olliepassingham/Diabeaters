@@ -65,8 +65,9 @@ export default function CheckEmail() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-center px-4 bg-background text-foreground ${import.meta.env.DEV ? "pt-14" : ""}`}
+      className={`min-h-screen bg-background text-foreground ${import.meta.env.DEV ? "pt-14" : ""}`}
     >
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
       {import.meta.env.DEV && (
         <div
           className="fixed top-0 left-0 right-0 bg-amber-500/90 text-amber-950 px-4 py-2 text-center text-xs font-medium z-50 space-y-1"
@@ -79,11 +80,11 @@ export default function CheckEmail() {
           </p>
         </div>
       )}
-      <Card className="w-full max-w-md">
+      <Card className="w-full rounded-2xl border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl">Check your email</CardTitle>
           {bannerMessage && (
-            <Alert className="mt-2">
+            <Alert className="mt-3 rounded-2xl border-border/60 bg-muted/25">
               <AlertTitle>Verification required</AlertTitle>
               <AlertDescription>{bannerMessage}</AlertDescription>
             </Alert>
@@ -94,7 +95,7 @@ export default function CheckEmail() {
             We&apos;ve sent a verification link to your email. Click the link to
             verify your account. Once verified, return to the app.
           </p>
-          <Alert className="border-border/80 bg-muted/30">
+          <Alert className="rounded-2xl border-border/80 bg-muted/30">
             <AlertTitle className="text-sm">Not seeing the email?</AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground space-y-2 pt-1">
               <ul className="list-disc pl-4 space-y-1.5">
@@ -160,6 +161,7 @@ export default function CheckEmail() {
           </Link>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

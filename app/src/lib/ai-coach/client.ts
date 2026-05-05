@@ -53,6 +53,7 @@ export async function sendCoachMessage(args: {
     lastFortnight: payload.lastFortnight,
     ratiosAreSet: payload.ratiosAreSet,
     bgUnits: payload.bgUnits,
+    pharmacyStatus: payload.pharmacyStatus,
     audience,
     ...(payload.dateOfBirth ? { dateOfBirth: payload.dateOfBirth } : {}),
   };

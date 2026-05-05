@@ -1,6 +1,7 @@
 /**
  * Follow graph: user_follows (Supabase + RLS).
  */
+import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase } from "@/lib/supabase";
 
 export async function followUser(followeeId: string): Promise<{ error: Error | null }> {
@@ -19,7 +20,7 @@ export async function followUser(followeeId: string): Promise<{ error: Error | n
   void supabase.functions
     .invoke("notify_feed_push", { body: { kind: "new_follower", followee_id: followeeId } })
     .then(({ error: fnErr }) => {
-      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push follow:", fnErr.message);
+      if (fnErr) logEdgeInvokeFailure("notify_feed_push new_follower", fnErr.message);
     });
 
   return { error: null };

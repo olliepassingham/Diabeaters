@@ -6,10 +6,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { ArrowRight, Eye, User as UserIcon } from "lucide-react";
 
 export default function ModeChooserPage() {
   const [location, setLocation] = useLocation();
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
+
+  useEffect(() => {
+    if (isCommunityAccountProfile(storage.getProfile())) {
+      setLocation("/settings");
+    }
+  }, [setLocation]);
   const [mode, setMode] = useState<ActiveAppMode | null>(() => {
     try {
       return getActiveAppMode();
@@ -52,29 +60,58 @@ export default function ModeChooserPage() {
     <PageShell variant="narrow" className="space-y-6 py-4 md:py-8">
       <PageHeader
         title="Choose your mode"
-        description="User Mode is for your own diabetes tools. Supporter Mode is read-only information about someone you support. If your account supports someone, you can change this later from Account."
+        description="Pick what this session should show. If your account supports someone, you can swap anytime from Account."
       />
 
-      <Card className="shadow-sm border-border/60 rounded-2xl">
-        <CardHeader>
+      <Card className="shadow-sm border-border/60 rounded-2xl overflow-hidden">
+        <CardHeader className="pb-3">
           <CardTitle className="text-xl">Current: {currentLabel}</CardTitle>
-          <CardDescription>Pick one for this session.</CardDescription>
+          <CardDescription>Tap a card to switch.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button className="w-full min-h-11" onClick={() => pick("patient")} data-testid="button-mode-patient">
-            User Mode
-          </Button>
-          <Button
-            className="w-full min-h-11"
-            variant={canChooseCarer ? "outline" : "secondary"}
-            disabled={!canChooseCarer}
-            onClick={() => pick("carer")}
-            data-testid="button-mode-carer"
+          <button
+            type="button"
+            onClick={() => pick("patient")}
+            data-testid="button-mode-patient"
+            className="pressable w-full rounded-2xl border border-border/60 bg-background/60 p-4 text-left shadow-sm hover-elevate"
           >
-            Supporter Mode
-          </Button>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-xl bg-primary/10 p-2.5">
+                <UserIcon className="h-5 w-5 text-primary" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-foreground">User Mode</div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Your own dashboard, supplies, scenarios, and tools.</p>
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => pick("carer")}
+            disabled={!canChooseCarer}
+            data-testid="button-mode-carer"
+            className="pressable w-full rounded-2xl border border-border/60 bg-background/60 p-4 text-left shadow-sm hover-elevate disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-xl bg-blue-500/10 p-2.5">
+                <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-foreground">Supporter Mode</div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Read-only views for the person you support.</p>
+              </div>
+            </div>
+          </button>
+
           {!canChooseCarer && (
-            <Alert>
+            <Alert className="rounded-2xl border-border/60">
               <AlertDescription>
                 This account isn’t linked to support someone yet. If you have an invite code, go to{" "}
                 <Link href="/carer-setup" className="font-medium underline underline-offset-4">

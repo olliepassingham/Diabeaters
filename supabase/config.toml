@@ -4,6 +4,7 @@
 #   supabase functions deploy notify_carers_on_hypo --no-verify-jwt
 #   supabase functions deploy notify_scenario_started --no-verify-jwt
 #   supabase functions deploy notify_supply_low --no-verify-jwt
+#   supabase functions deploy notify_supply_low_cron --no-verify-jwt
 #   supabase functions deploy notify_dm_push --no-verify-jwt
 #
 # Gateway JWT verification is off for these functions; each handler validates the JWT with
@@ -23,6 +24,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.notify_supply_low]
+verify_jwt = false
+
+[functions.notify_supply_low_cron]
 verify_jwt = false
 
 [functions.notify_dm_push]

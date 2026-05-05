@@ -5,6 +5,14 @@ import {
   travelWeatherSupplyShortfallMultiplier,
   tripCalendarDaysBetween,
 } from "./travel-supply-policy";
+import {
+  formatPharmacyHHmm,
+  latestPharmacyWindowEndingBefore,
+  pharmacyDayKeyForDate,
+  pharmacyDayLabel,
+  pharmacyHasAnyHours,
+  pharmacyOpenIntervalsForDay,
+} from "./pharmacy";
 import appPkg from "../../package.json";
 
 const STORAGE_KEYS = {
@@ -33,6 +41,7 @@ const STORAGE_KEYS = {
   EVENTS: "diabeater_events",
   ROUTINES: "diabeater_routines",
   PRESCRIPTION_CYCLE: "diabeater_prescription_cycle",
+  PHARMACY: "diabeater_pharmacy",
   CARER_LINKS: "diabeater_carer_links",
   CARER_PRIVACY: "diabeater_carer_privacy",
   CARER_ACTIVITY_LOG: "diabeater_carer_activity_log",
@@ -407,6 +416,9 @@ export function setWelcomeStruggleCardDismissed(): void {
 
 export type RatioFormat = "per10g" | "1toXg" | "perCP";
 
+/** `community` = learn + feed persona; default / omit = full patient tools. */
+export type AccountType = "patient" | "community";
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -419,6 +431,11 @@ export interface UserProfile {
   hasAcceptedDisclaimer: boolean;
   ratioFormat?: RatioFormat;
   carbPortionSize?: number;
+  accountType?: AccountType;
+}
+
+export function isCommunityAccountProfile(profile: UserProfile | null | undefined): boolean {
+  return profile?.accountType === "community";
 }
 
 export interface UserSettings {
@@ -624,6 +641,58 @@ export interface PrescriptionCycle {
   leadTimeDays: number;
   lastOrderDate?: string;
   lastCollectionDate?: string;
+}
+
+/**
+ * Opening hours for one weekday on the user's primary pharmacy.
+ *
+ * Times are local-time `HH:mm` (24h). v1 assumes UK / patient device local time —
+ * we do not yet store a separate IANA timezone (see `pharmacy.ts`).
+ *
+ * - `closed` true => the pharmacy is shut all day.
+ * - `open` / `close` define the day's main window.
+ * - `break` (optional) describes a midday closure that splits the window.
+ */
+export interface PharmacyHoursDay {
+  closed?: boolean;
+  open?: string;
+  close?: string;
+  break?: { start: string; end: string };
+}
+
+export type PharmacyDayKey = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export const PHARMACY_DAY_KEYS: readonly PharmacyDayKey[] = [
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+  "sun",
+] as const;
+
+export interface Pharmacy {
+  /** Display name (required when saving). */
+  name: string;
+  phone?: string;
+  addressLine?: string;
+  notes?: string;
+  hours: Record<PharmacyDayKey, PharmacyHoursDay>;
+  /** ISO timestamp of the last edit; written by `savePharmacy`. */
+  updatedAt: string;
+}
+
+export function emptyPharmacyHours(): Record<PharmacyDayKey, PharmacyHoursDay> {
+  return {
+    mon: {},
+    tue: {},
+    wed: {},
+    thu: {},
+    fri: {},
+    sat: {},
+    sun: {},
+  };
 }
 
 export interface EmergencyContact {
@@ -1734,6 +1803,55 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.PRESCRIPTION_CYCLE, JSON.stringify(cycle));
   },
 
+  getPharmacy(): Pharmacy | null {
+    const data = localStorage.getItem(STORAGE_KEYS.PHARMACY);
+    if (!data) return null;
+    try {
+      const parsed = JSON.parse(data) as Partial<Pharmacy> | null;
+      if (!parsed || typeof parsed !== "object") return null;
+      const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
+      if (!name) return null;
+      const hoursIn = (parsed.hours ?? {}) as Partial<Record<PharmacyDayKey, PharmacyHoursDay>>;
+      const hours = emptyPharmacyHours();
+      for (const key of PHARMACY_DAY_KEYS) {
+        const v = hoursIn[key];
+        if (v && typeof v === "object") hours[key] = v;
+      }
+      return {
+        name,
+        phone: parsed.phone?.trim() || undefined,
+        addressLine: parsed.addressLine?.trim() || undefined,
+        notes: parsed.notes?.trim() || undefined,
+        hours,
+        updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date(0).toISOString(),
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  savePharmacy(pharmacy: Pharmacy | null): void {
+    if (!pharmacy) {
+      localStorage.removeItem(STORAGE_KEYS.PHARMACY);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+      }
+      return;
+    }
+    const record: Pharmacy = {
+      ...pharmacy,
+      name: pharmacy.name.trim(),
+      phone: pharmacy.phone?.trim() || undefined,
+      addressLine: pharmacy.addressLine?.trim() || undefined,
+      notes: pharmacy.notes?.trim() || undefined,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEYS.PHARMACY, JSON.stringify(record));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+    }
+  },
+
   markSupplyOrdered(id: string): Supply | null {
     return this.updateSupply(id, { isOnOrder: true, orderedDate: new Date().toISOString() });
   },
@@ -1807,6 +1925,30 @@ export const storage = {
     const scenarioState = this.getScenarioState();
     const settings = this.getSettings();
     const leadTime = cycle?.leadTimeDays || 5;
+    const pharmacy = this.getPharmacy();
+    const usePharmacy = pharmacy && pharmacyHasAnyHours(pharmacy);
+
+    /**
+     * Append a "(pharmacy is closed Sun, collect by Sat 13:00)" hint to a reason
+     * when the natural deadline lands on a closed day. Returns "" when no shift is needed
+     * or no pharmacy hours are configured. `daysFromToday` is non-negative.
+     */
+    const pharmacyCollectByHint = (daysFromToday: number): string => {
+      if (!usePharmacy || !pharmacy) return "";
+      const deadline = new Date();
+      deadline.setHours(23, 59, 59, 999);
+      deadline.setDate(deadline.getDate() + daysFromToday);
+      const deadlineKey = pharmacyDayKeyForDate(deadline);
+      const intervals = pharmacyOpenIntervalsForDay(pharmacy.hours[deadlineKey]);
+      if (intervals.length > 0) return "";
+      const window = latestPharmacyWindowEndingBefore(pharmacy, deadline);
+      if (!window) return "";
+      const dayKey = pharmacyDayKeyForDate(window.start);
+      const closedLabel = pharmacyDayLabel(deadlineKey, "short");
+      const collectLabel = pharmacyDayLabel(dayKey, "short");
+      const closeMin = window.end.getHours() * 60 + window.end.getMinutes();
+      return ` (pharmacy is closed ${closedLabel} — collect by ${collectLabel} ${formatPharmacyHHmm(closeMin)})`;
+    };
 
     const collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[] = [];
     const skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[] = [];
@@ -1834,13 +1976,15 @@ export const storage = {
         const isOverdue = daysUntilCollect < 0;
         const overdueDays = Math.abs(daysUntilCollect);
 
+        const orderedHint = isOverdue ? "" : pharmacyCollectByHint(Math.max(0, daysUntilCollect));
+
         if (adjustedQty <= 0 || daysRemaining <= 0) {
           collectSoon.push({
             supply,
             daysUntilCollect,
             reason: isOverdue
               ? `You're out of ${supply.name} — prescription should be ready (ordered ${overdueDays} day${overdueDays !== 1 ? "s" : ""} ago), collect now`
-              : `You're out of ${supply.name} — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}`,
+              : `You're out of ${supply.name} — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}${orderedHint}`,
           });
         } else if (daysRemaining <= 3) {
           collectSoon.push({
@@ -1848,7 +1992,7 @@ export const storage = {
             daysUntilCollect,
             reason: isOverdue
               ? `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — prescription should be ready, collect now`
-              : `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}`,
+              : `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}${orderedHint}`,
           });
         } else if (isOverdue) {
           collectSoon.push({
@@ -1864,10 +2008,11 @@ export const storage = {
           reason: `You're out of ${supply.name} — order now`,
         });
       } else if (!supply.isOnOrder && daysRemaining > 0 && daysRemaining <= leadTime) {
+        const runOutHint = pharmacyCollectByHint(daysRemaining);
         collectSoon.push({
           supply,
           daysUntilCollect: -1,
-          reason: `${supply.name} will run out in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} — time to order`,
+          reason: `${supply.name} will run out in ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} — time to order${runOutHint}`,
         });
       }
 

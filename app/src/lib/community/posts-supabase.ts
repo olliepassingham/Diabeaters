@@ -3,6 +3,7 @@
  * Images: bucket `community_post_images`, paths stored in image_urls jsonb.
  * Pagination: RPC fetch_community_posts_page (see supabase migration).
  */
+import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { listFolloweeIdsForCurrentUser } from "./follows-supabase";
@@ -230,7 +231,7 @@ export async function togglePostLike(
   void supabase.functions
     .invoke("notify_feed_push", { body: { kind: "feed_post_like", post_id: postId } })
     .then(({ error: fnErr }) => {
-      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push like:", fnErr.message);
+      if (fnErr) logEdgeInvokeFailure("notify_feed_push like", fnErr.message);
     });
 
   return { error: null };
@@ -520,7 +521,7 @@ export async function insertFeedPost(
       void supabase.functions
         .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
         .then(({ error: fnErr }) => {
-          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
         });
     }
     return { data: await finalizeSinglePostRow(out), error: null };
@@ -561,7 +562,7 @@ export async function insertFeedPost(
       void supabase.functions
         .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
         .then(({ error: fnErr }) => {
-          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
         });
     }
     return { data: await finalizeSinglePostRow(out), error: null };
@@ -601,7 +602,7 @@ export async function insertFeedPost(
       void supabase.functions
         .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
         .then(({ error: fnErr }) => {
-          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
         });
     }
     return { data: await finalizeSinglePostRow(out), error: null };
@@ -679,7 +680,7 @@ export async function insertFeedPost(
       void supabase.functions
         .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
         .then(({ error: fnErr }) => {
-          if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push mention:", fnErr.message);
+          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
         });
     }
     return { data: await finalizeSinglePostRow(out), error: null };
@@ -760,7 +761,7 @@ export async function insertCommunityComment(postId: string, body: string): Prom
   void supabase.functions
     .invoke("notify_feed_push", { body: { kind: "feed_post_comment", post_id: postId, comment_id: out.id } })
     .then(({ error: fnErr }) => {
-      if (fnErr && import.meta.env.DEV) console.warn("[feed] notify_feed_push comment:", fnErr.message);
+      if (fnErr) logEdgeInvokeFailure("notify_feed_push comment", fnErr.message);
     });
 
   return { data: out, error: null };

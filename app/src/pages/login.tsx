@@ -136,9 +136,10 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
-      <PageShell variant="narrow" className="w-full max-w-md">
-      <Card className="w-full">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+        <PageShell variant="narrow" className="w-full max-w-md">
+      <Card className="w-full rounded-2xl border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl">Log in to Diabeaters</CardTitle>
         </CardHeader>
@@ -229,13 +230,14 @@ export default function Login() {
           <p className="text-xs text-center pt-2">
             <Link href="/welcome">
               <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
-                Choose Family Member / Supporter on the welcome screen
+                Back to welcome
               </span>
             </Link>
           </p>
         </CardContent>
       </Card>
       </PageShell>
+    </div>
     </div>
   );
 }

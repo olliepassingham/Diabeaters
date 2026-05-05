@@ -9,8 +9,8 @@
  * Push: direct APNs (APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY, optional APNS_BUNDLE_ID, APNS_USE_SANDBOX)
  * or legacy relay (PUSH_NOTIFICATION_API_URL, optional PUSH_NOTIFICATION_API_KEY).
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { deliverSupplyLowAlerts } from "../_shared/supply-low-delivery.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -28,32 +28,6 @@ function isUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     s,
   );
-}
-
-function prefsAllowSupply(prefs: unknown): { enabled: boolean; inapp: boolean; push: boolean } {
-  const p = (prefs && typeof prefs === "object" ? prefs : {}) as Record<string, unknown>;
-  return {
-    enabled: p.enabled !== false,
-    inapp: p.inapp !== false,
-    push: p.push === true,
-  };
-}
-
-/** UTC YYYY-MM-DD for daily idempotency buckets. */
-function utcDateKey(d = new Date()): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/** One in-app row per recipient per patient supply threshold per UTC day. */
-function supplyLowDedupeKey(patientUserId: string, supplyId: string, level: "low" | "critical"): string {
-  return `supplies_low:${patientUserId}:${supplyId}:${level}:${utcDateKey()}`;
-}
-
-function isUniqueViolation(err: { code?: string; message?: string } | null): boolean {
-  if (!err) return false;
-  const code = String(err.code ?? "");
-  const msg = (err.message ?? "").toLowerCase();
-  return code === "23505" || msg.includes("duplicate key") || msg.includes("unique constraint");
 }
 
 Deno.serve(async (req: Request) => {
@@ -133,97 +107,27 @@ Deno.serve(async (req: Request) => {
     }
 
     const carers = (linkRows ?? [])
-      .map((r) => ({ carer_id: String((r as any).carer_id), scopes: (r as any).scopes }))
+      .map((r) => ({ carer_id: String((r as Record<string, unknown>).carer_id), scopes: (r as Record<string, unknown>).scopes }))
       .filter((r) => isUuid(r.carer_id))
       .filter((r) => {
         const scopes = (r.scopes && typeof r.scopes === "object" ? r.scopes : {}) as Record<string, unknown>;
         return scopes.supplies === true || scopes.supplies === "true";
       });
 
-    const recipients = [callerId, ...carers.map((c) => c.carer_id)];
-    const { data: prefsRows } = await admin
-      .from("notification_preferences")
-      .select("user_id,prefs")
-      .in("user_id", recipients);
-    const prefsById = new Map<string, unknown>(
-      (prefsRows ?? []).map((r: any) => [String(r.user_id), r.prefs]),
-    );
-
-    const title =
-      level === "critical" ? "Supplies critical" : "Supplies running low";
-
-    const dedupeKey = supplyLowDedupeKey(callerId, supplyId, level);
-
-    let inappDelivered = 0;
-    let pushDelivered = 0;
-
-    for (const rid of recipients) {
-      const prefs = prefsAllowSupply(prefsById.get(rid));
-      if (!prefs.enabled) continue;
-
-      const isPatient = rid === callerId;
-      const bodyText = isPatient
-        ? `${supplyName} is ${level}${daysRemaining != null ? ` (${Math.max(0, Math.round(daysRemaining))}d left)` : ""}.`
-        : `${patientLabel}: ${supplyName} is ${level}${daysRemaining != null ? ` (${Math.max(0, Math.round(daysRemaining))}d left)` : ""}.`;
-
-      const data = {
-        kind: "supplies_low",
-        level,
-        supply_id: supplyId,
-        supply_name: supplyName,
-        days_remaining: daysRemaining,
-        patient_user_id: callerId,
-        deep_link: isPatient ? "/supplies" : "/carer-view",
-      };
-
-      let inappInsertedFresh = false;
-
-      if (prefs.inapp) {
-        const { error: insErr } = await admin.from("notifications").insert({
-          user_id: rid,
-          title,
-          body: bodyText,
-          data,
-          dedupe_key: dedupeKey,
-          read: false,
-        });
-        if (!insErr) {
-          inappDelivered += 1;
-          inappInsertedFresh = true;
-        } else if (isUniqueViolation(insErr)) {
-          /* duplicate same-day notify — expected when multiple clients poll */
-        } else {
-          console.error("[notify_supply_low] notification insert", insErr);
-        }
-      }
-
-      const shouldSendPush =
-        prefs.push &&
-        iosPushDeliveryConfigured() &&
-        (inappInsertedFresh || !prefs.inapp);
-
-      if (shouldSendPush) {
-        const { data: tokenRows } = await admin
-          .from("push_tokens")
-          .select("token")
-          .eq("user_id", rid)
-          .eq("platform", "ios");
-        const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
-        for (const t of tokens) {
-          try {
-            const ok = await deliverIosPushToDevice(t, title, bodyText, data);
-            if (ok) pushDelivered += 1;
-          } catch (e) {
-            console.error("[notify_supply_low] push send", e);
-          }
-        }
-      }
-    }
+    const { inappDelivered, pushDelivered, recipients } = await deliverSupplyLowAlerts(admin, {
+      patientId: callerId,
+      patientLabel,
+      supplyId,
+      supplyName,
+      level,
+      daysRemaining,
+      carers,
+    });
 
     return new Response(
       JSON.stringify({
         success: true,
-        recipients: recipients.length,
+        recipients,
         delivered_inapp: inappDelivered,
         delivered_push: pushDelivered,
       }),
@@ -237,4 +141,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-

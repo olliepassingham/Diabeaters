@@ -21,7 +21,9 @@ import { Link } from "wouter";
 import {
   storage,
   DIABEATER_SETTINGS_CHANGED_EVENT,
+  DIABEATER_PROFILE_CHANGED_EVENT,
   dismissSoftSetupNudge,
+  isCommunityAccountProfile,
   isSoftSetupNudgeDismissed,
   isWithinOnboardingPostFinishGracePeriod,
   Supply as LocalSupply,
@@ -29,6 +31,7 @@ import {
   UserProfile,
   HypoTreatment,
 } from "@/lib/storage";
+import { getActiveAppMode } from "@/lib/carer-session";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -738,12 +741,14 @@ export default function Dashboard() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
     window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onSettingsChanged);
 
     return () => {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onSettingsChanged);
     };
   }, []);
 
@@ -784,17 +789,24 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
+  const mode = getActiveAppMode();
+  const isCommunityDash =
+    isCommunityAccountProfile(profile) && mode !== "patient" && mode !== "carer";
+
   const inOnboardingSetupGrace = isWithinOnboardingPostFinishGracePeriod(ONBOARDING_SETUP_GRACE_DAYS);
   const showSoftSetupNudge =
-    !isSettingsComplete && inOnboardingSetupGrace && !softSetupNudgeDismissed;
-  const showFullSetupPrompt = !isSettingsComplete && !inOnboardingSetupGrace;
+    !isCommunityDash && !isSettingsComplete && inOnboardingSetupGrace && !softSetupNudgeDismissed;
+  const showFullSetupPrompt =
+    !isCommunityDash && !isSettingsComplete && !inOnboardingSetupGrace;
 
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
     isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
+  const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day"]);
   const widgetsToRender = activeWidgets
     .filter((w) => w.type !== "settings-completion")
-    .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget);
+    .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget)
+    .filter((w) => !isCommunityDash || communityDashWidgetAllow.has(w.type));
 
   if (isLoading) {
     return <DashboardSkeleton />;
@@ -805,7 +817,11 @@ export default function Dashboard() {
       <PageHeader
         screenReaderOnly
         title={<span data-testid="dashboard-title">Dashboard</span>}
-        description={<span data-testid="dashboard-subtitle">Your daily overview</span>}
+        description={
+          <span data-testid="dashboard-subtitle">
+            {isCommunityDash ? "Explore education and the community" : "Your daily overview"}
+          </span>
+        }
       />
       {/* Today: high-signal cluster (reads as one section) */}
       <section className="space-y-4" data-testid="dashboard-today">
@@ -840,22 +856,26 @@ export default function Dashboard() {
           </Alert>
         )}
 
-        <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
-          <HeroCard
-            status={healthStatus}
-            profile={profile}
-            cloudFullName={cloudProfile?.full_name ?? null}
-            onEditWidgets={() => setWidgetsDialogOpen(true)}
-          />
-        </div>
+        {!isCommunityDash ? (
+          <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>
+            <HeroCard
+              status={healthStatus}
+              profile={profile}
+              cloudFullName={cloudProfile?.full_name ?? null}
+              onEditWidgets={() => setWidgetsDialogOpen(true)}
+            />
+          </div>
+        ) : null}
 
-        <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
-          <WelcomeWidget />
-        </section>
+        {!isCommunityDash ? (
+          <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
+            <WelcomeWidget />
+          </section>
+        ) : null}
 
         <CoachEntryCard />
 
-        <SupplyTrackerTodaySection />
+        {!isCommunityDash ? <SupplyTrackerTodaySection /> : null}
 
         {showSoftSetupNudge && (
           <section className="animate-fade-in-up" style={{ animationDelay: "70ms" }}>

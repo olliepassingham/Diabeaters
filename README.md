@@ -244,7 +244,8 @@ create policy "Supplies: delete own" on public.supplies
 
 In-app and carer alerts are driven by **Supabase Edge Functions**. Deploy these (from the repo’s `supabase/functions/` or your CI) so invokes from the app succeed:
 
-- `notify_supply_low` — low/critical supply transitions
+- `notify_supply_low` — low/critical supply transitions (patient JWT from the app)
+- `notify_supply_low_cron` — same alerts on a schedule using cached days-left on `supplies` (service role; see `supabase/README.md`)
 - `notify_carers_on_hypo` — carers (+ optional patient inbox row) after a hypo log
 - `notify_scenario_started` — sick day / travel mode started
 

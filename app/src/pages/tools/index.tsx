@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
@@ -150,6 +151,42 @@ export function carerToolsForHub(): ToolDef[] {
   return [coach, ...CARER_TOOLS];
 }
 
+const COMMUNITY_TOOLS: ToolDef[] = [
+  {
+    id: "hypo-help",
+    href: "/tools/hypo-help",
+    icon: Droplet,
+    title: "What is a hypo?",
+    description: "Educational overview of low blood glucose — when to treat urgently vs when to read and learn.",
+  },
+  {
+    id: "education",
+    href: "/education",
+    icon: BookOpen,
+    title: "Education",
+    description: "A–Z glossary of type 1 diabetes and app terms.",
+  },
+  {
+    id: "tips",
+    href: "/tools/tips",
+    icon: Lightbulb,
+    title: "Tips",
+    description: "Tip of the day and a bigger library of practical reminders.",
+  },
+];
+
+export function communityToolsForHub(): ToolDef[] {
+  if (!isAiCoachEnabled) return COMMUNITY_TOOLS;
+  const coach: ToolDef = {
+    id: "ai-coach",
+    href: "/coach",
+    icon: MessageCircle,
+    title: AI_ASSISTANT_NAME,
+    description: `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,
+  };
+  return [coach, ...COMMUNITY_TOOLS];
+}
+
 function ToolCard({
   href,
   icon: Icon,
@@ -228,16 +265,20 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" }) {
+function ToolsAboutDialog({ hubVariant }: { hubVariant: "patient" | "carer" | "community" }) {
   return (
     <PageInfoDialog
       title="About Tools"
       description="Calculators, tracking, and learning resources. Educational only — always follow your care team’s advice."
     >
-      {hubVariant === "carer" ? (
+      {hubVariant === "carer" || hubVariant === "community" ? (
         <>
-          <InfoSection title="Supporter tools">
-            <p>General education and hypo guidance. Always follow the care team’s plan for the person you support.</p>
+          <InfoSection title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"}>
+            <p>
+              {hubVariant === "community"
+                ? "Education, tips, and hypo awareness — without personal dose or supply tracking."
+                : "General education and hypo guidance. Always follow the care team’s plan for the person you support."}
+            </p>
           </InfoSection>
         </>
       ) : (
@@ -262,7 +303,7 @@ export function ToolsHubPage({
   hubVariant = "patient",
 }: {
   tools?: ToolDef[];
-  hubVariant?: "patient" | "carer";
+  hubVariant?: "patient" | "carer" | "community";
 }) {
   const byId = new Map(tools.map((t) => [t.id, t] as const));
 
@@ -285,7 +326,7 @@ export function ToolsHubPage({
       : ["insulin-calculator", "hypo-help", "correction-helper"];
 
   const actNowIds: readonly string[] =
-    hubVariant === "carer"
+    hubVariant === "carer" || hubVariant === "community"
       ? byId.has("ai-coach")
         ? ["ai-coach", "hypo-help"]
         : ["hypo-help"]
@@ -298,19 +339,24 @@ export function ToolsHubPage({
 
   const learn = (["education", "tips"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
-  const supporterTools = hubVariant === "carer" ? ([...actNow, ...learn] as ToolDef[]) : [];
+  const supporterTools =
+    hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-10">
       <PageHeader className="max-w-2xl" title="Tools" actions={<ToolsAboutDialog hubVariant={hubVariant} />} />
 
-      <DobUnknownNotice hidden={hubVariant === "carer"} testId="tools-dob-unknown-notice" />
+      <DobUnknownNotice hidden={hubVariant === "carer" || hubVariant === "community"} testId="tools-dob-unknown-notice" />
 
-      {hubVariant === "carer" && supporterTools.length > 0 ? (
-        <section className="space-y-4" aria-label="Supporter tools" data-testid="tools-section-supporter">
+      {(hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
+        <section
+          className="space-y-4"
+          aria-label={hubVariant === "community" ? "Community tools" : "Supporter tools"}
+          data-testid="tools-section-supporter"
+        >
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title="Supporter tools" />
+            <SectionHeader title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"} />
           </div>
           <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
@@ -417,7 +463,16 @@ export default function ToolsPage() {
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
-  const tileCount = isCarerMode ? carerToolsForHub().length : patientToolsForHub().length;
+  const isCommunityMode =
+    !hasCarerLink &&
+    activeMode !== "patient" &&
+    activeMode !== "carer" &&
+    (activeMode === "community" || (activeMode == null && isCommunityAccountProfile(storage.getProfile())));
+  const tileCount = isCarerMode
+    ? carerToolsForHub().length
+    : isCommunityMode
+      ? communityToolsForHub().length
+      : patientToolsForHub().length;
 
   useEffect(() => {
     prefetchToolsHubLinkedChunks();
@@ -425,14 +480,14 @@ export default function ToolsPage() {
 
   useEffect(() => {
     if (loading) return;
-    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
+    if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, setLocation]);
+  }, [loading, isCarerMode, isCommunityMode, setLocation]);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);
@@ -450,7 +505,8 @@ export default function ToolsPage() {
       </PageShell>
     );
   }
-  if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
+  if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
   if (isCarerMode) return <ToolsHubPage tools={carerToolsForHub()} hubVariant="carer" />;
+  if (isCommunityMode) return <ToolsHubPage tools={communityToolsForHub()} hubVariant="community" />;
   return <ToolsHubPage tools={patientToolsForHub()} hubVariant="patient" />;
 }

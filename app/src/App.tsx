@@ -67,6 +67,7 @@ import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { getProfile } from "@/lib/profile";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
 import Privacy from "@/pages/privacy";
@@ -103,6 +104,7 @@ const Travel = lazy(() => import("@/pages/travel"));
 
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const SettingsEmergencyPage = lazy(() => import("@/pages/settings/emergency"));
+const SettingsPharmacyPage = lazy(() => import("@/pages/settings/pharmacy"));
 
 const Scenarios = lazy(() => import("@/pages/scenarios"));
 const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
@@ -392,16 +394,46 @@ function isCoachPath(pathOnly: string): boolean {
   return p === "/coach";
 }
 
+/** Community Member session: learn, feed, coach, account; no clinical tools. */
+function isCommunityMemberAllowedPath(pathOnly: string): boolean {
+  const p = (pathOnly || "/").split("?")[0] ?? "/";
+  if (p === "/") return true;
+  if (p === "/tools" || p.startsWith("/tools/")) return true;
+  if (p === "/education" || p.startsWith("/education/")) return true;
+  if (p === "/coach") return true;
+  if (p === "/notifications") return true;
+  if (p === "/account") return true;
+  if (p === "/settings") return true;
+  if (p === "/settings/appearance") return true;
+  if (p === "/settings/notifications") return true;
+  if (p === "/settings/about") return true;
+  if (p === "/privacy" || p === "/support") return true;
+  if (isCommunityPath(p)) return true;
+  return false;
+}
+
+function computeCommunityMemberMode(
+  hasCarerLink: boolean,
+  activeMode: ReturnType<typeof getActiveAppMode>,
+): boolean {
+  if (hasCarerLink) return false;
+  if (activeMode === "patient" || activeMode === "carer") return false;
+  if (activeMode === "community") return true;
+  if (activeMode == null && isCommunityAccountProfile(storage.getProfile())) return true;
+  return false;
+}
+
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [location, setLocation] = useLocation();
   const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);
@@ -410,22 +442,27 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
+    if (isCommunityMode && !isCommunityMemberAllowedPath(pathOnly)) {
+      setLocation("/tools");
+      return;
+    }
     if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) {
       setLocation("/carer-view");
       return;
     }
-    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
+    if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, pathOnly, setLocation]);
+  }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
+  if (isCommunityMode && !isCommunityMemberAllowedPath(pathOnly)) return null;
   if (isCarerMode && !isCommunityPath(pathOnly) && !isCoachPath(pathOnly)) return null;
-  if (hasCarerIntent() || hasPendingCarer()) return null;
+  if (!isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
   return <>{children}</>;
 }
 
@@ -451,33 +488,14 @@ function isCarerAllowedPath(pathOnly: string): boolean {
 function CarerSetupIntentGuard({ children }: { children: React.ReactNode }) {
   const { data: linkedPatient, loading } = useLinkedPatient();
   const [, setLocation] = useLocation();
-  const isCarerMode = Boolean(linkedPatient);
-
-  useEffect(() => {
-    if (loading) return;
-    if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) {
-      setLocation("/carer-setup");
-    }
-  }, [loading, isCarerMode, setLocation]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
-    );
-  }
-  if (!isCarerMode && (hasCarerIntent() || hasPendingCarer())) return null;
-  return <>{children}</>;
-}
-
-function FamilyCarersGate() {
-  const { isCarer: hasCarerLink, loading } = useLinkedCarer();
-  const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const { isCarer: hasCarerLink } = useLinkedCarer();
+  const isCarerMode = Boolean(linkedPatient);
+  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);
@@ -486,6 +504,42 @@ function FamilyCarersGate() {
 
   useEffect(() => {
     if (loading) return;
+    if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) {
+      setLocation("/carer-setup");
+    }
+  }, [loading, isCarerMode, isCommunityMode, setLocation]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
+    );
+  }
+  if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
+  return <>{children}</>;
+}
+
+function FamilyCarersGate() {
+  const { isCarer: hasCarerLink, loading } = useLinkedCarer();
+  const [, setLocation] = useLocation();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (isCommunityMode) {
+      setLocation("/tools");
+      return;
+    }
     if (isCarerMode) {
       setLocation("/carer-view");
       return;
@@ -493,14 +547,14 @@ function FamilyCarersGate() {
     if (hasCarerIntent() || hasPendingCarer()) {
       setLocation("/carer-setup");
     }
-  }, [loading, isCarerMode, setLocation]);
+  }, [loading, isCarerMode, isCommunityMode, setLocation]);
 
   if (loading) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
   }
-  if (isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
+  if (isCommunityMode || isCarerMode || hasCarerIntent() || hasPendingCarer()) return null;
   return (
     <Suspense fallback={<RouteFallback />}>
       <FamilyCarers />
@@ -770,6 +824,13 @@ function InnerRouter() {
           <SettingsEmergencyPage />
         </Suspense>
       </Route>
+      <Route path="/settings/pharmacy">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsPharmacyPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
       <Route path="/settings/notifications">
         <Suspense fallback={<RouteFallback />}>
           <SettingsPage />
@@ -911,10 +972,12 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
  */
 function UnverifiedAccountShell({
   isCarerMode,
+  suppressClinicalPollers,
   onBrandClick,
   onLogout,
 }: {
   isCarerMode: boolean;
+  suppressClinicalPollers: boolean;
   onBrandClick: () => void;
   onLogout: () => void | Promise<void>;
 }) {
@@ -922,9 +985,9 @@ function UnverifiedAccountShell({
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
-      {!isCarerMode ? <SickDayMedDuePoller /> : null}
-      {!isCarerMode ? <AlcoholReminderPoller /> : null}
-      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
+      {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
+      {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
+      {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
       <AppTopBar isCarer={isCarerMode} pathOnly="/account" onBrandClick={onBrandClick} onLogout={onLogout} />
       <main
@@ -951,7 +1014,9 @@ function AuthenticatedShell() {
   const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
-  const iosNotifPrompt = useIosLocalNotificationPermissionPrompt(!isCarerMode);
+  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+  const suppressClinicalPollers = isCarerMode || isCommunityMode;
+  const iosNotifPrompt = useIosLocalNotificationPermissionPrompt(!suppressClinicalPollers);
 
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
@@ -964,12 +1029,16 @@ function AuthenticatedShell() {
       if (location.split("?")[0] !== "/carer-view") setLocation("/carer-view");
       return;
     }
+    if (isCommunityMode) {
+      if (location.split("?")[0] !== "/tools") setLocation("/tools");
+      return;
+    }
     if (location.split("?")[0] !== "/") setLocation("/");
   };
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);
@@ -977,12 +1046,12 @@ function AuthenticatedShell() {
   }, []);
 
   useEffect(() => {
-    if (isCarerMode) return;
+    if (suppressClinicalPollers) return;
     if (!Capacitor.isNativePlatform?.() || Capacitor.getPlatform?.() !== "ios") return;
     void import("@/lib/ios-system-notifications").then((m) => {
       void m.cancelLegacyHelpfulCheckInNotification();
     });
-  }, [isCarerMode]);
+  }, [suppressClinicalPollers]);
 
   useEffect(() => {
     if (!hasCarerLink) return;
@@ -992,6 +1061,15 @@ function AuthenticatedShell() {
       setActiveAppMode("carer");
     } else {
       setActiveAppMode("patient");
+    }
+  }, [hasCarerLink, activeMode, pathOnly]);
+
+  useEffect(() => {
+    if (hasCarerLink) return;
+    if (activeMode != null) return;
+    if (pathOnly === "/mode") return;
+    if (isCommunityAccountProfile(storage.getProfile()) || getPrimaryAppRole() === "community") {
+      setActiveAppMode("community");
     }
   }, [hasCarerLink, activeMode, pathOnly]);
 
@@ -1006,6 +1084,13 @@ function AuthenticatedShell() {
       setLocation("/");
     }
   }, [hasCarerLink, activeMode, pathOnly, setLocation]);
+
+  useEffect(() => {
+    if (!isCommunityMode) return;
+    if (!isCommunityMemberAllowedPath(pathOnly) && pathOnly !== "/mode") {
+      setLocation("/tools");
+    }
+  }, [isCommunityMode, pathOnly, setLocation]);
 
   useEffect(() => {
     const onSupplySyncToast = (ev: Event) => {
@@ -1065,15 +1150,20 @@ function AuthenticatedShell() {
   return (
     <AskAnythingProvider defaultAudience={isCarerMode ? "supporter" : "patient"}>
       {slimUnverifiedAccount ? (
-        <UnverifiedAccountShell isCarerMode={isCarerMode} onBrandClick={goBrandHome} onLogout={handleLogout} />
+        <UnverifiedAccountShell
+          isCarerMode={isCarerMode}
+          suppressClinicalPollers={suppressClinicalPollers}
+          onBrandClick={goBrandHome}
+          onLogout={handleLogout}
+        />
       ) : (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
-      {!isCarerMode ? <SickDayMedDuePoller /> : null}
-      {!isCarerMode ? <SupplyLowNotifyPoller /> : null}
-      {!isCarerMode ? <AlcoholReminderPoller /> : null}
-      {!isCarerMode ? <PumpFailureReminderPoller /> : null}
+      {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
+      {!suppressClinicalPollers ? <SupplyLowNotifyPoller /> : null}
+      {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
+      {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
       <AppTopBar
@@ -1082,7 +1172,7 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
-      {!isCarerMode && iosNotifPrompt.show ? (
+      {!suppressClinicalPollers && iosNotifPrompt.show ? (
         <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">
           <Alert className="border-border/60 bg-background/55 backdrop-blur">
             <AlertDescription className="text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1101,7 +1191,7 @@ function AuthenticatedShell() {
           </Alert>
         </div>
       ) : null}
-      {!isCarerMode ? <AppStatusStrip /> : null}
+      {!suppressClinicalPollers ? <AppStatusStrip /> : null}
       <main
         id="app-scroll-main"
         className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
@@ -1237,7 +1327,7 @@ function AppContent() {
         setAppGateReady(true);
         return;
       }
-      if (hasCarerIntent() || hasPendingCarer()) {
+      if ((hasCarerIntent() || hasPendingCarer()) && getPrimaryAppRole() !== "community") {
         setLinkedCarer(false);
         setPatientOnboardingSatisfied(true);
         setAppGateReady(true);
@@ -1281,7 +1371,7 @@ function AppContent() {
     if (publicEntry) return;
     if (!user?.id) return;
     if (linkedCarer) return;
-    if (hasCarerIntent() || hasPendingCarer()) return;
+    if (getPrimaryAppRole() !== "community" && (hasCarerIntent() || hasPendingCarer())) return;
     if (patientOnboardingSatisfied) return;
     if (pathOnly === "/onboarding" || pathOnly === "/account") return;
     const role = getPrimaryAppRole();
@@ -1335,11 +1425,13 @@ function AppContent() {
     );
   }
 
+  const carerPendingBlocksOnboarding =
+    getPrimaryAppRole() !== "community" && (hasCarerIntent() || hasPendingCarer());
+
   if (
     user?.id &&
     !linkedCarer &&
-    !hasCarerIntent() &&
-    !hasPendingCarer() &&
+    !carerPendingBlocksOnboarding &&
     !patientOnboardingSatisfied &&
     pathOnly !== "/onboarding" &&
     pathOnly !== "/account"

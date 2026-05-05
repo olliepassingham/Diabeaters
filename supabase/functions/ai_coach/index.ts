@@ -8,7 +8,7 @@
  *
  * @see docs/regulatory/ai_coach_system_prompt.md
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { packContext } from "../_shared/ai-coach/contextPacker.ts";
 import { intercept } from "../_shared/ai-coach/interceptor.ts";
 import { callOpenAiChatJson } from "../_shared/ai-coach/llmClient.ts";
@@ -204,6 +204,53 @@ function normalizeBgUnits(raw: unknown): string | null {
   return null;
 }
 
+function normalizePharmacyStatus(raw: unknown): {
+  configured: boolean;
+  openNow: boolean | null;
+  nextOpensInMinutes: number | null;
+  closesInMinutes: number | null;
+  todaySummary: string | null;
+  tomorrowSummary: string | null;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const configured = Boolean(o.configured);
+  const openNow = typeof o.openNow === "boolean" ? o.openNow : o.openNow == null ? null : null;
+  const clampMins = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return null;
+    if (v < 0) return 0;
+    // Cap to 14 days to prevent abuse / huge numbers.
+    if (v > 14 * 24 * 60) return 14 * 24 * 60;
+    return Math.round(v);
+  };
+  const nextOpensInMinutes = clampMins(o.nextOpensInMinutes);
+  const closesInMinutes = clampMins(o.closesInMinutes);
+  const clampSummary = (v: unknown): string | null => {
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    if (!t) return null;
+    // Keep this short so the coach context stays compact.
+    return t.slice(0, 140);
+  };
+  const todaySummary = clampSummary(o.todaySummary);
+  const tomorrowSummary = clampSummary(o.tomorrowSummary);
+  return { configured, openNow, nextOpensInMinutes, closesInMinutes, todaySummary, tomorrowSummary };
+}
+
+function isPharmacyHoursQuestion(message: string): boolean {
+  const m = message.trim().toLowerCase();
+  if (!m) return false;
+  if (!m.includes("pharmacy") && !m.includes("chemist")) return false;
+  return (
+    m.includes("open") ||
+    m.includes("opening") ||
+    m.includes("hours") ||
+    m.includes("time") ||
+    m.includes("tomorrow") ||
+    m.includes("today")
+  );
+}
+
 /**
  * Returns true when the caller has at least one row in `public.carer_links`
  * where they are the carer (i.e. they support someone). The Edge Function uses
@@ -312,6 +359,7 @@ Deno.serve(async (req: Request) => {
     const ratiosAreSet = Boolean(b.ratiosAreSet);
     const bgUnitsClient = normalizeBgUnits(b.bgUnits ?? b.bg_units);
     const requestedAudience: CoachAudience = normalizeAudience(b.audience);
+    const pharmacyStatus = normalizePharmacyStatus(b.pharmacyStatus);
 
     if (!message || message.length > 8000) {
       const out: CoachResponse = {
@@ -432,6 +480,24 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(200, { success: true, ...out });
     }
 
+    if (isPharmacyHoursQuestion(message) && pharmacyStatus?.configured) {
+      const bits: string[] = [];
+      if (pharmacyStatus.todaySummary) bits.push(pharmacyStatus.todaySummary);
+      if (pharmacyStatus.tomorrowSummary) bits.push(pharmacyStatus.tomorrowSummary);
+      const summary = bits.filter(Boolean).join("\n");
+      const reply: CoachResponse = {
+        reply:
+          summary ||
+          "I can see you have a pharmacy saved, but I don't have its opening hours. Add them under Settings → Your pharmacy, then ask me again.",
+        suggestedQuestions: [],
+        suggestedNextActions: summary ? [] : [{ label: "Open Supplies", href: "/supplies" }],
+        deferToTeam: false,
+        category: "llm",
+        postFilter: "n/a",
+      };
+      return jsonResponse(200, { success: true, ...reply });
+    }
+
     const enableLlm = (Deno.env.get("ENABLE_AI_COACH") ?? "").trim().toLowerCase() === "true";
     if (!enableLlm) {
       await insertAudit(admin, {
@@ -500,6 +566,7 @@ Deno.serve(async (req: Request) => {
       },
       lastFortnight,
       ratiosAreSet,
+      ...(pharmacyStatus ? { pharmacyStatus } : {}),
     });
 
     let llmReply: CoachReply;

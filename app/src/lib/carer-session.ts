@@ -8,12 +8,12 @@ const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
 /** Chosen on /welcome: patient-only, supporter-only, or both (patient tools + supporter linking). */
 const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
 
-export type ActiveAppMode = "patient" | "carer";
+export type ActiveAppMode = "patient" | "carer" | "community";
 
 /** Chosen on /welcome: drives default session mode when the account can use both User and Supporter. */
-export type PrimaryAppRole = "patient" | "carer";
+export type PrimaryAppRole = "patient" | "carer" | "community";
 
-export type OnboardingAccountPath = "patient" | "supporter" | "both";
+export type OnboardingAccountPath = "patient" | "supporter" | "both" | "community";
 
 function emitModeChanged(mode: ActiveAppMode | null) {
   try {
@@ -56,13 +56,13 @@ export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
 export function getOnboardingAccountPath(): OnboardingAccountPath | null {
   try {
     const raw = localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
-    if (raw === "patient" || raw === "supporter" || raw === "both") return raw;
+    if (raw === "patient" || raw === "supporter" || raw === "both" || raw === "community") return raw;
   } catch {
     // ignore
   }
   try {
     const legacy = sessionStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
-    if (legacy === "patient" || legacy === "supporter" || legacy === "both") return legacy;
+    if (legacy === "patient" || legacy === "supporter" || legacy === "both" || legacy === "community") return legacy;
   } catch {
     // ignore
   }
@@ -88,7 +88,7 @@ export function setPrimaryAppRole(role: PrimaryAppRole): void {
 
 export function getPrimaryAppRole(): PrimaryAppRole | null {
   const raw = sessionStorage.getItem(PRIMARY_APP_ROLE_KEY);
-  if (raw === "patient" || raw === "carer") return raw;
+  if (raw === "patient" || raw === "carer" || raw === "community") return raw;
   return null;
 }
 
@@ -119,6 +119,12 @@ export function hasPendingCarer(): boolean {
 }
 
 export function setPendingPatient(): void {
+  clearPendingCarer();
+  clearCarerIntent();
+}
+
+/** Community-member path from /welcome: clears supporter intent (same as patient). */
+export function setPendingCommunity(): void {
   clearPendingCarer();
   clearCarerIntent();
 }
@@ -164,7 +170,7 @@ export function clearActiveCarerPatientId(): void {
 
 export function getActiveAppMode(): ActiveAppMode | null {
   const raw = sessionStorage.getItem(ACTIVE_APP_MODE_KEY);
-  if (raw === "patient" || raw === "carer") return raw;
+  if (raw === "patient" || raw === "carer" || raw === "community") return raw;
   return null;
 }
 

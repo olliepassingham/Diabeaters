@@ -43,6 +43,8 @@ export interface PackContextInput {
   profile: ProfileInput;
   lastFortnight: LastFortnightInput;
   ratiosAreSet: boolean;
+  /** Optional client-provided pharmacy opening status. */
+  pharmacyStatus?: CoachContext["pharmacy"];
   /** Optional: override "now" for deterministic tests. */
   now?: Date;
 }
@@ -156,6 +158,7 @@ export function packContext(input: PackContextInput): CoachContext {
 
   return {
     profile,
+    ...(input.pharmacyStatus ? { pharmacy: input.pharmacyStatus } : {}),
     lastFortnight,
     ratiosAreSet: Boolean(input.ratiosAreSet),
     dataSparse,

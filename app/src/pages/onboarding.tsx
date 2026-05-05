@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,16 +31,26 @@ import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile } from "@/lib/profile";
-import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import {
+  describePartialClinicalPrefsCloudSync,
+  syncAccountTypeToCloud,
+  syncClinicalPrefsToCloud,
+} from "@/lib/clinical-prefs-cloud-sync";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { PageShell } from "@/components/layout/page-shell";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getOnboardingSecondaryCta, getPostOnboardingPath } from "@/lib/onboarding-routes";
-import { getOnboardingAccountPath } from "@/lib/carer-session";
+import {
+  clearOnboardingAccountPath,
+  getOnboardingAccountPath,
+  setActiveAppMode,
+  setPrimaryAppRole,
+} from "@/lib/carer-session";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -272,15 +282,22 @@ function OnboardingStepPills({ steps, currentStep }: { steps: Step[]; currentSte
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const showBothPath = useMemo(() => getOnboardingAccountPath() === "both", []);
-  const steps: Step[] = useMemo(
-    () =>
-      showBothPath
-        ? ["welcome", "care_context", "struggle", "details", "disclaimer", "first_win"]
-        : ["welcome", "struggle", "details", "disclaimer", "first_win"],
-    [showBothPath],
+  const search = useSearch();
+  const upgradeFlow = useMemo(() => new URLSearchParams(search).get("upgrade") === "1", [search]);
+  const accountPath = useMemo(() => getOnboardingAccountPath(), []);
+  const showBothPath = accountPath === "both";
+  const showCommunityPath = accountPath === "community";
+  const steps: Step[] = useMemo(() => {
+    if (upgradeFlow) return ["details", "disclaimer", "first_win"];
+    if (showCommunityPath) return ["welcome", "disclaimer", "first_win"];
+    if (showBothPath) return ["welcome", "care_context", "struggle", "details", "disclaimer", "first_win"];
+    return ["welcome", "struggle", "details", "disclaimer", "first_win"];
+  }, [upgradeFlow, showCommunityPath, showBothPath]);
+  const [currentStep, setCurrentStep] = useState<Step>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1"
+      ? "details"
+      : "welcome",
   );
-  const [currentStep, setCurrentStep] = useState<Step>("welcome");
   const [data, setData] = useState<OnboardingData>({
     name: "",
     diabetesType: "type1",
@@ -302,6 +319,22 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     cgmDays: "",
   });
 
+  useEffect(() => {
+    if (!upgradeFlow) return;
+    const p = storage.getProfile();
+    if (!p) return;
+    setData((prev) => ({
+      ...prev,
+      name: p.name?.trim() ? p.name : prev.name,
+      bgUnits: p.bgUnits || prev.bgUnits,
+      carbUnits: p.carbUnits || prev.carbUnits,
+      diabetesType: p.diabetesType && p.diabetesType !== "none" ? p.diabetesType : prev.diabetesType,
+      insulinDeliveryMethod: p.insulinDeliveryMethod || prev.insulinDeliveryMethod,
+      dateOfBirth: p.dateOfBirth || prev.dateOfBirth,
+      hasAcceptedDisclaimer: p.hasAcceptedDisclaimer,
+    }));
+  }, [upgradeFlow]);
+
   const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext) => {
     setData((prev) => ({ ...prev, [field]: value }));
   };
@@ -310,6 +343,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
 
   const handleSaveProfile = () => {
+    const prev = storage.getProfile();
     storage.saveProfile({
       name: data.name,
       email: "",
@@ -320,6 +354,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       usingInsulin: true,
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
       dateOfBirth: normalizeDateOfBirthInput(data.dateOfBirth) ?? "",
+      ratioFormat: prev?.ratioFormat,
+      carbPortionSize: prev?.carbPortionSize,
+      accountType: "patient",
     });
 
     const settings: Record<string, number | string | undefined> = {};
@@ -373,13 +410,85 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
   };
 
+  const handleFinishCommunity = async (pathOverride?: string) => {
+    storage.saveProfile({
+      name: data.name,
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "none",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: false,
+      hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
+      dateOfBirth: "",
+      accountType: "community",
+    });
+    try {
+      localStorage.removeItem("diabeater_onboarding_struggle");
+      localStorage.removeItem("diabeater_profile_incomplete");
+    } catch {
+      /* ignore */
+    }
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    recordOnboardingFinishedAt();
+    setActiveAppMode("community");
+    setPrimaryAppRole("community");
+    if (user?.id) {
+      const fullName = data.name.trim() ? data.name.trim() : null;
+      const { error } = await upsertProfile({
+        id: user.id,
+        onboarding_complete: true,
+        full_name: fullName,
+        account_type: "community",
+      });
+      if (error) {
+        toast({
+          title: "Could not sync profile",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        const acctRes = await syncAccountTypeToCloud(user.id);
+        if (acctRes.error) {
+          toast({
+            title: "Profile synced; account type pending",
+            description: acctRes.error.message,
+            variant: "destructive",
+          });
+        }
+      }
+    }
+    toast({
+      title: `Welcome${data.name ? `, ${data.name}` : ""}`,
+      description: "Explore Tools for education and tips, or open the feed when your profile is public.",
+    });
+    if (onComplete) {
+      onComplete(pathOverride ?? "/tools");
+    }
+  };
+
   const handleFinish = async (pathOverride?: string) => {
+    if (showCommunityPath) {
+      await handleFinishCommunity(pathOverride);
+      return;
+    }
+
     handleSaveProfile();
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
+    if (upgradeFlow) {
+      setActiveAppMode("patient");
+      setPrimaryAppRole("patient");
+      clearOnboardingAccountPath();
+    }
     if (user?.id) {
       const fullName = data.name.trim() ? data.name.trim() : null;
-      const { error } = await upsertProfile({ id: user.id, onboarding_complete: true, full_name: fullName });
+      const { error } = await upsertProfile({
+        id: user.id,
+        onboarding_complete: true,
+        full_name: fullName,
+        account_type: "patient",
+      });
       if (error) {
         toast({
           title: "Could not sync profile",
@@ -403,11 +512,23 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             });
           }
         }
+        const acctRes = await syncAccountTypeToCloud(user.id);
+        if (acctRes.error && !syncRes.error) {
+          toast({
+            title: "Profile synced; account type pending",
+            description: acctRes.error.message,
+            variant: "destructive",
+          });
+        }
       }
     }
     toast({
-      title: `Welcome to Diabeaters${data.name ? `, ${data.name}` : ""}!`,
-      description: "Let's get started.",
+      title: upgradeFlow
+        ? "Clinical tools unlocked"
+        : `Welcome to Diabeaters${data.name ? `, ${data.name}` : ""}!`,
+      description: upgradeFlow
+        ? "Supplies, meal planning, scenarios, and the rest of the app are ready when you are."
+        : "Let's get started.",
     });
     if (onComplete) {
       onComplete(pathOverride);
@@ -419,7 +540,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
-      case "details": return data.struggle !== null;
+      case "details":
+        return upgradeFlow || data.struggle !== null;
       case "disclaimer": return data.hasAcceptedDisclaimer;
       case "first_win": return true;
       default: return true;
@@ -429,7 +551,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const renderStep = () => {
     switch (currentStep) {
       case "welcome":
-        return <WelcomeStep data={data} updateData={updateData} showBothPath={showBothPath} />;
+        return (
+          <WelcomeStep
+            data={data}
+            updateData={updateData}
+            showBothPath={showBothPath}
+            communityFlow={showCommunityPath}
+          />
+        );
       case "care_context":
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
@@ -444,7 +573,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "disclaimer":
         return <DisclaimerStep data={data} updateData={updateData} />;
       case "first_win":
-        return <FirstWinStep data={data} onFinish={handleFinish} />;
+        return showCommunityPath ? (
+          <CommunityMemberFirstWinStep onFinish={handleFinish} />
+        ) : (
+          <FirstWinStep data={data} onFinish={handleFinish} />
+        );
       default:
         return null;
     }
@@ -527,14 +660,54 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   );
 }
 
+function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) => void | Promise<void> }) {
+  return (
+    <div className="space-y-8 pb-4 sm:pb-0">
+      <div className="text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="rounded-full bg-primary/10 p-4">
+            <Sparkles className="h-8 w-8 text-primary" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">You&apos;re ready to explore</h2>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            Education, tips, optional feed, and {AI_ASSISTANT_NAME} — all in one place. You can switch to full Type&nbsp;1
+            tools anytime in Settings.
+          </p>
+        </div>
+      </div>
+      <div
+        className="space-y-3 fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
+        data-testid="onboarding-community-first-win-actions"
+      >
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={() => void onFinish("/tools")}
+          data-testid="button-onboarding-community-complete"
+        >
+          Open Tools
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          Finishing saves your profile. You can add more detail anytime in Settings.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function WelcomeStep({
   data,
   updateData,
   showBothPath,
+  communityFlow,
 }: {
   data: OnboardingData;
   updateData: (field: keyof OnboardingData, value: any) => void;
   showBothPath: boolean;
+  communityFlow?: boolean;
 }) {
   return (
     <div className="text-center space-y-8">
@@ -550,9 +723,11 @@ function WelcomeStep({
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Diabeaters</h1>
           <p className="text-lg text-muted-foreground max-w-sm mx-auto leading-relaxed">
-            {showBothPath
-              ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
-              : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
+            {communityFlow
+              ? "Learn at your own pace, join the conversation when you want, and keep things simple — no supply or dose tracking required."
+              : showBothPath
+                ? "We’ll set up your own tools first, then you can link Supporter access in a couple of taps."
+                : "You’ll leave with the one thing you care about most working for you — less guessing, more living."}
           </p>
         </div>
       </div>
@@ -571,6 +746,7 @@ function WelcomeStep({
             />
           </div>
 
+          {!communityFlow ? (
           <div className="space-y-2">
             <Label className="text-base">Diabetes type</Label>
             <button
@@ -590,6 +766,7 @@ function WelcomeStep({
               Diabeaters is built for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
             </p>
           </div>
+          ) : null}
         </CardContent>
       </Card>
 

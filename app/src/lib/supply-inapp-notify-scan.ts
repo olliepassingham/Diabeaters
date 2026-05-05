@@ -1,4 +1,5 @@
 import { invokeNotifySupplyLow } from "@/lib/invoke-notify-supply-low";
+import { writeSupplyForecastToCloud } from "@/lib/supplies";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
@@ -38,6 +39,10 @@ export type SupplyInAppNotifyScanResult = {
 /**
  * When supply levels cross low/critical thresholds, call the cloud notify function so the in-app inbox
  * (and carers) receive the same alerts as on the Supplies screen. Updates persisted threshold state.
+ *
+ * **Runs only while this client is active** (foreground / visible / ~15m timer / iOS resume) — there is no
+ * server-side cron on supply rows today, so APNs for low stock cannot fire if the app has not run a scan
+ * since the threshold was crossed. See `docs/ios-push-notification-paths.md`.
  */
 export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifyScanResult> {
   if (supplyLowScanLock) {
@@ -98,10 +103,13 @@ export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifySc
     const shouldSend =
       (prev === "ok" && (level === "low" || level === "critical")) ||
       (prev === "low" && level === "critical");
-    if (!shouldSend) continue;
+    if (!shouldSend) {
+      if (item.cloud_id) void writeSupplyForecastToCloud(item);
+      continue;
+    }
 
     const res = await invokeNotifySupplyLow({
-      supplyId: item.id,
+      supplyId: item.cloud_id?.trim() || item.id,
       supplyName: item.name,
       level: level === "critical" ? "critical" : "low",
       daysRemaining: rounded,
@@ -115,6 +123,7 @@ export async function runSupplyLowInAppNotifyScan(): Promise<SupplyInAppNotifySc
         edgeFailure = { success: false, error: res.error, detail: res.detail };
       }
     }
+    if (item.cloud_id) void writeSupplyForecastToCloud(item);
   }
 
   setSupplyAlertState(nextState);

@@ -20,7 +20,7 @@
  *
  * Invoke with user's JWT; body: { hypo_id, user_id } must match the hypo row and JWT sub.
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {

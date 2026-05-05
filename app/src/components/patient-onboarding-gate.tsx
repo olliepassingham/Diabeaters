@@ -40,13 +40,24 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/welcome");
         return;
       }
+      const upgradeWizard = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1";
+      if (upgradeWizard) {
+        setShowWizard(true);
+        setReady(true);
+        return;
+      }
+
       const { profile } = await getProfile(user.id);
       if (cancelled) return;
       const done =
         profile?.onboarding_complete === true ||
         (typeof localStorage !== "undefined" && localStorage.getItem(ONBOARDING_LS) === "true");
       if (done) {
-        setLocation("/");
+        if (profile?.account_type === "community") {
+          setLocation("/tools");
+        } else {
+          setLocation("/");
+        }
         return;
       }
       setShowWizard(true);

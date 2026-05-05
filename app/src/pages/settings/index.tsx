@@ -25,6 +25,8 @@ import {
   Info,
   Users,
   AtSign,
+  Building2,
+  Sparkles,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
@@ -624,6 +626,9 @@ export default function Settings() {
   const [insulinCartridgeUnits, setInsulinCartridgeUnits] = useState("");
   const [suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled] = useState(false);
   
+  const isCommunityAccount = profile?.accountType === "community";
+  const hidePatientClinicalHub = isCarer || isCommunityAccount;
+
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
     pushNotifications: true,
@@ -736,10 +741,13 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    if (isCarer && (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios")) {
+    if (
+      hidePatientClinicalHub &&
+      (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios" || pathOnly === "/settings/pharmacy")
+    ) {
       setLocation("/settings");
     }
-  }, [isCarer, pathOnly, setLocation]);
+  }, [hidePatientClinicalHub, pathOnly, setLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1169,13 +1177,15 @@ export default function Settings() {
           description={
             isCarer
               ? "Your supporter account, alerts, and appearance."
-              : "Personal profile, clinical defaults, alerts, and appearance."
+              : isCommunityAccount
+                ? "Community profile, alerts, and appearance."
+                : "Personal profile, clinical defaults, alerts, and appearance."
           }
           actions={settingsInfoDialog}
         />
 
-        {!isCarer && (
-          <SettingsHubGroup title="Personal & clinical">
+        {!hidePatientClinicalHub && (
+        <SettingsHubGroup title="Personal & clinical">
             <SettingsHubNavLink
               href="/settings/usage"
               label="Personal info & usage"
@@ -1187,6 +1197,12 @@ export default function Settings() {
               label="Ratios"
               description="TDD, targets, correction factor, meal ratios"
               icon={Syringe}
+            />
+            <SettingsHubNavLink
+              href="/settings/pharmacy"
+              label="Your pharmacy"
+              description="Name and weekly opening hours for collect-by hints"
+              icon={Building2}
             />
           </SettingsHubGroup>
         )}
@@ -1202,7 +1218,18 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        {!isCarer && (
+        {isCommunityAccount && (
+          <SettingsHubGroup title="Account type">
+            <SettingsHubNavLink
+              href="/onboarding?upgrade=1"
+              label="I have Type 1 diabetes / use insulin"
+              description="Unlock supplies, meal planner, ratios, scenarios, and the full dashboard"
+              icon={Sparkles}
+            />
+          </SettingsHubGroup>
+        )}
+
+        {!isCarer && !isCommunityAccount && (
           <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
               href="/family-carers"
@@ -1229,7 +1256,9 @@ export default function Settings() {
             description={
               isCarer
                 ? "Feed, messages, and device alerts for your supporter account"
-                : "Hypo, trends, scenarios"
+                : isCommunityAccount
+                  ? "Feed, messages, and device alerts"
+                  : "Hypo, trends, scenarios"
             }
             icon={Bell}
           />

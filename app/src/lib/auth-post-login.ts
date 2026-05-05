@@ -40,5 +40,10 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
     setLocation("/welcome");
     return;
   }
+  if (role === "community") {
+    setActiveAppMode("community");
+    setLocation("/tools");
+    return;
+  }
   setLocation("/");
 }

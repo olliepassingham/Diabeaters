@@ -31,8 +31,9 @@ export default function ResetRequest() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+        <Card className="w-full rounded-2xl border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Check your email</CardTitle>
           </CardHeader>
@@ -59,13 +60,15 @@ export default function ResetRequest() {
             </Link>
           </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-background text-foreground">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+      <Card className="w-full rounded-2xl border-border/60 shadow-sm">
         <CardHeader>
           <CardTitle className="text-xl">Reset your password</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -115,6 +118,7 @@ export default function ResetRequest() {
           </p>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

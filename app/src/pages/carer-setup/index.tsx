@@ -24,7 +24,7 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 // Note: we intentionally avoid PageBackButton (history.back) here; we need a safe fallback.
-import { ChevronLeft, Info } from "lucide-react";
+import { ChevronLeft, Info, Users } from "lucide-react";
 
 function emitCarerLinkUpdated(): void {
   try {
@@ -149,10 +149,18 @@ export default function CarerSetupPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-background text-foreground">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+        <Card className="w-full rounded-2xl border-border/60 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-primary/10 p-2.5">
+                <Users className="h-5 w-5 text-primary" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
+              </div>
+            </div>
             <CardDescription>
               If you are supporting someone using Diabeaters, sign in or create an account, then enter the invite code
               they shared with you.
@@ -172,26 +180,28 @@ export default function CarerSetupPage() {
             </p>
           </CardContent>
         </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-background text-foreground">
-      <div className="w-full max-w-md space-y-4">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+      <div className="w-full space-y-4">
         <div className="flex items-center -ml-2">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="mr-2"
+            className="mr-2 rounded-xl"
             aria-label="Go back"
             onClick={handleBack}
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
         </div>
-        <Card className="w-full">
+        <Card className="w-full rounded-2xl border-border/60 shadow-sm">
           <CardHeader>
             <CardTitle className="text-xl">Family &amp; Supporter Access</CardTitle>
             <CardDescription>
@@ -200,7 +210,7 @@ export default function CarerSetupPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {!configured && (
-              <Alert>
+              <Alert className="rounded-2xl border-border/60">
                 <Info className="h-4 w-4" />
                 <AlertDescription>Cloud linking is not configured in this build.</AlertDescription>
               </Alert>
@@ -226,6 +236,7 @@ export default function CarerSetupPage() {
             </p>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

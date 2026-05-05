@@ -67,32 +67,30 @@ export default function VerifiedSuccess() {
   }, [user?.id]);
 
   return (
-    <PageShell variant="narrow" className="space-y-6 py-6 md:py-10">
-      <Card data-testid="verified-success" className="dashboard-card-hover bg-white/80 dark:bg-neutral-900/70 border-neutral-200/60 dark:border-neutral-700/50 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-2xl md:text-3xl font-semibold tracking-tight">
-            You&apos;re verified ✅
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            You can now use all features.
-          </p>
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-10 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+        <PageShell variant="narrow" className="w-full max-w-md">
+          <Card data-testid="verified-success" className="w-full rounded-2xl border-border/60 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-semibold tracking-tight">
+                You&apos;re verified
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-sm text-muted-foreground">You can now use all features.</p>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button asChild className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200">
-              <Link href={primaryHref}>{primaryLabel}</Link>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
-            >
-              <Link href="/account">Open Account</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </PageShell>
+              <div className="flex flex-col gap-3">
+                <Button asChild className="w-full">
+                  <Link href={primaryHref}>{primaryLabel}</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/account">Open Account</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </PageShell>
+      </div>
+    </div>
   );
 }

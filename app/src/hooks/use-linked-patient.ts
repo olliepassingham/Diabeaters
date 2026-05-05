@@ -45,7 +45,7 @@ export function useLinkedPatient(): {
 
   useEffect(() => {
     const onMode = (ev: Event) => {
-      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | null }>;
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
       setActiveMode(ce.detail?.mode ?? getActiveAppMode());
     };
     window.addEventListener("diabeater:app-mode", onMode);

@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
-import { storage } from "@/lib/storage";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
@@ -339,8 +339,11 @@ export default function Account() {
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
   const primaryRole = getPrimaryAppRole();
+  const isCommunityAccount = isCommunityAccountProfile(storage.getProfile());
   const livingWithLine =
-    primaryRole !== "carer" && (activeMode == null || activeMode === "patient")
+    !isCommunityAccount &&
+    primaryRole !== "carer" &&
+    (activeMode == null || activeMode === "patient")
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
@@ -395,11 +398,13 @@ export default function Account() {
         description={
           isCarer
             ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
-            : "Your profile, emergency details, and sign-in options."
+            : isCommunityAccount
+              ? "Your community profile and sign-in options."
+              : "Your profile, emergency details, and sign-in options."
         }
         className="max-w-xl"
       />
-      <DobUnknownNotice hidden={isCarer} testId="account-dob-unknown-notice" />
+      <DobUnknownNotice hidden={isCarer || isCommunityAccount} testId="account-dob-unknown-notice" />
       <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
         <CardContent className="relative p-4 sm:p-5 space-y-0">
           <Button
@@ -586,7 +591,7 @@ export default function Account() {
                   {uploadSubmitting ? "Uploading…" : "Upload photo"}
                 </Button>
 
-                {!isCarer && (
+                {!isCarer && !isCommunityAccount && (
                   <Button variant="outline" size="sm" className="min-h-11 col-span-2" asChild>
                     <Link href="/family-carers" data-testid="link-manage-carers">
                       Manage supporters
@@ -625,7 +630,7 @@ export default function Account() {
         </Alert>
       )}
 
-      {!isCarer && (
+      {!isCarer && !isCommunityAccount && (
         <Card
           id="account-emergency"
           className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"

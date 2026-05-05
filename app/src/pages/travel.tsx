@@ -73,6 +73,7 @@ import { upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { PharmacyCard } from "@/components/pharmacy-card";
 
 interface TravelPlan {
   duration: number;
@@ -2160,6 +2161,10 @@ export default function Travel() {
                   <SelectItem value="unsure">Unsure</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Your home pharmacy (for collecting before you go):
+              </p>
+              <PharmacyCard variant="default" />
             </div>
 
             <div className="space-y-2">

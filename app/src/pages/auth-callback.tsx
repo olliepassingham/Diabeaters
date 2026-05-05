@@ -47,7 +47,7 @@ export default function AuthCallback() {
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 bg-background text-foreground"
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-background text-foreground [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]"
       data-testid="auth-callback-loading"
     >
       <div

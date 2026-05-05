@@ -8,12 +8,14 @@ const mockSettings = {
 };
 
 vi.mock("@/lib/storage", () => ({
+  isCommunityAccountProfile: vi.fn(() => false),
   storage: {
     getHypoTreatments: vi.fn(() => []),
     getExerciseOutcomes: vi.fn(() => []),
     getScenarioState: vi.fn(() => ({ sickDayActive: false, travelModeActive: false })),
     getSettings: vi.fn(() => mockSettings),
     getProfile: vi.fn(() => ({ bgUnits: "mmol/L" })),
+    getPharmacy: vi.fn(() => null),
   },
 }));
 

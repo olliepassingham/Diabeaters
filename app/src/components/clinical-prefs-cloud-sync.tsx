@@ -22,9 +22,11 @@ export function ClinicalPrefsCloudSync() {
     user?.id,
     hasCarerLink,
     profile?.id,
+    profile?.account_type,
     profile?.insulin_delivery_method,
     profile?.tdd,
     profile?.date_of_birth,
+    profile?.pharmacy?.updatedAt,
   ]);
 
   return null;

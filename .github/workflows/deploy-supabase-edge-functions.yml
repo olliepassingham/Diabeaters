@@ -40,6 +40,7 @@ jobs:
           supabase functions deploy notify_carers_on_hypo --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_scenario_started --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy notify_supply_low_cron --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_dm_push --project-ref "$REF" --no-verify-jwt
           # JWT verified at gateway + in handler (see supabase/config.toml). Do not pass --no-verify-jwt.
           supabase functions deploy ai_coach --project-ref "$REF"

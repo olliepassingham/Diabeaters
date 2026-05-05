@@ -4,7 +4,9 @@ import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
+import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureIosPushRegistered } from "@/lib/push-tokens";
+import { storage } from "@/lib/storage";
 
 type AuthContextValue = {
   user: User | null;
@@ -109,6 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !user?.id) return;
     void ensureIosPushRegistered();
+    /** Keeps `notification_preferences` aligned with this device so edge functions see `push: true`. */
+    void syncNotificationPreferences(storage.getNotificationSettings());
     const timer = window.setTimeout(() => {
       void import("@/lib/supplies").then((m) => m.reconcileSupplies());
     }, 800);

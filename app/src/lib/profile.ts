@@ -27,6 +27,20 @@ export type ProfileRow = {
   tdd?: number | null;
   /** Optional YYYY-MM-DD; owner or linked supporter (when permitted) may set on cloud profile. */
   date_of_birth?: string | null;
+  /** Owner-managed primary pharmacy + opening hours JSON; never selected for community batches. */
+  pharmacy?: PharmacyJson | null;
+  /** patient = full tools; community = learn + feed persona. */
+  account_type?: "patient" | "community" | null;
+};
+
+/** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
+export type PharmacyJson = {
+  name?: string;
+  phone?: string;
+  addressLine?: string;
+  notes?: string;
+  hours?: Record<string, { open?: string; close?: string; closed?: boolean; break?: { start?: string; end?: string } }>;
+  updatedAt?: string;
 };
 
 /** Safe fields for community public profile pages (never include emergency_*). */
@@ -61,6 +75,20 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
   else if (rawDob === undefined) date_of_birth = undefined;
   else date_of_birth = normalizeDateOfBirthInput(String(rawDob)) ?? null;
 
+  const rawPharmacy = data.pharmacy;
+  let pharmacy: PharmacyJson | null | undefined;
+  if (rawPharmacy === null) pharmacy = null;
+  else if (rawPharmacy === undefined) pharmacy = undefined;
+  else if (typeof rawPharmacy === "object") pharmacy = rawPharmacy as PharmacyJson;
+  else pharmacy = null;
+
+  const rawAccountType = data.account_type;
+  let account_type: "patient" | "community" | null | undefined;
+  if (rawAccountType === null) account_type = null;
+  else if (rawAccountType === undefined) account_type = undefined;
+  else if (rawAccountType === "patient" || rawAccountType === "community") account_type = rawAccountType;
+  else account_type = "patient";
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -77,6 +105,8 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     insulin_delivery_method,
     tdd,
     date_of_birth,
+    pharmacy,
+    account_type,
   };
 }
 
@@ -274,6 +304,8 @@ export type ProfileUpdatePayload = {
     | "insulin_delivery_method"
     | "tdd"
     | "date_of_birth"
+    | "pharmacy"
+    | "account_type"
   >
 >;
 
@@ -294,6 +326,8 @@ export async function updateProfile(
     insulin_delivery_method,
     tdd,
     date_of_birth,
+    pharmacy,
+    account_type,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -332,6 +366,13 @@ export async function updateProfile(
       update.date_of_birth = n ?? null;
     }
   }
+  if (pharmacy !== undefined) {
+    update.pharmacy = pharmacy ?? null;
+  }
+  if (account_type !== undefined) {
+    if (account_type === null) update.account_type = "patient";
+    else if (account_type === "patient" || account_type === "community") update.account_type = account_type;
+  }
 
   try {
     const { data, error } = await supabase
@@ -364,6 +405,7 @@ export async function upsertProfile(payload: {
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
   emergency_notes?: string | null;
+  account_type?: "patient" | "community" | null;
 }): Promise<{ data: ProfileRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
@@ -378,6 +420,7 @@ export async function upsertProfile(payload: {
     emergency_contact_name,
     emergency_contact_phone,
     emergency_notes,
+    account_type,
   } = payload;
 
   const update: Record<string, unknown> = { id };
@@ -393,6 +436,10 @@ export async function upsertProfile(payload: {
     update.emergency_contact_phone = emergency_contact_phone ?? null;
   }
   if (emergency_notes !== undefined) update.emergency_notes = emergency_notes ?? null;
+  if (account_type !== undefined) {
+    if (account_type === null) update.account_type = "patient";
+    else if (account_type === "patient" || account_type === "community") update.account_type = account_type;
+  }
 
   try {
     const { data, error } = await supabase

@@ -2,7 +2,7 @@ import {
   getBearerAuthHeadersForEdgeFunctions,
   invokeEdgeFunctionPost,
 } from "@/lib/edge-function-invoke-auth";
-import { devWarn } from "@/lib/dev-log";
+import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase, getSupabaseUrlAndAnonKey } from "@/lib/supabase";
 
 export async function invokeNotifySupplyLow(params: {
@@ -37,7 +37,7 @@ export async function invokeNotifySupplyLow(params: {
   );
 
   if (error) {
-    devWarn("[invokeNotifySupplyLow]", error.message);
+    logEdgeInvokeFailure("notify_supply_low", error.message);
     return { success: false, error: "invoke_failed", detail: error.message };
   }
   const payload = data as { success?: boolean; error?: string; detail?: string } | null;

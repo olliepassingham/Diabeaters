@@ -30,7 +30,7 @@ export async function syncNotificationPreferences(settings: NotificationSettings
     .from("notification_preferences")
     .upsert({ user_id: uid, prefs }, { onConflict: "user_id" });
 
-  if (import.meta.env.DEV && error) {
+  if (error) {
     console.warn("[notification_preferences] upsert failed:", error.message);
   }
 }

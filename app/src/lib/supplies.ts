@@ -266,6 +266,8 @@ export async function syncToCloud(local: LocalSupply): Promise<void> {
       storage.updateSupply(local.id, {
         updated_at: (data?.updated_at as string) || clientTs,
       });
+      const nextLocal = storage.getSupplies().find((s) => s.id === local.id);
+      if (nextLocal) void writeSupplyForecastToCloud(nextLocal);
     } else {
       const insertRow = {
         user_id: userId,
@@ -335,7 +337,38 @@ type CloudSupplyRow = {
   unit?: string | null;
   category?: string | null;
   notes?: string | null;
+  days_remaining_cached?: number | null;
+  supply_forecast_at?: string | null;
 };
+
+/**
+ * Writes client-computed days-until-empty to `public.supplies` for `notify_supply_low_cron`
+ * when the app is not running. Best-effort; ignores failures.
+ */
+export async function writeSupplyForecastToCloud(local: LocalSupply): Promise<void> {
+  const cloudId = local.cloud_id;
+  if (!cloudId) return;
+  if (!isOnline()) return;
+  const supabase = getSupabase();
+  if (!supabase) return;
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+  const days = storage.getDaysRemaining(local);
+  if (!Number.isFinite(days)) return;
+  try {
+    await supabase
+      .from("supplies")
+      .update({
+        days_remaining_cached: Math.round(days),
+        supply_forecast_at: new Date().toISOString(),
+      })
+      .eq("id", cloudId)
+      .eq("user_id", userId);
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Compare ISO timestamps; ties favour local to avoid churn. */
 export function compareUpdatedAtForSync(
@@ -461,6 +494,10 @@ export async function reconcileSupplies(): Promise<void> {
     if (matchedCloudIds.has(c.id)) continue;
     matchedCloudIds.add(c.id);
     storage.importSupplyFromCloudReconcile(c);
+  }
+
+  for (const l of storage.getSupplies()) {
+    if (l.cloud_id) void writeSupplyForecastToCloud(l);
   }
 }
 
