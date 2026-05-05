@@ -32,6 +32,7 @@ import { EmergencyProfileProvider } from "@/hooks/use-emergency-profile";
 import { isUserVerified, logout } from "@/lib/auth";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { pathFromOpenedAppUrl } from "@/lib/native-app-open-url";
 
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
@@ -170,22 +171,6 @@ function getSafeNext(pathname: string, search: string): string {
   const qs = search ? `?${search.replace(/^\?/, "")}` : "";
   const next = `${p}${qs}`;
   return next.startsWith("/") && !next.startsWith("//") ? next : "/";
-}
-
-/** Map an opened URL (custom scheme or http(s)) to an in-app path for wouter. */
-function pathFromOpenedAppUrl(rawUrl: string): string | null {
-  try {
-    const url = new URL(rawUrl);
-    const isHttp = url.protocol === "https:" || url.protocol === "http:";
-    const nextPath = isHttp
-      ? `${url.pathname}${url.search}${url.hash}`
-      : `/${url.hostname || url.host || ""}${url.pathname || ""}${url.search}${url.hash}`.replace(/\/{2,}/g, "/");
-
-    const safe = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
-    return safe;
-  } catch {
-    return null;
-  }
 }
 
 function useNativeDeepLinks() {
@@ -1308,6 +1293,13 @@ function AppContent() {
   const [linkedCarer, setLinkedCarer] = useState(false);
   const [patientOnboardingSatisfied, setPatientOnboardingSatisfied] = useState(true);
   const pathOnly = location.split("?")[0] ?? location;
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (user?.id) return;
+    if (pathOnly !== "/" && pathOnly !== "") return;
+    setLocation("/welcome");
+  }, [authLoading, user?.id, pathOnly, setLocation]);
 
   useEffect(() => {
     let cancelled = false;
