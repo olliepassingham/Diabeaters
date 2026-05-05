@@ -1,6 +1,9 @@
 /**
- * Builds the privacy-minimised `lastFortnight` summary sent to the AI Coach
- * Edge Function. Numbers and booleans only — no free-text notes, names, or
+ * Builds a privacy-minimised summary still sent with the coach request for UI
+ * parity and future use. The Edge Function does **not** trust client-reported
+ * activity counts for the model: it recomputes hypo-related counts from
+ * `hypo_logs` and supply shape from `supplies` using the authenticated user id.
+ * This module stays numbers/booleans only — no free-text notes, names, or
  * destinations.
  */
 

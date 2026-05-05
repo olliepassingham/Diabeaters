@@ -139,9 +139,21 @@ export interface CoachContext {
     sickDayActive: boolean;
     travelModeActive: boolean;
   };
+  /**
+   * Optional supply snapshot from `public.supplies` (server-read only).
+   * Category is the app’s canonical supply type string; no product names or notes.
+   */
+  supplies?: CoachSuppliesSummary;
   ratiosAreSet: boolean;
   /** Empty when the user has logged < ~14 days of data; the model is told to admit this. */
   dataSparse: boolean;
+}
+
+/** Aggregated supply rows for Coach — counts and enums only. */
+export interface CoachSuppliesSummary {
+  trackedSlots: number;
+  criticalOrEmptySlots: number;
+  slotsByCategory: Record<string, number>;
 }
 
 /** Body the client POSTs to the Edge Function. */

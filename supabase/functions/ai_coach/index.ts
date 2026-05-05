@@ -10,14 +10,12 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { packContext } from "../_shared/ai-coach/contextPacker.ts";
+import { loadCoachSuppliesSummary, loadCoachTrustedLastFortnight } from "../_shared/ai-coach/trustedContextFromDb.ts";
 import { intercept } from "../_shared/ai-coach/interceptor.ts";
 import { callOpenAiChatJson } from "../_shared/ai-coach/llmClient.ts";
 import { applyPostFilter } from "../_shared/ai-coach/postFilter.ts";
 import { deterministicResponse } from "../_shared/ai-coach/responses.ts";
-import {
-  deriveServerAudience,
-  serverPlaceholderLastFortnight,
-} from "../_shared/ai-coach/serverInputs.ts";
+import { deriveServerAudience } from "../_shared/ai-coach/serverInputs.ts";
 import type {
   AuditCategory,
   CoachAudience,
@@ -33,7 +31,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 /** Must match `AI_COACH_CONSENT_VERSION` in `app/src/lib/ai-coach/consent.ts`. */
-const AI_COACH_CONSENT_VERSION = "2026-05-03";
+const AI_COACH_CONSENT_VERSION = "2026-05-06";
 
 const CONSENT_REQUIRED_REPLY: CoachReply = {
   reply:
@@ -552,11 +550,13 @@ Deno.serve(async (req: Request) => {
     const hasCarerLink = await callerHasCarerLink(admin, userId);
     const audience = deriveServerAudience(requestedAudience, hasCarerLink);
     /**
-     * `lastFortnight` is *not* read from the body. The model sees the zero
-     * placeholder and is instructed (system prompt) to admit when data is
-     * sparse rather than invent patterns.
+     * `lastFortnight` is not read from the body (anti-tamper). Counts come from
+     * server-side `hypo_logs` in the last 14 days; supply shape from `supplies`.
      */
-    const lastFortnight = serverPlaceholderLastFortnight();
+    const [lastFortnight, suppliesSummary] = await Promise.all([
+      loadCoachTrustedLastFortnight(admin, userId),
+      loadCoachSuppliesSummary(admin, userId),
+    ]);
     const context = packContext({
       profile: {
         dateOfBirth,
@@ -567,6 +567,7 @@ Deno.serve(async (req: Request) => {
       lastFortnight,
       ratiosAreSet,
       ...(pharmacyStatus ? { pharmacyStatus } : {}),
+      ...(suppliesSummary ? { suppliesSummary } : {}),
     });
 
     let llmReply: CoachReply;

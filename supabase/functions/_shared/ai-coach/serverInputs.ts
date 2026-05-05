@@ -7,12 +7,10 @@
  *     actually linked as a carer for at least one patient (a row in
  *     `public.carer_links`). The body's `audience` is ignored for `supporter`
  *     unless that link exists.
- *   - `EMPTY_LAST_FORTNIGHT` / `serverPlaceholderLastFortnight` — replaces any
- *     client-supplied `lastFortnight` with zero counts and `null` time-in-range
- *     so the prompt never echoes a client-controlled "history" back to the LLM.
- *     The system prompt instructs the model to admit when data is sparse, so
- *     this placeholder is the safest default until we wire a real server-side
- *     view.
+ *   - `EMPTY_LAST_FORTNIGHT` / `serverPlaceholderLastFortnight` — zero baseline
+ *     used when building server-trusted `lastFortnight` input (see
+ *     `trustedContextFromDb.ts`). Client-supplied `lastFortnight` is ignored for
+ *     the model to prevent tampering.
  */
 
 import type { CoachAudience } from "./types.ts";

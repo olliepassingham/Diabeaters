@@ -182,6 +182,24 @@ describe("packContext — dataSparse", () => {
   });
 });
 
+describe("packContext — supplies summary", () => {
+  it("includes sanitised supplies when suppliesSummary is provided", () => {
+    const ctx = packContext(
+      input({
+        suppliesSummary: {
+          trackedSlots: 3,
+          criticalOrEmptySlots: 1,
+          slotsByCategory: { cgm: 2, infusion_set: 1 },
+        },
+      }),
+    );
+    expect(ctx.supplies?.trackedSlots).toBe(3);
+    expect(ctx.supplies?.criticalOrEmptySlots).toBe(1);
+    expect(ctx.supplies?.slotsByCategory.cgm).toBe(2);
+    expect(ctx.supplies?.slotsByCategory.infusion_set).toBe(1);
+  });
+});
+
 describe("packContext — PII strip", () => {
   it("never includes name/email/postcode-shaped keys even if smuggled in", () => {
     // Caller passes extra fields by accident — packer must drop them.

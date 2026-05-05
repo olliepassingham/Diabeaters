@@ -299,6 +299,12 @@ export default function CoachPage() {
                     messages. Each message is sent to our API and may be processed by OpenAI when enabled for this
                     deployment.
                   </li>
+                  <li>
+                    To personalise answers safely, the server may attach small <strong>aggregates</strong> from your
+                    account when you have synced them: for example counts from your hypo log (last 14 days) and supply
+                    rows (category and stock level only). It does not send free-text notes, treatment wording, supply
+                    display names, or destinations to the model.
+                  </li>
                   <li>For urgent symptoms, use Help Now or emergency services.</li>
                   {isSupporter ? (
                     <li>

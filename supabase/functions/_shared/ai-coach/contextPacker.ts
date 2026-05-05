@@ -12,7 +12,7 @@
  * Pure logic — runs under both Deno and Vitest.
  */
 
-import type { CoachContext } from "./types.ts";
+import type { CoachContext, CoachSuppliesSummary } from "./types.ts";
 
 const SPARSE_BG_THRESHOLD = 14;
 const SPARSE_EXERCISE_THRESHOLD = 1;
@@ -45,8 +45,24 @@ export interface PackContextInput {
   ratiosAreSet: boolean;
   /** Optional client-provided pharmacy opening status. */
   pharmacyStatus?: CoachContext["pharmacy"];
+  /** Optional server-derived supply snapshot (counts / categories only). */
+  suppliesSummary?: CoachSuppliesSummary;
   /** Optional: override "now" for deterministic tests. */
   now?: Date;
+}
+
+function sanitizeSuppliesSummary(s: CoachSuppliesSummary): CoachSuppliesSummary {
+  const capSlots = 200;
+  const tracked = Math.min(capSlots, Math.max(0, Math.floor(s.trackedSlots)));
+  const critical = Math.min(tracked, Math.max(0, Math.floor(s.criticalOrEmptySlots)));
+  const slotsByCategory: Record<string, number> = {};
+  for (const [k, v] of Object.entries(s.slotsByCategory ?? {})) {
+    const kk = k.trim().toLowerCase().slice(0, 40);
+    if (!kk) continue;
+    const n = typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.floor(v))) : 0;
+    if (n > 0) slotsByCategory[kk] = n;
+  }
+  return { trackedSlots: tracked, criticalOrEmptySlots: critical, slotsByCategory };
 }
 
 /** Whole years since DOB using UTC calendar dates (no PII beyond what DOB implies). */
@@ -156,10 +172,16 @@ export function packContext(input: PackContextInput): CoachContext {
     lastFortnight.bgReadings < SPARSE_BG_THRESHOLD &&
     lastFortnight.exerciseSessions <= SPARSE_EXERCISE_THRESHOLD;
 
+  const supplies =
+    input.suppliesSummary && input.suppliesSummary.trackedSlots > 0
+      ? sanitizeSuppliesSummary(input.suppliesSummary)
+      : undefined;
+
   return {
     profile,
     ...(input.pharmacyStatus ? { pharmacy: input.pharmacyStatus } : {}),
     lastFortnight,
+    ...(supplies ? { supplies } : {}),
     ratiosAreSet: Boolean(input.ratiosAreSet),
     dataSparse,
   };
