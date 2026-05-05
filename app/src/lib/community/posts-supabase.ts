@@ -126,14 +126,34 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
 
 async function fetchCommentCountsForPostIds(postIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
+  for (const id of postIds) out.set(id, 0);
   if (postIds.length === 0) return out;
   const supabase = getSupabase();
   if (!supabase) return out;
 
-  // Fallback for older DBs without denormalized `community_posts.comment_count`.
-  // We count comment rows for the current page of posts.
+  // Counts rows visible under RLS (same as expanding comments). Merged with denormalized counts in finalize.
   const { data, error } = await supabase
     .from("community_post_comments")
+    .select("post_id")
+    .in("post_id", postIds);
+
+  if (error) return out;
+  for (const row of (data ?? []) as Array<{ post_id: string }>) {
+    const pid = String(row.post_id);
+    out.set(pid, (out.get(pid) ?? 0) + 1);
+  }
+  return out;
+}
+
+async function fetchLikeCountsForPostIds(postIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const id of postIds) out.set(id, 0);
+  if (postIds.length === 0) return out;
+  const supabase = getSupabase();
+  if (!supabase) return out;
+
+  const { data, error } = await supabase
+    .from("community_post_reactions")
     .select("post_id")
     .in("post_id", postIds);
 
@@ -184,15 +204,22 @@ async function attachAuthorPreviews(posts: CommunityPostRow[]): Promise<Communit
   });
 }
 
-/** Merge like flags + author profile snippets in parallel (was sequential: likes then client-only profiles). */
+/** Merge engagement totals, like flags, and author profile snippets (parallel). */
 async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
   if (withCounts.length === 0) return withCounts;
   const postIds = withCounts.map((p) => p.id);
-  const [liked, withAuthors] = await Promise.all([
+  const [commentCounts, likeCounts, liked, withAuthors] = await Promise.all([
+    fetchCommentCountsForPostIds(postIds),
+    fetchLikeCountsForPostIds(postIds),
     fetchMyLikesForPostIds(postIds),
     attachAuthorPreviews(withCounts),
   ]);
-  return mergeLikedIntoPosts(withAuthors, liked);
+  const merged = withAuthors.map((p) => ({
+    ...p,
+    comment_count: Math.max(p.comment_count, commentCounts.get(p.id) ?? 0),
+    like_count: Math.max(p.like_count, likeCounts.get(p.id) ?? 0),
+  }));
+  return mergeLikedIntoPosts(merged, liked);
 }
 
 async function finalizeSinglePostRow(row: CommunityPostRow): Promise<CommunityPostRow> {
@@ -317,15 +344,7 @@ export async function fetchCommunityPostsPage(
   const raw = (data ?? []) as Record<string, unknown>[];
   const posts = raw.map((row) => mapPost(row));
 
-  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
-  const withCounts = commentCountMissing
-    ? await (async () => {
-        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
-        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
-      })()
-    : posts;
-
-  const dataOut = await finalizePostRowsForFeed(withCounts);
+  const dataOut = await finalizePostRowsForFeed(posts);
   return { data: dataOut, error: null };
 }
 
@@ -363,15 +382,7 @@ export async function fetchCommunityPostsFromFollowingPage(
   const raw = (data ?? []) as Record<string, unknown>[];
   const posts = raw.map((row) => mapPost(row));
 
-  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
-  const withCounts = commentCountMissing
-    ? await (async () => {
-        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
-        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
-      })()
-    : posts;
-
-  const dataOut = await finalizePostRowsForFeed(withCounts);
+  const dataOut = await finalizePostRowsForFeed(posts);
   return { data: dataOut, error: null };
 }
 
@@ -402,15 +413,7 @@ export async function fetchCommunityPostsByAuthorPage(
   const raw = (data ?? []) as Record<string, unknown>[];
   const posts = raw.map((row) => mapPost(row));
 
-  const commentCountMissing = raw.some((r) => !Object.prototype.hasOwnProperty.call(r, "comment_count"));
-  const withCounts = commentCountMissing
-    ? await (async () => {
-        const counts = await fetchCommentCountsForPostIds(posts.map((p) => p.id));
-        return posts.map((p) => ({ ...p, comment_count: counts.get(p.id) ?? 0 }));
-      })()
-    : posts;
-
-  const dataOut = await finalizePostRowsForFeed(withCounts);
+  const dataOut = await finalizePostRowsForFeed(posts);
   return { data: dataOut, error: null };
 }
 
@@ -784,21 +787,8 @@ export async function fetchCommunityPostById(postId: string): Promise<{
   if (error) return { data: null, error: new Error(error.message) };
   if (!data) return { data: null, error: null };
 
-  const raw = data as Record<string, unknown>;
-  const row = mapPost(raw);
-
-  const commentCountMissing = !Object.prototype.hasOwnProperty.call(raw, "comment_count");
-  const withCount = commentCountMissing
-    ? await (async () => {
-        const { count } = await supabase
-          .from("community_post_comments")
-          .select("id", { count: "exact", head: true })
-          .eq("post_id", row.id);
-        return { ...row, comment_count: Number.isFinite(count) ? Math.max(0, count ?? 0) : 0 };
-      })()
-    : row;
-
-  const finalized = await finalizePostRowsForFeed([withCount]);
+  const row = mapPost(data as Record<string, unknown>);
+  const finalized = await finalizePostRowsForFeed([row]);
   return { data: finalized[0] ?? null, error: null };
 }
 

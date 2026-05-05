@@ -56,7 +56,6 @@ import {
   fetchDmThreadsForCurrentUser,
   fetchPollVoteState,
   getFirstWhitelistedFeedLink,
-  fetchLikerUserIdsForPost,
   fetchPostLikersWithProfiles,
   fetchPollVotersWithProfiles,
   otherMemberUserId,
@@ -362,19 +361,6 @@ export function FeedPostCard({
   const [shareRecentLoading, setShareRecentLoading] = useState(false);
   const [shareRecentError, setShareRecentError] = useState<string | null>(null);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null);
-
-  /** Align card like_count with reaction rows the viewer can see (fixes stale feed totals). */
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const res = await fetchLikerUserIdsForPost(post.id);
-      if (cancelled || res.error) return;
-      onLikersLoadedRef.current?.({ visibleCount: res.data.length });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [post.id]);
 
   const [likersOpen, setLikersOpen] = useState(false);
   const [likersLoading, setLikersLoading] = useState(false);
