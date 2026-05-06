@@ -32,6 +32,7 @@ import { GripVertical, Columns2, RectangleHorizontal, LayoutGrid } from "lucide-
 import { DASHBOARD_WIDGET_BY_ID } from "@/config/dashboard-widgets";
 import type { WidgetPlacement } from "@/hooks/useDashboardWidgets";
 import type { WidgetSize, WidgetType } from "@/lib/storage";
+import { shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
 
 export type DashboardWidgetSettingsProps = {
   open: boolean;
@@ -153,7 +154,11 @@ export function DashboardWidgetSettings({
 }: DashboardWidgetSettingsProps) {
   const sorted = useMemo(() => [...placements].sort((a, b) => a.order - b.order), [placements]);
   const sortedForUi = useMemo(
-    () => (isSettingsComplete ? sorted.filter((p) => p.type !== "settings-completion") : sorted),
+    () => {
+      const base = isSettingsComplete ? sorted.filter((p) => p.type !== "settings-completion") : sorted;
+      const welcomeOk = shouldOfferWelcomeWidget();
+      return welcomeOk ? base : base.filter((p) => p.type !== "welcome");
+    },
     [sorted, isSettingsComplete],
   );
   const enabledCount = sortedForUi.filter((p) => p.enabled).length;

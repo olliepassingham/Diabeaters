@@ -4,6 +4,7 @@ export { RatioAdviserWidget } from "./ratio-adviser-widget";
 export { WelcomeWidget } from "./welcome-widget";
 export { TipOfDayWidget } from "./tip-of-day-widget";
 export { AppointmentsWidget } from "./appointments-widget";
+export { PharmacyWidget } from "@/components/dashboard/widgets/PharmacyWidget";
 export { RoutinesWidget } from "@/components/dashboard/widgets/RoutinesWidget";
 export { QuickExerciseWidget } from "@/components/dashboard/widgets/QuickExerciseWidget";
 export { CommunityQuickPostWidget } from "@/components/dashboard/widgets/CommunityQuickPostWidget";

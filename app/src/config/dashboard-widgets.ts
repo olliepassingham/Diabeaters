@@ -9,6 +9,7 @@ import {
   RoutinesWidget,
   TipOfDayWidget,
   WelcomeWidget,
+  PharmacyWidget,
   CommunityQuickPostWidget,
 } from "@/components/widgets";
 
@@ -38,6 +39,14 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     defaultEnabled: true,
     defaultSize: "half",
     component: CommunityQuickPostWidget,
+  },
+  {
+    id: "pharmacy",
+    label: "Pharmacy",
+    description: "Opening hours and whether it is open right now.",
+    defaultEnabled: true,
+    defaultSize: "half",
+    component: PharmacyWidget,
   },
   {
     id: "supply-summary",

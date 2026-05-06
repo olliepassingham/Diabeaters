@@ -60,6 +60,15 @@ function readShouldShow(): { struggle: string | null } {
   return { struggle: s };
 }
 
+export function shouldOfferWelcomeWidget(): boolean {
+  try {
+    const { struggle } = readShouldShow();
+    return Boolean(struggle && STRUGGLE_CONFIGS[struggle]);
+  } catch {
+    return false;
+  }
+}
+
 export function WelcomeWidget() {
   const [, setLocation] = useLocation();
   const [visible, setVisible] = useState(false);

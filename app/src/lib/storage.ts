@@ -715,6 +715,7 @@ export type WidgetType =
   | "supply-summary"
   | "settings-completion"
   | "ratio-adviser"
+  | "pharmacy"
   | "welcome"
   | "tip-of-day"
   | "appointments"
@@ -1275,6 +1276,7 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
   "supply-summary": "full",
   "quick-exercise": "half",
   "ratio-adviser": "half",
+  "pharmacy": "half",
   "appointments": "half",
   "routines": "half",
   "tip-of-day": "full",
@@ -1287,11 +1289,12 @@ export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "full" },
   { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 2, size: "half" },
   { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
-  { id: "appointments", type: "appointments", enabled: true, order: 4, size: "half" },
-  { id: "routines", type: "routines", enabled: true, order: 5, size: "half" },
-  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 6, size: "full" },
-  { id: "settings-completion", type: "settings-completion", enabled: true, order: 7, size: "half" },
-  { id: "welcome", type: "welcome", enabled: false, order: 8, size: "full" },
+  { id: "pharmacy", type: "pharmacy", enabled: true, order: 4, size: "half" },
+  { id: "appointments", type: "appointments", enabled: true, order: 5, size: "half" },
+  { id: "routines", type: "routines", enabled: true, order: 6, size: "half" },
+  { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 7, size: "full" },
+  { id: "settings-completion", type: "settings-completion", enabled: true, order: 8, size: "half" },
+  { id: "welcome", type: "welcome", enabled: false, order: 9, size: "full" },
 ];
 
 function generateId(): string {
