@@ -1287,9 +1287,9 @@ export const DEFAULT_WIDGET_SIZES: Record<WidgetType, WidgetSize> = {
 export const DEFAULT_WIDGETS: DashboardWidget[] = [
   { id: "community-quick-post", type: "community-quick-post", enabled: true, order: 0, size: "half" },
   { id: "supply-summary", type: "supply-summary", enabled: true, order: 1, size: "full" },
-  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 2, size: "half" },
-  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 3, size: "half" },
-  { id: "pharmacy", type: "pharmacy", enabled: true, order: 4, size: "half" },
+  { id: "pharmacy", type: "pharmacy", enabled: true, order: 2, size: "half" },
+  { id: "quick-exercise", type: "quick-exercise", enabled: true, order: 3, size: "half" },
+  { id: "ratio-adviser", type: "ratio-adviser", enabled: true, order: 4, size: "half" },
   { id: "appointments", type: "appointments", enabled: true, order: 5, size: "half" },
   { id: "routines", type: "routines", enabled: true, order: 6, size: "half" },
   { id: "tip-of-day", type: "tip-of-day", enabled: true, order: 7, size: "full" },

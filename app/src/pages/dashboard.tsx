@@ -804,7 +804,7 @@ export default function Dashboard() {
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
     isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
-  const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day"]);
+  const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day", "pharmacy"]);
   const widgetsToRender = activeWidgets
     .filter((w) => w.type !== "settings-completion")
     .filter((w) => w.type !== "community-quick-post" || showCommunityQuickPostWidget)

@@ -41,20 +41,20 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
     component: CommunityQuickPostWidget,
   },
   {
-    id: "pharmacy",
-    label: "Pharmacy",
-    description: "Opening hours and whether it is open right now.",
-    defaultEnabled: true,
-    defaultSize: "half",
-    component: PharmacyWidget,
-  },
-  {
     id: "supply-summary",
     label: "Supplies",
     description: "Stock on hand and how long each item is expected to last (run-out bars).",
     defaultEnabled: true,
     defaultSize: "full",
     component: SupplySummaryWidget,
+  },
+  {
+    id: "pharmacy",
+    label: "Pharmacy",
+    description: "Opening hours and whether it is open right now.",
+    defaultEnabled: true,
+    defaultSize: "half",
+    component: PharmacyWidget,
   },
   {
     id: "quick-exercise",
