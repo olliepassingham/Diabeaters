@@ -1,19 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import type { NotificationSettings } from "@/lib/storage";
 import { Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SettingsBackLink } from "./shared";
-import { Capacitor } from "@capacitor/core";
-import { App } from "@capacitor/app";
-import { readPushDiag } from "@/lib/push-tokens";
-import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
-import { useToast } from "@/hooks/use-toast";
 
 export function NotificationsTab({
   notifSettings,
@@ -33,30 +27,6 @@ export function NotificationsTab({
   const scenarioOn = notifSettings.scenarioAlerts !== false;
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
-
-  const pushDiag = readPushDiag();
-  const isIosNative = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios";
-  const { toast } = useToast();
-  const [appInfo, setAppInfo] = useState<{ version: string; build: string } | null>(null);
-
-  useEffect(() => {
-    if (!isIosNative) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const info = await App.getInfo();
-        if (cancelled) return;
-        const version = typeof info.version === "string" ? info.version : "";
-        const build = typeof info.build === "string" ? info.build : "";
-        setAppInfo(version || build ? { version, build } : null);
-      } catch {
-        if (!cancelled) setAppInfo(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isIosNative]);
 
   const inner = (
     <div className="space-y-6">
@@ -85,60 +55,10 @@ export function NotificationsTab({
         />
       </div>
 
-      {isIosNative ? (
-        <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <Label className="text-small text-muted-foreground">Push diagnostics</Label>
-            <span className="text-xs text-muted-foreground">iOS</span>
-          </div>
-          <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
-            <div>
-              App:{" "}
-              {appInfo
-                ? `${appInfo.version || "—"}${appInfo.build ? ` (${appInfo.build})` : ""}`
-                : "—"}
-            </div>
-            <div>State: {typeof pushDiag?.state === "string" ? pushDiag.state : "unknown"}</div>
-            <div>Token: {typeof pushDiag?.tokenPrefix === "string" ? pushDiag.tokenPrefix : "—"}</div>
-            <div>Save: {typeof pushDiag?.saveError === "string" && pushDiag.saveError ? pushDiag.saveError : "ok/unknown"}</div>
-            <div>
-              Error: {typeof pushDiag?.error === "string" && pushDiag.error ? pushDiag.error : "—"}
-            </div>
-            <div>Updated: {typeof pushDiag?.updatedAt === "string" ? pushDiag.updatedAt : "—"}</div>
-          </div>
-          <div className="mt-3 flex items-center justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!notifSettings.enabled || !notifSettings.pushNotifications}
-              onClick={() => {
-                void (async () => {
-                  const res = await invokeNotifyPushTest();
-                  if (!res.success) {
-                    toast({
-                      title: "Test push failed",
-                      description: [res.error, res.detail].filter(Boolean).join(" · ") || "Unknown error",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  toast({
-                    title: "Test push sent",
-                    description:
-                      typeof res.delivered_push === "number"
-                        ? `Delivered to ${res.delivered_push} device${res.delivered_push === 1 ? "" : "s"}.`
-                        : "Sent.",
-                  });
-                })();
-              }}
-              data-testid="button-test-push"
-            >
-              Send test push
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {/*
+        Push diagnostics intentionally removed for App Store review.
+        Push can still be enabled via the switch above.
+      */}
 
       {!supporterMode && (
         <>
