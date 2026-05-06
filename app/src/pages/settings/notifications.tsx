@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SettingsBackLink } from "./shared";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import { readPushDiag } from "@/lib/push-tokens";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +37,26 @@ export function NotificationsTab({
   const pushDiag = readPushDiag();
   const isIosNative = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios";
   const { toast } = useToast();
+  const [appInfo, setAppInfo] = useState<{ version: string; build: string } | null>(null);
+
+  useEffect(() => {
+    if (!isIosNative) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const info = await App.getInfo();
+        if (cancelled) return;
+        const version = typeof info.version === "string" ? info.version : "";
+        const build = typeof info.build === "string" ? info.build : "";
+        setAppInfo(version || build ? { version, build } : null);
+      } catch {
+        if (!cancelled) setAppInfo(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isIosNative]);
 
   const inner = (
     <div className="space-y-6">
@@ -71,6 +92,12 @@ export function NotificationsTab({
             <span className="text-xs text-muted-foreground">iOS</span>
           </div>
           <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+            <div>
+              App:{" "}
+              {appInfo
+                ? `${appInfo.version || "—"}${appInfo.build ? ` (${appInfo.build})` : ""}`
+                : "—"}
+            </div>
             <div>State: {typeof pushDiag?.state === "string" ? pushDiag.state : "unknown"}</div>
             <div>Token: {typeof pushDiag?.tokenPrefix === "string" ? pushDiag.tokenPrefix : "—"}</div>
             <div>Save: {typeof pushDiag?.saveError === "string" && pushDiag.saveError ? pushDiag.saveError : "ok/unknown"}</div>
