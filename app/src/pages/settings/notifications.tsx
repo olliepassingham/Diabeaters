@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import type { NotificationSettings } from "@/lib/storage";
 import { Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -10,6 +11,8 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { SettingsBackLink } from "./shared";
 import { Capacitor } from "@capacitor/core";
 import { readPushDiag } from "@/lib/push-tokens";
+import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
+import { useToast } from "@/hooks/use-toast";
 
 export function NotificationsTab({
   notifSettings,
@@ -32,6 +35,7 @@ export function NotificationsTab({
 
   const pushDiag = readPushDiag();
   const isIosNative = Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios";
+  const { toast } = useToast();
 
   const inner = (
     <div className="space-y-6">
@@ -71,6 +75,37 @@ export function NotificationsTab({
             <div>Token: {typeof pushDiag?.tokenPrefix === "string" ? pushDiag.tokenPrefix : "—"}</div>
             <div>Save: {typeof pushDiag?.saveError === "string" && pushDiag.saveError ? pushDiag.saveError : "ok/unknown"}</div>
             <div>Updated: {typeof pushDiag?.updatedAt === "string" ? pushDiag.updatedAt : "—"}</div>
+          </div>
+          <div className="mt-3 flex items-center justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!notifSettings.enabled || !notifSettings.pushNotifications}
+              onClick={() => {
+                void (async () => {
+                  const res = await invokeNotifyPushTest();
+                  if (!res.success) {
+                    toast({
+                      title: "Test push failed",
+                      description: [res.error, res.detail].filter(Boolean).join(" · ") || "Unknown error",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  toast({
+                    title: "Test push sent",
+                    description:
+                      typeof res.delivered_push === "number"
+                        ? `Delivered to ${res.delivered_push} device${res.delivered_push === 1 ? "" : "s"}.`
+                        : "Sent.",
+                  });
+                })();
+              }}
+              data-testid="button-test-push"
+            >
+              Send test push
+            </Button>
           </div>
         </div>
       ) : null}
