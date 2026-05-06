@@ -1678,11 +1678,25 @@ export const storage = {
       }
 
       if (current.activeItemStartDate) {
-        const info = this.getActiveItemInfo(current);
+        const activeStart = new Date(current.activeItemStartDate);
+        activeStart.setHours(0, 0, 0, 0);
+        const daysSinceActive = Math.max(
+          0,
+          Math.floor((today.getTime() - activeStart.getTime()) / (1000 * 60 * 60 * 24)),
+        );
+
         // While an item is active (not expired), adjusted quantity stays at quantityAtPickup.
-        if (info && !info.isExpired) {
+        if (daysSinceActive < itemDuration) {
           return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: desired });
         }
+
+        // When the active item is expired, `getAdjustedQuantity()` uses the active-start model
+        // (1 in use + subsequent whole items). Keep the baseline consistent so steppers work
+        // even when the UI currently shows 0.
+        const daysAfterActiveExpired = daysSinceActive - itemDuration;
+        const totalStockItemsUsedOrInUse = 1 + Math.floor(daysAfterActiveExpired / itemDuration);
+        const nextPickupBaseline = Math.max(0, desired + totalStockItemsUsedOrInUse);
+        return this.updateSupply(id, { currentQuantity: desired, quantityAtPickup: nextPickupBaseline });
       }
 
       const itemsUsed = Math.floor(daysElapsed / itemDuration);
