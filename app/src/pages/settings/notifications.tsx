@@ -74,6 +74,9 @@ export function NotificationsTab({
             <div>State: {typeof pushDiag?.state === "string" ? pushDiag.state : "unknown"}</div>
             <div>Token: {typeof pushDiag?.tokenPrefix === "string" ? pushDiag.tokenPrefix : "—"}</div>
             <div>Save: {typeof pushDiag?.saveError === "string" && pushDiag.saveError ? pushDiag.saveError : "ok/unknown"}</div>
+            <div>
+              Error: {typeof pushDiag?.error === "string" && pushDiag.error ? pushDiag.error : "—"}
+            </div>
             <div>Updated: {typeof pushDiag?.updatedAt === "string" ? pushDiag.updatedAt : "—"}</div>
           </div>
           <div className="mt-3 flex items-center justify-end">
