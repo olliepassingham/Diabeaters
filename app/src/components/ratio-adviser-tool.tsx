@@ -990,36 +990,143 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
           {step === 4 && result && (
             <div className="space-y-4">
-              <div className={`rounded-lg p-4 space-y-3 ${
-                result.direction === "tighten"
-                  ? "bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800"
-                  : result.direction === "loosen"
-                  ? "bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800"
-                  : result.direction === "on_track"
-                  ? "bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800"
-                  : "bg-muted/30 border"
-              }`}>
-                <div className="flex items-center gap-2">
-                  {result.direction === "tighten" && <TrendingDown className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
-                  {result.direction === "loosen" && <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
-                  {result.direction === "on_track" && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
-                  {result.direction === "monitor" && <Search className="h-5 w-5 text-muted-foreground" />}
-                  <h4 className="font-medium">{result.summary}</h4>
-                </div>
-                <p className="text-sm">{result.detail}</p>
-              </div>
+              {(() => {
+                const accent =
+                  result.direction === "tighten"
+                    ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20"
+                    : result.direction === "loosen"
+                      ? "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20"
+                      : result.direction === "on_track"
+                        ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20"
+                        : "border-border bg-muted/20";
+                const Icon =
+                  result.direction === "tighten"
+                    ? TrendingDown
+                    : result.direction === "loosen"
+                      ? TrendingUp
+                      : result.direction === "on_track"
+                        ? CheckCircle2
+                        : Search;
+                const iconClass =
+                  result.direction === "tighten"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : result.direction === "loosen"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : result.direction === "on_track"
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-muted-foreground";
 
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Talking points for your diabetes team:</p>
-                <ul className="space-y-1">
-                  {result.talkingPoints.map((point, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary mt-1">&bull;</span>
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                const sentences = result.detail
+                  .split(/(?<=[.!?])\s+/)
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                const shortDetail = sentences.slice(0, 2).join(" ");
+                const remainingDetail = sentences.slice(2).join(" ");
+
+                const nextSteps: string[] =
+                  result.direction === "monitor"
+                    ? [
+                        "Check 2–3 hours after this meal for 5–7 days",
+                        "Write down the carbs (and any high-fat/high-protein meals)",
+                        "Note insulin timing (before/after eating) and activity",
+                      ]
+                    : result.direction === "on_track"
+                      ? [
+                          "Keep an eye on it — needs can change with stress, illness, activity, and seasons",
+                          "If you start seeing a new pattern, re-run this tool for that meal",
+                        ]
+                      : [
+                          "Track 3–5 examples of this meal with carbs + timing + BG at 2h and 4h",
+                          "Bring the pattern to your diabetes team before changing ratios",
+                          "If you’re having frequent hypos, treat per your plan and contact your team promptly",
+                        ];
+
+                return (
+                  <>
+                    <div className={`rounded-xl border p-4 space-y-3 ${accent}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 shrink-0">
+                          <Icon className={`h-5 w-5 ${iconClass}`} aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold leading-snug">{result.summary}</h4>
+                          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{shortDetail}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={copyAssessmentToClipboard}
+                          data-testid="button-copy-ratio-assessment"
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-adviser-start-over">
+                          <RotateCcw className="h-4 w-4 mr-1" />
+                          Another meal
+                        </Button>
+                        <Button variant="outline" size="sm" asChild data-testid="link-assessment-to-ratios">
+                          <Link href="/ratios">Ratios</Link>
+                        </Button>
+                        {onNavigateToMeal && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onNavigateToMeal()}
+                            data-testid="button-assessment-meal-planner"
+                          >
+                            <ArrowRight className="h-4 w-4 mr-1" />
+                            Meal planner
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+                        <p className="text-sm font-semibold">What to do next</p>
+                        <ul className="mt-2 space-y-2">
+                          {nextSteps.map((s, i) => (
+                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/70 shrink-0" />
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="rounded-xl border border-border/60 bg-background/60 p-4">
+                        <p className="text-sm font-semibold">Talking points for your diabetes team</p>
+                        <ul className="mt-2 space-y-2">
+                          {result.talkingPoints.map((point, i) => (
+                            <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+                              <span>{point}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <Collapsible className="border rounded-xl px-3 py-2">
+                      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-semibold py-2 hover:opacity-90">
+                        <span className="flex items-center gap-2 text-left">
+                          <BookOpen className="h-4 w-4 shrink-0 text-primary" />
+                          Details (why this is the suggestion)
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 pb-3 text-xs text-muted-foreground leading-relaxed">
+                        <p>{result.detail}</p>
+                        {remainingDetail ? null : null}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </>
+                );
+              })()}
 
               {(result.direction === "tighten" || result.direction === "loosen") && (
                 <Collapsible className="border rounded-lg px-3 py-2">
@@ -1043,29 +1150,6 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                   </CollapsibleContent>
                 </Collapsible>
               )}
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={copyAssessmentToClipboard} data-testid="button-copy-ratio-assessment">
-                  <Copy className="h-4 w-4 mr-1" />
-                  Copy summary
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-adviser-start-over">
-                  <RotateCcw className="h-4 w-4 mr-1" />
-                  Check another meal
-                </Button>
-                <Button variant="outline" size="sm" asChild data-testid="link-assessment-to-ratios">
-                  <Link href="/ratios">Open Ratios page</Link>
-                </Button>
-                {onNavigateToMeal && (
-                  <Button variant="outline" size="sm" onClick={() => onNavigateToMeal()} data-testid="button-assessment-meal-planner">
-                    <ArrowRight className="h-4 w-4 mr-1" />
-                    Meal planner
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" asChild data-testid="link-assessment-isf">
-                  <Link href="/ratios">Correction factor (ISF)</Link>
-                </Button>
-              </div>
 
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
