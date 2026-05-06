@@ -43,16 +43,20 @@ export type DashboardWidgetSettingsProps = {
   resetWidgets: () => void;
   /** When true, hide the Settings progress row (setup is complete). */
   isSettingsComplete?: boolean;
+  /** When false, hide the half/full width control (mobile: always full width). */
+  allowResize?: boolean;
 };
 
 function SortableRow({
   placement,
   onToggle,
   onResize,
+  allowResize,
 }: {
   placement: WidgetPlacement;
   onToggle: (id: WidgetType, enabled: boolean) => void;
   onResize: (id: WidgetType, size: WidgetSize) => void;
+  allowResize: boolean;
 }) {
   const def = DASHBOARD_WIDGET_BY_ID.get(placement.id);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -94,27 +98,29 @@ function SortableRow({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:flex-nowrap">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1 rounded-lg px-2.5 text-xs"
-          onClick={() => onResize(placement.id, placement.size === "full" ? "half" : "full")}
-          title={placement.size === "full" ? "Use half width on large screens" : "Use full width"}
-          data-testid={`button-size-${placement.type}`}
-        >
-          {placement.size === "full" ? (
-            <>
-              <RectangleHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Full width</span>
-            </>
-          ) : (
-            <>
-              <Columns2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              <span className="hidden sm:inline">Half width</span>
-            </>
-          )}
-        </Button>
+        {allowResize ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+            onClick={() => onResize(placement.id, placement.size === "full" ? "half" : "full")}
+            title={placement.size === "full" ? "Use half width on large screens" : "Use full width"}
+            data-testid={`button-size-${placement.type}`}
+          >
+            {placement.size === "full" ? (
+              <>
+                <RectangleHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Full width</span>
+              </>
+            ) : (
+              <>
+                <Columns2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Half width</span>
+              </>
+            )}
+          </Button>
+        ) : null}
 
         <div className="flex items-center gap-1.5">
           <Label htmlFor={switchId} className="sr-only">
@@ -143,6 +149,7 @@ export function DashboardWidgetSettings({
   reorderWidgets,
   resetWidgets,
   isSettingsComplete = false,
+  allowResize = true,
 }: DashboardWidgetSettingsProps) {
   const sorted = useMemo(() => [...placements].sort((a, b) => a.order - b.order), [placements]);
   const sortedForUi = useMemo(
@@ -178,7 +185,7 @@ export function DashboardWidgetSettings({
         <DialogHeader className="space-y-1 border-b border-gray-100 px-6 py-5 text-left dark:border-border">
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
             <LayoutGrid className="h-5 w-5 text-primary" aria-hidden />
-            Customize dashboard
+            Customise dashboard
           </DialogTitle>
           <DialogDescription className="text-base text-gray-600 dark:text-muted-foreground">
             Choose which cards appear on your dashboard and drag them into your preferred order. Your choices are saved on
@@ -204,6 +211,7 @@ export function DashboardWidgetSettings({
                         placement={p}
                         onToggle={toggleWidget}
                         onResize={setWidgetSize}
+                        allowResize={allowResize}
                       />
                     ))}
                   </div>

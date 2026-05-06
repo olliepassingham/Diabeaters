@@ -53,6 +53,7 @@ import { WelcomeWidget } from "@/components/widgets/welcome-widget";
 import { StagingChip } from "@/components/StagingChip";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 import { DashboardWidgetSettings } from "@/components/dashboard/DashboardWidgetSettings";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
@@ -264,7 +265,7 @@ function DashboardInfoDialog() {
         <p>Tap the layout button to edit widgets. You can show or hide cards and drag them into the order you prefer. Your layout is saved on this device.</p>
       </InfoSection>
       <InfoSection title="Reordering">
-        <p>In the widget editor, drag the handle beside each row to change order. Use the width control for full or half width on larger screens.</p>
+        <p>In the widget editor, drag the handle beside each row to change order. On tablets and larger screens, you can also switch some widgets between full and half width.</p>
       </InfoSection>
       <InfoSection title="Status Indicator">
         <p>The status shows your overall diabetes situation. Green means stable, amber means watch, and red means action is needed.</p>
@@ -383,7 +384,7 @@ function HeroCard({
                   onClick={onEditWidgets}
                   className="min-h-10 min-w-10 sm:min-h-11 sm:min-w-11 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-neutral-200"
                   data-testid="button-customize"
-                  aria-label="Customize dashboard widgets"
+                  aria-label="Customise dashboard widgets"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -690,6 +691,7 @@ export default function Dashboard() {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const { profile: cloudProfile, loading: cloudProfileLoading } = useProfile();
+  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
@@ -905,6 +907,7 @@ export default function Dashboard() {
         reorderWidgets={reorderWidgets}
         resetWidgets={resetWidgets}
         isSettingsComplete={isSettingsComplete}
+        allowResize={!isMobile}
       />
 
       <section className="animate-stagger space-y-4 pt-2" data-testid="dashboard-widgets">
@@ -917,9 +920,9 @@ export default function Dashboard() {
               <div
                 key={w.id}
                 data-testid={`widget-container-${w.type}`}
-                className={w.size === "full" ? "md:col-span-2" : undefined}
+                className={isMobile || w.size === "full" ? "md:col-span-2" : undefined}
               >
-                <Comp layoutSize={w.size} />
+                <Comp layoutSize={isMobile ? "full" : w.size} />
               </div>
             );
           })}
