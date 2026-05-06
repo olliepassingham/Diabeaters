@@ -111,7 +111,7 @@ function patientToolsForHub(): ToolDef[] {
         icon: MessageCircle,
         title: AI_ASSISTANT_NAME,
         description:
-          `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice. Requires consent; OpenAI is used when your team enables it.`,
+          `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,
       }
     : undefined;
   return coach ? [coach, ...PATIENT_TOOLS] : [...PATIENT_TOOLS];
