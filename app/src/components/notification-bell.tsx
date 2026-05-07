@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Popover,
   PopoverContent,
@@ -33,6 +35,46 @@ import { isAiCoachEnabled } from "@/lib/flags";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import { coachTopicForInAppNotification } from "@/lib/ai-coach/notification-topic-map";
 import { askAssistantAboutThisAriaLabel } from "@/lib/ai-coach/persona";
+import { getProfilesByIds } from "@/lib/profile";
+import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
+
+function initialsFromName(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const a = parts[0]?.[0] ?? "?";
+  const b = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  return (a + b).toUpperCase();
+}
+
+function InAppToastContent(props: {
+  title: string;
+  body?: string;
+  avatarUrl?: string | null;
+  initials?: string;
+  eyebrow?: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Avatar className="h-9 w-9">
+        {props.avatarUrl ? <AvatarImage src={props.avatarUrl} alt="" /> : null}
+        <AvatarFallback className="text-[11px] font-semibold">
+          {props.initials?.trim() ? props.initials : "DB"}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        {props.eyebrow ? (
+          <div className="text-[11px] font-medium text-muted-foreground">{props.eyebrow}</div>
+        ) : null}
+        <div className="truncate text-sm font-semibold text-foreground">{props.title}</div>
+        {props.body?.trim() ? (
+          <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{props.body}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 export function NotificationBell() {
   try {
@@ -114,15 +156,79 @@ export function NotificationBell() {
             },
             (payload) => {
               const row = payload.new as Record<string, unknown>;
-              const title = String(row.title ?? "Notification");
+              const rowTitle = String(row.title ?? "Notification");
               const bodyRaw = row.body;
-              const description =
-                typeof bodyRaw === "string" && bodyRaw.trim() ? bodyRaw : undefined;
-              toast({
-                title,
-                description,
-                duration: 4000,
+              const bodyText = typeof bodyRaw === "string" && bodyRaw.trim() ? bodyRaw.trim() : "";
+              const data = (row.data && typeof row.data === "object" ? row.data : {}) as Record<string, unknown>;
+              const kind = typeof data.kind === "string" ? data.kind : "";
+
+              const href = getPathForInAppNotification({
+                id: String(row.id ?? ""),
+                user_id: String(row.user_id ?? ""),
+                title: rowTitle,
+                body: bodyText,
+                data: data as InAppNotificationRow["data"],
+                created_at: String(row.created_at ?? ""),
+                read: Boolean(row.read),
               });
+
+              const action = href ? (
+                <ToastAction
+                  altText="Open"
+                  onClick={() => {
+                    setOpen(false);
+                    setLocation(href);
+                  }}
+                  className="h-8 px-2 text-xs"
+                >
+                  Open
+                </ToastAction>
+              ) : undefined;
+
+              // Default: compact modern toast without avatar lookup.
+              const t = toast({
+                title: (
+                  <InAppToastContent
+                    eyebrow="New"
+                    title={rowTitle}
+                    body={bodyText || undefined}
+                    initials={initialsFromName(rowTitle)}
+                  />
+                ),
+                action,
+                duration: 5000,
+                className: "px-4 py-3 pr-10 rounded-xl border-border/60 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70",
+              });
+
+              // DM: show sender avatar + name when available.
+              if (kind === "dm_message") {
+                const senderId = typeof data.sender_user_id === "string" ? data.sender_user_id : "";
+                if (senderId) {
+                  void (async () => {
+                    const profiles = await getProfilesByIds([senderId]);
+                    const prof = profiles.get(senderId);
+                    const displayName = prof?.full_name?.trim() || "New message";
+                    const avatarKey = prof?.avatar_url ?? null;
+                    const { url } = avatarKey ? await resolveProfileImageUrlResult(avatarKey) : { url: null };
+                    t.update({
+                      title: (
+                        <InAppToastContent
+                          eyebrow="New message"
+                          title={displayName}
+                          body={bodyText || undefined}
+                          avatarUrl={url}
+                          initials={initialsFromName(displayName)}
+                        />
+                      ),
+                      action,
+                      duration: 6000,
+                      className:
+                        "px-4 py-3 pr-10 rounded-xl border-border/60 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70",
+                    });
+                  })();
+                }
+              }
+
               notifyInAppNotificationsChanged();
             },
           )
