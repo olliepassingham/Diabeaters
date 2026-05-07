@@ -405,21 +405,36 @@ function HeroCard({
               <Button
                 variant="destructive"
                 size="sm"
-                className={`min-h-11 w-full min-w-0 rounded-full px-3 text-sm bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600 border-destructive-border ${isUrgent ? "glow-pulse-critical" : ""}`}
+                className={[
+                  "min-h-11 w-full min-w-0 rounded-2xl px-3 text-sm",
+                  "bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600",
+                  "shadow-sm shadow-red-600/10 ring-1 ring-red-500/25 hover:shadow-md hover:ring-red-500/35 active:translate-y-[0.5px]",
+                  "transition-all",
+                  isUrgent ? "glow-pulse-critical" : "",
+                ].join(" ")}
                 data-testid="button-help-now"
               >
-                <Phone className="h-4 w-4 mr-1 shrink-0" />
-                Help Now
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
+                  <Phone className="h-4 w-4 shrink-0" />
+                </span>
+                <span className="ml-2 font-semibold tracking-tight">Help Now</span>
               </Button>
             </Link>
             <Button
               size="sm"
-              className="min-h-11 min-w-0 flex-1 rounded-full bg-green-600 dark:bg-green-700 px-3 text-sm text-white gap-1"
+              className={[
+                "min-h-11 min-w-0 flex-1 rounded-2xl px-3 text-sm text-white",
+                "bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-700 dark:to-green-700",
+                "shadow-sm shadow-emerald-600/10 ring-1 ring-emerald-500/25 hover:shadow-md hover:ring-emerald-500/35 active:translate-y-[0.5px]",
+                "transition-all",
+              ].join(" ")}
               onClick={handleTreatedHypoClick}
               data-testid="button-dashboard-treated-hypo"
             >
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              Treated a Hypo
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              </span>
+              <span className="ml-2 font-semibold tracking-tight">Treated a Hypo</span>
             </Button>
           </div>
         </CardContent>
