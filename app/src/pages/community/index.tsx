@@ -569,7 +569,7 @@ export default function CommunityHomePage() {
   const ComposerFormBody = () => (
     <>
       <div className="space-y-1.5">
-        <Label htmlFor="feed-topic" className="text-sm">
+        <Label htmlFor="feed-topic" className="text-sm font-medium text-foreground">
           Topic
         </Label>
         <Select
@@ -577,7 +577,10 @@ export default function CommunityHomePage() {
           onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
           disabled={submitting || !user || !canComposeToFeed}
         >
-          <SelectTrigger id="feed-topic" className="w-full">
+          <SelectTrigger
+            id="feed-topic"
+            className="h-11 w-full border-border/60 bg-muted/25 text-foreground dark:bg-muted/30 dark:text-foreground [&>span]:text-foreground"
+          >
             <SelectValue placeholder="Choose a topic" />
           </SelectTrigger>
           <SelectContent>
@@ -1203,14 +1206,34 @@ export default function CommunityHomePage() {
 
       {isMobile ? (
         <Sheet open={composerSheetOpen} onOpenChange={setComposerSheetOpen}>
-          <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl px-4 pb-8 pt-2">
-            <SheetHeader className="space-y-1 pb-3 text-left">
-              <SheetTitle className="font-display text-lg tracking-tight">New post</SheetTitle>
-              <SheetDescription className="text-sm">Share with the community. Add photos, a poll, or an event.</SheetDescription>
+          <SheetContent
+            side="bottom"
+            className={cn(
+              "flex h-[min(92dvh,calc(100dvh-0.5rem))] max-h-[100dvh] flex-col overflow-hidden rounded-t-3xl border-t border-border/60 bg-background p-0 pt-2 shadow-2xl",
+            )}
+          >
+            <div className="flex shrink-0 flex-col items-center gap-2 px-4 pb-1 pt-1">
+              <div
+                className="h-1 w-10 shrink-0 rounded-full bg-muted-foreground/30"
+                aria-hidden
+              />
+            </div>
+            <SheetHeader className="shrink-0 space-y-1 px-4 pb-2 text-left">
+              <SheetTitle className="font-display text-lg tracking-tight text-foreground">New post</SheetTitle>
+              <SheetDescription className="text-sm text-muted-foreground">
+                Share with the community. Add photos, a poll, or an event.
+              </SheetDescription>
             </SheetHeader>
-            <form onSubmit={handlePost} className="space-y-3" data-testid="feed-composer-form-sheet" id="feed-composer-form-sheet">
-              <ComposerFormBody />
-            </form>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
+              <form
+                onSubmit={handlePost}
+                className="space-y-3 pb-2"
+                data-testid="feed-composer-form-sheet"
+                id="feed-composer-form-sheet"
+              >
+                <ComposerFormBody />
+              </form>
+            </div>
           </SheetContent>
         </Sheet>
       ) : null}
