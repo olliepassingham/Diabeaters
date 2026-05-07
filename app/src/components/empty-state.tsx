@@ -66,14 +66,26 @@ export function HubLoadingSkeleton({ tiles = 6, className }: HubLoadingSkeletonP
 /** Stacked post-shaped placeholders for feed loading. */
 export function FeedLoadingSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading feed">
+    <ul className="space-y-3" aria-busy="true" aria-label="Loading feed">
       {Array.from({ length: rows }, (_, i) => (
-        <Skeleton
+        <li
           key={i}
-          className="h-36 w-full animate-soft-in rounded-2xl sm:h-40"
-          style={{ animationDelay: `${i * 70}ms` }}
-        />
+          className="surface-glass-muted flex gap-3 rounded-2xl border border-border/50 p-3 sm:p-4 animate-soft-in"
+          style={{ animationDelay: `${i * 55}ms` }}
+        >
+          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-3 w-32 rounded-md" />
+            <Skeleton className="h-3 w-20 rounded-md opacity-80" />
+            <Skeleton className="h-14 w-full rounded-xl opacity-60" />
+            <div className="flex gap-3 pt-1">
+              <Skeleton className="h-7 w-14 rounded-lg opacity-70" />
+              <Skeleton className="h-7 w-20 rounded-lg opacity-70" />
+              <Skeleton className="h-7 w-16 rounded-lg opacity-70" />
+            </div>
+          </div>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

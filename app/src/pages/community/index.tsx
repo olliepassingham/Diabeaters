@@ -4,12 +4,13 @@ import { Capacitor } from "@capacitor/core";
 import { Camera, type GalleryPhoto } from "@capacitor/camera";
 import {
   BarChart2,
+  Bookmark,
   Calendar,
   ChevronDown,
   ImagePlus,
   MessageCircle,
   Plus,
-  Search,
+  Search as SearchIcon,
   Send,
   X,
 } from "lucide-react";
@@ -40,9 +41,17 @@ import {
 } from "@/lib/community";
 import { followUser, listFolloweeIdsForCurrentUser } from "@/lib/community";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -75,6 +84,12 @@ function initialFeedComposerOpen(): boolean {
     if (draft?.body?.trim()) return true;
   } catch {
     /* ignore */
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia(`(max-width: 767px)`).matches
+  ) {
+    return false;
   }
   return window.matchMedia("(min-width: 768px)").matches;
 }
@@ -126,6 +141,18 @@ export default function CommunityHomePage() {
   /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
   const [followeesLoading, setFolloweesLoading] = useState(false);
+  const isMobile = useIsMobile();
+  const [composerSheetOpen, setComposerSheetOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return Boolean(readFeedComposerDraft()?.body?.trim());
+    } catch {
+      return false;
+    }
+  });
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [feedSearchExpanded, setFeedSearchExpanded] = useState(false);
+  const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
@@ -137,6 +164,25 @@ export default function CommunityHomePage() {
         : fetchCommunityPostsFromFollowingPage(limit, cursor, topicFilter),
     [feedTab, topicFilter],
   );
+
+  useEffect(() => {
+    if (!user?.id || feedTab !== "following") {
+      setFollowingAuthorIds(null);
+      return;
+    }
+    let cancelled = false;
+    void listFolloweeIdsForCurrentUser().then((res) => {
+      if (cancelled) return;
+      if (res.error) {
+        setFollowingAuthorIds([user.id]);
+        return;
+      }
+      setFollowingAuthorIds([...new Set([user.id, ...(res.ids ?? [])])]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, feedTab]);
 
   /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
   useEffect(() => {
@@ -450,8 +496,10 @@ export default function CommunityHomePage() {
   }, [composer, composerFiles.length, composerPostKind]);
 
   useEffect(() => {
-    if (composerExpandSignal) setComposerPanelOpen(true);
-  }, [composerExpandSignal]);
+    if (!composerExpandSignal) return;
+    if (isMobile) setComposerSheetOpen(true);
+    else setComposerPanelOpen(true);
+  }, [composerExpandSignal, isMobile]);
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -514,8 +562,277 @@ export default function CommunityHomePage() {
     }
     resetComposerAfterPost();
     if (res.data) setFeedListKey((k) => k + 1);
+    if (isMobile) setComposerSheetOpen(false);
     toast({ title: "Posted" });
   }
+
+  const ComposerFormBody = () => (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="feed-topic" className="text-sm">
+          Topic
+        </Label>
+        <Select
+          value={composerTopic}
+          onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
+          disabled={submitting || !user || !canComposeToFeed}
+        >
+          <SelectTrigger id="feed-topic" className="w-full">
+            <SelectValue placeholder="Choose a topic" />
+          </SelectTrigger>
+          <SelectContent>
+            {orderedTopics.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {composerPostKind === "poll" ? (
+        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+          <div className="space-y-1">
+            <Label htmlFor="feed-poll-q">Poll question</Label>
+            <Input
+              id="feed-poll-q"
+              value={pollQuestion}
+              onChange={(e) => setPollQuestion(e.target.value.slice(0, 500))}
+              placeholder="What do you want to ask?"
+              disabled={submitting || !user || !canComposeToFeed}
+              maxLength={500}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">2–6 options, each up to 500 characters.</p>
+          <div className="space-y-2">
+            {pollOptions.map((opt, i) => (
+              <div key={i} className="flex gap-2">
+                <Input
+                  value={opt}
+                  onChange={(e) =>
+                    setPollOptions((prev) => {
+                      const next = [...prev];
+                      next[i] = e.target.value.slice(0, 500);
+                      return next;
+                    })
+                  }
+                  placeholder={`Option ${i + 1}`}
+                  disabled={submitting || !user || !canComposeToFeed}
+                  maxLength={500}
+                  aria-label={`Poll option ${i + 1}`}
+                />
+                {pollOptions.length > 2 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    disabled={submitting || !user || !canComposeToFeed}
+                    onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label={`Remove option ${i + 1}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+            {pollOptions.length < MAX_POLL_OPTIONS ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={submitting || !user || !canComposeToFeed}
+                onClick={() => setPollOptions((prev) => [...prev, ""])}
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add option
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {composerPostKind === "event" ? (
+        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
+          <div className="space-y-1">
+            <Label htmlFor="feed-event-title">Event name</Label>
+            <Input
+              id="feed-event-title"
+              value={eventTitle}
+              onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
+              placeholder="Meetup title"
+              disabled={submitting || !user || !canComposeToFeed}
+              maxLength={500}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="feed-event-start">Starts</Label>
+            <Input
+              id="feed-event-start"
+              type="datetime-local"
+              value={eventStartsAt}
+              onChange={(e) => setEventStartsAt(e.target.value)}
+              disabled={submitting || !user || !canComposeToFeed}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="feed-event-loc">Location (optional)</Label>
+            <Input
+              id="feed-event-loc"
+              value={eventLocation}
+              onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
+              placeholder="Where?"
+              disabled={submitting || !user || !canComposeToFeed}
+              maxLength={500}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="feed-event-details">Details (optional)</Label>
+            <Textarea
+              id="feed-event-details"
+              value={eventDetails}
+              onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
+              placeholder="More about the event…"
+              rows={3}
+              disabled={submitting || !user || !canComposeToFeed}
+              maxLength={2000}
+              className="surface-field rounded-xl"
+            />
+          </div>
+        </div>
+      ) : null}
+      <Textarea
+        value={composer}
+        onChange={(e) => setComposer(e.target.value)}
+        placeholder={
+          composerPostKind === "poll"
+            ? "Optional intro before the poll…"
+            : composerPostKind === "event"
+              ? "Optional intro before the event details…"
+              : "Share something on the feed…"
+        }
+        rows={3}
+        maxLength={8000}
+        disabled={submitting || !user || !canComposeToFeed}
+        className="surface-field min-h-[5.5rem] rounded-xl"
+      />
+      <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
+      {composerPostKind === "standard" && composerPreviews.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
+          <p className="text-xs font-medium text-muted-foreground">
+            Attached photos
+            <span className="ml-1.5 tabular-nums text-foreground/80">({composerPreviews.length})</span>
+          </p>
+          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:thin]">
+            {composerPreviews.map((src, i) => {
+              const name = composerFiles[i]?.name?.trim() || `Photo ${i + 1}`;
+              return (
+                <div key={`${src}-${i}`} className="relative w-[5.5rem] shrink-0 sm:w-24">
+                  <div className="relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
+                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => removeComposerImage(i)}
+                      aria-label={`Remove ${name}`}
+                      disabled={submitting}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p
+                    className="mt-1.5 truncate text-center text-[10px] leading-tight text-muted-foreground sm:text-xs"
+                    title={name}
+                  >
+                    {name}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {composerPostKind === "standard" && composerPreviews.length > 0 ? (
+        <div className="space-y-2">
+          {composerPreviews.map((src, i) => (
+            <div key={src} className="space-y-1">
+              <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
+                Photo {i + 1} description (optional)
+              </Label>
+              <Input
+                id={`feed-composer-alt-${i}`}
+                value={composerImageAlts[i] ?? ""}
+                onChange={(e) =>
+                  setComposerImageAlts((prev) => {
+                    const next = [...prev];
+                    next[i] = e.target.value.slice(0, 500);
+                    return next;
+                  })
+                }
+                placeholder="What’s in this image? Helps people using screen readers."
+                disabled={submitting || !user || !canComposeToFeed}
+                maxLength={500}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          id="feed-composer-images"
+          disabled={
+            submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES || composerPostKind !== "standard"
+          }
+          onChange={(e) => onPickImages(e.target.files)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={
+            submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES || composerPostKind !== "standard"
+          }
+          onClick={() => void pickImagesFromLibraryOnly()}
+          aria-label="Add photos to post"
+        >
+          <ImagePlus className="h-4 w-4 mr-1.5" />
+          Photo
+        </Button>
+        <Button
+          type="button"
+          variant={composerPostKind === "poll" ? "default" : "outline"}
+          size="sm"
+          disabled={submitting || !user}
+          onClick={onPollModeClick}
+          aria-pressed={composerPostKind === "poll"}
+          aria-label={composerPostKind === "poll" ? "Switch to normal post" : "Add poll"}
+        >
+          <BarChart2 className="h-4 w-4 mr-1.5" />
+          Poll
+        </Button>
+        <Button
+          type="button"
+          variant={composerPostKind === "event" ? "default" : "outline"}
+          size="sm"
+          disabled={submitting || !user}
+          onClick={onEventModeClick}
+          aria-pressed={composerPostKind === "event"}
+          aria-label={composerPostKind === "event" ? "Switch to normal post" : "Add event"}
+        >
+          <Calendar className="h-4 w-4 mr-1.5" />
+          Event
+        </Button>
+        <InlineInfoHint ariaLabel="Photo limits for posts" content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`} />
+        <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit || !canComposeToFeed}>
+          <Send className="h-4 w-4 mr-1.5" />
+          Post
+        </Button>
+      </div>
+    </>
+  );
 
   if (!isSupabaseConfigured()) {
     return (
@@ -547,7 +864,7 @@ export default function CommunityHomePage() {
               aria-label="Find people"
               title="Find people"
             >
-              <Search className="h-4 w-4" aria-hidden />
+              <SearchIcon className="h-4 w-4" aria-hidden />
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/community/messages">
@@ -703,30 +1020,58 @@ export default function CommunityHomePage() {
         </DialogContent>
       </Dialog>
 
-        <div className="surface-glass-muted space-y-3 rounded-2xl p-4">
-          <div className="flex flex-col gap-3">
-            <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
-              <TabsList className="grid h-11 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
-                <TabsTrigger value="following" className="rounded-lg data-[state=active]:bg-card/95">
-                  Following
-                </TabsTrigger>
-                <TabsTrigger value="everyone" className="rounded-lg data-[state=active]:bg-card/95">
-                  Everyone
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+      {isMobile ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/80 px-3 py-3 text-left shadow-sm ring-1 ring-border/40 backdrop-blur-sm dark:bg-card/50 min-h-[3rem]"
+          onClick={() => setComposerSheetOpen(true)}
+          data-testid="feed-composer-mobile-pill"
+        >
+          <CommunityAuthorAvatar
+            displayName={(profile?.full_name ?? user?.email ?? "You").trim() || "You"}
+            avatarPath={profile?.avatar_url ?? null}
+            size="sm"
+            profileHref={user?.id ? `/community/profile/${encodeURIComponent(user.id)}` : undefined}
+          />
+          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            {composer.trim() ? composer.trim() : "Share something on the feed…"}
+          </span>
+        </button>
+      ) : null}
+
+      <div
+        className={cn(
+          "space-y-2 rounded-2xl border border-border/50 bg-background/85 p-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/70",
+          "sticky top-0 z-20 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
+        )}
+      >
+        <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
+          <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
+            <TabsTrigger value="following" className="rounded-lg text-sm data-[state=active]:bg-card/95">
+              Following
+            </TabsTrigger>
+            <TabsTrigger value="everyone" className="rounded-lg text-sm data-[state=active]:bg-card/95">
+              Everyone
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div
-          className="-mx-1 flex gap-2 overflow-x-auto rounded-xl bg-background/40 px-2 py-2 dark:bg-background/25"
-          role="group"
-          aria-label="Filter feed by topic"
+          role="tablist"
+          aria-label="Feed topic and saved filter"
+          className="flex gap-2 overflow-x-auto rounded-xl bg-muted/25 px-1 py-1.5 dark:bg-muted/15 [scrollbar-width:thin]"
         >
           <Button
             type="button"
-            variant={topicFilter === null ? "default" : "outline"}
+            role="tab"
+            aria-selected={topicFilter === null && !savedOnly}
+            variant={topicFilter === null && !savedOnly ? "default" : "outline"}
             size="sm"
             className="shrink-0 rounded-full"
-            onClick={() => setTopicFilter(null)}
+            onClick={() => {
+              setTopicFilter(null);
+              setSavedOnly(false);
+            }}
           >
             All topics
           </Button>
@@ -734,30 +1079,84 @@ export default function CommunityHomePage() {
             <Button
               key={t.id}
               type="button"
-              variant={topicFilter === t.id ? "default" : "outline"}
+              role="tab"
+              aria-selected={topicFilter === t.id && !savedOnly}
+              variant={topicFilter === t.id && !savedOnly ? "default" : "outline"}
               size="sm"
               className="shrink-0 whitespace-nowrap rounded-full"
-              onClick={() => setTopicFilter(t.id)}
+              onClick={() => {
+                setTopicFilter(t.id);
+                setSavedOnly(false);
+              }}
             >
               {t.label}
             </Button>
           ))}
+          <Button
+            type="button"
+            role="tab"
+            aria-selected={savedOnly}
+            variant={savedOnly ? "default" : "outline"}
+            size="sm"
+            className="shrink-0 gap-1 rounded-full"
+            onClick={() => {
+              setSavedOnly((s) => {
+                const next = !s;
+                if (next) setTopicFilter(null);
+                return next;
+              });
+            }}
+          >
+            <Bookmark className="h-3.5 w-3.5" aria-hidden />
+            Saved
+          </Button>
         </div>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            value={feedSearch}
-            onChange={(e) => setFeedSearch(e.target.value)}
-            placeholder="Search loaded posts…"
-            className="pl-9"
-            aria-label="Search feed"
-          />
-        </div>
+
+        {isMobile && !feedSearchExpanded ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-xl"
+              aria-label="Open search"
+              onClick={() => setFeedSearchExpanded(true)}
+            >
+              <SearchIcon className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
+        ) : (
+          <div className="relative">
+            <SearchIcon
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={feedSearch}
+              onChange={(e) => setFeedSearch(e.target.value)}
+              placeholder="Search posts and people"
+              className="pl-9"
+              aria-label="Search feed"
+            />
+            {isMobile && feedSearchExpanded ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 h-7 -translate-y-1/2 px-2 text-xs"
+                onClick={() => {
+                  setFeedSearch("");
+                  setFeedSearchExpanded(false);
+                }}
+              >
+                Close
+              </Button>
+            ) : null}
+          </div>
+        )}
       </div>
 
+      {!isMobile ? (
       <Collapsible open={composerPanelOpen} onOpenChange={setComposerPanelOpen}>
         <Card variant="glass" className={cn(!canComposeToFeed && user ? "opacity-90" : undefined)} data-testid="feed-composer-card">
           <CardHeader className="space-y-0 pb-2">
@@ -793,291 +1192,28 @@ export default function CommunityHomePage() {
           </CardHeader>
           <CollapsibleContent className="overflow-hidden">
             <CardContent className="pt-0">
-          <form onSubmit={handlePost} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="feed-topic" className="text-sm">
-                Topic
-              </Label>
-              <Select
-                value={composerTopic}
-                onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
-                disabled={submitting || !user || !canComposeToFeed}
-              >
-                <SelectTrigger id="feed-topic" className="w-full">
-                  <SelectValue placeholder="Choose a topic" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orderedTopics.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {composerPostKind === "poll" ? (
-              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
-                <div className="space-y-1">
-                  <Label htmlFor="feed-poll-q">Poll question</Label>
-                  <Input
-                    id="feed-poll-q"
-                    value={pollQuestion}
-                    onChange={(e) => setPollQuestion(e.target.value.slice(0, 500))}
-                    placeholder="What do you want to ask?"
-                    disabled={submitting || !user || !canComposeToFeed}
-                    maxLength={500}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">2–6 options, each up to 500 characters.</p>
-                <div className="space-y-2">
-                  {pollOptions.map((opt, i) => (
-                    <div key={i} className="flex gap-2">
-                      <Input
-                        value={opt}
-                        onChange={(e) =>
-                          setPollOptions((prev) => {
-                            const next = [...prev];
-                            next[i] = e.target.value.slice(0, 500);
-                            return next;
-                          })
-                        }
-                        placeholder={`Option ${i + 1}`}
-                        disabled={submitting || !user || !canComposeToFeed}
-                        maxLength={500}
-                        aria-label={`Poll option ${i + 1}`}
-                      />
-                      {pollOptions.length > 2 ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0"
-                          disabled={submitting || !user || !canComposeToFeed}
-                          onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
-                          aria-label={`Remove option ${i + 1}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                    </div>
-                  ))}
-                  {pollOptions.length < MAX_POLL_OPTIONS ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={submitting || !user || !canComposeToFeed}
-                      onClick={() => setPollOptions((prev) => [...prev, ""])}
-                    >
-                      <Plus className="h-4 w-4 mr-1.5" />
-                      Add option
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {composerPostKind === "event" ? (
-              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
-                <div className="space-y-1">
-                  <Label htmlFor="feed-event-title">Event name</Label>
-                  <Input
-                    id="feed-event-title"
-                    value={eventTitle}
-                    onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
-                    placeholder="Meetup title"
-                    disabled={submitting || !user || !canComposeToFeed}
-                    maxLength={500}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="feed-event-start">Starts</Label>
-                  <Input
-                    id="feed-event-start"
-                    type="datetime-local"
-                    value={eventStartsAt}
-                    onChange={(e) => setEventStartsAt(e.target.value)}
-                    disabled={submitting || !user || !canComposeToFeed}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="feed-event-loc">Location (optional)</Label>
-                  <Input
-                    id="feed-event-loc"
-                    value={eventLocation}
-                    onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
-                    placeholder="Where?"
-                    disabled={submitting || !user || !canComposeToFeed}
-                    maxLength={500}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="feed-event-details">Details (optional)</Label>
-                  <Textarea
-                    id="feed-event-details"
-                    value={eventDetails}
-                    onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
-                    placeholder="More about the event…"
-                    rows={3}
-                    disabled={submitting || !user || !canComposeToFeed}
-                    maxLength={2000}
-                    className="surface-field rounded-xl"
-                  />
-                </div>
-              </div>
-            ) : null}
-            <Textarea
-              value={composer}
-              onChange={(e) => setComposer(e.target.value)}
-              placeholder={
-                composerPostKind === "poll"
-                  ? "Optional intro before the poll…"
-                  : composerPostKind === "event"
-                    ? "Optional intro before the event details…"
-                    : "Share something on the feed…"
-              }
-              rows={3}
-              maxLength={8000}
-              disabled={submitting || !user || !canComposeToFeed}
-              className="surface-field min-h-[5.5rem] rounded-xl"
-            />
-            <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
-            {composerPostKind === "standard" && composerPreviews.length > 0 && (
-              <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
-                <p className="text-xs font-medium text-muted-foreground">
-                  Attached photos
-                  <span className="ml-1.5 tabular-nums text-foreground/80">({composerPreviews.length})</span>
-                </p>
-                <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:thin]">
-                  {composerPreviews.map((src, i) => {
-                    const name = composerFiles[i]?.name?.trim() || `Photo ${i + 1}`;
-                    return (
-                      <div
-                        key={`${src}-${i}`}
-                        className="relative w-[5.5rem] shrink-0 sm:w-24"
-                      >
-                        <div className="relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
-                          <img src={src} alt="" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => removeComposerImage(i)}
-                            aria-label={`Remove ${name}`}
-                            disabled={submitting}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <p className="mt-1.5 truncate text-center text-[10px] leading-tight text-muted-foreground sm:text-xs" title={name}>
-                          {name}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {composerPostKind === "standard" && composerPreviews.length > 0 ? (
-              <div className="space-y-2">
-                {composerPreviews.map((src, i) => (
-                  <div key={src} className="space-y-1">
-                    <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
-                      Photo {i + 1} description (optional)
-                    </Label>
-                    <Input
-                      id={`feed-composer-alt-${i}`}
-                      value={composerImageAlts[i] ?? ""}
-                      onChange={(e) =>
-                        setComposerImageAlts((prev) => {
-                          const next = [...prev];
-                          next[i] = e.target.value.slice(0, 500);
-                          return next;
-                        })
-                      }
-                      placeholder="What’s in this image? Helps people using screen readers."
-                      disabled={submitting || !user || !canComposeToFeed}
-                      maxLength={500}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                id="feed-composer-images"
-                disabled={
-                  submitting ||
-                  !user ||
-                  !canComposeToFeed ||
-                  composerFiles.length >= MAX_POST_IMAGES ||
-                  composerPostKind !== "standard"
-                }
-                onChange={(e) => onPickImages(e.target.files)}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={
-                  submitting ||
-                  !user ||
-                  !canComposeToFeed ||
-                  composerFiles.length >= MAX_POST_IMAGES ||
-                  composerPostKind !== "standard"
-                }
-                onClick={() => void pickImagesFromLibraryOnly()}
-                aria-label="Add photos to post"
-              >
-                <ImagePlus className="h-4 w-4 mr-1.5" />
-                Photo
-              </Button>
-              <Button
-                type="button"
-                variant={composerPostKind === "poll" ? "default" : "outline"}
-                size="sm"
-                disabled={submitting || !user}
-                onClick={onPollModeClick}
-                aria-pressed={composerPostKind === "poll"}
-                aria-label={composerPostKind === "poll" ? "Switch to normal post" : "Add poll"}
-              >
-                <BarChart2 className="h-4 w-4 mr-1.5" />
-                Poll
-              </Button>
-              <Button
-                type="button"
-                variant={composerPostKind === "event" ? "default" : "outline"}
-                size="sm"
-                disabled={submitting || !user}
-                onClick={onEventModeClick}
-                aria-pressed={composerPostKind === "event"}
-                aria-label={composerPostKind === "event" ? "Switch to normal post" : "Add event"}
-              >
-                <Calendar className="h-4 w-4 mr-1.5" />
-                Event
-              </Button>
-              <InlineInfoHint
-                ariaLabel="Photo limits for posts"
-                content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`}
-              />
-              <Button
-                type="submit"
-                size="sm"
-                className="ml-auto"
-                disabled={submitting || !composerCanSubmit || !canComposeToFeed}
-              >
-                <Send className="h-4 w-4 mr-1.5" />
-                Post
-              </Button>
-            </div>
-          </form>
+              <form onSubmit={handlePost} className="space-y-3" data-testid="feed-composer-form">
+                <ComposerFormBody />
+              </form>
             </CardContent>
           </CollapsibleContent>
         </Card>
       </Collapsible>
+      ) : null}
+
+      {isMobile ? (
+        <Sheet open={composerSheetOpen} onOpenChange={setComposerSheetOpen}>
+          <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl px-4 pb-8 pt-2">
+            <SheetHeader className="space-y-1 pb-3 text-left">
+              <SheetTitle className="font-display text-lg tracking-tight">New post</SheetTitle>
+              <SheetDescription className="text-sm">Share with the community. Add photos, a poll, or an event.</SheetDescription>
+            </SheetHeader>
+            <form onSubmit={handlePost} className="space-y-3" data-testid="feed-composer-form-sheet" id="feed-composer-form-sheet">
+              <ComposerFormBody />
+            </form>
+          </SheetContent>
+        </Sheet>
+      ) : null}
 
       <FeedPostList
         key={feedListKey}
@@ -1086,6 +1222,21 @@ export default function CommunityHomePage() {
         pageSize={PAGE_SIZE}
         topicsForSelect={orderedTopics}
         showRefreshButton
+        feedTab={feedTab}
+        topicFilter={topicFilter}
+        followingAuthorIds={followingAuthorIds}
+        savedOnly={savedOnly}
+        feedListRevision={feedListKey}
+        onOpenFindPeople={() => setPeopleOpen(true)}
+        onClearSearch={() => {
+          setFeedSearch("");
+          setFeedSearchExpanded(false);
+        }}
+        onExploreTopicInEveryone={(tid) => {
+          setFeedTab("everyone");
+          setTopicFilter(tid);
+          setSavedOnly(false);
+        }}
         emptyStateTitle="Nothing here yet"
         emptyStateDescription={
           feedTab === "following"

@@ -44,6 +44,11 @@ function wrapFeedRpcError(err: { message: string }): Error {
       `${msg} Apply migration 20260409120000_community_post_topics (see docs/sql/community_post_topics.sql), then reload the API schema in Supabase Dashboard → Settings → API.`,
     );
   }
+  if (msg.includes("search_community_posts")) {
+    return new Error(
+      `${msg} Apply migration 20260507140000_community_feed_search_saves_realtime.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
   if (msg.includes("content_note") || msg.includes("image_alt_texts")) {
     return new Error(
       `${msg} Apply migration 20260411120000_community_posts_feed_ux_columns.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
@@ -120,6 +125,7 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
     comment_count: Number.isFinite(cc) ? Math.max(0, Math.floor(cc)) : 0,
     like_count: Number.isFinite(lc) ? Math.max(0, Math.floor(lc)) : 0,
     liked_by_me: Boolean(r.liked_by_me),
+    saved_by_me: Boolean(r.saved_by_me),
     created_at: String(r.created_at ?? ""),
   };
 }
@@ -188,6 +194,28 @@ function mergeLikedIntoPosts(posts: CommunityPostRow[], likedIds: Set<string>): 
   return posts.map((p) => ({ ...p, liked_by_me: likedIds.has(p.id) }));
 }
 
+function mergeSavedIntoPosts(posts: CommunityPostRow[], savedIds: Set<string>): CommunityPostRow[] {
+  return posts.map((p) => ({ ...p, saved_by_me: savedIds.has(p.id) }));
+}
+
+async function fetchMySavesForPostIds(postIds: string[]): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const supabase = getSupabase();
+  if (!supabase) return new Set();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return new Set();
+
+  const { data, error } = await supabase
+    .from("community_post_saves")
+    .select("post_id")
+    .eq("user_id", uid)
+    .in("post_id", postIds);
+
+  if (error) return new Set();
+  return new Set((data ?? []).map((row: { post_id: string }) => String(row.post_id)));
+}
+
 async function attachAuthorPreviews(posts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
   const ids = [...new Set(posts.map((p) => p.author_id).filter(Boolean))];
   if (ids.length === 0) return posts;
@@ -208,10 +236,11 @@ async function attachAuthorPreviews(posts: CommunityPostRow[]): Promise<Communit
 async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
   if (withCounts.length === 0) return withCounts;
   const postIds = withCounts.map((p) => p.id);
-  const [commentCounts, likeCounts, liked, withAuthors] = await Promise.all([
+  const [commentCounts, likeCounts, liked, saved, withAuthors] = await Promise.all([
     fetchCommentCountsForPostIds(postIds),
     fetchLikeCountsForPostIds(postIds),
     fetchMyLikesForPostIds(postIds),
+    fetchMySavesForPostIds(postIds),
     attachAuthorPreviews(withCounts),
   ]);
   const merged = withAuthors.map((p) => ({
@@ -219,7 +248,7 @@ async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<
     comment_count: Math.max(p.comment_count, commentCounts.get(p.id) ?? 0),
     like_count: Math.max(p.like_count, likeCounts.get(p.id) ?? 0),
   }));
-  return mergeLikedIntoPosts(merged, liked);
+  return mergeSavedIntoPosts(mergeLikedIntoPosts(merged, liked), saved);
 }
 
 async function finalizeSinglePostRow(row: CommunityPostRow): Promise<CommunityPostRow> {
@@ -384,6 +413,71 @@ export async function fetchCommunityPostsFromFollowingPage(
 
   const dataOut = await finalizePostRowsForFeed(posts);
   return { data: dataOut, error: null };
+}
+
+export async function searchCommunityPostsPage(
+  limit: number,
+  cursor: FeedCursor | null,
+  query: string,
+  topicFilter?: CommunityTopicId | null,
+  authorIds?: string[] | null,
+): Promise<{
+  data: CommunityPostRow[] | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  const q = query.trim();
+  if (q.length < 2) return { data: [], error: null };
+
+  const lim = Math.min(Math.max(limit, 1), PAGE_LIMIT_CAP);
+  const ids =
+    authorIds != null && authorIds.length > 0 ? [...new Set(authorIds.filter(Boolean))] : null;
+
+  const { data, error } = await supabase.rpc("search_community_posts", {
+    p_query: q,
+    p_limit: lim,
+    p_cursor_created_at: cursor?.created_at ?? null,
+    p_cursor_id: cursor?.id ?? null,
+    p_topic: topicFilter ?? null,
+    p_author_ids: ids,
+  });
+
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
+  const raw = (data ?? []) as Record<string, unknown>[];
+  const posts = raw.map((row) => mapPost(row));
+  const dataOut = await finalizePostRowsForFeed(posts);
+  return { data: dataOut, error: null };
+}
+
+export async function togglePostSave(
+  postId: string,
+  currentlySaved: boolean,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  if (currentlySaved) {
+    const { error } = await supabase
+      .from("community_post_saves")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", uid);
+    if (error) return { error: new Error(error.message) };
+    return { error: null };
+  }
+
+  const { error } = await supabase.from("community_post_saves").insert({
+    post_id: postId,
+    user_id: uid,
+  });
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
 }
 
 /** Posts for a specific author (RLS applies for blocks). */
@@ -717,18 +811,28 @@ export async function insertCommunityPost(
   });
 }
 
-export async function fetchCommentsForPost(postId: string): Promise<{
+export async function fetchCommentsForPost(
+  postId: string,
+  options?: { limit?: number },
+): Promise<{
   data: CommunityPostCommentRow[] | null;
   error: Error | null;
 }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
-  const { data, error } = await supabase
+  let q = supabase
     .from("community_post_comments")
     .select("*")
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
+
+  const lim = options?.limit;
+  if (typeof lim === "number" && lim > 0) {
+    q = q.limit(lim);
+  }
+
+  const { data, error } = await q;
 
   if (error) return { data: null, error: new Error(error.message) };
   return {

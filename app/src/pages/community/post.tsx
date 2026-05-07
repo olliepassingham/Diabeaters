@@ -43,6 +43,7 @@ import {
   insertCommunityComment,
   submitContentReport,
   togglePostLike,
+  togglePostSave,
   updateCommunityPost,
   type CommunityPostCommentRow,
   type CommunityPostRow,
@@ -185,6 +186,16 @@ export default function CommunityPostPage() {
         like_count: Math.max(0, post.like_count + (currentlyLiked ? 1 : -1)),
       });
       toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
+    }
+  }
+
+  async function handleToggleSave(pid: string, currentlySaved: boolean) {
+    if (!user || !post || pid !== post.id) return;
+    setPost({ ...post, saved_by_me: !currentlySaved });
+    const res = await togglePostSave(pid, currentlySaved);
+    if (res.error) {
+      setPost({ ...post, saved_by_me: currentlySaved });
+      toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
     }
   }
 
@@ -350,6 +361,7 @@ export default function CommunityPostPage() {
         onToggleComments={() => setExpanded((e) => !e)}
         onReplyFocus={replyFocus}
         onLike={() => void handleToggleLike(post.id, post.liked_by_me)}
+        onSavePost={() => void handleToggleSave(post.id, post.saved_by_me)}
         onSubmitComment={() => void submitComment()}
         onReportPost={() => openReport("post", post.id)}
         onReportComment={(cid) => openReport("comment", cid)}

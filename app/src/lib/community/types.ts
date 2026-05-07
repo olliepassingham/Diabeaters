@@ -31,6 +31,8 @@ export type CommunityPostRow = {
   like_count: number;
   /** Whether the current user has liked this post (client merges from reactions). */
   liked_by_me: boolean;
+  /** Whether the current user saved/bookmarked this post (community_post_saves). */
+  saved_by_me: boolean;
   created_at: string;
   /** Set by feed fetchers together with `liked_by_me` so avatars/names load with the post payload. */
   author_preview?: CommunityPostAuthorPreview;

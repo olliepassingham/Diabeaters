@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, SearchX, Users } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useToast } from "@/hooks/use-toast";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import {
   COMMUNITY_TOPICS,
   DEFAULT_COMMUNITY_TOPIC,
@@ -41,9 +41,13 @@ import {
   fetchCommentsForPost,
   insertCommunityComment,
   isCommunityTopicId,
+  listBlockRelatedUserIdsForCurrentUser,
+  searchCommunityPostsPage,
   submitContentReport,
   togglePostLike,
+  togglePostSave,
   updateCommunityPost,
+  shouldUseFeedServerSearch,
   type CommunityPostAuthorPreview,
   type CommunityPostCommentRow,
   type CommunityPostRow,
@@ -91,11 +95,30 @@ export function FeedPostList(props: {
   showRefreshButton?: boolean;
   /** Topic dropdown order (edit post); defaults to canonical list. */
   topicsForSelect?: readonly CommunityTopicRow[];
+  /** Main feed only: Following vs Everyone (onboarding empty state). */
+  feedTab?: "everyone" | "following";
+  topicFilter?: CommunityTopicId | null;
+  /** When `feedTab` is following, author ids (self + followees) for search + realtime. */
+  followingAuthorIds?: string[] | null;
+  onOpenFindPeople?: () => void;
+  /** Show only posts saved by the viewer (client filter). */
+  savedOnly?: boolean;
+  /** Bump when parent remount key changes (realtime channel id). */
+  feedListRevision?: number;
+  /** Clear search field (main feed). */
+  onClearSearch?: () => void;
+  /** Switch to Everyone tab with a topic (onboarding). */
+  onExploreTopicInEveryone?: (topicId: CommunityTopicId) => void;
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
   const { fetchPage } = props;
   const topicsForSelect = props.topicsForSelect ?? COMMUNITY_TOPICS;
+  const topicFilter = props.topicFilter ?? null;
+  const followingAuthorIdsForSearch =
+    props.feedTab === "following" && props.followingAuthorIds && props.followingAuthorIds.length > 0
+      ? props.followingAuthorIds
+      : null;
 
   const [posts, setPosts] = useState<CommunityPostRow[]>([]);
   const postsRef = useRef(posts);
@@ -105,6 +128,16 @@ export function FeedPostList(props: {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState(props.searchQuery ?? "");
+  const [newPostCount, setNewPostCount] = useState(0);
+  const blockedUserIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(props.searchQuery ?? ""), 250);
+    return () => window.clearTimeout(t);
+  }, [props.searchQuery]);
+
+  const useServerSearch = shouldUseFeedServerSearch(debouncedSearch);
 
   const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
   const [authorMetaPending, setAuthorMetaPending] = useState(false);
@@ -132,6 +165,20 @@ export function FeedPostList(props: {
   const pullAnchorRef = useRef<HTMLDivElement>(null);
 
   const loadFirstPage = useCallback(async () => {
+    if (useServerSearch) {
+      const res = await searchCommunityPostsPage(pageSize, null, debouncedSearch, topicFilter, followingAuthorIdsForSearch);
+      if (res.error) {
+        toast({ title: "Search failed", description: res.error.message, variant: "destructive" });
+        setPosts([]);
+        setHasMore(false);
+        return;
+      }
+      const list = res.data ?? [];
+      setPosts(list);
+      setHasMore(list.length >= pageSize);
+      return;
+    }
+
     const res = await fetchPage(pageSize, null);
     if (res.error) {
       toast({ title: "Could not load posts", description: res.error.message, variant: "destructive" });
@@ -142,7 +189,15 @@ export function FeedPostList(props: {
     const list = res.data ?? [];
     setPosts(list);
     setHasMore(list.length >= pageSize);
-  }, [fetchPage, pageSize, toast]);
+  }, [
+    useServerSearch,
+    debouncedSearch,
+    topicFilter,
+    followingAuthorIdsForSearch,
+    fetchPage,
+    pageSize,
+    toast,
+  ]);
 
   const refresh = useCallback(async () => {
     try {
@@ -163,6 +218,7 @@ export function FeedPostList(props: {
 
   const runRefresh = useCallback(async () => {
     setRefreshing(true);
+    setNewPostCount(0);
     try {
       await loadFirstPage();
     } finally {
@@ -180,11 +236,11 @@ export function FeedPostList(props: {
   useEffect(() => {
     setLoading(true);
     void refresh();
-    // Reset per-post state when data source changes.
     setExpanded({});
     setCommentsByPost({});
     setCommentDrafts({});
     setLoadingComments({});
+    setNewPostCount(0);
   }, [refresh]);
 
   const loadMore = useCallback(async () => {
@@ -194,6 +250,30 @@ export function FeedPostList(props: {
     const last = list[list.length - 1];
     if (!last) return;
     setLoadingMore(true);
+
+    if (useServerSearch) {
+      const res = await searchCommunityPostsPage(
+        pageSize,
+        { created_at: last.created_at, id: last.id },
+        debouncedSearch,
+        topicFilter,
+        followingAuthorIdsForSearch,
+      );
+      setLoadingMore(false);
+      if (res.error) {
+        toast({ title: "Could not load more", description: res.error.message, variant: "destructive" });
+        return;
+      }
+      const next = res.data ?? [];
+      if (next.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      setPosts((prev) => [...prev, ...next]);
+      setHasMore(next.length >= pageSize);
+      return;
+    }
+
     const res = await fetchPage(pageSize, { created_at: last.created_at, id: last.id });
     setLoadingMore(false);
     if (res.error) {
@@ -207,7 +287,18 @@ export function FeedPostList(props: {
     }
     setPosts((prev) => [...prev, ...next]);
     setHasMore(next.length >= pageSize);
-  }, [hasMore, loadingMore, loading, fetchPage, pageSize, toast]);
+  }, [
+    hasMore,
+    loadingMore,
+    loading,
+    fetchPage,
+    pageSize,
+    toast,
+    useServerSearch,
+    debouncedSearch,
+    topicFilter,
+    followingAuthorIdsForSearch,
+  ]);
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
@@ -221,6 +312,45 @@ export function FeedPostList(props: {
     obs.observe(el);
     return () => obs.disconnect();
   }, [hasMore, loadMore, loading, posts.length]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured() || useServerSearch || !props.viewerId) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    let cancelled = false;
+    void listBlockRelatedUserIdsForCurrentUser().then((r) => {
+      if (cancelled || r.error) return;
+      blockedUserIdsRef.current = r.ids;
+    });
+
+    const selfId = props.viewerId;
+    const topic = topicFilter;
+    const following = followingAuthorIdsForSearch;
+    const rev = props.feedListRevision ?? 0;
+
+    const channel = supabase
+      .channel(`community_posts_inserts_${selfId}_${rev}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "community_posts" },
+        (payload) => {
+          const row = payload.new as { id?: string; author_id?: string; topic?: string };
+          if (!row?.author_id || !row.id) return;
+          if (row.author_id === selfId) return;
+          if (blockedUserIdsRef.current.has(row.author_id)) return;
+          if (topic != null && row.topic !== topic) return;
+          if (following && !following.includes(row.author_id)) return;
+          setNewPostCount((c) => c + 1);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      void supabase.removeChannel(channel);
+    };
+  }, [props.viewerId, topicFilter, followingAuthorIdsForSearch, useServerSearch, props.feedListRevision]);
 
   /** Seed author rows from post payload so names/avatar paths paint with the feed (not after a second fetch). */
   useLayoutEffect(() => {
@@ -291,17 +421,22 @@ export function FeedPostList(props: {
     return { name: shortId(authorId), avatar_url: null, public_handle: null };
   }
 
-  const filteredPosts = useMemo(() => {
+  const displayPosts = useMemo(() => {
+    let list = posts;
+    if (props.savedOnly) {
+      list = list.filter((p) => p.saved_by_me);
+    }
+    if (useServerSearch) return list;
     const q = (props.searchQuery ?? "").trim().toLowerCase();
-    if (!q) return posts;
-    return posts.filter((p) => {
+    if (!q) return list;
+    return list.filter((p) => {
       if (p.body.toLowerCase().includes(q)) return true;
       const m = authorMeta[p.author_id];
       const name = (m?.name ?? "").toLowerCase();
       const handle = (m?.public_handle ?? "").toLowerCase();
       return name.includes(q) || handle.includes(q);
     });
-  }, [posts, props.searchQuery, authorMeta]);
+  }, [posts, props.searchQuery, props.savedOnly, authorMeta, useServerSearch]);
 
   async function ensureCommentsLoaded(postId: string) {
     if (commentsByPost[postId]) return;
@@ -358,6 +493,23 @@ export function FeedPostList(props: {
         const nextCount = Math.max(0, p.like_count + (nextLiked ? 1 : -1));
         return { ...p, liked_by_me: nextLiked, like_count: nextCount };
       }),
+    );
+  }
+
+  async function onSavePost(postId: string) {
+    if (!props.viewerId) {
+      toast({ title: "Sign in", description: "Log in to save posts.", variant: "destructive" });
+      return;
+    }
+    const cur = postsRef.current.find((p) => p.id === postId);
+    if (!cur) return;
+    const res = await togglePostSave(postId, cur.saved_by_me);
+    if (res.error) {
+      toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p)),
     );
   }
 
@@ -442,6 +594,24 @@ export function FeedPostList(props: {
     toast({ title: "Updated", description: "Your post was updated." });
   }
 
+  const searchLabelRaw = useServerSearch ? debouncedSearch.trim() : (props.searchQuery ?? "").trim();
+  const searchNoResults =
+    Boolean(searchLabelRaw) &&
+    displayPosts.length === 0 &&
+    !loading &&
+    (useServerSearch ? posts.length === 0 : posts.length > 0);
+
+  const savedFilterEmpty =
+    Boolean(props.savedOnly) && !loading && posts.length > 0 && displayPosts.length === 0;
+
+  const followingOnboardingEmpty =
+    props.feedTab === "following" &&
+    !loading &&
+    posts.length === 0 &&
+    !useServerSearch &&
+    !props.savedOnly &&
+    !(props.searchQuery ?? "").trim();
+
   if (!isSupabaseConfigured()) {
     return (
       <div className={props.className}>
@@ -476,16 +646,81 @@ export function FeedPostList(props: {
         </div>
       ) : null}
 
+      {newPostCount > 0 && !useServerSearch ? (
+        <div className="pb-2" aria-live="polite">
+          <Button
+            type="button"
+            size="sm"
+            className="w-full rounded-full shadow-sm"
+            variant="secondary"
+            onClick={() => void runRefresh()}
+          >
+            {newPostCount} new {newPostCount === 1 ? "post" : "posts"} — tap to refresh
+          </Button>
+        </div>
+      ) : null}
+
       {loading ? (
         <FeedLoadingSkeleton />
-      ) : filteredPosts.length === 0 ? (
+      ) : searchNoResults ? (
+        <EmptyState
+          title={`No matches for "${searchLabelRaw}"`}
+          description="Try different words or clear search."
+          icon={SearchX}
+        >
+          {props.onClearSearch ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => props.onClearSearch?.()}>
+              Clear search
+            </Button>
+          ) : null}
+        </EmptyState>
+      ) : savedFilterEmpty ? (
+        <EmptyState
+          title="No saved posts yet"
+          description="Use the bookmark action on a post to save it here."
+        />
+      ) : followingOnboardingEmpty ? (
+        <EmptyState
+          title="Build your Following feed"
+          description="Follow people you want to hear from, or browse Everyone for any topic."
+          icon={Users}
+        >
+          {props.onOpenFindPeople ? (
+            <Button type="button" size="sm" onClick={() => props.onOpenFindPeople?.()}>
+              Find people
+            </Button>
+          ) : null}
+          {props.onExploreTopicInEveryone ? (
+            <div className="w-full max-w-sm space-y-2 text-left">
+              <p className="text-center text-xs font-medium text-muted-foreground">Browse a topic (Everyone)</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {(props.topicsForSelect ?? COMMUNITY_TOPICS)
+                  .filter((t) => t.id !== DEFAULT_COMMUNITY_TOPIC)
+                  .slice(0, 5)
+                  .map((t) => (
+                    <Button
+                      key={t.id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-full text-xs"
+                      onClick={() => props.onExploreTopicInEveryone?.(t.id)}
+                    >
+                      {t.label}
+                    </Button>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </EmptyState>
+      ) : displayPosts.length === 0 ? (
         <EmptyState
           title={props.emptyStateTitle ?? "No posts yet"}
           description={props.emptyStateDescription ?? "When someone posts, it will show up here."}
         />
       ) : (
         <div className="space-y-3">
-          {filteredPosts.map((post) => {
+          {displayPosts.map((post) => {
             const m = metaFor(post.author_id);
             return (
               <FeedPostCard
@@ -511,6 +746,7 @@ export function FeedPostList(props: {
                   window.setTimeout(() => commentInputRefs.current[post.id]?.focus(), 0);
                 }}
                 onLike={() => void onLike(post.id)}
+                onSavePost={() => void onSavePost(post.id)}
                 onSubmitComment={() => void onSubmitComment(post.id)}
                 onReportPost={() => openReport("post", post.id)}
                 onReportComment={(commentId) => openReport("comment", commentId)}

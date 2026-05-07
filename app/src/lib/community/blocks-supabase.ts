@@ -65,6 +65,42 @@ export async function blockUser(blockedId: string): Promise<{ error: Error | nul
   return { error: null };
 }
 
+export async function listBlockRelatedUserIdsForCurrentUser(): Promise<{
+  ids: Set<string>;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { ids: new Set(), error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { ids: new Set(), error: null };
+
+  const out = new Set<string>();
+
+  const { data: blockedByMe, error: e1 } = await supabase
+    .from("user_blocks")
+    .select("blocked_id")
+    .eq("blocker_id", uid);
+  if (e1) return { ids: new Set(), error: new Error(e1.message) };
+  for (const row of blockedByMe ?? []) {
+    const id = (row as { blocked_id: string }).blocked_id;
+    if (id) out.add(String(id));
+  }
+
+  const { data: blockers, error: e2 } = await supabase
+    .from("user_blocks")
+    .select("blocker_id")
+    .eq("blocked_id", uid);
+  if (e2) return { ids: new Set(), error: new Error(e2.message) };
+  for (const row of blockers ?? []) {
+    const id = (row as { blocker_id: string }).blocker_id;
+    if (id) out.add(String(id));
+  }
+
+  return { ids: out, error: null };
+}
+
 export async function unblockUser(blockedId: string): Promise<{ error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { error: new Error("Supabase not configured") };

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  Bookmark,
   Flag,
   Heart,
   Link2,
@@ -53,6 +54,7 @@ import { cn } from "@/lib/utils";
 import {
   castPollVote,
   communityTopicLabel,
+  fetchCommentsForPost,
   fetchDmThreadsForCurrentUser,
   fetchPollVoteState,
   getFirstWhitelistedFeedLink,
@@ -291,6 +293,7 @@ type FeedPostCardProps = {
   onToggleComments: () => void;
   onReplyFocus: () => void;
   onLike: () => void;
+  onSavePost: () => void;
   onSubmitComment: () => void;
   onReportPost: () => void;
   onReportComment: (commentId: string) => void;
@@ -324,6 +327,7 @@ export function FeedPostCard({
   onToggleComments,
   onReplyFocus,
   onLike,
+  onSavePost,
   onSubmitComment,
   onReportPost,
   onReportComment,
@@ -371,11 +375,37 @@ export function FeedPostCard({
   const [likersTruncated, setLikersTruncated] = useState(false);
 
   const [commentSort, setCommentSort] = useState<"oldest" | "newest">("oldest");
+  const [topCommentPreview, setTopCommentPreview] = useState<{ body: string; authorName: string } | null>(null);
+  const commentMetaRef = useRef(commentMeta);
+  commentMetaRef.current = commentMeta;
   const sortedComments = useMemo(() => {
     const arr = [...comments];
     if (commentSort === "newest") arr.reverse();
     return arr;
   }, [comments, commentSort]);
+
+  useEffect(() => {
+    if (expanded || post.comment_count === 0) {
+      setTopCommentPreview(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchCommentsForPost(post.id, { limit: 1 }).then((res) => {
+      if (cancelled || res.error || !res.data?.[0]) {
+        if (!cancelled) setTopCommentPreview(null);
+        return;
+      }
+      const c = res.data[0];
+      const meta = commentMetaRef.current(c.author_id);
+      setTopCommentPreview({
+        body: c.body.trim(),
+        authorName: meta.name,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [post.id, post.comment_count, expanded]);
 
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
@@ -539,6 +569,28 @@ export function FeedPostCard({
     setShareBusy(false);
   }
 
+  async function sharePostLinkExternally() {
+    const url = `${window.location.origin}/community/post/${post.id}`;
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: "Diabeaters post",
+          text: post.body.slice(0, 200),
+          url,
+        });
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied", description: "Paste to share elsewhere." });
+    } catch {
+      toast({ title: "Could not share", description: url, variant: "destructive" });
+    }
+  }
+
   async function handleSendSelectedPeer() {
     if (!viewerId || !shareSelectedPeer?.user_id) return;
     if (shareSelectedPeer.user_id === viewerId) return;
@@ -691,7 +743,10 @@ export function FeedPostCard({
                 onClick={onLike}
               >
                 <Heart
-                  className={cn("h-4 w-4 shrink-0", post.liked_by_me && "fill-primary text-primary")}
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-all duration-200 ease-out",
+                    post.liked_by_me ? "fill-primary text-primary scale-110" : "scale-100",
+                  )}
                 />
               </Button>
               <Button
@@ -745,14 +800,56 @@ export function FeedPostCard({
               size="sm"
               className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
               disabled={!viewerId}
-              aria-label="Send post in a private message"
-              onClick={() => setShareOpen(true)}
-              data-testid="button-share-post-to-dm"
+              aria-pressed={post.saved_by_me}
+              aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
+              onClick={onSavePost}
             >
-              <Share2 className="h-4 w-4 shrink-0" />
-              <span className="text-xs text-foreground">Send</span>
+              <Bookmark
+                className={cn(
+                  "h-4 w-4 shrink-0 transition-colors",
+                  post.saved_by_me && "fill-primary text-primary",
+                )}
+              />
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                  aria-label="Share post"
+                  data-testid="button-share-post-to-dm"
+                >
+                  <Share2 className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="text-xs text-foreground">Share</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem disabled={!viewerId} onClick={() => setShareOpen(true)}>
+                  Send in message
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    void sharePostLinkExternally();
+                  }}
+                >
+                  Share link
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+          {!expanded && topCommentPreview && post.comment_count > 0 ? (
+            <button
+              type="button"
+              className="w-full rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/35"
+              onClick={onToggleComments}
+            >
+              <span className="font-semibold text-foreground">{topCommentPreview.authorName}</span>
+              <span className="text-muted-foreground"> · </span>
+              <span className="line-clamp-2">{topCommentPreview.body}</span>
+            </button>
+          ) : null}
           {expanded && (
             <div className="border-t border-border/60 pt-3 space-y-2">
               {loadingComments ? (

@@ -37,6 +37,7 @@ export {
   type CommunityPollExtra,
   type CommunityPostKind,
 } from "./post-kinds";
+export * from "./feed-search-mode";
 export * from "./posts-supabase";
 export * from "./dm-supabase";
 export * from "./follows-supabase";
