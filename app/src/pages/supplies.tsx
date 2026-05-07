@@ -155,6 +155,113 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
   );
 }
 
+function RunwaySummaryCard(props: {
+  supplies: Supply[];
+  criticalSupplies: Supply[];
+  lowSupplies: Supply[];
+  onJumpToSupply: (id: string) => void;
+  onOpenPlanning: () => void;
+  onAddSupply: () => void;
+}) {
+  const { supplies, criticalSupplies, lowSupplies } = props;
+
+  const minDays =
+    supplies.length === 0
+      ? null
+      : (() => {
+          const allDays = supplies.map((s) => storage.getDaysRemaining(s)).filter((d) => d !== 999);
+          return allDays.length > 0 ? Math.min(...allDays) : null;
+        })();
+
+  const headline =
+    supplies.length === 0
+      ? "Start tracking your supplies"
+      : minDays === null
+        ? "Add daily usage to estimate runway"
+        : minDays <= 3
+          ? "Action needed soon"
+          : minDays <= 7
+            ? "Plan a reorder"
+            : "You’re in a good place";
+
+  const sub =
+    supplies.length === 0
+      ? "Add insulin, needles, sensors, and more. We’ll estimate run-out dates based on your habits."
+      : minDays === null
+        ? "Set a daily usage rate for at least one item to unlock days-left estimates and the depletion timeline."
+        : minDays <= 3
+          ? `Shortest runway is ${minDays} day${minDays === 1 ? "" : "s"}. Consider ordering now.`
+          : minDays <= 7
+            ? `Shortest runway is ${minDays} days. A quick plan now avoids last‑minute shortages.`
+            : `Shortest runway is ${minDays} days. Keep things up to date as you use and refill items.`;
+
+  const tone =
+    supplies.length === 0
+      ? "bg-card"
+      : minDays === null
+        ? "bg-card"
+        : minDays <= 3
+          ? "bg-red-500/[0.06]"
+          : minDays <= 7
+            ? "bg-amber-500/[0.06]"
+            : "bg-emerald-500/[0.05]";
+
+  const ring =
+    supplies.length === 0
+      ? "border-border/70"
+      : minDays === null
+        ? "border-border/70"
+        : minDays <= 3
+          ? "border-red-500/35"
+          : minDays <= 7
+            ? "border-amber-500/35"
+            : "border-emerald-500/30";
+
+  const primaryAction =
+    supplies.length === 0 ? (
+      <Button size="sm" onClick={props.onAddSupply} data-testid="button-runway-add-supply">
+        <Plus className="h-4 w-4 mr-1.5" />
+        Add supply
+      </Button>
+    ) : criticalSupplies.length > 0 ? (
+      <Button size="sm" onClick={() => props.onJumpToSupply(criticalSupplies[0].id)} data-testid="button-runway-jump-critical">
+        <AlertTriangle className="h-4 w-4 mr-1.5" />
+        View critical
+      </Button>
+    ) : lowSupplies.length > 0 ? (
+      <Button size="sm" variant="outline" onClick={props.onOpenPlanning} data-testid="button-runway-open-planning">
+        <Calendar className="h-4 w-4 mr-1.5" />
+        Planning
+      </Button>
+    ) : (
+      <Button size="sm" variant="outline" onClick={props.onOpenPlanning} data-testid="button-runway-open-planning-ok">
+        <Calendar className="h-4 w-4 mr-1.5" />
+        Planning
+      </Button>
+    );
+
+  return (
+    <Card className={`overflow-hidden rounded-2xl border ${ring} ${tone}`} data-testid="card-runway-summary">
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-background/70 border border-border/60">
+                <TrendingDown className="h-4 w-4 text-primary" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">{headline}</p>
+                <p className="text-xs text-muted-foreground">{sub}</p>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">{primaryAction}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 function PrescriptionCyclePanel({ 
   cycle, 
@@ -1008,24 +1115,63 @@ function SupplyCard({
   };
 
   const lastPickupText = getLastPickupText();
+  const stockNowInt = Math.max(0, Math.floor(adjustedQuantity));
+  const runwayLabel =
+    daysRemaining === 999 ? "Set usage" : `~${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`;
+  const runwayTone =
+    daysRemaining === 999
+      ? "bg-muted text-muted-foreground"
+      : status === "critical"
+        ? "bg-red-600 text-white"
+        : status === "low"
+          ? "bg-amber-600 text-white"
+          : "bg-emerald-600 text-white";
 
   return (
-    <Card className={status === "critical" ? "border-red-500/50 glow-critical" : status === "low" ? "border-yellow-500/50 glow-warning" : ""}>
+    <Card
+      className={[
+        "rounded-2xl border-border/70 overflow-hidden",
+        status === "critical"
+          ? "border-red-500/35 bg-red-500/[0.03]"
+          : status === "low"
+            ? "border-amber-500/35 bg-amber-500/[0.03]"
+            : "bg-card",
+      ].join(" ")}
+    >
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg ${
-              status === "critical" ? "bg-red-500/10" : 
-              status === "low" ? "bg-yellow-500/10" : "bg-primary/10"
-            }`}>
-              <Icon className={`h-4 w-4 ${
-                status === "critical" ? "text-red-600 dark:text-red-500" : 
-                status === "low" ? "text-yellow-600 dark:text-yellow-500" : "text-primary"
-              }`} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex items-start gap-3">
+            <div
+              className={[
+                "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border",
+                status === "critical"
+                  ? "border-red-500/30 bg-red-500/10"
+                  : status === "low"
+                    ? "border-amber-500/25 bg-amber-500/10"
+                    : "border-border/60 bg-primary/10",
+              ].join(" ")}
+            >
+              <Icon
+                className={[
+                  "h-4 w-4",
+                  status === "critical"
+                    ? "text-red-600 dark:text-red-400"
+                    : status === "low"
+                      ? "text-amber-700 dark:text-amber-400"
+                      : "text-primary",
+                ].join(" ")}
+                aria-hidden
+              />
             </div>
-            <div>
-              <p className="font-medium text-sm">{supply.name}</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-semibold text-foreground">{supply.name}</p>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${runwayTone}`}>
+                  {runwayLabel}
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground">{typeLabels[supply.type]}</p>
+              {lastPickupText ? <p className="mt-1 text-[11px] text-muted-foreground">{lastPickupText}</p> : null}
             </div>
           </div>
           <div className="flex gap-1">
@@ -1056,13 +1202,10 @@ function SupplyCard({
           </div>
         </div>
 
-        <div className={`p-3 rounded-lg mb-3 ${
-          status === "critical" ? "bg-red-500/10" : 
-          status === "low" ? "bg-yellow-500/10" : "bg-primary/5"
-        }`}>
-          <div className="flex items-baseline justify-between gap-2">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Stock now</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Stock now</p>
+            <div className="mt-1">
               {isInsulinType(supply.type) ? (
                 <div data-testid={`text-remaining-${supply.id}`}>
                   {(() => {
@@ -1072,80 +1215,68 @@ function SupplyCard({
                     const plural = containerCount === 1 ? containerLabel : `${containerLabel}s`;
                     return (
                       <>
-                        <p className={`text-2xl font-bold ${
-                          status === "critical" ? "text-red-600 dark:text-red-500" : 
-                          status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                        }`}>
+                        <p className="text-xl font-semibold tabular-nums">
                           {containerCount} {plural}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          ~{Math.floor(adjustedQuantity)} units remaining
-                        </p>
+                        <p className="text-xs text-muted-foreground">~{stockNowInt} units</p>
                       </>
                     );
                   })()}
                 </div>
               ) : supply.type === "cgm" ? (
-                <p className={`text-2xl font-bold ${
-                  status === "critical" ? "text-red-600 dark:text-red-500" : 
-                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                }`} data-testid={`text-remaining-${supply.id}`}>
-                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "sensor" : "sensors"}
+                <p className="text-xl font-semibold tabular-nums" data-testid={`text-remaining-${supply.id}`}>
+                  {stockNowInt} {stockNowInt === 1 ? "sensor" : "sensors"}
                 </p>
               ) : supply.type === "infusion_set" ? (
-                <p className={`text-2xl font-bold ${
-                  status === "critical" ? "text-red-600 dark:text-red-500" : 
-                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                }`} data-testid={`text-remaining-${supply.id}`}>
-                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "set" : "sets"}
+                <p className="text-xl font-semibold tabular-nums" data-testid={`text-remaining-${supply.id}`}>
+                  {stockNowInt} {stockNowInt === 1 ? "set" : "sets"}
                 </p>
               ) : supply.type === "reservoir" ? (
-                <p className={`text-2xl font-bold ${
-                  status === "critical" ? "text-red-600 dark:text-red-500" : 
-                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                }`} data-testid={`text-remaining-${supply.id}`}>
-                  {Math.floor(adjustedQuantity)} {Math.floor(adjustedQuantity) === 1 ? "reservoir" : "reservoirs"}
+                <p className="text-xl font-semibold tabular-nums" data-testid={`text-remaining-${supply.id}`}>
+                  {stockNowInt} {stockNowInt === 1 ? "reservoir" : "reservoirs"}
                 </p>
               ) : (
-                <p className={`text-2xl font-bold ${
-                  status === "critical" ? "text-red-600 dark:text-red-500" : 
-                  status === "low" ? "text-yellow-600 dark:text-yellow-500" : ""
-                }`} data-testid={`text-remaining-${supply.id}`}>
-                  ~{Math.floor(adjustedQuantity)}{supply.type === "needle" ? " needles" : ""}
-                </p>
-              )}
-              {forecastUsage > 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Forecast assumes {forecastUsage}/day{isInsulinType(supply.type) ? " units" : supply.type === "needle" ? " needles" : ""}{" "}
-                  {smarterEnabled && (
-                    <span className="ml-1">
-                      • Smarter: {forecastConfidence}
-                    </span>
-                  )}{" "}
-                  •{" "}
-                  <Link href="/settings/usage#settings-usage" className="underline underline-offset-2">
-                    Edit habits
-                  </Link>
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <Badge 
-                variant={status === "critical" ? "destructive" : status === "low" ? "secondary" : "outline"}
-                className="mb-1"
-                data-testid={`badge-days-${supply.id}`}
-              >
-                {status === "critical" && <AlertTriangle className="h-3 w-3 mr-1" />}
-                {daysRemaining === 999 ? "N/A" : `~${daysRemaining} days`}
-              </Badge>
-              {runOutDate && daysRemaining < 999 && (
-                <p className="text-xs text-muted-foreground">
-                  Est. run out: {format(runOutDate, "MMM d")}
+                <p className="text-xl font-semibold tabular-nums" data-testid={`text-remaining-${supply.id}`}>
+                  {stockNowInt}
                 </p>
               )}
             </div>
           </div>
+
+          <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Runway</p>
+            <div className="mt-1">
+              {daysRemaining === 999 ? (
+                <>
+                  <p className="text-sm font-semibold text-foreground">Estimate unavailable</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Add daily usage to get days left.</p>
+                  <Button asChild size="sm" variant="outline" className="mt-2 h-8 px-2 text-xs">
+                    <Link href="/settings/usage#settings-usage">Set usage</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-xl font-semibold tabular-nums">{daysRemaining} days</p>
+                  {runOutDate ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">Est. run out {format(runOutDate, "d MMM")}</p>
+                  ) : (
+                    <p className="mt-0.5 text-xs text-muted-foreground">Based on your current habits</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
+
+        {forecastUsage > 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Forecast: {forecastUsage}/day{isInsulinType(supply.type) ? " units" : supply.type === "needle" ? " needles" : ""}{" "}
+            {smarterEnabled ? <span className="ml-1">• Smarter: {forecastConfidence}</span> : null} •{" "}
+            <Link href="/settings/usage#settings-usage" className="underline underline-offset-2">
+              Edit habits
+            </Link>
+          </p>
+        ) : null}
 
         {activeItemInfo && (
           <p className="text-xs text-muted-foreground -mt-1 mb-2">
@@ -2632,6 +2763,15 @@ export default function Supplies() {
           )}
         </div>
       </div>
+
+      <RunwaySummaryCard
+        supplies={supplies}
+        criticalSupplies={criticalSupplies}
+        lowSupplies={lowSupplies}
+        onJumpToSupply={handleTimelineClick}
+        onOpenPlanning={() => setPlanningOpen(true)}
+        onAddSupply={handleAddNew}
+      />
 
       {(criticalSupplies.length > 0 || lowSupplies.length > 0) && (
         <Card className="border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
