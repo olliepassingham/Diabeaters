@@ -155,114 +155,6 @@ function DepletionTimeline({ supplies, onSupplyClick }: { supplies: Supply[]; on
   );
 }
 
-function RunwaySummaryCard(props: {
-  supplies: Supply[];
-  criticalSupplies: Supply[];
-  lowSupplies: Supply[];
-  onJumpToSupply: (id: string) => void;
-  onOpenPlanning: () => void;
-  onAddSupply: () => void;
-}) {
-  const { supplies, criticalSupplies, lowSupplies } = props;
-
-  const minDays =
-    supplies.length === 0
-      ? null
-      : (() => {
-          const allDays = supplies.map((s) => storage.getDaysRemaining(s)).filter((d) => d !== 999);
-          return allDays.length > 0 ? Math.min(...allDays) : null;
-        })();
-
-  const headline =
-    supplies.length === 0
-      ? "Start tracking your supplies"
-      : minDays === null
-        ? "Add daily usage to estimate runway"
-        : minDays <= 3
-          ? "Action needed soon"
-          : minDays <= 7
-            ? "Plan a reorder"
-            : "You’re in a good place";
-
-  const sub =
-    supplies.length === 0
-      ? "Add insulin, needles, sensors, and more. We’ll estimate run-out dates based on your habits."
-      : minDays === null
-        ? "Set a daily usage rate for at least one item to unlock days-left estimates and the depletion timeline."
-        : minDays <= 3
-          ? `Shortest runway is ${minDays} day${minDays === 1 ? "" : "s"}. Consider ordering now.`
-          : minDays <= 7
-            ? `Shortest runway is ${minDays} days. A quick plan now avoids last‑minute shortages.`
-            : `Shortest runway is ${minDays} days. Keep things up to date as you use and refill items.`;
-
-  const tone =
-    supplies.length === 0
-      ? "bg-card"
-      : minDays === null
-        ? "bg-card"
-        : minDays <= 3
-          ? "bg-red-500/[0.06]"
-          : minDays <= 7
-            ? "bg-amber-500/[0.06]"
-            : "bg-emerald-500/[0.05]";
-
-  const ring =
-    supplies.length === 0
-      ? "border-border/70"
-      : minDays === null
-        ? "border-border/70"
-        : minDays <= 3
-          ? "border-red-500/35"
-          : minDays <= 7
-            ? "border-amber-500/35"
-            : "border-emerald-500/30";
-
-  const primaryAction =
-    supplies.length === 0 ? (
-      <Button size="sm" onClick={props.onAddSupply} data-testid="button-runway-add-supply">
-        <Plus className="h-4 w-4 mr-1.5" />
-        Add supply
-      </Button>
-    ) : criticalSupplies.length > 0 ? (
-      <Button size="sm" onClick={() => props.onJumpToSupply(criticalSupplies[0].id)} data-testid="button-runway-jump-critical">
-        <AlertTriangle className="h-4 w-4 mr-1.5" />
-        View critical
-      </Button>
-    ) : lowSupplies.length > 0 ? (
-      <Button size="sm" variant="outline" onClick={props.onOpenPlanning} data-testid="button-runway-open-planning">
-        <Calendar className="h-4 w-4 mr-1.5" />
-        Planning
-      </Button>
-    ) : (
-      <Button size="sm" variant="outline" onClick={props.onOpenPlanning} data-testid="button-runway-open-planning-ok">
-        <Calendar className="h-4 w-4 mr-1.5" />
-        Planning
-      </Button>
-    );
-
-  return (
-    <Card className={`overflow-hidden rounded-2xl border ${ring} ${tone}`} data-testid="card-runway-summary">
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-background/70 border border-border/60">
-                <TrendingDown className="h-4 w-4 text-primary" aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{headline}</p>
-                <p className="text-xs text-muted-foreground">{sub}</p>
-              </div>
-            </div>
-          </div>
-          <div className="shrink-0 flex items-center gap-2">{primaryAction}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-
 function PrescriptionCyclePanel({ 
   cycle, 
   onSave, 
@@ -2693,30 +2585,26 @@ export default function Supplies() {
 
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="w-full">
-          <div className="-mx-2 px-2 flex items-center gap-2 flex-nowrap md:flex-wrap">
+          <div className="-mx-1 flex gap-2 overflow-x-auto rounded-xl bg-background/20 px-1 py-1 [scrollbar-width:thin]">
             <Button
               size="sm"
               onClick={handleAddNew}
-              className="shrink min-w-0 px-3 md:px-4"
+              className="shrink-0 min-w-0 px-3"
               data-testid="button-add-new-supply"
             >
               <Plus className="h-4 w-4 md:mr-1" />
-              <span className="hidden md:inline">Add Supply</span>
-              <span className="md:hidden ml-1">Add</span>
+              <span className="ml-1">Add</span>
             </Button>
 
             <Button
               variant="outline"
               size="sm"
               onClick={() => setUsualDialogOpen(true)}
-              className="shrink min-w-0 px-3 md:px-4"
+              className="shrink-0 min-w-0 px-3"
               data-testid="button-edit-usual-prescription"
             >
               <Pencil className="h-4 w-4 md:mr-1" />
-              <span className="hidden md:inline">
-                {usualPrescription && usualPrescription.items.length > 0 ? "Edit Usual" : "Set Usual"}
-              </span>
-              <span className="md:hidden ml-1">Usual</span>
+              <span className="ml-1">{usualPrescription && usualPrescription.items.length > 0 ? "Usual" : "Set usual"}</span>
             </Button>
 
             <Button
@@ -2724,28 +2612,39 @@ export default function Supplies() {
               size="sm"
               onClick={handleUndo}
               disabled={!previousSupplies}
-              className="shrink-0 px-3 md:px-4"
+              className="shrink-0 px-3"
               data-testid="button-undo"
               aria-label="Undo"
               title="Undo"
             >
               <Undo2 className="h-4 w-4 md:mr-1" />
-              <span className="hidden md:inline">Undo</span>
+              <span className="ml-1">Undo</span>
             </Button>
 
             <Link href="/settings/usage#settings-usage">
               <Button
                 variant="outline"
                 size="sm"
-                className="shrink-0 px-3 md:px-4"
+                className="shrink-0 px-3"
                 data-testid="button-usage-settings"
                 aria-label="Habits"
                 title="Habits"
               >
                 <Settings className="h-4 w-4 md:mr-1" />
-                <span className="hidden md:inline">Habits</span>
+                <span className="ml-1">Habits</span>
               </Button>
             </Link>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 px-3"
+              onClick={() => setPlanningOpen((p) => !p)}
+              data-testid="button-toggle-planning"
+            >
+              <Calendar className="h-4 w-4 md:mr-1" />
+              <span className="ml-1">Planning</span>
+            </Button>
           </div>
 
           {usualPrescription && usualPrescription.items.length > 0 && (
@@ -2763,15 +2662,6 @@ export default function Supplies() {
           )}
         </div>
       </div>
-
-      <RunwaySummaryCard
-        supplies={supplies}
-        criticalSupplies={criticalSupplies}
-        lowSupplies={lowSupplies}
-        onJumpToSupply={handleTimelineClick}
-        onOpenPlanning={() => setPlanningOpen(true)}
-        onAddSupply={handleAddNew}
-      />
 
       {(criticalSupplies.length > 0 || lowSupplies.length > 0) && (
         <Card className="border-amber-500/30 bg-amber-50/40 dark:bg-amber-950/20">
@@ -2795,14 +2685,6 @@ export default function Supplies() {
                   Jump
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={() => setPlanningOpen(true)}
-              >
-                Planning
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -2852,7 +2734,7 @@ export default function Supplies() {
       </details>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex-wrap h-auto gap-1">
+        <TabsList className="-mx-1 flex h-auto w-[calc(100%+0.5rem)] gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:thin]">
           <TabsTrigger value="all" data-testid="tab-all">
             All ({supplies.length})
           </TabsTrigger>
