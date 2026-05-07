@@ -59,7 +59,7 @@ async function sendViaApns(
   opts: { title: string; body: string; data?: Record<string, unknown> },
 ): Promise<boolean> {
   const bundleId = Deno.env.get("APNS_BUNDLE_ID")?.trim() || "com.passingtime.diabeaters";
-  const useSandbox = Deno.env.get("APNS_USE_SANDBOX") === "true";
+  const useSandbox = (Deno.env.get("APNS_USE_SANDBOX") ?? "").trim().toLowerCase() === "true";
   const host = useSandbox ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const hex = normalizeDeviceToken(deviceToken);
   if (!/^[0-9a-f]+$/i.test(hex) || hex.length < 32) {
