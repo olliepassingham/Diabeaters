@@ -10,7 +10,6 @@ import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageShell } from "@/components/layout";
-import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 export default function HelpNow() {
   const { data: linkedPatient } = useLinkedPatient();
@@ -18,7 +17,7 @@ export default function HelpNow() {
   const emergencyEditHref = emergencyDetailsEditHref(isCarer);
   const { profile: cloudProfile } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [mode, setMode] = useState<"awake" | "unconscious" | null>(null);
+  const [mode, setMode] = useState<"awake" | "unconscious">("awake");
   const { data: emergency, syncGeneration } = useEmergencyProfile();
 
   useEffect(() => {
@@ -43,104 +42,80 @@ export default function HelpNow() {
     [],
   );
 
+  /** Space for fixed emergency bar above bottom nav (nav height is measured at runtime). */
+  const emergencyDockClearance =
+    "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 7.25rem)";
+
   return (
-    <PageShell variant="standard" className="min-h-[calc(100vh-8rem)] space-y-4 pb-24">
-      <Card className="overflow-hidden rounded-2xl border border-red-500/20 bg-gradient-to-br from-red-500/[0.12] via-background to-background">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-600 text-white shadow-sm shadow-red-600/20">
-                  <ShieldAlert className="h-5 w-5" aria-hidden />
-                </span>
-                <div className="min-w-0">
-                  <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">Help Now</h1>
-                  <p className="text-sm text-muted-foreground">
-                    Emergency steps for someone with Type 1 diabetes
+    <PageShell
+      variant="standard"
+      className="min-h-[calc(100vh-8rem)] space-y-4"
+      style={{ paddingBottom: emergencyDockClearance }}
+    >
+      <div
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-red-600 via-rose-600 to-red-800 text-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.55)] ring-1 ring-white/10 dark:from-red-700 dark:via-rose-700 dark:to-red-950 dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]"
+        role="alert"
+        aria-live="polite"
+      >
+        <div
+          className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-black/15 blur-2xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,transparent_40%,rgba(255,255,255,0.06)_50%,transparent_60%)]"
+          aria-hidden
+        />
+        <div className="relative flex gap-0 sm:gap-1">
+          <div className="w-1 shrink-0 rounded-l-3xl bg-gradient-to-b from-white/50 via-white/25 to-white/10" aria-hidden />
+          <div className="min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+              <span className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/12 shadow-inner shadow-black/10 ring-1 ring-white/20 backdrop-blur-sm sm:mx-0">
+                <ShieldAlert className="h-7 w-7 text-white drop-shadow-sm" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1 space-y-3 text-center sm:text-left">
+                <div>
+                  <p className="inline-flex items-center justify-center rounded-full bg-black/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-red-50 ring-1 ring-white/15 sm:justify-start">
+                    Type 1 diabetes · Emergency
                   </p>
+                  <h1 className="mt-3 text-balance text-2xl font-bold leading-[1.15] tracking-tight sm:text-3xl sm:leading-tight">
+                    This person needs urgent help
+                  </h1>
                 </div>
-              </div>
-              <div className="mt-3 rounded-xl border border-border/70 bg-background/70 p-3">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Person</p>
-                <p className="mt-0.5 text-sm font-semibold text-foreground">{displayName || "Unknown name"}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  If you’re unsure what’s happening, call <strong>999</strong>.
+                {displayName ? (
+                  <p className="text-base font-semibold text-white sm:text-lg">
+                    <span className="text-red-100/90">Name · </span>
+                    <span className="whitespace-normal break-words">{displayName}</span>
+                  </p>
+                ) : null}
+                <p className="text-base font-medium leading-snug text-white sm:text-lg">
+                  <strong className="font-bold text-white">Type 1 diabetes</strong> — blood sugar can drop fast.
                 </p>
               </div>
             </div>
-            <div className="shrink-0">
-              <MedicalSourcesLink anchor="helpnow" compact />
-            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card key={syncGeneration} className="rounded-2xl border-border/70 bg-card">
+      <Card className="rounded-2xl border-amber-500/35 bg-gradient-to-b from-amber-500/[0.08] to-card shadow-sm ring-1 ring-amber-500/15 dark:from-amber-500/10">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BookOpen className="h-4 w-4 text-muted-foreground" aria-hidden />
-            Emergency contacts
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-foreground">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm dark:bg-amber-600">
+              <AlertCircle className="h-5 w-5" aria-hidden />
+            </span>
+            <span>Low blood sugar — common signs</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 space-y-2">
-          {primaryContact ? (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{primaryContact.name}</p>
-                <p className="text-xs text-muted-foreground">{primaryContact.phone}</p>
-              </div>
-              <Button size="sm" onClick={() => handleCall(primaryContact.phone)} data-testid="button-call-primary-synced">
-                <Phone className="h-4 w-4 mr-1.5" />
-                Call
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-3">
-              <p className="text-sm font-medium text-foreground">No emergency contact saved</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Add an emergency contact so a helper can quickly call someone who knows the person.
-              </p>
-              <Button size="sm" variant="outline" className="mt-2" asChild data-testid="button-call-contact">
-                <Link href={emergencyEditHref}>
-                  <User className="h-4 w-4 mr-1.5" />
-                  Add contact
-                </Link>
-              </Button>
-            </div>
-          )}
-
-          {emergency?.phoneSecondary?.trim() ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => handleCall(emergency.phoneSecondary.trim())}
-              data-testid="button-call-secondary-synced"
-            >
-              Call secondary contact
-            </Button>
-          ) : null}
-
-          <Button variant="secondary" size="sm" className="w-full" asChild>
-            <Link href={emergencyEditHref}>Edit emergency details</Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-border/70 bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
-            Quick check
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Low blood sugar can look like shaking, sweating, confusion, slurred speech, drowsiness, pale skin.
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {quickSymptoms.map((s) => (
-              <div key={s} className="rounded-lg border border-border/70 bg-background/60 px-2 py-1.5 text-muted-foreground">
+              <div
+                key={s}
+                className="rounded-xl border border-amber-500/20 bg-background/80 px-2 py-2.5 text-center text-sm font-semibold text-foreground shadow-sm"
+              >
                 {s}
               </div>
             ))}
@@ -152,7 +127,7 @@ export default function HelpNow() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <HeartPulse className="h-4 w-4 text-primary" aria-hidden />
-            What is happening right now?
+            What should you do?
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 space-y-3">
@@ -179,19 +154,19 @@ export default function HelpNow() {
 
           {mode === "awake" ? (
             <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4">
-              <p className="text-sm font-semibold text-foreground">Do this now</p>
-              <ol className="mt-2 space-y-2 text-sm text-muted-foreground">
+              <p className="text-base font-semibold text-foreground">Awake &amp; can swallow — do this</p>
+              <ol className="mt-3 space-y-2.5 text-base text-foreground">
                 <li>
-                  <strong className="text-foreground">Give fast sugar</strong> (juice, regular non‑diet cola, glucose tablets, sweets).
+                  <strong>Fast sugar:</strong> juice, regular (not diet) cola, glucose tablets, or sweets.
                 </li>
                 <li>
-                  <strong className="text-foreground">Stay with them</strong> and wait <strong className="text-foreground">10–15 minutes</strong>.
+                  <strong>Stay</strong> — wait <strong>10–15 minutes</strong>.
                 </li>
                 <li>
-                  If they don’t improve, <strong className="text-foreground">repeat fast sugar</strong>.
+                  <strong>Repeat</strong> fast sugar if no better.
                 </li>
                 <li>
-                  If they get worse or you are unsure, <strong className="text-foreground">call 999</strong>.
+                  <strong>Worse or unsure</strong> — red button below.
                 </li>
               </ol>
             </div>
@@ -199,8 +174,8 @@ export default function HelpNow() {
 
           {mode === "unconscious" ? (
             <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.06] p-4">
-              <p className="text-sm font-semibold text-foreground">Call 999 immediately</p>
-              <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+              <p className="text-base font-semibold text-foreground">Severe emergency — red button below</p>
+              <div className="mt-3 space-y-2 text-base text-foreground">
                 <div className="rounded-xl border border-border/70 bg-background/60 p-3">
                   <p>
                     <strong className="text-foreground">Do not</strong> give food or drink.
@@ -215,15 +190,6 @@ export default function HelpNow() {
                   </p>
                 </div>
               </div>
-              <Button
-                size="lg"
-                className="mt-3 w-full rounded-xl bg-red-600 dark:bg-red-700"
-                onClick={callEmergencyServices}
-                data-testid="button-call-999-unconscious"
-              >
-                <Phone className="h-5 w-5 mr-2" />
-                Call 999 now
-              </Button>
             </div>
           ) : null}
         </CardContent>
@@ -237,24 +203,73 @@ export default function HelpNow() {
               Pump user note
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0 text-sm text-muted-foreground space-y-2">
+          <CardContent className="space-y-3 pt-0 text-base font-medium text-foreground">
             <p>
-              If their blood sugar is low, <strong className="text-foreground">do not disconnect the pump</strong>. Treat the hypo first.
+              Low sugar: <strong>do not disconnect the pump</strong> — treat the hypo first.
             </p>
             <p>
-              If unconscious, <strong className="text-foreground">do not remove the pump</strong>. Tell paramedics they use a pump.
+              Unconscious: <strong>do not remove the pump</strong> — say they use a pump to paramedics.
             </p>
-            <MedicalSourcesLink anchor="sickday" compact />
           </CardContent>
         </Card>
       ) : null}
 
-      <p className="text-center text-xs text-muted-foreground">
-        Emergency guidance only — call <strong>999</strong> if unsure.
-      </p>
+      <Card key={syncGeneration} className="rounded-2xl border-border/70 bg-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BookOpen className="h-4 w-4 text-muted-foreground" aria-hidden />
+            Emergency contacts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-2">
+          {primaryContact ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 p-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">{primaryContact.name}</p>
+                <p className="text-sm text-muted-foreground">{primaryContact.phone}</p>
+              </div>
+              <Button size="sm" onClick={() => handleCall(primaryContact.phone)} data-testid="button-call-primary-synced">
+                <Phone className="h-4 w-4 mr-1.5" />
+                Call
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-3">
+              <p className="text-sm font-semibold text-foreground">No contact saved</p>
+              <Button size="sm" variant="outline" className="mt-3" asChild data-testid="button-call-contact">
+                <Link href={emergencyEditHref}>
+                  <User className="h-4 w-4 mr-1.5" />
+                  Add contact
+                </Link>
+              </Button>
+            </div>
+          )}
 
-      <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-[60] px-4 pb-4">
-        <div className="mx-auto max-w-md rounded-2xl border border-border/70 bg-background/85 p-3 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-background/70">
+          {emergency?.phoneSecondary?.trim() ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => handleCall(emergency.phoneSecondary.trim())}
+              data-testid="button-call-secondary-synced"
+            >
+              Call secondary contact
+            </Button>
+          ) : null}
+
+          <Button variant="secondary" size="sm" className="w-full" asChild>
+            <Link href={emergencyEditHref}>Edit emergency details</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div
+        className="fixed left-0 right-0 z-[95] px-4 pb-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]"
+        style={{
+          bottom: "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 0.5rem)",
+        }}
+      >
+        <div className="mx-auto max-w-md rounded-2xl border border-border/70 bg-background/95 p-3 shadow-xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
           <div className="flex items-stretch gap-2">
             <Button size="lg" className="flex-1 rounded-xl bg-red-600 dark:bg-red-700" onClick={callEmergencyServices} data-testid="button-call-999">
               <Phone className="h-5 w-5 mr-2" />
