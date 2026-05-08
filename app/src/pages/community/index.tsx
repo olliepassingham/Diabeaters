@@ -63,7 +63,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { getProfilesByIds, searchProfilesByHandlePrefix, useProfile } from "@/lib/profile";
+import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
 
 function shortId(id: string) {
@@ -154,6 +154,7 @@ export default function CommunityHomePage() {
   const [savedOnly, setSavedOnly] = useState(false);
   const [feedSearchExpanded, setFeedSearchExpanded] = useState(false);
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
+  const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
@@ -184,6 +185,36 @@ export default function CommunityHomePage() {
       cancelled = true;
     };
   }, [user?.id, feedTab]);
+
+  useEffect(() => {
+    const q = feedSearch.trim();
+    if (q.length < 2) {
+      setSearchMatchedAuthorIds(null);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const res = await searchPublicProfilesForFeedQuery(q, 18);
+        if (cancelled) return;
+        if (res.error) {
+          setSearchMatchedAuthorIds(null);
+          return;
+        }
+        // When Following tab is active, restrict author matches to people you follow (+self).
+        if (feedTab === "following" && followingAuthorIds && followingAuthorIds.length > 0) {
+          const allow = new Set(followingAuthorIds);
+          setSearchMatchedAuthorIds(res.ids.filter((id) => allow.has(id)));
+          return;
+        }
+        setSearchMatchedAuthorIds(res.ids);
+      })();
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [feedSearch, feedTab, followingAuthorIds]);
 
   /** Optional `?draft=` for short shared links (dashboard uses localStorage draft instead). */
   useEffect(() => {
@@ -1141,23 +1172,6 @@ export default function CommunityHomePage() {
               className="pl-9 pr-20"
               aria-label="Search feed"
             />
-            <Button
-              type="button"
-              variant={savedOnly ? "secondary" : "outline"}
-              size="icon"
-              className="absolute right-10 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg"
-              aria-pressed={savedOnly}
-              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-              onClick={() => {
-                setSavedOnly((s) => {
-                  const next = !s;
-                  if (next) setTopicFilter(null);
-                  return next;
-                });
-              }}
-            >
-              <Bookmark className="h-4 w-4" aria-hidden />
-            </Button>
             {isMobile && feedSearchExpanded ? (
               <Button
                 type="button"
@@ -1280,6 +1294,7 @@ export default function CommunityHomePage() {
         feedTab={feedTab}
         topicFilter={topicFilter}
         followingAuthorIds={followingAuthorIds}
+        searchMatchedAuthorIds={searchMatchedAuthorIds}
         savedOnly={savedOnly}
         feedListRevision={feedListKey}
         onOpenFindPeople={() => setPeopleOpen(true)}

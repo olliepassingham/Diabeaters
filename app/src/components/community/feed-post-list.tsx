@@ -100,6 +100,8 @@ export function FeedPostList(props: {
   topicFilter?: CommunityTopicId | null;
   /** When `feedTab` is following, author ids (self + followees) for search + realtime. */
   followingAuthorIds?: string[] | null;
+  /** Author ids matched from name/handle search (used for server search). */
+  searchMatchedAuthorIds?: string[] | null;
   onOpenFindPeople?: () => void;
   /** Show only posts saved by the viewer (client filter). */
   savedOnly?: boolean;
@@ -119,6 +121,8 @@ export function FeedPostList(props: {
     props.feedTab === "following" && props.followingAuthorIds && props.followingAuthorIds.length > 0
       ? props.followingAuthorIds
       : null;
+  const authorIdsForServerSearch =
+    props.searchMatchedAuthorIds && props.searchMatchedAuthorIds.length > 0 ? props.searchMatchedAuthorIds : null;
 
   const [posts, setPosts] = useState<CommunityPostRow[]>([]);
   const postsRef = useRef(posts);
@@ -166,7 +170,13 @@ export function FeedPostList(props: {
 
   const loadFirstPage = useCallback(async () => {
     if (useServerSearch) {
-      const res = await searchCommunityPostsPage(pageSize, null, debouncedSearch, topicFilter, followingAuthorIdsForSearch);
+      const res = await searchCommunityPostsPage(
+        pageSize,
+        null,
+        debouncedSearch,
+        topicFilter,
+        authorIdsForServerSearch,
+      );
       if (res.error) {
         toast({ title: "Search failed", description: res.error.message, variant: "destructive" });
         setPosts([]);
@@ -193,7 +203,7 @@ export function FeedPostList(props: {
     useServerSearch,
     debouncedSearch,
     topicFilter,
-    followingAuthorIdsForSearch,
+    authorIdsForServerSearch,
     fetchPage,
     pageSize,
     toast,
@@ -257,7 +267,7 @@ export function FeedPostList(props: {
         { created_at: last.created_at, id: last.id },
         debouncedSearch,
         topicFilter,
-        followingAuthorIdsForSearch,
+        authorIdsForServerSearch,
       );
       setLoadingMore(false);
       if (res.error) {
@@ -297,7 +307,7 @@ export function FeedPostList(props: {
     useServerSearch,
     debouncedSearch,
     topicFilter,
-    followingAuthorIdsForSearch,
+    authorIdsForServerSearch,
   ]);
 
   useEffect(() => {

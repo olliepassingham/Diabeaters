@@ -290,6 +290,47 @@ export async function searchProfilesByHandlePrefix(
   return { data: mapped.filter((p) => Boolean(p.public_handle?.trim())), error: null };
 }
 
+/** Feed search helper: public profiles matching handle prefix OR name substring. */
+export async function searchPublicProfilesForFeedQuery(
+  rawQuery: string,
+  limit = 12,
+): Promise<{ ids: string[]; error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { ids: [], error: new Error("Supabase not configured") };
+
+  const q = rawQuery.trim().replace(/^@/, "");
+  if (q.length < 2) return { ids: [], error: null };
+
+  const lim = Math.max(1, Math.min(30, limit));
+  try {
+    // We do two small queries to keep indexes usable (prefix vs substring).
+    const [byHandle, byName] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id")
+        .eq("is_public", true)
+        .ilike("public_handle", `${q.toLowerCase()}%`)
+        .limit(lim),
+      supabase
+        .from("profiles")
+        .select("id")
+        .eq("is_public", true)
+        .ilike("full_name", `%${q}%`)
+        .limit(lim),
+    ]);
+
+    const err = byHandle.error ?? byName.error;
+    if (err) return { ids: [], error: new Error(err.message) };
+
+    const ids = new Set<string>();
+    for (const row of (byHandle.data ?? []) as Array<{ id: string }>) ids.add(String(row.id));
+    for (const row of (byName.data ?? []) as Array<{ id: string }>) ids.add(String(row.id));
+    return { ids: [...ids].slice(0, lim), error: null };
+  } catch (e) {
+    return { ids: [], error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
 export type ProfileUpdatePayload = {
   id: string;
 } & Partial<
