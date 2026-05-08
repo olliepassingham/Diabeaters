@@ -1901,6 +1901,13 @@ export const storage = {
       return { daysLeft, isExpired: false, effectiveStartDate: supply.activeItemStartDate };
     }
 
+    // If we're out of stock, don't assume a new item started on schedule.
+    // This avoids confusing states like "Runway 0 days" while showing "Active sensor: 5 days left".
+    const adjustedQty = this.getAdjustedQuantity(supply);
+    if (adjustedQty <= 0) {
+      return { daysLeft: 0, isExpired: true, effectiveStartDate: supply.activeItemStartDate };
+    }
+
     const cyclesCompleted = Math.floor(daysSinceOriginalStart / duration);
     const effectiveStart = new Date(activeStart);
     effectiveStart.setDate(effectiveStart.getDate() + cyclesCompleted * duration);
@@ -1912,6 +1919,41 @@ export const storage = {
       isExpired: daysLeft === 0,
       effectiveStartDate: effectiveStart.toISOString(),
     };
+  },
+
+  /**
+   * Auto-advance duration-based active item dates (CGM / infusion set / reservoir)
+   * to the start of the current cycle when the stored date is in the past.
+   *
+   * Only advances when there is stock remaining, so we don't fabricate an active item
+   * after you've run out.
+   */
+  autoAdvanceActiveItemDates(): { updated: number } {
+    const supplies = this.getSupplies();
+    if (supplies.length === 0) return { updated: 0 };
+
+    let updated = 0;
+    for (const s of supplies) {
+      if (s.type !== "cgm" && s.type !== "infusion_set" && s.type !== "reservoir") continue;
+      if (!s.activeItemStartDate) continue;
+
+      const info = this.getActiveItemInfo(s);
+      if (!info) continue;
+      if (info.isExpired) continue;
+
+      // Normalize to the effective cycle start to keep edit UI aligned with what the app considers "current".
+      const current = new Date(s.activeItemStartDate);
+      const effective = new Date(info.effectiveStartDate);
+      current.setHours(0, 0, 0, 0);
+      effective.setHours(0, 0, 0, 0);
+      if (Number.isNaN(current.getTime()) || Number.isNaN(effective.getTime())) continue;
+      if (current.getTime() === effective.getTime()) continue;
+
+      this.updateSupply(s.id, { activeItemStartDate: info.effectiveStartDate });
+      updated += 1;
+    }
+
+    return { updated };
   },
 
   markItemChangedEarly(id: string): Supply | null {

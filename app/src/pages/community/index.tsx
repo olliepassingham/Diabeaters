@@ -47,6 +47,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -1061,7 +1062,7 @@ export default function CommunityHomePage() {
 
         <div
           role="tablist"
-          aria-label="Feed topic and saved filter"
+          aria-label="Feed topics"
           className="flex gap-2 overflow-x-auto rounded-xl bg-muted/25 px-1 py-1.5 dark:bg-muted/15 [scrollbar-width:thin]"
         >
           <Button
@@ -1095,28 +1096,27 @@ export default function CommunityHomePage() {
               {t.label}
             </Button>
           ))}
-          <Button
-            type="button"
-            role="tab"
-            aria-selected={savedOnly}
-            variant={savedOnly ? "default" : "outline"}
-            size="sm"
-            className="shrink-0 gap-1 rounded-full"
-            onClick={() => {
-              setSavedOnly((s) => {
-                const next = !s;
-                if (next) setTopicFilter(null);
-                return next;
-              });
-            }}
-          >
-            <Bookmark className="h-3.5 w-3.5" aria-hidden />
-            Saved
-          </Button>
         </div>
 
         {isMobile && !feedSearchExpanded ? (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant={savedOnly ? "secondary" : "outline"}
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-xl"
+              aria-pressed={savedOnly}
+              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+              onClick={() => {
+                setSavedOnly((s) => {
+                  const next = !s;
+                  if (next) setTopicFilter(null);
+                  return next;
+                });
+              }}
+            >
+              <Bookmark className="h-4 w-4" aria-hidden />
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -1138,9 +1138,26 @@ export default function CommunityHomePage() {
               value={feedSearch}
               onChange={(e) => setFeedSearch(e.target.value)}
               placeholder="Search posts and people"
-              className="pl-9"
+              className="pl-9 pr-20"
               aria-label="Search feed"
             />
+            <Button
+              type="button"
+              variant={savedOnly ? "secondary" : "outline"}
+              size="icon"
+              className="absolute right-10 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg"
+              aria-pressed={savedOnly}
+              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+              onClick={() => {
+                setSavedOnly((s) => {
+                  const next = !s;
+                  if (next) setTopicFilter(null);
+                  return next;
+                });
+              }}
+            >
+              <Bookmark className="h-4 w-4" aria-hidden />
+            </Button>
             {isMobile && feedSearchExpanded ? (
               <Button
                 type="button"
@@ -1219,10 +1236,25 @@ export default function CommunityHomePage() {
               />
             </div>
             <SheetHeader className="shrink-0 space-y-1 px-4 pb-2 text-left">
-              <SheetTitle className="font-display text-lg tracking-tight text-foreground">New post</SheetTitle>
-              <SheetDescription className="text-sm text-muted-foreground">
-                Share with the community. Add photos, a poll, or an event.
-              </SheetDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <SheetTitle className="font-display text-lg tracking-tight text-foreground">New post</SheetTitle>
+                  <SheetDescription className="text-sm text-muted-foreground">
+                    Share with the community. Add photos, a poll, or an event.
+                  </SheetDescription>
+                </div>
+                <SheetClose asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-xl border-border/60 bg-background/80 px-3 text-sm font-semibold text-foreground shadow-sm backdrop-blur"
+                    aria-label="Close new post"
+                  >
+                    Close
+                  </Button>
+                </SheetClose>
+              </div>
             </SheetHeader>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
               <form

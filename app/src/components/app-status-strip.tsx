@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 import { useToast } from "@/hooks/use-toast";
 import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
 import {
@@ -143,11 +145,13 @@ export function AppStatusStrip() {
   const [postExerciseOpen, setPostExerciseOpen] = useState(false);
   const [exerciseExpanded, setExerciseExpanded] = useState(false);
   const [exerciseBgInput, setExerciseBgInput] = useState<string>("");
+  const [stripClock, setStripClock] = useState(() => Date.now());
   const lastExPhaseKey = useRef<string>("");
   const exerciseAutoFinishKey = useRef<string | null>(null);
 
   useEffect(() => {
     const tick = window.setInterval(() => {
+      setStripClock(Date.now());
       setSc(storage.getScenarioState());
       setEx(storage.getActiveExercise());
     }, 1000);
@@ -388,6 +392,14 @@ export function AppStatusStrip() {
     return getRecoveryInsulinHeadline(exercisePlan, Boolean(isPump), new Date().getHours() >= 17);
   }, [ex?.phase, exercisePlan, isPump]);
 
+  const exerciseHypoStrip = useMemo(() => {
+    if (!ex) return null;
+    const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
+    const bg = resolveExerciseBgForHypo(ex, exerciseBgInput);
+    if (bg == null) return null;
+    return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {});
+  }, [ex, exerciseBgInput, bgUnits]);
+
   const recoveryMinutesLeft = useMemo(() => {
     if (!ex?.recoveryEndsAt) return null;
     const t = new Date(ex.recoveryEndsAt).getTime() - Date.now();
@@ -595,6 +607,18 @@ export function AppStatusStrip() {
                   </TooltipContent>
                 </Tooltip>
               </div>
+
+              {ex.phase === "active" && ex.exerciseStartedAt ? (
+                <ExerciseWorkoutProgressBar
+                  phase={ex.phase}
+                  exerciseStartedAt={ex.exerciseStartedAt}
+                  durationMinutes={ex.durationMinutes}
+                  nowMs={stripClock}
+                  compact
+                />
+              ) : null}
+
+              {exerciseHypoStrip ? <ExerciseHypoTreatmentHint suggestion={exerciseHypoStrip} /> : null}
 
               {ex.phase === "pre" ? (
                 <div className="space-y-1">

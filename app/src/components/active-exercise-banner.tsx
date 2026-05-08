@@ -46,6 +46,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { useToast } from "@/hooks/use-toast";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { computeExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
   cardio: "Cardio", strength: "Strength", hiit: "HIIT",
@@ -798,7 +800,32 @@ export function ActiveExerciseBanner() {
 
   const isEvening = new Date().getHours() >= 18;
 
-  if (!session && !showOutcomeDialog) return null;
+  const nowMsActive =
+    session?.phase === "active" && session.exerciseStartedAt
+      ? new Date(session.exerciseStartedAt).getTime() + elapsed
+      : Date.now();
+
+  const hypoSuggestionBanner = useMemo(() => {
+    if (!session) return null;
+    const settings = storage.getSettings();
+    const profile = storage.getProfile();
+    let bg: number | null = null;
+    if (session.phase === "pre") {
+      const draft = preDraftBg.trim().replace(",", ".");
+      if (draft !== "") {
+        const n = parseFloat(draft);
+        if (Number.isFinite(n)) bg = n;
+      }
+      if (bg == null) bg = session.preBg ?? null;
+    } else if (session.phase === "active") {
+      bg = session.midBg ?? session.preBg ?? null;
+    } else {
+      bg = session.recoveryBg ?? session.midBg ?? session.preBg ?? null;
+    }
+    if (bg == null) return null;
+    const units = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
+    return computeExerciseHypoSuggestion(bg, settings, units, profile ?? {});
+  }, [session, preDraftBg]);
 
   const activeEffectiveBg = session?.phase === "active" ? session.midBg ?? session.preBg : null;
   const activeEffectiveTrend =
@@ -825,9 +852,8 @@ export function ActiveExerciseBanner() {
     session?.phase === "recovery" && exercisePlanResult
       ? getRecoveryInsulinHeadline(exercisePlanResult, isPump, isEvening)
       : null;
-  const progressPercent = session?.phase === "active" && session.exerciseStartedAt
-    ? Math.min(100, (elapsed / (session.durationMinutes * 60 * 1000)) * 100)
-    : 0;
+
+  if (!session && !showOutcomeDialog) return null;
 
   return (
     <>
@@ -890,15 +916,22 @@ export function ActiveExerciseBanner() {
               </button>
             )}
 
-            {session.phase === "active" && (
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-background/40">
-                <div
-                  className="h-full rounded-full bg-green-500 transition-all duration-1000 dark:bg-green-400"
-                  style={{ width: `${progressPercent}%` }}
-                  data-testid="progress-exercise"
+            {session.phase === "active" && session.exerciseStartedAt ? (
+              <div className="mt-2 space-y-2">
+                <ExerciseWorkoutProgressBar
+                  phase={session.phase}
+                  exerciseStartedAt={session.exerciseStartedAt}
+                  durationMinutes={session.durationMinutes}
+                  nowMs={nowMsActive}
+                  compact
                 />
+                <ExerciseHypoTreatmentHint suggestion={hypoSuggestionBanner} />
               </div>
-            )}
+            ) : hypoSuggestionBanner ? (
+              <div className="mt-2">
+                <ExerciseHypoTreatmentHint suggestion={hypoSuggestionBanner} />
+              </div>
+            ) : null}
 
             {(session.phase === "pre" || expanded) && (
               <div

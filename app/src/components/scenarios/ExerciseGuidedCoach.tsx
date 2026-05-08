@@ -68,6 +68,8 @@ import {
   scheduleExerciseActiveReminders,
   scheduleExercisePreReminders,
 } from "@/lib/exercise-reminders";
+import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 
 // ----- Type / intensity catalogues kept local so the form can be self-contained -----
 
@@ -313,6 +315,14 @@ export function ExerciseGuidedCoach() {
       hypoProneHistory: historyBias?.hypoProne === true,
     });
   }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
+
+  const hypoCoachSuggestion = useMemo(() => {
+    if (!activeSession) return null;
+    const bg = resolveExerciseBgForHypo(activeSession, bgInput);
+    if (bg == null) return null;
+    const settings = storage.getSettings();
+    return computeExerciseHypoSuggestion(bg, settings, bgUnits, profile);
+  }, [activeSession, bgInput, bgUnits, profile.dateOfBirth, profile.bgUnits]);
 
   // ----- Mutators -----
   const update = (updates: Parameters<typeof storage.updateActiveExercise>[0]) => {
@@ -604,7 +614,7 @@ export function ExerciseGuidedCoach() {
             </TabsList>
 
             {/* ----- HERO RECOMMENDATION ----- */}
-            <div className="pt-3">
+            <div className="pt-3 space-y-3">
               {readiness ? (
                 <div
                   className={cn(
@@ -634,6 +644,17 @@ export function ExerciseGuidedCoach() {
                   ) : null}
                 </div>
               ) : null}
+
+              {phase === "active" && activeSession.exerciseStartedAt ? (
+                <ExerciseWorkoutProgressBar
+                  phase={phase}
+                  exerciseStartedAt={activeSession.exerciseStartedAt}
+                  durationMinutes={activeSession.durationMinutes}
+                  nowMs={now}
+                />
+              ) : null}
+
+              {hypoCoachSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoCoachSuggestion} /> : null}
             </div>
 
             <TabsContent value="pre" className="space-y-4 pt-2">

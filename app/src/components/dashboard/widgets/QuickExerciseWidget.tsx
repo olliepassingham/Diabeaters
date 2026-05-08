@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot } from "lucide-react";
@@ -10,6 +10,8 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 
 const EXERCISE_ICONS: Record<ExerciseType, typeof Dumbbell> = {
   cardio: Flame,
@@ -28,6 +30,8 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const load = useCallback(() => {
     try {
@@ -58,6 +62,27 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const tick = () => {
+      setNowTick(Date.now());
+      setActiveSession(storage.getActiveExercise?.() ?? null);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [activeSession?.id]);
+
+  const hypoWidgetSuggestion = useMemo(() => {
+    if (!activeSession) return null;
+    const bg = resolveExerciseBgForHypo(activeSession);
+    if (bg == null) return null;
+    const settings = storage.getSettings();
+    const profile = storage.getProfile();
+    const u = (profile?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
+    return computeExerciseHypoSuggestion(bg, settings, u, profile ?? {});
+  }, [activeSession]);
 
   const handleQuickStart = (exercise: ExerciseRoutine) => {
     try {
@@ -164,19 +189,32 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {activeSession && (
-          <div
-            className="flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2.5 text-sm"
-            data-testid="text-active-session-notice"
-          >
-            <Play className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="font-medium text-emerald-800 dark:text-emerald-200">
-              {activeSession.exerciseName} is{" "}
-              {activeSession.phase === "pre"
-                ? "preparing"
-                : activeSession.phase === "active"
-                  ? "in progress"
-                  : "in recovery"}
-            </span>
+          <div className="space-y-2.5 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-teal-500/[0.04] px-3 py-3 dark:from-emerald-950/40 dark:to-transparent">
+            <div className="flex items-start gap-2.5" data-testid="text-active-session-notice">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                <Play className="h-4 w-4 shrink-0" aria-hidden />
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <p className="text-sm font-semibold text-foreground leading-tight">{activeSession.exerciseName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {activeSession.phase === "pre"
+                    ? "Preparing — start when ready"
+                    : activeSession.phase === "active"
+                      ? "Workout in progress"
+                      : "Recovery window"}
+                </p>
+              </div>
+            </div>
+            {activeSession.phase === "active" && activeSession.exerciseStartedAt ? (
+              <ExerciseWorkoutProgressBar
+                phase={activeSession.phase}
+                exerciseStartedAt={activeSession.exerciseStartedAt}
+                durationMinutes={activeSession.durationMinutes}
+                nowMs={nowTick}
+                compact
+              />
+            ) : null}
+            {hypoWidgetSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoWidgetSuggestion} /> : null}
           </div>
         )}
 

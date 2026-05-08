@@ -503,14 +503,14 @@ export function FeedPostList(props: {
     }
     const cur = postsRef.current.find((p) => p.id === postId);
     if (!cur) return;
+    // Optimistic update; togglePostSave is idempotent (duplicate PK treated as success).
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p)));
     const res = await togglePostSave(postId, cur.saved_by_me);
     if (res.error) {
+      // Revert on failure.
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, saved_by_me: cur.saved_by_me } : p)));
       toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
-      return;
     }
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p)),
-    );
   }
 
   function openReport(type: "post" | "comment", id: string) {

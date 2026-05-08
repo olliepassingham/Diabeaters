@@ -472,11 +472,24 @@ export async function togglePostSave(
     return { error: null };
   }
 
-  const { error } = await supabase.from("community_post_saves").insert({
-    post_id: postId,
-    user_id: uid,
-  });
-  if (error) return { error: new Error(error.message) };
+  // Make saves idempotent. If UI state is stale (e.g. saved_by_me false but row exists),
+  // inserting would throw a duplicate PK error. Treat that as success.
+  const { error } = await supabase
+    .from("community_post_saves")
+    .upsert(
+      {
+        post_id: postId,
+        user_id: uid,
+      },
+      { onConflict: "user_id,post_id", ignoreDuplicates: true },
+    );
+  if (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "23505" || error.message.toLowerCase().includes("duplicate key")) {
+      return { error: null };
+    }
+    return { error: new Error(error.message) };
+  }
   return { error: null };
 }
 
