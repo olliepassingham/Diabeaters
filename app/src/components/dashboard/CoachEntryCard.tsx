@@ -13,11 +13,10 @@ export function CoachEntryCard() {
         className={[
           "min-h-11 w-full sm:w-auto",
           "rounded-2xl px-4 font-semibold tracking-tight",
-          "bg-gradient-to-r from-indigo-600 to-violet-600",
-          "shadow-sm shadow-indigo-600/10 ring-1 ring-indigo-500/20",
-          "hover:shadow-md hover:ring-indigo-500/30 active:translate-y-[0.5px]",
+          "bg-primary text-primary-foreground",
+          "shadow-sm shadow-[0_8px_24px_-12px_hsl(var(--primary)/0.55)] ring-1 ring-[hsl(var(--primary)/0.28)]",
+          "hover:bg-primary/90 hover:shadow-md hover:ring-[hsl(var(--primary)/0.38)] active:translate-y-[0.5px]",
           "transition-all",
-          "dark:from-indigo-500 dark:to-violet-500 dark:shadow-indigo-500/10 dark:ring-indigo-400/20",
         ].join(" ")}
       >
         <Link href="/coach" data-testid="link-dashboard-coach-open">
