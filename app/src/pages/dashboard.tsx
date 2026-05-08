@@ -66,7 +66,7 @@ import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerT
 import { isCommunityEnabled } from "@/lib/flags";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
-import { getHealthStatus, type HealthStatus } from "@/lib/dashboard-health-status";
+import { getHealthStatus, getTodayGlanceLine, type HealthStatus } from "@/lib/dashboard-health-status";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
@@ -284,11 +284,15 @@ function HeroCard({
   status,
   profile,
   cloudFullName,
+  supplies,
+  scenarioState,
   onEditWidgets,
 }: {
   status: HealthStatus;
   profile: UserProfile | null;
   cloudFullName: string | null;
+  supplies: LocalSupply[];
+  scenarioState: ScenarioState;
   onEditWidgets: () => void;
 }) {
   const { user } = useAuth();
@@ -355,6 +359,15 @@ function HeroCard({
 
   const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
   const firstName = displayName.split(" ")[0] || "";
+  const glance = getTodayGlanceLine(supplies, scenarioState);
+  const activeExercise = storage.getActiveExercise();
+  const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
+  const glanceTone =
+    glance.type === "warning"
+      ? "text-red-700 dark:text-red-300"
+      : glance.type === "info"
+        ? "text-amber-800 dark:text-amber-200"
+        : "text-emerald-800 dark:text-emerald-200";
 
   return (
     <>
@@ -363,7 +376,7 @@ function HeroCard({
         className="dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 hover:shadow-lg hover:ring-primary/10 dark:border-primary/18 dark:from-primary/[0.09] dark:via-transparent dark:to-transparent dark:ring-border/35"
         data-testid="card-hero"
       >
-        <CardContent className="p-4 md:p-6 space-y-4 md:space-y-5">
+        <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
@@ -398,7 +411,53 @@ function HeroCard({
                 <StatusPill status={status} />
               </div>
             </div>
+            <div className={`text-xs leading-snug ${glanceTone}`} data-testid="text-dashboard-glance">
+              {glance.message}
+            </div>
           </div>
+
+          {(scenarioState.sickDayActive ||
+            scenarioState.travelModeActive ||
+            Boolean(activeExercise) ||
+            pumpFailureActive) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Active
+              </span>
+              {scenarioState.sickDayActive ? (
+                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                  <Link href="/sick-day" data-testid="chip-active-sickday">
+                    <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" />
+                    Sick day
+                  </Link>
+                </Button>
+              ) : null}
+              {scenarioState.travelModeActive ? (
+                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                  <Link href="/travel" data-testid="chip-active-travel">
+                    <ArrowRight className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
+                    Travel
+                  </Link>
+                </Button>
+              ) : null}
+              {activeExercise ? (
+                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                  <Link href="/scenarios/exercise" data-testid="chip-active-exercise">
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+                    Exercise
+                  </Link>
+                </Button>
+              ) : null}
+              {pumpFailureActive ? (
+                <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                  <Link href="/scenarios/pump-failure" data-testid="chip-active-pumpfailure">
+                    <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-red-600 dark:text-red-400" />
+                    Pump failure
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          )}
 
           <div className="flex min-w-0 flex-nowrap items-stretch gap-2">
             <Link href="/help-now" className="min-w-0 flex-1">
@@ -451,7 +510,7 @@ function HeroCard({
               Record details about your hypo treatment.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
+          <div className="space-y-3 pt-2">
             <div className="space-y-2">
               <Label htmlFor="dash-hypo-glucose">{`Blood glucose (${bgUnitsLabel}) — optional`}</Label>
               <Input
@@ -841,7 +900,7 @@ export default function Dashboard() {
         }
       />
       {/* Today: high-signal cluster (reads as one section) */}
-      <section className="space-y-4" data-testid="dashboard-today">
+      <section className="space-y-3 sm:space-y-4" data-testid="dashboard-today">
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
@@ -879,6 +938,8 @@ export default function Dashboard() {
               status={healthStatus}
               profile={profile}
               cloudFullName={cloudProfile?.full_name ?? null}
+              supplies={supplies}
+              scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
             />
           </div>
@@ -925,9 +986,9 @@ export default function Dashboard() {
         allowResize={!isMobile}
       />
 
-      <section className="animate-stagger space-y-4 pt-2" data-testid="dashboard-widgets">
+      <section className="animate-stagger space-y-3 sm:space-y-4 pt-2" data-testid="dashboard-widgets">
         {widgetsToRender.length > 0 ? <PageSectionLabel>Your widgets</PageSectionLabel> : null}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;
             if (!Comp) return null;

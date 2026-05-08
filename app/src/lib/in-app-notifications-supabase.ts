@@ -66,6 +66,19 @@ export async function markAllInAppNotificationsRead(): Promise<{ error: Error | 
   return { error: null };
 }
 
+export async function deleteInAppNotification(id: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  const { error } = await supabase.from("notifications").delete().eq("id", id).eq("user_id", uid);
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
 /**
  * Removes all in-app notification rows for the current user.
  * Tries client DELETE first (RLS: notifications_delete_own); falls back to clear_my_notifications RPC

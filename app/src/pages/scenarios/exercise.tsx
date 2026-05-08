@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
@@ -7,12 +7,24 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { storage } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
+import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
+import { ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { Activity } from "lucide-react";
 
 export default function ScenarioExercisePage() {
+  const [tick, setTick] = useState(0);
+  const active = useMemo(() => storage.getActiveExercise(), [tick]);
+
   useEffect(() => {
     if (storage.getActiveExercise()) {
       recordLastInteraction("scenario:exercise");
     }
+  }, []);
+
+  useEffect(() => {
+    if (!storage.getActiveExercise()) return;
+    const t = window.setInterval(() => setTick((n) => n + 1), 15_000);
+    return () => window.clearInterval(t);
   }, []);
 
   return (
@@ -38,6 +50,29 @@ export default function ScenarioExercisePage() {
           </>
         }
       />
+
+      {active ? (
+        <ScenarioActiveCard
+          title={active.exerciseName || "Exercise"}
+          subtitle="Active session"
+          badgeText="Active"
+          tone="blue"
+          icon={<Activity className="h-4 w-4 text-primary" aria-hidden />}
+          facts={[
+            { label: "Intensity", value: (active.intensity || "unknown").replace(/_/g, " ") },
+            { label: "Duration", value: active.durationMinutes ? `${active.durationMinutes} min` : "—" },
+            { label: "Phase", value: (active.phase || "active").replace(/_/g, " ") },
+          ]}
+        >
+          <ExerciseWorkoutProgressBar
+            phase={active.phase}
+            exerciseStartedAt={active.exerciseStartedAt}
+            durationMinutes={active.durationMinutes}
+            nowMs={Date.now()}
+          />
+        </ScenarioActiveCard>
+      ) : null}
+
       <ExerciseGuidedCoach />
       <ScenarioToolDisclaimer className="mt-2" />
     </PageShell>

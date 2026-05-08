@@ -159,6 +159,40 @@ export default function CommunityHomePage() {
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
 
+  // Deep-link support: /community?saved=1
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(search.replace(/^\?/, ""));
+      const saved = params.get("saved");
+      if (saved === "1" || saved === "true") {
+        setSavedOnly(true);
+        setTopicFilter(null);
+      }
+    } catch {
+      // ignore
+    }
+    // Only on mount; user interactions should control state afterwards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep URL in sync so "Saved posts" feels like a real place users can return to.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(search.replace(/^\?/, ""));
+      if (savedOnly) {
+        params.set("saved", "1");
+      } else {
+        params.delete("saved");
+      }
+      const next = `${pathname.split("?")[0]}${params.toString() ? `?${params.toString()}` : ""}`;
+      if (next !== pathname) setLocation(next);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedOnly]);
+
   const fetchFeedPage = useCallback(
     (limit: number, cursor: FeedCursor | null) =>
       feedTab === "everyone"
@@ -336,6 +370,59 @@ export default function CommunityHomePage() {
       setSuggestedLoading(false);
     })();
   }, [peopleOpen, user?.id, suggestedLoading, suggested.length]);
+
+  // Lightweight discovery: show suggested profiles on Following even before opening "Find people".
+  useEffect(() => {
+    if (!user?.id) return;
+    if (feedTab !== "following") return;
+    if (suggestedLoading || suggested.length > 0) return;
+    // Avoid suggestions while user is actively searching or using Saved.
+    if (savedOnly || feedSearch.trim()) return;
+
+    setSuggestedLoading(true);
+    void (async () => {
+      const [pageRes, followingRes] = await Promise.all([
+        fetchCommunityPostsPage(50, null),
+        listFolloweeIdsForCurrentUser(),
+      ]);
+      if (pageRes.error || followingRes.error) {
+        setSuggestedLoading(false);
+        return;
+      }
+      const followeeSet = new Set(followingRes.ids);
+      const ids: string[] = [];
+      for (const p of pageRes.data ?? []) {
+        const id = String(p.author_id);
+        if (!id || id === user.id) continue;
+        if (followeeSet.has(id)) continue;
+        if (!ids.includes(id)) ids.push(id);
+        if (ids.length >= 12) break;
+      }
+      if (ids.length === 0) {
+        setSuggested([]);
+        setSuggestedLoading(false);
+        return;
+      }
+      const profiles = await getProfilesByIds(ids);
+      const out = ids
+        .map((id) => {
+          const pr = profiles.get(id);
+          const handle = (pr?.public_handle ?? "").trim();
+          const isPublic = pr?.is_public !== false;
+          if (!handle || !isPublic) return null;
+          return {
+            id,
+            name: pr?.full_name?.trim() || shortId(id),
+            avatar_url: pr?.avatar_url ?? null,
+            handle,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => Boolean(x))
+        .slice(0, 6);
+      setSuggested(out);
+      setSuggestedLoading(false);
+    })();
+  }, [user?.id, feedTab, savedOnly, feedSearch, suggestedLoading, suggested.length]);
 
   async function handleFollow(id: string) {
     if (!user?.id) {
@@ -1188,7 +1275,84 @@ export default function CommunityHomePage() {
             ) : null}
           </div>
         )}
+
+        {!isMobile ? (
+          <div className="flex items-center justify-end">
+            <Button
+              type="button"
+              variant={savedOnly ? "secondary" : "outline"}
+              size="sm"
+              className="rounded-full"
+              aria-pressed={savedOnly}
+              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+              onClick={() => {
+                setSavedOnly((s) => {
+                  const next = !s;
+                  if (next) setTopicFilter(null);
+                  return next;
+                });
+              }}
+              data-testid="button-saved-filter-desktop"
+            >
+              <Bookmark className="h-4 w-4 mr-2" aria-hidden />
+              Saved
+            </Button>
+          </div>
+        ) : null}
       </div>
+
+      {feedTab === "following" && !savedOnly && !feedSearch.trim() && (suggestedLoading || suggested.length > 0) ? (
+        <Card variant="glass" className="overflow-hidden" data-testid="card-feed-suggested-following">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold">Suggested people</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => setPeopleOpen(true)}>
+                Find more
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {suggestedLoading ? (
+              <p className="text-xs text-muted-foreground">Loading…</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {suggested.slice(0, 3).map((p) => {
+                  const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
+                  const busy = Boolean(followBusyIds[p.id]);
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <CommunityAuthorAvatar
+                          displayName={p.name}
+                          avatarPath={p.avatar_url ?? null}
+                          size="sm"
+                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{p.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">@{p.handle}</p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={alreadyFollowing ? "secondary" : "outline"}
+                        disabled={alreadyFollowing || busy}
+                        onClick={() => void handleFollow(p.id)}
+                      >
+                        {alreadyFollowing ? "Following" : busy ? "Following…" : "Follow"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!isMobile ? (
       <Collapsible open={composerPanelOpen} onOpenChange={setComposerPanelOpen}>
@@ -1298,6 +1462,11 @@ export default function CommunityHomePage() {
         savedOnly={savedOnly}
         feedListRevision={feedListKey}
         onOpenFindPeople={() => setPeopleOpen(true)}
+        onSwitchToEveryone={() => {
+          setFeedTab("everyone");
+          setTopicFilter(null);
+          setSavedOnly(false);
+        }}
         onClearSearch={() => {
           setFeedSearch("");
           setFeedSearchExpanded(false);

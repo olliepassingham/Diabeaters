@@ -17,6 +17,7 @@ import { storage, type PumpFailureSession } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { schedulePumpFailureReminders, cancelPumpFailureReminders } from "@/lib/pump-failure-reminders";
 import { useToast } from "@/hooks/use-toast";
+import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 
 const STEPS = [
   {
@@ -154,20 +155,33 @@ export default function PumpFailurePage() {
         <CardContent className="space-y-4">
           {sc.pumpFailureActive ? (
             <>
-              <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
-                <p className="text-sm font-medium">Pump failure mode is active</p>
-                {upcoming[0]?.atIso ? (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Next reminder in{" "}
-                    <span className="font-semibold tabular-nums">
-                      {minutesUntil(upcoming[0].atIso) ?? "—"}m
-                    </span>
-                    .
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1">No upcoming reminders.</p>
-                )}
-              </div>
+              <ScenarioActiveCard
+                title="Pump failure mode is active"
+                badgeText="Active"
+                tone="amber"
+                icon={<Clock className="h-4 w-4 text-primary" aria-hidden />}
+                facts={[
+                  {
+                    label: "Next reminder",
+                    value: upcoming[0]?.atIso ? (
+                      <span className="tabular-nums">{minutesUntil(upcoming[0].atIso) ?? "—"}m</span>
+                    ) : (
+                      "—"
+                    ),
+                  },
+                  {
+                    label: "Ketones",
+                    value: session?.ketonesLevel ? String(session.ketonesLevel).replace(/_/g, " ") : "Unknown",
+                  },
+                  {
+                    label: "Glucose",
+                    value:
+                      session?.bgValue && session?.bgUnits
+                        ? `${session.bgValue} ${session.bgUnits}`
+                        : "Not set",
+                  },
+                ]}
+              />
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={endActive} data-testid="button-pumpfailure-end">
                   <Power className="h-4 w-4 mr-2" />

@@ -111,6 +111,8 @@ export function FeedPostList(props: {
   onClearSearch?: () => void;
   /** Switch to Everyone tab with a topic (onboarding). */
   onExploreTopicInEveryone?: (topicId: CommunityTopicId) => void;
+  /** Switch to Everyone tab (onboarding). */
+  onSwitchToEveryone?: () => void;
 }) {
   const { toast } = useToast();
   const pageSize = props.pageSize ?? 20;
@@ -692,14 +694,21 @@ export function FeedPostList(props: {
       ) : followingOnboardingEmpty ? (
         <EmptyState
           title="Build your Following feed"
-          description="Follow people you want to hear from, or browse Everyone for any topic."
+          description="Follow a few people to personalise this tab. Until then, browse Everyone to discover posts and topics."
           icon={Users}
         >
-          {props.onOpenFindPeople ? (
-            <Button type="button" size="sm" onClick={() => props.onOpenFindPeople?.()}>
-              Find people
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap justify-center gap-2">
+            {props.onOpenFindPeople ? (
+              <Button type="button" size="sm" onClick={() => props.onOpenFindPeople?.()}>
+                Find people
+              </Button>
+            ) : null}
+            {props.onSwitchToEveryone ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => props.onSwitchToEveryone?.()}>
+                Go to Everyone
+              </Button>
+            ) : null}
+          </div>
           {props.onExploreTopicInEveryone ? (
             <div className="w-full max-w-sm space-y-2 text-left">
               <p className="text-center text-xs font-medium text-muted-foreground">Browse a topic (Everyone)</p>

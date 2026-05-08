@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
   deleteAllInAppNotificationsForUser,
+  deleteInAppNotification,
   fetchInAppNotificationsForUser,
   markAllInAppNotificationsRead,
   markInAppNotificationRead,
@@ -30,7 +31,10 @@ import {
 } from "@/lib/in-app-notifications-events";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { Bell, Check, Trash2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getProfilesByIds } from "@/lib/profile";
+import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
+import { Bell, Check, MessageCircle, Trash2 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { FeedLoadingSkeleton } from "@/components/empty-state";
 
@@ -42,6 +46,9 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(configured);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [rows, setRows] = useState<InAppNotificationRow[]>([]);
+  const [senderMeta, setSenderMeta] = useState<
+    Map<string, { name: string; avatarUrl: string | null }>
+  >(new Map());
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
 
@@ -65,7 +72,35 @@ export default function NotificationsPage() {
       return;
     }
     setFetchError(null);
-    setRows(res.data ?? []);
+    const nextRows = res.data ?? [];
+    setRows(nextRows);
+
+    // Enrich DM notifications with sender avatars/names.
+    try {
+      const senderIds = Array.from(
+        new Set(
+          nextRows
+            .map((r) => (r.data && typeof r.data === "object" ? (r.data as any).sender_user_id : null))
+            .filter((id): id is string => typeof id === "string" && id.length > 0),
+        ),
+      );
+      if (senderIds.length === 0) {
+        setSenderMeta(new Map());
+      } else {
+        const profiles = await getProfilesByIds(senderIds);
+        const meta = new Map<string, { name: string; avatarUrl: string | null }>();
+        for (const id of senderIds) {
+          const p = profiles.get(id);
+          const name = p?.full_name?.trim() || p?.public_handle?.trim() || "Message";
+          const avatarKey = p?.avatar_url ?? null;
+          const { url } = avatarKey ? await resolveProfileImageUrlResult(avatarKey) : { url: null };
+          meta.set(id, { name, avatarUrl: url });
+        }
+        setSenderMeta(meta);
+      }
+    } catch {
+      // ignore enrichment errors (keep list fast/robust)
+    }
   }, [configured, toast]);
 
   useEffect(() => {
@@ -125,6 +160,17 @@ export default function NotificationsPage() {
 
     const path = getPathForInAppNotification(row);
     if (path) setLocation(path);
+  };
+
+  const handleDeleteOne = async (row: InAppNotificationRow) => {
+    if (!configured) return;
+    const res = await deleteInAppNotification(row.id);
+    if (res.error) {
+      toast({ title: "Could not delete", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    notifyInAppNotificationsChanged({ skipPageRefresh: true });
   };
 
   return (
@@ -209,6 +255,10 @@ export default function NotificationsPage() {
               <ul className="space-y-2">
                 {rows.map((r) => {
                   const when = r.created_at ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true }) : "";
+                  const data = (r.data && typeof r.data === "object" ? r.data : {}) as Record<string, unknown>;
+                  const kind = typeof data.kind === "string" ? data.kind : "";
+                  const senderId = kind === "dm_message" && typeof data.sender_user_id === "string" ? data.sender_user_id : "";
+                  const sender = senderId ? senderMeta.get(senderId) : undefined;
                   return (
                     <li key={r.id}>
                       <button
@@ -220,11 +270,73 @@ export default function NotificationsPage() {
                         data-testid={`notif-row-${r.id}`}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{r.title}</p>
+                          <div className="flex items-start gap-3 min-w-0">
+                            {kind === "dm_message" ? (
+                              <Avatar className="h-9 w-9 mt-0.5">
+                                {sender?.avatarUrl ? <AvatarImage src={sender.avatarUrl} alt="" /> : null}
+                                <AvatarFallback className="text-[11px] font-semibold">
+                                  {sender?.name?.trim()?.slice(0, 2).toUpperCase() || "DM"}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-muted/30 text-muted-foreground">
+                                <Bell className="h-4 w-4" aria-hidden />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">
+                                {kind === "dm_message" && sender?.name ? sender.name : r.title}
+                              </p>
                             <p className="text-sm text-muted-foreground line-clamp-2">{r.body}</p>
                           </div>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{when}</span>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-2">
+                            {kind === "dm_message" ? (
+                              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
+                                <MessageCircle className="h-3 w-3" />
+                                Message
+                              </span>
+                            ) : null}
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{when}</span>
+                            {!r.read ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void (async () => {
+                                    const res = await markInAppNotificationRead(r.id);
+                                    if (res.error) {
+                                      toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
+                                      return;
+                                    }
+                                    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: true } : x)));
+                                    notifyInAppNotificationsChanged({ skipPageRefresh: true });
+                                  })();
+                                }}
+                              >
+                                Mark read
+                              </Button>
+                            ) : null}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void handleDeleteOne(r);
+                              }}
+                              aria-label="Delete notification"
+                              data-testid={`button-delete-notif-${r.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </button>
                     </li>

@@ -86,6 +86,7 @@ export default function Adviser() {
   }, []);
 
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
+  const [showMealResultDetails, setShowMealResultDetails] = useState(false);
 
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
@@ -94,6 +95,8 @@ export default function Adviser() {
   const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
   const [exerciseWithin, setExerciseWithin] = useState("2");
+
+  const [showCurrentRatios, setShowCurrentRatios] = useState(false);
 
   useEffect(() => {
     // Deep-link prefill from Exercise planner:
@@ -362,81 +365,99 @@ export default function Adviser() {
         }
       />
 
+      {/**
+       * Keep safety context visible without pushing the tools below the fold on phones.
+       * These banners default to compact summaries with tap-to-expand details.
+       */}
       {recentHypoCount48h > 0 && (
-        <Alert
-          className="mb-3 border-red-200/80 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg~*]:pl-6"
-          data-testid="banner-recent-hypos-adviser"
-        >
-          <AlertCircle className="text-red-600 dark:text-red-400" />
-          <AlertDescription className="text-xs text-red-900 dark:text-red-100 leading-snug">
-            <strong className="font-semibold">Recent hypo:</strong>{" "}
-            {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} logged in the last 48 hours — take extra
-            care with boluses and corrections.
-          </AlertDescription>
-        </Alert>
+        <details className="group mb-3" data-testid="banner-recent-hypos-adviser">
+          <summary className="list-none">
+            <Alert className="cursor-pointer border-red-200/80 bg-red-50/50 p-3 dark:border-red-900/50 dark:bg-red-950/20 [&>svg]:left-3 [&>svg]:top-3 [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg~*]:pl-6">
+              <AlertCircle className="text-red-600 dark:text-red-400" />
+              <AlertDescription className="text-xs leading-snug text-red-900 dark:text-red-100">
+                <span className="font-semibold">Recent hypo:</span>{" "}
+                {recentHypoCount48h} treatment{recentHypoCount48h === 1 ? "" : "s"} in the last 48h
+                <span className="text-red-900/70 dark:text-red-100/70"> · tap for more</span>
+              </AlertDescription>
+              <div className="mt-2 hidden text-xs text-red-900/80 dark:text-red-100/80 group-open:block">
+                Take extra care with boluses and corrections, and consider being more conservative until you&apos;re stable again.
+              </div>
+            </Alert>
+          </summary>
+        </details>
       )}
 
       {showPostExerciseBanner && (
-        <Alert
-          className="mb-3 border-emerald-300/60 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
-          data-testid="banner-recent-exercise-adviser"
-        >
-          <Dumbbell className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-            <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100 sm:min-w-0 sm:flex-1">
-              <strong>{postExerciseBannerCopy.adviserLead}:</strong> {postExerciseBannerCopy.adviserDetail}
-            </AlertDescription>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 self-start border-emerald-600/30 text-emerald-900 dark:border-emerald-500/40 dark:text-emerald-100"
-              onClick={() => {
-                storage.snoozePostExerciseNudges(8);
-                setPostExerciseNudgeRev((n) => n + 1);
-                toast({
-                  title: "Reminders snoozed",
-                  description: "Post-exercise tips are hidden for 8 hours. Resume anytime from the home status strip.",
-                });
-              }}
-              data-testid="banner-post-exercise-snooze"
-            >
-              Snooze 8h
-            </Button>
-          </div>
-        </Alert>
+        <details className="group mb-3" data-testid="banner-recent-exercise-adviser">
+          <summary className="list-none">
+            <Alert className="cursor-pointer border-emerald-300/60 bg-emerald-50/50 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <Dumbbell className="h-4 w-4 text-emerald-700 dark:text-emerald-300" />
+              <AlertDescription className="text-sm text-emerald-900 dark:text-emerald-100">
+                <strong>{postExerciseBannerCopy.adviserLead}:</strong>{" "}
+                <span className="text-emerald-900/80 dark:text-emerald-100/80">tap for details</span>
+              </AlertDescription>
+              <div className="mt-2 hidden text-sm text-emerald-900/80 dark:text-emerald-100/80 group-open:block">
+                {postExerciseBannerCopy.adviserDetail}
+              </div>
+            </Alert>
+          </summary>
+        </details>
       )}
 
       {scenarioState.sickDayActive && (
-        <Alert className="mb-4 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20" data-testid="banner-sick-day-active">
-          <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-sm text-amber-800 dark:text-amber-200">
-              Sick day mode is active. Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
-            </span>
-            <Link href="/scenarios/sick-day">
-              <Badge variant="outline" className="cursor-pointer text-amber-700 dark:text-amber-300 border-amber-400" data-testid="link-sick-day-scenarios">
-                Sick day settings
-              </Badge>
-            </Link>
-          </AlertDescription>
-        </Alert>
+        <details className="group mb-3" data-testid="banner-sick-day-active">
+          <summary className="list-none">
+            <Alert className="cursor-pointer border-amber-500/50 bg-amber-50/50 p-3 dark:bg-amber-950/20">
+              <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Sick day:</strong> active <span className="text-amber-800/70 dark:text-amber-200/70">· tap for more</span>
+                </span>
+                <Link href="/scenarios/sick-day">
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer border-amber-400 text-amber-700 dark:text-amber-300"
+                    data-testid="link-sick-day-scenarios"
+                  >
+                    Settings
+                  </Badge>
+                </Link>
+              </AlertDescription>
+              <div className="mt-2 hidden text-sm text-amber-800/80 dark:text-amber-200/80 group-open:block">
+                Your insulin needs may be different — ratios are adjusted and exercise should be approached cautiously.
+              </div>
+            </Alert>
+          </summary>
+        </details>
       )}
 
       {scenarioState.travelModeActive && (
-        <Alert className="mb-4 border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20" data-testid="banner-travel-mode-active">
-          <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-sm text-blue-800 dark:text-blue-200">
-              Travel Mode is active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ''}. Be mindful of timezone and routine changes affecting your levels.
-            </span>
-            <Link href="/scenarios/travel">
-              <Badge variant="outline" className="cursor-pointer text-blue-700 dark:text-blue-300 border-blue-400" data-testid="link-travel-scenarios">
-                Travel Settings
-              </Badge>
-            </Link>
-          </AlertDescription>
-        </Alert>
+        <details className="group mb-3" data-testid="banner-travel-mode-active">
+          <summary className="list-none">
+            <Alert className="cursor-pointer border-blue-500/50 bg-blue-50/50 p-3 dark:bg-blue-950/20">
+              <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Travel:</strong>{" "}
+                  active{scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}
+                  <span className="text-blue-800/70 dark:text-blue-200/70"> · tap for more</span>
+                </span>
+                <Link href="/scenarios/travel">
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer border-blue-400 text-blue-700 dark:text-blue-300"
+                    data-testid="link-travel-scenarios"
+                  >
+                    Settings
+                  </Badge>
+                </Link>
+              </AlertDescription>
+              <div className="mt-2 hidden text-sm text-blue-800/80 dark:text-blue-200/80 group-open:block">
+                Be mindful of timezone and routine changes affecting your levels.
+              </div>
+            </Alert>
+          </summary>
+        </details>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
@@ -572,29 +593,61 @@ export default function Adviser() {
                 </div>
               )}
 
-              <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm font-medium mb-2">Your Current Ratios</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                  <div className="flex justify-between gap-1 flex-wrap">
-                    <span className="text-muted-foreground">Breakfast:</span>
-                    <span className={getRatioForMeal("breakfast") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("breakfast")}</span>
-                  </div>
-                  <div className="flex justify-between gap-1 flex-wrap">
-                    <span className="text-muted-foreground">Lunch:</span>
-                    <span className={getRatioForMeal("lunch") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("lunch")}</span>
-                  </div>
-                  <div className="flex justify-between gap-1 flex-wrap">
-                    <span className="text-muted-foreground">Dinner:</span>
-                    <span className={getRatioForMeal("dinner") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("dinner")}</span>
-                  </div>
-                  <div className="flex justify-between gap-1 flex-wrap">
-                    <span className="text-muted-foreground">Snack:</span>
-                    <span className={getRatioForMeal("snack") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("snack")}</span>
-                  </div>
-                </div>
+              <div className="bg-muted/50 rounded-lg">
+                <Collapsible open={showCurrentRatios} onOpenChange={setShowCurrentRatios}>
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between gap-3 p-3 text-left"
+                      data-testid="button-toggle-current-ratios"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Your current ratios</p>
+                        <p className="text-xs text-muted-foreground">
+                          Breakfast {getRatioForMeal("breakfast")} · Lunch {getRatioForMeal("lunch")}
+                        </p>
+                      </div>
+                      {showCurrentRatios ? (
+                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-3 pb-3">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                        <div className="flex justify-between gap-1 flex-wrap">
+                          <span className="text-muted-foreground">Breakfast:</span>
+                          <span className={getRatioForMeal("breakfast") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("breakfast")}</span>
+                        </div>
+                        <div className="flex justify-between gap-1 flex-wrap">
+                          <span className="text-muted-foreground">Lunch:</span>
+                          <span className={getRatioForMeal("lunch") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("lunch")}</span>
+                        </div>
+                        <div className="flex justify-between gap-1 flex-wrap">
+                          <span className="text-muted-foreground">Dinner:</span>
+                          <span className={getRatioForMeal("dinner") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("dinner")}</span>
+                        </div>
+                        <div className="flex justify-between gap-1 flex-wrap">
+                          <span className="text-muted-foreground">Snack:</span>
+                          <span className={getRatioForMeal("snack") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("snack")}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
 
-              <Button onClick={handleQuickMealPlan} disabled={!mealCarbs} className="w-full" data-testid="button-get-meal-advice">
+              <Button
+                onClick={() => {
+                  setShowMealResultDetails(false);
+                  handleQuickMealPlan();
+                }}
+                disabled={!mealCarbs}
+                className="w-full"
+                data-testid="button-get-meal-advice"
+              >
                 {isPumpUser ? "Get bolus suggestion" : "Get Dose Suggestion"}
               </Button>
             </CardContent>
@@ -698,43 +751,77 @@ export default function Adviser() {
                         ) : null}
                       </div>
                     )}
-                    {mealResult.roundingAdvice && (
-                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
-                        <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
-                      </div>
-                    )}
-                    {mealResult.tips && (
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
-                      </ul>
-                    )}
+                    <Collapsible open={showMealResultDetails} onOpenChange={setShowMealResultDetails}>
+                      <CollapsibleTrigger asChild>
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                          data-testid="button-toggle-meal-result-details"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                            <span className="text-sm font-medium">More detail</span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              Tips, rounding, safety notes
+                            </span>
+                          </div>
+                          {showMealResultDetails ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="pt-2 space-y-2">
+                          {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
+                            </p>
+                          ) : null}
+                          {mealResult.roundingAdvice && (
+                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
+                              <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
+                            </div>
+                          )}
+                          {mealResult.tips && (
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {mealResult.tips.map((tip, i) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="text-primary">-</span>
+                                  {tip}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {scenarioState.sickDayActive && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
+                              <div className="flex items-start gap-2">
+                                <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-amber-800 dark:text-amber-200">
+                                  <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
+                              <div className="flex items-start gap-2">
+                                <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                  <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
               </CardContent>
             </Card>
-          )}
-
-          {scenarioState.sickDayActive && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
-              <div className="flex items-start gap-2">
-                <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
-              <div className="flex items-start gap-2">
-                <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
-                </p>
-              </div>
-            </div>
           )}
 
           <Button

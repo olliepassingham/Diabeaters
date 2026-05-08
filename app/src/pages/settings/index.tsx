@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   storage,
@@ -55,6 +56,8 @@ import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
+import { Progress } from "@/components/ui/progress";
+import { CheckCircle2 } from "lucide-react";
 
 /** Mobile save bars must sit above `BottomNav` (z-[100]); `bottom-0` + lower z-index left them untappable behind the tabs. */
 const SETTINGS_MOBILE_STICKY_FOOTER =
@@ -1168,6 +1171,7 @@ export default function Settings() {
   );
 
   if (pathOnly === "/settings") {
+    const completion = storage.getSettingsCompletion();
     return (
       <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
         <FaceLogoWatermark />
@@ -1183,6 +1187,44 @@ export default function Settings() {
           }
           actions={settingsInfoDialog}
         />
+
+        {!isCarer && !isCommunityAccount ? (
+          <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="text-base">2‑minute setup</CardTitle>
+                  <CardDescription>
+                    Helps the dashboard, supplies, meal planner, and scenarios give better suggestions.
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  {completion.percentage}%
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              <Progress value={completion.percentage} className="h-2" />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild variant="outline" className="justify-start">
+                  <Link href="/settings/ratios">
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
+                    Ratios & TDD
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="justify-start">
+                  <Link href="/settings/usage#settings-usage">
+                    <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
+                    Usage & supplies
+                  </Link>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                You can still use the app without this — it just makes forecasts and advice more accurate.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {!hidePatientClinicalHub && (
         <SettingsHubGroup title="Personal & clinical">

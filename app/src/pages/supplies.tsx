@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -1096,6 +1096,7 @@ function CombinedScenarioImpactPanel({ supplies, scenarioState }: { supplies: Su
 
 function SupplyCard({ 
   supply, 
+  nextActionHint,
   onEdit, 
   onDelete, 
   onAdjustQuantity,
@@ -1105,6 +1106,7 @@ function SupplyCard({
   onRefresh,
 }: { 
   supply: Supply; 
+  nextActionHint?: { label: string; tone: "muted" | "amber" | "red" | "blue" };
   onEdit: (supply: Supply) => void;
   onDelete: (id: string) => void;
   onAdjustQuantity: (args: {
@@ -1119,6 +1121,10 @@ function SupplyCard({
   onClearOrder: (id: string) => void;
   onRefresh: () => void;
 }) {
+  const actionRowRef = useRef<HTMLDivElement | null>(null);
+  const onOrderRef = useRef<HTMLDivElement | null>(null);
+  const [nextActionNudge, setNextActionNudge] = useState(0);
+
   const adjustedQuantity = storage.getAdjustedQuantity(supply);
   const daysRemaining = storage.getDaysRemaining(supply);
   const runOutDate = storage.getRunOutDate(supply);
@@ -1153,6 +1159,190 @@ function SupplyCard({
 
   const lastPickupText = getLastPickupText();
   const stockNowInt = Math.max(0, Math.floor(adjustedQuantity));
+  const nextAction =
+    nextActionHint ??
+    (supply.isOnOrder
+      ? { label: "Ordered", tone: "blue" as const }
+      : daysRemaining !== 999 && daysRemaining <= 3
+        ? { label: "Reorder now", tone: "red" as const }
+        : status === "critical"
+          ? { label: "Reorder now", tone: "red" as const }
+          : status === "low"
+            ? { label: "Reorder soon", tone: "amber" as const }
+            : { label: "OK", tone: "muted" as const });
+
+  const nextActionBadgeClass =
+    nextAction.tone === "red"
+      ? "border-red-500/40 bg-red-500/[0.10] text-red-900 dark:text-red-100"
+      : nextAction.tone === "amber"
+        ? "border-amber-500/40 bg-amber-500/[0.10] text-amber-950 dark:text-amber-50"
+        : nextAction.tone === "blue"
+          ? "border-blue-500/40 bg-blue-500/[0.10] text-blue-900 dark:text-blue-100"
+          : "border-border/70 bg-background/60 text-muted-foreground";
+
+  const forecastLine =
+    forecastUsage > 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" ? (
+      <p className="text-xs text-muted-foreground">
+        Forecast: {forecastUsage}/day{isInsulinType(supply.type) ? " units" : supply.type === "needle" ? " needles" : ""}{" "}
+        {smarterEnabled ? <span className="ml-1">• Smarter: {forecastConfidence}</span> : null} •{" "}
+        <Link href="/settings/usage#settings-usage" className="underline underline-offset-2">
+          Edit habits
+        </Link>
+      </p>
+    ) : null;
+
+  const detailsContent = (
+    <>
+      {supply.type === "cgm" ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Sensor duration</span>
+            <span>{storage.getSettings().cgmDays || 14} days each</span>
+          </div>
+          {supply.activeItemStartDate && (() => {
+            const info = storage.getActiveItemInfo(supply);
+            if (!info) return null;
+            const changeSoon = info.daysLeft <= 1;
+            return (
+              <div className="space-y-1">
+                <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                  <span>Active sensor</span>
+                  <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                  data-testid={`button-change-early-${supply.id}`}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  {changeSoon ? "Changed sensor" : "Changed early"}
+                </Button>
+              </div>
+            );
+          })()}
+        </div>
+      ) : supply.type === "infusion_set" ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Site change</span>
+            <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
+          </div>
+          {supply.activeItemStartDate && (() => {
+            const info = storage.getActiveItemInfo(supply);
+            if (!info) return null;
+            const changeSoon = info.daysLeft <= 1;
+            return (
+              <div className="space-y-1">
+                <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                  <span>Active set</span>
+                  <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                  data-testid={`button-change-early-${supply.id}`}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  {changeSoon ? "Changed set" : "Changed early"}
+                </Button>
+              </div>
+            );
+          })()}
+        </div>
+      ) : supply.type === "reservoir" ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span>Reservoir change</span>
+            <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
+          </div>
+          {supply.activeItemStartDate && (() => {
+            const info = storage.getActiveItemInfo(supply);
+            if (!info) return null;
+            const changeSoon = info.daysLeft <= 1;
+            return (
+              <div className="space-y-1">
+                <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
+                  <span>Active reservoir</span>
+                  <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-xs"
+                  onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
+                  data-testid={`button-change-early-${supply.id}`}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1.5" />
+                  {changeSoon ? "Changed reservoir" : "Changed early"}
+                </Button>
+              </div>
+            );
+          })()}
+        </div>
+      ) : (() => {
+        const effectiveUsage2 = storage.getEffectiveDailyUsage(supply);
+        const primingWaste = isInsulinType(supply.type) ? storage.getPrimingWastePerDay(supply.type) : 0;
+        const baseUsage = effectiveUsage2 - primingWaste;
+        return (
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Daily usage</span>
+              <span>
+                {effectiveUsage2 > 0 ? effectiveUsage2 : supply.dailyUsage}/day
+                {isInsulinType(supply.type) && " units"}
+                {supply.type === "needle" && " needles"}
+              </span>
+            </div>
+            {primingWaste > 0 && baseUsage > 0 && (
+              <p className="text-xs text-muted-foreground">
+                ({baseUsage}u dose + {primingWaste}u priming waste)
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {lastPickupText && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="h-3 w-3" />
+          {lastPickupText}
+        </div>
+      )}
+
+      {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 &&
+       supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (() => {
+        const effectiveUsage2 = storage.getEffectiveDailyUsage(supply);
+        const usedAmount = Math.round(daysSincePickup * effectiveUsage2);
+        return (
+          <div className="text-xs text-muted-foreground">
+            Started with {supply.quantityAtPickup}{isInsulinType(supply.type) ? "u" : ""} • Used ~{usedAmount}{isInsulinType(supply.type) ? "u" : ""}
+          </div>
+        );
+      })()}
+
+      {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "cgm" && (
+        <div className="text-xs text-muted-foreground">
+          Started with {supply.quantityAtPickup} sensor{supply.quantityAtPickup !== 1 ? "s" : ""}
+        </div>
+      )}
+
+      {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "infusion_set" && (
+        <div className="text-xs text-muted-foreground">
+          Started with {supply.quantityAtPickup} set{supply.quantityAtPickup !== 1 ? "s" : ""}
+        </div>
+      )}
+
+      {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "reservoir" && (
+        <div className="text-xs text-muted-foreground">
+          Started with {supply.quantityAtPickup} reservoir{supply.quantityAtPickup !== 1 ? "s" : ""}
+        </div>
+      )}
+    </>
+  );
   const runwayPanel =
     daysRemaining === 999
       ? {
@@ -1225,6 +1415,31 @@ function SupplyCard({
             </div>
           </div>
           <div className="flex shrink-0 gap-1">
+            <button
+              type="button"
+              className="hidden sm:inline-flex"
+              onClick={() => {
+                const target = supply.isOnOrder ? onOrderRef.current : actionRowRef.current;
+                if (target) {
+                  setNextActionNudge((n) => n + 1);
+                  target.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+              }}
+              aria-label={`Next action: ${nextAction.label}`}
+              data-testid={`button-next-action-${supply.id}`}
+            >
+              <Badge
+                variant="outline"
+                className={[
+                  "mr-1 transition",
+                  nextActionBadgeClass,
+                  nextActionNudge > 0 ? "ring-2 ring-primary/30" : "",
+                ].join(" ")}
+                data-testid={`badge-next-action-${supply.id}`}
+              >
+                {nextAction.label}
+              </Badge>
+            </button>
             <Button variant="ghost" size="icon" onClick={() => onEdit(supply)} data-testid={`button-edit-${supply.id}`}>
               <Pencil className="h-4 w-4" />
             </Button>
@@ -1250,6 +1465,34 @@ function SupplyCard({
               </AlertDialogContent>
             </AlertDialog>
           </div>
+        </div>
+
+        <div className="mt-2 sm:hidden">
+          <button
+            type="button"
+            className="inline-flex"
+            onClick={() => {
+              const target = supply.isOnOrder ? onOrderRef.current : actionRowRef.current;
+              if (target) {
+                setNextActionNudge((n) => n + 1);
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+              }
+            }}
+            aria-label={`Next action: ${nextAction.label}`}
+            data-testid={`button-next-action-mobile-${supply.id}`}
+          >
+            <Badge
+              variant="outline"
+              className={[
+                "inline-flex transition",
+                nextActionBadgeClass,
+                nextActionNudge > 0 ? "ring-2 ring-primary/30" : "",
+              ].join(" ")}
+              data-testid={`badge-next-action-mobile-${supply.id}`}
+            >
+              {nextAction.label}
+            </Badge>
+          </button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1318,15 +1561,9 @@ function SupplyCard({
           </div>
         </div>
 
-        {forecastUsage > 0 && supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Forecast: {forecastUsage}/day{isInsulinType(supply.type) ? " units" : supply.type === "needle" ? " needles" : ""}{" "}
-            {smarterEnabled ? <span className="ml-1">• Smarter: {forecastConfidence}</span> : null} •{" "}
-            <Link href="/settings/usage#settings-usage" className="underline underline-offset-2">
-              Edit habits
-            </Link>
-          </p>
-        ) : null}
+        <div className="mt-2 hidden sm:block">
+          {forecastLine}
+        </div>
 
         {activeItemInfo && (
           <p className="text-xs text-muted-foreground -mt-1 mb-2">
@@ -1334,164 +1571,80 @@ function SupplyCard({
           </p>
         )}
 
-        <details className="mt-1">
+        <details className="mt-1 hidden sm:block">
           <summary className="text-xs text-muted-foreground cursor-pointer select-none">
             Details
           </summary>
           <div className="mt-3 space-y-2 text-sm">
-          {supply.type === "cgm" ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span>Sensor duration</span>
-                <span>{storage.getSettings().cgmDays || 14} days each</span>
-              </div>
-              {supply.activeItemStartDate && (() => {
-                const info = storage.getActiveItemInfo(supply);
-                if (!info) return null;
-                const changeSoon = info.daysLeft <= 1;
-                return (
-                  <div className="space-y-1">
-                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                      <span>Active sensor</span>
-                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs"
-                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
-                      data-testid={`button-change-early-${supply.id}`}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1.5" />
-                      {changeSoon ? "Changed sensor" : "Changed early"}
-                    </Button>
-                  </div>
-                );
-              })()}
+            {detailsContent}
+          </div>
+        </details>
+
+        <details className="mt-2 sm:hidden group">
+          <summary className="list-none cursor-pointer select-none">
+            <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-medium">More</span>
+              <span className="ml-2 flex items-center gap-2">
+                <span className="hidden [details[open]_&]:inline">Tap to hide</span>
+                <span className="[details[open]_&]:hidden">Tap to view</span>
+                <ChevronDown className="h-4 w-4 group-open:hidden" />
+                <ChevronUp className="h-4 w-4 hidden group-open:block" />
+              </span>
             </div>
-          ) : supply.type === "infusion_set" ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span>Site change</span>
-                <span>Every {storage.getSettings().siteChangeDays || 3} days</span>
+          </summary>
+          <div className="mt-2 space-y-3">
+            {forecastLine ? (
+              <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+                {forecastLine}
               </div>
-              {supply.activeItemStartDate && (() => {
-                const info = storage.getActiveItemInfo(supply);
-                if (!info) return null;
-                const changeSoon = info.daysLeft <= 1;
-                return (
-                  <div className="space-y-1">
-                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                      <span>Active set</span>
-                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs"
-                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
-                      data-testid={`button-change-early-${supply.id}`}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1.5" />
-                      {changeSoon ? "Changed set" : "Changed early"}
-                    </Button>
-                  </div>
-                );
-              })()}
-            </div>
-          ) : supply.type === "reservoir" ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <span>Reservoir change</span>
-                <span>Every {storage.getSettings().reservoirChangeDays || 3} days</span>
+            ) : null}
+            <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Details</p>
+              <div className="mt-2 space-y-2 text-sm">
+                {detailsContent}
               </div>
-              {supply.activeItemStartDate && (() => {
-                const info = storage.getActiveItemInfo(supply);
-                if (!info) return null;
-                const changeSoon = info.daysLeft <= 1;
-                return (
-                  <div className="space-y-1">
-                    <div className={`flex items-center justify-between ${changeSoon ? "text-yellow-600 dark:text-yellow-500" : "text-muted-foreground"}`}>
-                      <span>Active reservoir</span>
-                      <span>{changeSoon ? "Change due today" : `${info.daysLeft} day${info.daysLeft !== 1 ? "s" : ""} left`}</span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs"
-                      onClick={(e) => { e.stopPropagation(); storage.markItemChangedEarly(supply.id); onRefresh(); }}
-                      data-testid={`button-change-early-${supply.id}`}
-                    >
-                      <RefreshCw className="h-3 w-3 mr-1.5" />
-                      {changeSoon ? "Changed reservoir" : "Changed early"}
-                    </Button>
-                  </div>
-                );
-              })()}
             </div>
-          ) : (() => {
-            const effectiveUsage = storage.getEffectiveDailyUsage(supply);
-            const primingWaste = isInsulinType(supply.type) ? storage.getPrimingWastePerDay(supply.type) : 0;
-            const baseUsage = effectiveUsage - primingWaste;
-            return (
-              <div className="space-y-0.5">
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Daily usage</span>
-                  <span>
-                    {effectiveUsage > 0 ? effectiveUsage : supply.dailyUsage}/day
-                    {isInsulinType(supply.type) && " units"}
-                    {supply.type === "needle" && " needles"}
-                  </span>
+            {history.length > 0 ? (
+              <div className="rounded-xl border border-border/70 bg-background/60 p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">History</p>
+                <div className="mt-2 space-y-1">
+                  {history.map((e) => (
+                    <div key={e.id} className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="truncate">
+                        {e.kind === "adjust" ? "Adjusted" : e.kind}
+                        {typeof e.delta === "number" && e.delta !== 0 && (
+                          <span
+                            className={
+                              e.delta < 0
+                                ? "text-amber-700 dark:text-amber-400"
+                                : "text-emerald-700 dark:text-emerald-400"
+                            }
+                          >
+                            {" "}
+                            {e.delta > 0 ? `+${e.delta}` : `${e.delta}`}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0">
+                        {new Date(e.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                {primingWaste > 0 && baseUsage > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    ({baseUsage}u dose + {primingWaste}u priming waste)
-                  </p>
-                )}
               </div>
-            );
-          })()}
-          
-          {lastPickupText && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              {lastPickupText}
-            </div>
-          )}
-          
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && 
-           supply.type !== "cgm" && supply.type !== "infusion_set" && supply.type !== "reservoir" && (() => {
-            const effectiveUsage = storage.getEffectiveDailyUsage(supply);
-            const usedAmount = Math.round(daysSincePickup * effectiveUsage);
-            return (
-              <div className="text-xs text-muted-foreground">
-                Started with {supply.quantityAtPickup}{isInsulinType(supply.type) ? "u" : ""} • Used ~{usedAmount}{isInsulinType(supply.type) ? "u" : ""}
-              </div>
-            );
-          })()}
-          
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "cgm" && (
-            <div className="text-xs text-muted-foreground">
-              Started with {supply.quantityAtPickup} sensor{supply.quantityAtPickup !== 1 ? 's' : ''}
-            </div>
-          )}
-          
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "infusion_set" && (
-            <div className="text-xs text-muted-foreground">
-              Started with {supply.quantityAtPickup} set{supply.quantityAtPickup !== 1 ? 's' : ''}
-            </div>
-          )}
-          
-          {supply.quantityAtPickup && daysSincePickup !== null && daysSincePickup > 0 && supply.type === "reservoir" && (
-            <div className="text-xs text-muted-foreground">
-              Started with {supply.quantityAtPickup} reservoir{supply.quantityAtPickup !== 1 ? 's' : ''}
-            </div>
-          )}
+            ) : null}
           </div>
         </details>
 
         {supply.isOnOrder && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 mt-3" data-testid={`order-status-${supply.id}`}>
+          <div
+            ref={onOrderRef}
+            className={[
+              "flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 mt-3 transition",
+              nextActionNudge > 0 ? "ring-2 ring-primary/20" : "",
+            ].join(" ")}
+            data-testid={`order-status-${supply.id}`}
+          >
             <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
@@ -1517,7 +1670,13 @@ function SupplyCard({
           </div>
         )}
 
-        <div className="pt-3 mt-3 border-t space-y-2">
+        <div
+          ref={actionRowRef}
+          className={[
+            "pt-3 mt-3 border-t space-y-2 transition",
+            nextActionNudge > 0 ? "ring-2 ring-primary/20 rounded-xl p-2 -mx-2" : "",
+          ].join(" ")}
+        >
           <div className="flex gap-2">
             <Button 
               variant="default" 
@@ -1589,7 +1748,7 @@ function SupplyCard({
         </div>
 
         {history.length > 0 && (
-          <details className="mt-2 opacity-90">
+          <details className="mt-2 opacity-90 hidden sm:block">
             <summary className="text-xs text-muted-foreground cursor-pointer select-none">
               History
             </summary>
@@ -2460,6 +2619,29 @@ export default function Supplies() {
     toast({ title: "Prescription cycle saved", description: "Your prescription schedule has been updated." });
   };
 
+  const nextActionHintBySupplyId = useMemo(() => {
+    const advice = storage.getSmartPrescriptionAdvice(supplies);
+    const map = new Map<string, { label: string; tone: "muted" | "amber" | "red" | "blue" }>();
+
+    for (const { supply, daysUntilCollect } of advice.collectSoon) {
+      if (supply.isOnOrder) {
+        const urgent = daysUntilCollect <= 0;
+        map.set(supply.id, {
+          label: urgent ? "Collect now" : "Collect soon",
+          tone: urgent ? "red" : "blue",
+        });
+      } else {
+        const urgent = daysUntilCollect <= 0;
+        map.set(supply.id, {
+          label: urgent ? "Order now" : "Order soon",
+          tone: urgent ? "red" : "amber",
+        });
+      }
+    }
+
+    return map;
+  }, [supplies, prescriptionCycle]);
+
   const handleAddNew = () => {
     setEditingSupply(null);
     setDialogOpen(true);
@@ -2957,6 +3139,7 @@ export default function Supplies() {
                   >
                     <SupplyCard
                       supply={supply}
+                      nextActionHint={nextActionHintBySupplyId.get(supply.id)}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onAdjustQuantity={handleAdjustQuantity}

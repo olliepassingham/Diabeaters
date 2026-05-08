@@ -17,6 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { 
   Plane, 
   MapPin, 
@@ -1421,28 +1422,36 @@ export default function Travel() {
 
             <CompactRiskConsiderations warnings={riskWarnings} />
 
-            <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
-                      <p className="text-xs text-green-600 dark:text-green-400">
-                        {hasEnded
-                          ? "Your trip has ended"
-                          : `Until ${
-                              formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"
-                            }`}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
-                    End Travel Mode
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ScenarioActiveCard
+              title="Travel mode"
+              subtitle={
+                hasEnded
+                  ? "Your trip has ended"
+                  : `Active until ${formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"}`
+              }
+              badgeText="Active"
+              tone="blue"
+              icon={<CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />}
+              actions={
+                <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
+                  End
+                </Button>
+              }
+              facts={[
+                { label: "Destination", value: plan.destination || "—" },
+                {
+                  label: "Timezone",
+                  value:
+                    plan.timezoneChange === "none"
+                      ? "No change"
+                      : `${plan.timezoneHours || 0}h ${plan.timezoneDirection || "—"}`,
+                },
+                {
+                  label: "Return",
+                  value: formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—",
+                },
+              ]}
+            />
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
@@ -1492,28 +1501,36 @@ export default function Travel() {
           </TabsContent>
         </Tabs>
 
-        <Card className="border-green-500/50 bg-green-50/30 dark:bg-green-950/20">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-800 dark:text-green-200">Travel Mode Active</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    {hasEnded
-                      ? "Your trip has ended"
-                      : `Until ${
-                          formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"
-                        }`}
-                  </p>
-                </div>
-              </div>
-              <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
-                End Travel Mode
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ScenarioActiveCard
+          title="Travel mode"
+          subtitle={
+            hasEnded
+              ? "Your trip has ended"
+              : `Active until ${formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"}`
+          }
+          badgeText="Active"
+          tone="blue"
+          icon={<CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />}
+          actions={
+            <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
+              End
+            </Button>
+          }
+          facts={[
+            { label: "Destination", value: plan.destination || "—" },
+            {
+              label: "Timezone",
+              value:
+                plan.timezoneChange === "none"
+                  ? "No change"
+                  : `${plan.timezoneHours || 0}h ${plan.timezoneDirection || "—"}`,
+            },
+            {
+              label: "Return",
+              value: formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—",
+            },
+          ]}
+        />
 
       </PageShell>
     );

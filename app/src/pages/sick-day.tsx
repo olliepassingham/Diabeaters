@@ -25,6 +25,7 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
+import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import {
@@ -1452,55 +1453,53 @@ export default function SickDay() {
           }
         />
 
-        <div className="rounded-2xl border border-border/60 bg-muted/10 px-4 py-3 shadow-sm ring-1 ring-border/40" data-testid="sickday-status-strip">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">Sick day mode status</p>
-              <p className="text-xs text-muted-foreground">
-                Started{" "}
-                {sickDayActivatedAt
-                  ? new Date(sickDayActivatedAt).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "recently"}{" "}
-                · {duration.label}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {nextCheckCountdown ? (
-                <Badge
-                  variant="secondary"
-                  className={nextCheckCountdown.overdue ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300" : ""}
-                  data-testid="badge-next-check"
-                >
-                  <Clock className="h-3 w-3 mr-1" />
-                  {nextCheckCountdown.overdue ? "Check due" : "Next check in"} {nextCheckCountdown.label}
-                </Badge>
-              ) : null}
-
-              <Badge variant="secondary" className="capitalize" data-testid="badge-ketones-strip">
-                Ketones: {ketoneLevel || "—"}
-              </Badge>
-
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  setActiveModeTab("log");
-                  scrollToId("sickday-log");
-                }}
-                data-testid="button-strip-log-check"
-              >
-                <Activity className="h-4 w-4 mr-2" />
-                Log a check
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ScenarioActiveCard
+          title="Sick day mode"
+          subtitle={
+            `Started ${
+              sickDayActivatedAt
+                ? new Date(sickDayActivatedAt).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "recently"
+            } · ${duration.label}`
+          }
+          badgeText="Active"
+          tone="amber"
+          icon={<Thermometer className="h-4 w-4 text-primary" aria-hidden />}
+          actions={
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setActiveModeTab("log");
+                scrollToId("sickday-log");
+              }}
+              data-testid="button-strip-log-check"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Log a check
+            </Button>
+          }
+          facts={[
+            {
+              label: "Next check",
+              value: nextCheckCountdown ? (
+                <span className={nextCheckCountdown.overdue ? "text-red-700 dark:text-red-300" : ""}>
+                  {nextCheckCountdown.overdue ? "Due" : "In"} {nextCheckCountdown.label}
+                </span>
+              ) : (
+                "—"
+              ),
+            },
+            { label: "Ketones", value: ketoneLevel || "—" },
+            { label: "Severity", value: severity ? String(severity) : "—" },
+          ]}
+          data-testid="sickday-status-strip"
+        />
 
         <Tabs value={activeModeTab} onValueChange={(v) => setActiveModeTab(v as "now" | "checklist" | "log")} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
