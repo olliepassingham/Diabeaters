@@ -212,7 +212,6 @@ export function AppStatusStrip() {
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
   const show =
     sc.sickDayActive || sc.travelModeActive || Boolean(ex) || inPostExerciseWindow || sc.pumpFailureActive || !online;
-  if (!show) return null;
 
   const isExerciseScenarioPage = pathname === "/scenarios/exercise";
 
@@ -444,6 +443,8 @@ export function AppStatusStrip() {
       ex.phase === "pre" ? ex.preTrend : ex.phase === "active" ? ex.midTrend : ex.recoveryTrend;
     return current === t;
   };
+
+  if (!show) return null;
 
   return (
     <div className="relative z-40 -mt-2 mb-2 space-y-2" data-testid="app-status-strip">

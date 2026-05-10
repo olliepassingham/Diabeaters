@@ -124,6 +124,8 @@ CREATE POLICY carer_links_carer_select
 -- ---------------------------------------------------------------------------
 -- RPC: redeem invite (recommended — carer cannot INSERT carer_links otherwise)
 -- ---------------------------------------------------------------------------
+-- Production: apply Supabase migrations (e.g. 20260503143000_carer_clinical_settings_profile_dob.sql and
+-- 20260510120000_redeem_carer_invite_age_default_scopes.sql) for clinical_settings + age-aware defaults.
 -- Idempotent: safe to re-run after dropping old version
 
 create or replace function public.redeem_carer_invite(invite_code text)

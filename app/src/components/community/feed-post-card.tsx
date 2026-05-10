@@ -2,10 +2,12 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
+  Calendar,
   Flag,
   Heart,
   Link2,
   Loader2,
+  MapPin,
   MessageSquare,
   MoreHorizontal,
   Pencil,
@@ -708,13 +710,41 @@ export function FeedPostCard({
             );
           })()}
           {eventExtra ? (
-            <div className="space-y-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-sm">
-              <p className="font-semibold leading-snug">{eventExtra.title}</p>
-              <p className="text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
-              {eventExtra.location ? <p>{eventExtra.location}</p> : null}
-              {eventExtra.details ? (
-                <p className="whitespace-pre-wrap text-muted-foreground">{eventExtra.details}</p>
+            <div className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-b from-primary/[0.07] to-muted/20 shadow-sm ring-1 ring-border/50 dark:from-primary/10 dark:to-muted/10">
+              {post.image_urls.length > 0 ? (
+                <CommunityPostImageGrid
+                  paths={post.image_urls}
+                  altTexts={post.image_alt_texts}
+                  variant="event-banner"
+                />
               ) : null}
+              <div
+                className={cn(
+                  "space-y-2 p-3 text-sm",
+                  post.image_urls.length > 0 && "border-t border-border/50 bg-background/50 backdrop-blur-sm dark:bg-background/30",
+                )}
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary dark:bg-primary/20">
+                    <Calendar className="h-4 w-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="font-semibold leading-snug text-foreground">{eventExtra.title}</p>
+                    <p className="text-sm text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
+                    {eventExtra.location ? (
+                      <p className="flex items-start gap-1.5 text-sm text-foreground/90">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <span>{eventExtra.location}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {eventExtra.details ? (
+                  <p className="whitespace-pre-wrap border-t border-border/40 pt-2 text-sm text-muted-foreground pl-[2.75rem] sm:pl-12">
+                    {eventExtra.details}
+                  </p>
+                ) : null}
+              </div>
             </div>
           ) : null}
           {pollExtra ? (
@@ -726,7 +756,9 @@ export function FeedPostCard({
             />
           ) : null}
           {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
-          <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
+          {!(eventExtra && post.image_urls.length > 0) ? (
+            <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
+          ) : null}
           <div
             className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
             data-testid="post-engagement-row"

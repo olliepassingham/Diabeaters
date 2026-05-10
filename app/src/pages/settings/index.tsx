@@ -1172,6 +1172,7 @@ export default function Settings() {
 
   if (pathOnly === "/settings") {
     const completion = storage.getSettingsCompletion();
+    const showSoftSetupCard = completion.completed < completion.total;
     return (
       <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
         <FaceLogoWatermark />
@@ -1188,7 +1189,7 @@ export default function Settings() {
           actions={settingsInfoDialog}
         />
 
-        {!isCarer && !isCommunityAccount ? (
+        {!isCarer && !isCommunityAccount && showSoftSetupCard ? (
           <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-3">

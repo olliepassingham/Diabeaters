@@ -334,16 +334,17 @@ function validateImageFiles(files: File[]): Error | null {
 }
 
 /** Signed URLs for displaying private bucket images (short TTL; refresh on feed load). */
-export async function getPostImageSignedUrls(paths: string[]): Promise<string[]> {
+export async function getPostImageSignedUrls(paths: string[]): Promise<(string | null)[]> {
   const supabase = getSupabase();
-  if (!supabase || paths.length === 0) return [];
-  const out: string[] = [];
-  for (const path of paths) {
+  if (!supabase || paths.length === 0) return paths.map(() => null);
+  const out: (string | null)[] = paths.map(() => null);
+  for (let i = 0; i < paths.length; i++) {
+    const path = String(paths[i] ?? "").trim();
+    if (!path) continue;
     const { data, error } = await supabase.storage
       .from(COMMUNITY_POST_IMAGES_BUCKET)
       .createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) continue;
-    out.push(data.signedUrl);
+    if (!error && data?.signedUrl) out[i] = data.signedUrl;
   }
   return out;
 }
@@ -544,6 +545,8 @@ export type InsertFeedPostInput =
       body: string;
       question: string;
       options: string[];
+      imageFiles?: File[];
+      imageAlts?: string[];
       mentions: FeedPostMentions;
     }
   | {
@@ -554,6 +557,8 @@ export type InsertFeedPostInput =
       startsAt: string;
       location?: string;
       details?: string;
+      imageFiles?: File[];
+      imageAlts?: string[];
       mentions: FeedPostMentions;
     };
 
@@ -569,6 +574,142 @@ function normalizeMentionsForInsert(
     map[k] = uid;
   }
   return { mentioned_user_ids: ids, mention_map: map };
+}
+
+type SupabaseNonNull = NonNullable<ReturnType<typeof getSupabase>>;
+
+async function insertCommunityPostRowWithOptionalImageUploads(params: {
+  supabase: SupabaseNonNull;
+  uid: string;
+  body: string;
+  topic: CommunityTopicId;
+  post_kind: "standard" | "poll" | "event";
+  post_extra: unknown | null;
+  mention_map: Record<string, string>;
+  mentioned_user_ids: string[];
+  imageFiles: File[];
+  imageAlts?: string[];
+}): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
+  const { supabase, uid, mentioned_user_ids } = params;
+  const files = params.imageFiles.filter(Boolean);
+  const vErr = validateImageFiles(files);
+  if (vErr) return { data: null, error: vErr };
+
+  const imageAltsForInsert = normalizeAltsForCount(params.imageAlts, files.length);
+
+  const fireMentionPushes = (postId: string) => {
+    for (const mentionId of mentioned_user_ids) {
+      void supabase.functions
+        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: postId, mentioned_user_id: mentionId } })
+        .then(({ error: fnErr }) => {
+          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
+        });
+    }
+  };
+
+  if (files.length === 0) {
+    const insertRow: Record<string, unknown> = {
+      author_id: uid,
+      body: params.body,
+      image_urls: [],
+      topic: params.topic,
+      post_kind: params.post_kind,
+      post_extra: params.post_extra,
+      mention_map: params.mention_map,
+      mentioned_user_ids,
+    };
+    const { data, error } = await supabase.from("community_posts").insert(insertRow).select("*").single();
+
+    if (error) return { data: null, error: new Error(error.message) };
+    if (!data) return { data: null, error: new Error("No row returned") };
+    const out = mapPost(data as Record<string, unknown>);
+    fireMentionPushes(out.id);
+    return { data: await finalizeSinglePostRow(out), error: null };
+  }
+
+  const pendingId = crypto.randomUUID();
+  const pendingPaths: string[] = [];
+  let postId: string | null = null;
+  const movedDests: string[] = [];
+
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const ext = extFromFile(files[i]!);
+      const path = `${uid}/pending/${pendingId}/${i}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(COMMUNITY_POST_IMAGES_BUCKET)
+        .upload(path, files[i]!, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: files[i]!.type || undefined,
+        });
+      if (upErr) throw new Error(upErr.message);
+      pendingPaths.push(path);
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      author_id: uid,
+      body: params.body,
+      /* Avoid publishing pending storage paths: we move() those objects away immediately, so any
+       * feed/realtime read between move and DB update would sign URLs for paths that no longer exist.
+       * Standard image-only posts must reference at least one image at insert time (CHECK constraint). */
+      image_urls:
+        params.post_kind === "standard" && !params.body.trim() && files.length > 0 ? pendingPaths : [],
+      topic: params.topic,
+      post_kind: params.post_kind,
+      post_extra: params.post_extra,
+      mention_map: params.mention_map,
+      mentioned_user_ids,
+    };
+    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
+      insertPayload.image_alt_texts = imageAltsForInsert;
+    }
+
+    const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
+
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("No row returned");
+
+    postId = String((data as Record<string, unknown>).id);
+    const finalPaths: string[] = [];
+
+    for (let i = 0; i < pendingPaths.length; i++) {
+      const ext = extFromFile(files[i]!);
+      const dest = `${uid}/${postId}/${i}.${ext}`;
+      const { error: mvErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).move(pendingPaths[i]!, dest);
+      if (mvErr) throw new Error(mvErr.message);
+      finalPaths.push(dest);
+      movedDests.push(dest);
+    }
+
+    const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
+    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
+      updatePayload.image_alt_texts = imageAltsForInsert;
+    }
+
+    const { data: updated, error: updErr } = await supabase
+      .from("community_posts")
+      .update(updatePayload)
+      .eq("id", postId)
+      .select("*")
+      .single();
+
+    if (updErr) throw new Error(updErr.message);
+    if (!updated) throw new Error("Update returned no row");
+    const out = mapPost(updated as Record<string, unknown>);
+    fireMentionPushes(out.id);
+    return { data: await finalizeSinglePostRow(out), error: null };
+  } catch (e) {
+    if (postId) {
+      await supabase.from("community_posts").delete().eq("id", postId);
+    }
+    const uniq = [...new Set([...pendingPaths, ...movedDests])];
+    if (uniq.length > 0) {
+      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
+    }
+    const msg = e instanceof Error ? e.message : "Upload failed";
+    return { data: null, error: new Error(msg) };
+  }
 }
 
 export async function insertFeedPost(
@@ -609,32 +750,19 @@ export async function insertFeedPost(
     }
     /* Older DBs still enforce community_posts_body_and_images_check (body or images required). */
     const bodyForRow = trimmedBody || q;
-    const { data, error } = await supabase
-      .from("community_posts")
-      .insert({
-        author_id: uid,
-        body: bodyForRow,
-        image_urls: [],
-        topic: input.topic,
-        post_kind: "poll",
-        post_extra: { question: q, options: opts },
-        mention_map,
-        mentioned_user_ids,
-      })
-      .select("*")
-      .single();
-
-    if (error) return { data: null, error: new Error(error.message) };
-    if (!data) return { data: null, error: new Error("No row returned") };
-    const out = mapPost(data as Record<string, unknown>);
-    for (const mentionId of mentioned_user_ids) {
-      void supabase.functions
-        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
-        .then(({ error: fnErr }) => {
-          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
-        });
-    }
-    return { data: await finalizeSinglePostRow(out), error: null };
+    const imageFiles = input.imageFiles?.filter(Boolean) ?? [];
+    return insertCommunityPostRowWithOptionalImageUploads({
+      supabase,
+      uid,
+      body: bodyForRow,
+      topic: input.topic,
+      post_kind: "poll",
+      post_extra: { question: q, options: opts },
+      mention_map,
+      mentioned_user_ids,
+      imageFiles,
+      imageAlts: input.imageAlts,
+    });
   }
 
   if (input.kind === "event") {
@@ -650,161 +778,38 @@ export async function insertFeedPost(
     if (loc) extra.location = loc;
     if (det) extra.details = det;
     const bodyForRow = trimmedBody || title;
-    const { data, error } = await supabase
-      .from("community_posts")
-      .insert({
-        author_id: uid,
-        body: bodyForRow,
-        image_urls: [],
-        topic: input.topic,
-        post_kind: "event",
-        post_extra: extra,
-        mention_map,
-        mentioned_user_ids,
-      })
-      .select("*")
-      .single();
-
-    if (error) return { data: null, error: new Error(error.message) };
-    if (!data) return { data: null, error: new Error("No row returned") };
-    const out = mapPost(data as Record<string, unknown>);
-    for (const mentionId of mentioned_user_ids) {
-      void supabase.functions
-        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
-        .then(({ error: fnErr }) => {
-          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
-        });
-    }
-    return { data: await finalizeSinglePostRow(out), error: null };
+    const imageFiles = input.imageFiles?.filter(Boolean) ?? [];
+    return insertCommunityPostRowWithOptionalImageUploads({
+      supabase,
+      uid,
+      body: bodyForRow,
+      topic: input.topic,
+      post_kind: "event",
+      post_extra: extra,
+      mention_map,
+      mentioned_user_ids,
+      imageFiles,
+      imageAlts: input.imageAlts,
+    });
   }
 
   const trimmed = input.body.trim();
   const files = input.imageFiles?.filter(Boolean) ?? [];
-  const vErr = validateImageFiles(files);
-  if (vErr) return { data: null, error: vErr };
-
   if (!trimmed && files.length === 0) {
     return { data: null, error: new Error("Add text or at least one photo.") };
   }
-
-  const imageAltsForInsert = normalizeAltsForCount(input.imageAlts, files.length);
-
-  if (files.length === 0) {
-    const { data, error } = await supabase
-      .from("community_posts")
-      .insert({
-        author_id: uid,
-        body: trimmed,
-        image_urls: [],
-        topic: input.topic,
-        post_kind: "standard",
-        post_extra: null,
-        mention_map,
-        mentioned_user_ids,
-      })
-      .select("*")
-      .single();
-
-    if (error) return { data: null, error: new Error(error.message) };
-    if (!data) return { data: null, error: new Error("No row returned") };
-    const out = mapPost(data as Record<string, unknown>);
-    for (const mentionId of mentioned_user_ids) {
-      void supabase.functions
-        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
-        .then(({ error: fnErr }) => {
-          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
-        });
-    }
-    return { data: await finalizeSinglePostRow(out), error: null };
-  }
-
-  const pendingId = crypto.randomUUID();
-  const pendingPaths: string[] = [];
-  let postId: string | null = null;
-  const movedDests: string[] = [];
-
-  try {
-    for (let i = 0; i < files.length; i++) {
-      const ext = extFromFile(files[i]!);
-      const path = `${uid}/pending/${pendingId}/${i}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .upload(path, files[i]!, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: files[i]!.type || undefined,
-        });
-      if (upErr) throw new Error(upErr.message);
-      pendingPaths.push(path);
-    }
-
-    const insertPayload: Record<string, unknown> = {
-      author_id: uid,
-      body: trimmed,
-      image_urls: pendingPaths,
-      topic: input.topic,
-      post_kind: "standard",
-      post_extra: null,
-      mention_map,
-      mentioned_user_ids,
-    };
-    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
-      insertPayload.image_alt_texts = imageAltsForInsert;
-    }
-
-    const { data, error } = await supabase.from("community_posts").insert(insertPayload).select("*").single();
-
-    if (error) throw new Error(error.message);
-    if (!data) throw new Error("No row returned");
-
-    postId = String((data as Record<string, unknown>).id);
-    const finalPaths: string[] = [];
-
-    for (let i = 0; i < pendingPaths.length; i++) {
-      const ext = extFromFile(files[i]!);
-      const dest = `${uid}/${postId}/${i}.${ext}`;
-      const { error: mvErr } = await supabase.storage
-        .from(COMMUNITY_POST_IMAGES_BUCKET)
-        .move(pendingPaths[i]!, dest);
-      if (mvErr) throw new Error(mvErr.message);
-      finalPaths.push(dest);
-      movedDests.push(dest);
-    }
-
-    const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
-    if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
-      updatePayload.image_alt_texts = imageAltsForInsert;
-    }
-
-    const { data: updated, error: updErr } = await supabase
-      .from("community_posts")
-      .update(updatePayload)
-      .eq("id", postId)
-      .select("*")
-      .single();
-
-    if (updErr) throw new Error(updErr.message);
-    if (!updated) throw new Error("Update returned no row");
-    const out = mapPost(updated as Record<string, unknown>);
-    for (const mentionId of mentioned_user_ids) {
-      void supabase.functions
-        .invoke("notify_feed_push", { body: { kind: "feed_post_mention", post_id: out.id, mentioned_user_id: mentionId } })
-        .then(({ error: fnErr }) => {
-          if (fnErr) logEdgeInvokeFailure("notify_feed_push mention", fnErr.message);
-        });
-    }
-    return { data: await finalizeSinglePostRow(out), error: null };
-  } catch (e) {
-    if (postId) {
-      await supabase.from("community_posts").delete().eq("id", postId);
-    }
-    const uniq = [...new Set([...pendingPaths, ...movedDests])];
-    if (uniq.length > 0) {
-      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
-    }
-    const msg = e instanceof Error ? e.message : "Upload failed";
-    return { data: null, error: new Error(msg) };
-  }
+  return insertCommunityPostRowWithOptionalImageUploads({
+    supabase,
+    uid,
+    body: trimmed,
+    topic: input.topic,
+    post_kind: "standard",
+    post_extra: null,
+    mention_map,
+    mentioned_user_ids,
+    imageFiles: files,
+    imageAlts: input.imageAlts,
+  });
 }
 
 /** @deprecated Use insertFeedPost with kind standard */

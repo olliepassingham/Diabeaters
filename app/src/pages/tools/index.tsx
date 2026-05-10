@@ -350,7 +350,7 @@ export function ToolsHubPage({
 
       {(hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
         <section
-          className="space-y-4"
+          className="space-y-3 sm:space-y-4"
           aria-label={hubVariant === "community" ? "Community tools" : "Supporter tools"}
           data-testid="tools-section-supporter"
         >
@@ -358,7 +358,7 @@ export function ToolsHubPage({
             <Users className="h-5 w-5 text-primary" aria-hidden />
             <SectionHeader title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"} />
           </div>
-          <ul className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5" aria-label="Supporter tools">
+          <ul className="grid list-none grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
               <li
                 key={t.id}

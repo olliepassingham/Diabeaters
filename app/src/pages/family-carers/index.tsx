@@ -16,7 +16,10 @@ import {
 } from "@/lib/carers";
 import type { CarerInviteRow, CarerLinkWithProfile, CarerScopes } from "@/lib/carers.types";
 import { DEFAULT_CARER_SCOPES } from "@/lib/carers.types";
+import { carerScopePresetSummary } from "@/lib/carer-scopes-by-age";
+import { getAgeBand } from "@/lib/user-age";
 import { getSupabase } from "@/lib/supabase";
+import { useProfile } from "@/lib/profile";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { Link, useLocation } from "wouter";
@@ -69,6 +72,9 @@ export default function FamilyCarersPage() {
   const configured = Boolean(getSupabase());
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { profile: cloudProfile } = useProfile();
+  const patientAgeBand = getAgeBand(cloudProfile?.date_of_birth ?? null);
+  const scopePresetHint = carerScopePresetSummary(patientAgeBand);
   const { data: emergency, syncGeneration } = useEmergencyProfile();
   const [links, setLinks] = useState<CarerLinkWithProfile[]>([]);
   const [invites, setInvites] = useState<CarerInviteRow[]>([]);
@@ -206,6 +212,16 @@ export default function FamilyCarersPage() {
         </Alert>
       )}
 
+      {configured && patientAgeBand === "child" && (
+        <Alert className="border-primary/25 bg-primary/[0.04]">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <span className="font-medium text-foreground">Supporter defaults for under-13 accounts.</span>{" "}
+            {scopePresetHint} Everyone stays on the toggles you set here after they link.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* A) Linked accounts (invite flow) */}
       <Card>
         <CardHeader>
@@ -272,7 +288,10 @@ export default function FamilyCarersPage() {
             <UserPlus className="h-5 w-5 text-primary shrink-0" />
             Invite someone
           </CardTitle>
-          <CardDescription>Codes expire after 7 days. Each successful link starts with every view option on.</CardDescription>
+          <CardDescription>
+            Codes expire after 7 days. A new link starts with every view option on; clinical basics on their profile also
+            turn on automatically for under-13 accounts (you can switch that off below after they link).
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
@@ -379,7 +398,9 @@ export default function FamilyCarersPage() {
               key: "clinical_settings" as const,
               label: "Clinical basics on their profile",
               description:
-                "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default.",
+                patientAgeBand === "child"
+                  ? "Lets a linked supporter update insulin delivery, total daily dose, and date of birth on the cloud profile. For under-13 accounts this starts on for new links so parents can help — turn it off if you prefer."
+                  : "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default for new links.",
               testId: "privacy-toggle-clinical-settings",
             },
           ].map((item) => (

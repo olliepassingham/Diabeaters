@@ -2,6 +2,10 @@
  * Client-side age helpers from profile date of birth (YYYY-MM-DD).
  * Logic matches `ageInWholeYearsUtc` in `supabase/functions/_shared/ai-coach/contextPacker.ts`
  * — keep both in sync when changing rules.
+ *
+ * Supporter invite defaults: `public.redeem_carer_invite` enables `clinical_settings` when
+ * `EXTRACT(YEAR FROM AGE((timezone('UTC', now()))::date, profiles.date_of_birth)) < 13` — if you
+ * change child/teen cutoffs here, update that migration too.
  */
 
 const ISO_DOB = /^(\d{4})-(\d{2})-(\d{2})$/;

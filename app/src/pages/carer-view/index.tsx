@@ -4,7 +4,20 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, ArrowLeft, Package, Heart, Phone, Calendar, Plane, Thermometer, Info, Users, Pill } from "lucide-react";
+import {
+  Eye,
+  ArrowLeft,
+  Package,
+  Heart,
+  Phone,
+  Calendar,
+  Plane,
+  Thermometer,
+  Info,
+  Users,
+  Pill,
+  ArrowRight,
+} from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   normaliseScopes,
@@ -45,6 +58,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function SectionHeading({
   title,
@@ -1121,6 +1136,80 @@ function supplyTone(row: CloudSupplyRow): "ok" | "low" | "critical" {
   return qty <= 0 ? "critical" : "ok";
 }
 
+function travelScenarioSummary(rows: Record<string, unknown>[]): { active: boolean; destination: string | null } {
+  for (const row of rows) {
+    const scenarioKey =
+      typeof row.scenario_key === "string" && row.scenario_key.trim()
+        ? row.scenario_key.trim()
+        : typeof row.scenarioKey === "string" && row.scenarioKey.trim()
+          ? row.scenarioKey.trim()
+          : null;
+    if (scenarioKey !== "travel") continue;
+    const rawState =
+      (row.state && typeof row.state === "object" ? (row.state as Record<string, unknown>) : null) ??
+      (row.payload && typeof row.payload === "object" ? (row.payload as Record<string, unknown>) : null) ??
+      (row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null);
+    if (!rawState) continue;
+    const active = rawState.travel_active === true || rawState.travelActive === true;
+    if (!active) continue;
+    const destination = typeof rawState.destination === "string" ? rawState.destination.trim() : null;
+    return { active: true, destination: destination || null };
+  }
+  return { active: false, destination: null };
+}
+
+type CarerGlanceType = "ok" | "info" | "warning";
+
+function deriveCarerHeaderContext(
+  supplies: CloudSupplyRow[],
+  sickState: Record<string, unknown> | null,
+  scenarioRows: Record<string, unknown>[],
+): {
+  glance: { type: CarerGlanceType; message: string };
+  showSickChip: boolean;
+  showTravelChip: boolean;
+} {
+  const travel = travelScenarioSummary(scenarioRows);
+  const sick = isSickDayScenarioActive(sickState);
+  const hasCritical = supplies.some((s) => supplyTone(s) === "critical");
+  const hasLow = supplies.some((s) => supplyTone(s) === "low");
+  const severity =
+    sickState && typeof sickState.severity === "string" ? String(sickState.severity).trim().toLowerCase() : "";
+  const severeSick = sick && severity === "severe";
+
+  let glance: { type: CarerGlanceType; message: string };
+  if (sick && travel.active) {
+    glance = {
+      type: "warning",
+      message:
+        "Sick day and travel mode are both active — review their plan with their care team if unsure.",
+    };
+  } else if (severeSick) {
+    glance = {
+      type: "warning",
+      message: "Severe sick day mode — follow their clinic plan and seek help if symptoms worsen.",
+    };
+  } else if (hasCritical) {
+    glance = { type: "warning", message: "Critical supplies need attention" };
+  } else if (hasLow || sick || travel.active) {
+    if (hasLow) glance = { type: "info", message: "Some supplies are running low" };
+    else if (sick) glance = { type: "info", message: "Sick day mode active" };
+    else
+      glance = {
+        type: "info",
+        message: travel.destination ? `Travel mode active — ${travel.destination}` : "Travel mode active",
+      };
+  } else {
+    glance = { type: "ok", message: "All clear for now" };
+  }
+
+  return {
+    glance,
+    showSickChip: sick,
+    showTravelChip: travel.active,
+  };
+}
+
 /** Wouter + `LinkedPatientInfo`: load link → optionally load patient bundle → ready. */
 type CarerViewPhase = "loading_link" | "unlinked" | "loading_patient" | "ready";
 
@@ -1188,9 +1277,14 @@ export default function CarerViewPage() {
   useEffect(() => {
     if (phase !== "ready") return;
     if (typeof window === "undefined") return;
-    if (window.location.hash !== "#carer-scenarios") return;
+    const hash = window.location.hash;
     requestAnimationFrame(() => {
-      document.getElementById("carer-scenarios")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (hash === "#carer-scenarios") {
+        document.getElementById("carer-scenarios")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+      if (hash === "#carer-sick-day-care") {
+        document.getElementById("carer-sick-day-care")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     });
   }, [phase, location]);
 
@@ -1380,6 +1474,16 @@ export default function CarerViewPage() {
   const scenarioLines = scenarioBannerLines(scenarioRows);
   const sickDayState = useMemo(() => sickDayScenarioState(scenarioRows), [scenarioRows]);
 
+  const carerHeaderContext = useMemo(
+    () =>
+      deriveCarerHeaderContext(
+        scopes.supplies ? supplies : [],
+        scopes.scenarios ? sickDayState : null,
+        scopes.scenarios ? scenarioRows : [],
+      ),
+    [scopes.supplies, scopes.scenarios, supplies, sickDayState, scenarioRows],
+  );
+
   const refreshScenarios = useCallback(async () => {
     if (!activeLink?.patientId) return;
     const sc = await fetchScenariosForLinkedPatient(activeLink.patientId);
@@ -1462,7 +1566,7 @@ export default function CarerViewPage() {
     <>
       {devOverlay}
       <PageShell variant="standard" className="max-w-3xl space-y-6 py-4">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 min-w-0">
               <div className="min-w-0">
@@ -1470,20 +1574,32 @@ export default function CarerViewPage() {
                   <Eye className="h-6 w-6 text-primary shrink-0" />
                   Supporter Mode
                 </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Read-only — you can view shared information and coordinate support.
-                </p>
               </div>
             </div>
 
-            <Badge variant="secondary" className="gap-1 shrink-0" aria-label="Read only">
-              <Eye className="h-3 w-3" />
-              Read only
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary px-2.5 py-1.5 text-xs font-medium text-secondary-foreground",
+                    "hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  )}
+                  aria-label="Read-only — you can view shared information and coordinate support."
+                  data-testid="button-carer-readonly-info"
+                >
+                  <Info className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                  Read-only
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[min(20rem,calc(100vw-2rem))] text-sm leading-snug">
+                Read-only — you can view shared information and coordinate support.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <Card className="border-border/60 shadow-sm" data-testid="carer-view-header">
-            <CardContent className="p-4 md:p-5 flex flex-col gap-4">
+            <CardContent className="p-4 md:p-5 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div
@@ -1514,6 +1630,43 @@ export default function CarerViewPage() {
                   </a>
                 )}
               </div>
+
+              <div
+                className={cn(
+                  "text-xs leading-snug",
+                  carerHeaderContext.glance.type === "warning"
+                    ? "text-red-700 dark:text-red-300"
+                    : carerHeaderContext.glance.type === "info"
+                      ? "text-amber-800 dark:text-amber-200"
+                      : "text-emerald-800 dark:text-emerald-200",
+                )}
+                data-testid="text-carer-glance"
+              >
+                {carerHeaderContext.glance.message}
+              </div>
+
+              {(scopes.scenarios ?? false) &&
+                (carerHeaderContext.showSickChip || carerHeaderContext.showTravelChip) && (
+                  <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-active-chips">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Active</span>
+                    {carerHeaderContext.showSickChip ? (
+                      <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                        <a href="#carer-sick-day-care" data-testid="chip-carer-sickday">
+                          <Thermometer className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" aria-hidden />
+                          Sick day
+                        </a>
+                      </Button>
+                    ) : null}
+                    {carerHeaderContext.showTravelChip ? (
+                      <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                        <a href="#carer-scenarios" data-testid="chip-carer-travel">
+                          <ArrowRight className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />
+                          Travel
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
             </CardContent>
           </Card>
 
@@ -1582,7 +1735,7 @@ export default function CarerViewPage() {
         </Alert>
       )}
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           <SectionHeading
             title="Now"
             subtitle="High-signal items that might need attention."
@@ -1629,7 +1782,7 @@ export default function CarerViewPage() {
             </Card>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             {(scopes.scenarios ?? false) && (
               <Card id="carer-scenarios" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-scenarios">
                 <CardHeader className="pb-2">
@@ -1664,11 +1817,13 @@ export default function CarerViewPage() {
             )}
 
             {(scopes.scenarios ?? false) && isSickDayScenarioActive(sickDayState) && activeLink?.patientId ? (
-              <SickDaySupporterCareCard
-                patientId={activeLink.patientId}
-                sickState={sickDayState}
-                onUpdated={refreshScenarios}
-              />
+              <div id="carer-sick-day-care" className="scroll-mt-24">
+                <SickDaySupporterCareCard
+                  patientId={activeLink.patientId}
+                  sickState={sickDayState}
+                  onUpdated={refreshScenarios}
+                />
+              </div>
             ) : null}
 
             {(scopes.supplies ?? false) && (
@@ -1764,7 +1919,7 @@ export default function CarerViewPage() {
         </div>
 
         {(scopes.appointments ?? false) && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <SectionHeading title="Upcoming" subtitle="Appointments coming up next." />
             <Card className="border-border/60 shadow-sm" data-testid="carer-view-appointments">
               <CardHeader className="pb-2">
@@ -1810,7 +1965,7 @@ export default function CarerViewPage() {
         )}
 
         {(scopes.emergency_info ?? false) && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <SectionHeading title="Reference" subtitle="Details for coordination and emergencies." />
             <Card id="carer-emergency" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-emergency">
               <CardHeader className="pb-2">
