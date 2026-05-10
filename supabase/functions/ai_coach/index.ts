@@ -239,6 +239,13 @@ function normalizePharmacyStatus(raw: unknown): {
   return { configured, openNow, nextOpensInMinutes, closesInMinutes, todaySummary, tomorrowSummary };
 }
 
+function clampCoachExerciseSessions14d(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  const v = Math.floor(raw);
+  // Cap so the context block stays bounded (no synced exercise table yet).
+  return Math.min(120, Math.max(0, v));
+}
+
 function isPharmacyHoursQuestion(message: string): boolean {
   const m = message.trim().toLowerCase();
   if (!m) return false;
@@ -352,11 +359,11 @@ Deno.serve(async (req: Request) => {
       ? (historyRaw.filter(isCoachTurn) as CoachTurn[])
       : [];
     /**
-     * Server hardening (Phase 3): we no longer trust `lastFortnight`,
-     * `dateOfBirth`, or `audience` from the request body. They are either
-     * derived from server-trusted state (profile / carer_links) or replaced
-     * with a zeroed placeholder so the model cannot be steered by client-
-     * supplied "history".
+     * Server hardening (Phase 3): we do not trust `lastFortnight`, `dateOfBirth`,
+     * or `audience` from the request body. Those are derived from server-trusted
+     * state (profile / carer_links / DB aggregates). The separate
+     * `exerciseSessions14d` field is the only activity count accepted from the
+     * device (clamped); exercise outcomes are not stored server-side yet.
      */
     const ratiosAreSet = Boolean(b.ratiosAreSet);
     const bgUnitsClient = normalizeBgUnits(b.bgUnits ?? b.bg_units);
@@ -554,18 +561,21 @@ Deno.serve(async (req: Request) => {
     const hasCarerLink = await callerHasCarerLink(admin, userId);
     const audience = deriveServerAudience(requestedAudience, hasCarerLink);
     /**
-     * `lastFortnight` is not read from the body (anti-tamper). Counts come from
-     * server-side `hypo_logs` in the last 14 days; supply shape from `supplies`.
+     * `lastFortnight` is built server-side from `hypo_logs`, `supplies`, and
+     * `scenarios`. `exerciseSessions14d` (device, clamped) is merged in because
+     * exercise is not synced to Postgres yet.
      */
     const [lastFortnightBase, suppliesSummary, scenarioFlags] = await Promise.all([
       loadCoachTrustedLastFortnight(admin, userId),
       loadCoachSuppliesSummary(admin, userId),
       loadCoachScenarioFlags(admin, userId),
     ]);
+    const exerciseFromDevice = clampCoachExerciseSessions14d(b.exerciseSessions14d);
     const lastFortnight = {
       ...lastFortnightBase,
       sickDayActive: scenarioFlags.sickDayActive,
       travelModeActive: scenarioFlags.travelModeActive,
+      exerciseSessions: exerciseFromDevice,
     };
     const context = packContext({
       profile: {

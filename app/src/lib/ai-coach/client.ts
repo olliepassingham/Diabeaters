@@ -53,6 +53,7 @@ export async function sendCoachMessage(args: {
     message: args.message.trim(),
     history: args.history.slice(-12),
     lastFortnight: payload.lastFortnight,
+    exerciseSessions14d: payload.lastFortnight.exerciseSessions,
     ratiosAreSet: payload.ratiosAreSet,
     bgUnits: payload.bgUnits,
     pharmacyStatus: payload.pharmacyStatus,

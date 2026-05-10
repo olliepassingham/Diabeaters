@@ -1869,14 +1869,6 @@ export const storage = {
     }
   },
 
-  markSupplyOrdered(id: string): Supply | null {
-    return this.updateSupply(id, { isOnOrder: true, orderedDate: new Date().toISOString() });
-  },
-
-  clearSupplyOrder(id: string): Supply | null {
-    return this.updateSupply(id, { isOnOrder: false, orderedDate: undefined });
-  },
-
   getItemDuration(type: Supply["type"]): number {
     const settings = this.getSettings();
     if (type === "cgm") return settings.cgmDays || 14;
@@ -1978,7 +1970,6 @@ export const storage = {
     collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[];
     skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[];
     travelExtras: { supply: Supply; extraNeeded: number; reason: string }[];
-    orderedSupplies: { supply: Supply; daysSinceOrder: number; estimatedCollectBy: number }[];
   } {
     const cycle = this.getPrescriptionCycle();
     const scenarioState = this.getScenarioState();
@@ -2012,61 +2003,17 @@ export const storage = {
     const collectSoon: { supply: Supply; daysUntilCollect: number; reason: string }[] = [];
     const skipSuggestions: { supply: Supply; daysRemaining: number; reason: string }[] = [];
     const travelExtras: { supply: Supply; extraNeeded: number; reason: string }[] = [];
-    const orderedSupplies: { supply: Supply; daysSinceOrder: number; estimatedCollectBy: number }[] = [];
 
     for (const supply of supplies) {
       const daysRemaining = this.getDaysRemaining(supply);
-      const adjustedQty = this.getAdjustedQuantity(supply);
 
-      if (supply.isOnOrder && supply.orderedDate) {
-        const orderDate = new Date(supply.orderedDate);
-        const today = new Date();
-        orderDate.setHours(0, 0, 0, 0);
-        today.setHours(0, 0, 0, 0);
-        const daysSinceOrder = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-        const daysUntilCollect = leadTime - daysSinceOrder;
-
-        orderedSupplies.push({
-          supply,
-          daysSinceOrder,
-          estimatedCollectBy: Math.max(0, daysUntilCollect),
-        });
-
-        const isOverdue = daysUntilCollect < 0;
-        const overdueDays = Math.abs(daysUntilCollect);
-
-        const orderedHint = isOverdue ? "" : pharmacyCollectByHint(Math.max(0, daysUntilCollect));
-
-        if (adjustedQty <= 0 || daysRemaining <= 0) {
-          collectSoon.push({
-            supply,
-            daysUntilCollect,
-            reason: isOverdue
-              ? `You're out of ${supply.name} — prescription should be ready (ordered ${overdueDays} day${overdueDays !== 1 ? "s" : ""} ago), collect now`
-              : `You're out of ${supply.name} — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}${orderedHint}`,
-          });
-        } else if (daysRemaining <= 3) {
-          collectSoon.push({
-            supply,
-            daysUntilCollect,
-            reason: isOverdue
-              ? `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — prescription should be ready, collect now`
-              : `Only ${daysRemaining} day${daysRemaining !== 1 ? "s" : ""} of ${supply.name} left — collect within ${daysUntilCollect} day${daysUntilCollect !== 1 ? "s" : ""}${orderedHint}`,
-          });
-        } else if (isOverdue) {
-          collectSoon.push({
-            supply,
-            daysUntilCollect,
-            reason: `${supply.name} prescription should be ready to collect (ordered ${daysSinceOrder} day${daysSinceOrder !== 1 ? "s" : ""} ago)`,
-          });
-        }
-      } else if (!supply.isOnOrder && daysRemaining <= 0) {
+      if (daysRemaining <= 0) {
         collectSoon.push({
           supply,
           daysUntilCollect: -1,
           reason: `You're out of ${supply.name} — order now`,
         });
-      } else if (!supply.isOnOrder && daysRemaining > 0 && daysRemaining <= leadTime) {
+      } else if (daysRemaining > 0 && daysRemaining <= leadTime) {
         const runOutHint = pharmacyCollectByHint(daysRemaining);
         collectSoon.push({
           supply,
@@ -2138,7 +2085,7 @@ export const storage = {
     collectSoon.sort((a, b) => a.daysUntilCollect - b.daysUntilCollect);
     skipSuggestions.sort((a, b) => b.daysRemaining - a.daysRemaining);
 
-    return { collectSoon, skipSuggestions, travelExtras, orderedSupplies };
+    return { collectSoon, skipSuggestions, travelExtras };
   },
 
   getEmergencyContacts(): EmergencyContact[] {

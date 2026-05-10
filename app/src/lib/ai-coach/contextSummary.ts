@@ -1,8 +1,10 @@
 /**
  * Builds a privacy-minimised summary still sent with the coach request for UI
- * parity and future use. The Edge Function does **not** trust client-reported
- * activity counts for the model: it recomputes hypo-related counts from
- * `hypo_logs` and supply shape from `supplies` using the authenticated user id.
+ * parity. The Edge Function does **not** trust client `lastFortnight` for the
+ * model: it recomputes hypo-related counts from `hypo_logs` and supply shape
+ * from `supplies` using the authenticated user id. It **does** take a separate
+ * clamped `exerciseSessions14d` hint (exercise is not in the DB yet) so
+ * activity counts can inform replies without exposing notes.
  * This module stays numbers/booleans only — no free-text notes, names, or
  * destinations.
  */

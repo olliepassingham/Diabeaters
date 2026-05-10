@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, ShoppingCart, CheckCircle2, X, Lightbulb, PackageCheck, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, CheckCircle2, X, Lightbulb, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -579,30 +579,6 @@ function PrescriptionCyclePanel({
               </div>
             )}
 
-            {advice.orderedSupplies.length > 0 && (
-              <div className="space-y-2" data-testid="section-ordered-supplies">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">On Order</p>
-                {advice.orderedSupplies.map(({ supply, daysSinceOrder, estimatedCollectBy }) => {
-                  const Icon = typeIcons[supply.type] || Package;
-                  const isReady = estimatedCollectBy === 0;
-                  return (
-                    <div key={supply.id} className={`flex items-center justify-between gap-2 p-2 rounded-lg ${isReady ? "bg-emerald-50 dark:bg-emerald-950/20" : "bg-blue-50 dark:bg-blue-950/20"}`} data-testid={`ordered-item-${supply.id}`}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Icon className={`h-3.5 w-3.5 shrink-0 ${isReady ? "text-emerald-600 dark:text-emerald-400" : "text-blue-600 dark:text-blue-400"}`} />
-                        <div className="min-w-0">
-                          <span className="text-sm truncate block">{supply.name}</span>
-                          <span className="text-xs text-muted-foreground">Ordered {daysSinceOrder === 0 ? "today" : `${daysSinceOrder}d ago`}</span>
-                        </div>
-                      </div>
-                      <Badge variant={isReady ? "default" : "secondary"} className="shrink-0 text-xs">
-                        {isReady ? "Ready to collect" : `~${estimatedCollectBy}d until ready`}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
             {advice.collectSoon.length > 0 && (
               <div className="space-y-2" data-testid="section-collect-soon">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Action Needed</p>
@@ -1101,8 +1077,6 @@ function SupplyCard({
   onDelete, 
   onAdjustQuantity,
   onLogPickup,
-  onMarkOrdered,
-  onClearOrder,
   onRefresh,
 }: { 
   supply: Supply; 
@@ -1117,12 +1091,9 @@ function SupplyCard({
     unitAmount: number;
   }) => void;
   onLogPickup: (supply: Supply) => void;
-  onMarkOrdered: (id: string) => void;
-  onClearOrder: (id: string) => void;
   onRefresh: () => void;
 }) {
   const actionRowRef = useRef<HTMLDivElement | null>(null);
-  const onOrderRef = useRef<HTMLDivElement | null>(null);
   const [nextActionNudge, setNextActionNudge] = useState(0);
 
   const adjustedQuantity = storage.getAdjustedQuantity(supply);
@@ -1161,15 +1132,13 @@ function SupplyCard({
   const stockNowInt = Math.max(0, Math.floor(adjustedQuantity));
   const nextAction =
     nextActionHint ??
-    (supply.isOnOrder
-      ? { label: "Ordered", tone: "blue" as const }
-      : daysRemaining !== 999 && daysRemaining <= 3
+    (daysRemaining !== 999 && daysRemaining <= 3
+      ? { label: "Reorder now", tone: "red" as const }
+      : status === "critical"
         ? { label: "Reorder now", tone: "red" as const }
-        : status === "critical"
-          ? { label: "Reorder now", tone: "red" as const }
-          : status === "low"
-            ? { label: "Reorder soon", tone: "amber" as const }
-            : { label: "OK", tone: "muted" as const });
+        : status === "low"
+          ? { label: "Reorder soon", tone: "amber" as const }
+          : { label: "OK", tone: "muted" as const });
 
   const nextActionBadgeClass =
     nextAction.tone === "red"
@@ -1419,7 +1388,7 @@ function SupplyCard({
               type="button"
               className="hidden sm:inline-flex"
               onClick={() => {
-                const target = supply.isOnOrder ? onOrderRef.current : actionRowRef.current;
+                const target = actionRowRef.current;
                 if (target) {
                   setNextActionNudge((n) => n + 1);
                   target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1472,7 +1441,7 @@ function SupplyCard({
             type="button"
             className="inline-flex"
             onClick={() => {
-              const target = supply.isOnOrder ? onOrderRef.current : actionRowRef.current;
+              const target = actionRowRef.current;
               if (target) {
                 setNextActionNudge((n) => n + 1);
                 target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1636,40 +1605,6 @@ function SupplyCard({
           </div>
         </details>
 
-        {supply.isOnOrder && (
-          <div
-            ref={onOrderRef}
-            className={[
-              "flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 mt-3 transition",
-              nextActionNudge > 0 ? "ring-2 ring-primary/20" : "",
-            ].join(" ")}
-            data-testid={`order-status-${supply.id}`}
-          >
-            <PackageCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-blue-800 dark:text-blue-300">
-                On order
-                {supply.orderedDate && (() => {
-                  const orderDate = new Date(supply.orderedDate);
-                  const today = new Date();
-                  orderDate.setHours(0, 0, 0, 0);
-                  today.setHours(0, 0, 0, 0);
-                  const days = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-                  return days === 0 ? " — ordered today" : ` — ordered ${days} day${days !== 1 ? "s" : ""} ago`;
-                })()}
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onClearOrder(supply.id)}
-              data-testid={`button-clear-order-${supply.id}`}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-
         <div
           ref={actionRowRef}
           className={[
@@ -1681,24 +1616,13 @@ function SupplyCard({
             <Button 
               variant="default" 
               size="sm" 
-              className="flex-1"
+              className="w-full"
               onClick={() => onLogPickup(supply)}
               data-testid={`button-refill-${supply.id}`}
             >
               <RotateCcw className="h-3 w-3 mr-1" />
               Refill
             </Button>
-            {!supply.isOnOrder && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onMarkOrdered(supply.id)}
-                data-testid={`button-mark-ordered-${supply.id}`}
-              >
-                <ShoppingCart className="h-3 w-3 mr-1" />
-                Ordered
-              </Button>
-            )}
           </div>
           {(() => {
             const inc = getSupplyIncrement(supply.type);
@@ -2152,9 +2076,10 @@ function RefillDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Refill {supply?.name}</DialogTitle>
+          <DialogTitle>Log pickup: {supply?.name}</DialogTitle>
           <DialogDescription>
-            Record your prescription refill. This resets your supply count and starts fresh tracking.
+            Use this when you have collected this item from the pharmacy. Enter how much you received — your stock and
+            pickup date update so forecasts stay accurate.
           </DialogDescription>
         </DialogHeader>
         
@@ -2163,13 +2088,13 @@ function RefillDialog({
             <CardContent className="p-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-medium">Quick refill</p>
+                  <p className="text-sm font-medium">Quick pickup</p>
                   <p className="text-xs text-muted-foreground">
                     Your usual: {supply?.typicalRefillQuantity} units
                   </p>
                 </div>
                 <Button onClick={handleQuickRefill} data-testid="button-quick-refill">
-                  Refill Now
+                  Log usual amount
                 </Button>
               </div>
             </CardContent>
@@ -2219,7 +2144,7 @@ function RefillDialog({
             disabled={parsedQty <= 0} 
             data-testid="button-confirm-pickup"
           >
-            Confirm Refill
+            Confirm pickup
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -2624,19 +2549,11 @@ export default function Supplies() {
     const map = new Map<string, { label: string; tone: "muted" | "amber" | "red" | "blue" }>();
 
     for (const { supply, daysUntilCollect } of advice.collectSoon) {
-      if (supply.isOnOrder) {
-        const urgent = daysUntilCollect <= 0;
-        map.set(supply.id, {
-          label: urgent ? "Collect now" : "Collect soon",
-          tone: urgent ? "red" : "blue",
-        });
-      } else {
-        const urgent = daysUntilCollect <= 0;
-        map.set(supply.id, {
-          label: urgent ? "Order now" : "Order soon",
-          tone: urgent ? "red" : "amber",
-        });
-      }
+      const urgent = daysUntilCollect <= 0;
+      map.set(supply.id, {
+        label: urgent ? "Order now" : "Order soon",
+        tone: urgent ? "red" : "amber",
+      });
     }
 
     return map;
@@ -2787,35 +2704,11 @@ export default function Supplies() {
       }
       storage.addPickupRecord(pickupSupply.id, pickupSupply.name, quantity);
       toast({ 
-        title: "Refill recorded", 
-        description: `${pickupSupply.name} refilled with ${quantity} units.${saveAsTypical ? " Saved as your typical amount." : ""}` 
+        title: "Pickup recorded", 
+        description: `${pickupSupply.name}: logged ${quantity} received from the pharmacy.${saveAsTypical ? " Saved as your usual amount." : ""}` 
       });
       refreshSupplies();
     }
-  };
-
-  const handleMarkOrdered = (id: string) => {
-    const updated = storage.markSupplyOrdered(id);
-    const supply = supplies.find(s => s.id === id);
-    if (updated) {
-      void maybeNotifyLowSupplies();
-      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
-    }
-    toast({
-      title: "Marked as ordered",
-      description: supply ? `${supply.name} marked as on order. We'll remind you when to collect.` : "Supply marked as on order.",
-    });
-    refreshSupplies();
-  };
-
-  const handleClearOrder = (id: string) => {
-    const updated = storage.clearSupplyOrder(id);
-    if (updated) {
-      void maybeNotifyLowSupplies();
-      void import("@/lib/supplies").then((m) => void m.syncToCloud(updated));
-    }
-    toast({ title: "Order cleared" });
-    refreshSupplies();
   };
 
   const filterByType = (type: string) => {
@@ -3144,8 +3037,6 @@ export default function Supplies() {
                       onDelete={handleDelete}
                       onAdjustQuantity={handleAdjustQuantity}
                       onLogPickup={handleLogPickup}
-                      onMarkOrdered={handleMarkOrdered}
-                      onClearOrder={handleClearOrder}
                       onRefresh={() => setSupplies(storage.getSupplies())}
                     />
                   </div>
