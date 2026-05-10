@@ -20,6 +20,7 @@ import { FaceLogo } from "@/components/face-logo";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { useProfile } from "@/lib/profile";
@@ -93,7 +94,7 @@ export function AppSidebar() {
         items.push({ title: "Feed", url: "/community", icon: Users });
       }
       if (isAiCoachEnabled) {
-        items.push({ title: "Coach", url: "/coach", icon: MessageCircle });
+        items.push({ title: AI_ASSISTANT_NAME, url: "/coach", icon: MessageCircle });
       }
       items.push(
         { title: "Account", url: "/account", icon: User },

@@ -696,7 +696,7 @@ export default function Account() {
                   {import.meta.env.DEV ? (
                     <>
                       Add{" "}
-                      <code className="text-xs">VITE_SUPPORT_EMAIL=your@email.com</code> to repo{" "}
+                      <code className="text-xs">VITE_SUPPORT_EMAIL=info@diabeaters.world</code> to repo{" "}
                       <code className="text-xs">.env.local</code> (then restart the dev server) for Gmail and default-mail
                       links. &quot;Send deletion request&quot; still works without it. You can still copy the text below.
                     </>

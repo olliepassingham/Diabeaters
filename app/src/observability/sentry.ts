@@ -95,3 +95,25 @@ export function captureException(err: unknown) {
   Sentry.captureException(err);
 }
 
+/**
+ * Lightweight observability for Beatie (`ai_coach`) send failures — no user message text.
+ * Uses tags + context; keep `detail` short and non-sensitive.
+ */
+export function captureAiCoachSendFailure(input: {
+  errorType: "http" | "network" | "unknown";
+  status?: number;
+  /** Short scrubbed server/client fragment only */
+  detail?: string;
+}) {
+  if (!DSN) return;
+  const detail = input.detail ? scrubText(input.detail).slice(0, 240) : undefined;
+  Sentry.withScope((scope) => {
+    scope.setTag("feature", "ai_coach");
+    scope.setTag("ai_coach.error_type", input.errorType);
+    if (input.status != null) scope.setTag("ai_coach.http_status", String(input.status));
+    scope.setContext("ai_coach", { detail: detail ?? "" });
+    const level = input.errorType === "network" ? "error" : "warning";
+    Sentry.captureMessage(`ai_coach send failed (${input.errorType})`, level);
+  });
+}
+

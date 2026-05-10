@@ -28,6 +28,8 @@ export async function sendCoachMessage(args: {
   history: CoachTurn[];
   /** Defaults to `"patient"` when omitted (matches server default). */
   audience?: CoachAudience;
+  /** When aborted, `fetch` rejects; callers should ignore user-cancelled sends. */
+  signal?: AbortSignal;
 }): Promise<CoachResponse> {
   const supabase = getSupabase();
   if (!supabase) {
@@ -69,8 +71,12 @@ export async function sendCoachMessage(args: {
         Authorization: auth.Authorization,
       },
       body: JSON.stringify(body),
+      signal: args.signal,
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw e;
+    }
     let host = "";
     try {
       host = new URL(url).hostname;
@@ -79,7 +85,7 @@ export async function sendCoachMessage(args: {
     }
     throw new Error(
       [
-        "Could not reach the coach API.",
+        "Could not reach the Beatie service (network).",
         host ? `Supabase host in this build: ${host}.` : "",
         "Deploy Edge Function ai_coach on that Supabase project (same project as this URL).",
         "The store app loads diabeaters.vercel.app — set Vercel Production VITE_SUPABASE_URL to that project, redeploy Vercel, then rebuild/sync the native app.",

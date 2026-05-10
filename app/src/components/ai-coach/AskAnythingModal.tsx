@@ -4,13 +4,14 @@ import { Link, useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Info } from "lucide-react";
 import { buildCoachHref } from "@/lib/ai-coach/links";
 import type { CoachTopicSlug } from "@/lib/ai-coach/topics";
 import type { CoachAudience } from "@/lib/ai-coach/types";
@@ -63,13 +64,17 @@ export function AskAnythingModal({ open, onOpenChange, audience, source }: AskAn
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-testid="dialog-ask-anything">
+      <DialogContent className="max-w-md" data-testid="dialog-ask-anything" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{askAssistantModalTitle()}</DialogTitle>
-          <DialogDescription>
-            Anything about type 1 diabetes — clinic prep, sick day, supplies, travel, exercise.
-          </DialogDescription>
         </DialogHeader>
+        <Alert className="border-border/60">
+          <Info className="h-4 w-4" aria-hidden />
+          <AlertTitle className="text-foreground">What you can ask</AlertTitle>
+          <AlertDescription>
+            Anything about type 1 diabetes — clinic prep, sick day, supplies, travel, exercise.
+          </AlertDescription>
+        </Alert>
         <div className="space-y-3">
           <Textarea
             value={draft}
@@ -95,13 +100,17 @@ export function AskAnythingModal({ open, onOpenChange, audience, source }: AskAn
               </Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Educational only — for urgent symptoms,{" "}
-            <Link href="/help-now" className="underline underline-offset-2">
-              open Help Now
-            </Link>
-            .
-          </p>
+          <Alert variant="default" className="border-border/55 bg-muted/15">
+            <Info className="h-4 w-4" aria-hidden />
+            <AlertTitle className="sr-only">Safety</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground">
+              Educational only — for urgent symptoms,{" "}
+              <Link href="/help-now" className="font-medium text-foreground underline underline-offset-2">
+                open Help Now
+              </Link>
+              .
+            </AlertDescription>
+          </Alert>
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

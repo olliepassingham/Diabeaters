@@ -39,7 +39,7 @@ const AI_COACH_CONSENT_VERSION = "2026-05-07";
 
 const CONSENT_REQUIRED_REPLY: CoachReply = {
   reply:
-    "To chat with Coach, please accept the consent screen in the app first. That tells you how your messages are processed and that this is educational support only, not medical advice.",
+    "To chat with Beatie, please accept the consent screen in the app first. That tells you how your messages are processed and that this is educational support only, not medical advice.",
   suggestedQuestions: [],
   suggestedNextActions: [],
   deferToTeam: false,
@@ -47,7 +47,7 @@ const CONSENT_REQUIRED_REPLY: CoachReply = {
 
 const RATE_LIMIT_REPLY: CoachReply = {
   reply:
-    "You have reached the daily message limit for Coach. Please try again tomorrow, or use Help Now or your diabetes team if you need urgent support.",
+    "You have reached the daily message limit for Beatie. Please try again tomorrow, or use Help Now or your diabetes team if you need urgent support.",
   suggestedQuestions: [],
   suggestedNextActions: [{ label: "Open Help Now", href: "/help-now" }],
   deferToTeam: true,

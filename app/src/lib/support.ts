@@ -1,10 +1,13 @@
 /**
  * Public support contact for in-app mailto and copy-to-clipboard flows.
- * Set `VITE_SUPPORT_EMAIL` in the Vite env for production builds.
+ * Override with `VITE_SUPPORT_EMAIL` in the Vite env when a deployment needs a different address.
  */
+const DEFAULT_SUPPORT_EMAIL = "info@diabeaters.world";
+
 export function getSupportEmail(): string {
   const v = import.meta.env.VITE_SUPPORT_EMAIL;
-  return typeof v === "string" && v.trim() ? v.trim() : "";
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return DEFAULT_SUPPORT_EMAIL;
 }
 
 export const ACCOUNT_DELETION_EMAIL_SUBJECT = "Account deletion request";

@@ -1,5 +1,6 @@
 import { Home, MessageCircle, Shapes, Users, Wrench, User } from "lucide-react";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
@@ -132,7 +133,7 @@ function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
   }
   if (isAiCoachEnabled) {
     tabs.push({
-      title: "Coach",
+      title: AI_ASSISTANT_NAME,
       href: "/coach",
       icon: MessageCircle,
       testId: "bottomnav-coach",

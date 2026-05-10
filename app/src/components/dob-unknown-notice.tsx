@@ -5,10 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DIABEATER_SETTINGS_CHANGED_EVENT, storage } from "@/lib/storage";
 import { isDateOfBirthUnknown } from "@/lib/user-age";
 import { cn } from "@/lib/utils";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 
 const DEFAULT_TITLE = "Add your date of birth to unlock adult-only sections";
-const DEFAULT_BODY =
-  "Until we know your age, the app keeps adult-only screens like alcohol and driving guidance turned off, and Coach uses the same boundary.";
+
+function defaultDobUnknownBody(): string {
+  return `Until we know your age, the app keeps adult-only screens like alcohol and driving guidance turned off, and ${AI_ASSISTANT_NAME} uses the same boundary.`;
+}
 
 export type DobUnknownNoticeProps = {
   title?: string;
@@ -22,19 +25,20 @@ export type DobUnknownNoticeProps = {
 
 /**
  * Default-deny inline CTA shown when the profile has no usable date of birth.
- * Adult-only routes (alcohol, driving) and Coach treat unknown DOB the same as
+ * Adult-only routes (alcohol, driving) and the in-app assistant treat unknown DOB the same as
  * `under-18`, so this nudge gives users a clear, low-friction way to unlock
  * the right experience for their age.
  */
 export function DobUnknownNotice({
   title = DEFAULT_TITLE,
-  body = DEFAULT_BODY,
+  body,
   ctaLabel = "Add date of birth",
   testId = "dob-unknown-notice",
   className,
   hidden,
 }: DobUnknownNoticeProps) {
   const [localDob, setLocalDob] = useState<string | null | undefined>(undefined);
+  const resolvedBody = body ?? defaultDobUnknownBody();
 
   useEffect(() => {
     setLocalDob(storage.getProfile()?.dateOfBirth ?? null);
@@ -67,7 +71,7 @@ export function DobUnknownNotice({
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <p className="text-sm font-medium text-foreground">{title}</p>
-            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{body}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{resolvedBody}</p>
             <Link
               href="/settings#settings-dob"
               className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"

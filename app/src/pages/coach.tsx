@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Loader2, Send } from "lucide-react";
+import { ChevronRight, Info, Loader2, Send } from "lucide-react";
 
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,9 +12,10 @@ import { useAuth } from "@/lib/auth-context";
 import { getSupabase } from "@/lib/supabase";
 import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
+import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
-import { AI_ASSISTANT_NAME, coachPageTitle } from "@/lib/ai-coach/persona";
+import { AI_ASSISTANT_NAME, coachPageSubtitle, coachPageTitle } from "@/lib/ai-coach/persona";
 import { recordLastInteraction } from "@/lib/last-interaction";
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
@@ -187,9 +188,28 @@ export default function CoachPage() {
     },
   });
 
+  const [retryableMessage, setRetryableMessage] = useState<string | null>(null);
+  const sendAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      sendAbortRef.current?.abort();
+    };
+  }, []);
+
   const sendMutation = useMutation({
-    mutationFn: async (payload: { message: string; history: CoachTurn[]; audience: CoachAudience }) => {
-      return sendCoachMessage(payload);
+    mutationFn: async (payload: {
+      message: string;
+      history: CoachTurn[];
+      audience: CoachAudience;
+      signal: AbortSignal;
+    }) => {
+      return sendCoachMessage({
+        message: payload.message,
+        history: payload.history,
+        audience: payload.audience,
+        signal: payload.signal,
+      });
     },
     onSuccess: (data) => {
       if (data.category !== "consent_required") {
@@ -200,7 +220,18 @@ export default function CoachPage() {
       setSendError(null);
     },
     onError: (e: unknown) => {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setSendError(coachSendErrorMessage(e));
+      if (e instanceof AiCoachHttpError) {
+        captureAiCoachSendFailure({ errorType: "http", status: e.status, detail: e.message });
+      } else if (e instanceof Error && e.message.includes("Could not reach the Beatie service")) {
+        captureAiCoachSendFailure({ errorType: "network", detail: e.message });
+      } else {
+        captureAiCoachSendFailure({
+          errorType: "unknown",
+          detail: e instanceof Error ? e.message : String(e),
+        });
+      }
     },
   });
 
@@ -208,40 +239,73 @@ export default function CoachPage() {
     saveStoredCoachState(messages);
   }, [messages]);
 
-  const onSend = useCallback(async () => {
-    const text = draft.trim();
-    if (!text || sendMutation.isPending || !hasConsent) return;
+  const sendCoachTurn = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || sendMutation.isPending || !hasConsent) return;
 
-    const historyForApi = messages;
-    setDraft("");
-    setMessages((m) => [...m, { role: "user", content: text }]);
-    setLastReply(null);
+      sendAbortRef.current?.abort();
+      const ac = new AbortController();
+      sendAbortRef.current = ac;
 
-    try {
-      const data = await sendMutation.mutateAsync({ message: text, history: historyForApi, audience });
-      if (data.category === "consent_required") {
+      setSendError(null);
+      const historyForApi = messages;
+      setDraft("");
+      setMessages((m) => [...m, { role: "user", content: trimmed }]);
+      setLastReply(null);
+      setRetryableMessage(null);
+
+      try {
+        const data = await sendMutation.mutateAsync({
+          message: trimmed,
+          history: historyForApi,
+          audience,
+          signal: ac.signal,
+        });
+        if (data.category === "consent_required") {
+          setMessages((m) => m.slice(0, -1));
+          setDraft(trimmed);
+          setConsentStep(0);
+          queryClient.setQueryData(coachConsentQueryKey(user?.id), null);
+          void queryClient.invalidateQueries({ queryKey: coachConsentQueryKey(user?.id) });
+          setSendError(
+            `The server has no ${AI_ASSISTANT_NAME} consent on file for your account. Complete “Before you start” again — this is normal right after a consent update on the server, or if consent never saved.`,
+          );
+          setRetryableMessage(null);
+          return;
+        }
+        recordLastInteraction("coach");
+        setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          setMessages((m) => m.slice(0, -1));
+          setDraft(trimmed);
+          return;
+        }
         setMessages((m) => m.slice(0, -1));
-        setDraft(text);
-        setConsentStep(0);
-        queryClient.setQueryData(coachConsentQueryKey(user?.id), null);
-        void queryClient.invalidateQueries({ queryKey: coachConsentQueryKey(user?.id) });
-        setSendError(
-          `The server has no ${AI_ASSISTANT_NAME} consent on file for your account. Complete “Before you start” again — this is normal right after the coach database migration, or if consent never saved.`,
-        );
-        return;
+        setDraft(trimmed);
+        setRetryableMessage(trimmed);
       }
-      recordLastInteraction("coach");
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
-    } catch {
-      setMessages((m) => m.slice(0, -1));
-      setDraft(text);
-    }
-  }, [audience, draft, hasConsent, messages, queryClient, sendMutation, user?.id]);
+    },
+    [audience, hasConsent, messages, queryClient, sendMutation, user?.id],
+  );
+
+  const onSend = useCallback(() => {
+    void sendCoachTurn(draft);
+  }, [draft, sendCoachTurn]);
+
+  const onRetrySend = useCallback(() => {
+    const t = retryableMessage?.trim();
+    if (!t || sendMutation.isPending || !hasConsent) return;
+    setSendError(null);
+    void sendCoachTurn(t);
+  }, [hasConsent, retryableMessage, sendCoachTurn, sendMutation.isPending]);
 
   const clearChat = useCallback(() => {
     setMessages([]);
     setLastReply(null);
     setSendError(null);
+    setRetryableMessage(null);
     try {
       localStorage.removeItem(CHAT_STORAGE_KEY_V2);
       localStorage.removeItem(CHAT_STORAGE_KEY_V1);
@@ -258,28 +322,37 @@ export default function CoachPage() {
 
   if (!supabase || !user) {
     return (
-      <PageShell>
+      <PageShell density="compact" className="pb-4">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <p className="text-sm text-muted-foreground">Sign in to use the coach.</p>
+        <Card className="border-border/60">
+          <CardContent className="flex gap-3 pt-6">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Sign in to chat with {AI_ASSISTANT_NAME}.
+            </p>
+          </CardContent>
+        </Card>
       </PageShell>
     );
   }
 
   if (consentQuery.isLoading) {
     return (
-      <PageShell>
+      <PageShell density="compact" className="pb-4">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Loading…
-        </div>
+        <Card className="border-border/60">
+          <CardContent className="flex items-center gap-2 pt-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            Loading…
+          </CardContent>
+        </Card>
       </PageShell>
     );
   }
 
   if (!hasConsent) {
     return (
-      <PageShell>
+      <PageShell density="compact" className="pb-4">
         <PageHeader title={pageTitle} leading={<PageBackButton />} />
         <Card className="max-w-lg">
           <CardHeader>
@@ -320,7 +393,11 @@ export default function CoachPage() {
               </>
             ) : (
               <>
-                <p>{intro}</p>
+                <Alert className="border-border/60 bg-muted/20">
+                  <Info className="h-4 w-4" aria-hidden />
+                  <AlertTitle className="text-foreground">How replies are generated</AlertTitle>
+                  <AlertDescription className="text-muted-foreground">{intro}</AlertDescription>
+                </Alert>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -361,11 +438,41 @@ export default function CoachPage() {
   return (
     <PageShell density="compact" className="flex min-h-0 flex-col pb-2">
       <PageHeader title={pageTitle} leading={<PageBackButton />} />
+      <Card className="shrink-0 border-border/60 bg-muted/15 shadow-sm dark:bg-muted/10">
+        <CardContent className="flex gap-3 py-3 sm:py-4">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <div className="min-w-0 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            <p>{coachPageSubtitle(isSupporter ? "supporter" : "patient")}</p>
+            {effectiveTopic !== "general" ? (
+              <p>
+                <span className="font-medium text-foreground">Topic</span>
+                <span className="text-muted-foreground"> · </span>
+                {topicCfg.label}
+              </p>
+            ) : null}
+            {messages.length === 0 && effectiveTopic !== "general" ? <p>{topicCfg.emptyHint}</p> : null}
+          </div>
+        </CardContent>
+      </Card>
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {sendError ? (
           <Alert variant="destructive" className="shrink-0">
             <AlertTitle>Could not send</AlertTitle>
-            <AlertDescription className="text-xs">{sendError}</AlertDescription>
+            <AlertDescription className="flex flex-col gap-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+              <span className="min-w-0 flex-1">{sendError}</span>
+              {retryableMessage?.trim() ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-9 shrink-0 self-start sm:self-center"
+                  disabled={sendMutation.isPending}
+                  onClick={() => void onRetrySend()}
+                >
+                  Retry
+                </Button>
+              ) : null}
+            </AlertDescription>
           </Alert>
         ) : null}
 
@@ -379,25 +486,20 @@ export default function CoachPage() {
             role="log"
             aria-live="polite"
           >
-            {messages.length === 0 ? (
-              <div className="space-y-4 py-1">
-                <p className="text-sm leading-relaxed text-muted-foreground">{topicCfg.emptyHint}</p>
-                {topicCfg.starters.length > 0 ? (
-                  <div className="flex flex-wrap gap-2" role="group" aria-label="Suggested prompts">
-                    {topicCfg.starters.map((q) => (
-                      <Button
-                        key={q}
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="h-auto min-h-10 max-w-full rounded-xl whitespace-normal border border-border/60 bg-background/80 text-left text-xs font-normal shadow-sm backdrop-blur-sm"
-                        onClick={() => setDraft(q)}
-                      >
-                        {q}
-                      </Button>
-                    ))}
-                  </div>
-                ) : null}
+            {messages.length === 0 && topicCfg.starters.length > 0 ? (
+              <div className="flex flex-wrap gap-2 py-1" role="group" aria-label="Suggested prompts">
+                {topicCfg.starters.map((q) => (
+                  <Button
+                    key={q}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="h-auto min-h-10 max-w-full rounded-xl whitespace-normal border border-border/60 bg-background/80 text-left text-xs font-normal shadow-sm backdrop-blur-sm"
+                    onClick={() => setDraft(q)}
+                  >
+                    {q}
+                  </Button>
+                ))}
               </div>
             ) : null}
             {messages.map((m, i) => (
@@ -427,9 +529,10 @@ export default function CoachPage() {
             className="rounded-2xl border border-border/60 bg-muted/25 p-3 shadow-sm dark:bg-muted/15"
             data-testid="coach-suggested-actions"
           >
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Open in the app
-            </p>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Info className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+              <span>Open in the app</span>
+            </div>
             <div className="flex flex-col gap-2">
               {lastReply.suggestedNextActions.map((a) => (
                 <Button
@@ -450,20 +553,28 @@ export default function CoachPage() {
         ) : null}
 
         {lastReply && lastReply.suggestedQuestions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {lastReply.suggestedQuestions.map((q) => (
-              <Button
-                key={q}
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs font-normal"
-                onClick={() => setDraft(q)}
-              >
-                {q}
-              </Button>
-            ))}
-          </div>
+          <Card className="shrink-0 border-border/60 shadow-sm">
+            <CardHeader className="space-y-0 pb-2 pt-4">
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <CardTitle className="text-sm font-semibold leading-none">Try asking next</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2 pb-4 pt-0">
+              {lastReply.suggestedQuestions.map((q) => (
+                <Button
+                  key={q}
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-auto min-h-9 max-w-full whitespace-normal text-left text-xs font-normal"
+                  onClick={() => setDraft(q)}
+                >
+                  {q}
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
         ) : null}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
@@ -498,32 +609,35 @@ export default function CoachPage() {
           </Button>
         </div>
 
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <p>After 2 hours without a new message, this thread clears on this device.</p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <button type="button" className="underline underline-offset-2" onClick={clearChat}>
-              Delete chat history now
-            </button>
-            <span aria-hidden>·</span>
-            <Link href="/privacy" className="underline underline-offset-2">
-              Privacy
-            </Link>
-          </div>
-        </div>
-
-        <aside
-          className="mt-4 rounded-xl border border-border/60 bg-muted/15 px-3 py-3 text-center sm:text-left dark:bg-muted/10"
-          aria-label="Educational disclaimer"
-        >
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Educational only</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Not medical advice. For urgent symptoms,{" "}
-            <Link href="/help-now" className="font-medium text-foreground underline underline-offset-2">
-              open Help Now
-            </Link>
-            .
-          </p>
-        </aside>
+        <Card className="shrink-0 border-border/60 bg-muted/10 shadow-sm dark:bg-muted/5">
+          <CardHeader className="space-y-0 pb-2 pt-4">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              <CardTitle className="text-sm font-semibold leading-none">About this chat</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pb-4 pt-0 text-xs leading-relaxed text-muted-foreground">
+            <p>
+              <span className="font-medium uppercase tracking-wide text-foreground/90">Educational only</span>
+              {" · "}
+              Not medical advice. For urgent symptoms,{" "}
+              <Link href="/help-now" className="font-medium text-foreground underline underline-offset-2">
+                open Help Now
+              </Link>
+              .
+            </p>
+            <p>After 2 hours without a new message, this thread clears on this device.</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <button type="button" className="font-medium text-foreground underline underline-offset-2" onClick={clearChat}>
+                Delete chat history now
+              </button>
+              <span aria-hidden>·</span>
+              <Link href="/privacy" className="font-medium text-foreground underline underline-offset-2">
+                Privacy
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </PageShell>
   );
