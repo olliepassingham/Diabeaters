@@ -39,6 +39,21 @@ export function iosPushDeliveryConfigured(): boolean {
   return apnsDirectConfigured() || pushRelayConfigured();
 }
 
+/** Values the Edge runtime uses for direct APNs (for `notify_push_test` diagnostics). */
+export function getApnsEdgeSendContext(): {
+  environment: "sandbox" | "production";
+  bundleId: string;
+  host: string;
+} {
+  const useSandbox = (Deno.env.get("APNS_USE_SANDBOX") ?? "").trim().toLowerCase() === "true";
+  const bundleId = Deno.env.get("APNS_BUNDLE_ID")?.trim() || "com.passingtime.diabeaters";
+  return {
+    environment: useSandbox ? "sandbox" : "production",
+    bundleId,
+    host: useSandbox ? "api.sandbox.push.apple.com" : "api.push.apple.com",
+  };
+}
+
 function normalizeP8(raw: string): string {
   return raw.trim().replace(/\\n/g, "\n");
 }

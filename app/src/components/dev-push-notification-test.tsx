@@ -17,11 +17,21 @@ function deliveryFailureHint(r: {
   delivered_push?: number;
   tokens?: number;
   success?: boolean;
+  apns_environment?: string;
+  apns_bundle_id?: string;
+  apns_host?: string;
 }): string | null {
   if (!r.success || (r.delivered_push ?? 0) > 0 || (r.tokens ?? 0) < 1) return null;
   const d = r.detail ?? "";
+  const bundle = r.apns_bundle_id ?? "com.passingtime.diabeaters";
   if (d.includes("BadDeviceToken") || d.includes("Unregistered")) {
-    return "\nAPNs rejected the device token (environment mismatch is common): TestFlight and App Store builds use production APNs — in Supabase Edge secrets set APNS_USE_SANDBOX unset or \"false\". Xcode installs from your Mac usually need APNS_USE_SANDBOX=true. After changing secrets, remove your stale row in push_tokens if needed, then reopen the app to register a fresh token.";
+    if (r.apns_environment === "sandbox") {
+      return `\nSupabase is using **sandbox** APNs (host ${r.apns_host ?? "sandbox"}). TestFlight and App Store need **production**. Remove secret APNS_USE_SANDBOX or set it to false, redeploy notify_push_test, delete your push_tokens row, force-quit the app, reopen, then try again.`;
+    }
+    if (r.apns_environment === "production") {
+      return `\nSupabase is using **production** APNs (topic ${bundle}). If this build is from **Xcode Run**, set APNS_USE_SANDBOX=true, redeploy, clear push_tokens, reopen. If **TestFlight/App Store**, confirm Apple App ID ${bundle} has Push, and APNS_TEAM_ID / APNS_KEY_ID / APNS_PRIVATE_KEY (.p8) belong to the **same** Apple Developer team as the app; fix any mismatch, redeploy, clear push_tokens, reopen.`;
+    }
+    return "\nAPNs rejected the device token. Check APNS_USE_SANDBOX vs install type (Xcode vs TestFlight), APNS_BUNDLE_ID, and Apple key/team; then delete push_tokens and reopen after redeploying notify_push_test.";
   }
   if (d.includes("TopicDisallowed") || d.includes("DeviceTokenNotForTopic")) {
     return "\nCheck APNS_BUNDLE_ID matches the app bundle id (default com.passingtime.diabeaters).";
@@ -70,6 +80,9 @@ export function DevPushNotificationTestPanel() {
         `success: ${r.success}`,
         r.error ? `error: ${r.error}` : null,
         r.failure_channel ? `failure_channel: ${r.failure_channel}` : null,
+        r.apns_environment ? `apns_environment: ${r.apns_environment}` : null,
+        r.apns_host ? `apns_host: ${r.apns_host}` : null,
+        r.apns_bundle_id ? `apns_bundle_id: ${r.apns_bundle_id}` : null,
         r.http_status != null ? `http_status: ${r.http_status}` : null,
         r.detail ? `detail: ${r.detail}` : null,
         r.tokens != null ? `tokens: ${r.tokens}` : null,

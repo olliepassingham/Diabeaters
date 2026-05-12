@@ -16,8 +16,10 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
+  apnsDirectConfigured,
   type DeliverIosPushResult,
   deliverIosPushToDevice,
+  getApnsEdgeSendContext,
   iosPushDeliveryConfigured,
 } from "../_shared/deliver-ios-push.ts";
 
@@ -117,6 +119,12 @@ Deno.serve(async (req: Request) => {
       out.detail = lastFailure.errorBody ?? null;
       if ("httpStatus" in lastFailure && lastFailure.httpStatus !== undefined) {
         out.http_status = lastFailure.httpStatus;
+      }
+      if (apnsDirectConfigured()) {
+        const ctx = getApnsEdgeSendContext();
+        out.apns_environment = ctx.environment;
+        out.apns_bundle_id = ctx.bundleId;
+        out.apns_host = ctx.host;
       }
     }
 

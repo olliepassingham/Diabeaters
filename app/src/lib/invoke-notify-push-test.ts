@@ -13,6 +13,9 @@ export async function invokeNotifyPushTest(): Promise<{
   delivered_push?: number;
   http_status?: number;
   failure_channel?: string;
+  apns_environment?: string;
+  apns_bundle_id?: string;
+  apns_host?: string;
 }> {
   const supabase = getSupabase();
   const env = getSupabaseUrlAndAnonKey();
@@ -29,6 +32,9 @@ export async function invokeNotifyPushTest(): Promise<{
     delivered_push?: number;
     http_status?: number;
     failure_channel?: string;
+    apns_environment?: string;
+    apns_bundle_id?: string;
+    apns_host?: string;
   }>("notify_push_test", {}, env, headers);
 
   if (error) {
@@ -45,6 +51,9 @@ export async function invokeNotifyPushTest(): Promise<{
         delivered_push?: number;
         http_status?: number;
         failure_channel?: string;
+        apns_environment?: string;
+        apns_bundle_id?: string;
+        apns_host?: string;
       }
     | null;
   if (!payload || typeof payload.success !== "boolean") {
@@ -59,6 +68,9 @@ export async function invokeNotifyPushTest(): Promise<{
     delivered_push: payload.delivered_push,
     http_status: payload.http_status,
     failure_channel: payload.failure_channel,
+    apns_environment: payload.apns_environment,
+    apns_bundle_id: payload.apns_bundle_id,
+    apns_host: payload.apns_host,
   };
 }
 
