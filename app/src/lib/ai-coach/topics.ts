@@ -123,7 +123,7 @@ const TOPIC_CONFIG: Record<
   supporter: {
     label: "Supporter",
     emptyHint:
-      "General education for someone supporting an adult with type 1 diabetes in the UK. Not personal medical advice for them — never override their plan or care team.",
+      "General education for someone supporting a person with type 1 diabetes in the UK. Not personal medical advice for them — never override their plan or care team.",
     starters: [
       "How can I support someone going through a hypo without taking over their plan?",
       "What questions could I prepare for a clinic visit on their behalf?",

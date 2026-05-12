@@ -9,13 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { getPatientClinicalPrefsForCarer } from "@/lib/carers";
 import { getSupabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
+import { getAgeBand } from "@/lib/user-age";
 import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
-import { AI_ASSISTANT_NAME, coachPageSubtitle, coachPageTitle } from "@/lib/ai-coach/persona";
+import {
+  AI_ASSISTANT_NAME,
+  coachPageSubtitle,
+  coachPageTitle,
+  coachSupporterHeaderLead,
+  coachSupporterTopicScopeHint,
+} from "@/lib/ai-coach/persona";
 import { recordLastInteraction } from "@/lib/last-interaction";
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
@@ -132,6 +142,41 @@ export default function CoachPage() {
   const effectiveTopic = topicSlug ?? (isSupporter ? "supporter" : "general");
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
   const pageTitle = coachPageTitle(isSupporter ? "supporter" : "patient");
+
+  const { linked, isCarer } = useLinkedCarer();
+
+  const patientDobForSupporterCoach = useQuery({
+    queryKey: ["coachSupporterPatientDob", linked?.patientId],
+    enabled: Boolean(isSupporter && supabase && user?.id && isCarer && linked?.patientId),
+    queryFn: async () => {
+      const r = await getPatientClinicalPrefsForCarer(linked!.patientId);
+      if (r.error) throw r.error;
+      return r.data?.date_of_birth ?? null;
+    },
+    staleTime: 60_000,
+  });
+
+  const supportedPersonAgeBand = useMemo(() => {
+    if (!isSupporter) return "adult";
+    if (isCarer && linked?.patientId) {
+      if (patientDobForSupporterCoach.isPending) return "unknown";
+      if (patientDobForSupporterCoach.isError) return "unknown";
+      return getAgeBand(patientDobForSupporterCoach.data ?? null);
+    }
+    return getAgeBand(storage.getProfile()?.dateOfBirth);
+  }, [
+    isSupporter,
+    isCarer,
+    linked?.patientId,
+    patientDobForSupporterCoach.isPending,
+    patientDobForSupporterCoach.isError,
+    patientDobForSupporterCoach.data,
+  ]);
+
+  const supporterTopicScopeHintText = useMemo(() => {
+    if (!isSupporter) return "";
+    return coachSupporterTopicScopeHint(supportedPersonAgeBand);
+  }, [isSupporter, supportedPersonAgeBand]);
 
   const [messages, setMessages] = useState<CoachTurn[]>(() => loadInitialMessages());
   const [draft, setDraft] = useState("");
@@ -439,19 +484,55 @@ export default function CoachPage() {
     <PageShell density="compact" className="flex min-h-0 flex-col pb-2">
       <PageHeader title={pageTitle} leading={<PageBackButton />} />
       <Card className="shrink-0 border-border/60 bg-muted/15 shadow-sm dark:bg-muted/10">
-        <CardContent className="flex gap-3 py-3 sm:py-4">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <div className="min-w-0 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            <p>{coachPageSubtitle(isSupporter ? "supporter" : "patient")}</p>
-            {effectiveTopic !== "general" ? (
-              <p>
-                <span className="font-medium text-foreground">Topic</span>
-                <span className="text-muted-foreground"> · </span>
-                {topicCfg.label}
-              </p>
-            ) : null}
-            {messages.length === 0 && effectiveTopic !== "general" ? <p>{topicCfg.emptyHint}</p> : null}
-          </div>
+        <CardContent
+          className={isSupporter ? "flex gap-2 py-2 pl-3 pr-2 sm:pl-4" : "flex gap-3 py-3 sm:py-4"}
+        >
+          <Info
+            className={
+              isSupporter
+                ? "mt-0.5 h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4"
+                : "mt-0.5 h-4 w-4 shrink-0 text-primary"
+            }
+            aria-hidden
+          />
+          {isSupporter ? (
+            <div className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground sm:text-xs">
+              <p className="text-foreground/90">{coachSupporterHeaderLead()}</p>
+              <details className="group mt-1.5 border-t border-border/40 pt-1.5">
+                <summary className="cursor-pointer list-none text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                  <span className="underline">Full scope and topic</span>
+                  <span className="ml-1 text-muted-foreground/80 no-underline group-open:hidden">▼</span>
+                  <span className="ml-1 hidden text-muted-foreground/80 no-underline group-open:inline">▲</span>
+                </summary>
+                <div className="mt-2 space-y-2 pb-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <p>{coachPageSubtitle("supporter")}</p>
+                  {effectiveTopic !== "general" ? (
+                    <p>
+                      <span className="font-medium text-foreground">Topic</span>
+                      <span className="text-muted-foreground"> · </span>
+                      {topicCfg.label}
+                      <br />
+                      <span className="mt-1 inline-block">
+                        {effectiveTopic === "supporter" ? supporterTopicScopeHintText : topicCfg.emptyHint}
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+              </details>
+            </div>
+          ) : (
+            <div className="min-w-0 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+              <p>{coachPageSubtitle("patient")}</p>
+              {effectiveTopic !== "general" ? (
+                <p>
+                  <span className="font-medium text-foreground">Topic</span>
+                  <span className="text-muted-foreground"> · </span>
+                  {topicCfg.label}
+                </p>
+              ) : null}
+              {messages.length === 0 && effectiveTopic !== "general" ? <p>{topicCfg.emptyHint}</p> : null}
+            </div>
+          )}
         </CardContent>
       </Card>
       <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -477,7 +558,11 @@ export default function CoachPage() {
         ) : null}
 
         <div
-          className="flex min-h-0 max-h-[min(32rem,calc(100dvh-14rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
+          className={
+            isSupporter
+              ? "flex min-h-0 max-h-[min(34rem,calc(100dvh-11rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
+              : "flex min-h-0 max-h-[min(32rem,calc(100dvh-14rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
+          }
           role="region"
           aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
         >

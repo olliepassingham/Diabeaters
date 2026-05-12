@@ -3,6 +3,7 @@ import {
   AI_ASSISTANT_NAME,
   askAssistantMidSentence,
   coachPageTitle,
+  coachSupporterTopicScopeHint,
   openAssistantCtaLabel,
 } from "./persona";
 
@@ -22,5 +23,12 @@ describe("ai-coach persona", () => {
 
   it("mid-sentence phrase is lowercase ask + name", () => {
     expect(askAssistantMidSentence()).toMatch(/^ask /);
+  });
+
+  it("supporter topic scope hint reflects age band", () => {
+    expect(coachSupporterTopicScopeHint("child")).toMatch(/supporting a child/i);
+    expect(coachSupporterTopicScopeHint("teen")).toMatch(/supporting a teenager/i);
+    expect(coachSupporterTopicScopeHint("adult")).toMatch(/supporting an adult/i);
+    expect(coachSupporterTopicScopeHint("unknown")).toMatch(/supporting a person/i);
   });
 });
