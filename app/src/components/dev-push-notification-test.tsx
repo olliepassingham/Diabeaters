@@ -11,6 +11,27 @@ function noPushTokenHint(): string {
   return "No row in push_tokens for this user. On this iPhone: turn on Enable notifications + Push (iOS) in app settings, allow Diabeaters in iOS Settings → Notifications, then leave and reopen the app. If it persists, check Supabase → push_tokens for your user_id.";
 }
 
+function deliveryFailureHint(r: {
+  detail?: string;
+  http_status?: number;
+  delivered_push?: number;
+  tokens?: number;
+  success?: boolean;
+}): string | null {
+  if (!r.success || (r.delivered_push ?? 0) > 0 || (r.tokens ?? 0) < 1) return null;
+  const d = r.detail ?? "";
+  if (d.includes("BadDeviceToken") || d.includes("Unregistered")) {
+    return "\nAPNs rejected the device token (environment mismatch is common): TestFlight and App Store builds use production APNs — in Supabase Edge secrets set APNS_USE_SANDBOX unset or \"false\". Xcode installs from your Mac usually need APNS_USE_SANDBOX=true. After changing secrets, remove your stale row in push_tokens if needed, then reopen the app to register a fresh token.";
+  }
+  if (d.includes("TopicDisallowed") || d.includes("DeviceTokenNotForTopic")) {
+    return "\nCheck APNS_BUNDLE_ID matches the app bundle id (default com.passingtime.diabeaters).";
+  }
+  if (r.http_status != null && r.http_status > 0) {
+    return `\nAPNs or relay returned HTTP ${r.http_status}. Full JSON is in the detail line above; see Supabase → Edge Functions → notify_push_test → Logs.`;
+  }
+  return null;
+}
+
 /** “Send test push” — build-time flag, staging, or per-device unlock (see About → Version taps on iOS). */
 export function DevPushNotificationTestPanel() {
   const { toast } = useToast();
@@ -48,10 +69,13 @@ export function DevPushNotificationTestPanel() {
       const lines = [
         `success: ${r.success}`,
         r.error ? `error: ${r.error}` : null,
+        r.failure_channel ? `failure_channel: ${r.failure_channel}` : null,
+        r.http_status != null ? `http_status: ${r.http_status}` : null,
         r.detail ? `detail: ${r.detail}` : null,
         r.tokens != null ? `tokens: ${r.tokens}` : null,
         r.delivered_push != null ? `delivered_push: ${r.delivered_push}` : null,
         r.error === "no_push_token" ? `\n${noPushTokenHint()}` : null,
+        deliveryFailureHint(r),
       ]
         .filter(Boolean)
         .join("\n");

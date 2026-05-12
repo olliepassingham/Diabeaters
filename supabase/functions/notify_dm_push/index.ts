@@ -220,8 +220,8 @@ Deno.serve(async (req: Request) => {
       const tokens = (tokenRows ?? []).map((t: { token: string }) => String(t.token)).filter(Boolean);
       for (const t of tokens) {
         try {
-          const ok = await deliverIosPushToDevice(t, "New message", bodyText, payload);
-          if (ok) pushDelivered += 1;
+          const r = await deliverIosPushToDevice(t, "New message", bodyText, payload);
+          if (r.success) pushDelivered += 1;
         } catch (e) {
           console.error("[notify_dm_push] push send", e);
         }

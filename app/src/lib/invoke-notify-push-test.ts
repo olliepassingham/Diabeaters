@@ -11,6 +11,8 @@ export async function invokeNotifyPushTest(): Promise<{
   detail?: string;
   tokens?: number;
   delivered_push?: number;
+  http_status?: number;
+  failure_channel?: string;
 }> {
   const supabase = getSupabase();
   const env = getSupabaseUrlAndAnonKey();
@@ -25,6 +27,8 @@ export async function invokeNotifyPushTest(): Promise<{
     detail?: string;
     tokens?: number;
     delivered_push?: number;
+    http_status?: number;
+    failure_channel?: string;
   }>("notify_push_test", {}, env, headers);
 
   if (error) {
@@ -33,7 +37,15 @@ export async function invokeNotifyPushTest(): Promise<{
   }
 
   const payload = data as
-    | { success?: boolean; error?: string; detail?: string; tokens?: number; delivered_push?: number }
+    | {
+        success?: boolean;
+        error?: string;
+        detail?: string;
+        tokens?: number;
+        delivered_push?: number;
+        http_status?: number;
+        failure_channel?: string;
+      }
     | null;
   if (!payload || typeof payload.success !== "boolean") {
     return { success: false, error: "invalid_response" };
@@ -45,6 +57,8 @@ export async function invokeNotifyPushTest(): Promise<{
     detail: payload.detail,
     tokens: payload.tokens,
     delivered_push: payload.delivered_push,
+    http_status: payload.http_status,
+    failure_channel: payload.failure_channel,
   };
 }
 

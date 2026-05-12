@@ -142,8 +142,8 @@ Deno.serve(async (req: Request) => {
           .eq("platform", "ios");
         const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
         for (const t of tokens) {
-          const ok = await deliverIosPushToDevice(t, title, bodyText, data);
-          if (ok) deliveredPush += 1;
+          const r = await deliverIosPushToDevice(t, title, bodyText, data);
+          if (r.success) deliveredPush += 1;
         }
       }
     }

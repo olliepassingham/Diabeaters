@@ -122,8 +122,8 @@ export async function deliverSupplyLowAlerts(
       const tokens = (tokenRows ?? []).map((t: Record<string, unknown>) => String(t.token)).filter(Boolean);
       for (const t of tokens) {
         try {
-          const ok = await deliverIosPushToDevice(t, title, bodyText, data);
-          if (ok) pushDelivered += 1;
+          const r = await deliverIosPushToDevice(t, title, bodyText, data);
+          if (r.success) pushDelivered += 1;
         } catch (e) {
           console.error("[supply-low-delivery] push send", e);
         }

@@ -15,7 +15,11 @@
  * or legacy relay (PUSH_NOTIFICATION_API_URL, optional PUSH_NOTIFICATION_API_KEY).
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import {
+  type DeliverIosPushResult,
+  deliverIosPushToDevice,
+  iosPushDeliveryConfigured,
+} from "../_shared/deliver-ios-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -96,16 +100,27 @@ Deno.serve(async (req: Request) => {
     const payload = { kind: "push_test", deep_link: "/settings/notifications" };
 
     let delivered = 0;
+    let lastFailure: Extract<DeliverIosPushResult, { success: false }> | undefined;
     for (const t of tokens) {
       try {
-        const ok = await deliverIosPushToDevice(t, title, body, payload);
-        if (ok) delivered += 1;
+        const r = await deliverIosPushToDevice(t, title, body, payload);
+        if (r.success) delivered += 1;
+        else lastFailure = r;
       } catch (e) {
         console.error("[notify_push_test] push send", e);
       }
     }
 
-    return new Response(JSON.stringify({ success: true, tokens: tokens.length, delivered_push: delivered }), {
+    const out: Record<string, unknown> = { success: true, tokens: tokens.length, delivered_push: delivered };
+    if (delivered === 0 && lastFailure) {
+      out.failure_channel = lastFailure.channel;
+      out.detail = lastFailure.errorBody ?? null;
+      if ("httpStatus" in lastFailure && lastFailure.httpStatus !== undefined) {
+        out.http_status = lastFailure.httpStatus;
+      }
+    }
+
+    return new Response(JSON.stringify(out), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

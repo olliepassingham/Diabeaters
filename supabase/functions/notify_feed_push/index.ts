@@ -217,8 +217,8 @@ Deno.serve(async (req: Request) => {
     const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
     let delivered = 0;
     for (const t of tokens) {
-      const ok = await deliverIosPushToDevice(t, title, bodyText, payload);
-      if (ok) delivered += 1;
+      const r = await deliverIosPushToDevice(t, title, bodyText, payload);
+      if (r.success) delivered += 1;
     }
 
     return new Response(

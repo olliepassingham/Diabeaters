@@ -16,6 +16,12 @@
  */
 import { SignJWT, importPKCS8 } from "https://esm.sh/jose@5.9.6";
 
+/** Outcome of one send attempt (APNs or relay). Used for metrics and test-push diagnostics. */
+export type DeliverIosPushResult =
+  | { success: true; channel: "apns" | "relay" }
+  | { success: false; channel: "apns" | "relay"; httpStatus?: number; errorBody?: string }
+  | { success: false; channel: "none"; errorBody?: string };
+
 export function apnsDirectConfigured(): boolean {
   return Boolean(
     Deno.env.get("APNS_TEAM_ID")?.trim() &&
@@ -57,14 +63,19 @@ async function buildApnsJwt(): Promise<string> {
 async function sendViaApns(
   deviceToken: string,
   opts: { title: string; body: string; data?: Record<string, unknown> },
-): Promise<boolean> {
+): Promise<DeliverIosPushResult> {
   const bundleId = Deno.env.get("APNS_BUNDLE_ID")?.trim() || "com.passingtime.diabeaters";
   const useSandbox = (Deno.env.get("APNS_USE_SANDBOX") ?? "").trim().toLowerCase() === "true";
   const host = useSandbox ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const hex = normalizeDeviceToken(deviceToken);
   if (!/^[0-9a-f]+$/i.test(hex) || hex.length < 32) {
     console.warn("[apns] invalid device token format");
-    return false;
+    return {
+      success: false,
+      channel: "apns",
+      httpStatus: 0,
+      errorBody: "invalid_device_token_format",
+    };
   }
 
   const custom = opts.data && typeof opts.data === "object" && !Array.isArray(opts.data)
@@ -84,7 +95,12 @@ async function sendViaApns(
     jwt = await buildApnsJwt();
   } catch (e) {
     console.error("[apns] jwt build failed", e);
-    return false;
+    return {
+      success: false,
+      channel: "apns",
+      httpStatus: 0,
+      errorBody: `jwt_build_failed: ${e instanceof Error ? e.message : String(e)}`,
+    };
   }
 
   const res = await fetch(`${host}/3/device/${hex}`, {
@@ -102,8 +118,9 @@ async function sendViaApns(
   if (!res.ok) {
     const body = await res.text();
     console.warn("[apns] send failed", res.status, body);
+    return { success: false, channel: "apns", httpStatus: res.status, errorBody: body.slice(0, 800) };
   }
-  return res.ok;
+  return { success: true, channel: "apns" };
 }
 
 async function sendViaRelay(
@@ -111,9 +128,9 @@ async function sendViaRelay(
   title: string,
   body: string,
   data: unknown,
-): Promise<boolean> {
+): Promise<DeliverIosPushResult> {
   const pushUrl = Deno.env.get("PUSH_NOTIFICATION_API_URL")?.trim();
-  if (!pushUrl) return false;
+  if (!pushUrl) return { success: false, channel: "none", errorBody: "relay_url_missing" };
   const pushKey = Deno.env.get("PUSH_NOTIFICATION_API_KEY")?.trim();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (pushKey) headers["Authorization"] = `Bearer ${pushKey}`;
@@ -123,9 +140,11 @@ async function sendViaRelay(
     body: JSON.stringify({ to: deviceToken, title, body, data }),
   });
   if (!res.ok) {
-    console.warn("[push-relay] status", res.status, await res.text());
+    const warnBody = await res.text();
+    console.warn("[push-relay] status", res.status, warnBody);
+    return { success: false, channel: "relay", httpStatus: res.status, errorBody: warnBody.slice(0, 800) };
   }
-  return res.ok;
+  return { success: true, channel: "relay" };
 }
 
 /**
@@ -137,17 +156,22 @@ export async function deliverIosPushToDevice(
   title: string,
   body: string,
   data: unknown,
-): Promise<boolean> {
+): Promise<DeliverIosPushResult> {
   const custom = data && typeof data === "object" && !Array.isArray(data)
     ? (data as Record<string, unknown>)
     : undefined;
 
+  let apnsFailure: Extract<DeliverIosPushResult, { success: false }> | undefined;
+
   if (apnsDirectConfigured()) {
-    const ok = await sendViaApns(deviceToken, { title, body, data: custom });
-    if (ok) return true;
+    const r = await sendViaApns(deviceToken, { title, body, data: custom });
+    if (r.success) return r;
+    apnsFailure = r;
   }
   if (pushRelayConfigured()) {
-    return await sendViaRelay(deviceToken, title, body, data);
+    const r = await sendViaRelay(deviceToken, title, body, data);
+    if (r.success) return r;
+    return apnsFailure ?? r;
   }
-  return false;
+  return apnsFailure ?? { success: false, channel: "none", errorBody: "no_push_delivery_path" };
 }
