@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Disclaimer } from "@/components/disclaimer";
@@ -7,7 +8,11 @@ import { BookOpen, ExternalLink, Info } from "lucide-react";
 import { Link } from "wouter";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
+import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import { SettingsBackLink, SettingsNavRow } from "./shared";
+import { useToast } from "@/hooks/use-toast";
+import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
+import { unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
 const SOURCES = [
   {
@@ -129,6 +134,33 @@ type SettingsAboutRouteProps = {
 
 export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRouteProps) {
   const year = new Date().getFullYear();
+  const { toast } = useToast();
+  /** Count consecutive taps; reset if the gap since the *previous* tap is too long. */
+  const versionTapRef = useRef({ count: 0, lastAt: 0 });
+
+  const onVersionTap = useCallback(() => {
+    if (!isIosLikeUserAgent()) return;
+    const now = Date.now();
+    const maxGapMs = 2500;
+    const prev = versionTapRef.current;
+    if (prev.lastAt > 0 && now - prev.lastAt > maxGapMs) {
+      versionTapRef.current = { count: 0, lastAt: 0 };
+    }
+    versionTapRef.current.count += 1;
+    versionTapRef.current.lastAt = now;
+    if (versionTapRef.current.count >= 7) {
+      versionTapRef.current = { count: 0, lastAt: 0 };
+      unlockPushTestUi();
+      toast({
+        title: "Push test tools enabled",
+        description: "Reloading… Then open Settings → Notifications.",
+      });
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 450);
+    }
+  }, [toast]);
+
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
       <FaceLogoWatermark />
@@ -143,10 +175,17 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
         <CardContent className="pt-6 pb-6 space-y-6">
           <div className="flex items-center justify-between py-3 border-b border-border">
             <span className="text-body font-medium text-foreground">Version</span>
-            <span className="text-small text-muted-foreground tabular-nums" data-testid="text-app-version">
+            <button
+              type="button"
+              className="text-small text-muted-foreground tabular-nums rounded-md px-2 py-1 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-end touch-manipulation hover:bg-muted/60 active:bg-muted"
+              data-testid="text-app-version"
+              aria-label={`App version ${appPackage.version}`}
+              onClick={onVersionTap}
+            >
               {appPackage.version}
-            </span>
+            </button>
           </div>
+          <PushTestUnlockCallout className="-mt-1" />
           <nav aria-label="Legal and support" className="flex flex-col">
             <SettingsNavRow href="/privacy" label="Privacy" />
             <SettingsNavRow href="/privacy#terms" label="Terms" />

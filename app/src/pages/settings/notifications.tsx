@@ -7,6 +7,8 @@ import type { NotificationSettings } from "@/lib/storage";
 import { Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
+import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
+import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import { SettingsBackLink } from "./shared";
 
 export function NotificationsTab({
@@ -268,6 +270,8 @@ export function SettingsNotificationsRoute({
             embedded
             supporterMode={supporterMode}
           />
+          <PushTestUnlockCallout className="pt-2" />
+          <DevPushNotificationTestPanel />
         </CardContent>
       </Card>
     </PageShell>

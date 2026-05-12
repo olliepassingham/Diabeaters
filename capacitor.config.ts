@@ -4,6 +4,10 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * iOS wrapper MUST always load production URL for App Store builds.
  * Do not point server.url at staging. For local staging tests, temporarily
  * override and run npx cap sync ios — revert before archiving.
+ *
+ * When `server.url` is set, the WebView loads that host’s JS (e.g. Vercel). Vite
+ * flags like `VITE_SHOW_PUSH_TEST` apply only if set on **that** deployment’s build,
+ * unless you use the per-device unlock (About → Version, seven taps on iOS).
  */
 const config: CapacitorConfig = {
   appId: "com.passingtime.diabeaters",

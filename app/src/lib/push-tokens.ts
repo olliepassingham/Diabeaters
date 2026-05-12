@@ -1,10 +1,11 @@
-import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
+import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
 
-let initialised = false;
+/** True while `registration` / `registrationError` listeners are attached. */
+let pushListenersBound = false;
 
 const PUSH_DIAG_KEY = "diabeaters:push_diag:v1";
 /** Persists the most recent native push token so logout can DELETE it from `push_tokens`. */
@@ -60,40 +61,24 @@ export function readPushDiag(): Record<string, unknown> | null {
   }
 }
 
-/** Call when turning iOS push off (or before re-registering) so the next ensure can run again. */
-export function resetIosPushRegistrationState(): void {
-  initialised = false;
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+function detachPushListeners(): void {
+  pushListenersBound = false;
+  if (!isIosDeviceForCapacitorPush()) return;
   try {
     void PushNotifications.removeAllListeners();
   } catch {
     // ignore
   }
+}
+
+/** Call when turning iOS push off (or before re-registering) so the next ensure can run again. */
+export function resetIosPushRegistrationState(): void {
+  detachPushListeners();
   writePushDiag({ state: "reset" });
 }
 
-export async function ensureIosPushRegistered(): Promise<void> {
-  if (initialised) return;
-
-  // Web/PWA push is out of scope for v1.
-  if (!Capacitor.isNativePlatform()) return;
-
-  const supabase = getSupabase();
-  if (!supabase) return;
-
-  const platform = Capacitor.getPlatform();
-  if (platform !== "ios") return;
-
-  const settings = storage.getNotificationSettings();
-  if (!settings.enabled || !settings.pushNotifications) return;
-
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session?.user?.id) return;
-
-  writePushDiag({ state: "starting", platform });
-
-  // Mark initialised once we know it's appropriate to prompt/register.
-  initialised = true;
+function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase>>): void {
+  if (pushListenersBound) return;
 
   try {
     void PushNotifications.removeAllListeners();
@@ -101,7 +86,6 @@ export async function ensureIosPushRegistered(): Promise<void> {
     // ignore
   }
 
-  // Attach listeners BEFORE register() so we never miss the token event.
   PushNotifications.addListener("registration", async (token: { value: string }) => {
     const t = token.value?.trim();
     writePushDiag({
@@ -127,6 +111,7 @@ export async function ensureIosPushRegistered(): Promise<void> {
   });
 
   PushNotifications.addListener("registrationError", (err: unknown) => {
+    detachPushListeners();
     writePushDiag({
       state: "registration_error",
       error: typeof err === "string" ? err : JSON.stringify(err),
@@ -136,9 +121,28 @@ export async function ensureIosPushRegistered(): Promise<void> {
     }
   });
 
+  pushListenersBound = true;
+}
+
+export async function ensureIosPushRegistered(): Promise<void> {
+  if (!isIosDeviceForCapacitorPush()) return;
+
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const settings = storage.getNotificationSettings();
+  if (!settings.enabled || !settings.pushNotifications) return;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.user?.id) return;
+
+  writePushDiag({ state: "starting", platform: "ios" });
+
+  attachPushListeners(supabase);
+
   const perm = await PushNotifications.requestPermissions();
   if (perm.receive !== "granted") {
-    initialised = false;
+    detachPushListeners();
     writePushDiag({ state: "permission_denied" });
     return;
   }
@@ -146,6 +150,41 @@ export async function ensureIosPushRegistered(): Promise<void> {
   writePushDiag({ state: "permission_granted" });
   await PushNotifications.register();
   writePushDiag({ state: "register_called" });
+}
+
+/**
+ * Lightweight refresh when returning from background: does not remove listeners.
+ * If listeners were never bound (e.g. race on first launch), falls back to full ensure.
+ */
+export async function refreshIosPushRegistration(): Promise<void> {
+  if (!isIosDeviceForCapacitorPush()) return;
+
+  const supabase = getSupabase();
+  if (!supabase) return;
+
+  const settings = storage.getNotificationSettings();
+  if (!settings.enabled || !settings.pushNotifications) return;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session?.user?.id) return;
+
+  const check = await PushNotifications.checkPermissions();
+  if (check.receive !== "granted") {
+    writePushDiag({ state: "foreground_skip_no_permission" });
+    return;
+  }
+
+  if (!pushListenersBound) {
+    await ensureIosPushRegistered();
+    return;
+  }
+
+  try {
+    await PushNotifications.register();
+    writePushDiag({ state: "foreground_reregister" });
+  } catch (e) {
+    writePushDiag({ state: "foreground_register_failed", error: e instanceof Error ? e.message : String(e) });
+  }
 }
 
 /**
@@ -186,14 +225,6 @@ export async function cleanupPushRegistration(): Promise<void> {
 
   forgetPushToken();
 
-  if (Capacitor.isNativePlatform?.() && Capacitor.getPlatform?.() === "ios") {
-    try {
-      await PushNotifications.removeAllListeners();
-    } catch {
-      // ignore
-    }
-  }
-
-  initialised = false;
+  detachPushListeners();
   writePushDiag({ state: "cleaned_up" });
 }

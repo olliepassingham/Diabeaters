@@ -26,3 +26,11 @@ export const isCommunityEnabled =
  * and rate limits still apply when those are configured.
  */
 export const isAiCoachEnabled = import.meta.env.VITE_FEATURE_AI_COACH !== "false";
+
+/**
+ * Settings → Notifications: “Send test push” panel (native iOS only). `import.meta.env.DEV` is false
+ * on phone builds that load the production bundle, so this also turns on for **staging** builds or when
+ * `VITE_SHOW_PUSH_TEST=true` at web build time (internal TestFlight / QA).
+ */
+export const isPushTestUiEnabled =
+  import.meta.env.DEV || isStaging || import.meta.env.VITE_SHOW_PUSH_TEST === "true";

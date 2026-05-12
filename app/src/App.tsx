@@ -66,6 +66,7 @@ import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
 import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
+import { IosPushForegroundSync } from "@/components/ios-push-foreground-sync";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { getProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
@@ -1151,6 +1152,7 @@ function AuthenticatedShell() {
         />
       ) : (
     <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
+      <IosPushForegroundSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}

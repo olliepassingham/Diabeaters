@@ -9,7 +9,7 @@ This document traces **how** remote notifications reach an iPhone, **what must b
 | **Apple** | App ID with Push Notifications; distribution signing; `aps-environment` production for App Store / TestFlight (`ios/App/App/AppRelease.entitlements`). |
 | **Supabase Edge Functions** | Secrets `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY` (see `supabase/functions/_shared/deliver-ios-push.ts`). For **App Store / TestFlight** builds, **`APNS_USE_SANDBOX` must be unset or `false`**. Sandbox is only for debug tokens from Xcode. |
 | **Optional** | `APNS_BUNDLE_ID` if not `com.passingtime.diabeaters`. Legacy relay: `PUSH_NOTIFICATION_API_URL` (+ optional key). |
-| **Client (native iOS)** | User grants iOS permission; in-app **Notifications** on + **Push** on. `ensureIosPushRegistered()` (`app/src/lib/push-tokens.ts`) upserts the device token into `public.push_tokens`. |
+| **Client (native iOS)** | User grants iOS permission; in-app **Notifications** on + **Push** on. `ensureIosPushRegistered()` (`app/src/lib/push-tokens.ts`) upserts the device token into `public.push_tokens`. On each return to the foreground, `IosPushForegroundSync` (`app/src/components/ios-push-foreground-sync.tsx`) calls `refreshIosPushRegistration()` so iOS can re-issue a token and the server prefs stay aligned (Apple expects periodic `registerForRemoteNotifications`). |
 | **Cloud prefs** | Row in `notification_preferences` for the user. `prefs.push === true` is required for most pushes. On sign-in, `syncNotificationPreferences()` runs (`app/src/lib/auth-context.tsx`) so local settings are upserted to the cloud (not only when visiting Settings). |
 
 Invoke failures from the app are logged with **`logEdgeInvokeFailure`** (`app/src/lib/dev-log.ts`) — check Safari Web Inspector / device logs for `[edge-invoke …]` if pushes are missing.
@@ -83,6 +83,33 @@ Invoked when sick day / travel mode starts (`invoke-notify-scenario-started.ts`)
 `supabase/config.toml` sets `verify_jwt = false` for several notify functions; each handler validates `Authorization` with `auth.getUser(jwt)` instead. Deploy with:
 
 `supabase functions deploy notify_supply_low --no-verify-jwt` and `supabase functions deploy notify_supply_low_cron --no-verify-jwt` (same pattern for other notify functions in `supabase/config.toml`). After deploy, add a **Cron** job (**Dashboard → Integrations → Cron**, or SQL with `pg_cron` + `pg_net`; see [Supabase: Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions)) that POSTs `…/functions/v1/notify_supply_low_cron` with the **service role** bearer as documented in the function file.
+
+---
+
+## Automated checks (repo)
+
+| Check | How |
+|--------|-----|
+| **REST tables** | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` → `npm run verify:push -- --db-only` (or env vars without `--db-only` args — see script header). |
+| **Edge + APNs + token** | `SUPABASE_URL` + `SUPABASE_ANON_KEY` + **`SUPABASE_USER_JWT`** (signed-in user `access_token`) → `npm run verify:push` — calls **`notify_push_test`**. |
+| **SQL counts** | Run `docs/sql/verify_push_notifications_setup.sql` in **SQL Editor**. |
+| **On device** | **Send test push** appears when: (1) the loaded bundle has **`VITE_SHOW_PUSH_TEST`** / staging / dev, or (2) on **native iOS** you unlock it under **Settings → About**: use **“Enable push test tools on this device…”** (confirm in the dialog), or tap the **version number 7 times** with less than ~2.5s between each tap. Then open **Settings → Notifications**. Because Capacitor **`server.url`** points at Vercel, deploy this UI to Vercel (or set `VITE_SHOW_PUSH_TEST` there) before the new controls appear on the phone. |
+
+---
+
+## Verifying in the Supabase Dashboard (no Mac terminal)
+
+You can do almost everything from the Supabase project UI:
+
+| What to check | Where in Supabase |
+|-----------------|-------------------|
+| **Tables & row counts** | **SQL** → **SQL Editor** → paste and run `docs/sql/verify_push_notifications_setup.sql`. Same aggregates as the CLI `--db-only` check (tokens, prefs, `push: true` count). |
+| **Browse raw rows** | **Table Editor** → `push_tokens` (filter by `user_id`) and `notification_preferences` (confirm `prefs` includes `"push": true`). |
+| **APNs / relay configured** | **Edge Functions** → **Manage secrets** — confirm `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_PRIVATE_KEY` exist (values are hidden). For TestFlight/App Store users, do **not** set `APNS_USE_SANDBOX` to `true`. |
+| **End-to-end push (Edge → APNs)** | Trigger **`notify_push_test`** with a **real user JWT** in `Authorization: Bearer …` (same as the app would send). Options: **Edge Functions** → `notify_push_test` → use the dashboard’s **Invoke** / test request UI and add that header, or use an app build that shows **Send test push** (see table above), then open **Edge Functions** → `notify_push_test` → **Logs** to see success or `[apns] send failed`. |
+| **Delivery errors** | **Edge Functions** → pick `notify_dm_push`, `notify_supply_low`, etc. → **Logs** after reproducing an action in the app. |
+
+SQL alone cannot prove APNs accepts your Apple key (that needs an HTTP call to Apple), but it **does** prove the database side is wired. APNs is confirmed by **Edge logs** after a test invoke or a real app-triggered notification.
 
 ---
 
