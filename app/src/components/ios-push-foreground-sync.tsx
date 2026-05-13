@@ -28,10 +28,12 @@ export function IosPushForegroundSync() {
       debounceTimer = setTimeout(() => {
         debounceTimer = undefined;
         const s = storage.getNotificationSettings();
-        void syncNotificationPreferences(s);
-        if (s.enabled && s.pushNotifications) {
-          void refreshIosPushRegistration();
-        }
+        void (async () => {
+          await syncNotificationPreferences(s);
+          if (s.enabled && s.pushNotifications) {
+            await refreshIosPushRegistration();
+          }
+        })();
       }, 600);
     };
 

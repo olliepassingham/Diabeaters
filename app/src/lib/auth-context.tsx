@@ -5,7 +5,7 @@ import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
-import { ensureIosPushRegistered } from "@/lib/push-tokens";
+import { ensureIosPushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { storage } from "@/lib/storage";
 
 type AuthContextValue = {
@@ -94,12 +94,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (initialE2EUser) return;
 
-    const { data } = onAuthStateChange((_event, session) => {
+    const { data } = onAuthStateChange((event, session) => {
       if (!isMounted) return;
       setSession(session ?? null);
       setUser(session?.user ?? null);
       setActiveUserIdForLocalStorage(session?.user?.id ?? null);
       setSentryUserId(session?.user?.id ?? null);
+      // Avoid hammering GoTrue's storage lock on TOKEN_REFRESHED; only sync when session identity is established.
+      if (
+        session?.user?.id &&
+        (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED")
+      ) {
+        void syncRememberedPushTokenToSupabase();
+      }
     });
 
     return () => {
@@ -110,9 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || !user?.id) return;
-    void ensureIosPushRegistered();
-    /** Keeps `notification_preferences` aligned with this device so edge functions see `push: true`. */
-    void syncNotificationPreferences(storage.getNotificationSettings());
+    /** Run sequentially so push registration and prefs upsert do not fight GoTrue's auth storage lock. */
+    void (async () => {
+      await ensureIosPushRegistered();
+      await syncNotificationPreferences(storage.getNotificationSettings());
+    })();
     const timer = window.setTimeout(() => {
       void import("@/lib/supplies").then((m) => m.reconcileSupplies());
     }, 800);

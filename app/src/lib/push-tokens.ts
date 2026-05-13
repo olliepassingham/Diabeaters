@@ -85,6 +85,7 @@ async function persistPushTokenToCloud(
   const uid = sess.session?.user?.id;
   if (!uid) {
     writePushDiag({ state: "token_save_failed", saveError: "no_session" });
+    console.warn("[push_tokens] skip persist: no Supabase session (sign in, then open Settings → Notifications).");
     return;
   }
 
@@ -96,8 +97,10 @@ async function persistPushTokenToCloud(
       return;
     }
     writePushDiag({ state: "rpc_returned_false", rpcBody: row });
+    console.warn("[push_tokens] register_ios_push_token returned ok=false:", row);
   } else if (rpc.error) {
     writePushDiag({ state: "rpc_invoke_failed", saveError: rpc.error.message });
+    console.warn("[push_tokens] register_ios_push_token RPC failed:", rpc.error.message);
   }
 
   const { error } = await supabase.from("push_tokens").upsert(

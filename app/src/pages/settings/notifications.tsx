@@ -250,15 +250,17 @@ export function SettingsNotificationsRoute({
   supporterMode = false,
 }: SettingsNotificationsRouteProps) {
   useEffect(() => {
-    void ensureIosPushRegistered();
-    void syncRememberedPushTokenToSupabase();
-    const t1 = window.setTimeout(() => void syncRememberedPushTokenToSupabase(), 600);
-    const t2 = window.setTimeout(() => void ensureIosPushRegistered(), 1600);
-    const t3 = window.setTimeout(() => void syncRememberedPushTokenToSupabase(), 3200);
+    /** One chained pass avoids overlapping getSession / auth locks with AuthProvider + Capacitor. */
+    const t = window.setTimeout(() => {
+      void (async () => {
+        await ensureIosPushRegistered();
+        await syncRememberedPushTokenToSupabase();
+      })();
+    }, 300);
+    const t2 = window.setTimeout(() => void syncRememberedPushTokenToSupabase(), 2500);
     return () => {
-      clearTimeout(t1);
+      clearTimeout(t);
       clearTimeout(t2);
-      clearTimeout(t3);
     };
   }, []);
 
