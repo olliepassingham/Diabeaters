@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
@@ -153,6 +154,8 @@ export async function getPushRegistrationDebugSnapshot(): Promise<Record<string,
     iosPushPermissionCheck = `error:${e instanceof Error ? e.message : String(e)}`;
   }
   return {
+    capacitorPlatform: Capacitor.getPlatform(),
+    capacitorIsNativePlatform: Capacitor.isNativePlatform(),
     isIosDeviceForCapacitorPush: isIosDeviceForCapacitorPush(),
     notificationEnabled: s.enabled,
     pushNotifications: s.pushNotifications,
