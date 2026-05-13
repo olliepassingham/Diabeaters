@@ -59,15 +59,16 @@ export function DevPushNotificationTestPanel() {
 
   useEffect(() => {
     if (!showPanel || !iosLike) return;
-    const tick = () => {
+    const tick = async () => {
       try {
-        setPushDebugJson(JSON.stringify(getPushRegistrationDebugSnapshot(), null, 2));
+        const snap = await getPushRegistrationDebugSnapshot();
+        setPushDebugJson(JSON.stringify(snap, null, 2));
       } catch {
         setPushDebugJson("{}");
       }
     };
-    tick();
-    const id = window.setInterval(tick, 2000);
+    void tick();
+    const id = window.setInterval(() => void tick(), 2000);
     return () => clearInterval(id);
   }, [showPanel, iosLike]);
 

@@ -140,9 +140,18 @@ export function readPushDiag(): Record<string, unknown> | null {
 }
 
 /** Snapshot for developer UI (macOS Console often hides WKWebView `console` output). */
-export function getPushRegistrationDebugSnapshot(): Record<string, unknown> {
+export async function getPushRegistrationDebugSnapshot(): Promise<Record<string, unknown>> {
   const s = storage.getNotificationSettings();
   const token = readRememberedPushToken();
+  let iosPushPermissionCheck: string | undefined;
+  try {
+    if (isIosDeviceForCapacitorPush()) {
+      const c = await PushNotifications.checkPermissions();
+      iosPushPermissionCheck = c.receive;
+    }
+  } catch (e) {
+    iosPushPermissionCheck = `error:${e instanceof Error ? e.message : String(e)}`;
+  }
   return {
     isIosDeviceForCapacitorPush: isIosDeviceForCapacitorPush(),
     notificationEnabled: s.enabled,
@@ -150,6 +159,7 @@ export function getPushRegistrationDebugSnapshot(): Record<string, unknown> {
     pushListenersBound,
     cachedTokenChars: token?.length ?? 0,
     cachedTokenPrefix: token && token.length >= 8 ? `${token.slice(0, 8)}…` : null,
+    iosPushPermissionCheck,
     diag: readPushDiag(),
   };
 }
@@ -184,7 +194,10 @@ function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase
       state: "registered",
       tokenPrefix: t ? `${t.slice(0, 10)}…` : "",
     });
-    if (!t) return;
+    if (!t) {
+      writePushDiag({ state: "registration_empty_token", registrationPayload: JSON.stringify(token) });
+      return;
+    }
 
     rememberPushToken(t);
     await persistPushTokenToCloud(supabase, t);
@@ -196,12 +209,31 @@ function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase
       state: "registration_error",
       error: typeof err === "string" ? err : JSON.stringify(err),
     });
-    if (import.meta.env.DEV) {
-      console.warn("[push_tokens] registration error:", err);
-    }
+    console.warn("[push_tokens] registration error:", err);
   });
 
   pushListenersBound = true;
+}
+
+function scheduleMissingTokenRegisterRetries(supabase: NonNullable<ReturnType<typeof getSupabase>>): void {
+  const delays = [6000, 15000, 30000];
+  for (const ms of delays) {
+    window.setTimeout(() => {
+      void (async () => {
+        if (!isIosDeviceForCapacitorPush()) return;
+        const s = storage.getNotificationSettings();
+        if (!s.enabled || !s.pushNotifications) return;
+        if (readRememberedPushToken()?.trim()) return;
+        writePushDiag({ state: "retry_register_no_cached_token", attemptAfterMs: ms });
+        try {
+          await PushNotifications.register();
+        } catch (e) {
+          writePushDiag({ state: "retry_register_threw", error: e instanceof Error ? e.message : String(e) });
+        }
+        await syncRememberedPushTokenToSupabase(supabase);
+      })();
+    }, ms);
+  }
 }
 
 export async function ensureIosPushRegistered(): Promise<void> {
@@ -235,8 +267,15 @@ export async function ensureIosPushRegistered(): Promise<void> {
     writePushDiag({ state: "register_threw", error: e instanceof Error ? e.message : String(e) });
     console.warn("[push_tokens] PushNotifications.register() failed:", e);
   }
+  try {
+    const chk = await PushNotifications.checkPermissions();
+    writePushDiag({ iosPushPermissionAfterRegister: chk.receive });
+  } catch {
+    // ignore
+  }
   await syncRememberedPushTokenToSupabase(supabase);
   scheduleRememberedTokenResync(supabase, [450, 2200]);
+  scheduleMissingTokenRegisterRetries(supabase);
 }
 
 /**
