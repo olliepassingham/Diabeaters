@@ -1,13 +1,50 @@
 import UIKit
 import Capacitor
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    /// Safari → Develop only lists WKWebViews when `isInspectable` is true (iOS 16.4+).
+    /// App Store / release binaries often omit this; this runs only in **Debug** Xcode installs.
+    private func scheduleInspectableWebViewRetries() {
+        #if DEBUG
+        guard #available(iOS 16.4, *) else { return }
+        Self.markWebViewInspectableIfPresent()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            Self.markWebViewInspectableIfPresent()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            Self.markWebViewInspectableIfPresent()
+        }
+        #endif
+    }
+
+    private static func markWebViewInspectableIfPresent() {
+        guard #available(iOS 16.4, *) else { return }
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows where window.isKeyWindow {
+                if let webView = findWKWebView(in: window.rootViewController?.view) {
+                    webView.isInspectable = true
+                    return
+                }
+            }
+        }
+    }
+
+    private static func findWKWebView(in root: UIView?) -> WKWebView? {
+        guard let root else { return nil }
+        if let w = root as? WKWebView { return w }
+        for sub in root.subviews {
+            if let w = findWKWebView(in: sub) { return w }
+        }
+        return nil
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
         return true
     }
 
@@ -34,7 +71,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        scheduleInspectableWebViewRetries()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
