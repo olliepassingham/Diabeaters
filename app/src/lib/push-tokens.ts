@@ -35,6 +35,44 @@ function forgetPushToken() {
   }
 }
 
+function scheduleRememberedTokenResync(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  delaysMs: readonly number[],
+): void {
+  for (const ms of delaysMs) {
+    window.setTimeout(() => {
+      void syncRememberedPushTokenToSupabase(supabase);
+    }, ms);
+  }
+}
+
+/**
+ * Writes the last known device token from localStorage to `push_tokens` if the user is signed in.
+ * Needed when the DB row was deleted but iOS does not re-fire `registration` for the same token.
+ */
+export async function syncRememberedPushTokenToSupabase(
+  supabaseArg?: NonNullable<ReturnType<typeof getSupabase>>,
+): Promise<void> {
+  if (!isIosDeviceForCapacitorPush()) return;
+  const supabase = supabaseArg ?? getSupabase();
+  if (!supabase) return;
+  const raw = readRememberedPushToken();
+  const t = raw?.trim();
+  if (!t) return;
+  const { data: sess } = await supabase.auth.getSession();
+  const uid = sess.session?.user?.id;
+  if (!uid) return;
+
+  const { error } = await supabase.from("push_tokens").upsert(
+    { user_id: uid, platform: "ios", token: t },
+    { onConflict: "user_id,platform,token" },
+  );
+  writePushDiag({ state: error ? "token_save_failed" : "token_saved", saveError: error?.message ?? null });
+  if (error) {
+    console.warn("[push_tokens] upsert failed:", error.message);
+  }
+}
+
 function writePushDiag(patch: Record<string, unknown>) {
   try {
     const raw = localStorage.getItem(PUSH_DIAG_KEY);
@@ -95,19 +133,7 @@ function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase
     if (!t) return;
 
     rememberPushToken(t);
-
-    const { data: sess } = await supabase.auth.getSession();
-    const uid = sess.session?.user?.id;
-    if (!uid) return;
-
-    const { error } = await supabase.from("push_tokens").upsert(
-      { user_id: uid, platform: "ios", token: t },
-      { onConflict: "user_id,platform,token" },
-    );
-    writePushDiag({ state: error ? "token_save_failed" : "token_saved", saveError: error?.message ?? null });
-    if (import.meta.env.DEV && error) {
-      console.warn("[push_tokens] upsert failed:", error.message);
-    }
+    await syncRememberedPushTokenToSupabase(supabase);
   });
 
   PushNotifications.addListener("registrationError", (err: unknown) => {
@@ -150,6 +176,8 @@ export async function ensureIosPushRegistered(): Promise<void> {
   writePushDiag({ state: "permission_granted" });
   await PushNotifications.register();
   writePushDiag({ state: "register_called" });
+  await syncRememberedPushTokenToSupabase(supabase);
+  scheduleRememberedTokenResync(supabase, [450, 2200]);
 }
 
 /**
@@ -182,6 +210,8 @@ export async function refreshIosPushRegistration(): Promise<void> {
   try {
     await PushNotifications.register();
     writePushDiag({ state: "foreground_reregister" });
+    await syncRememberedPushTokenToSupabase(supabase);
+    scheduleRememberedTokenResync(supabase, [450, 2200]);
   } catch (e) {
     writePushDiag({ state: "foreground_register_failed", error: e instanceof Error ? e.message : String(e) });
   }
