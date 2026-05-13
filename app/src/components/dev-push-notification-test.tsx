@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +88,20 @@ export function DevPushNotificationTestPanel() {
     );
   }
 
+  const copyPushDebug = useCallback(async () => {
+    const text = pushDebugJson || "{}";
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Copied", description: "Paste into Notes, Mail, or a message to share the JSON." });
+    } catch {
+      toast({
+        title: "Copy blocked",
+        description: "Scroll the box below, long-press the text, then Select All → Copy.",
+        variant: "destructive",
+      });
+    }
+  }, [pushDebugJson, toast]);
+
   const run = async () => {
     setBusy(true);
     try {
@@ -134,16 +148,27 @@ export function DevPushNotificationTestPanel() {
         <code className="text-[11px]">push_tokens</code>, and APNs secrets on the project.
       </p>
       <div className="rounded-md border border-amber-700/30 bg-black/25 p-2 space-y-1">
-        <p className="text-[10px] font-medium uppercase tracking-wide text-amber-200/80">
-          Push registration (this device)
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-amber-200/80">
+            Push registration (this device)
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="h-7 shrink-0 text-[10px] px-2"
+            onClick={() => void copyPushDebug()}
+          >
+            Copy JSON
+          </Button>
+        </div>
         <p className="text-[10px] text-muted-foreground leading-snug">
           macOS <strong className="text-foreground/80">Console</strong> usually does not show JavaScript logs from the
           app WebView. Use this JSON instead (updates every 2s). Ensure Supabase migrations{" "}
           <code className="text-[10px]">register_ios_push_token</code> + grants are applied.
         </p>
         <pre
-          className="text-[10px] leading-tight text-foreground/90 font-mono whitespace-pre-wrap break-all max-h-36 overflow-y-auto"
+          className="text-[10px] leading-tight text-foreground/90 font-mono whitespace-pre-wrap break-all max-h-36 overflow-y-auto select-text"
           data-testid="push-registration-debug-json"
         >
           {pushDebugJson || "{}"}
