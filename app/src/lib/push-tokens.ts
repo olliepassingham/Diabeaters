@@ -139,6 +139,21 @@ export function readPushDiag(): Record<string, unknown> | null {
   }
 }
 
+/** Snapshot for developer UI (macOS Console often hides WKWebView `console` output). */
+export function getPushRegistrationDebugSnapshot(): Record<string, unknown> {
+  const s = storage.getNotificationSettings();
+  const token = readRememberedPushToken();
+  return {
+    isIosDeviceForCapacitorPush: isIosDeviceForCapacitorPush(),
+    notificationEnabled: s.enabled,
+    pushNotifications: s.pushNotifications,
+    pushListenersBound,
+    cachedTokenChars: token?.length ?? 0,
+    cachedTokenPrefix: token && token.length >= 8 ? `${token.slice(0, 8)}…` : null,
+    diag: readPushDiag(),
+  };
+}
+
 function detachPushListeners(): void {
   pushListenersBound = false;
   if (!isIosDeviceForCapacitorPush()) return;

@@ -6,6 +6,7 @@ import { isPushTestUiEnabled } from "@/lib/flags";
 import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
+import { getPushRegistrationDebugSnapshot } from "@/lib/push-tokens";
 
 function noPushTokenHint(): string {
   return "No row in push_tokens for this user. On this iPhone: turn on Enable notifications + Push (iOS) in app settings, allow Diabeaters in iOS Settings → Notifications, then leave and reopen the app. If it persists, check Supabase → push_tokens for your user_id.";
@@ -47,6 +48,7 @@ export function DevPushNotificationTestPanel() {
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
+  const [pushDebugJson, setPushDebugJson] = useState<string>("");
 
   useEffect(() => {
     setUnlocked(isPushTestUiUnlocked());
@@ -54,6 +56,20 @@ export function DevPushNotificationTestPanel() {
 
   const iosLike = isIosLikeUserAgent();
   const showPanel = isPushTestUiEnabled || (iosLike && unlocked);
+
+  useEffect(() => {
+    if (!showPanel || !iosLike) return;
+    const tick = () => {
+      try {
+        setPushDebugJson(JSON.stringify(getPushRegistrationDebugSnapshot(), null, 2));
+      } catch {
+        setPushDebugJson("{}");
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 2000);
+    return () => clearInterval(id);
+  }, [showPanel, iosLike]);
 
   if (!showPanel) return null;
 
@@ -117,6 +133,22 @@ export function DevPushNotificationTestPanel() {
         <strong className="text-foreground/85">Push notifications (iOS)</strong> above, a row in{" "}
         <code className="text-[11px]">push_tokens</code>, and APNs secrets on the project.
       </p>
+      <div className="rounded-md border border-amber-700/30 bg-black/25 p-2 space-y-1">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-amber-200/80">
+          Push registration (this device)
+        </p>
+        <p className="text-[10px] text-muted-foreground leading-snug">
+          macOS <strong className="text-foreground/80">Console</strong> usually does not show JavaScript logs from the
+          app WebView. Use this JSON instead (updates every 2s). Ensure Supabase migrations{" "}
+          <code className="text-[10px]">register_ios_push_token</code> + grants are applied.
+        </p>
+        <pre
+          className="text-[10px] leading-tight text-foreground/90 font-mono whitespace-pre-wrap break-all max-h-36 overflow-y-auto"
+          data-testid="push-registration-debug-json"
+        >
+          {pushDebugJson || "{}"}
+        </pre>
+      </div>
       <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run()}>
         {busy ? "Sending…" : "Send test push"}
       </Button>
