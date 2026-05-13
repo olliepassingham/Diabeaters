@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +10,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
+import { ensureIosPushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { SettingsBackLink } from "./shared";
 
 export function NotificationsTab({
@@ -247,6 +249,19 @@ export function SettingsNotificationsRoute({
   onThreshold,
   supporterMode = false,
 }: SettingsNotificationsRouteProps) {
+  useEffect(() => {
+    void ensureIosPushRegistered();
+    void syncRememberedPushTokenToSupabase();
+    const t1 = window.setTimeout(() => void syncRememberedPushTokenToSupabase(), 600);
+    const t2 = window.setTimeout(() => void ensureIosPushRegistered(), 1600);
+    const t3 = window.setTimeout(() => void syncRememberedPushTokenToSupabase(), 3200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+
   return (
     <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
       <FaceLogoWatermark />

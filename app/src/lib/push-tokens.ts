@@ -116,13 +116,12 @@ export function resetIosPushRegistrationState(): void {
 }
 
 function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase>>): void {
-  if (pushListenersBound) return;
-
   try {
     void PushNotifications.removeAllListeners();
   } catch {
     // ignore
   }
+  pushListenersBound = false;
 
   PushNotifications.addListener("registration", async (token: { value: string }) => {
     const t = token.value?.trim();
@@ -174,8 +173,13 @@ export async function ensureIosPushRegistered(): Promise<void> {
   }
 
   writePushDiag({ state: "permission_granted" });
-  await PushNotifications.register();
-  writePushDiag({ state: "register_called" });
+  try {
+    await PushNotifications.register();
+    writePushDiag({ state: "register_called" });
+  } catch (e) {
+    writePushDiag({ state: "register_threw", error: e instanceof Error ? e.message : String(e) });
+    console.warn("[push_tokens] PushNotifications.register() failed:", e);
+  }
   await syncRememberedPushTokenToSupabase(supabase);
   scheduleRememberedTokenResync(supabase, [450, 2200]);
 }

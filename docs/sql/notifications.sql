@@ -169,3 +169,5 @@ BEGIN
 END;
 $$;
 
+-- Capacitor upserts use role `authenticated` (not only service_role).
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.push_tokens TO authenticated;
