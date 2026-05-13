@@ -63,11 +63,51 @@ export async function syncRememberedPushTokenToSupabase(
   const uid = sess.session?.user?.id;
   if (!uid) return;
 
+  await persistPushTokenToCloud(supabase, t);
+}
+
+/**
+ * Persists one iOS device token for the signed-in user (RPC first, then table upsert).
+ * RPC uses SECURITY DEFINER so token saves survive broken RLS/GRANT on `push_tokens`.
+ */
+async function persistPushTokenToCloud(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  token: string,
+): Promise<void> {
+  const t = token.trim();
+  if (!t || t.length < 32) {
+    writePushDiag({ state: "token_save_failed", saveError: "invalid_token_length" });
+    return;
+  }
+
+  const { data: sess } = await supabase.auth.getSession();
+  const uid = sess.session?.user?.id;
+  if (!uid) {
+    writePushDiag({ state: "token_save_failed", saveError: "no_session" });
+    return;
+  }
+
+  const rpc = await supabase.rpc("register_ios_push_token", { p_token: t });
+  if (!rpc.error && rpc.data && typeof rpc.data === "object") {
+    const row = rpc.data as { ok?: boolean; error?: string };
+    if (row.ok === true) {
+      writePushDiag({ state: "token_saved", savePath: "rpc" });
+      return;
+    }
+    writePushDiag({ state: "rpc_returned_false", rpcBody: row });
+  } else if (rpc.error) {
+    writePushDiag({ state: "rpc_invoke_failed", saveError: rpc.error.message });
+  }
+
   const { error } = await supabase.from("push_tokens").upsert(
     { user_id: uid, platform: "ios", token: t },
     { onConflict: "user_id,platform,token" },
   );
-  writePushDiag({ state: error ? "token_save_failed" : "token_saved", saveError: error?.message ?? null });
+  writePushDiag({
+    state: error ? "token_save_failed" : "token_saved",
+    saveError: error?.message ?? null,
+    savePath: error ? "upsert_failed" : "upsert",
+  });
   if (error) {
     console.warn("[push_tokens] upsert failed:", error.message);
   }
@@ -132,7 +172,7 @@ function attachPushListeners(supabase: NonNullable<ReturnType<typeof getSupabase
     if (!t) return;
 
     rememberPushToken(t);
-    await syncRememberedPushTokenToSupabase(supabase);
+    await persistPushTokenToCloud(supabase, t);
   });
 
   PushNotifications.addListener("registrationError", (err: unknown) => {
