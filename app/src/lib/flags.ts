@@ -28,9 +28,10 @@ export const isCommunityEnabled =
 export const isAiCoachEnabled = import.meta.env.VITE_FEATURE_AI_COACH !== "false";
 
 /**
- * Settings → Notifications: “Send test push” panel (native iOS only). `import.meta.env.DEV` is false
- * on phone builds that load the production bundle, so this also turns on for **staging** builds or when
- * `VITE_SHOW_PUSH_TEST=true` at web build time (internal TestFlight / QA).
+ * Settings → Notifications: “Send test push” panel (native iOS only). Never on `APP_ENV=production`
+ * (including `VITE_SHOW_PUSH_TEST`); use **staging** or local dev for QA. `import.meta.env.DEV` is false
+ * on phone builds that load the production bundle; staging / `VITE_SHOW_PUSH_TEST=true` cover internal builds.
  */
 export const isPushTestUiEnabled =
-  import.meta.env.DEV || isStaging || import.meta.env.VITE_SHOW_PUSH_TEST === "true";
+  !isProd &&
+  (import.meta.env.DEV || isStaging || import.meta.env.VITE_SHOW_PUSH_TEST === "true");

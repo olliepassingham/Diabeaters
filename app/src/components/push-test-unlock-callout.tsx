@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { isProd } from "@/lib/flags";
 import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
 import { isPushTestUiUnlocked, unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
@@ -34,7 +35,7 @@ export function PushTestUnlockCallout({ className }: { className?: string }) {
     }, 450);
   }, [toast]);
 
-  if (!isIosLikeUserAgent() || isPushTestUiUnlocked()) return null;
+  if (isProd || !isIosLikeUserAgent() || isPushTestUiUnlocked()) return null;
 
   return (
     <div className={className}>

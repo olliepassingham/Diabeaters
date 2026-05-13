@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { isPushTestUiEnabled } from "@/lib/flags";
+import { isProd, isPushTestUiEnabled } from "@/lib/flags";
 import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
@@ -55,7 +55,7 @@ export function DevPushNotificationTestPanel() {
   }, []);
 
   const iosLike = isIosLikeUserAgent();
-  const showPanel = isPushTestUiEnabled || (iosLike && unlocked);
+  const showPanel = !isProd && (isPushTestUiEnabled || (iosLike && unlocked));
 
   useEffect(() => {
     if (!showPanel || !iosLike) return;
