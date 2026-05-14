@@ -1657,7 +1657,7 @@ export default function SickDay() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium">Travel Mode is also active{travelDestination ? ` — ${travelDestination}` : ""}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Being unwell while travelling increases your supply needs. Your supply forecasts on the Supplies page now show the combined impact of both scenarios.
+                        Being unwell while travelling increases your supply needs. Your supply forecasts on the Supplies page now show the combined impact of sick day and travel together.
                       </p>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <Link href="/scenarios?tab=travel">

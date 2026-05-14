@@ -528,7 +528,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         ? "Clinical tools unlocked"
         : `Welcome to Diabeaters${data.name ? `, ${data.name}` : ""}!`,
       description: upgradeFlow
-        ? "Supplies, meal planning, scenarios, and the rest of the app are ready when you are."
+        ? "Supplies, meal planning, situation guides, and the rest of the app are ready when you are."
         : "Let's get started.",
     });
     if (onComplete) {
@@ -1048,7 +1048,7 @@ function EssentialsStep({
                     <>
                       <p>
                         We only use this to estimate their age on this device so education and calculators can stay
-                        appropriate for a child or teenager (for example hypo help and which scenarios appear). It is not
+                        appropriate for a child or teenager (for example hypo help and which situation guides appear). It is not
                         sold and it is not used for advertising.
                       </p>
                       <p>
@@ -1060,7 +1060,7 @@ function EssentialsStep({
                     <>
                       <p>
                         We only use this to work out your age here so guidance can stay age-appropriate (for example hypo
-                        tools and which scenarios you see). It is not sold and it is not used for advertising.
+                        tools and which situation guides you see). It is not sold and it is not used for advertising.
                       </p>
                       <p>
                         It stays with your signed-in account and you can edit or clear it whenever you like in Settings.

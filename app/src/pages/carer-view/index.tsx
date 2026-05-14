@@ -726,13 +726,13 @@ function SickDaySupporterCareCard(props: {
         </CardTitle>
         <CardDescription>
           Shared from their app when sick day mode is on. You can add readings and notes here; they sync to their
-          scenario for both of you.
+          sick-day record for both of you.
         </CardDescription>
         <Alert className="mt-3 border-border/60 bg-muted/30 py-3">
           <AlertDescription className="text-sm space-y-2 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
             <span className="text-muted-foreground block sm:inline">
               If they have already recovered but this section is still open, you can mark sick day as ended (updates
-              their shared scenario).
+              their shared sick-day status).
             </span>
             <Button
               type="button"
@@ -1788,13 +1788,13 @@ export default function CarerViewPage() {
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2">
                     <Plane className="h-5 w-5 text-primary" />
-                    Scenario status
+                    Guide status
                   </CardTitle>
-                  <CardDescription>Shared scenario flags (Sick day, Travel, Bedtime).</CardDescription>
+                  <CardDescription>Shared travel, sick-day, and bedtime flags when their project allows it.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {scenarioLines.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No scenario data visible yet.</p>
+                    <p className="text-sm text-muted-foreground">No guide status visible yet.</p>
                   ) : (
                     scenarioLines.map((line, i) => (
                       <div

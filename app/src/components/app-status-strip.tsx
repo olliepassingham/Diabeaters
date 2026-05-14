@@ -604,7 +604,7 @@ export function AppStatusStrip() {
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-snug">
                     Short summary only — always follow your care team for targets and doses. For meal timing, pump temp-basal
-                    ideas, and longer recovery text, open <span className="font-medium">Scenarios → Exercise</span>.
+                    ideas, and longer recovery text, open <span className="font-medium">Guides → Exercise</span>.
                   </TooltipContent>
                 </Tooltip>
               </div>

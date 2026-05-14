@@ -37,7 +37,7 @@ export default function Privacy() {
               <li>
                 <span className="font-semibold text-foreground">App data you enter</span>
                 <span className="text-muted-foreground"> — </span>
-                for example supplies, routines, ratios, scenario settings, and notes.
+                for example supplies, routines, ratios, travel and sick-day guide settings, and notes.
               </li>
               <li>
                 <span className="font-semibold text-foreground">Health-related data you choose to enter</span>

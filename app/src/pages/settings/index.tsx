@@ -135,7 +135,7 @@ function ProfileTab({
             <div className="space-y-2">
               <p>
                 Format: YYYY-MM-DD. We use this only to calculate age on this device for age-matched education (for
-                example hypo and correction tools, and which scenarios appear). It syncs with your profile when you are
+                example hypo and correction tools, and which situation guides appear). It syncs with your profile when you are
                 signed in.
               </p>
               <p>
@@ -1031,7 +1031,7 @@ export default function Settings() {
       </InfoSection>
       <InfoSection title="Notifications">
         <p>
-          Hypo alerts, supply trend alerts, scenario alerts, community feed likes and comments.
+          Hypo alerts, supply trend alerts, travel and sick-day guide alerts, community feed likes and comments.
         </p>
       </InfoSection>
       <InfoSection title="About">
@@ -1196,7 +1196,7 @@ export default function Settings() {
                 <div className="min-w-0">
                   <CardTitle className="text-base">2‑minute setup</CardTitle>
                   <CardDescription>
-                    Helps the dashboard, supplies, meal planner, and scenarios give better suggestions.
+                    Helps the dashboard, supplies, meal planner, and situation guides give better suggestions.
                   </CardDescription>
                 </div>
                 <Badge variant="secondary" className="shrink-0">
@@ -1266,7 +1266,7 @@ export default function Settings() {
             <SettingsHubNavLink
               href="/onboarding?upgrade=1"
               label="I have Type 1 diabetes / use insulin"
-              description="Unlock supplies, meal planner, ratios, scenarios, and the full dashboard"
+              description="Unlock supplies, meal planner, ratios, situation guides, and the full dashboard"
               icon={Sparkles}
             />
           </SettingsHubGroup>
@@ -1301,7 +1301,7 @@ export default function Settings() {
                 ? "Feed, messages, and device alerts for your supporter account"
                 : isCommunityAccount
                   ? "Feed, messages, and device alerts"
-                  : "Hypo, trends, scenarios"
+                  : "Hypo, trends, guides"
             }
             icon={Bell}
           />

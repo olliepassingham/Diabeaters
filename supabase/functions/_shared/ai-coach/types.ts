@@ -44,6 +44,7 @@ export type CoachAudience = "patient" | "supporter";
 export type AllowedHref =
   | "/adviser"
   | "/adviser?tab=meal"
+  | "/adviser?tab=meal&split=1"
   | "/adviser?tab=ratios"
   | "/scenarios/exercise"
   | "/scenarios/travel"
@@ -64,6 +65,7 @@ export type AllowedHref =
 export const ALLOWED_HREFS: ReadonlyArray<AllowedHref> = [
   "/adviser",
   "/adviser?tab=meal",
+  "/adviser?tab=meal&split=1",
   "/adviser?tab=ratios",
   "/scenarios/exercise",
   "/scenarios/travel",

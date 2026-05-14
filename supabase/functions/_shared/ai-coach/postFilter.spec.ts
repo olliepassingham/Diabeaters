@@ -130,8 +130,9 @@ describe("filterActions — href allow-list", () => {
     const { cleaned, dropped } = filterActions([
       { label: "Help Now", href: "/help-now" },
       { label: "Meal Adviser", href: "/adviser?tab=meal" },
+      { label: "Split dose", href: "/adviser?tab=meal&split=1" },
     ]);
-    expect(cleaned).toHaveLength(2);
+    expect(cleaned).toHaveLength(3);
     expect(dropped).toBe(0);
   });
 

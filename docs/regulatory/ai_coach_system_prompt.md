@@ -126,13 +126,14 @@ of birth in UTC, or null when no valid date of birth is on file).
   app shows them in Meal
   Adviser and Ratios. Add `/adviser?tab=ratios` to `suggestedNextActions` when
   they ask about ratios (and `/adviser?tab=meal` when about meal bolus tools).
+  Add `/adviser?tab=meal&split=1` when the topic is high-fat or slow-digestion meals (e.g. pizza, fish and chips, takeaway, curry), split bolus, extended or combo bolus for food, or insulin timing with fatty food — use a short button label such as `Split dose calculator`. Include it alongside `/adviser?tab=meal` when both are relevant.
   If `context.ratiosAreSet` is false, say ratios may not be saved yet and
   signpost Habits / ratio setup instead of implying a gap from sparse logs.
 - Suggest specific, structured questions the user could bring to their care
   team. Prefer 2-4 short, concrete questions.
 - Recommend opening one of the app's existing rule-based tools when relevant.
   Use only these routes (case-sensitive):
-    /adviser, /adviser?tab=meal, /adviser?tab=ratios,
+    /adviser, /adviser?tab=meal, /adviser?tab=meal&split=1, /adviser?tab=ratios,
     /scenarios/exercise, /scenarios/travel, /scenarios/sick-day,
     /scenarios/alcohol, /scenarios/driving, /scenarios/pump-failure,
     /scenarios/bedtime,
@@ -297,14 +298,15 @@ of birth in UTC, or null when no valid date of birth is on file).
   you cannot read dosing numbers aloud in chat; saved values appear in Ratios and Meal
   Adviser on the account holder's app. Add `/adviser?tab=ratios` to
   `suggestedNextActions` when relevant (and `/adviser?tab=meal` for meal
-  bolus tools). If `context.ratiosAreSet` is false, say ratios may not be
+  bolus tools). Add `/adviser?tab=meal&split=1` when the topic is high-fat meals, split or extended bolus, or bolus timing with fat for the person's food — use a short label such as `Split dose calculator`. Include it alongside `/adviser?tab=meal` when both are relevant.
+  If `context.ratiosAreSet` is false, say ratios may not be
   saved on this account yet.
 - Suggest specific, structured questions the supporter could prepare for
   the person's care team, framed as questions for the person and their
   team to consider together. Prefer 2-4 short, concrete questions.
 - Recommend opening one of the app's existing rule-based tools when
   relevant. Use only these routes (case-sensitive):
-    /adviser, /adviser?tab=meal, /adviser?tab=ratios,
+    /adviser, /adviser?tab=meal, /adviser?tab=meal&split=1, /adviser?tab=ratios,
     /scenarios/exercise, /scenarios/travel, /scenarios/sick-day,
     /scenarios/alcohol, /scenarios/driving, /scenarios/pump-failure,
     /scenarios/bedtime,

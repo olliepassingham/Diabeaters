@@ -50,56 +50,56 @@ const PATIENT_TOOLS: ToolDef[] = [
     href: "/adviser?tab=meal",
     icon: Calculator,
     title: "Meal & ratios",
-    description: "Meal bolus ideas from your saved carb ratios, plus ratio review and the ratio adviser.",
+    description: "Meal insulin from your saved carb ratios — same screen has split doses and ratio review.",
   },
   {
     id: "correction-helper",
     href: "/tools/correction",
     icon: TrendingUp,
     title: "Correction helper",
-    description: "Estimate a correction dose from your ISF; links to Ratios, Meal, Bedtime, Sick day.",
+    description: "A correction dose estimate from the insulin sensitivity you save in Settings.",
   },
   {
     id: "hypo-help",
     href: "/tools/hypo-help",
     icon: Droplet,
     title: "Hypo help",
-    description: "Fast-acting carbs to treat a low from current and target BG.",
+    description: "Rough fast-carb amounts for a low, from your current and target glucose.",
   },
   {
     id: "routines",
     href: "/tools/routines",
     icon: Repeat,
     title: "Routines",
-    description: "Saved workouts and meal patterns for quick reuse.",
+    description: "Saved workouts and meals you use often — open them in one tap.",
   },
   {
     id: "appointments",
     href: "/appointments",
     icon: Calendar,
     title: "Appointments",
-    description: "Clinic visits and check-ups in one place.",
+    description: "Clinic visits and check-ups in one list.",
   },
   {
     id: "supply-tracker",
     href: "/supplies",
     icon: Package,
     title: "Supply tracker",
-    description: "Stock, days remaining, and low-stock awareness.",
+    description: "Stock levels and rough days-left when you add how much you use each day.",
   },
   {
     id: "education",
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "A–Z glossary of type 1 diabetes and app terms.",
+    description: "Plain-language articles and definitions when a term is new to you.",
   },
   {
     id: "tips",
     href: "/tools/tips",
     icon: Lightbulb,
     title: "Tips",
-    description: "Tip of the day and a bigger library of practical reminders.",
+    description: "A daily tip plus more short ideas you can dip into anytime.",
   },
 ];
 
@@ -130,7 +130,7 @@ export const CARER_TOOLS: ToolDef[] = [
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "A–Z glossary of type 1 diabetes and app terms.",
+    description: "Plain-language articles and definitions when a term is new to you.",
   },
 ];
 
@@ -164,7 +164,7 @@ const COMMUNITY_TOOLS: ToolDef[] = [
     href: "/education",
     icon: BookOpen,
     title: "Education",
-    description: "A–Z glossary of type 1 diabetes and app terms.",
+    description: "Plain-language articles and definitions when a term is new to you.",
   },
   {
     id: "tips",
@@ -344,7 +344,12 @@ export function ToolsHubPage({
 
   return (
     <PageShell variant="standard" className="max-w-5xl space-y-10">
-      <PageHeader className="max-w-2xl" title="Tools" actions={<ToolsAboutDialog hubVariant={hubVariant} />} />
+      <PageHeader
+        className="max-w-2xl"
+        title="Tools"
+        description={hubVariant === "patient" ? "Quick answers, planning tools, and learn-at-your-pace reads." : undefined}
+        actions={<ToolsAboutDialog hubVariant={hubVariant} />}
+      />
 
       <DobUnknownNotice hidden={hubVariant === "carer" || hubVariant === "community"} testId="tools-dob-unknown-notice" />
 

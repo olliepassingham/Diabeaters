@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isPushTestUiEnabled } from "@/lib/flags";
-import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
+import { isIosDeviceForCapacitorPush, isIosShellForPushTestUi } from "@/lib/ios-user-agent";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
 import { getPushRegistrationDebugSnapshot } from "@/lib/push-tokens";
@@ -21,6 +22,8 @@ function deliveryFailureHint(r: {
   apns_environment?: string;
   apns_bundle_id?: string;
   apns_host?: string;
+  apns_topic?: string;
+  token_probe?: { hex_length: number; hex_prefix_8: string };
 }): string | null {
   if (!r.success || (r.delivered_push ?? 0) > 0 || (r.tokens ?? 0) < 1) return null;
   const d = r.detail ?? "";
@@ -46,19 +49,20 @@ function deliveryFailureHint(r: {
 /** “Send test push” — build-time flag, staging, or per-device unlock (see About → Version taps on iOS). */
 export function DevPushNotificationTestPanel() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [busy, setBusy] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [pushDebugJson, setPushDebugJson] = useState<string>("");
 
   useEffect(() => {
     setUnlocked(isPushTestUiUnlocked());
-  }, []);
+  }, [location]);
 
-  const iosLike = isIosLikeUserAgent();
-  const showPanel = isPushTestUiEnabled || (iosLike && unlocked);
+  const iosShell = isIosShellForPushTestUi();
+  const showPanel = isPushTestUiEnabled || (unlocked && iosShell);
 
   useEffect(() => {
-    if (!showPanel || !iosLike) return;
+    if (!showPanel || !isIosDeviceForCapacitorPush()) return;
     const tick = async () => {
       try {
         const snap = await getPushRegistrationDebugSnapshot();
@@ -70,11 +74,11 @@ export function DevPushNotificationTestPanel() {
     void tick();
     const id = window.setInterval(() => void tick(), 2000);
     return () => clearInterval(id);
-  }, [showPanel, iosLike]);
+  }, [showPanel]);
 
   if (!showPanel) return null;
 
-  if (!iosLike) {
+  if (!iosShell) {
     return (
       <div className="mt-6 rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
@@ -109,11 +113,16 @@ export function DevPushNotificationTestPanel() {
       const r = await invokeNotifyPushTest();
       const lines = [
         `success: ${r.success}`,
+        r.delivered_ok != null ? `delivered_ok: ${r.delivered_ok}` : null,
         r.error ? `error: ${r.error}` : null,
         r.failure_channel ? `failure_channel: ${r.failure_channel}` : null,
         r.apns_environment ? `apns_environment: ${r.apns_environment}` : null,
         r.apns_host ? `apns_host: ${r.apns_host}` : null,
+        r.apns_topic ? `apns_topic: ${r.apns_topic}` : null,
         r.apns_bundle_id ? `apns_bundle_id: ${r.apns_bundle_id}` : null,
+        r.token_probe
+          ? `token_probe: ${JSON.stringify(r.token_probe)} (compare hex_prefix_8 to Copy JSON cachedTokenPrefix)`
+          : null,
         r.http_status != null ? `http_status: ${r.http_status}` : null,
         r.detail ? `detail: ${r.detail}` : null,
         r.tokens != null ? `tokens: ${r.tokens}` : null,

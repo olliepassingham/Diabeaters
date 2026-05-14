@@ -20,6 +20,21 @@ export function isIosLikeUserAgent(): boolean {
 }
 
 /**
+ * Whether to show iOS-only developer tooling (push test panel, About unlock taps).
+ *
+ * Prefer {@link isIosDeviceForCapacitorPush} for registering with APNs. This helper is slightly
+ * broader for **UI**: `Capacitor.getPlatform()` is usually `"ios"` in the App Store shell even when
+ * `navigator.userAgent` is trimmed and no longer matches {@link isIosLikeUserAgent}. Some
+ * `server.url` builds report `"web"`; we then trust {@link isIosLikeUserAgent} or native shell.
+ */
+export function isIosShellForPushTestUi(): boolean {
+  const p = Capacitor.getPlatform();
+  if (p === "ios") return true;
+  if (isIosLikeUserAgent()) return true;
+  return p === "web" && Capacitor.isNativePlatform?.() === true;
+}
+
+/**
  * Allow Capacitor PushNotifications flows when the runtime reports `"web"` on a real iOS device
  * (remote `server.url` quirk) as well as when it correctly reports `"ios"`.
  */

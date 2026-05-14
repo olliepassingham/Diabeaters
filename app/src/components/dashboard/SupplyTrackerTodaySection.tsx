@@ -264,7 +264,7 @@ export function SupplyTrackerEntryCard() {
   const scenarioLine =
     scenarioState.travelModeActive || scenarioState.sickDayActive
       ? "Scenario active"
-      : "No scenarios active";
+      : "No active guides";
 
   return (
     <Card className={outerCardClass} data-testid="dashboard-supply-entry-card">

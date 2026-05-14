@@ -13,7 +13,7 @@ import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, R
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays, startOfDay } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -981,7 +981,7 @@ function CombinedScenarioImpactPanel({ supplies, scenarioState }: { supplies: Su
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-            <CardTitle className="text-base">Combined Scenario Impact</CardTitle>
+            <CardTitle className="text-base">Travel and sick day together</CardTitle>
           </div>
           <div className="flex flex-wrap gap-1">
             <Badge variant="secondary" className="text-xs">
@@ -995,7 +995,7 @@ function CombinedScenarioImpactPanel({ supplies, scenarioState }: { supplies: Su
           </div>
         </div>
         <CardDescription>
-          Travelling while unwell — your supplies face higher demand from both scenarios
+          Travelling while unwell — your supplies face higher demand from travel and sick day together
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -2424,6 +2424,7 @@ function EditUsualPrescriptionDialog({
 
 export default function Supplies() {
   const { toast } = useToast();
+  const search = useSearch();
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState<Supply | null>(null);
@@ -2438,6 +2439,7 @@ export default function Supplies() {
   const [highlightedSupplyId, setHighlightedSupplyId] = useState<string | null>(null);
   const [usualDialogOpen, setUsualDialogOpen] = useState(false);
   const [planningOpen, setPlanningOpen] = useState(false);
+  const lastSupplyDeepLinkKey = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -2754,6 +2756,33 @@ export default function Supplies() {
     setTimeout(() => setHighlightedSupplyId(null), 2000);
   };
 
+  useEffect(() => {
+    const qs = (search || "").replace(/^\?/, "");
+    const params = new URLSearchParams(qs);
+    const supplyId = params.get("supply") ?? params.get("id");
+    if (!supplyId) {
+      lastSupplyDeepLinkKey.current = null;
+      return;
+    }
+    if (supplies.length === 0) return;
+    if (!supplies.some((s) => s.id === supplyId)) return;
+
+    const dedupeKey = `${qs}|${supplyId}`;
+    if (lastSupplyDeepLinkKey.current === dedupeKey) return;
+    lastSupplyDeepLinkKey.current = dedupeKey;
+
+    setActiveTab("all");
+    setHighlightedSupplyId(supplyId);
+    const scrollT = window.setTimeout(() => {
+      document.getElementById(`supply-card-${supplyId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    const clearHighlightT = window.setTimeout(() => setHighlightedSupplyId(null), 2200);
+    return () => {
+      window.clearTimeout(scrollT);
+      window.clearTimeout(clearHighlightT);
+    };
+  }, [search, supplies]);
+
   return (
     <PageShell variant="standard" className="relative space-y-4">
       <FaceLogoWatermark />
@@ -2942,7 +2971,7 @@ export default function Supplies() {
             />
           </span>
           <span className="text-xs text-muted-foreground text-right max-w-[55%] sm:max-w-none">
-            Prescription · pharmacy · scenarios — optional timeline
+            Prescription · pharmacy · guides — optional timeline
           </span>
         </summary>
         {planningOpen && (

@@ -22,8 +22,11 @@ import {
   storage,
   DIABEATER_SETTINGS_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   dismissSoftSetupNudge,
+  dismissFirstWeekChecklist,
   isCommunityAccountProfile,
+  isFirstWeekChecklistDismissed,
   isSoftSetupNudgeDismissed,
   isWithinOnboardingPostFinishGracePeriod,
   Supply as LocalSupply,
@@ -61,9 +64,10 @@ import { repairSickDayCloudIfLocalInactive } from "@/lib/scenarios-supabase";
 import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
-import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
+import { FirstWeekChecklistCard } from "@/components/dashboard/FirstWeekChecklistCard";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import { getHealthStatus, getTodayGlanceLine, type HealthStatus } from "@/lib/dashboard-health-status";
@@ -680,6 +684,7 @@ function DashboardSkeleton() {
 }
 
 const ONBOARDING_SETUP_GRACE_DAYS = 5;
+const FIRST_WEEK_CHECKLIST_DAYS = 7;
 
 function SoftSettingsNudge({
   completion,
@@ -730,7 +735,7 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-amber-600" />
-            <h3 className="font-display text-h3 font-semibold tracking-tight">Complete Your Setup</h3>
+            <h3 className="font-display text-h3 font-semibold tracking-tight">Finish your setup</h3>
           </div>
           <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
             {completion.completed}/{completion.total}
@@ -746,12 +751,12 @@ function SetupPromptCard({ completion }: { completion: { percentage: number; com
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Complete your settings to unlock all features and get personalized recommendations.
+          Add the basics in Settings to unlock the full app and more tailored suggestions.
         </p>
         
         <Link href="/settings">
           <Button className="w-full gradient-primary border-primary-border" data-testid="button-complete-setup">
-            Complete Settings
+            Open Settings
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </Link>
@@ -781,6 +786,7 @@ export default function Dashboard() {
   const [isSettingsComplete, setIsSettingsComplete] = useState(() => storage.isSettingsComplete());
   const [settingsCompletion, setSettingsCompletion] = useState(() => storage.getSettingsCompletion());
   const [softSetupNudgeDismissed, setSoftSetupNudgeDismissed] = useState(() => isSoftSetupNudgeDismissed());
+  const [firstWeekChecklistDismissed, setFirstWeekChecklistDismissed] = useState(() => isFirstWeekChecklistDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
@@ -814,10 +820,16 @@ export default function Dashboard() {
 
     const onSettingsChanged = () => refreshData();
 
+    const onActiveUserChanged = () => {
+      setFirstWeekChecklistDismissed(isFirstWeekChecklistDismissed());
+      refreshData();
+    };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
     window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onSettingsChanged);
+    window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUserChanged);
 
     return () => {
       clearTimeout(timer);
@@ -825,6 +837,7 @@ export default function Dashboard() {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);
       window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onSettingsChanged);
+      window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUserChanged);
     };
   }, []);
 
@@ -874,6 +887,13 @@ export default function Dashboard() {
     !isCommunityDash && !isSettingsComplete && inOnboardingSetupGrace && !softSetupNudgeDismissed;
   const showFullSetupPrompt =
     !isCommunityDash && !isSettingsComplete && !inOnboardingSetupGrace;
+
+  const inFirstWeekSinceOnboarding = isWithinOnboardingPostFinishGracePeriod(FIRST_WEEK_CHECKLIST_DAYS);
+  const showFirstWeekChecklist =
+    !isCommunityDash &&
+    inFirstWeekSinceOnboarding &&
+    !firstWeekChecklistDismissed &&
+    !showFullSetupPrompt;
 
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
@@ -945,6 +965,19 @@ export default function Dashboard() {
           </div>
         ) : null}
 
+        {!isCommunityDash && showFirstWeekChecklist && (
+          <div className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
+            <FirstWeekChecklistCard
+              suppliesCount={supplies.length}
+              isSettingsComplete={isSettingsComplete}
+              onDismiss={() => {
+                dismissFirstWeekChecklist();
+                setFirstWeekChecklistDismissed(true);
+              }}
+            />
+          </div>
+        )}
+
         {!isCommunityDash ? (
           <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
@@ -987,7 +1020,6 @@ export default function Dashboard() {
       />
 
       <section className="animate-stagger space-y-3 sm:space-y-4 pt-2" data-testid="dashboard-widgets">
-        {widgetsToRender.length > 0 ? <PageSectionLabel>Your widgets</PageSectionLabel> : null}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {widgetsToRender.map((w) => {
             const Comp = w.Component;

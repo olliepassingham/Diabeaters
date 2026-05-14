@@ -58,7 +58,7 @@ export function getTodayGlanceLine(
     }
     return {
       type: "warning",
-      message: "Action may be needed — review supplies and active scenarios.",
+      message: "Action may be needed — review supplies and active guides.",
     };
   }
 

@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
 
 import { Link, useLocation } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -30,16 +31,33 @@ import {
   getPostExerciseEducationalCopy,
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
+import {
+  getMealAbsorptionVisual,
+  getSplitFatAbsorptionVisual,
+  MEAL_FOOD_TYPE_OPTIONS,
+  mealFoodTypeLabel,
+  splitFatLevelShortLabel,
+  type MealFoodType,
+} from "@/lib/meal-planner-food-categories";
 
 
 function getInitialTab(): string {
   const params = new URLSearchParams(window.location.search);
+  const split = params.get("split");
+  if (split === "1" || split === "true") return "meal";
   const tab = params.get("tab");
   if (tab === "meal" || tab === "ratios") {
     return tab;
   }
   if (tab === "ratio-adviser") return "ratios";
   return "meal";
+}
+
+function getInitialMealTime(): string {
+  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const mt = params.get("mealTime");
+  if (mt === "breakfast" || mt === "lunch" || mt === "dinner" || mt === "snack") return mt;
+  return "lunch";
 }
 
 export default function Adviser() {
@@ -66,12 +84,23 @@ export default function Adviser() {
     const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
     const params = new URLSearchParams(qs);
     const tab = params.get("tab");
-    if (tab === "meal" || tab === "ratios") {
+    const split = params.get("split");
+    if (split === "1" || split === "true") {
+      setActiveTab("meal");
+      setShowSplitCalculator(true);
+    } else if (tab === "meal" || tab === "ratios") {
       setActiveTab(tab);
+      if (tab === "ratios") setShowSplitCalculator(false);
     } else if (tab === "ratio-adviser") {
       setActiveTab("ratios");
+      setShowSplitCalculator(false);
     }
     setCameFromRatios(params.get("from") === "ratios");
+
+    const mtParam = params.get("mealTime");
+    if (mtParam === "breakfast" || mtParam === "lunch" || mtParam === "dinner" || mtParam === "snack") {
+      setMealTime(mtParam);
+    }
   }, [location]);
 
   useEffect(() => {
@@ -90,7 +119,13 @@ export default function Adviser() {
 
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
-  const [mealTime, setMealTime] = useState<string>("lunch");
+  const [mealTime, setMealTime] = useState<string>(getInitialMealTime);
+  const [mealFoodType, setMealFoodType] = useState<MealFoodType>("balanced");
+  const mealAbsorptionVisual = useMemo(() => getMealAbsorptionVisual(mealFoodType), [mealFoodType]);
+  const mealFoodShortLabel = useMemo(() => {
+    const full = mealFoodTypeLabel(mealFoodType);
+    return full.includes(" (") ? full.slice(0, full.indexOf(" (")) : full;
+  }, [mealFoodType]);
 
   const [planningAroundExercise, setPlanningAroundExercise] = useState(false);
   const [exerciseTiming, setExerciseTiming] = useState<"before" | "after" | "during">("before");
@@ -179,6 +214,7 @@ export default function Adviser() {
   const [splitFatLevel, setSplitFatLevel] = useState<"low" | "medium" | "high">("high");
   const [splitMealTime, setSplitMealTime] = useState<"breakfast" | "lunch" | "dinner" | "snack">("dinner");
   const [showSplitCalculator, setShowSplitCalculator] = useState(false);
+  const [showSplitResultDetails, setShowSplitResultDetails] = useState(false);
   const [splitResult, setSplitResult] = useState<{
     totalUnits: number;
     firstDose: number;
@@ -187,6 +223,8 @@ export default function Adviser() {
     splitRatio: string;
     ratioUsed: string;
   } | null>(null);
+
+  const splitAbsorptionVisual = useMemo(() => getSplitFatAbsorptionVisual(splitFatLevel), [splitFatLevel]);
 
   const bgUnits = profile.bgUnits || "mmol/L";
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
@@ -288,6 +326,7 @@ export default function Adviser() {
       splitRatio,
       ratioUsed,
     });
+    setShowSplitResultDetails(false);
   };
 
   const handleQuickMealPlan = () => {
@@ -309,7 +348,7 @@ export default function Adviser() {
     try {
       storage.addActivityLog({
         activityType: "meal_planning",
-        activityDetails: `${carbValue}g carbs for ${mealTime}`,
+        activityDetails: `${carbValue}g carbs for ${mealTime} (${mealFoodTypeLabel(mealFoodType)})`,
         recommendation: `${result.dose} units`,
       });
     } catch {}
@@ -341,13 +380,13 @@ export default function Adviser() {
           <PageInfoDialog title="About Meal &amp; ratios" description="Meal planning and ratio tools">
             <InfoSection title="Meal planner">
               <p>
-                Enter carbs and meal type for a dose suggestion based on your ratios. Toggle &quot;Planning around exercise?&quot; to get
-                adjusted doses for meals before, during, or after workouts.
+                Carbs and meal time set the dose from your ratios. After a suggestion, you&apos;ll see carbs and a simple absorption-time bar
+                from your food choice (fast vs slow — typical patterns only). Use &quot;Planning around exercise?&quot; for before, during, or
+                after workouts.
                 {isPumpUser && (
                   <>
                     {" "}
-                    If you use a pump, program boluses on your device and always check IOB; your pump may suggest different amounts if
-                    automation is on.
+                    On a pump, program boluses on your device and check IOB; automation may suggest different amounts.
                   </>
                 )}
               </p>
@@ -544,6 +583,22 @@ export default function Adviser() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="meal-food-type">What sort of food?</Label>
+                <Select value={mealFoodType} onValueChange={(v) => setMealFoodType(v as MealFoodType)}>
+                  <SelectTrigger id="meal-food-type" data-testid="select-meal-food-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEAL_FOOD_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Dumbbell className="h-4 w-4 text-primary" />
@@ -669,8 +724,6 @@ export default function Adviser() {
                   </Button>
                 </div>
 
-                {mealResult.error !== "no_ratios" && <MedicalNumericOutputDisclaimer compact />}
-
                 {mealResult.error === "no_ratios" ? (
                   <div className="p-4 bg-muted rounded-lg text-center space-y-2">
                     <p className="text-sm text-muted-foreground">You need insulin-to-carb ratios before the meal planner can suggest doses.</p>
@@ -679,146 +732,161 @@ export default function Adviser() {
                       Go to Ratio Adviser
                     </Button>
                   </div>
-                ) : mealResult.exerciseContext === "during" ? (
-                  <div className="space-y-3">
-                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 dark:border-blue-800/50 dark:bg-blue-950/25">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1 min-w-0">
-                          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
-                            During exercise
-                          </p>
-                          <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                            {isPumpUser ? "Usually no meal bolus" : "Usually no insulin"}
-                          </p>
-                          <p className="text-sm text-blue-700/80 dark:text-blue-200/80">
-                            {mealResult.carbs}g carbs
-                            {mealResult.standardDose != null
-                              ? ` • Standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    {mealResult.tips && (
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
-                      </ul>
-                    )}
-                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {mealResult.exerciseContext && mealResult.standardDose !== undefined && (
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
-                          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Standard</p>
-                          <p className="text-xl font-bold line-through text-muted-foreground">
-                            {mealResult.standardDose}u
-                          </p>
-                          <p className="text-xs text-muted-foreground">{mealResult.carbs}g • {mealResult.mealType}</p>
+                  <>
+                    {mealResult.exerciseContext === "during" ? (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 dark:border-blue-800/50 dark:bg-blue-950/25">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1 min-w-0">
+                              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
+                                During exercise
+                              </p>
+                              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                                {isPumpUser ? "Usually no meal bolus" : "Usually no insulin"}
+                              </p>
+                              <p className="text-sm text-blue-700/80 dark:text-blue-200/80">
+                                {mealResult.carbs}g carbs
+                                {mealResult.standardDose != null
+                                  ? ` • Standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
-                          <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">
-                            {mealResult.exerciseContext === "before" ? "Pre‑exercise" : "Post‑exercise"}
-                            {typeof mealResult.exerciseReduction === "number" ? ` • −${mealResult.exerciseReduction}%` : ""}
-                          </p>
-                          <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
-                            {mealResult.dose}u
-                          </p>
-                          <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">
-                            {isPumpUser ? "Adjusted bolus (program on pump)" : "Adjusted dose"}
-                          </p>
-                        </div>
+                        <MealCarbAbsorptionPreview
+                          carbsGrams={mealResult.carbs}
+                          visual={mealAbsorptionVisual}
+                          foodChoiceLabel={mealFoodShortLabel}
+                        />
+                        {mealResult.tips && (
+                          <ul className="text-sm text-muted-foreground space-y-1">
+                            {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
+                          </ul>
+                        )}
                       </div>
-                    )}
-                    {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
-                      <p className="text-xs text-muted-foreground text-center">
-                        Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
-                      </p>
-                    ) : null}
-                    {!mealResult.exerciseContext && (
-                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
-                        <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">Suggested</p>
-                        <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
-                          {mealResult.dose}u
-                        </p>
-                        <p className="text-sm text-emerald-700/80 dark:text-emerald-200/80">
-                          {mealResult.carbs}g • {mealResult.mealType}
-                        </p>
-                        {isPumpUser ? (
-                          <p className="text-xs text-emerald-800/90 dark:text-emerald-200/90 pt-1">
-                            Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
+                    ) : (
+                      <div className="space-y-3">
+                        {mealResult.exerciseContext && mealResult.standardDose !== undefined && (
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
+                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Standard</p>
+                              <p className="text-xl font-bold line-through text-muted-foreground">
+                                {mealResult.standardDose}u
+                              </p>
+                              <p className="text-xs text-muted-foreground">{mealResult.carbs}g • {mealResult.mealType}</p>
+                            </div>
+                            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
+                              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">
+                                {mealResult.exerciseContext === "before" ? "Pre‑exercise" : "Post‑exercise"}
+                                {typeof mealResult.exerciseReduction === "number" ? ` • −${mealResult.exerciseReduction}%` : ""}
+                              </p>
+                              <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
+                                {mealResult.dose}u
+                              </p>
+                              <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">
+                                {isPumpUser ? "Adjusted bolus (program on pump)" : "Adjusted dose"}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
+                          <p className="text-xs text-muted-foreground text-center">
+                            Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
                           </p>
                         ) : null}
+                        {!mealResult.exerciseContext && (
+                          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">Suggested</p>
+                            <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
+                              {mealResult.dose}u
+                            </p>
+                            <p className="text-sm text-emerald-700/80 dark:text-emerald-200/80">
+                              {mealResult.carbs}g • {mealResult.mealType}
+                            </p>
+                            {isPumpUser ? (
+                              <p className="text-xs text-emerald-800/90 dark:text-emerald-200/90 pt-1">
+                                Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
+                              </p>
+                            ) : null}
+                          </div>
+                        )}
+                        <MealCarbAbsorptionPreview
+                          carbsGrams={mealResult.carbs}
+                          visual={mealAbsorptionVisual}
+                          foodChoiceLabel={mealFoodShortLabel}
+                        />
+                        <Collapsible open={showMealResultDetails} onOpenChange={setShowMealResultDetails}>
+                          <CollapsibleTrigger asChild>
+                            <button
+                              type="button"
+                              className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                              data-testid="button-toggle-meal-result-details"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                                <span className="text-sm font-medium">More detail</span>
+                                <span className="text-xs text-muted-foreground truncate">
+                                  Tips, rounding, safety notes
+                                </span>
+                              </div>
+                              {showMealResultDetails ? (
+                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="pt-2 space-y-2">
+                              <MedicalNumericOutputDisclaimer compact />
+                              {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
+                                <p className="text-xs text-muted-foreground text-center">
+                                  Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
+                                </p>
+                              ) : null}
+                              {mealResult.roundingAdvice && (
+                                <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
+                                  <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
+                                </div>
+                              )}
+                              {mealResult.tips && (
+                                <ul className="text-sm text-muted-foreground space-y-1">
+                                  {mealResult.tips.map((tip, i) => (
+                                    <li key={i} className="flex gap-2">
+                                      <span className="text-primary">-</span>
+                                      {tip}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {scenarioState.sickDayActive && (
+                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
+                                  <div className="flex items-start gap-2">
+                                    <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                                      <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
+                                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
+                                  <div className="flex items-start gap-2">
+                                    <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                                      <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
                     )}
-                    <Collapsible open={showMealResultDetails} onOpenChange={setShowMealResultDetails}>
-                      <CollapsibleTrigger asChild>
-                        <button
-                          type="button"
-                          className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
-                          data-testid="button-toggle-meal-result-details"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-                            <span className="text-sm font-medium">More detail</span>
-                            <span className="text-xs text-muted-foreground truncate">
-                              Tips, rounding, safety notes
-                            </span>
-                          </div>
-                          {showMealResultDetails ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="pt-2 space-y-2">
-                          {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
-                            <p className="text-xs text-muted-foreground text-center">
-                              Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
-                            </p>
-                          ) : null}
-                          {mealResult.roundingAdvice && (
-                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
-                              <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
-                            </div>
-                          )}
-                          {mealResult.tips && (
-                            <ul className="text-sm text-muted-foreground space-y-1">
-                              {mealResult.tips.map((tip, i) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="text-primary">-</span>
-                                  {tip}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {scenarioState.sickDayActive && (
-                            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
-                              <div className="flex items-start gap-2">
-                                <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                <p className="text-sm text-amber-800 dark:text-amber-200">
-                                  <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                          {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
-                              <div className="flex items-start gap-2">
-                                <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                                <p className="text-sm text-blue-800 dark:text-blue-200">
-                                  <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                          <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -843,7 +911,7 @@ export default function Adviser() {
                     <Pizza className="h-5 w-5 text-primary" />
                     <div className="text-left">
                       <span className="font-medium">Split Dose Calculator</span>
-                      <p className="text-xs text-muted-foreground font-normal">For high-fat meals like pizza, fish & chips</p>
+                      <p className="text-xs text-muted-foreground font-normal">Carbs, timing, absorption bar</p>
                     </div>
                   </div>
                   {showSplitCalculator ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -851,15 +919,6 @@ export default function Adviser() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <CardContent className="pt-0 space-y-4">
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      High-fat meals slow carb absorption.{" "}
-                      {isPumpUser
-                        ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
-                        : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
-                    </p>
-                  </div>
-
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="split-carbs">Total carbs (g)</Label>
@@ -907,13 +966,17 @@ export default function Adviser() {
                   </Button>
 
                   {splitResult && (
-                    <div className="p-4 bg-primary/5 rounded-lg space-y-3">
-                      <MedicalNumericOutputDisclaimer compact />
-                      <h4 className="font-medium flex items-center gap-2">
-                        <Pizza className="h-4 w-4 text-primary" />
-                        Your Split Dose Plan ({splitResult.splitRatio})
-                      </h4>
-                      
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <Pizza className="h-4 w-4 text-primary" />
+                          Split plan
+                        </h4>
+                        <Badge variant="secondary" className="font-mono text-xs tabular-nums">
+                          {splitResult.splitRatio}
+                        </Badge>
+                      </div>
+
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                           <p className="text-xs text-green-600 dark:text-green-400 font-medium">
@@ -937,37 +1000,83 @@ export default function Adviser() {
                         </div>
                       </div>
 
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <p><strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs</p>
-                        <p className="text-xs">{splitResult.ratioUsed}</p>
-                        <p><strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to {splitResult.secondDoseDelay + 1} hours.</p>
-                      </div>
+                      <MealCarbAbsorptionPreview
+                        carbsGrams={parseInt(splitCarbs, 10)}
+                        visual={splitAbsorptionVisual}
+                        foodChoiceLabel={splitFatLevelShortLabel(splitFatLevel)}
+                        previewTestId="split-carb-absorption-preview"
+                      />
 
-                      <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
-                        <p><strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use a device that can deliver finer increments, follow your care team’s guidance.</p>
-                        <p>
-                          <strong>Tip:</strong>{" "}
-                          {isPumpUser
-                            ? "Set a timer for the second part; check BG and IOB before delivering."
-                            : "Set a timer for your second dose! Check BG before taking it."}
-                        </p>
-                      </div>
-
-                      {isPumpUser && (
-                        <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
-                          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
-                          <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                            Your pump may have an extended/square wave bolus feature that handles this automatically. 
-                            Check your pump's manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
-                          </p>
-                        </div>
-                      )}
+                      <Collapsible open={showSplitResultDetails} onOpenChange={setShowSplitResultDetails}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                            data-testid="button-toggle-split-result-details"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-sm font-medium">More detail</span>
+                              <span className="text-xs text-muted-foreground truncate">Why split, ratio, tips</span>
+                            </div>
+                            {showSplitResultDetails ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="pt-2 space-y-3">
+                            <MedicalNumericOutputDisclaimer compact />
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-sm text-blue-800 dark:text-blue-200">
+                                High-fat meals slow carb absorption.{" "}
+                                {isPumpUser
+                                  ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
+                                  : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
+                              </p>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>
+                                <strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs
+                              </p>
+                              <p className="text-xs">{splitResult.ratioUsed}</p>
+                              <p>
+                                <strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to{" "}
+                                {splitResult.secondDoseDelay + 1} hours.
+                              </p>
+                            </div>
+                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
+                              <p>
+                                <strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use
+                                a device that can deliver finer increments, follow your care team&apos;s guidance.
+                              </p>
+                              <p>
+                                <strong>Tip:</strong>{" "}
+                                {isPumpUser
+                                  ? "Set a timer for the second part; check BG and IOB before delivering."
+                                  : "Set a timer for your second dose! Check BG before taking it."}
+                              </p>
+                            </div>
+                            {isPumpUser && (
+                              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
+                                <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
+                                <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                                  Your pump may have an extended/square wave bolus feature that handles this automatically. Check your
+                                  pump&apos;s manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
+                                </p>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              [Not medical advice. Everyone&apos;s response to fat varies. Start conservatively and adjust based on your
+                              experience.]
+                            </p>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   )}
-
-                  <p className="text-xs text-muted-foreground">
-                    [Not medical advice. Everyone's response to fat varies. Start conservatively and adjust based on your experience.]
-                  </p>
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>

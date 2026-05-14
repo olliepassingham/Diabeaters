@@ -66,8 +66,8 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
   },
   {
     id: "ratio-adviser",
-    label: "Ratio adviser",
-    description: "Your insulin ratios and correction factor at a glance.",
+    label: "Your ratios",
+    description: "Carb ratios by meal, with a shortcut into meal planning.",
     defaultEnabled: true,
     defaultSize: "half",
     component: RatioAdviserWidget,

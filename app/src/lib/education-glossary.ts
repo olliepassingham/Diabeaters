@@ -162,7 +162,7 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
     slug: "infusion-set",
     short: "Pump cannula and tubing that delivers insulin under the skin.",
     definition:
-      "An infusion set is the disposable part of pump therapy that sits under the skin and connects insulin from the pump to your body. Rotation of sites reduces lipohypertrophy. Occlusions, kinks, or set failures can cause sudden highs or ketones; pump-failure and travel scenarios in the app refer to carrying backup plans your team provides.",
+      "An infusion set is the disposable part of pump therapy that sits under the skin and connects insulin from the pump to your body. Rotation of sites reduces lipohypertrophy. Occlusions, kinks, or set failures can cause sudden highs or ketones; pump-failure and travel guides in the app refer to carrying backup plans your team provides.",
   },
   {
     term: "Insulin on board (IOB)",
@@ -176,7 +176,7 @@ export const GLOSSARY_TERMS: GlossaryTerm[] = [
     slug: "insulin-pump-therapy",
     short: "Continuous subcutaneous insulin via a pump.",
     definition:
-      "Pump therapy delivers basal in small pulses and boluses in user-directed doses. It allows fine-tuning and temporary basal changes for exercise or illness. You still need supplies, site changes, and emergency MDI backup if your team prescribes it. Profile questions in Diabeaters use pump vs MDI to show relevant wording in supplies and scenarios.",
+      "Pump therapy delivers basal in small pulses and boluses in user-directed doses. It allows fine-tuning and temporary basal changes for exercise or illness. You still need supplies, site changes, and emergency MDI backup if your team prescribes it. Profile questions in Diabeaters use pump vs MDI to show relevant wording in supplies and situation guides.",
   },
   {
     term: "Insulin resistance",

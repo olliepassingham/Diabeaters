@@ -7,7 +7,7 @@ import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-r
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage } from "@/lib/storage";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
-import { PageHeader, PageSectionLabel, PageShell } from "@/components/layout";
+import { PageHeader, PageShell } from "@/components/layout";
 
 type ScenarioCardDef = {
   href: string;
@@ -117,10 +117,10 @@ export default function Scenarios() {
   return (
     <PageShell variant="standard" className="space-y-8">
       <PageHeader
-        title="Scenarios"
-        description="One situation at a time — pick what matches yours."
+        title="Situation guides"
+        description="Exercise, travel, sick days, bedtime, and more — tap the one you need."
         actions={
-          <PageInfoDialog title="About Scenarios" description="Special situation guidance for diabetes management">
+          <PageInfoDialog title="About situation guides" description="Step-by-step help for specific moments — not a substitute for your clinic.">
             <InfoSection title="Exercise">
               <p>Open structured exercise planning with carbs, checks, and bolus tips — moved here from Tools.</p>
             </InfoSection>
@@ -149,8 +149,6 @@ export default function Scenarios() {
           </PageInfoDialog>
         }
       />
-
-      <PageSectionLabel>Situation guides</PageSectionLabel>
 
       <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
         {visibleScenarioCards.map((c, idx) => (

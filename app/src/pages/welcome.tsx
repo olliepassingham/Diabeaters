@@ -73,7 +73,7 @@ export default function Welcome() {
                       <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Full tools: supplies, meal planner, scenarios, and a personalised dashboard.
+                      Full tools: supplies, meal planner, situation guides, and a personalised dashboard.
                     </p>
                   </div>
                 </div>

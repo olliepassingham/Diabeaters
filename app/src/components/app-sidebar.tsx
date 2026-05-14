@@ -40,8 +40,8 @@ import {
 const patientItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Supply Tracker", url: "/supplies", icon: Package },
-  { title: "Meal planner", url: "/adviser", icon: Bot },
-  { title: "Scenarios", url: "/scenarios", icon: AlertTriangle },
+  { title: "Meal & ratios", url: "/adviser", icon: Bot },
+  { title: "Guides", url: "/scenarios", icon: AlertTriangle },
   { title: "Appointments", url: "/appointments", icon: Calendar },
   { title: "Supporters", url: "/family-carers", icon: Heart },
   { title: "Settings", url: "/settings", icon: Settings },

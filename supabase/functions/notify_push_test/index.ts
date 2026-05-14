@@ -97,6 +97,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    /** Normalized hex probe (matches Edge APNs path); safe prefix for comparing to in-app Copy JSON. */
+    const tokenProbe = (raw: string) => {
+      const h = raw.replace(/\s+/g, "").replace(/[<>]/g, "").toLowerCase();
+      return { hex_length: h.length, hex_prefix_8: h.slice(0, 8) };
+    };
+
     const title = "Diabeaters test push";
     const body = "If you can read this, APNs delivery is working for your device.";
     const payload = { kind: "push_test", deep_link: "/settings/notifications" };
@@ -113,7 +119,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const out: Record<string, unknown> = { success: true, tokens: tokens.length, delivered_push: delivered };
+    const out: Record<string, unknown> = {
+      success: true,
+      tokens: tokens.length,
+      delivered_push: delivered,
+      delivered_ok: delivered > 0,
+    };
     if (delivered === 0 && lastFailure) {
       out.failure_channel = lastFailure.channel;
       out.detail = lastFailure.errorBody ?? null;
@@ -124,7 +135,9 @@ Deno.serve(async (req: Request) => {
         const ctx = getApnsEdgeSendContext();
         out.apns_environment = ctx.environment;
         out.apns_bundle_id = ctx.bundleId;
+        out.apns_topic = ctx.bundleId;
         out.apns_host = ctx.host;
+        out.token_probe = tokenProbe(tokens[0] ?? "");
       }
     }
 

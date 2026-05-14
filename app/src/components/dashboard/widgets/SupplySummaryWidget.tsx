@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, ShoppingCart, ArrowRight, Syringe, Activity, Plug, Cylinder } from "lucide-react";
+import { Package, AlertTriangle, Syringe, Activity, Plug, Cylinder } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { getUnitsPerPen, storage, Supply } from "@/lib/storage";
@@ -132,7 +131,7 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
           )}
         </div>
         <p className="text-small text-muted-foreground uppercase tracking-wide mt-0.5">
-          Stock &amp; estimated run-out
+          Stock &amp; estimated run-out · tap an item to open it
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5 p-4 pt-0 md:px-6 md:pb-5">
@@ -182,10 +181,11 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
               const runOutDate = storage.getRunOutDate(s);
 
               return (
-                <div
+                <Link
                   key={s.id}
+                  href={`/supplies?supply=${encodeURIComponent(s.id)}`}
                   className={cn(
-                    "space-y-1 rounded-lg border border-border/70 bg-card/60 px-2 py-1.5 transition-colors",
+                    "block space-y-1 rounded-lg border border-border/70 bg-card/60 px-2 py-1.5 text-left no-underline transition-colors outline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     status === "critical" &&
                       "border-red-500/40 bg-red-500/[0.06] dark:border-red-500/30 dark:bg-red-950/25",
                     status === "low" &&
@@ -243,7 +243,7 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
                   <div className="h-1 overflow-hidden rounded-full bg-muted">
                     <div className={cn("h-full rounded-full transition-all", barColor)} style={{ width: `${barWidth}%` }} />
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -261,33 +261,6 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
             </div>
           </div>
         )}
-
-        <div className={cn("mt-auto flex gap-2", compact ? "flex-col" : "flex-row")}>
-          <Link href="/supplies" className="min-w-0 flex-1">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full min-h-10 gap-1.5 font-medium shadow-sm border border-border/80"
-              data-testid="button-view-supplies"
-            >
-              {compact ? "Supplies" : "View supplies"}
-              <ArrowRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            </Button>
-          </Link>
-          {!compact && (
-            <Link href="/supplies">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-10 min-w-10 shrink-0 border-border/80 px-3 shadow-sm"
-                title="Supplies & orders"
-                data-testid="button-add-order"
-              >
-                <ShoppingCart className="h-4 w-4" aria-hidden />
-              </Button>
-            </Link>
-          )}
-        </div>
       </CardContent>
     </WidgetCard>
   );

@@ -69,7 +69,7 @@ function patientTabs(showCommunityTab: boolean): TabDef[] {
       isActive: (pathname) => pathname === "/",
     },
     {
-      title: "Scenarios",
+      title: "Guides",
       href: "/scenarios",
       icon: Shapes,
       testId: "bottomnav-scenarios",

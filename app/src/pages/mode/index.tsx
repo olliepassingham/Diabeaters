@@ -84,7 +84,7 @@ export default function ModeChooserPage() {
                   <div className="font-semibold text-foreground">User Mode</div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">Your own dashboard, supplies, scenarios, and tools.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Your own dashboard, supplies, situation guides, and tools.</p>
               </div>
             </div>
           </button>

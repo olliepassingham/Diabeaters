@@ -80,7 +80,7 @@ type StorageLogicalKey = keyof typeof STORAGE_KEYS;
  * Each scope groups a set of `STORAGE_KEYS` entries. The settings UI exposes
  * checkboxes for these so people can choose what their backup contains:
  *
- *  - `clinical`     — profile, ratios, supplies, hypos, appointments, scenarios.
+ *  - `clinical`     — profile, ratios, supplies, hypos, appointments, situation guides.
  *                     Default ON.
  *  - `app_settings` — notification prefs, dashboard widgets, quick actions.
  *                     Default ON (small, safe to share with yourself).
@@ -108,7 +108,7 @@ const BACKUP_SCOPE_LABELS: Record<BackupScope, string> = {
 
 const BACKUP_SCOPE_DESCRIPTIONS: Record<BackupScope, string> = {
   clinical:
-    "Profile, ratios, supplies, hypo logs, appointments, sick-day, scenarios, routines.",
+    "Profile, ratios, supplies, hypo logs, appointments, sick-day, situation guides, routines.",
   app_settings: "Notification prefs, dashboard widgets, quick actions, units.",
   community: "Local drafts of posts, replies, reels, and follows.",
   messages: "Local copies of direct messages and conversations.",
@@ -297,8 +297,37 @@ export function dismissSoftSetupNudge(): void {
   }
 }
 
-/** Same-tab: local appointment rows changed (storage event does not fire in the writing tab). */
+function firstWeekChecklistDismissedKey(): string {
+  if (typeof window === "undefined") return "diabeater_first_week_checklist_dismissed";
+  try {
+    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
+    return uid ? `diabeater_first_week_checklist_dismissed_u_${uid}` : "diabeater_first_week_checklist_dismissed";
+  } catch {
+    return "diabeater_first_week_checklist_dismissed";
+  }
+}
+
+export function isFirstWeekChecklistDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(firstWeekChecklistDismissedKey()) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function dismissFirstWeekChecklist(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(firstWeekChecklistDismissedKey(), "true");
+  } catch {
+    /* ignore */
+  }
+}
+
 export const DIABEATER_APPOINTMENTS_CHANGED_EVENT = "diabeater-appointments-changed";
+
+/** Same-tab: local appointment rows changed (storage event does not fire in the writing tab). */
 
 function notifyAppointmentsLocalChanged(): void {
   if (typeof window === "undefined") return;

@@ -156,7 +156,7 @@ export function NotificationsTab({
 
           <div id="notif-scenario" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
             <div className="space-y-0.5 pr-4">
-              <Label className="text-small text-muted-foreground">Scenario alerts</Label>
+              <Label className="text-small text-muted-foreground">Travel &amp; sick-day guide alerts</Label>
               <p className="text-small text-muted-foreground">Sick day, travel, and similar prompts</p>
             </div>
             <Switch
@@ -226,7 +226,7 @@ export function NotificationsTab({
         <CardDescription className="text-body text-muted-foreground">
           {supporterMode
             ? "Alerts for your supporter account: community and messages. The person you support manages their own clinical alerts."
-            : "Control alerts for hypos, supplies, scenarios, community, and messages."}
+            : "Control alerts for hypos, supplies, travel and sick-day guides, community, and messages."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">{inner}</CardContent>
@@ -274,7 +274,7 @@ export function SettingsNotificationsRoute({
         description={
           supporterMode
             ? "Feed, messages, and device alerts for your supporter account."
-            : "Hypo alerts, trend alerts, scenario alerts, and community feed."
+            : "Hypo alerts, trend alerts, travel and sick-day guide alerts, and community feed."
         }
         actions={settingsInfoDialog}
       />

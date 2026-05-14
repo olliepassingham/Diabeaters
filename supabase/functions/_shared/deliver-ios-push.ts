@@ -59,7 +59,8 @@ function normalizeP8(raw: string): string {
 }
 
 function normalizeDeviceToken(token: string): string {
-  return token.replace(/\s+/g, "").replace(/[<>]/g, "");
+  // APNs path `/3/device/{token}` is safest with lowercase hex (some stacks reject mixed case).
+  return token.replace(/\s+/g, "").replace(/[<>]/g, "").toLowerCase();
 }
 
 async function buildApnsJwt(): Promise<string> {
@@ -83,7 +84,7 @@ async function sendViaApns(
   const useSandbox = (Deno.env.get("APNS_USE_SANDBOX") ?? "").trim().toLowerCase() === "true";
   const host = useSandbox ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const hex = normalizeDeviceToken(deviceToken);
-  if (!/^[0-9a-f]+$/i.test(hex) || hex.length < 32) {
+  if (!/^[0-9a-f]+$/.test(hex) || hex.length < 32) {
     console.warn("[apns] invalid device token format");
     return {
       success: false,
