@@ -499,6 +499,8 @@ export interface UserSettings {
   reservoirsPerBox?: number;
   insulinCartridgeUnits?: number;
   basalInjectionTime?: string;
+  /** Second usual time when `longActingInjectionsPerDay` is 2 (MDI). */
+  basalInjectionTime2?: string;
   primingUnitsPerInjection?: number;
   suppliesSmarterForecastEnabled?: boolean;
 }

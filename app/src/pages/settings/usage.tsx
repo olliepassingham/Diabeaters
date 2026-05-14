@@ -27,7 +27,7 @@ export function SettingsUsageRoute({ settingsInfoDialog, usageToolsInner }: Sett
       />
       <Card
         id="settings-usage-tools"
-        className="scroll-mt-20 overflow-hidden rounded-xl border-border/60 bg-card/90 shadow-sm sm:rounded-2xl"
+        className="scroll-mt-20 overflow-hidden rounded-xl border border-border/60 bg-card/95 shadow-sm ring-1 ring-border/30 sm:rounded-2xl"
       >
         {usageToolsInner}
       </Card>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,100 @@ interface RiskWarning {
   title: string;
   description: string;
   severity: "low" | "medium" | "high";
+}
+
+type BasalAdjustmentRow = {
+  day: number;
+  label: string;
+  homeTime: string;
+  localTime: string;
+  note: string;
+};
+
+type TravelPlanBasalSlice = Pick<TravelPlan, "timezoneHours" | "timezoneDirection" | "timezoneChange">;
+
+/** Gradual MDI long-acting clock shift for a single home-clock anchor time. */
+function buildBasalAdjustmentSchedule(
+  basalInjectionTime: string,
+  plan: TravelPlanBasalSlice,
+): BasalAdjustmentRow[] {
+  const anchor = basalInjectionTime.trim();
+  if (plan.timezoneChange === "none" || !anchor) return [];
+
+  const [hours, minutes] = anchor.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return [];
+
+  const homeTimeMinutes = hours * 60 + minutes;
+  const tzDiff = plan.timezoneHours;
+  const direction = plan.timezoneDirection;
+
+  const maxShiftPerDay = 2;
+  const daysToAdjust = Math.ceil(tzDiff / maxShiftPerDay);
+
+  const schedule: BasalAdjustmentRow[] = [];
+
+  const formatTime = (totalMinutes: number) => {
+    let mins = totalMinutes % (24 * 60);
+    if (mins < 0) mins += 24 * 60;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  };
+
+  schedule.push({
+    day: 0,
+    label: "Travel Day",
+    homeTime: anchor,
+    localTime: formatTime(homeTimeMinutes + (direction === "east" ? tzDiff * 60 : -tzDiff * 60)),
+    note: "Take at your usual time (shown in both home and local time)",
+  });
+
+  for (let i = 1; i <= daysToAdjust; i++) {
+    const shiftSoFar = Math.min(i * maxShiftPerDay, tzDiff);
+    const shiftMinutes = shiftSoFar * 60;
+
+    let adjustedHomeMinutes: number;
+    let adjustedLocalMinutes: number;
+
+    if (direction === "east") {
+      adjustedHomeMinutes = homeTimeMinutes - shiftMinutes;
+      adjustedLocalMinutes = homeTimeMinutes + tzDiff * 60 - shiftMinutes;
+    } else {
+      adjustedHomeMinutes = homeTimeMinutes + shiftMinutes;
+      adjustedLocalMinutes = homeTimeMinutes - tzDiff * 60 + shiftMinutes;
+    }
+
+    const isFullyAdjusted = shiftSoFar >= tzDiff;
+
+    schedule.push({
+      day: i,
+      label: `Day ${i}`,
+      homeTime: formatTime(adjustedHomeMinutes),
+      localTime: formatTime(adjustedLocalMinutes),
+      note: isFullyAdjusted ? "Fully adjusted to local time" : `Shifted ${shiftSoFar}h of ${tzDiff}h total`,
+    });
+  }
+
+  if (daysToAdjust > 0) {
+    schedule.push({
+      day: daysToAdjust + 1,
+      label: "Onwards",
+      homeTime: direction === "east" ? formatTime(homeTimeMinutes - tzDiff * 60) : formatTime(homeTimeMinutes + tzDiff * 60),
+      localTime: anchor,
+      note: "Continue taking at your usual local time",
+    });
+  }
+
+  return schedule;
+}
+
+function pickBasalRowForDay(rows: BasalAdjustmentRow[], dayInTrip: number): BasalAdjustmentRow | null {
+  if (!rows.length) return null;
+  const entry = rows.find((s) => s.day === dayInTrip);
+  if (entry) return entry;
+  const lastEntry = rows[rows.length - 1];
+  if (dayInTrip >= (lastEntry?.day ?? 0)) return lastEntry;
+  return null;
 }
 
 function TravelDisclaimerCard() {
@@ -696,6 +790,7 @@ export default function Travel() {
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [basalInjectionTime, setBasalInjectionTime] = useState("22:00");
+  const [basalInjectionTime2, setBasalInjectionTime2] = useState("");
   const { toast } = useToast();
   const [activeTravelTab, setActiveTravelTab] = useState<"overview" | "plan" | "checklist">("overview");
 
@@ -707,10 +802,41 @@ export default function Travel() {
   const [prepNotes, setPrepNotes] = useState("");
   const [prepChecklistOpen, setPrepChecklistOpen] = useState(false);
   const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
+  const [selectedLanguage, setSelectedLanguage] = useState("English");
 
   const isPumpUser = profile?.insulinDeliveryMethod === "pump";
   const showClimateTab =
     plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
+
+  const usesTwoBasalDoses = !isPumpUser && (settings.longActingInjectionsPerDay ?? 0) >= 2;
+
+  const basalSchedules = useMemo(() => {
+    if (isPumpUser || plan.timezoneChange === "none") return [];
+    const out: { doseLabel: string; rows: BasalAdjustmentRow[] }[] = [];
+    const firstLabel = usesTwoBasalDoses ? "First long-acting dose" : "Long-acting insulin";
+    if (basalInjectionTime.trim()) {
+      out.push({
+        doseLabel: firstLabel,
+        rows: buildBasalAdjustmentSchedule(basalInjectionTime, plan),
+      });
+    }
+    if (usesTwoBasalDoses && basalInjectionTime2.trim()) {
+      out.push({
+        doseLabel: "Second long-acting dose",
+        rows: buildBasalAdjustmentSchedule(basalInjectionTime2, plan),
+      });
+    }
+    return out.filter((s) => s.rows.length > 0);
+  }, [
+    isPumpUser,
+    plan.timezoneChange,
+    plan.timezoneHours,
+    plan.timezoneDirection,
+    basalInjectionTime,
+    basalInjectionTime2,
+    usesTwoBasalDoses,
+    settings.longActingInjectionsPerDay,
+  ]);
 
   useEffect(() => {
     if (storage.getScenarioState().travelModeActive) {
@@ -722,95 +848,6 @@ export default function Travel() {
     if (!showClimateTab && resultsTab === "climate") setResultsTab("packing");
   }, [showClimateTab, resultsTab]);
 
-  // Calculate long-acting insulin adjustment schedule for MDI users
-  const calculateBasalAdjustmentSchedule = () => {
-    if (isPumpUser || plan.timezoneChange === "none" || !basalInjectionTime) return [];
-    
-    const [hours, minutes] = basalInjectionTime.split(":").map(Number);
-    const homeTimeMinutes = hours * 60 + minutes;
-    const tzDiff = plan.timezoneHours;
-    const direction = plan.timezoneDirection;
-    
-    // Shift by 2-3 hours per day maximum
-    const maxShiftPerDay = 2;
-    const daysToAdjust = Math.ceil(tzDiff / maxShiftPerDay);
-    
-    const schedule: Array<{
-      day: number;
-      label: string;
-      homeTime: string;
-      localTime: string;
-      note: string;
-    }> = [];
-    
-    const formatTime = (totalMinutes: number) => {
-      let mins = totalMinutes % (24 * 60);
-      if (mins < 0) mins += 24 * 60;
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-    };
-    
-    // Day 0: Travel day - take at usual home time
-    schedule.push({
-      day: 0,
-      label: "Travel Day",
-      homeTime: basalInjectionTime,
-      localTime: formatTime(homeTimeMinutes + (direction === "east" ? tzDiff * 60 : -tzDiff * 60)),
-      note: "Take at your usual time (shown in both home and local time)"
-    });
-    
-    // Gradual adjustment days
-    for (let i = 1; i <= daysToAdjust; i++) {
-      const shiftSoFar = Math.min(i * maxShiftPerDay, tzDiff);
-      const shiftMinutes = shiftSoFar * 60;
-      
-      let adjustedHomeMinutes: number;
-      let adjustedLocalMinutes: number;
-      
-      if (direction === "east") {
-        // Travelling east: shift injection earlier (local time catching up to target)
-        adjustedHomeMinutes = homeTimeMinutes - shiftMinutes;
-        adjustedLocalMinutes = homeTimeMinutes + (tzDiff * 60) - shiftMinutes;
-      } else {
-        // Travelling west: shift injection later
-        adjustedHomeMinutes = homeTimeMinutes + shiftMinutes;
-        adjustedLocalMinutes = homeTimeMinutes - (tzDiff * 60) + shiftMinutes;
-      }
-      
-      const isFullyAdjusted = shiftSoFar >= tzDiff;
-      
-      schedule.push({
-        day: i,
-        label: `Day ${i}`,
-        homeTime: formatTime(adjustedHomeMinutes),
-        localTime: formatTime(adjustedLocalMinutes),
-        note: isFullyAdjusted 
-          ? "Fully adjusted to local time" 
-          : `Shifted ${shiftSoFar}h of ${tzDiff}h total`
-      });
-    }
-    
-    // Final day showing target local time
-    if (daysToAdjust > 0) {
-      schedule.push({
-        day: daysToAdjust + 1,
-        label: "Onwards",
-        homeTime: direction === "east" 
-          ? formatTime(homeTimeMinutes - tzDiff * 60)
-          : formatTime(homeTimeMinutes + tzDiff * 60),
-        localTime: basalInjectionTime,
-        note: "Continue taking at your usual local time"
-      });
-    }
-    
-    return schedule;
-  };
-
-  const basalSchedule = calculateBasalAdjustmentSchedule();
-
-  const [selectedLanguage, setSelectedLanguage] = useState("English");
-
   useLayoutEffect(() => {
     const s = storage.getSupplies();
     const st = storage.getSettings();
@@ -820,6 +857,11 @@ export default function Travel() {
     setProfile(p);
     if (st.basalInjectionTime) {
       setBasalInjectionTime(st.basalInjectionTime);
+    }
+    if (st.basalInjectionTime2) {
+      setBasalInjectionTime2(st.basalInjectionTime2);
+    } else {
+      setBasalInjectionTime2("");
     }
 
     const scenarioState = storage.getScenarioState();
@@ -1182,14 +1224,15 @@ export default function Travel() {
       return acc;
     }, {} as Record<string, PackingItem[]>);
 
-    const todayScheduleEntry = (() => {
-      if (plan.timezoneChange === "none" || !basalSchedule.length) return null;
+    const todayScheduleEntries = (() => {
+      if (plan.timezoneChange === "none" || !basalSchedules.length) return [];
       const dayInTrip = daysElapsed;
-      const entry = basalSchedule.find(s => s.day === dayInTrip);
-      if (entry) return entry;
-      const lastEntry = basalSchedule[basalSchedule.length - 1];
-      if (dayInTrip >= (lastEntry?.day || 0)) return lastEntry;
-      return null;
+      return basalSchedules
+        .map(({ doseLabel, rows }) => {
+          const entry = pickBasalRowForDay(rows, dayInTrip);
+          return entry ? { doseLabel, ...entry } : null;
+        })
+        .filter((x): x is BasalAdjustmentRow & { doseLabel: string } => x != null);
     })();
 
     const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
@@ -1288,33 +1331,40 @@ export default function Travel() {
               </Card>
             )}
 
-            {todayScheduleEntry && !isPumpUser && hasStarted && !hasEnded && (
+            {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
               <Card className="border-purple-200 dark:border-purple-800">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    Today's Insulin Timing
+                    Today&apos;s insulin timing
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
+                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-4">
+                    {todayScheduleEntries.map((row, idx) => (
+                      <div
+                        key={`${row.doseLabel}-${idx}`}
+                        className={idx > 0 ? "pt-4 border-t border-purple-200 dark:border-purple-800" : ""}
+                      >
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Long-acting injection today</p>
-                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid="text-today-injection-time">
-                          {todayScheduleEntry.localTime} <span className="text-sm font-normal">local time</span>
+                        <p className="text-sm text-muted-foreground">{row.doseLabel}</p>
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid={idx === 0 ? "text-today-injection-time" : `text-today-injection-time-${idx + 1}`}>
+                          {row.localTime} <span className="text-sm font-normal">local time</span>
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          ({todayScheduleEntry.homeTime} home time)
+                          ({row.homeTime} home time)
                         </p>
                       </div>
                       <div className="text-right">
                         <Badge variant="outline" className="text-purple-700 dark:text-purple-300">
-                          {todayScheduleEntry.label}
+                          {row.label}
                         </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">{todayScheduleEntry.note}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{row.note}</p>
                       </div>
                     </div>
+                      </div>
+                    ))}
                     {plan.timezoneChange === "major" && (
                       <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
                         Shifting by up to 2 hours per day until adjusted to local time ({plan.timezoneHours}h {plan.timezoneDirection}).
@@ -2861,13 +2911,16 @@ export default function Travel() {
                   </h4>
                 </div>
                 <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
-                  Enter your usual long-acting (basal) insulin injection time to see a gradual adjustment schedule for your trip.
+                  {usesTwoBasalDoses
+                    ? "Enter your two usual long-acting (basal) home-clock times to see gradual adjustment schedules for each dose."
+                    : "Enter your usual long-acting (basal) insulin injection time to see a gradual adjustment schedule for your trip."}
                 </p>
                 
                 <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                    <div className="flex flex-wrap items-center gap-3">
                     <Label htmlFor="basal-time" className="text-blue-900 dark:text-blue-100 whitespace-nowrap">
-                      I usually take my long-acting insulin at:
+                      {usesTwoBasalDoses ? "First long-acting dose (home time):" : "I usually take my long-acting insulin at:"}
                     </Label>
                     <Input
                       id="basal-time"
@@ -2881,54 +2934,80 @@ export default function Travel() {
                       className="w-32 bg-white dark:bg-blue-900/50"
                       data-testid="input-basal-time"
                     />
-                    <span className="text-sm text-blue-700 dark:text-blue-300">(home time)</span>
+                    {!usesTwoBasalDoses ? <span className="text-sm text-blue-700 dark:text-blue-300">(home time)</span> : null}
+                    </div>
+                    {usesTwoBasalDoses ? (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Label htmlFor="basal-time-2" className="text-blue-900 dark:text-blue-100 whitespace-nowrap">
+                          Second long-acting dose (home time):
+                        </Label>
+                        <Input
+                          id="basal-time-2"
+                          type="time"
+                          value={basalInjectionTime2}
+                          onChange={(e) => {
+                            setBasalInjectionTime2(e.target.value);
+                            const current = storage.getSettings();
+                            storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
+                          }}
+                          className="w-32 bg-white dark:bg-blue-900/50"
+                          data-testid="input-basal-time-2"
+                        />
+                      </div>
+                    ) : null}
                   </div>
 
-                  {basalSchedule.length > 0 && (
-                    <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        Your Adjustment Schedule ({plan.timezoneHours}h {plan.timezoneDirection})
-                      </h5>
-                      <div className="bg-white dark:bg-blue-900/30 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100">
-                              <th className="px-3 py-2 text-left font-medium">Day</th>
-                              <th className="px-3 py-2 text-left font-medium">Home Time</th>
-                              <th className="px-3 py-2 text-left font-medium">Local Time</th>
-                              <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {basalSchedule.map((row, idx) => (
-                              <tr 
-                                key={idx} 
-                                className={idx % 2 === 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
-                              >
-                                <td className="px-3 py-2 text-blue-800 dark:text-blue-200 font-medium">
-                                  {row.label}
-                                </td>
-                                <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
-                                  {row.homeTime}
-                                </td>
-                                <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
-                                  {row.localTime}
-                                </td>
-                                <td className="px-3 py-2 text-blue-600 dark:text-blue-400 text-xs hidden sm:table-cell">
-                                  {row.note}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="sm:hidden space-y-1 mt-2">
-                        {basalSchedule.map((row, idx) => (
-                          <p key={idx} className="text-xs text-blue-600 dark:text-blue-400">
-                            <strong>{row.label}:</strong> {row.note}
-                          </p>
-                        ))}
-                      </div>
+                  {basalSchedules.some((s) => s.rows.length > 0) && (
+                    <div className="space-y-6">
+                      {basalSchedules.map(({ doseLabel, rows }) =>
+                        rows.length === 0 ? null : (
+                          <div key={doseLabel} className="space-y-2">
+                            <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                              {doseLabel} — adjustment schedule ({plan.timezoneHours}h {plan.timezoneDirection})
+                            </h5>
+                            <div className="bg-white dark:bg-blue-900/30 rounded-lg overflow-hidden">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100">
+                                    <th className="px-3 py-2 text-left font-medium">Day</th>
+                                    <th className="px-3 py-2 text-left font-medium">Home Time</th>
+                                    <th className="px-3 py-2 text-left font-medium">Local Time</th>
+                                    <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rows.map((row, idx) => (
+                                    <tr
+                                      key={`${doseLabel}-${idx}`}
+                                      className={idx % 2 === 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
+                                    >
+                                      <td className="px-3 py-2 text-blue-800 dark:text-blue-200 font-medium">
+                                        {row.label}
+                                      </td>
+                                      <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
+                                        {row.homeTime}
+                                      </td>
+                                      <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
+                                        {row.localTime}
+                                      </td>
+                                      <td className="px-3 py-2 text-blue-600 dark:text-blue-400 text-xs hidden sm:table-cell">
+                                        {row.note}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="sm:hidden space-y-1 mt-2">
+                              {rows.map((row, idx) => (
+                                <p key={`${doseLabel}-m-${idx}`} className="text-xs text-blue-600 dark:text-blue-400">
+                                  <strong>{row.label}:</strong> {row.note}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ),
+                      )}
                     </div>
                   )}
 

@@ -112,6 +112,22 @@ function mdiBasalBedtimeBucket(basalTime: string | undefined): "morning" | "even
   return "evening";
 }
 
+/** MDI: combines both basal clock times when user takes two long-acting injections per day. */
+function mdiBasalBedtimeBucketFromSettings(settings: UserSettings | null | undefined): "morning" | "evening" | null {
+  if (!settings) return null;
+  const n = settings.longActingInjectionsPerDay ?? 0;
+  const t1 = settings.basalInjectionTime;
+  const t2 = settings.basalInjectionTime2;
+  if (n >= 2 && t2?.trim()) {
+    const b1 = mdiBasalBedtimeBucket(t1);
+    const b2 = mdiBasalBedtimeBucket(t2);
+    if (b1 === "evening" || b2 === "evening") return "evening";
+    if (b1 === "morning" && b2 === "morning") return "morning";
+    return b2 ?? b1;
+  }
+  return mdiBasalBedtimeBucket(t1);
+}
+
 export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
@@ -375,7 +391,7 @@ export default function Bedtime() {
       cautionCount++;
     }
 
-    const mdiBasalForBed = !isPumpUser ? mdiBasalBedtimeBucket(userSettings?.basalInjectionTime) : null;
+    const mdiBasalForBed = !isPumpUser ? mdiBasalBedtimeBucketFromSettings(userSettings) : null;
     if (mdiBasalForBed === "morning") {
       factors.push({
         label: "Long-acting timing",
@@ -506,6 +522,7 @@ export default function Bedtime() {
           hours_until_sleep: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
           mdi_basal_bedtime_bucket: mdiBasalForBed,
           basal_injection_time: !isPumpUser ? userSettings?.basalInjectionTime ?? null : null,
+          basal_injection_time_2: !isPumpUser ? userSettings?.basalInjectionTime2 ?? null : null,
         },
       },
     });
