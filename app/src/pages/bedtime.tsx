@@ -50,9 +50,12 @@ interface CorrectionSuggestion {
 interface ReadinessResult {
   level: ReadinessLevel;
   title: string;
+  /** Single-line summary (e.g. for logs / screen readers). */
   message: string;
+  /** Short scannable lines under the verdict. */
+  messageBullets: string[];
   tips: string[];
-  factors: { label: string; status: "good" | "caution" | "concern"; note: string }[];
+  factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
   correction: CorrectionSuggestion | null;
   snack: { grams: number; reason: string } | null;
 }
@@ -126,6 +129,34 @@ function mdiBasalBedtimeBucketFromSettings(settings: UserSettings | null | undef
     return b2 ?? b1;
   }
   return mdiBasalBedtimeBucket(t1);
+}
+
+/** Phrases aligned with the bedtime "Hours since …" select values. */
+function hoursSinceSelectPhrase(raw: string): string {
+  switch (raw) {
+    case "0.5":
+      return "less than an hour";
+    case "1":
+      return "about 1 hour";
+    case "2":
+      return "about 2 hours";
+    case "3":
+      return "about 3 hours";
+    case "4":
+      return "four or more hours";
+    default:
+      return "a while";
+  }
+}
+
+/** Short display of usual basal clock(s) from settings (MDI). */
+function formatBasalClockSummary(settings: UserSettings | null | undefined): string | null {
+  if (!settings?.basalInjectionTime?.trim()) return null;
+  const t1 = settings.basalInjectionTime.trim();
+  const n = settings.longActingInjectionsPerDay ?? 0;
+  const t2 = settings.basalInjectionTime2?.trim();
+  if (n >= 2 && t2) return `${t1} and ${t2}`;
+  return t1;
 }
 
 export default function Bedtime() {
@@ -265,8 +296,12 @@ export default function Bedtime() {
     if (!currentBg) return;
 
     const bg = parseFloat(currentBg);
-    const foodHours = hoursSinceFood ? parseFloat(hoursSinceFood) : 999;
-    const insulinHours = hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : 999;
+    const foodSelected = hoursSinceFood.trim() !== "";
+    const foodHours = foodSelected ? parseFloat(hoursSinceFood) : NaN;
+    const foodPhrase = foodSelected ? hoursSinceSelectPhrase(hoursSinceFood) : null;
+    const insulinSelected = hoursSinceInsulin.trim() !== "";
+    const insulinHoursForIOB = insulinSelected ? parseFloat(hoursSinceInsulin) : 999;
+    const bolusPhrase = insulinSelected ? hoursSinceSelectPhrase(hoursSinceInsulin) : null;
     const sleepHours = hoursUntilSleep ? parseFloat(hoursUntilSleep) : null;
     const carbs = mealCarbs ? parseFloat(mealCarbs) : null;
     
@@ -282,13 +317,28 @@ export default function Bedtime() {
     let cautionCount = 0;
 
     if (bgMmol < targetLowMmol - 1) {
-      factors.push({ label: "Blood glucose", status: "concern", note: "Below target - consider a small snack" });
+      factors.push({
+        label: "Blood glucose",
+        status: "concern",
+        note: "Below target",
+        detail: "Consider a small snack before sleep if your plan allows.",
+      });
       concernCount++;
     } else if (bgMmol < targetLowMmol) {
-      factors.push({ label: "Blood glucose", status: "caution", note: "On the lower side of target" });
+      factors.push({
+        label: "Blood glucose",
+        status: "caution",
+        note: "On the lower side of target",
+        detail: "Worth keeping hypo treatment within reach overnight.",
+      });
       cautionCount++;
     } else if (bgMmol > targetHighMmol + 3) {
-      factors.push({ label: "Blood glucose", status: "caution", note: "Higher than ideal - a bedtime correction may help" });
+      factors.push({
+        label: "Blood glucose",
+        status: "caution",
+        note: "Higher than ideal",
+        detail: "A bedtime correction may help — follow your care team's guidance.",
+      });
       cautionCount++;
     } else if (bgMmol > targetHighMmol) {
       factors.push({ label: "Blood glucose", status: "caution", note: "Slightly above target" });
@@ -298,59 +348,154 @@ export default function Bedtime() {
     }
 
     if (bgTrend === "falling") {
-      factors.push({ label: "Trend", status: "caution", note: "Falling - increased risk of dropping overnight" });
+      factors.push({
+        label: "Trend",
+        status: "caution",
+        note: "Falling",
+        detail: "Can mean a higher risk of dropping overnight.",
+      });
       cautionCount++;
     } else if (bgTrend === "rising") {
-      factors.push({ label: "Trend", status: "good", note: "Rising - recheck before sleep" });
+      factors.push({
+        label: "Trend",
+        status: "good",
+        note: "Rising",
+        detail: "Worth rechecking before you fully settle.",
+      });
     } else if (bgTrend === "not_sure") {
       factors.push({
         label: "Trend",
         status: "good",
-        note: "Not set — tap Stable, Rising, or Falling if you know your BG direction",
+        note: "Trend not set",
+        detail: "Tap Stable, Rising, or Falling if you know your BG direction.",
       });
     } else {
       factors.push({ label: "Trend", status: "good", note: "Stable" });
     }
 
-    if (foodHours < 2) {
-      factors.push({ label: "Last food", status: "caution", note: "Still digesting - glucose may rise" });
-      cautionCount++;
-    } else if (foodHours < 3) {
-      factors.push({ label: "Last food", status: "good", note: "Mostly digested" });
+    if (foodSelected && Number.isFinite(foodHours)) {
+      if (foodHours < 2) {
+        factors.push({
+          label: "Last food",
+          status: "caution",
+          note: `About ${foodPhrase} since eating`,
+          detail: "Digestion can still be lifting glucose.",
+        });
+        cautionCount++;
+      } else if (foodHours < 3) {
+        factors.push({
+          label: "Last food",
+          status: "good",
+          note: `About ${foodPhrase} since eating`,
+          detail: "Much of the carb effect has usually passed unless the meal was very large or fatty.",
+        });
+      } else {
+        factors.push({
+          label: "Last food",
+          status: "good",
+          note: `About ${foodPhrase} since eating`,
+          detail: "Most meals are well through absorption by now.",
+        });
+      }
     } else {
-      factors.push({ label: "Last food", status: "good", note: "Fully digested" });
+      factors.push({
+        label: "Last food",
+        status: "good",
+        note: "Food timing not entered",
+        detail: "Next time, pick hours since food so we can estimate what's still digesting.",
+      });
     }
 
     if (carbs != null && Number.isFinite(carbs) && carbs > 0) {
-      if (foodHours < 2 && carbs >= 40) {
-        factors.push({ label: "Meal carbs", status: "caution", note: "Larger meal recently - consider rechecking before sleep" });
+      const carbRounded = Math.round(carbs);
+      if (foodSelected && Number.isFinite(foodHours) && foodHours < 2 && carbs >= 40) {
+        factors.push({
+          label: "Meal carbs",
+          status: "caution",
+          note: `About ${carbRounded}g carbs, soon after eating`,
+          detail: "A recheck before sleep is sensible while absorption finishes.",
+        });
+        cautionCount++;
+      } else if (foodSelected && Number.isFinite(foodHours) && foodHours < 2) {
+        factors.push({
+          label: "Meal carbs",
+          status: "caution",
+          note: `About ${carbRounded}g carbs, food only ${foodPhrase} ago`,
+          detail: "Watch for a late rise if insulin coverage was light.",
+        });
         cautionCount++;
       } else {
-        factors.push({ label: "Meal carbs", status: "good", note: "Noted" });
+        factors.push({
+          label: "Meal carbs",
+          status: "good",
+          note: `About ${carbRounded}g carbs`,
+          detail: foodPhrase
+            ? `Last food about ${foodPhrase} ago.`
+            : "Add hours since food for a tighter read on what's still digesting.",
+        });
       }
     }
 
-    if (insulinHours < 2) {
-      factors.push({ label: "Last bolus", status: "caution", note: "Insulin still active - watch for drops" });
-      cautionCount++;
-    } else if (insulinHours < 4) {
-      factors.push({ label: "Last bolus", status: "good", note: "Some insulin still working" });
+    if (insulinSelected && Number.isFinite(insulinHoursForIOB)) {
+      if (insulinHoursForIOB < 2) {
+        factors.push({
+          label: "Mealtime insulin",
+          status: "caution",
+          note: `About ${bolusPhrase} since last mealtime dose`,
+          detail: "Rapid-acting can still be bringing glucose down.",
+        });
+        cautionCount++;
+      } else if (insulinHoursForIOB < 4) {
+        factors.push({
+          label: "Mealtime insulin",
+          status: "good",
+          note: `About ${bolusPhrase} since last mealtime dose`,
+          detail: "A tail of insulin may still be active.",
+        });
+      } else {
+        factors.push({
+          label: "Mealtime insulin",
+          status: "good",
+          note: `About ${bolusPhrase} since last mealtime dose`,
+          detail: "Little routine bolus insulin is usually left now.",
+        });
+      }
     } else {
-      factors.push({ label: "Last bolus", status: "good", note: "No active bolus insulin" });
+      factors.push({
+        label: "Mealtime insulin",
+        status: "good",
+        note: "Mealtime insulin timing not entered",
+        detail: "Next time, pick hours since dose so active insulin is reflected here.",
+      });
     }
 
     if (exercisedToday) {
-      factors.push({ label: "Exercise today", status: "caution", note: "Increased hypo risk overnight" });
+      factors.push({
+        label: "Exercise today",
+        status: "caution",
+        note: "You exercised today",
+        detail: "Hypo risk can stay higher overnight.",
+      });
       cautionCount++;
     }
 
     if (hadAlcohol) {
-      factors.push({ label: "Alcohol", status: "concern", note: "Can cause delayed lows - set an alarm" });
+      factors.push({
+        label: "Alcohol",
+        status: "concern",
+        note: "Alcohol tonight or recently",
+        detail: "Can cause delayed lows — consider an overnight check.",
+      });
       concernCount++;
     }
 
     if (recentHypos) {
-      factors.push({ label: "Recent hypos", status: "concern", note: "Higher overnight risk - consider an alarm and snack if needed" });
+      factors.push({
+        label: "Recent hypos",
+        status: "concern",
+        note: "Hypos recently",
+        detail: "Higher overnight risk — alarm and snack may help if your plan allows.",
+      });
       concernCount++;
     }
 
@@ -358,12 +503,22 @@ export default function Bedtime() {
       if (sleepHours <= 0.25) {
         factors.push({ label: "Time to sleep", status: "good", note: "Heading to bed now" });
       } else if (sleepHours <= 1) {
-        factors.push({ label: "Time to sleep", status: "good", note: "Soon - good time to do this check" });
+        factors.push({ label: "Time to sleep", status: "good", note: "Bedtime soon", detail: "Good moment for this check." });
       } else if (sleepHours <= 2) {
-        factors.push({ label: "Time to sleep", status: "caution", note: "Glucose may change before bed - recheck closer to sleep" });
+        factors.push({
+          label: "Time to sleep",
+          status: "caution",
+          note: "More than ~1 hour until bed",
+          detail: "Glucose may change — recheck closer to sleep.",
+        });
         cautionCount++;
       } else {
-        factors.push({ label: "Time to sleep", status: "caution", note: "Still a while yet - consider rechecking nearer bedtime" });
+        factors.push({
+          label: "Time to sleep",
+          status: "caution",
+          note: "Still a while until bed",
+          detail: "Consider running this check again nearer bedtime.",
+        });
         cautionCount++;
       }
     }
@@ -373,7 +528,8 @@ export default function Bedtime() {
       factors.push({
         label: "Sick day",
         status: severity === "severe" ? "concern" : "caution",
-        note: "Being unwell affects overnight glucose - check more often",
+        note: "Sick day mode on",
+        detail: "Illness affects overnight glucose — plan extra checks.",
       });
       if (severity === "severe") concernCount++;
       else cautionCount++;
@@ -384,40 +540,69 @@ export default function Bedtime() {
       factors.push({
         label: "Travel mode",
         status: "caution",
-        note: hasTimezoneShift
-          ? "Timezone changes can affect overnight glucose patterns"
-          : "Travel and routine changes can affect overnight levels",
+        note: "Travel mode on",
+        detail: hasTimezoneShift
+          ? "A big timezone shift can change overnight patterns."
+          : "Routine changes can nudge overnight levels.",
       });
       cautionCount++;
     }
 
     const mdiBasalForBed = !isPumpUser ? mdiBasalBedtimeBucketFromSettings(userSettings) : null;
-    if (mdiBasalForBed === "morning") {
+    const basalClockSummary = !isPumpUser ? formatBasalClockSummary(userSettings) : null;
+
+    if (isPumpUser) {
       factors.push({
-        label: "Long-acting timing",
-        status: "caution",
-        note:
-          "Your usual long-acting dose is earlier in the day. Overnight glucose can behave differently than when long-acting is taken near bedtime—trends and snacks still matter.",
+        label: "Basal delivery",
+        status: "good",
+        note: "Pump basal in the background",
+        detail: "Tonight still depends on boluses, food timing, temp basals, and activity.",
       });
-      cautionCount++;
-    } else if (mdiBasalForBed === "evening") {
+    } else if (basalClockSummary) {
+      const basalHeadline = `Usual long-acting around ${basalClockSummary} (home clock)`;
+      if (mdiBasalForBed === "morning") {
+        factors.push({
+          label: "Long-acting timing",
+          status: "caution",
+          note: basalHeadline,
+          detail:
+            "Earlier in the day than a bedtime anchor for many people — overnight drift can differ; trends and snacks still matter.",
+        });
+        cautionCount++;
+      } else if (mdiBasalForBed === "evening") {
+        factors.push({
+          label: "Long-acting timing",
+          status: "good",
+          note: basalHeadline,
+          detail: "Closer to sleep for many on MDI — often steadier overnight; food, boluses, and illness still count.",
+        });
+      } else {
+        factors.push({ label: "Long-acting timing", status: "good", note: basalHeadline });
+      }
+    } else {
       factors.push({
         label: "Long-acting timing",
         status: "good",
-        note:
-          "Your usual long-acting time is closer to sleep. Many people find that lines up with steadier overnight glucose, but illness, food, and activity still count.",
+        note: "Long-acting time not in settings",
+        detail: "Add it under Personal & usage so we can relate tonight to your usual basal.",
       });
     }
 
     let level: ReadinessLevel;
     let title: string;
     let message: string;
+    let messageBullets: string[] = [];
     const tips: string[] = [];
 
     if (concernCount >= 2 || (concernCount >= 1 && cautionCount >= 2)) {
       level = "alert";
       title = "Set an Alarm Tonight";
       message = "There are a few things that could affect your overnight glucose. Setting an alarm to check would be wise.";
+      messageBullets = [
+        "Several stressors could affect you overnight.",
+        "Plan a glucose check in the small hours if you can.",
+        "Keep hypo treatment within reach.",
+      ];
       tips.push("Set an alarm for 2-3am to check your levels");
       tips.push("Keep fast-acting glucose by your bed");
       if (bgMmol < targetLowMmol) tips.push("Have a small snack before bed");
@@ -430,15 +615,42 @@ export default function Bedtime() {
       level = "monitor";
       title = "Worth Keeping an Eye On";
       message = "Things look reasonable, but there's a factor or two to be aware of. You'll probably be fine, but stay mindful.";
-      if (foodHours < 2) tips.push("Your glucose may rise as food digests");
-      if (insulinHours < 2) tips.push("Check again before you actually fall asleep");
+      const monitorBits: string[] = [];
+      if (foodSelected && Number.isFinite(foodHours) && foodHours < 3 && foodPhrase) {
+        monitorBits.push(`last food only ${foodPhrase} ago`);
+      }
+      if (carbs != null && Number.isFinite(carbs) && carbs >= 45) {
+        monitorBits.push(`~${Math.round(carbs)}g carbs noted`);
+      }
+      if (insulinSelected && insulinHoursForIOB < 3 && bolusPhrase) {
+        monitorBits.push(`mealtime insulin only ${bolusPhrase} ago`);
+      }
+      messageBullets = ["Mostly manageable — a couple of flags are still worth noticing."];
+      if (monitorBits.length > 0) {
+        messageBullets.push(`From your inputs: ${monitorBits.join(" · ")}.`);
+      }
+      messageBullets.push("Food digesting and insulin tails can still move numbers before morning.");
+      message = messageBullets.join(" ");
+      if (foodSelected && Number.isFinite(foodHours) && foodHours < 2) tips.push("Your glucose may rise as food digests");
+      if (insulinSelected && insulinHoursForIOB < 2) tips.push("Check again before you actually fall asleep");
       if (exercisedToday) tips.push("Keep a snack nearby just in case");
       if (sleepHours !== null && sleepHours > 1.5) tips.push("You've got time - recheck before you head to bed");
       tips.push("If you wake in the night, do a quick check");
     } else {
       level = "steady";
       title = "Looking Good for Sleep";
-      message = "Your glucose looks stable, no recent food or insulin actively working. You're set for a restful night.";
+      const steadyParts: string[] = [];
+      if (foodSelected && foodPhrase) steadyParts.push(`last food ~${foodPhrase} ago`);
+      if (insulinSelected && bolusPhrase) steadyParts.push(`mealtime insulin ~${bolusPhrase} ago`);
+      if (!isPumpUser && basalClockSummary) steadyParts.push(`usual long-acting ~${basalClockSummary} (home clock)`);
+      messageBullets = ["Your glucose looks in a comfortable range for sleep."];
+      if (steadyParts.length > 0) {
+        messageBullets.push(`You shared: ${steadyParts.join(" · ")}.`);
+      } else {
+        messageBullets.push("Adding food and mealtime-insulin timing next time will mirror your routine more closely.");
+      }
+      messageBullets.push("From these inputs alone, nothing screams overnight trouble — still follow your care plan if you feel off.");
+      message = messageBullets.join(" ");
       tips.push("Sweet dreams - you've set yourself up well");
       tips.push("Your glucose is in a comfortable range for sleep");
       if (isPumpUser) tips.push("Your pump's basal rate should keep you steady overnight");
@@ -460,14 +672,14 @@ export default function Bedtime() {
     }
 
     if (mdiBasalForBed === "morning") {
-      tips.push(
-        "With a morning long-acting routine, some people see glucose drift up later at night—your care team's plan and occasional overnight checks still apply.",
-      );
+      tips.push("Morning long-acting: some people drift up later at night — your team's plan still applies.");
+      tips.push("Occasional overnight checks can help you learn your pattern.");
     } else if (mdiBasalForBed === "evening") {
-      tips.push("Long-acting near bedtime often supports steadier overnight levels for many people on MDI—still watch for hypos if you exercised or drank alcohol.");
+      tips.push("Evening long-acting often supports steadier overnight levels for many on MDI.");
+      tips.push("Still watch for hypos after exercise or alcohol.");
     }
 
-    const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHours);
+    const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHoursForIOB);
 
     const snack: ReadinessResult["snack"] =
       bgMmol < targetLowMmol || bgTrend === "falling" || recentHypos
@@ -482,7 +694,7 @@ export default function Bedtime() {
           }
         : null;
 
-    setResult({ level, title, message, tips, factors, correction, snack });
+    setResult({ level, title, message, messageBullets, tips, factors, correction, snack });
     setSaved(false);
     setDetailsOpen(false);
     setAlarmPlanned(false);
@@ -518,7 +730,7 @@ export default function Bedtime() {
           had_alcohol: hadAlcohol,
           hours_since_food: Number.isFinite(foodHours) ? foodHours : null,
           meal_carbs: carbs != null && Number.isFinite(carbs) ? carbs : null,
-          hours_since_insulin: Number.isFinite(insulinHours) ? insulinHours : null,
+          hours_since_insulin: insulinSelected && Number.isFinite(insulinHoursForIOB) ? insulinHoursForIOB : null,
           hours_until_sleep: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
           mdi_basal_bedtime_bucket: mdiBasalForBed,
           basal_injection_time: !isPumpUser ? userSettings?.basalInjectionTime ?? null : null,
@@ -790,7 +1002,20 @@ export default function Bedtime() {
                         {result.title}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
+                    <ul
+                      className="mt-2 list-none space-y-2 pl-0 text-sm text-muted-foreground"
+                      aria-label="Bedtime summary"
+                    >
+                      {(result.messageBullets.length > 0 ? result.messageBullets : [result.message]).map((line, i) => (
+                        <li key={i} className="flex gap-2.5 leading-relaxed">
+                          <span
+                            className="mt-2 h-1 w-1 shrink-0 rounded-full bg-current opacity-40"
+                            aria-hidden
+                          />
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -829,21 +1054,29 @@ export default function Bedtime() {
             <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-factors">
               <CardContent className="p-5 md:p-6 space-y-3">
                 <h3 className="font-semibold text-foreground">Factors</h3>
-                <div className="grid gap-2 md:grid-cols-2" data-testid="container-bedtime-factors">
+                <div className="grid gap-3 sm:grid-cols-2" data-testid="container-bedtime-factors">
                   {result.factors.map((factor, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2"
+                      className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
                       data-testid={`card-factor-${i}`}
                     >
-                      {getStatusIcon(factor.status)}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium" data-testid={`text-factor-label-${i}`}>
+                      <div className="mt-0.5 shrink-0">{getStatusIcon(factor.status)}</div>
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium text-foreground" data-testid={`text-factor-label-${i}`}>
                           {factor.label}
                         </p>
-                        <p className="text-xs text-muted-foreground" data-testid={`text-factor-note-${i}`}>
+                        <p className="text-sm leading-relaxed text-foreground/90" data-testid={`text-factor-note-${i}`}>
                           {factor.note}
                         </p>
+                        {factor.detail ? (
+                          <p
+                            className="text-xs leading-relaxed text-muted-foreground"
+                            data-testid={`text-factor-detail-${i}`}
+                          >
+                            {factor.detail}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -991,6 +1224,9 @@ export default function Bedtime() {
                 <h3 id="bedtime-section-fuel" className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 dark:text-amber-100/90">
                   Food & insulin
                 </h3>
+                <p className="text-xs text-muted-foreground leading-snug">
+                  Pick the closest options — the bedtime summary uses them to describe digestion and active mealtime insulin in your own words.
+                </p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="hours-food" className="flex items-center gap-2 text-sm font-medium text-foreground">

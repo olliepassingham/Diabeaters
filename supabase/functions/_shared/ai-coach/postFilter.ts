@@ -152,6 +152,34 @@ function isAllowedHref(href: string): href is AllowedHref {
   return (ALLOWED_HREFS as readonly string[]).includes(href);
 }
 
+/**
+ * When the model labels a button like "Manage routines" but points at
+ * `/education`, rewrite to `/routines` so the in-app Routines tool opens.
+ */
+function rewriteRoutineToolsMislinkedToEducation(actions: CoachAction[]): {
+  actions: CoachAction[];
+  changed: boolean;
+} {
+  let changed = false;
+  const out = actions.map((a) => {
+    if (a.href !== "/education") return a;
+    const lab = a.label;
+    if (!/\broutines?\b/i.test(lab)) return a;
+    const impliesToolVerb =
+      /\b(manage|managing|create|creating|open|opening|save|saving|edit|editing|set up|go to|your)\b/i.test(
+        lab,
+      );
+    const impliesReadingOnly =
+      /\b(read|learn|article|browse|topics?|explore|guides?|hub)\b/i.test(lab);
+    if (impliesToolVerb && !impliesReadingOnly) {
+      changed = true;
+      return { ...a, href: "/routines" };
+    }
+    return a;
+  });
+  return { actions: out, changed };
+}
+
 function filterActions(
   actions: CoachAction[] | undefined,
   profileGate?: PostFilterProfileGate,
@@ -244,6 +272,13 @@ export function applyPostFilter(
     reasons.push(`dropped_${dropped}_action${dropped === 1 ? "" : "s"}`);
   }
 
+  const { actions: suggestedNextActions, changed: routineHrefFixed } =
+    rewriteRoutineToolsMislinkedToEducation(cleanedActions);
+  if (routineHrefFixed) {
+    rewritten = true;
+    reasons.push("routine_tool_href_corrected");
+  }
+
   const suggestedQuestions = Array.isArray(reply.suggestedQuestions)
     ? reply.suggestedQuestions.filter((q) => typeof q === "string").slice(0, 4)
     : [];
@@ -251,7 +286,7 @@ export function applyPostFilter(
   const out: CoachReply = {
     reply: textOut,
     suggestedQuestions,
-    suggestedNextActions: cleanedActions,
+    suggestedNextActions,
     deferToTeam: Boolean(reply.deferToTeam),
   };
 

@@ -140,6 +140,14 @@ of birth in UTC, or null when no valid date of birth is on file).
     /tools/hypo-help, /tools/correction, /tools/tips,
     /education,
     /help-now, /emergency-card, /supplies, /routines.
+- Route choice for buttons: `/routines` opens the Routines tool in Diabeaters
+  (saved checklists, morning or evening stacks, meal patterns, creating or
+  editing routines the app can remind them about). `/education` opens the
+  education hub for browsing topics and articles. If they ask about building,
+  managing, saving, or following a routine inside the app, put `/routines` in
+  `suggestedNextActions`, not `/education`, unless they clearly want reading
+  material only. Button labels must match the destination (e.g. do not label a
+  button "Manage routines" with href `/education`).
 - Whenever you tell the user to open or use another part of the Diabeaters app,
   add matching entries to JSON "suggestedNextActions" (1-3 items) using only the
   routes listed above. Each entry must have a short "label" for the button and
@@ -313,6 +321,14 @@ of birth in UTC, or null when no valid date of birth is on file).
     /tools/hypo-help, /tools/correction, /tools/tips,
     /education,
     /help-now, /emergency-card, /supplies, /routines.
+- Route choice for buttons: `/routines` opens the Routines tool (saved
+  checklists, morning or evening stacks, meal patterns, creating or editing
+  routines on the account holder's app). `/education` opens the education hub
+  for browsing topics and articles. If the question is about building, managing,
+  saving, or following a routine in the app, use `/routines` in
+  `suggestedNextActions`, not `/education`, unless they clearly want reading
+  material only. Button labels must match the destination (e.g. do not label a
+  button "Manage routines" with href `/education`).
 - Whenever you point the supporter to another part of the Diabeaters app,
   add matching entries to JSON "suggestedNextActions" (1-3 items) using
   only the routes listed above. Each entry must have a short "label" for
@@ -520,6 +536,7 @@ After the model replies, the server runs the following checks on `reply`. Failur
 - **Personal target regex:** numbers near `aim|target|should be|shoot for|stick to` and BG units. (General educational ranges using "between X and Y, set by your team" pass; personalised "aim for X" fails.)
 - **CGM-arrow action regex:** `(↑↑|↓↓|two arrows? (up|down)|three arrows? (up|down))` paired with `correct|bolus|reduce|drop|increase|inject` in the same sentence.
 - **Forbidden href:** any `href` not in the allow-list in the system prompt is dropped from `suggestedNextActions`.
+- **Routine tool href correction:** if an action has `href` `/education` but the `label` signals opening the in-app Routines tool (contains "routine" or "routines" together with verbs such as manage, create, open, save, edit) and does not signal reading-only intent (read, learn, article, browse, topics, hub), the server rewrites `href` to `/routines`.
 - **Age-gated href:** `/scenarios/alcohol` is dropped when `context.profile` indicates the account holder is under 18; `/scenarios/driving` is dropped when they are under 17 (UK learner age) or when they are known to be under 18 but their exact age in years is not on file.
 - **Length cap:** `reply` > 1500 chars is truncated and a follow-up suggestion is added.
 
@@ -566,6 +583,7 @@ Add new rows here as edge cases surface in production.
 
 ## 10. Change log
 
+- _2026-05-10_ — Beatie: system prompt distinguishes `/routines` (saved habits in the app) from `/education` (reading hub); post-filter rewrites `/education` → `/routines` when a button label clearly targets the Routines tool but the model returned the wrong href.
 - _2026-05-01_ — initial draft; pending review.
 - _2026-05-01_ — review pass: broaden refusals to cover device/equipment changes and CGM-arrow interpretation; ban clinician roleplay and refusal negotiation; expand href allow-list; tone bans (no emojis / exclamations / "good"-"bad" BG / control language); Personalise lane reframed as observation-not-interpretation; add cross-cutting rules (no behavioural moralising, no competitor recommendations); tighten `hypo` regex; add `refuse_device_change` template; post-filter catches worded numbers, hedges, and CGM-arrow actions; add 6 acceptance test rows.
 - _2026-05-01_ — clinical-reviewer pass: add §2 honesty caveat to admit when `context` is too sparse to spot patterns; tighten `keto` interceptor (separate `\bdka\b` / `\bketoacidos(is|es)\b` from contextual `ketones?`) so educational queries fall through; add new §6 category "disordered eating with insulin (T1DE / diabulimia / insulin omission)" with specialist signposting; add §6.1 making each category's deterministic response payload explicit; expand §5 Educate / Defer / Refuse with high-frequency real-world topics (periods, sensor-vs-finger / compression low, NHS funding, ketone education; steroids, burnout, hypo unawareness; alcohol+insulin, time-zone insulin timing); add 7 acceptance test rows (#20–#26) including a regression test for the keto false-positive fix.

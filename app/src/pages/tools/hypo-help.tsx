@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Calculator, Droplet, Info } from "lucide-react";
+import { Calculator, ChevronDown, ChevronUp, Droplet, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { StepLadder, type StepLadderStep } from "@/components/visualizations/step-ladder";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +65,7 @@ export default function HypoHelpPage() {
   } | null>(null);
   const [hypoCalcError, setHypoCalcError] = useState<string | null>(null);
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
+  const [contextOpen, setContextOpen] = useState(false);
 
   const bgUnits = profile.bgUnits || "mmol/L";
   const postExerciseHypoCopy = useMemo(() => {
@@ -139,81 +141,17 @@ export default function HypoHelpPage() {
       />
 
       <Card className="surface-card overflow-hidden rounded-2xl border-border/70 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold tracking-tight">After a hypo — typical check-in flow</CardTitle>
-          <CardDescription>
-            A simple pattern many teams teach (often called 15–15 style). Your written plan from your diabetes team
-            always comes first.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <StepLadder
-            steps={HYPO_RECHECK_FLOW_STEPS}
-            ariaLabel="Hypo treatment check-in steps"
-            data-testid="hypo-1515-step-ladder"
-          />
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Illustration only — not medical advice. Severe hypos need help straight away; follow emergency instructions
-            you were given with your glucagon.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="surface-card">
-        <CardHeader>
+        <CardHeader className="space-y-1 pb-2">
           <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-            <Droplet className="h-6 w-6 text-red-500" />
+            <Droplet className="h-6 w-6 shrink-0 text-red-500" aria-hidden />
             Hypo treatment calculator
           </CardTitle>
-          <CardDescription>How much glucose you may need from your current reading to your target</CardDescription>
+          <CardDescription className="text-sm leading-snug">
+            Enter your current reading and target — we estimate fast carbs. Your written hypo plan from your team always
+            comes first.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {postExerciseHypoCopy && (
-            <Alert
-              className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20"
-              data-testid="alert-hypo-recent-exercise"
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <AlertDescription className="text-sm sm:min-w-0 sm:flex-1">
-                  <strong>Recent exercise:</strong> {postExerciseHypoCopy.hypoDetail}
-                </AlertDescription>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 shrink-0 self-start"
-                  onClick={() => {
-                    storage.snoozePostExerciseNudges(8);
-                    setPostExerciseNudgeRev((n) => n + 1);
-                    toast({
-                      title: "Reminders snoozed",
-                      description: "Post-exercise tips are hidden for 8 hours.",
-                    });
-                  }}
-                  data-testid="alert-hypo-post-ex-snooze"
-                >
-                  Snooze 8h
-                </Button>
-              </div>
-            </Alert>
-          )}
-          {profile?.insulinDeliveryMethod === "pump" && (
-            <Alert data-testid="alert-hypo-pump-note">
-              <AlertDescription className="text-sm">
-                On a pump: an <strong>extended bolus</strong> or recent correction may still be bringing your BG down.
-                If you use automation (loop/AID), check whether a suspend or reduced delivery is active — treat the low
-                with fast carbs first, then review IOB with your team&apos;s plan.
-              </AlertDescription>
-            </Alert>
-          )}
-          {lastHypoDetail && (
-            <Alert className="border-border bg-muted/40" data-testid="alert-last-hypo-context">
-              <AlertDescription className="text-sm text-muted-foreground">
-                Last logged hypo {formatDistanceToNow(new Date(lastHypoDetail.at), { addSuffix: true })}:{" "}
-                <span className="text-foreground font-medium">{lastHypoDetail.label}</span>
-              </AlertDescription>
-            </Alert>
-          )}
           {weightRequired && (
             <Alert data-testid="alert-hypo-minor-weight">
               <AlertDescription className="text-sm">
@@ -222,11 +160,6 @@ export default function HypoHelpPage() {
               </AlertDescription>
             </Alert>
           )}
-          <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-            <p className="text-small text-red-800 dark:text-red-200">
-              This supports more precise treatment than a fixed 15g rule. If in doubt, use your usual hypo plan.
-            </p>
-          </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
@@ -356,8 +289,100 @@ export default function HypoHelpPage() {
               </div>
             )}
 
+          <Collapsible open={contextOpen} onOpenChange={setContextOpen}>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-between gap-2 font-normal text-muted-foreground hover:text-foreground"
+                data-testid="button-hypo-context-toggle"
+                aria-expanded={contextOpen}
+              >
+                <span>Reminders &amp; extra context</span>
+                {contextOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" aria-hidden />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950/30">
+                <p className="text-small text-red-800 dark:text-red-200">
+                  This supports more precise treatment than a fixed 15g rule. If in doubt, use your usual hypo plan.
+                </p>
+              </div>
+              {postExerciseHypoCopy && (
+                <Alert
+                  className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/70 dark:bg-emerald-950/20"
+                  data-testid="alert-hypo-recent-exercise"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                    <AlertDescription className="text-sm sm:min-w-0 sm:flex-1">
+                      <strong>Recent exercise:</strong> {postExerciseHypoCopy.hypoDetail}
+                    </AlertDescription>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 self-start"
+                      onClick={() => {
+                        storage.snoozePostExerciseNudges(8);
+                        setPostExerciseNudgeRev((n) => n + 1);
+                        toast({
+                          title: "Reminders snoozed",
+                          description: "Post-exercise tips are hidden for 8 hours.",
+                        });
+                      }}
+                      data-testid="alert-hypo-post-ex-snooze"
+                    >
+                      Snooze 8h
+                    </Button>
+                  </div>
+                </Alert>
+              )}
+              {profile?.insulinDeliveryMethod === "pump" && (
+                <Alert data-testid="alert-hypo-pump-note">
+                  <AlertDescription className="text-sm">
+                    On a pump: an <strong>extended bolus</strong> or recent correction may still be bringing your BG
+                    down. If you use automation (loop/AID), check whether a suspend or reduced delivery is active —
+                    treat the low with fast carbs first, then review IOB with your team&apos;s plan.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {lastHypoDetail && (
+                <Alert className="border-border bg-muted/40" data-testid="alert-last-hypo-context">
+                  <AlertDescription className="text-sm text-muted-foreground">
+                    Last logged hypo {formatDistanceToNow(new Date(lastHypoDetail.at), { addSuffix: true })}:{" "}
+                    <span className="font-medium text-foreground">{lastHypoDetail.label}</span>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
           <p className="text-tiny text-muted-foreground">
             Not medical advice. For severe hypos or if you can&apos;t swallow, use glucagon and get emergency help.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="surface-card overflow-hidden rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold tracking-tight">After treating — typical check-in flow</CardTitle>
+          <CardDescription className="text-sm">
+            A visual reminder of the usual treat → wait → recheck pattern many teams teach (often called 15–15 style).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <StepLadder
+            steps={HYPO_RECHECK_FLOW_STEPS}
+            ariaLabel="Hypo treatment check-in steps"
+            data-testid="hypo-1515-step-ladder"
+          />
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Illustration only — not medical advice. Severe hypos need help straight away; follow emergency instructions
+            you were given with your glucagon.
           </p>
         </CardContent>
       </Card>

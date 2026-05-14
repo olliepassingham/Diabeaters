@@ -255,6 +255,29 @@ describe("applyPostFilter", () => {
     expect(r.reply.suggestedNextActions[0].href).toBe("/help-now");
   });
 
+  it("rewrites /education to /routines when the label implies the routines tool (#routine-href)", () => {
+    const r = applyPostFilter(
+      reply({
+        reply: "Morning routines can help.",
+        suggestedNextActions: [{ label: "Manage routines", href: "/education" }],
+      }),
+    );
+    expect(r.reply.suggestedNextActions[0].href).toBe("/routines");
+    expect(r.status).toBe("rewritten");
+    expect(r.reasons).toContain("routine_tool_href_corrected");
+  });
+
+  it("does not rewrite education when the label implies reading", () => {
+    const r = applyPostFilter(
+      reply({
+        reply: "General info.",
+        suggestedNextActions: [{ label: "Read about routines", href: "/education" }],
+      }),
+    );
+    expect(r.reply.suggestedNextActions[0].href).toBe("/education");
+    expect(r.reasons).not.toContain("routine_tool_href_corrected");
+  });
+
   it("returns a refusal reply when given a malformed object", () => {
     // @ts-expect-error: intentional misuse to exercise defensive branch.
     const r = applyPostFilter({ reply: 123 });

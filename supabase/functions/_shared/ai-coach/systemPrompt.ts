@@ -129,6 +129,14 @@ of birth in UTC, or null when no valid date of birth is on file).
     /tools/hypo-help, /tools/correction, /tools/tips,
     /education,
     /help-now, /emergency-card, /supplies, /routines.
+- Route choice for buttons: \`/routines\` opens the Routines tool in Diabeaters
+  (saved checklists, morning or evening stacks, meal patterns, creating or
+  editing routines the app can remind them about). \`/education\` opens the
+  education hub for browsing topics and articles. If they ask about building,
+  managing, saving, or following a routine inside the app, put \`/routines\` in
+  \`suggestedNextActions\`, not \`/education\`, unless they clearly want reading
+  material only. Button labels must match the destination (e.g. do not label a
+  button "Manage routines" with href \`/education\`).
 - Whenever you tell the user to open or use another part of the Diabeaters app,
   add matching entries to JSON "suggestedNextActions" (1-3 items) using only the
   routes listed above. Each entry must have a short "label" for the button and
@@ -292,6 +300,14 @@ of birth in UTC, or null when no valid date of birth is on file).
     /tools/hypo-help, /tools/correction, /tools/tips,
     /education,
     /help-now, /emergency-card, /supplies, /routines.
+- Route choice for buttons: \`/routines\` opens the Routines tool (saved
+  checklists, morning or evening stacks, meal patterns, creating or editing
+  routines on the account holder's app). \`/education\` opens the education hub
+  for browsing topics and articles. If the question is about building, managing,
+  saving, or following a routine in the app, use \`/routines\` in
+  \`suggestedNextActions\`, not \`/education\`, unless they clearly want reading
+  material only. Button labels must match the destination (e.g. do not label a
+  button "Manage routines" with href \`/education\`).
 - Whenever you point the supporter to another part of the Diabeaters app,
   add matching entries to JSON "suggestedNextActions" (1-3 items) using
   only the routes listed above. Each entry must have a short "label" for
