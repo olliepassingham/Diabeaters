@@ -5,13 +5,13 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import {
   fetchDmThreadsForCurrentUser,
   fetchDmThreadUserSettings,
@@ -547,7 +547,7 @@ export default function CommunityMessagesPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
+      <PageShell variant="standard" className="mx-auto max-w-xl space-y-4">
         <PageHeader leading={<PageBackButton />} title="Messages" />
         <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
       </PageShell>
@@ -555,120 +555,109 @@ export default function CommunityMessagesPage() {
   }
 
   return (
-    <PageShell
-      variant="standard"
-      className="max-w-lg mx-auto space-y-4 pb-4"
-    >
+    <PageShell variant="standard" className="mx-auto max-w-xl space-y-4 pb-8">
       <PageHeader
         leading={<PageBackButton />}
         title="Messages"
-        description="Direct messages (1:1)."
         actions={
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" asChild className="rounded-xl">
             <Link href="/community">
-              <MessageCircle className="h-4 w-4 mr-1.5" />
+              <MessageCircle className="mr-1.5 h-4 w-4" />
               Feed
             </Link>
           </Button>
         }
       />
 
-      <Card className="pressable card-interactive">
-        <CardContent className="pt-4 space-y-2">
-          <FieldLabelWithInfo
-            htmlFor="messages-search"
-            info="Search your conversations and start new chats by @handle."
+      <form onSubmit={handleStartChat} className="space-y-2">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <Input
+            id="messages-search"
+            ref={handleInputRef}
+            value={handleInput}
+            onChange={(e) => setHandleInput(e.target.value)}
+            placeholder="Search or @handle…"
+            title="Search your conversations and start new chats by @handle."
+            className="h-9 rounded-lg border-border/60 bg-background pl-8 text-sm shadow-sm"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="off"
+            disabled={starting || !user}
+            aria-autocomplete="list"
+            aria-controls="messages-handle-suggestions"
+            aria-label="Search conversations or enter a public @handle to start a chat"
+          />
+        </div>
+
+        {handleInput.trim() ? (
+          <div
+            id="messages-handle-suggestions"
+            className="space-y-1.5 rounded-lg border border-border/50 bg-muted/20 p-2 dark:bg-muted/15"
           >
-            Search
-          </FieldLabelWithInfo>
-          <form onSubmit={handleStartChat} className="space-y-2">
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                id="messages-search"
-                ref={handleInputRef}
-                value={handleInput}
-                onChange={(e) => setHandleInput(e.target.value)}
-                placeholder="Search or enter @handle"
-                className="pl-9 h-10 text-sm"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoComplete="off"
-                disabled={starting || !user}
-                aria-autocomplete="list"
-                aria-controls="messages-handle-suggestions"
-              />
-            </div>
-
-            {handleInput.trim() ? (
-              <div
-                id="messages-handle-suggestions"
-                className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-2"
-              >
-                {suggestLoading ? <p className="text-sm text-muted-foreground px-1">Searching…</p> : null}
-                {suggestError ? <p className="text-sm text-destructive px-1">{suggestError}</p> : null}
-                {!suggestLoading && !suggestError && suggestions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground px-1">
-                    No matching handles. Keep typing to filter conversations.
-                  </p>
-                ) : null}
-                {suggestions.length > 0 ? (
-                  <ul className="space-y-1.5">
-                    {suggestions.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center gap-3 rounded-lg border border-border/50 bg-card/70 px-2 py-2"
-                      >
-                        <CommunityAuthorAvatar
-                          displayName={p.name}
-                          avatarPath={p.avatar_url}
-                          size="sm"
-                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{p.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={starting || !user}
-                          onClick={() => void openChatWithUserId(p.id)}
-                        >
-                          Chat
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
+            {suggestLoading ? <p className="px-1 text-xs text-muted-foreground">Searching…</p> : null}
+            {suggestError ? <p className="px-1 text-xs text-destructive">{suggestError}</p> : null}
+            {!suggestLoading && !suggestError && suggestions.length === 0 ? (
+              <p className="px-1 text-xs text-muted-foreground">No matching handles. Keep typing to filter chats.</p>
             ) : null}
-
-            {hiddenSet.size > 0 ? (
-              <div className="flex items-center justify-between gap-3 pt-0.5">
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground min-h-9 px-1"
-                  onClick={() => setShowHidden((v) => !v)}
-                >
-                  {showHidden ? "Hide hidden conversations" : "Show hidden conversations"}
-                </button>
-                {showHidden ? <span className="text-xs text-muted-foreground">{hiddenSet.size} hidden</span> : null}
-              </div>
+            {suggestions.length > 0 ? (
+              <ul className="space-y-1">
+                {suggestions.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center gap-2 rounded-md border border-border/40 bg-card/80 px-2 py-1.5 dark:bg-card/60"
+                  >
+                    <CommunityAuthorAvatar
+                      displayName={p.name}
+                      avatarPath={p.avatar_url}
+                      size="sm"
+                      profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">{p.name}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">@{p.handle}</p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 px-2 text-xs"
+                      disabled={starting || !user}
+                      onClick={() => void openChatWithUserId(p.id)}
+                    >
+                      Chat
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             ) : null}
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        ) : null}
+
+        {hiddenSet.size > 0 ? (
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <button
+              type="button"
+              className="min-h-8 px-0.5 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              onClick={() => setShowHidden((v) => !v)}
+            >
+              {showHidden ? "Hide hidden conversations" : "Show hidden conversations"}
+            </button>
+            {showHidden ? (
+              <span className="text-[11px] tabular-nums text-muted-foreground">{hiddenSet.size} hidden</span>
+            ) : null}
+          </div>
+        ) : null}
+      </form>
 
       {loading ? (
-        <div className="space-y-2" aria-busy="true" aria-label="Loading conversations">
+        <div className="space-y-2.5" aria-busy="true" aria-label="Loading conversations">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-[4.25rem] w-full rounded-2xl" style={{ animationDelay: `${i * 60}ms` }} />
+            <Skeleton key={i} className="h-[4.5rem] w-full rounded-2xl" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
       ) : threads.length === 0 ? (
@@ -690,7 +679,7 @@ export default function CommunityMessagesPage() {
           </Button>
         </EmptyState>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2.5">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -707,8 +696,13 @@ export default function CommunityMessagesPage() {
             return (
               <li key={t.id}>
                 <Link href={`/community/messages/${t.id}`} className="block">
-                  <Card className="pressable card-interactive transition-colors hover:bg-muted/30">
-                    <CardContent className="flex items-center gap-3 py-3">
+                  <Card
+                    className={cn(
+                      "pressable card-interactive rounded-2xl border-border/60 shadow-sm transition-colors",
+                      "hover:border-primary/25 hover:bg-muted/25 dark:hover:bg-muted/15",
+                    )}
+                  >
+                    <CardContent className="flex items-center gap-3 py-3.5 pl-3 pr-2 sm:pl-4">
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}

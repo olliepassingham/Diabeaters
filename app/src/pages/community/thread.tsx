@@ -10,13 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
   fetchDmMessages,
-  fetchDmThreadsForCurrentUser,
+  fetchDmThreadMembers,
   insertDmMessage,
   otherMemberUserId,
   parseSharedFeedPostMessage,
   toggleDmMessageLike,
   type DmMessageRow,
-  type ThreadWithMembers,
 } from "@/lib/community";
 import { getProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
@@ -46,19 +45,45 @@ export default function CommunityThreadPage() {
 
   const load = useCallback(async () => {
     if (!threadId) return;
-    const res = await fetchDmMessages(threadId);
-    if (res.error) {
-      toast({ title: "Could not load messages", description: res.error.message, variant: "destructive" });
+    setLoading(true);
+    setPeerLabel(null);
+    setPeerAvatarPath(null);
+    setPeerUserId(null);
+
+    const [msgRes, memRes] = await Promise.all([
+      fetchDmMessages(threadId),
+      user?.id ? fetchDmThreadMembers(threadId) : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (msgRes.error) {
+      toast({ title: "Could not load messages", description: msgRes.error.message, variant: "destructive" });
       setMessages([]);
     } else {
-      setMessages(res.data ?? []);
+      setMessages(msgRes.data ?? []);
     }
+
+    if (!user?.id) {
+      setPeerLabel(null);
+    } else if (memRes.error || !memRes.data?.length) {
+      setPeerLabel("Conversation");
+    } else {
+      const other = otherMemberUserId(memRes.data, user.id);
+      if (!other) {
+        setPeerLabel("Conversation");
+      } else {
+        const { profile } = await getProfile(other);
+        const name = profile?.full_name?.trim() || shortId(other);
+        setPeerLabel(name);
+        setPeerAvatarPath(profile?.avatar_url ?? null);
+        setPeerUserId(other);
+      }
+    }
+
     setLoading(false);
-  }, [threadId, toast]);
+  }, [threadId, toast, user?.id]);
 
   useEffect(() => {
     if (!threadId) return;
-    setLoading(true);
     void load();
   }, [threadId, load]);
 
@@ -75,42 +100,6 @@ export default function CommunityThreadPage() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [pendingImage]);
-
-  useEffect(() => {
-    if (!threadId || !user?.id) {
-      setPeerLabel(null);
-      setPeerAvatarPath(null);
-      setPeerUserId(null);
-      return;
-    }
-    setPeerLabel(null);
-    setPeerAvatarPath(null);
-    setPeerUserId(null);
-    let cancelled = false;
-    void (async () => {
-      const res = await fetchDmThreadsForCurrentUser();
-      if (cancelled || res.error) return;
-      const t = (res.data ?? []).find((x) => x.id === threadId) as ThreadWithMembers | undefined;
-      if (!t) {
-        setPeerLabel("Conversation");
-        return;
-      }
-      const other = otherMemberUserId(t.members, user.id);
-      if (!other) {
-        setPeerLabel("Conversation");
-        return;
-      }
-      const { profile } = await getProfile(other);
-      if (cancelled) return;
-      const name = profile?.full_name?.trim() || shortId(other);
-      setPeerLabel(name);
-      setPeerAvatarPath(profile?.avatar_url ?? null);
-      setPeerUserId(other);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [threadId, user?.id]);
 
   const toggleLike = useCallback(
     async (m: DmMessageRow) => {

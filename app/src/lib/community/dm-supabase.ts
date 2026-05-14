@@ -76,16 +76,20 @@ async function enrichDmMessagesWithLikesAndImages(messages: DmMessageRow[]): Pro
   const uid = sessionData.session?.user?.id ?? null;
   const ids = messages.map((m) => m.id);
 
-  const { data: likesRows, error: likesErr } = await supabase
-    .from("dm_message_likes")
-    .select("message_id, user_id")
-    .in("message_id", ids);
+  const uniquePaths = [...new Set(messages.map((m) => m.image_storage_path).filter(Boolean))] as string[];
 
-  if (likesErr && import.meta.env.DEV) {
-    console.warn("[dm] likes fetch", likesErr.message);
+  const [likesRes, pathTuples] = await Promise.all([
+    supabase.from("dm_message_likes").select("message_id, user_id").in("message_id", ids),
+    Promise.all(
+      uniquePaths.map(async (p) => [p, await signedUrlForStoragePath(p)] as const),
+    ),
+  ]);
+
+  if (likesRes.error && import.meta.env.DEV) {
+    console.warn("[dm] likes fetch", likesRes.error.message);
   }
 
-  const likeRows = likesErr ? [] : (likesRows ?? []);
+  const likeRows = likesRes.error ? [] : (likesRes.data ?? []);
 
   const countMap = new Map<string, number>();
   const myLikes = new Set<string>();
@@ -96,14 +100,10 @@ async function enrichDmMessagesWithLikesAndImages(messages: DmMessageRow[]): Pro
     if (uid && String(rec.user_id) === uid) myLikes.add(mid);
   }
 
-  const uniquePaths = [...new Set(messages.map((m) => m.image_storage_path).filter(Boolean))] as string[];
   const urlByPath = new Map<string, string>();
-  await Promise.all(
-    uniquePaths.map(async (p) => {
-      const url = await signedUrlForStoragePath(p);
-      if (url) urlByPath.set(p, url);
-    }),
-  );
+  for (const [p, url] of pathTuples) {
+    if (url) urlByPath.set(p, url);
+  }
 
   return messages.map((m) => ({
     ...m,
@@ -160,18 +160,40 @@ export async function fetchDmThreadsForCurrentUser(): Promise<{
 
   if (tErr) return { data: null, error: new Error(tErr.message) };
 
-  const withMembers: ThreadWithMembers[] = [];
+  const { data: allMembers, error: memErr } = await supabase
+    .from("dm_thread_members")
+    .select("*")
+    .in("thread_id", threadIds);
 
-  for (const t of threads ?? []) {
-    const tr = mapThread(t as Record<string, unknown>);
-    const { data: mems, error: memErr } = await supabase.from("dm_thread_members").select("*").eq("thread_id", tr.id);
+  if (memErr) return { data: null, error: new Error(memErr.message) };
 
-    if (memErr) return { data: null, error: new Error(memErr.message) };
-    const members = (mems ?? []).map((m) => mapMember(m as Record<string, unknown>));
-    withMembers.push({ ...tr, members });
+  const membersByThread = new Map<string, DmThreadMemberRow[]>();
+  for (const row of allMembers ?? []) {
+    const m = mapMember(row as Record<string, unknown>);
+    const list = membersByThread.get(m.thread_id) ?? [];
+    list.push(m);
+    membersByThread.set(m.thread_id, list);
   }
 
+  const withMembers: ThreadWithMembers[] = (threads ?? []).map((t) => {
+    const tr = mapThread(t as Record<string, unknown>);
+    return { ...tr, members: membersByThread.get(tr.id) ?? [] };
+  });
+
   return { data: withMembers, error: null };
+}
+
+/** Members for a single thread (peer resolution without loading every thread). */
+export async function fetchDmThreadMembers(threadId: string): Promise<{
+  data: DmThreadMemberRow[];
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured") };
+
+  const { data, error } = await supabase.from("dm_thread_members").select("*").eq("thread_id", threadId);
+  if (error) return { data: [], error: new Error(error.message) };
+  return { data: (data ?? []).map((r) => mapMember(r as Record<string, unknown>)), error: null };
 }
 
 export async function fetchDmThreadUserSettings(threadIds: string[]): Promise<{
@@ -231,7 +253,7 @@ export async function fetchDmMessages(threadId: string): Promise<{
   return { data: await enrichDmMessagesWithLikesAndImages(mapped), error: null };
 }
 
-/** Latest message per thread (parallel queries; empty threads map to null). */
+/** Latest message per thread — prefers single RPC round-trip when deployed. */
 export async function fetchLatestDmMessageForThreads(threadIds: string[]): Promise<{
   data: Map<string, DmMessageRow | null>;
   error: Error | null;
@@ -241,6 +263,35 @@ export async function fetchLatestDmMessageForThreads(threadIds: string[]): Promi
     return { data: new Map(), error: new Error("Supabase not configured") };
   }
   if (threadIds.length === 0) return { data: new Map(), error: null };
+
+  const rpcRes = await supabase.rpc("latest_dm_messages_for_threads", {
+    p_thread_ids: threadIds,
+  });
+
+  if (!rpcRes.error) {
+    const map = new Map<string, DmMessageRow | null>();
+    for (const tid of threadIds) {
+      map.set(tid, null);
+    }
+    for (const row of (rpcRes.data ?? []) as Record<string, unknown>[]) {
+      const m = mapMessage(row);
+      map.set(m.thread_id, m);
+    }
+    return { data: map, error: null };
+  }
+
+  const errMsg = rpcRes.error.message.toLowerCase();
+  if (
+    !errMsg.includes("could not find") &&
+    !errMsg.includes("function") &&
+    !errMsg.includes("schema cache")
+  ) {
+    return { data: new Map(), error: new Error(rpcRes.error.message) };
+  }
+
+  if (import.meta.env.DEV) {
+    console.warn("[dm] latest_dm_messages_for_threads unavailable; using per-thread fallback.", rpcRes.error.message);
+  }
 
   const results = await Promise.all(
     threadIds.map(async (tid) => {
