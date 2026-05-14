@@ -22,6 +22,8 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { runSupplyLowInAppNotifyScan } from "@/lib/supply-inapp-notify-scan";
 import { PharmacyCard } from "@/components/pharmacy-card";
 import { ToastAction } from "@/components/ui/toast";
+import { SupplyRunwayFill } from "@/components/visualizations/supply-runway-fill";
+import { SupplyRunwayAtAGlance } from "@/components/visualizations/supply-runway-at-glance";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
 import {
   travelPlanStockBufferMultiplier,
@@ -147,7 +149,6 @@ function DepletionTimeline({
 
       {supplyData.map(({ supply, daysRemaining, actualDays, status, runOutDate }) => {
         const barWidth = maxDays > 0 ? Math.max((daysRemaining / maxDays) * 100, 2) : 2;
-        const barColor = status === "critical" ? "bg-red-500" : status === "low" ? "bg-yellow-500" : "bg-emerald-500";
         const Icon = typeIcons[supply.type] || Package;
 
         return (
@@ -177,12 +178,10 @@ function DepletionTimeline({
                 )}
               </div>
             </div>
-            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${barColor}`}
-                style={{ width: `${barWidth}%` }}
-              />
-            </div>
+            <SupplyRunwayFill
+              fillPercent={barWidth}
+              status={status === "critical" ? "critical" : status === "low" ? "low" : "ok"}
+            />
           </button>
         );
       })}
@@ -2846,6 +2845,10 @@ export default function Supplies() {
           </AlertDescription>
         </Alert>
       )}
+
+      {supplies.length > 0 ? (
+        <SupplyRunwayAtAGlance supplies={supplies} onSupplyClick={handleTimelineClick} />
+      ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="w-full">

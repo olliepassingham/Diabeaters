@@ -113,6 +113,16 @@ export function SupplyTrackerTodaySection() {
       ? ((travelPlan as { travelType?: unknown }).travelType as "domestic" | "international")
       : null;
 
+  const suppliesNeedingAttentionCount = useMemo(
+    () =>
+      supplies.filter((s) => {
+        const st = storage.getSupplyStatus(s);
+        return st === "critical" || st === "low";
+      }).length,
+    [supplies],
+  );
+  const hideSupplyShortcutCard = suppliesNeedingAttentionCount > 0;
+
   let worst: "critical" | "low" | "ok" = "ok";
   let minDays: number | null = null;
   if (supplies.length > 0) {
@@ -189,9 +199,13 @@ export function SupplyTrackerTodaySection() {
 
   return (
     <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <SupplyTrackerEntryCard />
-        <TodayAtAGlanceCard />
+      <div
+        className={
+          hideSupplyShortcutCard ? "grid grid-cols-1" : "grid grid-cols-1 gap-3 sm:gap-3 md:grid-cols-2 md:gap-4"
+        }
+      >
+        {!hideSupplyShortcutCard ? <SupplyTrackerEntryCard /> : null}
+        <TodayAtAGlanceCard supplyShortcutHidden={hideSupplyShortcutCard} />
       </div>
     </section>
   );
@@ -289,7 +303,8 @@ export function SupplyTrackerEntryCard() {
   );
 }
 
-export function TodayAtAGlanceCard() {
+export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
+  const supplyShortcutHidden = props.supplyShortcutHidden === true;
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
 
@@ -347,6 +362,16 @@ export function TodayAtAGlanceCard() {
 
   const status = useMemo(() => getTodayGlanceLine(supplies, scenarioState), [supplies, scenarioState]);
 
+  const showSupplyAttentionRows = suppliesNeedingAttention.length > 0;
+  const omitDuplicateStockBanner =
+    showSupplyAttentionRows &&
+    (status.message === "Critical supplies need attention" || status.message === "Some supplies are running low");
+
+  const worstSupplyAttention = useMemo(() => {
+    if (!suppliesNeedingAttention.length) return null as null | "critical" | "low";
+    return suppliesNeedingAttention.some((s) => storage.getSupplyStatus(s) === "critical") ? "critical" : "low";
+  }, [suppliesNeedingAttention]);
+
   const holidayPrep: HolidayPrep | null = storage.getHolidayPrep?.() ?? null;
   const departDays = holidayPrep ? daysUntil(holidayPrep.departureDate) : null;
   const showTripCountdown = holidayPrep && departDays !== null && departDays >= 0 && departDays <= 7;
@@ -361,121 +386,153 @@ export function TodayAtAGlanceCard() {
       ? ((travelPlan as { travelType?: unknown }).travelType as "domestic" | "international")
       : null;
 
+  const supplyBlock = (
+    <div
+      className={
+        worstSupplyAttention === "critical"
+          ? "rounded-lg border border-red-500/25 bg-red-500/[0.06] px-2 py-1.5 dark:bg-red-950/20"
+          : worstSupplyAttention === "low"
+            ? "rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-2 py-1.5 dark:bg-amber-950/15"
+            : "rounded-lg border border-border/50 bg-muted/15 px-2 py-1.5 dark:bg-muted/10"
+      }
+    >
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Supplies</p>
+        {supplyShortcutHidden ? (
+          <Link
+            href="/supplies"
+            className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+            data-testid="link-today-open-supplies"
+          >
+            Open tracker
+          </Link>
+        ) : null}
+      </div>
+      <ul className="space-y-1">
+        {suppliesNeedingAttention.slice(0, 4).map((supply) => {
+          const st = storage.getSupplyStatus(supply);
+          return (
+            <li key={supply.id} className="flex min-h-9 items-center justify-between gap-2 text-sm leading-tight">
+              <span className="min-w-0 truncate text-foreground/90">{supply.name}</span>
+              <Badge variant={st === "critical" ? "destructive" : "secondary"} className="shrink-0 text-[11px] tabular-nums">
+                {storage.getDaysRemaining(supply)}d left
+              </Badge>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+
   return (
     <Card
       className="dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 rounded-xl overflow-hidden"
       data-testid="dashboard-today-card"
     >
-      <CardContent className="px-3 py-3 md:px-4 md:py-4 space-y-0" data-testid="dashboard-today-inline">
-        <div className="mb-3 flex items-center justify-between gap-2 border-b border-border/60 pb-3">
+      <CardContent className="space-y-0 px-3 py-2.5 md:px-3.5 md:py-3" data-testid="dashboard-today-inline">
+        <div className="mb-2 flex items-center justify-between gap-2 border-b border-border/50 pb-2">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <Calendar className="h-4 w-4" aria-hidden />
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+              <Calendar className="h-3.5 w-3.5" aria-hidden />
             </div>
             <span className="text-sm font-semibold tracking-tight text-foreground">Today</span>
           </div>
           <Badge
             variant={status.type === "warning" ? "destructive" : status.type === "info" ? "secondary" : "outline"}
-            className="max-w-[55%] shrink-0 truncate border-border/80 bg-muted/40 text-xs font-medium text-foreground dark:bg-muted/25"
+            className="max-w-[58%] shrink-0 truncate border-border/80 bg-muted/40 text-[11px] font-medium text-foreground dark:bg-muted/25"
           >
             {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
           </Badge>
         </div>
 
-        <div
-          className={`flex items-start gap-2.5 rounded-lg px-2 py-2 -mx-0.5 ${
-            status.type === "warning"
-              ? "bg-red-500/10 dark:bg-red-950/20"
-              : status.type === "info"
-                ? "bg-amber-500/12 dark:bg-amber-950/25"
-                : "bg-green-500/10 dark:bg-green-950/25"
-          }`}
-        >
-          {status.type === "warning" ? (
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" aria-hidden />
-          ) : status.type === "info" ? (
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" aria-hidden />
+        <div className="flex flex-col gap-2">
+          {omitDuplicateStockBanner ? (
+            <span className="sr-only" data-testid="text-today-status">
+              {status.message}
+            </span>
           ) : (
-            <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-500" aria-hidden />
+            <div
+              className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${
+                status.type === "warning"
+                  ? "bg-red-500/10 dark:bg-red-950/20"
+                  : status.type === "info"
+                    ? "bg-amber-500/12 dark:bg-amber-950/25"
+                    : "bg-green-500/10 dark:bg-green-950/25"
+              }`}
+            >
+              {status.type === "warning" ? (
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" aria-hidden />
+              ) : status.type === "info" ? (
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-500" aria-hidden />
+              ) : (
+                <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-500" aria-hidden />
+              )}
+              <span className="min-w-0 text-sm leading-snug text-foreground" data-testid="text-today-status">
+                {status.message}
+              </span>
+            </div>
           )}
-          <span className="min-w-0 text-sm leading-snug text-foreground" data-testid="text-today-status">
-            {status.message}
-          </span>
-        </div>
 
-        {showTripCountdown ? (
-          <div className="mt-3 pl-0.5" data-testid="dashboard-today-extras">
-            <Link href="/scenarios/travel" className="block">
-              <div
-                className="cursor-pointer rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/40 dark:bg-muted/10 dark:hover:bg-muted/20"
-                data-testid="dashboard-today-trip-countdown"
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>
-                <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-                  {holidayPrep?.destination?.trim()
-                    ? `${holidayPrep.destination.trim()}${travelType ? ` (${travelType})` : ""}`
-                    : "Trip coming up"}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {departDays === 0 ? "Departs today" : `Departs in ${departDays}d`}
-                </p>
-              </div>
-            </Link>
-          </div>
-        ) : null}
-
-        {(hasActiveScenario || suppliesNeedingAttention.length > 0 || isEvening) && (
-          <div className="mt-3 space-y-3">
-            {hasActiveScenario && (
-              <div className="space-y-2">
-                {scenarioState.travelModeActive && (
-                  <div className="rounded-lg bg-blue-50/90 p-2.5 text-sm text-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                    Travel mode until{" "}
-                    {scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate).toLocaleDateString("en-GB") : "unspecified"}
-                  </div>
-                )}
-                {scenarioState.sickDayActive && (
-                  <div className="rounded-lg bg-orange-50/90 p-2.5 text-sm text-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
-                    Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
-                  </div>
-                )}
-              </div>
-            )}
-
-            {suppliesNeedingAttention.length > 0 && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Supplies</p>
-                {suppliesNeedingAttention.slice(0, 4).map((supply) => {
-                  const st = storage.getSupplyStatus(supply);
-                  return (
-                    <div key={supply.id} className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate text-muted-foreground">{supply.name}</span>
-                      <Badge
-                        variant={st === "critical" ? "destructive" : "secondary"}
-                        className="shrink-0 text-xs"
-                      >
-                        {storage.getDaysRemaining(supply)}d left
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {isEvening && (
-              <Link href="/scenarios/bedtime" className="block">
+          {showTripCountdown ? (
+            <div data-testid="dashboard-today-extras">
+              <Link href="/scenarios/travel" className="block">
                 <div
-                  className="flex cursor-pointer items-center gap-2 rounded-lg bg-indigo-50/90 p-2.5 text-sm text-indigo-900 transition-colors hover:bg-indigo-100/90 dark:bg-indigo-950/35 dark:text-indigo-100 dark:hover:bg-indigo-950/50"
-                  data-testid="card-evening-bedtime"
+                  className="cursor-pointer rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 transition-colors hover:border-border hover:bg-muted/35 dark:bg-muted/10 dark:hover:bg-muted/20"
+                  data-testid="dashboard-today-trip-countdown"
                 >
-                  <Moon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="min-w-0">Bedtime check</span>
-                  <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>
+                  <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                    {holidayPrep?.destination?.trim()
+                      ? `${holidayPrep.destination.trim()}${travelType ? ` (${travelType})` : ""}`
+                      : "Trip coming up"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {departDays === 0 ? "Departs today" : `Departs in ${departDays}d`}
+                  </p>
                 </div>
               </Link>
-            )}
-          </div>
-        )}
+            </div>
+          ) : null}
+
+          {hasActiveScenario ? (
+            <div className="flex flex-col gap-1.5">
+              {scenarioState.travelModeActive && (
+                <div className="rounded-lg bg-blue-50/90 px-2.5 py-2 text-sm leading-snug text-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
+                  Travel mode until{" "}
+                  {scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate).toLocaleDateString("en-GB") : "unspecified"}
+                </div>
+              )}
+              {scenarioState.sickDayActive && (
+                <div className="rounded-lg bg-orange-50/90 px-2.5 py-2 text-sm leading-snug text-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
+                  Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {showSupplyAttentionRows ? (
+            supplyShortcutHidden ? (
+              <Link href="/supplies" className="block rounded-lg no-underline outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                {supplyBlock}
+              </Link>
+            ) : (
+              supplyBlock
+            )
+          ) : null}
+
+          {isEvening ? (
+            <Link href="/scenarios/bedtime" className="block pt-0.5">
+              <div
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-indigo-50/90 px-2.5 py-2 text-sm leading-snug text-indigo-900 transition-colors hover:border-indigo-200/80 hover:bg-indigo-100/90 dark:border-indigo-900/30 dark:bg-indigo-950/35 dark:text-indigo-100 dark:hover:bg-indigo-950/50"
+                data-testid="card-evening-bedtime"
+              >
+                <Moon className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="min-w-0 font-medium">Bedtime check</span>
+                <ArrowRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              </div>
+            </Link>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

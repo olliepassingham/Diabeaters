@@ -240,6 +240,14 @@ export const DIABEATER_SETTINGS_CHANGED_EVENT = "diabeater-settings-changed";
 /** Dispatched when `saveProfile` updates local profile JSON (same-tab). */
 export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
 
+/** Same-tab: quick exercise session JSON was written or cleared (`diabeater_active_exercise`). */
+export const DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT = "diabeater-active-exercise-changed";
+
+export function notifyActiveExerciseChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT));
+}
+
 const ONBOARDING_FINISHED_AT_KEY = "diabeater_onboarding_finished_at";
 
 /** Persist when the onboarding wizard finishes so the dashboard can show a lighter first week. */
@@ -4171,6 +4179,7 @@ export const storage = {
       },
     };
     localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(session));
+    notifyActiveExerciseChanged();
     return session;
   },
 
@@ -4193,6 +4202,7 @@ export const storage = {
     if (!session) return null;
     const updated = { ...session, ...updates };
     localStorage.setItem(STORAGE_KEYS.ACTIVE_EXERCISE, JSON.stringify(updated));
+    notifyActiveExerciseChanged();
     return updated;
   },
 
@@ -4237,6 +4247,7 @@ export const storage = {
       });
     }
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
+    notifyActiveExerciseChanged();
     return session;
   },
 

@@ -69,7 +69,8 @@ import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { IosPushForegroundSync } from "@/components/ios-push-foreground-sync";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { getProfile } from "@/lib/profile";
-import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
+import type { ActiveExerciseSession } from "@/lib/storage";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import NotFound from "@/pages/not-found";
 import ShotsPage from "@/pages/shots";
@@ -1011,6 +1012,22 @@ function AuthenticatedShell() {
   const suppressClinicalPollers = isCarerMode || isCommunityMode;
   const iosNotifPrompt = useIosLocalNotificationPermissionPrompt(!suppressClinicalPollers);
 
+  const [activeExerciseSession, setActiveExerciseSession] = useState<ActiveExerciseSession | null>(() =>
+    storage.getActiveExercise(),
+  );
+
+  useEffect(() => {
+    const sync = () => {
+      setActiveExerciseSession(storage.getActiveExercise());
+    };
+    sync();
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, sync);
+  }, []);
+
+  /** Lock scroll to `#app-scroll-main` so header + exercise strip stay in view during quick exercise. */
+  const lockShellHeightForExercise = Boolean(activeExerciseSession);
+
   const handleLogout = async () => {
     clearCarerClientSessionKeys();
     await logout();
@@ -1151,7 +1168,11 @@ function AuthenticatedShell() {
           onLogout={handleLogout}
         />
       ) : (
-    <div className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground">
+    <div
+      className={`relative flex w-full min-w-0 flex-col bg-background text-foreground ${
+        lockShellHeightForExercise ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen"
+      }`}
+    >
       <IosPushForegroundSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />

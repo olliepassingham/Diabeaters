@@ -79,3 +79,22 @@ export function getTodayGlanceLine(
 
   return { type: "ok", message: "All clear for now" };
 }
+
+/**
+ * Hero and Today both use {@link getTodayGlanceLine}; for stock-only info/warnings the Today
+ * card already surfaces the same copy — skip the hero glance line to avoid repetition.
+ */
+export function shouldOmitHeroGlanceLineDuplicatingTodayCard(
+  glance: { type: TodayGlanceStatusType; message: string },
+  supplies: Supply[],
+): boolean {
+  const hasLow = supplies.some((s) => storage.getSupplyStatus(s) === "low");
+  const hasCritical = supplies.some((s) => storage.getSupplyStatus(s) === "critical");
+  if (glance.type === "info" && glance.message === "Some supplies are running low" && hasLow) {
+    return true;
+  }
+  if (glance.type === "warning" && glance.message === "Critical supplies need attention" && hasCritical) {
+    return true;
+  }
+  return false;
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import type { LucideIcon } from "lucide-react";
 import {
   Plane,
   Thermometer,
@@ -13,6 +14,13 @@ import {
   Play,
   Info,
   CircleCheck,
+  Moon,
+  Activity,
+  Lightbulb,
+  Cookie,
+  Droplets,
+  Sparkles,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +43,7 @@ import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   formatLastExerciseSummaryLine,
+  getPostExerciseEducationalCopy,
   getPostExercisePersonalizedTipBullets,
   inferPostExerciseLoadTier,
   insulinDeliveryForPostExerciseTips,
@@ -120,6 +129,51 @@ function formatElapsedShort(ms: number): string {
   const s = totalSec % 60;
   if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Icon + tint for post-exercise tip rows (copy-aware, educational only). */
+function postExerciseTipPresentation(text: string, index: number): { Icon: LucideIcon; iconWrap: string } {
+  const lower = text.toLowerCase();
+  if (/bedtime|overnight|\bat night\b|toward bed/.test(lower)) {
+    return {
+      Icon: Moon,
+      iconWrap: "bg-violet-500/18 text-violet-800 shadow-sm shadow-violet-950/10 dark:text-violet-100",
+    };
+  }
+  if (/\bcarb|hypo|fast carb|lows?\b|snack|glucose is/.test(lower)) {
+    return {
+      Icon: Cookie,
+      iconWrap: "bg-amber-500/18 text-amber-900 shadow-sm shadow-amber-950/10 dark:text-amber-100",
+    };
+  }
+  if (/\biob\b|bolus|insulin|pump|injection|correction|stacking|doses?\b/.test(lower)) {
+    return {
+      Icon: Syringe,
+      iconWrap: "bg-sky-500/16 text-sky-900 shadow-sm shadow-sky-950/10 dark:text-sky-100",
+    };
+  }
+  if (/hydra|water|refuel/.test(lower)) {
+    return {
+      Icon: Droplets,
+      iconWrap: "bg-cyan-500/15 text-cyan-900 shadow-sm shadow-cyan-950/10 dark:text-cyan-100",
+    };
+  }
+  if (/\btrain|workout|session|muscle|cardio|hiit|burst|endurance|sensitivity|dip\b/.test(lower)) {
+    return {
+      Icon: Activity,
+      iconWrap: "bg-emerald-500/18 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100",
+    };
+  }
+  if (index === 0) {
+    return {
+      Icon: Sparkles,
+      iconWrap: "bg-emerald-500/18 text-emerald-900 shadow-sm shadow-emerald-950/10 dark:text-emerald-100",
+    };
+  }
+  return {
+    Icon: Lightbulb,
+    iconWrap: "bg-muted/80 text-muted-foreground shadow-sm",
+  };
 }
 
 /**
@@ -848,6 +902,7 @@ export function AppStatusStrip() {
             const summaryLine = formatLastExerciseSummaryLine(last);
             const delivery = insulinDeliveryForPostExerciseTips(storage.getProfile());
             const tipBullets = getPostExercisePersonalizedTipBullets(tier, last, delivery);
+            const edu = getPostExerciseEducationalCopy(tier);
             return (
               <>
                 <div className={rowClass} data-testid="status-post-exercise-header-row">
@@ -878,20 +933,58 @@ export function AppStatusStrip() {
                   </Button>
                 </div>
                 {postExerciseOpen ? (
-                  <div className="rounded-2xl border border-border/60 bg-muted/15 px-3 py-3 space-y-3 dark:bg-muted/10">
-                    {summaryLine ? (
-                      <p className="text-sm font-medium text-foreground" data-testid="status-post-exercise-summary">
-                        Last session: {summaryLine}
+                  <div
+                    className="overflow-hidden rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/[0.07] via-background/95 to-violet-500/[0.06] shadow-sm dark:from-emerald-500/10 dark:to-violet-500/10"
+                    role="region"
+                    aria-label="Post-exercise tips"
+                  >
+                    <div className="space-y-3 px-3.5 pb-3.5 pt-3.5 sm:px-4 sm:pb-4 sm:pt-4">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-800/90 dark:text-emerald-200/90">
+                        {edu.stripHint}
                       </p>
-                    ) : null}
-                    <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground leading-relaxed">
-                      {tipBullets.map((b) => (
-                        <li key={b}>{b}</li>
-                      ))}
-                    </ul>
-                    <p className="text-[11px] text-muted-foreground leading-snug">
-                      Educational only — follow your diabetes team&apos;s written plan first.
-                    </p>
+                      {summaryLine ? (
+                        <div
+                          className="flex items-start gap-3 rounded-xl border border-border/50 bg-background/55 px-3 py-2.5 backdrop-blur-sm dark:bg-background/35"
+                          data-testid="status-post-exercise-summary"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-800 dark:text-emerald-100">
+                            <Dumbbell className="h-5 w-5" aria-hidden />
+                          </div>
+                          <div className="min-w-0 pt-0.5">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Last session</p>
+                            <p className="text-base font-semibold leading-snug text-foreground">{summaryLine}</p>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="space-y-2">
+                        {tipBullets.map((b, i) => {
+                          const { Icon, iconWrap } = postExerciseTipPresentation(b, i);
+                          return (
+                            <div
+                              key={`${i}-${b.slice(0, 48)}`}
+                              className="flex gap-3 rounded-xl border border-border/45 bg-background/50 px-3 py-2.5 backdrop-blur-sm dark:bg-background/30"
+                              data-testid={`status-post-exercise-tip-${i}`}
+                            >
+                              <div
+                                className={cn(
+                                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5 dark:ring-white/10",
+                                  iconWrap,
+                                )}
+                              >
+                                <Icon className="h-[18px] w-[18px]" aria-hidden />
+                              </div>
+                              <p className="min-w-0 pt-1 text-sm leading-snug text-foreground/90">{b}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2 rounded-lg border border-dashed border-border/60 bg-muted/20 px-2.5 py-2 dark:bg-muted/10">
+                        <Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                          Educational only — follow your diabetes team&apos;s written plan first.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
               </>

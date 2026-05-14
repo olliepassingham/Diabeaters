@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -837,222 +838,282 @@ export default function Bedtime() {
       ) : null}
 
       <Collapsible open={quickCheckOpen} onOpenChange={setQuickCheckOpen}>
-        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-inputs">
+        <Card
+          className={cn(
+            "overflow-hidden rounded-2xl border-indigo-500/20 shadow-md ring-1 ring-indigo-500/10 dark:ring-indigo-400/10",
+            "bg-gradient-to-br from-indigo-500/[0.08] via-card to-violet-600/[0.06] dark:from-indigo-950/50 dark:via-card dark:to-violet-950/25",
+          )}
+          data-testid="card-bedtime-inputs"
+        >
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="w-full text-left rounded-t-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+              className="w-full text-left transition-colors hover:bg-muted/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               aria-label={quickCheckOpen ? "Collapse quick check" : "Expand quick check"}
               data-testid="button-bedtime-quick-check-toggle"
             >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="text-lg">Quick check</CardTitle>
-                    <CardDescription>
-                      {quickCheckOpen
-                        ? "30 seconds. Save the result to track patterns."
-                        : currentBg.trim()
-                          ? `Tap to edit • BG ${currentBg} ${bgUnits}`
-                          : "Tap to edit your inputs"}
-                    </CardDescription>
-                  </div>
-                  <span className="mt-1 shrink-0 text-muted-foreground">
-                    {quickCheckOpen ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
-                  </span>
+              <div className="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-700 shadow-inner shadow-indigo-950/10 dark:bg-indigo-400/10 dark:text-indigo-100"
+                  aria-hidden
+                >
+                  <Moon className="h-5 w-5" />
                 </div>
-              </CardHeader>
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-indigo-700/90 dark:text-indigo-300/90">
+                    Wind down
+                  </span>
+                  <span className="mt-0.5 block text-lg font-semibold tracking-tight text-foreground sm:text-xl">Quick check</span>
+                  {!quickCheckOpen ? (
+                    <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground">
+                      {currentBg.trim() ? `Tap to edit • BG ${currentBg} ${bgUnits}` : "Tap to edit your inputs"}
+                    </span>
+                  ) : null}
+                </div>
+                <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground dark:bg-background/40">
+                  {quickCheckOpen ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
+                </span>
+              </div>
             </button>
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="current-bg" className="flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Current blood glucose
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="current-bg"
-                  type="number"
-                  step="0.1"
-                  placeholder={bgUnits === "mmol/L" ? "e.g., 7.2" : "e.g., 130"}
-                  value={currentBg}
-                  onChange={(e) => setCurrentBg(e.target.value)}
-                  className="flex-1"
-                  data-testid="input-bedtime-bg"
-                />
-                <span className="flex items-center text-sm text-muted-foreground px-2">{bgUnits}</span>
-              </div>
-            </div>
+            <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 pb-5 pt-4 backdrop-blur-[2px] dark:bg-background/30 sm:px-5 sm:pb-6 sm:pt-5">
+              <section
+                className="space-y-4 rounded-2xl border border-indigo-500/15 bg-indigo-500/[0.04] p-4 dark:bg-indigo-950/20"
+                aria-labelledby="bedtime-section-glucose"
+              >
+                <h3 id="bedtime-section-glucose" className="text-[11px] font-semibold uppercase tracking-wider text-indigo-800 dark:text-indigo-200">
+                  Glucose now
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="current-bg" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-indigo-600 dark:text-indigo-300">
+                        <Activity className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Current blood glucose
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="current-bg"
+                        type="number"
+                        step="0.1"
+                        placeholder={bgUnits === "mmol/L" ? "e.g., 7.2" : "e.g., 130"}
+                        value={currentBg}
+                        onChange={(e) => setCurrentBg(e.target.value)}
+                        className="h-11 flex-1 border-border/70 bg-background/80 text-base shadow-sm dark:bg-background/60"
+                        data-testid="input-bedtime-bg"
+                      />
+                      <span className="flex items-center rounded-lg border border-border/60 bg-muted/30 px-3 text-sm font-medium text-muted-foreground">
+                        {bgUnits}
+                      </span>
+                    </div>
+                  </div>
 
-            <div className="space-y-2">
-              <Label id="label-bedtime-bg-direction" className="text-foreground">
-                BG direction <span className="font-normal text-muted-foreground">(optional)</span>
-              </Label>
-              <div className="flex flex-wrap gap-2" role="group" aria-labelledby="label-bedtime-bg-direction">
-                <Button
-                  type="button"
-                  variant={bgTrend === "steady" ? "default" : "outline"}
-                  size="sm"
-                  className="min-h-10 flex-1 sm:flex-1"
-                  onClick={() => setBgTrend((prev) => (prev === "steady" ? "not_sure" : "steady"))}
-                  data-testid="button-bedtime-bg-trend-stable"
-                >
-                  <Minus className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                  Stable
-                </Button>
-                <Button
-                  type="button"
-                  variant={bgTrend === "rising" ? "default" : "outline"}
-                  size="sm"
-                  className="min-h-10 flex-1 sm:flex-1"
-                  onClick={() => setBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
-                  data-testid="button-bedtime-bg-trend-rising"
-                >
-                  <TrendingUp className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                  Rising
-                </Button>
-                <Button
-                  type="button"
-                  variant={bgTrend === "falling" ? "default" : "outline"}
-                  size="sm"
-                  className="min-h-10 flex-1 sm:flex-1"
-                  onClick={() => setBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
-                  data-testid="button-bedtime-bg-trend-falling"
-                >
-                  <TrendingDown className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
-                  Falling
-                </Button>
-              </div>
-            </div>
+                  <div className="space-y-2">
+                    <Label id="label-bedtime-bg-direction" className="text-sm font-medium text-foreground">
+                      BG direction <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <div
+                      className="flex gap-1 rounded-xl border border-border/60 bg-muted/35 p-1 dark:bg-muted/25"
+                      role="group"
+                      aria-labelledby="label-bedtime-bg-direction"
+                    >
+                      <Button
+                        type="button"
+                        variant={bgTrend === "steady" ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "min-h-10 flex-1 rounded-lg shadow-none",
+                          bgTrend === "steady" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                        )}
+                        onClick={() => setBgTrend((prev) => (prev === "steady" ? "not_sure" : "steady"))}
+                        data-testid="button-bedtime-bg-trend-stable"
+                      >
+                        <Minus className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Stable
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={bgTrend === "rising" ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "min-h-10 flex-1 rounded-lg shadow-none",
+                          bgTrend === "rising" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                        )}
+                        onClick={() => setBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
+                        data-testid="button-bedtime-bg-trend-rising"
+                      >
+                        <TrendingUp className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Rising
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={bgTrend === "falling" ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "min-h-10 flex-1 rounded-lg shadow-none",
+                          bgTrend === "falling" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                        )}
+                        onClick={() => setBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
+                        data-testid="button-bedtime-bg-trend-falling"
+                      >
+                        <TrendingDown className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        Falling
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="hours-food" className="flex items-center gap-2">
-                <Utensils className="h-4 w-4" />
-                Hours since last food
-              </Label>
-              <Select value={hoursSinceFood} onValueChange={setHoursSinceFood}>
-                <SelectTrigger id="hours-food" data-testid="select-hours-food">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0.5">Less than 1 hour</SelectItem>
-                  <SelectItem value="1">1 hour</SelectItem>
-                  <SelectItem value="2">2 hours</SelectItem>
-                  <SelectItem value="3">3 hours</SelectItem>
-                  <SelectItem value="4">4+ hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <section
+                className="space-y-4 rounded-2xl border border-amber-500/12 bg-amber-500/[0.03] p-4 dark:bg-amber-950/10"
+                aria-labelledby="bedtime-section-fuel"
+              >
+                <h3 id="bedtime-section-fuel" className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 dark:text-amber-100/90">
+                  Food & insulin
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="hours-food" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
+                        <Utensils className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Hours since last food
+                    </Label>
+                    <Select value={hoursSinceFood} onValueChange={setHoursSinceFood}>
+                      <SelectTrigger id="hours-food" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-food">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0.5">Less than 1 hour</SelectItem>
+                        <SelectItem value="1">1 hour</SelectItem>
+                        <SelectItem value="2">2 hours</SelectItem>
+                        <SelectItem value="3">3 hours</SelectItem>
+                        <SelectItem value="4">4+ hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="meal-carbs" className="flex items-center gap-2">
-                <Utensils className="h-4 w-4" />
-                Meal carbs (optional)
-              </Label>
-              <Input
-                id="meal-carbs"
-                type="number"
-                inputMode="numeric"
-                placeholder="e.g., 45"
-                value={mealCarbs}
-                onChange={(e) => setMealCarbs(e.target.value)}
-                data-testid="input-meal-carbs"
-              />
-            </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="meal-carbs" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
+                        <Utensils className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Meal carbs (optional)
+                    </Label>
+                    <Input
+                      id="meal-carbs"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="e.g., 45"
+                      value={mealCarbs}
+                      onChange={(e) => setMealCarbs(e.target.value)}
+                      className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                      data-testid="input-meal-carbs"
+                    />
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hours-insulin" className="flex items-center gap-2">
-                <Syringe className="h-4 w-4" />
-                Hours since last mealtime dose
-                <InfoTooltip {...DIABETES_TERMS.bolus} />
-              </Label>
-              <Select value={hoursSinceInsulin} onValueChange={setHoursSinceInsulin}>
-                <SelectTrigger id="hours-insulin" data-testid="select-hours-insulin">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0.5">Less than 1 hour</SelectItem>
-                  <SelectItem value="1">1 hour</SelectItem>
-                  <SelectItem value="2">2 hours</SelectItem>
-                  <SelectItem value="3">3 hours</SelectItem>
-                  <SelectItem value="4">4+ hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="hours-insulin" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
+                        <Syringe className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Hours since last mealtime dose
+                      <InfoTooltip {...DIABETES_TERMS.bolus} />
+                    </Label>
+                    <Select value={hoursSinceInsulin} onValueChange={setHoursSinceInsulin}>
+                      <SelectTrigger id="hours-insulin" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-insulin">
+                        <SelectValue placeholder="Select..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0.5">Less than 1 hour</SelectItem>
+                        <SelectItem value="1">1 hour</SelectItem>
+                        <SelectItem value="2">2 hours</SelectItem>
+                        <SelectItem value="3">3 hours</SelectItem>
+                        <SelectItem value="4">4+ hours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="hours-sleep" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                How long until you plan to sleep?
-              </Label>
-              <Select value={hoursUntilSleep} onValueChange={setHoursUntilSleep}>
-                <SelectTrigger id="hours-sleep" data-testid="select-hours-sleep">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0.25">Going to bed now</SelectItem>
-                  <SelectItem value="0.5">About 30 minutes</SelectItem>
-                  <SelectItem value="1">About 1 hour</SelectItem>
-                  <SelectItem value="1.5">About 1.5 hours</SelectItem>
-                  <SelectItem value="2">About 2 hours</SelectItem>
-                  <SelectItem value="3">3+ hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <section
+                className="space-y-3 rounded-2xl border border-violet-500/15 bg-violet-500/[0.04] p-4 dark:bg-violet-950/20"
+                aria-labelledby="bedtime-section-sleep"
+              >
+                <h3 id="bedtime-section-sleep" className="text-[11px] font-semibold uppercase tracking-wider text-violet-900 dark:text-violet-100/90">
+                  Tonight
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="hours-sleep" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-violet-700 dark:text-violet-300">
+                      <Clock className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    How long until you plan to sleep?
+                  </Label>
+                  <Select value={hoursUntilSleep} onValueChange={setHoursUntilSleep}>
+                    <SelectTrigger id="hours-sleep" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-sleep">
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.25">Going to bed now</SelectItem>
+                      <SelectItem value="0.5">About 30 minutes</SelectItem>
+                      <SelectItem value="1">About 1 hour</SelectItem>
+                      <SelectItem value="1.5">About 1.5 hours</SelectItem>
+                      <SelectItem value="2">About 2 hours</SelectItem>
+                      <SelectItem value="3">3+ hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </section>
 
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="exercised" className="flex items-center gap-2 cursor-pointer">
-                  <Activity className="h-4 w-4" />
-                  Exercised today?
-                </Label>
-                <Switch
-                  id="exercised"
-                  checked={exercisedToday}
-                  onCheckedChange={setExercisedToday}
-                  data-testid="switch-exercised"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="alcohol" className="flex items-center gap-2 cursor-pointer">
-                  <Wine className="h-4 w-4" />
-                  Had alcohol?
-                </Label>
-                <Switch
-                  id="alcohol"
-                  checked={hadAlcohol}
-                  onCheckedChange={setHadAlcohol}
-                  data-testid="switch-alcohol"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="recent-hypos" className="flex items-center gap-2 cursor-pointer">
-                  <AlertTriangle className="h-4 w-4" />
-                  Any recent hypos?
-                </Label>
-                <Switch
-                  id="recent-hypos"
-                  checked={recentHypos}
-                  onCheckedChange={setRecentHypos}
-                  data-testid="switch-recent-hypos"
-                />
-              </div>
-            </div>
-          </div>
+              <section
+                className="overflow-hidden rounded-2xl border border-border/60 bg-muted/15 dark:bg-muted/10"
+                aria-label="Extra context"
+              >
+                <div className="border-b border-border/50 bg-muted/25 px-4 py-2.5 dark:bg-muted/15">
+                  <p className="text-xs font-medium text-muted-foreground">Anything else affecting tonight?</p>
+                </div>
+                <div className="divide-y divide-border/50">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <Label htmlFor="exercised" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                      <Activity className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                      Exercised today?
+                    </Label>
+                    <Switch id="exercised" checked={exercisedToday} onCheckedChange={setExercisedToday} data-testid="switch-exercised" />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <Label htmlFor="alcohol" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                      <Wine className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                      Had alcohol?
+                    </Label>
+                    <Switch id="alcohol" checked={hadAlcohol} onCheckedChange={setHadAlcohol} data-testid="switch-alcohol" />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <Label htmlFor="recent-hypos" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" aria-hidden />
+                      Any recent hypos?
+                    </Label>
+                    <Switch id="recent-hypos" checked={recentHypos} onCheckedChange={setRecentHypos} data-testid="switch-recent-hypos" />
+                  </div>
+                </div>
+              </section>
 
-          <Button 
-            onClick={calculateReadiness} 
-            disabled={!canCalculate}
-            className="w-full"
-            data-testid="button-check-bedtime"
-          >
-            <Moon className="h-4 w-4 mr-2" />
-            Check bedtime
-          </Button>
+              <Button
+                onClick={calculateReadiness}
+                disabled={!canCalculate}
+                className={cn(
+                  "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                  "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500",
+                  "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
+                )}
+                data-testid="button-check-bedtime"
+              >
+                <Moon className="mr-2 h-4 w-4" aria-hidden />
+                Check bedtime
+              </Button>
             </CardContent>
           </CollapsibleContent>
         </Card>

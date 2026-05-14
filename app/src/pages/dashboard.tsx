@@ -70,7 +70,12 @@ import { isCommunityEnabled } from "@/lib/flags";
 import { FirstWeekChecklistCard } from "@/components/dashboard/FirstWeekChecklistCard";
 import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
-import { getHealthStatus, getTodayGlanceLine, type HealthStatus } from "@/lib/dashboard-health-status";
+import {
+  getHealthStatus,
+  getTodayGlanceLine,
+  shouldOmitHeroGlanceLineDuplicatingTodayCard,
+  type HealthStatus,
+} from "@/lib/dashboard-health-status";
 
 const VERIFIED_WELCOME_PENDING_KEY = "diabeater_verified_welcome_pending";
 const VERIFIED_WELCOME_DISMISSED_AT_KEY = "diabeater_verified_welcome_dismissed_at";
@@ -364,6 +369,7 @@ function HeroCard({
   const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
   const firstName = displayName.split(" ")[0] || "";
   const glance = getTodayGlanceLine(supplies, scenarioState);
+  const omitHeroGlanceLine = shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies);
   const activeExercise = storage.getActiveExercise();
   const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
   const glanceTone =
@@ -415,9 +421,11 @@ function HeroCard({
                 <StatusPill status={status} />
               </div>
             </div>
-            <div className={`text-xs leading-snug ${glanceTone}`} data-testid="text-dashboard-glance">
-              {glance.message}
-            </div>
+            {!omitHeroGlanceLine ? (
+              <div className={`text-xs leading-snug ${glanceTone}`} data-testid="text-dashboard-glance">
+                {glance.message}
+              </div>
+            ) : null}
           </div>
 
           {(scenarioState.sickDayActive ||

@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   IdCard,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { ScenarioToolDisclaimer } from "@/components/disclaimer";
+import { DISCLAIMER_TEXT } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile } from "@/lib/storage";
@@ -33,7 +34,6 @@ import {
 } from "@/lib/driving-readiness-tool";
 import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
-import { MedicalSourcesLink } from "@/components/medical-sources-link";
 
 const FROM_SCENARIOS = "from=/scenarios";
 
@@ -261,19 +261,11 @@ export default function DrivingScenarioPage() {
 
   return (
     <div className="min-h-[50vh]">
-      <PageShell variant="standard" className="space-y-7">
+      <PageShell variant="standard" className="space-y-4">
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}
             title="Driving"
-            description={
-              <>
-                <span>Quick readiness check — not legal or medical advice.</span>
-                <span className="mt-1.5 block text-xs text-muted-foreground font-normal">
-                  This app does not state legal blood-glucose limits. Use the info button for more.
-                </span>
-              </>
-            }
             actions={
               <>
                 <ScenarioCoachLink topic="driving" />
@@ -295,18 +287,6 @@ export default function DrivingScenarioPage() {
             }
           />
         </div>
-
-        <ScenarioToolDisclaimer />
-
-        {profile?.insulinDeliveryMethod === "pump" && (
-          <Alert data-testid="alert-driving-pump">
-            <AlertTitle className="text-sm">Pump</AlertTitle>
-            <AlertDescription className="text-sm">
-              Before driving, check <strong>IOB</strong>, any active temp basal, and that your pump/CGM alarms are set how
-              your team recommends — automation may change delivery without a manual bolus.
-            </AlertDescription>
-          </Alert>
-        )}
 
         {phase === "form" ? (
           <div className="space-y-2">
@@ -551,7 +531,43 @@ export default function DrivingScenarioPage() {
           </div>
         ) : null}
 
-        <MedicalSourcesLink anchor="driving" />
+        <div className="space-y-4 border-t border-border/50 pt-6">
+          {profile?.insulinDeliveryMethod === "pump" && (
+            <Alert data-testid="alert-driving-pump">
+              <AlertTitle className="text-sm">Pump</AlertTitle>
+              <AlertDescription className="text-sm">
+                Before driving, check <strong>IOB</strong>, any active temp basal, and that your pump/CGM alarms are set how
+                your team recommends — automation may change delivery without a manual bolus.
+              </AlertDescription>
+            </Alert>
+          )}
+          <Alert
+            data-testid="driving-footer-disclosure"
+            className={cn(
+              "rounded-2xl border-border/60 bg-gradient-to-br from-muted/40 via-muted/15 to-background py-4 shadow-sm sm:py-5",
+              "[&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-muted-foreground [&>svg~*]:pl-11 sm:[&>svg]:left-5 sm:[&>svg]:top-5 sm:[&>svg~*]:pl-12",
+            )}
+          >
+            <Shield className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            <AlertDescription className="space-y-3 text-sm leading-relaxed sm:space-y-3.5">
+              <p className="text-pretty text-muted-foreground">{DISCLAIMER_TEXT}</p>
+              <div
+                className="flex flex-col gap-1.5 border-t border-border/50 pt-3 text-xs leading-relaxed text-muted-foreground sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2 sm:text-sm"
+                data-testid="medical-sources-link"
+              >
+                <Link
+                  href="/medical-sources#driving"
+                  className="inline-flex w-fit shrink-0 font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:text-primary hover:decoration-primary/50"
+                >
+                  Sources
+                </Link>
+                <span className="text-muted-foreground sm:min-w-0 sm:flex-1">
+                  — references behind this check. Not a substitute for your clinic or local licensing rules.
+                </span>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       </PageShell>
 
       {phase !== "form" ? (

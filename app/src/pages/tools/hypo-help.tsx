@@ -17,11 +17,35 @@ import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { StepLadder, type StepLadderStep } from "@/components/visualizations/step-ladder";
 import { useToast } from "@/hooks/use-toast";
 import {
   getPostExerciseEducationalCopy,
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
+
+const HYPO_RECHECK_FLOW_STEPS: StepLadderStep[] = [
+  {
+    id: "treat",
+    title: "Treat with fast carbs",
+    description: "Glucose tablets, juice, gel, or whatever your hypo plan lists — enough to bring you up safely.",
+  },
+  {
+    id: "wait",
+    title: "Wait about 15 minutes",
+    description: "Give glucose time to work before you decide what to do next (a timer can help).",
+  },
+  {
+    id: "recheck",
+    title: "Recheck your blood glucose",
+    description: "Use your meter or CGM trend — don’t guess from symptoms alone.",
+  },
+  {
+    id: "repeat",
+    title: "Still low? Repeat or escalate",
+    description: "Treat again per your team’s rules. Use glucagon and get emergency help if you can’t swallow or someone can’t keep you safe.",
+  },
+];
 
 export default function HypoHelpPage() {
   const { toast } = useToast();
@@ -113,6 +137,27 @@ export default function HypoHelpPage() {
           </PageInfoDialog>
         }
       />
+
+      <Card className="surface-card overflow-hidden rounded-2xl border-border/70 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold tracking-tight">After a hypo — typical check-in flow</CardTitle>
+          <CardDescription>
+            A simple pattern many teams teach (often called 15–15 style). Your written plan from your diabetes team
+            always comes first.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <StepLadder
+            steps={HYPO_RECHECK_FLOW_STEPS}
+            ariaLabel="Hypo treatment check-in steps"
+            data-testid="hypo-1515-step-ladder"
+          />
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Illustration only — not medical advice. Severe hypos need help straight away; follow emergency instructions
+            you were given with your glucagon.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card className="surface-card">
         <CardHeader>

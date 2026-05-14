@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -2106,65 +2107,116 @@ export default function SickDay() {
           </TabsContent>
 
           <TabsContent value="log" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-update">
-            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Update Your Readings
-                </CardTitle>
-                <CardDescription>Update your glucose, ketones, or severity and recalculate</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="update-severity-active" className="text-sm">Illness Severity</Label>
-                  <Select value={severity} onValueChange={setSeverity}>
-                    <SelectTrigger id="update-severity-active" data-testid="select-update-severity-active">
-                      <SelectValue placeholder="Select severity level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                      <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                      <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="update-bg-active" className="text-sm">Blood Glucose ({bgUnits})</Label>
-                    <Input
-                      id="update-bg-active"
-                      type="number"
-                      placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                      value={bgLevel}
-                      onChange={(e) => setBgLevel(e.target.value)}
-                      data-testid="input-update-bg-active"
-                    />
+            <Card
+              className={cn(
+                "overflow-hidden rounded-2xl border-orange-500/20 shadow-md ring-1 ring-orange-500/10 dark:ring-orange-400/10",
+                "bg-gradient-to-br from-orange-500/[0.06] via-card to-sky-500/[0.04] dark:from-orange-950/35 dark:via-card dark:to-sky-950/18",
+              )}
+            >
+              <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-3 pt-4 backdrop-blur-sm sm:px-5 sm:pt-5">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-700 shadow-inner shadow-orange-950/10 dark:bg-orange-400/10 dark:text-orange-200"
+                    aria-hidden
+                  >
+                    <Activity className="h-5 w-5" />
                   </div>
+                  <div className="min-w-0">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-orange-800/90 dark:text-orange-200/90">
+                      Recalculate
+                    </span>
+                    <CardTitle className="text-base tracking-tight sm:text-lg">Update your readings</CardTitle>
+                    <CardDescription className="mt-1 leading-relaxed">
+                      Change glucose, ketones, or severity and run the adviser again.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-5">
+                <section
+                  className="space-y-3 rounded-2xl border border-orange-500/18 bg-orange-500/[0.04] p-4 dark:bg-orange-950/15"
+                  aria-labelledby="sickday-update-section-severity"
+                >
+                  <h3 id="sickday-update-section-severity" className="text-[11px] font-semibold uppercase tracking-wider text-orange-900 dark:text-orange-100/90">
+                    Illness
+                  </h3>
                   <div className="space-y-2">
-                    <Label htmlFor="update-ketones-active" className="text-sm flex items-center">
-                      Ketone Level
-                      <InfoTooltip {...DIABETES_TERMS.ketones} />
+                    <Label htmlFor="update-severity-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-orange-700 dark:text-orange-300">
+                        <Thermometer className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Illness severity
                     </Label>
-                    <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
-                      <SelectTrigger id="update-ketones-active" data-testid="select-update-ketone-active">
-                        <SelectValue placeholder="Select level" />
+                    <Select value={severity} onValueChange={setSeverity}>
+                      <SelectTrigger id="update-severity-active" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-update-severity-active">
+                        <SelectValue placeholder="Select severity level" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None (negative)</SelectItem>
-                        <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
-                        <SelectItem value="small">Small (0.6-1.5)</SelectItem>
-                        <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
-                        <SelectItem value="large">Large (3.0+)</SelectItem>
+                        <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
+                        <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
+                        <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <Button 
-                  onClick={handleCalculate} 
-                  className="w-full"
+                </section>
+                <section
+                  className="space-y-3 rounded-2xl border border-sky-500/15 bg-sky-500/[0.04] p-4 dark:bg-sky-950/15"
+                  aria-labelledby="sickday-update-section-readings"
+                >
+                  <h3 id="sickday-update-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-sky-900 dark:text-sky-100/90">
+                    Glucose & ketones
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="update-bg-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-sky-800 dark:text-sky-200">
+                          <Activity className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Blood glucose ({bgUnits})
+                      </Label>
+                      <Input
+                        id="update-bg-active"
+                        type="number"
+                        placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
+                        value={bgLevel}
+                        onChange={(e) => setBgLevel(e.target.value)}
+                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        data-testid="input-update-bg-active"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="update-ketones-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-sky-800 dark:text-sky-200">
+                          <Droplets className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Ketone level
+                        <InfoTooltip {...DIABETES_TERMS.ketones} />
+                      </Label>
+                      <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
+                        <SelectTrigger id="update-ketones-active" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-update-ketone-active">
+                          <SelectValue placeholder="Select level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (negative)</SelectItem>
+                          <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
+                          <SelectItem value="small">Small (0.6-1.5)</SelectItem>
+                          <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
+                          <SelectItem value="large">Large (3.0+)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </section>
+                <Button
+                  onClick={handleCalculate}
+                  className={cn(
+                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                    "bg-gradient-to-r from-orange-600 to-sky-600 text-white hover:from-orange-500 hover:to-sky-500",
+                  )}
                   data-testid="button-update-readings-active"
                 >
-                  Update Recommendations
+                  <Activity className="mr-2 h-4 w-4" aria-hidden />
+                  Update recommendations
                 </Button>
               </CardContent>
             </Card>
@@ -2219,97 +2271,170 @@ export default function SickDay() {
             )}
 
             {/* Log a Check */}
-            <Card id="sickday-log" data-testid="card-log-check">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Activity className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  Log a Check
-                </CardTitle>
-                <CardDescription>Record your current readings and symptoms</CardDescription>
+            <Card
+              id="sickday-log"
+              data-testid="card-log-check"
+              className={cn(
+                "overflow-hidden rounded-2xl border-emerald-500/20 shadow-md ring-1 ring-emerald-500/10 dark:ring-emerald-400/10",
+                "bg-gradient-to-br from-emerald-500/[0.07] via-card to-teal-500/[0.05] dark:from-emerald-950/35 dark:via-card dark:to-teal-950/18",
+              )}
+            >
+              <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pt-6">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700 shadow-inner shadow-emerald-950/10 dark:bg-emerald-400/10 dark:text-emerald-200"
+                    aria-hidden
+                  >
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-emerald-800/90 dark:text-emerald-200/90">
+                      Journal
+                    </span>
+                    <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Log a check</CardTitle>
+                    <CardDescription className="mt-1 leading-relaxed">Record readings, care you gave, and how you feel.</CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-6 sm:py-6">
+                <section
+                  className="space-y-3 rounded-2xl border border-emerald-500/18 bg-emerald-500/[0.04] p-4 dark:bg-emerald-950/15"
+                  aria-labelledby="sickday-log-section-readings"
+                >
+                  <h3 id="sickday-log-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-emerald-900 dark:text-emerald-100/90">
+                    Readings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="journal-bg" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-emerald-800 dark:text-emerald-200">
+                          <Activity className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Blood glucose ({bgUnits})
+                      </Label>
+                      <Input
+                        id="journal-bg"
+                        type="number"
+                        placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
+                        value={journalBg}
+                        onChange={(e) => setJournalBg(e.target.value)}
+                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        data-testid="input-journal-bg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="journal-ketone" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-emerald-800 dark:text-emerald-200">
+                          <Droplets className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Ketone level
+                      </Label>
+                      <Select value={journalKetone} onValueChange={setJournalKetone}>
+                        <SelectTrigger id="journal-ketone" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-journal-ketone">
+                          <SelectValue placeholder="Select level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="trace">Trace</SelectItem>
+                          <SelectItem value="small">Small</SelectItem>
+                          <SelectItem value="moderate">Moderate</SelectItem>
+                          <SelectItem value="large">Large</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </section>
+                <section
+                  className="space-y-3 rounded-2xl border border-border/60 bg-muted/15 p-4 dark:bg-muted/10"
+                  aria-labelledby="sickday-log-section-care"
+                >
+                  <h3 id="sickday-log-section-care" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Care <span className="font-normal normal-case">(optional)</span>
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="journal-correction" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
+                          <Syringe className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Correction (units)
+                      </Label>
+                      <Input
+                        id="journal-correction"
+                        type="number"
+                        placeholder="Optional"
+                        value={journalCorrection}
+                        onChange={(e) => setJournalCorrection(e.target.value)}
+                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        data-testid="input-journal-correction"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="journal-fluids" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
+                          <Droplets className="h-3.5 w-3.5" aria-hidden />
+                        </span>
+                        Fluids (ml)
+                      </Label>
+                      <Input
+                        id="journal-fluids"
+                        type="number"
+                        placeholder="Optional"
+                        value={journalFluids}
+                        onChange={(e) => setJournalFluids(e.target.value)}
+                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        data-testid="input-journal-fluids"
+                      />
+                    </div>
+                  </div>
+                </section>
+                <section
+                  className="space-y-3 rounded-2xl border border-teal-500/12 bg-teal-500/[0.03] p-4 dark:bg-teal-950/12"
+                  aria-labelledby="sickday-log-section-notes"
+                >
+                  <h3 id="sickday-log-section-notes" className="text-[11px] font-semibold uppercase tracking-wider text-teal-900 dark:text-teal-100/90">
+                    Symptoms & notes
+                  </h3>
                   <div className="space-y-2">
-                    <Label htmlFor="journal-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
+                    <Label htmlFor="journal-symptoms" className="text-sm font-medium text-foreground">
+                      Symptoms
+                    </Label>
                     <Input
-                      id="journal-bg"
-                      type="number"
-                      placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
-                      value={journalBg}
-                      onChange={(e) => setJournalBg(e.target.value)}
-                      data-testid="input-journal-bg"
+                      id="journal-symptoms"
+                      type="text"
+                      placeholder="e.g., headache, nausea, fever"
+                      value={journalSymptoms}
+                      onChange={(e) => setJournalSymptoms(e.target.value)}
+                      className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                      data-testid="input-journal-symptoms"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="journal-ketone" className="text-sm">Ketone Level</Label>
-                    <Select value={journalKetone} onValueChange={setJournalKetone}>
-                      <SelectTrigger id="journal-ketone" data-testid="select-journal-ketone">
-                        <SelectValue placeholder="Select level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="trace">Trace</SelectItem>
-                        <SelectItem value="small">Small</SelectItem>
-                        <SelectItem value="moderate">Moderate</SelectItem>
-                        <SelectItem value="large">Large</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="journal-correction" className="text-sm">Correction Dose (units)</Label>
-                    <Input
-                      id="journal-correction"
-                      type="number"
-                      placeholder="Optional"
-                      value={journalCorrection}
-                      onChange={(e) => setJournalCorrection(e.target.value)}
-                      data-testid="input-journal-correction"
+                    <Label htmlFor="journal-notes" className="text-sm font-medium text-foreground">
+                      Notes
+                    </Label>
+                    <Textarea
+                      id="journal-notes"
+                      placeholder="Any additional notes..."
+                      value={journalNotes}
+                      onChange={(e) => setJournalNotes(e.target.value)}
+                      className="resize-none border-border/70 bg-background/80 dark:bg-background/60"
+                      rows={2}
+                      data-testid="textarea-journal-notes"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="journal-fluids" className="text-sm">Fluids (ml)</Label>
-                    <Input
-                      id="journal-fluids"
-                      type="number"
-                      placeholder="Optional"
-                      value={journalFluids}
-                      onChange={(e) => setJournalFluids(e.target.value)}
-                      data-testid="input-journal-fluids"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="journal-symptoms" className="text-sm">Symptoms</Label>
-                  <Input
-                    id="journal-symptoms"
-                    type="text"
-                    placeholder="e.g., headache, nausea, fever"
-                    value={journalSymptoms}
-                    onChange={(e) => setJournalSymptoms(e.target.value)}
-                    data-testid="input-journal-symptoms"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="journal-notes" className="text-sm">Notes</Label>
-                  <Textarea
-                    id="journal-notes"
-                    placeholder="Any additional notes..."
-                    value={journalNotes}
-                    onChange={(e) => setJournalNotes(e.target.value)}
-                    className="resize-none"
-                    rows={2}
-                    data-testid="textarea-journal-notes"
-                  />
-                </div>
+                </section>
                 <Button
                   onClick={handleLogJournalEntry}
-                  className="w-full"
+                  className={cn(
+                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                    "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500",
+                    "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
+                  )}
                   data-testid="button-log-journal-entry"
                 >
-                  <Check className="h-4 w-4 mr-2" />
-                  Log Entry
+                  <Check className="mr-2 h-4 w-4" aria-hidden />
+                  Log entry
                 </Button>
               </CardContent>
             </Card>
@@ -2400,12 +2525,16 @@ export default function SickDay() {
                     scrollToId("sickday-log");
                     handleLogJournalEntry();
                   }}
-                  className="w-full"
+                  className={cn(
+                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                    "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500",
+                    "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
+                  )}
                   disabled={!journalBg.trim() || !journalKetone}
                   data-testid="button-log-journal-entry-sticky"
                 >
-                  <Check className="h-4 w-4 mr-2" />
-                  Log Entry
+                  <Check className="mr-2 h-4 w-4" aria-hidden />
+                  Log entry
                 </Button>
               </div>
             </div>
@@ -2630,109 +2759,169 @@ export default function SickDay() {
       <div className="grid gap-7">
         {!results ? (
           <>
-          <Card variant="glass">
-            <CardHeader>
-              <CardTitle>Input Information</CardTitle>
-              <CardDescription>
-                Enter your details to calculate sick day adjustments
-              </CardDescription>
+          <Card
+            className={cn(
+              "overflow-hidden rounded-2xl border-orange-500/20 shadow-md ring-1 ring-orange-500/10 dark:ring-orange-400/10",
+              "bg-gradient-to-br from-orange-500/[0.07] via-card to-rose-500/[0.05] dark:from-orange-950/40 dark:via-card dark:to-rose-950/20",
+            )}
+          >
+            <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pt-6">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-700 shadow-inner shadow-orange-950/10 dark:bg-orange-400/10 dark:text-orange-200"
+                  aria-hidden
+                >
+                  <Thermometer className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-orange-800/90 dark:text-orange-200/90">
+                    Sick day adviser
+                  </span>
+                  <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Your details</CardTitle>
+                  <CardDescription className="mt-1 leading-relaxed">
+                    Enter readings and severity to see adjustment estimates.
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tdd" className="flex items-center">
-                  Total Daily Dose (TDD) - Units
-                  <InfoTooltip {...DIABETES_TERMS.tdd} />
-                </Label>
-                {settings.tdd ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="tdd"
-                        type="number"
-                        value={tdd}
-                        readOnly
-                        className="bg-muted cursor-default"
-                        data-testid="input-tdd"
-                      />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">units/day</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      From your <Link href="/settings/ratios" className="text-primary hover:underline" data-testid="link-insulin-settings">Insulin & Ratios</Link>
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="p-3 rounded-md bg-muted border border-dashed">
+            <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-6 sm:py-6">
+              <section
+                className="space-y-3 rounded-2xl border border-amber-500/15 bg-amber-500/[0.04] p-4 dark:bg-amber-950/15"
+                aria-labelledby="sickday-input-section-tdd"
+              >
+                <h3 id="sickday-input-section-tdd" className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 dark:text-amber-100/90">
+                  Insulin profile
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="tdd" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
+                      <Syringe className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    Total Daily Dose (TDD)
+                    <InfoTooltip {...DIABETES_TERMS.tdd} />
+                  </Label>
+                  {settings.tdd ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="tdd"
+                          type="number"
+                          value={tdd}
+                          readOnly
+                          className="h-11 cursor-default bg-muted"
+                          data-testid="input-tdd"
+                        />
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">units/day</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        From your{" "}
+                        <Link href="/settings/ratios" className="text-primary hover:underline" data-testid="link-insulin-settings">
+                          Insulin & Ratios
+                        </Link>
+                      </p>
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-amber-500/25 bg-background/60 p-3 dark:bg-background/40">
                       <p className="text-sm text-muted-foreground">
                         TDD not configured. Please set your Total Daily Dose in{" "}
-                        <Link href="/settings/ratios" className="text-primary hover:underline font-medium" data-testid="link-settings-insulin">
+                        <Link href="/settings/ratios" className="font-medium text-primary hover:underline" data-testid="link-settings-insulin">
                           Settings → Insulin & Ratios
                         </Link>{" "}
                         to use the Sick day adviser.
                       </p>
                     </div>
-                  </>
+                  )}
+                  <p className="text-xs text-muted-foreground">Your typical total insulin per day (basal + bolus combined).</p>
+                </div>
+              </section>
+
+              <section
+                className="space-y-3 rounded-2xl border border-orange-500/18 bg-orange-500/[0.045] p-4 dark:bg-orange-950/20"
+                aria-labelledby="sickday-input-section-severity"
+              >
+                <h3 id="sickday-input-section-severity" className="text-[11px] font-semibold uppercase tracking-wider text-orange-900 dark:text-orange-100/90">
+                  Illness
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="severity" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-orange-700 dark:text-orange-300">
+                      <Thermometer className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    Illness severity
+                  </Label>
+                  <Select value={severity} onValueChange={setSeverity}>
+                    <SelectTrigger id="severity" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-severity">
+                      <SelectValue placeholder="Select severity level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
+                      <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
+                      <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </section>
+
+              <section
+                className="space-y-4 rounded-2xl border border-rose-500/15 bg-rose-500/[0.04] p-4 dark:bg-rose-950/18"
+                aria-labelledby="sickday-input-section-readings"
+              >
+                <h3 id="sickday-input-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-rose-900 dark:text-rose-100/90">
+                  Readings now
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="bg-level" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-rose-700 dark:text-rose-300">
+                        <Activity className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Current blood glucose ({bgUnits})
+                    </Label>
+                    <Input
+                      id="bg-level"
+                      type="number"
+                      placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
+                      value={bgLevel}
+                      onChange={(e) => setBgLevel(e.target.value)}
+                      className="h-11 border-border/70 bg-background/80 text-base shadow-sm dark:bg-background/60"
+                      data-testid="input-bg-level"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ketone-level" className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-rose-700 dark:text-rose-300">
+                        <Droplets className="h-3.5 w-3.5" aria-hidden />
+                      </span>
+                      Ketone level
+                      <InfoTooltip {...DIABETES_TERMS.ketones} />
+                    </Label>
+                    <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
+                      <SelectTrigger id="ketone-level" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-ketone-level">
+                        <SelectValue placeholder="Select ketone level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None / Negative</SelectItem>
+                        <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
+                        <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
+                        <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
+                        <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Use a blood ketone meter or urine strips to check.</p>
+              </section>
+
+              <Button
+                onClick={handleCalculate}
+                className={cn(
+                  "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                  "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Your typical total insulin dose per day (basal + bolus combined)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="severity">Illness Severity</Label>
-                <Select value={severity} onValueChange={setSeverity}>
-                  <SelectTrigger id="severity" data-testid="select-severity">
-                    <SelectValue placeholder="Select severity level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                    <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                    <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="bg-level">Current Blood Glucose ({bgUnits})</Label>
-                <Input
-                  id="bg-level"
-                  type="number"
-                  placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                  value={bgLevel}
-                  onChange={(e) => setBgLevel(e.target.value)}
-                  data-testid="input-bg-level"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ketone-level" className="flex items-center">
-                  Ketone Level
-                  <InfoTooltip {...DIABETES_TERMS.ketones} />
-                </Label>
-                <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
-                  <SelectTrigger id="ketone-level" data-testid="select-ketone-level">
-                    <SelectValue placeholder="Select ketone level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None / Negative</SelectItem>
-                    <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
-                    <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
-                    <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
-                    <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Use blood ketone meter or urine ketone strips to check
-                </p>
-              </div>
-
-              <Button 
-                onClick={handleCalculate} 
-                className="w-full" 
                 data-testid="button-calculate"
               >
-                <Activity className="h-4 w-4 mr-2" />
-                Calculate Recommendations
+                <Activity className="mr-2 h-4 w-4" aria-hidden />
+                Calculate recommendations
               </Button>
             </CardContent>
           </Card>
