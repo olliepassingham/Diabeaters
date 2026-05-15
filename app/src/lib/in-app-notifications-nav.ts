@@ -9,13 +9,15 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   const kind = typeof data.kind === "string" ? data.kind : "";
   const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
   if (target) {
-    // Back-compat: older notifications used "/dashboard" but the app route is "/".
+    if (kind === "hypo_logged_self" && (target === "/" || target === "/dashboard")) {
+      return "/tools/hypo-history";
+    }
     if (target === "/dashboard") return "/";
     return target;
   }
 
   if (kind === "supplies_low") return "/supplies";
-  if (kind === "hypo_logged_self") return "/";
+  if (kind === "hypo_logged_self") return "/tools/hypo-history";
   if (kind === "hypo_logged" || kind === "scenario_started") return "/carer-view";
   if (kind === "feed_post_like" || kind === "feed_post_comment" || kind === "feed_post_mention") {
     const postId = typeof data.post_id === "string" ? data.post_id : "";

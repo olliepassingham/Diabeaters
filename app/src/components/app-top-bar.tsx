@@ -5,14 +5,15 @@ import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-u
 
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-import { MessageCircle, Settings, User as UserIcon, LogOut } from "lucide-react";
+import { Settings, User as UserIcon, LogOut } from "lucide-react";
 import { Link } from "wouter";
 
 import { FaceLogo } from "@/components/face-logo";
+import { MessagesInboxNavButton } from "@/components/messages-inbox-nav-button";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { isCommunityEnabled } from "@/lib/flags";
-import { prefetchAccount, prefetchCommunityMessages } from "@/components/bottom-nav";
+import { prefetchAccount } from "@/components/bottom-nav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -165,19 +166,7 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
         </div>
 
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
-          {isCommunityEnabled && (
-            <Button variant="ghost" size="icon" asChild>
-              <Link
-                href="/community/messages"
-                aria-label="Messages"
-                data-testid="button-messages"
-                onPointerEnter={prefetchCommunityMessages}
-                onTouchStart={prefetchCommunityMessages}
-              >
-                <MessageCircle className="h-5 w-5" />
-              </Link>
-            </Button>
-          )}
+          {isCommunityEnabled && <MessagesInboxNavButton />}
           <NotificationBell />
         </div>
       </div>

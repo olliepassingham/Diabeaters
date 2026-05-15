@@ -89,6 +89,7 @@ const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resol
 const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
+const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
@@ -734,6 +735,11 @@ function InnerRouter() {
       <Route path="/tools/hypo-help">
         <Suspense fallback={<RouteFallback />}>
           <HypoHelpPage />
+        </Suspense>
+      </Route>
+      <Route path="/tools/hypo-history">
+        <Suspense fallback={<RouteFallback />}>
+          <HypoHistoryPage />
         </Suspense>
       </Route>
       <Route path="/tools/routines">

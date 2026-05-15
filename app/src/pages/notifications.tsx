@@ -34,9 +34,17 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getProfilesByIds } from "@/lib/profile";
 import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
-import { Bell, Check, MessageCircle, Trash2 } from "lucide-react";
+import { Bell, Check, Trash2 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { FeedLoadingSkeleton } from "@/components/empty-state";
+import {
+  collectProfileUserIdsForNotifications,
+  initialsFromDisplayName,
+  isDmMessageInAppNotification,
+  primaryLineForNotification,
+  profileUserIdForInAppNotification,
+  showsProfileAvatar,
+} from "@/lib/in-app-notification-display";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -72,18 +80,12 @@ export default function NotificationsPage() {
       return;
     }
     setFetchError(null);
-    const nextRows = res.data ?? [];
+    const nextRows = (res.data ?? []).filter((r) => !isDmMessageInAppNotification(r));
     setRows(nextRows);
 
     // Enrich DM notifications with sender avatars/names.
     try {
-      const senderIds = Array.from(
-        new Set(
-          nextRows
-            .map((r) => (r.data && typeof r.data === "object" ? (r.data as any).sender_user_id : null))
-            .filter((id): id is string => typeof id === "string" && id.length > 0),
-        ),
-      );
+      const senderIds = collectProfileUserIdsForNotifications(nextRows);
       if (senderIds.length === 0) {
         setSenderMeta(new Map());
       } else {
@@ -91,7 +93,7 @@ export default function NotificationsPage() {
         const meta = new Map<string, { name: string; avatarUrl: string | null }>();
         for (const id of senderIds) {
           const p = profiles.get(id);
-          const name = p?.full_name?.trim() || p?.public_handle?.trim() || "Message";
+          const name = p?.full_name?.trim() || p?.public_handle?.trim() || "Member";
           const avatarKey = p?.avatar_url ?? null;
           const { url } = avatarKey ? await resolveProfileImageUrlResult(avatarKey) : { url: null };
           meta.set(id, { name, avatarUrl: url });
@@ -174,23 +176,19 @@ export default function NotificationsPage() {
   };
 
   return (
-    <PageShell variant="standard" className="max-w-2xl space-y-6">
-      <div className="flex items-center">
+    <PageShell variant="narrow" density="compact" className="pb-6">
+      <div className="flex items-center gap-2">
         <PageBackButton />
       </div>
       <PageHeader
-        title={
-          <span className="inline-flex items-center gap-2">
-            <Bell className="h-7 w-7 text-primary shrink-0" />
-            Notifications
-          </span>
-        }
-        description="In-app alerts and updates."
+        stackActionsMaxSm
+        title="Notifications"
+        description="Updates from messages, your community, and the app."
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0}>
-              <Check className="h-4 w-4 mr-2" />
-              Mark all read
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0} aria-label="Mark all read">
+              <Check className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Mark all read</span>
             </Button>
             <Button
               variant="outline"
@@ -199,21 +197,22 @@ export default function NotificationsPage() {
               onClick={() => setClearDialogOpen(true)}
               disabled={!configured || loading || rows.length === 0}
               data-testid="button-clear-all-notifications"
+              aria-label="Clear all notifications"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear all
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Clear all</span>
             </Button>
           </>
         }
       />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">
-            Inbox{unread > 0 ? ` · ${unread} unread` : ""}
+      <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
+        <CardHeader className="space-y-0 border-b border-border/50 bg-muted/20 px-4 py-3 sm:px-5">
+          <CardTitle className="text-base font-semibold tracking-tight">
+            Inbox{unread > 0 ? <span className="text-muted-foreground font-normal"> · {unread} unread</span> : null}
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0">
+        <CardContent className="p-0">
           {!configured ? (
             <div className="py-10 text-center text-muted-foreground px-2">
               <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -251,94 +250,97 @@ export default function NotificationsPage() {
               <p className="text-xs mt-1">You&apos;re all caught up.</p>
             </div>
           ) : (
-            <ScrollArea className="max-h-[60vh] pr-2">
-              <ul className="space-y-2">
+            <ScrollArea className="max-h-[min(75dvh,32rem)]">
+              <ul className="divide-y divide-border/60">
                 {rows.map((r) => {
-                  const when = r.created_at ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true }) : "";
-                  const data = (r.data && typeof r.data === "object" ? r.data : {}) as Record<string, unknown>;
-                  const kind = typeof data.kind === "string" ? data.kind : "";
-                  const senderId = kind === "dm_message" && typeof data.sender_user_id === "string" ? data.sender_user_id : "";
-                  const sender = senderId ? senderMeta.get(senderId) : undefined;
+                  const when = r.created_at
+                    ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true })
+                    : "";
+                  const actorId = profileUserIdForInAppNotification(r);
+                  const actor = actorId ? senderMeta.get(actorId) : undefined;
+                  const primary = primaryLineForNotification(r, actor);
+                  const showAvatar = showsProfileAvatar(r);
                   return (
                     <li key={r.id}>
-                      <button
-                        type="button"
-                        className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                          r.read ? "bg-card" : "bg-primary/5 border-primary/20"
+                      <div
+                        className={`group flex gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4 ${
+                          r.read ? "bg-card hover:bg-muted/30" : "bg-primary/[0.04] hover:bg-primary/[0.07]"
                         }`}
-                        onClick={() => void handleOpen(r)}
-                        data-testid={`notif-row-${r.id}`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 min-w-0">
-                            {kind === "dm_message" ? (
-                              <Avatar className="h-9 w-9 mt-0.5">
-                                {sender?.avatarUrl ? <AvatarImage src={sender.avatarUrl} alt="" /> : null}
-                                <AvatarFallback className="text-[11px] font-semibold">
-                                  {sender?.name?.trim()?.slice(0, 2).toUpperCase() || "DM"}
-                                </AvatarFallback>
-                              </Avatar>
-                            ) : (
-                              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-border/60 bg-muted/30 text-muted-foreground">
-                                <Bell className="h-4 w-4" aria-hidden />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">
-                                {kind === "dm_message" && sender?.name ? sender.name : r.title}
-                              </p>
-                            <p className="text-sm text-muted-foreground line-clamp-2">{r.body}</p>
-                          </div>
-                          </div>
-                          <div className="shrink-0 flex items-center gap-2">
-                            {kind === "dm_message" ? (
-                              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
-                                <MessageCircle className="h-3 w-3" />
-                                Message
-                              </span>
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                          onClick={() => void handleOpen(r)}
+                          data-testid={`notif-row-${r.id}`}
+                        >
+                          {showAvatar ? (
+                            <Avatar className="mt-0.5 h-11 w-11 shrink-0 ring-1 ring-border/60">
+                              {actor?.avatarUrl ? <AvatarImage src={actor.avatarUrl} alt="" /> : null}
+                              <AvatarFallback className="text-xs font-semibold">
+                                {initialsFromDisplayName(primary)}
+                              </AvatarFallback>
+                            </Avatar>
+                          ) : (
+                            <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/80 ring-1 ring-border/50">
+                              <Bell className="h-4 w-4 text-muted-foreground" aria-hidden />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                              <span className="truncate text-sm font-semibold text-foreground">{primary}</span>
+                              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{when}</span>
+                            </div>
+                            {r.body?.trim() ? (
+                              <p className="text-sm leading-snug text-muted-foreground line-clamp-4">{r.body}</p>
                             ) : null}
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">{when}</span>
-                            {!r.read ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void (async () => {
-                                    const res = await markInAppNotificationRead(r.id);
-                                    if (res.error) {
-                                      toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
-                                      return;
-                                    }
-                                    setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: true } : x)));
-                                    notifyInAppNotificationsChanged({ skipPageRefresh: true });
-                                  })();
-                                }}
-                              >
-                                Mark read
-                              </Button>
-                            ) : null}
+                          </div>
+                        </button>
+                        <div className="flex shrink-0 flex-col gap-1 border-l border-border/50 pl-2">
+                          {!r.read ? (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-9 w-9 text-muted-foreground hover:text-foreground"
                               type="button"
+                              aria-label="Mark as read"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                void handleDeleteOne(r);
+                                void (async () => {
+                                  const res = await markInAppNotificationRead(r.id);
+                                  if (res.error) {
+                                    toast({
+                                      title: "Could not update",
+                                      description: res.error.message,
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: true } : x)));
+                                  notifyInAppNotificationsChanged({ skipPageRefresh: true });
+                                })();
                               }}
-                              aria-label="Delete notification"
-                              data-testid={`button-delete-notif-${r.id}`}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Check className="h-4 w-4" />
                             </Button>
-                          </div>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void handleDeleteOne(r);
+                            }}
+                            aria-label="Delete notification"
+                            data-testid={`button-delete-notif-${r.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </button>
+                      </div>
                     </li>
                   );
                 })}

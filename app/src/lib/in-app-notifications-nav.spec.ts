@@ -41,8 +41,13 @@ describe("getPathForInAppNotification", () => {
 
   it("maps hypo_logged_self and hypo_logged", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_logged_self" } }))).toBe(
-      "/",
+      "/tools/hypo-history",
     );
+    expect(
+      getPathForInAppNotification(
+        row({ id: "1", user_id: "u", data: { kind: "hypo_logged_self", deep_link: "/" } }),
+      ),
+    ).toBe("/tools/hypo-history");
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_logged" } }))).toBe(
       "/carer-view",
     );

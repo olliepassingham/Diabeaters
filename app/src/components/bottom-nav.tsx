@@ -15,6 +15,8 @@ const iconClass = "h-[23px] w-[23px]";
 
 let prefetchedCommunity = false;
 let prefetchedCommunityMessages = false;
+let prefetchedCommunityThread = false;
+let prefetchedNotificationsPage = false;
 let prefetchedAccount = false;
 let prefetchedTools = false;
 let prefetchedScenarios = false;
@@ -30,6 +32,26 @@ export function prefetchCommunityMessages(): void {
   if (prefetchedCommunityMessages) return;
   prefetchedCommunityMessages = true;
   void import("@/pages/community/messages");
+}
+
+export function prefetchCommunityThread(): void {
+  if (prefetchedCommunityThread) return;
+  prefetchedCommunityThread = true;
+  void import("@/pages/community/thread");
+}
+
+export function prefetchNotificationsPage(): void {
+  if (prefetchedNotificationsPage) return;
+  prefetchedNotificationsPage = true;
+  void import("@/pages/notifications");
+}
+
+/** Feed + DM inbox + thread + `/notifications` — header / feed first hops. */
+function prefetchCommunityNavigationBundle(): void {
+  prefetchCommunity();
+  prefetchCommunityMessages();
+  prefetchCommunityThread();
+  prefetchNotificationsPage();
 }
 
 export function prefetchAccount(): void {
@@ -228,30 +250,55 @@ export function BottomNav() {
 
   /**
    * Warm lazy chunks for bottom-nav targets so first taps feel instant.
-   * Supporters mostly hop Supporter ↔ Feed ↔ Account ↔ Messages — start those chunks immediately
-   * instead of waiting for idle (patient mode still defers to idle to avoid competing with LCP).
+   * Community DM + bell targets are warmed soon after paint when the user can reach them from the header
+   * (patient dashboard used to defer everything to idle, so the messages chunk often missed the first tap).
    */
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const run = () => {
+
+    const warmCommonTabs = () => {
       prefetchTools();
       prefetchAccount();
       if (!isCarerMode && !isCommunityMode) prefetchScenarios();
-      if (showCommunityTab) {
-        prefetchCommunity();
-        prefetchCommunityMessages();
-      }
     };
+
+    let idleId = 0;
+    let timeoutId = 0;
+    let rafOuter = 0;
+    let rafInner = 0;
+
+    const communityWarm =
+      (isCommunityEnabled && (showCommunityTab || isCommunityMode)) || (isCarerMode && isCommunityEnabled);
+
     if (isCarerMode || isCommunityMode) {
-      run();
+      warmCommonTabs();
+      if (communityWarm) prefetchCommunityNavigationBundle();
       return;
     }
-    if (typeof window.requestIdleCallback === "function") {
-      const idleId = window.requestIdleCallback(run, { timeout: 4500 });
-      return () => window.cancelIdleCallback(idleId);
+
+    if (communityWarm) {
+      rafOuter = window.requestAnimationFrame(() => {
+        rafInner = window.requestAnimationFrame(() => {
+          prefetchCommunityNavigationBundle();
+        });
+      });
     }
-    const timeoutId = window.setTimeout(run, 1200);
-    return () => window.clearTimeout(timeoutId);
+
+    const scheduleCommon = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(warmCommonTabs, { timeout: 4500 });
+      } else {
+        timeoutId = window.setTimeout(warmCommonTabs, 1200);
+      }
+    };
+    scheduleCommon();
+
+    return () => {
+      window.cancelAnimationFrame(rafOuter);
+      window.cancelAnimationFrame(rafInner);
+      if (idleId) window.cancelIdleCallback(idleId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, [isCarerMode, isCommunityMode, showCommunityTab]);
 
   const tabs = isCarerMode
@@ -296,8 +343,7 @@ export function BottomNav() {
         const active = tab.isActive(pathname, hash);
         const warmPrefetch = () => {
           if (tab.href === "/community") {
-            prefetchCommunity();
-            prefetchCommunityMessages();
+            prefetchCommunityNavigationBundle();
           }
           if (tab.href === "/account") prefetchAccount();
           if (tab.href === "/tools") prefetchTools();

@@ -253,6 +253,33 @@ export async function fetchDmMessages(threadId: string): Promise<{
   return { data: await enrichDmMessagesWithLikesAndImages(mapped), error: null };
 }
 
+/**
+ * Marks every message from other participants in this thread as read for the current user.
+ * Used when opening the chat so the inbox unread badge matches `read_at` on `dm_messages`.
+ */
+export async function markIncomingDmMessagesAsReadInThread(threadId: string): Promise<{
+  readAt: string | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { readAt: null, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { readAt: null, error: null };
+
+  const readAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("dm_messages")
+    .update({ read_at: readAt })
+    .eq("thread_id", threadId)
+    .neq("sender_id", uid)
+    .is("read_at", null);
+
+  if (error) return { readAt: null, error: new Error(error.message) };
+  return { readAt, error: null };
+}
+
 /** Latest message per thread — prefers single RPC round-trip when deployed. */
 export async function fetchLatestDmMessageForThreads(threadIds: string[]): Promise<{
   data: Map<string, DmMessageRow | null>;
@@ -436,6 +463,68 @@ export async function toggleDmMessageLike(messageId: string): Promise<{
 export function otherMemberUserId(members: DmThreadMemberRow[], currentUserId: string): string | null {
   const other = members.find((m) => m.user_id !== currentUserId);
   return other?.user_id ?? null;
+}
+
+/** Mirrors `messages.tsx` hidden-list localStorage key. */
+const DM_HIDDEN_LOCAL_KEY = "diabeater_dm_hidden_v1";
+
+function readLocalHiddenDmThreadIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(DM_HIDDEN_LOCAL_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Threads where the latest message is from someone else and still unread (`read_at` unset),
+ * excluding conversations hidden locally or in `dm_thread_user_settings`.
+ * Same notion as the unread dot on the messages list (hidden threads excluded from the default inbox).
+ */
+export async function countUnreadDmThreadsForCurrentUser(): Promise<{
+  count: number;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { count: 0, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { count: 0, error: null };
+
+  const threadsRes = await fetchDmThreadsForCurrentUser();
+  if (threadsRes.error) return { count: 0, error: threadsRes.error };
+
+  const list = threadsRes.data ?? [];
+  if (list.length === 0) return { count: 0, error: null };
+
+  const threadIds = list.map((t) => t.id);
+  const hiddenLocal = readLocalHiddenDmThreadIds();
+  const [lastRes, settingsRes] = await Promise.all([
+    fetchLatestDmMessageForThreads(threadIds),
+    fetchDmThreadUserSettings(threadIds),
+  ]);
+
+  if (lastRes.error) return { count: 0, error: lastRes.error };
+  const settings = settingsRes.data;
+
+  let count = 0;
+  for (const t of list) {
+    if (hiddenLocal.has(t.id)) continue;
+    if (settings.get(t.id)?.hidden) continue;
+
+    const last = lastRes.data.get(t.id) ?? null;
+    if (last && last.sender_id !== uid && last.read_at == null) {
+      count += 1;
+    }
+  }
+
+  return { count, error: null };
 }
 
 /** Absolute URL when running in the browser so the link opens from notifications / copy-paste. */

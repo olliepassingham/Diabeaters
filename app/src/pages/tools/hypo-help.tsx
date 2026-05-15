@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 import { Calculator, ChevronDown, ChevronUp, Droplet, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -409,6 +410,11 @@ export default function HypoHelpPage() {
           </div>
         </div>
       </Card>
+      <p className="text-center text-sm text-muted-foreground">
+        <Link href="/tools/hypo-history" className="font-medium text-primary underline-offset-4 hover:underline">
+          View hypo treatment history
+        </Link>
+      </p>
       <MedicalSourcesLink anchor="hypoglycaemia" />
     </PageShell>
   );

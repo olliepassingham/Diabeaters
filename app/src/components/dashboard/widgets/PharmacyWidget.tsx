@@ -41,12 +41,19 @@ export function PharmacyWidget(props: DashboardWidgetLayoutProps) {
     <WidgetCard data-testid="widget-pharmacy">
       <CardHeader className={cn("space-y-0 pb-2", compact ? "px-4 pt-4" : "px-4 pt-4")}>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Building2 className="h-4 w-4" aria-hidden />
-            </span>
-            Pharmacy
-          </CardTitle>
+          <Link
+            href="/settings/pharmacy"
+            className="min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="Open pharmacy — opening hours and details"
+            data-testid="link-pharmacy-widget-title"
+          >
+            <div className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Building2 className="h-4 w-4" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold text-foreground">Pharmacy</CardTitle>
+            </div>
+          </Link>
           <Link
             href="/settings/pharmacy"
             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"

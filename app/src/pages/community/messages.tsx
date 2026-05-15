@@ -17,6 +17,7 @@ import {
   fetchDmThreadUserSettings,
   fetchLatestDmMessageForThreads,
   getOrCreateDmThread,
+  notifyDmInboxChanged,
   otherMemberUserId,
   type DmMessageRow,
   upsertDmThreadUserSettings,
@@ -292,6 +293,7 @@ export default function CommunityMessagesPage() {
         title: "Conversation hidden",
         description: "You can show hidden conversations using the toggle above.",
       });
+      notifyDmInboxChanged();
     },
     [toast, hideThread],
   );
@@ -332,6 +334,7 @@ export default function CommunityMessagesPage() {
       setAvatarByUserId({});
       setHandleByUserId({});
       setLoading(false);
+      notifyDmInboxChanged();
       return;
     }
 
@@ -343,6 +346,7 @@ export default function CommunityMessagesPage() {
       setAvatarByUserId({});
       setHandleByUserId({});
       setLoading(false);
+      notifyDmInboxChanged();
       return;
     }
 
@@ -407,6 +411,7 @@ export default function CommunityMessagesPage() {
       }
     } finally {
       setThreadDetailsLoading(false);
+      notifyDmInboxChanged();
     }
   }, [toast, user?.id]);
 

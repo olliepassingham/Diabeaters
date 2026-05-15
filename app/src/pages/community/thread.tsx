@@ -12,6 +12,8 @@ import {
   fetchDmMessages,
   fetchDmThreadMembers,
   insertDmMessage,
+  markIncomingDmMessagesAsReadInThread,
+  notifyDmInboxChanged,
   otherMemberUserId,
   parseSharedFeedPostMessage,
   toggleDmMessageLike,
@@ -59,7 +61,23 @@ export default function CommunityThreadPage() {
       toast({ title: "Could not load messages", description: msgRes.error.message, variant: "destructive" });
       setMessages([]);
     } else {
-      setMessages(msgRes.data ?? []);
+      const list = msgRes.data ?? [];
+      setMessages(list);
+
+      const hasIncomingUnread = user?.id
+        ? list.some((m) => m.sender_id !== user.id && m.read_at == null)
+        : false;
+      if (user?.id && hasIncomingUnread) {
+        const markRes = await markIncomingDmMessagesAsReadInThread(threadId);
+        if (!markRes.error && markRes.readAt) {
+          notifyDmInboxChanged();
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.sender_id !== user.id && m.read_at == null ? { ...m, read_at: markRes.readAt! } : m,
+            ),
+          );
+        }
+      }
     }
 
     if (!user?.id) {

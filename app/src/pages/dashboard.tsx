@@ -609,6 +609,13 @@ function HeroCard({
                 )}
               </div>
             )}
+            <div className="flex justify-end border-t border-border/40 pt-2">
+              <Button variant="ghost" className="h-auto px-2 text-xs font-medium text-primary hover:text-primary" asChild>
+                <Link href="/tools/hypo-history" data-testid="link-hypo-full-history">
+                  View full history page
+                </Link>
+              </Button>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHypoDialogOpen(false)}>Cancel</Button>
