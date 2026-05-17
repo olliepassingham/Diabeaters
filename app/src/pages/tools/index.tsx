@@ -13,6 +13,7 @@ import {
   Map as MapIcon,
   ChevronRight,
   MessageCircle,
+  ScrollText,
   Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,6 +66,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: Droplet,
     title: "Hypo help",
     description: "Rough fast-carb amounts for a low, from your current and target glucose.",
+  },
+  {
+    id: "activity-log",
+    href: "/tools/activity",
+    icon: ScrollText,
+    title: "Activity log",
+    description: "Calendar of hypos, guides, checks, and other things you have recorded.",
   },
   {
     id: "routines",
@@ -333,7 +341,7 @@ export function ToolsHubPage({
       : patientActNowIds;
   const actNow = actNowIds.map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
-  const plan = (["routines", "appointments", "supply-tracker"] as const)
+  const plan = (["routines", "appointments", "supply-tracker", "activity-log"] as const)
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 

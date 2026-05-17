@@ -131,6 +131,10 @@ export default function HypoHistoryPage() {
       </Card>
 
       <p className="text-center text-xs text-muted-foreground">
+        <Link href="/tools/activity" className="font-medium text-primary underline-offset-4 hover:underline">
+          View full activity log
+        </Link>
+        {" · "}
         Educational record only — not a substitute for clinic notes or downloads your team provides.
       </p>
     </PageShell>

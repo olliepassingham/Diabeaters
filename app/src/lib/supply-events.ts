@@ -46,6 +46,15 @@ export function listLocalSupplyEvents(supplyId: string, limit = 10): SupplyEvent
   return events.slice(0, Math.max(0, limit));
 }
 
+/** Flat list of supply events across all items, newest first. */
+export function listAllLocalSupplyEvents(limit = 500): SupplyEvent[] {
+  const all = safeParse<Record<string, SupplyEvent[]>>(localStorage.getItem(STORAGE_KEY)) ?? {};
+  const flat = Object.values(all).flat();
+  return flat
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, Math.max(0, limit));
+}
+
 type InferredUsageResult = {
   usagePerDay: number | null;
   confidence: "low" | "medium" | "high";

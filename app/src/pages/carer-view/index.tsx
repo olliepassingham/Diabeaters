@@ -17,6 +17,7 @@ import {
   Users,
   Pill,
   ArrowRight,
+  History,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -48,6 +49,7 @@ import {
   getActiveCarerPatientId,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
+import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { devWarn } from "@/lib/dev-log";
 import { DevNote } from "@/components/dev/DevNote";
 import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
@@ -1473,6 +1475,21 @@ export default function CarerViewPage() {
   }, [appointmentRows]);
   const scenarioLines = scenarioBannerLines(scenarioRows);
   const sickDayState = useMemo(() => sickDayScenarioState(scenarioRows), [scenarioRows]);
+  const carerActivityEvents = useMemo(
+    () =>
+      collectCarerActivityEvents({
+        hypoLogs,
+        scenarioRows,
+        appointmentRows,
+        scopes,
+      }),
+    [hypoLogs, scenarioRows, appointmentRows, scopes],
+  );
+  const carerActivityWeek = useMemo(
+    () => getActivityWeekSummary(carerActivityEvents),
+    [carerActivityEvents],
+  );
+  const showCarerActivityLog = scopes.hypo_alerts || scopes.scenarios || scopes.appointments;
 
   const carerHeaderContext = useMemo(
     () =>
@@ -1781,6 +1798,33 @@ export default function CarerViewPage() {
               </CardContent>
             </Card>
           )}
+
+          {showCarerActivityLog ? (
+            <Card className="border-border/60 shadow-sm" data-testid="carer-view-activity">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5 text-primary" />
+                  Activity log
+                </CardTitle>
+                <CardDescription>Shared hypos, guides, and clinic visits by day — read-only.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {carerActivityWeek.countLast7Days === 0 ? (
+                  <p className="text-sm text-muted-foreground">No shared activity in the last 7 days.</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="text-2xl font-semibold tabular-nums text-foreground">
+                      {carerActivityWeek.countLast7Days}
+                    </span>{" "}
+                    {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
+                  </p>
+                )}
+                <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
+                  <Link href="/carer-view/activity">View calendar</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             {(scopes.scenarios ?? false) && (

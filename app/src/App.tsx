@@ -46,6 +46,7 @@ const Welcome = lazy(() => import("@/pages/welcome"));
 const VerifiedReturn = lazy(() => import("@/pages/verified-return"));
 const FamilyCarers = lazy(() => import("@/pages/family-carers"));
 const CarerView = lazy(() => import("@/pages/carer-view"));
+const CarerActivityLogPage = lazy(() => import("@/pages/carer-view/activity-log"));
 const CarerSetup = lazy(() => import("@/pages/carer-setup"));
 const ModeChooser = lazy(() => import("@/pages/mode"));
 const NotificationsPage = lazy(() => import("@/pages/notifications"));
@@ -90,6 +91,7 @@ const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
+const ActivityLogPage = lazy(() => import("@/pages/tools/activity-log"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
@@ -570,6 +572,11 @@ function InnerRouter() {
           <ModeChooser />
         </Suspense>
       </Route>
+      <Route path="/carer-view/activity">
+        <Suspense fallback={<RouteFallback />}>
+          <CarerActivityLogPage />
+        </Suspense>
+      </Route>
       <Route path="/carer-view/:section">
         <Suspense fallback={<RouteFallback />}>
           <CarerView />
@@ -740,6 +747,11 @@ function InnerRouter() {
       <Route path="/tools/hypo-history">
         <Suspense fallback={<RouteFallback />}>
           <HypoHistoryPage />
+        </Suspense>
+      </Route>
+      <Route path="/tools/activity">
+        <Suspense fallback={<RouteFallback />}>
+          <ActivityLogPage />
         </Suspense>
       </Route>
       <Route path="/tools/routines">
