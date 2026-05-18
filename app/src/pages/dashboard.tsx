@@ -369,7 +369,7 @@ function HeroCard({
   const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
   const firstName = displayName.split(" ")[0] || "";
   const glance = getTodayGlanceLine(supplies, scenarioState);
-  const omitHeroGlanceLine = shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies);
+  const omitHeroGlanceLine = shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies, scenarioState);
   const activeExercise = storage.getActiveExercise();
   const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
   const glanceTone =

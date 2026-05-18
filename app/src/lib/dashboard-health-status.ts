@@ -22,7 +22,7 @@ export function getHealthStatus(supplies: Supply[], scenarioState: ScenarioState
     return "action";
   }
 
-  if (hasLow || scenarioState.sickDayActive || scenarioState.travelModeActive) {
+  if (hasLow || scenarioState.sickDayActive) {
     return "watch";
   }
 
@@ -69,12 +69,13 @@ export function getTodayGlanceLine(
     if (scenarioState.sickDayActive) {
       return { type: "info", message: "Sick day mode active" };
     }
-    if (scenarioState.travelModeActive) {
-      return {
-        type: "info",
-        message: `Travel mode active${scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}`,
-      };
-    }
+  }
+
+  if (scenarioState.travelModeActive) {
+    return {
+      type: "info",
+      message: `Travel mode active${scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}`,
+    };
   }
 
   return { type: "ok", message: "All clear for now" };
@@ -87,6 +88,7 @@ export function getTodayGlanceLine(
 export function shouldOmitHeroGlanceLineDuplicatingTodayCard(
   glance: { type: TodayGlanceStatusType; message: string },
   supplies: Supply[],
+  scenarioState?: ScenarioState,
 ): boolean {
   const hasLow = supplies.some((s) => storage.getSupplyStatus(s) === "low");
   const hasCritical = supplies.some((s) => storage.getSupplyStatus(s) === "critical");
@@ -94,6 +96,9 @@ export function shouldOmitHeroGlanceLineDuplicatingTodayCard(
     return true;
   }
   if (glance.type === "warning" && glance.message === "Critical supplies need attention" && hasCritical) {
+    return true;
+  }
+  if (scenarioState?.travelModeActive && /^travel mode active/i.test(glance.message)) {
     return true;
   }
   return false;

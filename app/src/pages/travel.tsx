@@ -17,7 +17,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { 
   Plane, 
   MapPin, 
@@ -1366,82 +1365,137 @@ export default function Travel() {
     const tripProfileChips = buildActiveTravelTripProfileChips(plan);
     const activeCoachPrompt = buildActiveTravelCoachPrompt(activeProgressInput);
 
+    const tripProgressShort = hasEnded
+      ? "Ended"
+      : hasStarted
+        ? `Day ${daysElapsed + 1}/${totalDays}`
+        : daysUntilStart <= 0
+          ? "Starts today"
+          : `${daysUntilStart}d to go`;
+
     return (
-      <PageShell variant="standard" className="space-y-7">
-        <PageHeader
-          stackActionsMaxSm
-          leading={<PageBackButton />}
-          title={
-            <span className="inline-flex min-w-0 flex-wrap items-center gap-2.5" data-testid="text-travel-dashboard-title">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-                <Plane className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden />
+      <PageShell variant="standard" className="space-y-3">
+        <header className="flex min-w-0 items-start gap-2" data-testid="travel-active-header">
+          <div className="shrink-0 pt-0.5">
+            <PageBackButton />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
+              <h1
+                className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground"
+                data-testid="text-travel-dashboard-title"
+              >
+                {plan.destination || "Travel"}
+              </h1>
+              <span className="shrink-0 text-sm font-medium tabular-nums text-foreground" data-testid="text-trip-progress">
+                {tripProgressShort}
               </span>
-              <span className="min-w-0">
-                {hasEnded ? "Trip complete" : hasStarted ? "Travelling" : "Trip starting soon"}
-              </span>
-            </span>
-          }
-          description={
-            <span className="block space-y-2">
-              <span>
-                <span className="font-medium text-foreground">{plan.destination}</span>
-                <span className="text-muted-foreground">
-                  {" "}
-                  · {plan.duration} day{plan.duration === 1 ? "" : "s"}
-                </span>
-              </span>
-              {tripProfileChips.length > 0 ? (
-                <span className="flex flex-wrap gap-1.5" data-testid="travel-trip-profile-chips">
-                  {tripProfileChips.map((chip) => (
-                    <Badge key={chip.label} variant="outline" className="text-[10px] font-normal">
-                      {chip.label}
-                    </Badge>
-                  ))}
-                </span>
-              ) : null}
-            </span>
-          }
-          actions={
-            <Badge variant="secondary" className="shrink-0 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-              <CheckCircle2 className="h-3 w-3 mr-1" aria-hidden />
-              Active
-            </Badge>
-          }
-        />
+            </div>
+            {tripProfileChips.length > 0 ? (
+              <div className="flex flex-wrap gap-1" data-testid="travel-trip-profile-chips">
+                {tripProfileChips.map((chip) => (
+                  <Badge key={chip.label} variant="outline" className="h-5 px-1.5 text-[10px] font-normal">
+                    {chip.label}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </header>
 
         <ScenarioToolHeroCard
           className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800"
-          classNames={{ content: "space-y-3" }}
+          classNames={{ content: "space-y-2 !pt-3 !pb-3.5 px-4 sm:px-5" }}
           body={
             <>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="text-muted-foreground">
-                  {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} —{" "}
-                  {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
-                </span>
-                <span className="font-medium" data-testid="text-trip-progress">
-                  {hasEnded ? "Trip ended" : hasStarted ? `Day ${daysElapsed + 1} of ${totalDays}` : `Starts in ${daysUntilStart} day${daysUntilStart !== 1 ? "s" : ""}`}
-                </span>
-              </div>
-              <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
-              <p className="text-xs text-muted-foreground" data-testid="travel-progress-guidance">
+              <p className="text-xs text-muted-foreground">
+                {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start"} —{" "}
+                {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End"}
+              </p>
+              <Progress value={progressPercent} className="h-1.5" data-testid="progress-trip" />
+              <p className="text-xs leading-snug text-muted-foreground" data-testid="travel-progress-guidance">
                 {todayFocus}
               </p>
-              <div className="border-t border-green-200/60 pt-3 dark:border-green-800/60">
-                <ScenarioCoachLink topic="travel" from="travel-active" q={activeCoachPrompt} />
+              <div className="border-t border-green-200/60 pt-2 dark:border-green-800/60">
+                <ScenarioCoachLink
+                  topic="travel"
+                  from="travel-active"
+                  q={activeCoachPrompt}
+                  className="min-h-10 w-full sm:w-auto"
+                />
               </div>
             </>
           }
         />
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid h-9 w-full grid-cols-3">
             <TabsTrigger value="overview" className="text-xs sm:text-sm" data-testid="tab-travel-overview">Overview</TabsTrigger>
             <TabsTrigger value="plan" className="text-xs sm:text-sm" data-testid="tab-travel-plan">Plan</TabsTrigger>
             <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-travel-checklist">Checklist</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-overview">
+          <TabsContent value="overview" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-overview">
+            <Card data-testid="card-travel-overview-glance">
+              <CardContent className="space-y-3 p-3 sm:p-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Return</p>
+                    <p className="font-medium leading-snug">
+                      {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Timezone</p>
+                    <p className="font-medium leading-snug">
+                      {plan.timezoneChange === "none"
+                        ? "No change"
+                        : `${plan.timezoneHours}h ${plan.timezoneDirection === "east" ? "east" : plan.timezoneDirection === "west" ? "west" : "shift"}`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pharmacies</p>
+                    <p className="font-medium leading-snug capitalize">
+                      {plan.accessRisk === "easy" ? "Easy access" : plan.accessRisk === "limited" ? "Limited" : "Unsure"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Packed</p>
+                    <p className="font-medium leading-snug" data-testid="text-overview-packing-progress">
+                      {checkedCount}/{packingList.length}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-9"
+                    onClick={() => setActiveTravelTab("checklist")}
+                    data-testid="button-overview-open-checklist"
+                  >
+                    <Package className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+                    Checklist
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="min-h-9" data-testid="button-overview-emergency">
+                    <Link href="/emergency-card">
+                      <Globe className="h-3.5 w-3.5 mr-1.5 text-red-600" aria-hidden />
+                      Emergency card
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="min-h-9" data-testid="button-overview-supplies">
+                    <Link href="/supplies">
+                      <Package className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+                      Supplies
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <CompactRiskConsiderations warnings={riskWarnings} />
+
             {isSickDayAlsoActive && (
               <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20" data-testid="card-sick-day-also-active">
                 <CardContent className="p-4">
@@ -1537,7 +1591,7 @@ export default function Travel() {
             )}
           </TabsContent>
 
-          <TabsContent value="plan" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-plan">
+          <TabsContent value="plan" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
             <Card className="border-red-200 dark:border-red-800">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -1607,41 +1661,9 @@ export default function Travel() {
               </CardContent>
             </Card>
 
-            <CompactRiskConsiderations warnings={riskWarnings} />
-
-            <ScenarioActiveCard
-              title="Travel mode"
-              subtitle={
-                hasEnded
-                  ? "Your trip has ended"
-                  : `Active until ${formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"}`
-              }
-              badgeText="Active"
-              tone="blue"
-              icon={<CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />}
-              actions={
-                <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
-                  End
-                </Button>
-              }
-              facts={[
-                { label: "Destination", value: plan.destination || "—" },
-                {
-                  label: "Timezone",
-                  value:
-                    plan.timezoneChange === "none"
-                      ? "No change"
-                      : `${plan.timezoneHours || 0}h ${plan.timezoneDirection || "—"}`,
-                },
-                {
-                  label: "Return",
-                  value: formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—",
-                },
-              ]}
-            />
           </TabsContent>
 
-          <TabsContent value="checklist" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
+          <TabsContent value="checklist" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1687,37 +1709,6 @@ export default function Travel() {
             </Card>
           </TabsContent>
         </Tabs>
-
-        <ScenarioActiveCard
-          title="Travel mode"
-          subtitle={
-            hasEnded
-              ? "Your trip has ended"
-              : `Active until ${formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "return"}`
-          }
-          badgeText="Active"
-          tone="blue"
-          icon={<CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />}
-          actions={
-            <Button variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-end-travel-active">
-              End
-            </Button>
-          }
-          facts={[
-            { label: "Destination", value: plan.destination || "—" },
-            {
-              label: "Timezone",
-              value:
-                plan.timezoneChange === "none"
-                  ? "No change"
-                  : `${plan.timezoneHours || 0}h ${plan.timezoneDirection || "—"}`,
-            },
-            {
-              label: "Return",
-              value: formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—",
-            },
-          ]}
-        />
 
         <TravelDisclaimerCard compact />
 

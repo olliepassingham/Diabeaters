@@ -31,9 +31,31 @@ describe("getHealthStatus", () => {
     vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
     expect(getHealthStatus([dummySupply], emptyScenario)).toBe("stable");
   });
+
+  it("returns stable when only travel mode is active", () => {
+    vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
+    const travelScenario = {
+      ...emptyScenario,
+      travelModeActive: true,
+      travelDestination: "Morocco",
+    } as ScenarioState;
+    expect(getHealthStatus([dummySupply], travelScenario)).toBe("stable");
+  });
 });
 
 describe("getTodayGlanceLine", () => {
+  it("still mentions travel when pill stays stable", () => {
+    vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
+    const travelScenario = {
+      ...emptyScenario,
+      travelModeActive: true,
+      travelDestination: "Morocco",
+    } as ScenarioState;
+    const line = getTodayGlanceLine([dummySupply], travelScenario);
+    expect(line.type).toBe("info");
+    expect(line.message).toMatch(/travel mode active.*morocco/i);
+  });
+
   it("does not say all clear when supplies are low", () => {
     vi.spyOn(storage, "getSupplyStatus").mockReturnValue("low");
     const line = getTodayGlanceLine([dummySupply], emptyScenario);
@@ -56,7 +78,7 @@ describe("shouldOmitHeroGlanceLineDuplicatingTodayCard", () => {
     expect(shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, [dummySupply])).toBe(true);
   });
 
-  it("returns false for travel-mode glance", () => {
+  it("omits travel-mode glance in hero when Active travel chip is shown", () => {
     vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
     const travelScenario = {
       ...emptyScenario,
@@ -64,6 +86,6 @@ describe("shouldOmitHeroGlanceLineDuplicatingTodayCard", () => {
       travelDestination: "Morocco",
     } as ScenarioState;
     const glance = getTodayGlanceLine([dummySupply], travelScenario);
-    expect(shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, [dummySupply])).toBe(false);
+    expect(shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, [dummySupply], travelScenario)).toBe(true);
   });
 });
