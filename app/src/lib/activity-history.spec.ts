@@ -1,3 +1,4 @@
+import { addDays, format } from "date-fns";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,7 +14,7 @@ import {
   toActivityDayKey,
 } from "./activity-history";
 import { DEFAULT_CARER_SCOPES } from "./carers.types";
-import { storage } from "./storage";
+import { setActiveUserIdForLocalStorage, storage } from "./storage";
 
 describe("activity-history", () => {
   beforeEach(() => {
@@ -126,6 +127,37 @@ describe("activity-history", () => {
     });
     expect(events).toHaveLength(1);
     expect(events[0].source).toBe("cloud");
+  });
+
+  it("includes upcoming and past appointments on the calendar", () => {
+    setActiveUserIdForLocalStorage("activity-test-user");
+    const upcomingDate = format(addDays(new Date(), 14), "yyyy-MM-dd");
+    const pastDate = format(addDays(new Date(), -14), "yyyy-MM-dd");
+
+    storage.addAppointment({
+      title: "Pump review",
+      type: "pump_review",
+      date: upcomingDate,
+      time: "10:30",
+      isCompleted: false,
+    });
+    storage.addAppointment({
+      title: "Annual clinic",
+      type: "clinic",
+      date: pastDate,
+      isCompleted: true,
+    });
+
+    const events = collectAllActivityEvents().filter((e) => e.kind === "appointment");
+    expect(events).toHaveLength(2);
+    expect(events.find((e) => e.title === "Pump review")?.subtitle).toContain("Upcoming");
+    expect(events.find((e) => e.title === "Annual clinic")?.subtitle).toContain("Completed");
+  });
+
+  it("maps legacy appointment_past filter to appointment", () => {
+    saveStoredActivityFilter("appointment_past" as never);
+    expect(loadStoredActivityFilter()).toBe("appointment");
+    saveStoredActivityFilter("all");
   });
 
   it("getActivityDayKeys returns unique days", () => {

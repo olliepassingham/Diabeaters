@@ -15,7 +15,7 @@ export type ActivityKind =
   | "ratio_snapshot"
   | "supply_event"
   | "supply_pickup"
-  | "appointment_past";
+  | "appointment";
 
 export type ActivitySource = "local" | "cloud";
 
@@ -47,6 +47,50 @@ function event(
   partial: Omit<ActivityEvent, "source"> & { source?: ActivitySource },
 ): ActivityEvent {
   return { source: "local", ...partial };
+}
+
+function appointmentAtIso(date: string, time?: string): string {
+  return time ? `${date}T${time}` : `${date}T12:00:00`;
+}
+
+function appointmentActivitySubtitle(
+  input: { date: string; time?: string; location?: string; isCompleted?: boolean },
+  when: Date,
+): string | undefined {
+  const todayStart = startOfDay(new Date());
+  const dayStart = startOfDay(when);
+  const parts: string[] = [];
+  if (input.time?.trim()) parts.push(input.time.trim());
+  if (input.isCompleted) {
+    parts.push("Completed");
+  } else if (!isBefore(dayStart, todayStart)) {
+    parts.push("Upcoming");
+  }
+  if (input.location?.trim()) parts.push(input.location.trim());
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+function mapAppointmentActivityEvent(input: {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  location?: string;
+  isCompleted?: boolean;
+  source?: ActivitySource;
+}): ActivityEvent | null {
+  const at = appointmentAtIso(input.date, input.time);
+  const when = parseActivityTimestamp(at);
+  if (!when) return null;
+  return event({
+    id: input.id,
+    kind: "appointment",
+    at,
+    title: input.title.trim() || "Appointment",
+    subtitle: appointmentActivitySubtitle(input, when),
+    href: "/appointments",
+    source: input.source,
+  });
 }
 
 function mapHypoTreatment(row: HypoTreatment): ActivityEvent {
@@ -218,30 +262,17 @@ export function collectAllActivityEvents(): ActivityEvent[] {
     );
   }
 
-  const todayStart = startOfDay(new Date());
-
   for (const appt of storage.getAppointments()) {
     if (appt.deletedAt) continue;
-    const at = appt.time ? `${appt.date}T${appt.time}` : `${appt.date}T12:00:00`;
-    const when = parseActivityTimestamp(at);
-    if (!when) continue;
-    const dayEnd = parseActivityTimestamp(`${appt.date}T23:59:59`);
-    const isPast =
-      isBefore(when, todayStart) ||
-      (dayEnd != null && isBefore(dayEnd, todayStart)) ||
-      appt.isCompleted;
-    if (!isPast) continue;
-
-    add(
-      event({
-        id: `appt-${appt.id}`,
-        kind: "appointment_past",
-        at,
-        title: appt.title,
-        subtitle: appt.location?.trim() || undefined,
-        href: "/appointments",
-      }),
-    );
+    const mapped = mapAppointmentActivityEvent({
+      id: `appt-${appt.id}`,
+      title: appt.title,
+      date: appt.date,
+      time: appt.time,
+      location: appt.location,
+      isCompleted: appt.isCompleted,
+    });
+    if (mapped) add(mapped);
   }
 
   for (const row of listAllLocalSupplyEvents()) {
@@ -316,7 +347,7 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   ratio_snapshot: "Ratios",
   supply_event: "Supplies",
   supply_pickup: "Pickup",
-  appointment_past: "Appointment",
+  appointment: "Appointment",
 };
 
 export const PRIMARY_ACTIVITY_KINDS: ActivityKind[] = [
@@ -337,12 +368,14 @@ const VALID_FILTERS = new Set<ActivityKind | "all">([
   "ratio_snapshot",
   "supply_event",
   "supply_pickup",
+  "appointment",
   "appointment_past",
 ]);
 
 export function loadStoredActivityFilter(): ActivityKind | "all" {
   try {
     const raw = sessionStorage.getItem(ACTIVITY_FILTER_STORAGE_KEY);
+    if (raw === "appointment_past") return "appointment";
     if (raw && VALID_FILTERS.has(raw as ActivityKind | "all")) {
       return raw as ActivityKind | "all";
     }
@@ -560,30 +593,20 @@ export function collectCarerActivityEvents(input: {
   }
 
   if (input.scopes.appointments) {
-    const todayStart = startOfDay(new Date());
     for (const row of input.appointmentRows ?? []) {
       const date = typeof row.date === "string" ? row.date : null;
       if (!date) continue;
-      const time = typeof row.time === "string" ? row.time : undefined;
-      const at = time ? `${date}T${time}` : `${date}T12:00:00`;
-      const when = parseActivityTimestamp(at);
-      if (!when) continue;
-      const completed = row.is_completed === true;
-      const dayEnd = parseActivityTimestamp(`${date}T23:59:59`);
-      const isPast =
-        isBefore(when, todayStart) ||
-        (dayEnd != null && isBefore(dayEnd, todayStart)) ||
-        completed;
-      if (!isPast) continue;
       const title = typeof row.title === "string" && row.title.trim() ? row.title.trim() : "Appointment";
-      add({
+      const mapped = mapAppointmentActivityEvent({
         id: `carer-appt-${row.id}`,
-        kind: "appointment_past",
-        at,
         title,
-        subtitle: typeof row.location === "string" ? row.location.trim() || undefined : undefined,
+        date,
+        time: typeof row.time === "string" ? row.time : undefined,
+        location: typeof row.location === "string" ? row.location : undefined,
+        isCompleted: row.is_completed === true,
         source: "cloud",
       });
+      if (mapped) add(mapped);
     }
   }
 

@@ -539,7 +539,7 @@ export function AppStatusStrip() {
             {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
           </Badge>
           <div className="flex items-center gap-2">
-            <Link href="/scenarios?tab=travel">
+            <Link href="/scenarios/travel">
               <Button size="sm" variant="outline" className={btnClass} data-testid="status-travel-view">
                 View <ChevronRight className="h-3.5 w-3.5 ml-1" aria-hidden />
               </Button>

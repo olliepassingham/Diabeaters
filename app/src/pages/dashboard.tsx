@@ -438,7 +438,7 @@ function HeroCard({
               </span>
               {scenarioState.sickDayActive ? (
                 <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/sick-day" data-testid="chip-active-sickday">
+                  <Link href="/scenarios/sick-day" data-testid="chip-active-sickday">
                     <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" />
                     Sick day
                   </Link>
@@ -446,7 +446,7 @@ function HeroCard({
               ) : null}
               {scenarioState.travelModeActive ? (
                 <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
-                  <Link href="/travel" data-testid="chip-active-travel">
+                  <Link href="/scenarios/travel" data-testid="chip-active-travel">
                     <ArrowRight className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
                     Travel
                   </Link>

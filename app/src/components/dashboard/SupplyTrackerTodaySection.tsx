@@ -10,7 +10,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Moon,
-  History,
+  ChevronRight,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -440,20 +440,44 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
       data-testid="dashboard-today-card"
     >
       <CardContent className="space-y-0 px-3 py-2.5 md:px-3.5 md:py-3" data-testid="dashboard-today-inline">
-        <div className="mb-2 flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+        <Link
+          href="/tools/activity"
+          className="group -mx-1 mb-2 flex items-center justify-between gap-2 rounded-lg border-b border-border/50 px-1 pb-2 outline-none ring-offset-background transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:hover:bg-muted/20"
+          data-testid="link-today-activity-calendar"
+          aria-label={
+            activityWeek.countLast7Days === 0
+              ? "Open activity calendar"
+              : `Open activity calendar, ${activityWeek.countLast7Days} entries this week`
+          }
+          onPointerEnter={() => prefetchToolsDestinationHref("/tools/activity")}
+          onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
+        >
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary transition-colors group-hover:bg-primary/25">
               <Calendar className="h-3.5 w-3.5" aria-hidden />
             </div>
-            <span className="text-sm font-semibold tracking-tight text-foreground">Today</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-0.5">
+                <span className="text-sm font-semibold tracking-tight text-foreground">Today</span>
+                <ChevronRight
+                  className="h-3.5 w-3.5 shrink-0 text-primary opacity-90 transition-transform group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </div>
+              <p className="text-[11px] leading-tight text-muted-foreground transition-colors group-hover:text-foreground/75">
+                {activityWeek.countLast7Days === 0
+                  ? "Activity calendar"
+                  : `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`}
+              </p>
+            </div>
           </div>
           <Badge
             variant={status.type === "warning" ? "destructive" : status.type === "info" ? "secondary" : "outline"}
-            className="max-w-[58%] shrink-0 truncate border-border/80 bg-muted/40 text-[11px] font-medium text-foreground dark:bg-muted/25"
+            className="max-w-[46%] shrink-0 truncate border-border/80 bg-muted/40 text-[11px] font-medium text-foreground dark:bg-muted/25"
           >
             {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
           </Badge>
-        </div>
+        </Link>
 
         <div className="flex flex-col gap-2">
           {omitDuplicateStockBanner ? (
@@ -529,29 +553,6 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
               supplyBlock
             )
           ) : null}
-
-          <Link
-            href="/tools/activity"
-            className="block"
-            onPointerEnter={() => prefetchToolsDestinationHref("/tools/activity")}
-            onFocus={() => prefetchToolsDestinationHref("/tools/activity")}
-          >
-            <div
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-2.5 py-2 text-sm transition-colors hover:border-border hover:bg-muted/35 dark:bg-muted/10 dark:hover:bg-muted/20"
-              data-testid="card-today-activity-log"
-            >
-              <History className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-500" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <span className="font-medium text-foreground">Activity log</span>
-                <p className="text-xs text-muted-foreground">
-                  {activityWeek.countLast7Days === 0
-                    ? "Nothing logged this week"
-                    : `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`}
-                </p>
-              </div>
-              <ArrowRight className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-            </div>
-          </Link>
 
           {isEvening ? (
             <Link href="/scenarios/bedtime" className="block pt-0.5">

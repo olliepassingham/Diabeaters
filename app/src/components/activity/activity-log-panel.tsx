@@ -36,7 +36,7 @@ const PATIENT_FILTER_CHIPS: FilterChip[] = [
   { id: "exercise_session", label: "Exercise" },
   { id: "ratio_snapshot", label: "Ratios" },
   { id: "supply_event", label: "Supplies" },
-  { id: "appointment_past", label: "Clinic" },
+  { id: "appointment", label: "Clinic" },
 ];
 
 const CARER_FILTER_CHIPS: FilterChip[] = [
@@ -44,7 +44,7 @@ const CARER_FILTER_CHIPS: FilterChip[] = [
   { id: "hypo_treated", label: "Hypos" },
   { id: "scenario_started", label: "Scenarios" },
   { id: "bedtime_check", label: "Bedtime" },
-  { id: "appointment_past", label: "Clinic" },
+  { id: "appointment", label: "Clinic" },
 ];
 
 function isFilterActive(kindFilter: ActivityKind | "all", chip: FilterChip): boolean {

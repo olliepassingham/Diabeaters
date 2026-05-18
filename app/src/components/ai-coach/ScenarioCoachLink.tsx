@@ -11,13 +11,23 @@ type Props = {
   /** Visible label; keep short for header toolbars. */
   label?: string;
   className?: string;
+  /** Pre-fill the coach message box (max 500 chars). */
+  q?: string | null;
+  /** Entry source for breadcrumbs / analytics. */
+  from?: string | null;
 };
 
-export function ScenarioCoachLink({ topic, label = scenarioAskAssistantLinkLabel(), className }: Props) {
+export function ScenarioCoachLink({
+  topic,
+  label = scenarioAskAssistantLinkLabel(),
+  className,
+  q,
+  from = "scenario-link",
+}: Props) {
   if (!isAiCoachEnabled) return null;
   return (
     <Button variant="outline" size="sm" className={className ?? "min-h-11 whitespace-nowrap"} asChild>
-      <Link href={buildCoachHref({ topic, from: "scenario-link" })} data-testid={`link-scenario-coach-${topic}`}>
+      <Link href={buildCoachHref({ topic, q, from })} data-testid={`link-scenario-coach-${topic}`}>
         <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
         {label}
       </Link>

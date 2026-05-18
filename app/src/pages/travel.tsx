@@ -29,7 +29,6 @@ import {
   AlertTriangle,
   AlertCircle,
   CheckCircle2,
-  ArrowLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -75,6 +74,12 @@ import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-starte
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { PharmacyCard } from "@/components/pharmacy-card";
+import {
+  buildActiveTravelCoachPrompt,
+  buildActiveTravelTodayFocus,
+  buildActiveTravelTripProfileChips,
+  type TravelTripStyle,
+} from "@/lib/travel-active-guidance";
 
 interface TravelPlan {
   duration: number;
@@ -88,6 +93,7 @@ interface TravelPlan {
   accessRisk: "easy" | "limited" | "unsure";
   weatherChange: "warmer" | "colder" | "similar" | "unknown";
   weatherSeverity: "slight" | "moderate" | "extreme";
+  tripStyle?: TravelTripStyle;
 }
 
 interface PackingItem {
@@ -114,6 +120,122 @@ type BasalAdjustmentRow = {
 };
 
 type TravelPlanBasalSlice = Pick<TravelPlan, "timezoneHours" | "timezoneDirection" | "timezoneChange">;
+
+type ClimateGuidanceSection = {
+  title: string;
+  subtitle: string;
+  bullets: string[];
+  callout?: string;
+};
+
+function climateWeatherGuidance(plan: TravelPlan, isPumpUser: boolean): ClimateGuidanceSection | null {
+  const severityNote =
+    plan.weatherSeverity === "extreme"
+      ? "Large climate swing — start with small dose changes and check often."
+      : plan.weatherSeverity === "moderate"
+        ? "Noticeable difference from home — adjust based on readings, not guesses."
+        : null;
+
+  if (plan.weatherChange === "warmer") {
+    const bullets = [
+      "Heat can make insulin work faster — hypo risk often goes up.",
+      "Check glucose every 2–3 hours while you settle in.",
+      "Keep insulin in a cool bag or Frio wallet; never leave it in a hot car.",
+      "Carry extra fast-acting hypo treatment (glucose tabs can melt).",
+      "Drink enough water — dehydration can push glucose up.",
+    ];
+    if (isPumpUser) bullets.push("Humidity and sweat: pack spare infusion sets and skin prep or tape.");
+    return {
+      title: "Hotter than home",
+      subtitle: "Focus on cooling supplies, frequent checks, and hypo readiness.",
+      bullets,
+      callout:
+        severityNote ??
+        "Mealtime insulin may need less than usual for some people — only change doses with your care team's plan.",
+    };
+  }
+  if (plan.weatherChange === "colder") {
+    const bullets = [
+      "Cold can slow insulin absorption — you may run higher before doses catch up.",
+      "Keep insulin next to your body so it does not freeze.",
+      "Warm test strips in your hands before using them.",
+      "Keep hypo supplies in an inside pocket — still check if you are active in the cold.",
+      "Shivering and winter sport can drop glucose like exercise.",
+    ];
+    if (isPumpUser) bullets.push("Keep the pump and tubing warm; cold insulin may not work properly.");
+    return {
+      title: "Colder than home",
+      subtitle: "Protect insulin from freezing and watch for both highs and activity lows.",
+      bullets,
+      callout:
+        severityNote ??
+        (plan.weatherSeverity !== "slight"
+          ? "Some people need more mealtime insulin in the cold — confirm any change with your team."
+          : "Trends matter more than a single reading — give changes a day before adjusting again."),
+    };
+  }
+  if (plan.weatherChange === "unknown") {
+    return {
+      title: "Weather not set",
+      subtitle: "Until you know the forecast, plan for both heat and cold.",
+      bullets: [
+        "If it is hot: cool insulin, check often, extra hypo supplies.",
+        "If it is cold: keep insulin warm, warm strips, watch for exercise lows.",
+        "Update your trip inputs when you have a forecast for tighter advice.",
+      ],
+    };
+  }
+  return null;
+}
+
+type ClimateTimezonePhase = { label: string; text: string };
+
+function climateTimezoneGuidance(plan: TravelPlan): ClimateGuidanceSection & { phases: ClimateTimezonePhase[] } {
+  const dir =
+    plan.timezoneDirection === "east" ? "Travelling east" : plan.timezoneDirection === "west" ? "Travelling west" : "Time zone change";
+
+  const bullets =
+    plan.timezoneDirection === "east"
+      ? [
+          "Your day is shorter — meals and boluses may need to move earlier.",
+          "Jet lag can cause temporary insulin resistance — expect some unpredictability.",
+          "Many people check glucose every 2–3 hours for the first 48 hours.",
+        ]
+      : plan.timezoneDirection === "west"
+        ? [
+            "Your day is longer — you may need an extra meal or bolus on travel day.",
+            "Some people keep long-acting on home time for day one, then shift slowly.",
+            "Extra checks help while your body clock adjusts.",
+          ]
+        : [
+            "Shift meals and basal timing gradually toward local time.",
+            "Check glucose more often for the first few days.",
+            "Discuss major time changes with your diabetes team before you go.",
+          ];
+
+  const phases: ClimateTimezonePhase[] = [
+    {
+      label: "Days 1–2",
+      text: "Check often; keep snacks handy. Long-acting may stay on home time at first if your team agrees.",
+    },
+    {
+      label: "Days 3–4",
+      text: "Move meals and basal toward local time in small steps (about 1–2 hours per day).",
+    },
+    {
+      label: "Day 5+",
+      text: "You should be on local routine — return journey uses the same idea in reverse.",
+    },
+  ];
+
+  return {
+    title: `${dir} · ${plan.timezoneHours}h`,
+    subtitle: "Shift timing gradually — rushing increases hypo and high risk.",
+    bullets,
+    phases,
+    callout: "Trips under 3 days: some people keep home basal times. Flexible insulins (e.g. degludec) may need less shifting — follow your own plan.",
+  };
+}
 
 /** Gradual MDI long-acting clock shift for a single home-clock anchor time. */
 function buildBasalAdjustmentSchedule(
@@ -199,9 +321,23 @@ function pickBasalRowForDay(rows: BasalAdjustmentRow[], dayInTrip: number): Basa
   return null;
 }
 
-function TravelDisclaimerCard() {
+function TravelDisclaimerCard({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <p
+        className="text-center text-[11px] leading-snug text-muted-foreground px-1"
+        role="note"
+        data-testid="travel-disclaimer-compact"
+      >
+        <AlertCircle className="inline h-3 w-3 mr-1 align-[-2px] text-yellow-600/70 dark:text-yellow-500/70" aria-hidden />
+        <span className="font-medium text-foreground/80">Not medical advice.</span> Educational preparation only —
+        follow your care team for travel and insulin planning.
+      </p>
+    );
+  }
+
   return (
-    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
+    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20" data-testid="travel-disclaimer">
       <CardContent className="p-4">
         <div className="flex gap-3">
           <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
@@ -1180,27 +1316,6 @@ export default function Travel() {
     });
   };
 
-  const resetPlan = () => {
-    storage.clearTravelWizardDraft();
-    setStep("entry");
-    const dates = getDefaultDates();
-    setPlan({
-      duration: 7,
-      destination: "",
-      travelType: "domestic",
-      timezoneChange: "none",
-      timezoneHours: 0,
-      timezoneDirection: "none",
-      startDate: dates.start,
-      endDate: dates.end,
-      accessRisk: "easy",
-      weatherChange: "unknown",
-      weatherSeverity: "moderate",
-    });
-    setPackingList([]);
-    setRiskWarnings([]);
-  };
-
   if (step === "entry" && isTravelModeActive && packingList.length > 0) {
     const startDate = parseISODateOrNull(plan.startDate) ?? new Date(getDefaultISOTripDates().start);
     const endDate = parseISODateOrNull(plan.endDate) ?? new Date(getDefaultISOTripDates().end);
@@ -1236,6 +1351,20 @@ export default function Travel() {
     })();
 
     const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
+    const dayNumber = hasStarted ? daysElapsed + 1 : 0;
+    const activeProgressInput = {
+      plan,
+      dayNumber,
+      totalDays,
+      hasStarted,
+      hasEnded,
+      daysUntilStart,
+      daysRemaining,
+      isPumpUser,
+    };
+    const todayFocus = buildActiveTravelTodayFocus(activeProgressInput);
+    const tripProfileChips = buildActiveTravelTripProfileChips(plan);
+    const activeCoachPrompt = buildActiveTravelCoachPrompt(activeProgressInput);
 
     return (
       <PageShell variant="standard" className="space-y-7">
@@ -1253,13 +1382,24 @@ export default function Travel() {
             </span>
           }
           description={
-            <>
-              <span className="font-medium text-foreground">{plan.destination}</span>
-              <span className="text-muted-foreground">
-                {" "}
-                · {plan.duration} day{plan.duration === 1 ? "" : "s"} ({plan.travelType})
+            <span className="block space-y-2">
+              <span>
+                <span className="font-medium text-foreground">{plan.destination}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {plan.duration} day{plan.duration === 1 ? "" : "s"}
+                </span>
               </span>
-            </>
+              {tripProfileChips.length > 0 ? (
+                <span className="flex flex-wrap gap-1.5" data-testid="travel-trip-profile-chips">
+                  {tripProfileChips.map((chip) => (
+                    <Badge key={chip.label} variant="outline" className="text-[10px] font-normal">
+                      {chip.label}
+                    </Badge>
+                  ))}
+                </span>
+              ) : null}
+            </span>
           }
           actions={
             <Badge variant="secondary" className="shrink-0 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
@@ -1284,18 +1424,15 @@ export default function Travel() {
                 </span>
               </div>
               <Progress value={progressPercent} className="h-2" data-testid="progress-trip" />
-              <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                <span>{daysElapsed} days elapsed</span>
-                <span>{daysRemaining} days remaining</span>
-              </div>
+              <p className="text-xs text-muted-foreground" data-testid="travel-progress-guidance">
+                {todayFocus}
+              </p>
               <div className="border-t border-green-200/60 pt-3 dark:border-green-800/60">
-                <ScenarioCoachLink topic="travel" />
+                <ScenarioCoachLink topic="travel" from="travel-active" q={activeCoachPrompt} />
               </div>
             </>
           }
         />
-
-        <TravelDisclaimerCard />
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
           <TabsList className="grid w-full grid-cols-3">
@@ -1581,6 +1718,8 @@ export default function Travel() {
             },
           ]}
         />
+
+        <TravelDisclaimerCard compact />
 
       </PageShell>
     );
@@ -2001,9 +2140,6 @@ export default function Travel() {
           <CardHeader>
             <div className="flex items-center gap-3">
               <PageBackButton />
-              <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
               <CardTitle className="text-xl">
                 Travel{" "}
                 <span className="text-sm font-normal text-muted-foreground">— Tell us about your upcoming travel</span>
@@ -2148,6 +2284,32 @@ export default function Travel() {
                   <SelectItem value="international">International</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Luggage className="h-4 w-4 text-muted-foreground" aria-hidden />
+                What&apos;s the trip like?
+              </Label>
+              <Select
+                value={plan.tripStyle ?? "not_sure"}
+                onValueChange={(value: TravelTripStyle) => setPlan((prev) => ({ ...prev, tripStyle: value }))}
+              >
+                <SelectTrigger data-testid="select-trip-style">
+                  <SelectValue placeholder="Choose the closest match" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not_sure">Not sure / mixed</SelectItem>
+                  <SelectItem value="relax">Relaxing — beach, resort, downtime</SelectItem>
+                  <SelectItem value="active">Active — hiking, skiing, lots of walking</SelectItem>
+                  <SelectItem value="city">City break — eating out, sightseeing</SelectItem>
+                  <SelectItem value="remote">Remote — limited shops or services</SelectItem>
+                  <SelectItem value="family">Visiting family or friends</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Shapes tips while you travel — you can change this when you edit your plan.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -2313,11 +2475,8 @@ export default function Travel() {
   return (
     <PageShell variant="standard" className="space-y-7">
       <div className="flex items-start gap-2 border-b border-border/60 pb-3 mb-3">
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="shrink-0">
           <PageBackButton />
-          <Button variant="ghost" size="icon" onClick={resetPlan} data-testid="button-new-plan">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <h1 className="text-base font-semibold leading-snug text-balance break-words sm:text-lg">
@@ -2565,483 +2724,174 @@ export default function Travel() {
         </TabsContent>
 
         {showClimateTab && (
-        <TabsContent value="climate" className="mt-4 space-y-3">
-          <Card className="border-border/70">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Thermometer className="h-4 w-4 shrink-0" />
-                At a glance
-              </CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                What to watch first on this trip; open a section for full detail and the basal table.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <ul className="list-disc list-inside space-y-1.5 text-sm text-foreground/90">
-                {plan.weatherChange === "warmer" && (
-                  <li>
-                    Warmer than home: heat can speed insulin — check glucose more often, keep extra fast hypo treatment
-                    handy, and keep insulin cool.
-                  </li>
-                )}
-                {plan.weatherChange === "colder" && (
-                  <li>
-                    Colder than home: insulin may act slower — watch trends, keep insulin from freezing, warm strips, and
-                    keep hypo supplies in inner pockets.
-                  </li>
-                )}
-                {plan.weatherChange === "unknown" && (
-                  <li>
-                    Weather still unknown: both heat and cold can change absorption — use the weather section when you
-                    know the forecast.
-                  </li>
-                )}
-                {plan.timezoneChange !== "none" && (
-                  <li>
-                    About {plan.timezoneHours} hour{plan.timezoneHours === 1 ? "" : "s"} time difference
-                    {plan.timezoneDirection === "none"
-                      ? ""
-                      : plan.timezoneDirection === "east"
-                        ? " (travelling east)"
-                        : " (travelling west)"}
-                    {": "}
-                    shift meals and basal gradually and monitor closely in the first days.
-                  </li>
-                )}
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Accordion
-            type="multiple"
-            className="w-full rounded-lg border border-border/60 bg-card px-1"
-            defaultValue={
-              plan.weatherChange !== "similar"
-                ? ["weather"]
-                : plan.timezoneChange !== "none"
-                  ? ["timezone"]
-                  : []
-            }
-          >
-            {plan.weatherChange !== "similar" && (
-              <AccordionItem value="weather" className="border-b-0 px-1">
-                <AccordionTrigger className="text-sm py-3 hover:no-underline">
-                  Weather — detail & actions
-                </AccordionTrigger>
-                <AccordionContent className="pb-2 pt-0 border-t border-border/40">
-                  <Card
-                    className={plan.weatherChange === "warmer"
-          ? "border-red-200 dark:border-red-800" 
-          : plan.weatherChange === "colder" 
-            ? "border-blue-200 dark:border-blue-800" 
-            : "border-orange-200 dark:border-orange-800"
-        }>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {plan.weatherChange === "warmer" ? (
-                <Sun className="h-5 w-5 text-red-600 dark:text-red-400" />
-              ) : plan.weatherChange === "colder" ? (
-                <Snowflake className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              ) : (
-                <Thermometer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-              )}
-              {plan.weatherChange === "warmer" 
-                ? "Hot Weather Adjustments" 
-                : plan.weatherChange === "colder" 
-                  ? "Cold Weather Adjustments" 
-                  : "Weather Considerations"}
-            </CardTitle>
-            <CardDescription>
-              {plan.weatherChange === "warmer" 
-                ? "Personalized recommendations for your warmer destination" 
-                : plan.weatherChange === "colder" 
-                  ? "Personalized recommendations for your colder destination" 
-                  : "How climate differences may affect your diabetes management"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {plan.weatherChange === "warmer" && (
-              <>
-                {/* Personalized Hot Weather Recommendations */}
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                  <h4 className="font-medium text-red-900 dark:text-red-100 mb-3 flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Your Insulin Adjustment Suggestion
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
-                      <p className="text-sm font-medium text-red-900 dark:text-red-100">Mealtime Doses</p>
-                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                        In heat, insulin can act faster (some people need less mealtime insulin)
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use your care team’s plan and adjust based on readings — heat affects everyone differently.
-                      </p>
-                    </div>
-                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-red-100 dark:border-red-900">
-                      <p className="text-sm font-medium text-red-900 dark:text-red-100">Background/Basal Insulin</p>
-                      <p className="text-lg font-bold text-red-600 dark:text-red-400">Often no change, but monitor closely</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        If you’re running lower than usual, follow your agreed basal plan or contact your team for advice.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <h5 className="font-medium text-sm mb-2">Why This Happens</h5>
-                    <p className="text-sm text-muted-foreground">
-                      Heat increases blood flow to the skin, causing insulin to absorb faster than normal. 
-                      This means the same dose works more quickly and effectively — increasing hypo risk.
-                    </p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <h5 className="font-medium text-sm mb-2">Key Actions</h5>
-                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Check blood glucose more often (every 2-3 hours)</li>
-                      <li>Carry extra hypo treatment — glucose tabs melt in heat</li>
-                      <li>Stay hydrated (dehydration raises BG)</li>
-                      <li>Keep insulin in a cooling case or bag</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {isPumpUser && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      <strong>Pump users:</strong> Infusion sets may lose adhesion in humidity and sweat. 
-                      Pack extra sets and consider skin prep wipes or additional tape.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {plan.weatherChange === "colder" && (
-              <>
-                {/* Personalized Cold Weather Recommendations */}
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    Your Insulin Adjustment Suggestion
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Mealtime Doses</p>
-                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        In cold, insulin can act slower (some people need more mealtime insulin)
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Start with your normal dose and adjust based on readings — cold affects everyone differently
-                      </p>
-                    </div>
-                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-900">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Background/Basal Insulin</p>
-                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">Often no change, but monitor trends</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        If you’re running higher than usual for more than a day, follow your agreed plan or contact your team.
-                      </p>
-                    </div>
-                    {plan.weatherSeverity !== "slight" && (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                        <p className="text-sm font-medium text-amber-900 dark:text-amber-100">⚠️ Activity Warning</p>
-                        <p className="text-sm text-amber-800 dark:text-amber-200">
-                          Shivering and winter activities (skiing, skating) burn glucose rapidly like exercise. 
-                          Despite needing more insulin for meals, you may experience <strong>unexpected hypos</strong> during physical activity in the cold.
-                        </p>
-                      </div>
+        <TabsContent value="climate" className="mt-4 space-y-3" data-testid="panel-travel-climate">
+          {(() => {
+            const weather = climateWeatherGuidance(plan, isPumpUser);
+            if (!weather) return null;
+            return (
+              <Card className="border-border/70">
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    {plan.weatherChange === "warmer" ? (
+                      <Sun className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
+                    ) : plan.weatherChange === "colder" ? (
+                      <Snowflake className="h-4 w-4 shrink-0 text-blue-500" aria-hidden />
+                    ) : (
+                      <Thermometer className="h-4 w-4 shrink-0" aria-hidden />
                     )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <h5 className="font-medium text-sm mb-2">Why This Happens</h5>
-                    <p className="text-sm text-muted-foreground">
-                      Cold reduces blood flow to the skin, slowing insulin absorption. 
-                      This means your usual dose may work more slowly or less effectively initially.
-                    </p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <h5 className="font-medium text-sm mb-2">Key Actions</h5>
-                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>Keep insulin close to your body (it can freeze!)</li>
-                      <li>Warm test strips before using</li>
-                      <li>CGM may read lower than actual in extreme cold</li>
-                      <li>Carry hypo treatment in an inside pocket</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {isPumpUser && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      <strong>Pump users:</strong> Keep your pump close to your body to prevent insulin from getting too cold. 
-                      Insulin left in a cold bag or exposed tubing may not work properly.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-
-            {plan.weatherChange === "unknown" && (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  You haven't specified the weather at your destination. Here's a quick overview of how temperature differences can affect your insulin needs:
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sun className="h-4 w-4 text-red-600 dark:text-red-400" />
-                      <h5 className="font-medium text-red-900 dark:text-red-100">If It's Hotter</h5>
-                    </div>
-                    <ul className="text-xs text-red-800 dark:text-red-200 space-y-1 list-disc list-inside">
-                      <li>Insulin can absorb faster (some people need less insulin)</li>
-                      <li>Higher hypo risk</li>
-                      <li>Keep insulin cool</li>
-                    </ul>
-                  </div>
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Snowflake className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <h5 className="font-medium text-blue-900 dark:text-blue-100">If It's Colder</h5>
-                    </div>
-                    <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
-                      <li>Insulin can absorb slower (some people need more insulin)</li>
-                      <li>Activity in cold = hypo risk</li>
-                      <li>Keep insulin warm (don't let it freeze)</li>
-                    </ul>
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Alert className="border-muted">
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Not medical advice.</strong> These are starting points based on general patterns. 
-                Everyone responds differently — monitor frequently, start with smaller adjustments, and increase if needed.
-                Discuss significant travel with your diabetes team beforehand if possible.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-
-            {plan.timezoneChange !== "none" && (
-              <AccordionItem value="timezone" className="border-b-0 px-1">
-                <AccordionTrigger className="text-sm py-3 hover:no-underline">
-                  Time zones & basal schedule
-                </AccordionTrigger>
-                <AccordionContent className="pb-2 pt-0 border-t border-border/40">
-                  <Card className="border-purple-200 dark:border-purple-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              Timezone Adjustment Guidance
-            </CardTitle>
-            <CardDescription>
-              Daily reminders for adjusting to {plan.timezoneHours}-hour time difference
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
-              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">
-                {plan.timezoneDirection === "east" ? "Travelling East" : "Travelling West"} — Key Strategy
-              </h4>
-              {plan.timezoneDirection === "east" ? (
-                <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
-                  <p>When travelling east, your day gets shorter. This affects insulin timing:</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>You may need less long-acting insulin on travel day (shorter day)</li>
-                    <li>Shift meal times and boluses earlier gradually over 2-3 days</li>
-                    <li>Monitor more frequently in the first 48 hours</li>
-                    <li>Expect some temporary insulin resistance from jet lag</li>
+                    {weather.title}
+                  </CardTitle>
+                  <CardDescription className="text-xs leading-snug">{weather.subtitle}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0 pb-4">
+                  <ul className="space-y-2.5 text-sm leading-snug text-foreground/90">
+                    {weather.bullets.map((line) => (
+                      <li key={line} className="flex gap-2.5">
+                        <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
+                        <span>{line}</span>
+                      </li>
+                    ))}
                   </ul>
-                </div>
-              ) : (
-                <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
-                  <p>When travelling west, your day gets longer. This affects insulin timing:</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>You may need extra short-acting insulin for the extended day</li>
-                    <li>Keep basal insulin on home time initially, then shift gradually</li>
-                    <li>Add an extra meal if your day extends significantly</li>
-                    <li>Monitor more frequently during the adjustment period</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <h5 className="font-medium text-sm mb-1">Day 1-2 (Departure)</h5>
-                <p className="text-xs text-muted-foreground">
-                  Check glucose every 2-3 hours. Keep snacks accessible. Consider keeping pump/basal on home timezone for first day.
-                </p>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <h5 className="font-medium text-sm mb-1">Day 3-4 (Adjusting)</h5>
-                <p className="text-xs text-muted-foreground">
-                  Begin shifting meal times to local schedule. Adjust basal timing by 2-3 hours per day. Continue extra monitoring.
-                </p>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <h5 className="font-medium text-sm mb-1">Day 5+ (Settled)</h5>
-                <p className="text-xs text-muted-foreground">
-                  Should be on local schedule. Resume normal monitoring pattern. Watch for delayed effects of jet lag.
-                </p>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <h5 className="font-medium text-sm mb-1">Return Journey</h5>
-                <p className="text-xs text-muted-foreground">
-                  Same process in reverse. Expect adjustment to take 1 day per hour of timezone difference.
-                </p>
-              </div>
-            </div>
+                  {weather.callout ? (
+                    <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                      {weather.callout}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
-            {!isPumpUser && (
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <Syringe className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100">
-                    Long-Acting Insulin Adjustment Calculator
-                  </h4>
-                </div>
-                <p className="text-sm text-blue-800 dark:text-blue-200 mb-4">
-                  {usesTwoBasalDoses
-                    ? "Enter your two usual long-acting (basal) home-clock times to see gradual adjustment schedules for each dose."
-                    : "Enter your usual long-acting (basal) insulin injection time to see a gradual adjustment schedule for your trip."}
-                </p>
-                
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                    <div className="flex flex-wrap items-center gap-3">
-                    <Label htmlFor="basal-time" className="text-blue-900 dark:text-blue-100 whitespace-nowrap">
-                      {usesTwoBasalDoses ? "First long-acting dose (home time):" : "I usually take my long-acting insulin at:"}
-                    </Label>
-                    <Input
-                      id="basal-time"
-                      type="time"
-                      value={basalInjectionTime}
-                      onChange={(e) => {
-                        setBasalInjectionTime(e.target.value);
-                        const current = storage.getSettings();
-                        storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
-                      }}
-                      className="w-32 bg-white dark:bg-blue-900/50"
-                      data-testid="input-basal-time"
-                    />
-                    {!usesTwoBasalDoses ? <span className="text-sm text-blue-700 dark:text-blue-300">(home time)</span> : null}
+          {plan.timezoneChange !== "none" && (() => {
+            const tz = climateTimezoneGuidance(plan);
+            return (
+            <Card className="border-border/70">
+              <CardHeader className="pb-2 pt-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-purple-500" aria-hidden />
+                  {tz.title}
+                </CardTitle>
+                <CardDescription className="text-xs leading-snug">{tz.subtitle}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0 pb-4">
+                <ul className="space-y-2.5 text-sm leading-snug text-foreground/90">
+                  {tz.bullets.map((line) => (
+                    <li key={line} className="flex gap-2.5">
+                      <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary/50" aria-hidden />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {tz.phases.map((phase) => (
+                    <div
+                      key={phase.label}
+                      className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5"
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {phase.label}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-foreground/85">{phase.text}</p>
                     </div>
-                    {usesTwoBasalDoses ? (
-                      <div className="flex flex-wrap items-center gap-3">
-                        <Label htmlFor="basal-time-2" className="text-blue-900 dark:text-blue-100 whitespace-nowrap">
-                          Second long-acting dose (home time):
+                  ))}
+                </div>
+
+                {tz.callout ? (
+                  <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                    {tz.callout}
+                  </p>
+                ) : null}
+
+                {!isPumpUser && (
+                  <div className="space-y-3 border-t border-border/50 pt-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="basal-time" className="text-xs">
+                          {usesTwoBasalDoses ? "First long-acting (home time)" : "Long-acting time (home)"}
                         </Label>
                         <Input
-                          id="basal-time-2"
+                          id="basal-time"
                           type="time"
-                          value={basalInjectionTime2}
+                          value={basalInjectionTime}
                           onChange={(e) => {
-                            setBasalInjectionTime2(e.target.value);
+                            setBasalInjectionTime(e.target.value);
                             const current = storage.getSettings();
-                            storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
+                            storage.saveSettings({ ...current, basalInjectionTime: e.target.value });
                           }}
-                          className="w-32 bg-white dark:bg-blue-900/50"
-                          data-testid="input-basal-time-2"
+                          className="h-10 w-32"
+                          data-testid="input-basal-time"
                         />
                       </div>
-                    ) : null}
-                  </div>
+                      {usesTwoBasalDoses ? (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="basal-time-2" className="text-xs">
+                            Second long-acting (home time)
+                          </Label>
+                          <Input
+                            id="basal-time-2"
+                            type="time"
+                            value={basalInjectionTime2}
+                            onChange={(e) => {
+                              setBasalInjectionTime2(e.target.value);
+                              const current = storage.getSettings();
+                              storage.saveSettings({ ...current, basalInjectionTime2: e.target.value });
+                            }}
+                            className="h-10 w-32"
+                            data-testid="input-basal-time-2"
+                          />
+                        </div>
+                      ) : null}
+                    </div>
 
-                  {basalSchedules.some((s) => s.rows.length > 0) && (
-                    <div className="space-y-6">
-                      {basalSchedules.map(({ doseLabel, rows }) =>
-                        rows.length === 0 ? null : (
-                          <div key={doseLabel} className="space-y-2">
-                            <h5 className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                              {doseLabel} — adjustment schedule ({plan.timezoneHours}h {plan.timezoneDirection})
-                            </h5>
-                            <div className="bg-white dark:bg-blue-900/30 rounded-lg overflow-hidden">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100">
-                                    <th className="px-3 py-2 text-left font-medium">Day</th>
-                                    <th className="px-3 py-2 text-left font-medium">Home Time</th>
-                                    <th className="px-3 py-2 text-left font-medium">Local Time</th>
-                                    <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Note</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {rows.map((row, idx) => (
-                                    <tr
-                                      key={`${doseLabel}-${idx}`}
-                                      className={idx % 2 === 0 ? "bg-blue-50/50 dark:bg-blue-950/20" : ""}
-                                    >
-                                      <td className="px-3 py-2 text-blue-800 dark:text-blue-200 font-medium">
-                                        {row.label}
-                                      </td>
-                                      <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
-                                        {row.homeTime}
-                                      </td>
-                                      <td className="px-3 py-2 text-blue-700 dark:text-blue-300 font-mono">
-                                        {row.localTime}
-                                      </td>
-                                      <td className="px-3 py-2 text-blue-600 dark:text-blue-400 text-xs hidden sm:table-cell">
-                                        {row.note}
-                                      </td>
+                    {basalSchedules.some((s) => s.rows.length > 0) && (
+                      <div className="space-y-4">
+                        {basalSchedules.map(({ doseLabel, rows }) =>
+                          rows.length === 0 ? null : (
+                            <div key={doseLabel} className="space-y-2">
+                              <p className="text-xs font-medium text-muted-foreground">{doseLabel}</p>
+                              <div className="overflow-hidden rounded-lg border border-border/60">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="bg-muted/40 text-left text-xs text-muted-foreground">
+                                      <th className="px-3 py-2 font-medium">Day</th>
+                                      <th className="px-3 py-2 font-medium">Home</th>
+                                      <th className="px-3 py-2 font-medium">Local</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    {rows.map((row, idx) => (
+                                      <tr
+                                        key={`${doseLabel}-${idx}`}
+                                        className={idx % 2 === 0 ? "bg-muted/15" : undefined}
+                                      >
+                                        <td className="px-3 py-2 font-medium">{row.label}</td>
+                                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.homeTime}</td>
+                                        <td className="px-3 py-2 font-mono text-xs tabular-nums">{row.localTime}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
-                            <div className="sm:hidden space-y-1 mt-2">
-                              {rows.map((row, idx) => (
-                                <p key={`${doseLabel}-m-${idx}`} className="text-xs text-blue-600 dark:text-blue-400">
-                                  <strong>{row.label}:</strong> {row.note}
-                                </p>
-                              ))}
-                            </div>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  )}
-
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                    <div className="flex gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
-                        <p><strong>Important notes:</strong></p>
-                        <ul className="list-disc list-inside space-y-0.5 ml-1">
-                          <li>Tresiba is more flexible and may not need gradual adjustment</li>
-                          <li>For trips under 3 days, you may keep your home injection time</li>
-                          <li>Monitor blood glucose more frequently during adjustment</li>
-                          <li>Discuss your specific plan with your diabetes team before travelling</li>
-                        </ul>
+                          ),
+                        )}
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                These are general guidelines only. Discuss your specific adjustment plan with your diabetes team before travelling, especially for major timezone changes.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-                </AccordionContent>
-              </AccordionItem>
-            )}
+                    )}
 
-          </Accordion>
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      Schedule is a guide only — agree your plan with your diabetes team before you go.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            );
+          })()}
+
+          <p className="text-center text-[11px] leading-snug text-muted-foreground">
+            Educational guidance only — not medical advice.
+          </p>
         </TabsContent>
         )}
 

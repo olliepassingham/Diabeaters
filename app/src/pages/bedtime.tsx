@@ -17,12 +17,16 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
+import {
+  buildBedtimePersonalizedCopy,
+  formatBedtimeBgDisplay,
+  hoursSinceSelectPhrase,
+} from "@/lib/bedtime-readiness";
 import {
   getMdiBedtimePostExerciseLine,
   getPumpBedtimePostExerciseLine,
@@ -50,9 +54,11 @@ interface CorrectionSuggestion {
 interface ReadinessResult {
   level: ReadinessLevel;
   title: string;
+  headline: string;
+  bgGlance: { display: string; trendLabel: string; rangeLabel: string };
+  guidance: string[];
   /** Single-line summary (e.g. for logs / screen readers). */
   message: string;
-  /** Short scannable lines under the verdict. */
   messageBullets: string[];
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
@@ -129,24 +135,6 @@ function mdiBasalBedtimeBucketFromSettings(settings: UserSettings | null | undef
     return b2 ?? b1;
   }
   return mdiBasalBedtimeBucket(t1);
-}
-
-/** Phrases aligned with the bedtime "Hours since …" select values. */
-function hoursSinceSelectPhrase(raw: string): string {
-  switch (raw) {
-    case "0.5":
-      return "less than an hour";
-    case "1":
-      return "about 1 hour";
-    case "2":
-      return "about 2 hours";
-    case "3":
-      return "about 3 hours";
-    case "4":
-      return "four or more hours";
-    default:
-      return "a while";
-  }
 }
 
 /** Short display of usual basal clock(s) from settings (MDI). */
@@ -493,8 +481,8 @@ export default function Bedtime() {
       factors.push({
         label: "Recent hypos",
         status: "concern",
-        note: "Hypos recently",
-        detail: "Higher overnight risk — alarm and snack may help if your plan allows.",
+        note: "You reported a recent hypo",
+        detail: "Raises overnight caution. A snack is only suggested if glucose is low, falling, or combined with exercise or alcohol.",
       });
       concernCount++;
     }
@@ -589,112 +577,95 @@ export default function Bedtime() {
     }
 
     let level: ReadinessLevel;
-    let title: string;
-    let message: string;
-    let messageBullets: string[] = [];
-    const tips: string[] = [];
-
     if (concernCount >= 2 || (concernCount >= 1 && cautionCount >= 2)) {
       level = "alert";
-      title = "Set an Alarm Tonight";
-      message = "There are a few things that could affect your overnight glucose. Setting an alarm to check would be wise.";
-      messageBullets = [
-        "Several stressors could affect you overnight.",
-        "Plan a glucose check in the small hours if you can.",
-        "Keep hypo treatment within reach.",
-      ];
-      tips.push("Set an alarm for 2-3am to check your levels");
-      tips.push("Keep fast-acting glucose by your bed");
-      if (bgMmol < targetLowMmol) tips.push("Have a small snack before bed");
-      if (hadAlcohol) tips.push("Alcohol can cause delayed lows for up to 24 hours");
-      if (hadAlcohol && isPumpUser) tips.push("Check your pump's IOB display before deciding on a correction");
-      if (exercisedToday) tips.push("Exercise can cause lows for up to 24 hours after");
-      if (exercisedToday && isPumpUser) tips.push("Consider setting a temporary basal rate at 80-90% overnight after exercise");
-      if (sleepHours !== null && sleepHours > 1) tips.push("Re-run this check closer to when you actually go to bed");
     } else if (cautionCount >= 2 || concernCount >= 1) {
       level = "monitor";
-      title = "Worth Keeping an Eye On";
-      message = "Things look reasonable, but there's a factor or two to be aware of. You'll probably be fine, but stay mindful.";
-      const monitorBits: string[] = [];
-      if (foodSelected && Number.isFinite(foodHours) && foodHours < 3 && foodPhrase) {
-        monitorBits.push(`last food only ${foodPhrase} ago`);
-      }
-      if (carbs != null && Number.isFinite(carbs) && carbs >= 45) {
-        monitorBits.push(`~${Math.round(carbs)}g carbs noted`);
-      }
-      if (insulinSelected && insulinHoursForIOB < 3 && bolusPhrase) {
-        monitorBits.push(`mealtime insulin only ${bolusPhrase} ago`);
-      }
-      messageBullets = ["Mostly manageable — a couple of flags are still worth noticing."];
-      if (monitorBits.length > 0) {
-        messageBullets.push(`From your inputs: ${monitorBits.join(" · ")}.`);
-      }
-      messageBullets.push("Food digesting and insulin tails can still move numbers before morning.");
-      message = messageBullets.join(" ");
-      if (foodSelected && Number.isFinite(foodHours) && foodHours < 2) tips.push("Your glucose may rise as food digests");
-      if (insulinSelected && insulinHoursForIOB < 2) tips.push("Check again before you actually fall asleep");
-      if (exercisedToday) tips.push("Keep a snack nearby just in case");
-      if (sleepHours !== null && sleepHours > 1.5) tips.push("You've got time - recheck before you head to bed");
-      tips.push("If you wake in the night, do a quick check");
     } else {
       level = "steady";
-      title = "Looking Good for Sleep";
-      const steadyParts: string[] = [];
-      if (foodSelected && foodPhrase) steadyParts.push(`last food ~${foodPhrase} ago`);
-      if (insulinSelected && bolusPhrase) steadyParts.push(`mealtime insulin ~${bolusPhrase} ago`);
-      if (!isPumpUser && basalClockSummary) steadyParts.push(`usual long-acting ~${basalClockSummary} (home clock)`);
-      messageBullets = ["Your glucose looks in a comfortable range for sleep."];
-      if (steadyParts.length > 0) {
-        messageBullets.push(`You shared: ${steadyParts.join(" · ")}.`);
-      } else {
-        messageBullets.push("Adding food and mealtime-insulin timing next time will mirror your routine more closely.");
-      }
-      messageBullets.push("From these inputs alone, nothing screams overnight trouble — still follow your care plan if you feel off.");
-      message = messageBullets.join(" ");
-      tips.push("Sweet dreams - you've set yourself up well");
-      tips.push("Your glucose is in a comfortable range for sleep");
-      if (isPumpUser) tips.push("Your pump's basal rate should keep you steady overnight");
     }
+
+    const concernLabels = factors.filter((f) => f.status === "concern").map((f) => f.label);
+    const cautionLabels = factors.filter((f) => f.status === "caution").map((f) => f.label);
+
+    const personalized = buildBedtimePersonalizedCopy({
+      level,
+      bgDisplay: formatBedtimeBgDisplay(bgMmol, bgUnits),
+      bgMmol,
+      targetLowMmol,
+      targetHighMmol,
+      bgTrend,
+      recentHypos,
+      exercisedToday,
+      hadAlcohol,
+      foodPhrase,
+      foodHours: foodSelected && Number.isFinite(foodHours) ? foodHours : null,
+      foodSelected,
+      bolusPhrase,
+      insulinHours: insulinSelected && Number.isFinite(insulinHoursForIOB) ? insulinHoursForIOB : null,
+      insulinSelected,
+      carbs: carbs != null && Number.isFinite(carbs) ? carbs : null,
+      sleepHours: sleepHours != null && Number.isFinite(sleepHours) ? sleepHours : null,
+      concernCount,
+      cautionCount,
+      concernLabels,
+      cautionLabels,
+      isPumpUser,
+      sickDayActive: scenarioState.sickDayActive,
+      sickDaySeverity: scenarioState.sickDaySeverity,
+      travelModeActive: scenarioState.travelModeActive,
+      travelTimezoneShift: scenarioState.travelTimezoneShift,
+      mdiBasalForBed,
+      basalClockSummary: basalClockSummary,
+    });
+
+    const tips = [...personalized.tips];
 
     if (scenarioState.sickDayActive) {
       tips.push("When unwell, set an alarm to check ketones and glucose overnight");
       if (scenarioState.sickDaySeverity === "severe") {
-        tips.push("With severe illness, consider checking every 2-3 hours overnight");
+        tips.push("With severe illness, consider checking every 2–3 hours overnight");
       }
     }
 
     if (scenarioState.travelModeActive) {
       const hasTimezoneShift = scenarioState.travelTimezoneShift && Math.abs(scenarioState.travelTimezoneShift) >= 2;
       if (hasTimezoneShift) {
-        tips.push("Your body clock may still be adjusting - overnight patterns could differ from normal");
+        tips.push("Your body clock may still be adjusting — overnight patterns could differ from normal");
       }
       tips.push("Keep your hypo kit easily accessible in an unfamiliar room");
     }
 
     if (mdiBasalForBed === "morning") {
       tips.push("Morning long-acting: some people drift up later at night — your team's plan still applies.");
-      tips.push("Occasional overnight checks can help you learn your pattern.");
     } else if (mdiBasalForBed === "evening") {
-      tips.push("Evening long-acting often supports steadier overnight levels for many on MDI.");
-      tips.push("Still watch for hypos after exercise or alcohol.");
+      tips.push("Still watch for hypos after exercise or alcohol, even with evening long-acting.");
+    }
+
+    if (level === "alert" && hadAlcohol && isPumpUser) {
+      tips.push("Check your pump's IOB display before deciding on a correction");
+    }
+    if (level === "alert" && exercisedToday && isPumpUser) {
+      tips.push("Consider a temporary basal at 80–90% overnight after exercise if your team uses that approach");
     }
 
     const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHoursForIOB);
+    const messageBullets = personalized.messageBullets;
+    const message = messageBullets.join(" ");
 
-    const snack: ReadinessResult["snack"] =
-      bgMmol < targetLowMmol || bgTrend === "falling" || recentHypos
-        ? {
-            grams: bgMmol < targetLowMmol ? 10 : 5,
-            reason:
-              bgMmol < targetLowMmol
-                ? "Below or near your target range"
-                : recentHypos
-                  ? "Recent hypos increase overnight risk"
-                  : "Falling trend can drop overnight",
-          }
-        : null;
-
-    setResult({ level, title, message, messageBullets, tips, factors, correction, snack });
+    setResult({
+      level,
+      title: personalized.title,
+      headline: personalized.headline,
+      bgGlance: personalized.bgGlance,
+      guidance: personalized.guidance,
+      message,
+      messageBullets,
+      tips,
+      factors,
+      correction,
+      snack: personalized.snack,
+    });
     setSaved(false);
     setDetailsOpen(false);
     setAlarmPlanned(false);
@@ -744,24 +715,30 @@ export default function Bedtime() {
     switch (level) {
       case "steady":
         return {
-          bg: "bg-green-50 dark:bg-green-950/30",
-          border: "border-green-200 dark:border-green-800",
-          icon: "text-green-600 dark:text-green-400",
-          title: "text-green-700 dark:text-green-300",
+          surface: "from-emerald-500/[0.12] via-card to-card dark:from-emerald-500/[0.08]",
+          border: "border-emerald-500/25 dark:border-emerald-500/20",
+          iconWrap: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+          icon: "text-emerald-600 dark:text-emerald-400",
+          title: "text-emerald-800 dark:text-emerald-200",
+          chip: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/20",
         };
       case "monitor":
         return {
-          bg: "bg-amber-50 dark:bg-amber-950/30",
-          border: "border-amber-200 dark:border-amber-800",
+          surface: "from-amber-500/[0.12] via-card to-card dark:from-amber-500/[0.08]",
+          border: "border-amber-500/25 dark:border-amber-500/20",
+          iconWrap: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
           icon: "text-amber-600 dark:text-amber-400",
-          title: "text-amber-700 dark:text-amber-300",
+          title: "text-amber-900 dark:text-amber-100",
+          chip: "bg-amber-500/10 text-amber-900 dark:text-amber-100 border-amber-500/20",
         };
       case "alert":
         return {
-          bg: "bg-red-50 dark:bg-red-950/30",
-          border: "border-red-200 dark:border-red-800",
+          surface: "from-red-500/[0.14] via-card to-card dark:from-red-500/[0.1]",
+          border: "border-red-500/30 dark:border-red-500/25",
+          iconWrap: "bg-red-500/15 text-red-700 dark:text-red-300",
           icon: "text-red-600 dark:text-red-400",
-          title: "text-red-700 dark:text-red-300",
+          title: "text-red-800 dark:text-red-200",
+          chip: "bg-red-500/10 text-red-800 dark:text-red-200 border-red-500/20",
         };
     }
   };
@@ -972,77 +949,100 @@ export default function Bedtime() {
         </div>
       )}
 
-      {result && (
-        <ScenarioToolHeroCard
-          data-testid="card-bedtime-result-hero"
-          className={`${getLevelColors(result.level).bg} ${getLevelColors(result.level).border} border shadow-sm`}
-          classNames={{ content: "space-y-4 px-5 pb-5 pt-5 sm:px-6 sm:pb-6 sm:pt-6" }}
-          body={
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="mt-0.5">
-                    {result.level === "steady" ? (
-                      <CheckCircle2 className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                    ) : result.level === "monitor" ? (
-                      <AlertCircle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                    ) : (
-                      <AlertTriangle className={`h-7 w-7 ${getLevelColors(result.level).icon}`} />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2
-                        className={`font-display text-xl font-semibold tracking-tight ${getLevelColors(result.level).title}`}
-                        data-testid="text-bedtime-verdict"
-                      >
-                        {verdictLabel(result.level)}
-                      </h2>
-                      <Badge variant="secondary" className="text-xs">
-                        {result.title}
-                      </Badge>
-                    </div>
-                    <ul
-                      className="mt-2 list-none space-y-2 pl-0 text-sm text-muted-foreground"
-                      aria-label="Bedtime summary"
-                    >
-                      {(result.messageBullets.length > 0 ? result.messageBullets : [result.message]).map((line, i) => (
-                        <li key={i} className="flex gap-2.5 leading-relaxed">
-                          <span
-                            className="mt-2 h-1 w-1 shrink-0 rounded-full bg-current opacity-40"
-                            aria-hidden
-                          />
-                          <span>{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+      {result && (() => {
+        const colors = getLevelColors(result.level);
+        const VerdictIcon =
+          result.level === "steady" ? CheckCircle2 : result.level === "monitor" ? AlertCircle : AlertTriangle;
+        return (
+          <Card
+            data-testid="card-bedtime-result-hero"
+            className={cn(
+              "overflow-hidden rounded-2xl border shadow-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
+              "bg-gradient-to-b",
+              colors.surface,
+              colors.border,
+            )}
+          >
+            <CardContent className="space-y-0 p-0">
+              <div className="flex items-start gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
+                <div
+                  className={cn(
+                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-inner",
+                    colors.iconWrap,
+                  )}
+                >
+                  <VerdictIcon className={cn("h-6 w-6", colors.icon)} aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Tonight&apos;s check
+                  </p>
+                  <h2
+                    className={cn("font-display text-2xl font-semibold tracking-tight", colors.title)}
+                    data-testid="text-bedtime-verdict"
+                  >
+                    {verdictLabel(result.level)}
+                  </h2>
+                  <p className="text-sm leading-relaxed text-foreground/85">{result.headline}</p>
                 </div>
               </div>
 
-              {result.snack && (
-                <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Snack idea:</span> {result.snack.grams}g fast carbs{" "}
-                    <span className="text-muted-foreground">({result.snack.reason})</span>
+              <div className="flex flex-wrap gap-2 border-y border-border/50 bg-background/40 px-5 py-3 backdrop-blur-sm dark:bg-background/25 sm:px-6">
+                <Badge variant="secondary" className={cn("rounded-lg px-2.5 py-1 font-semibold tabular-nums", colors.chip)}>
+                  {result.bgGlance.display}
+                </Badge>
+                <Badge variant="outline" className="rounded-lg border-border/60 bg-background/50 px-2.5 py-1 text-xs">
+                  {result.bgGlance.trendLabel}
+                </Badge>
+                <Badge variant="outline" className="rounded-lg border-border/60 bg-background/50 px-2.5 py-1 text-xs">
+                  {result.bgGlance.rangeLabel}
+                </Badge>
+              </div>
+
+              <div className="space-y-3 px-5 py-4 sm:px-6 sm:py-5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What to do</p>
+                <ol className="space-y-2.5" aria-label="Bedtime guidance">
+                  {result.guidance.map((line, i) => (
+                    <li key={line} className="flex gap-3 text-sm leading-relaxed text-foreground/90">
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                          colors.iconWrap,
+                        )}
+                        aria-hidden
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 pt-0.5">{line}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {result.snack ? (
+                <div className="mx-5 mb-5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 sm:mx-6 sm:mb-6">
+                  <p className="text-sm font-medium text-foreground">Optional snack</p>
+                  <p className="mt-0.5 text-sm text-foreground/90">
+                    <span className="font-semibold tabular-nums">{result.snack.grams}g</span> fast carbs
+                    <span className="text-muted-foreground"> — {result.snack.reason}</span>
                   </p>
                 </div>
-              )}
-            </>
-          }
-        />
-      )}
+              ) : null}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {result ? (
-        <div className="-mt-2">
+        <div className="-mt-1">
           <Button
             type="button"
             variant="outline"
-            className="w-full justify-between"
+            className="h-11 w-full justify-between rounded-xl border-border/60 bg-card/80"
             onClick={() => setDetailsOpen((v) => !v)}
             data-testid="button-open-details-top"
           >
-            <span>{detailsOpen ? "Hide details" : "Show details"}</span>
+            <span>{detailsOpen ? "Hide factor breakdown" : "Why we said this"}</span>
             {detailsOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
           </Button>
         </div>
@@ -1051,14 +1051,19 @@ export default function Bedtime() {
       {result ? (
         <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
           <CollapsibleContent>
-            <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-factors">
-              <CardContent className="p-5 md:p-6 space-y-3">
-                <h3 className="font-semibold text-foreground">Factors</h3>
+            <Card className="rounded-2xl border-border/60 shadow-sm" data-testid="card-bedtime-factors">
+              <CardContent className="space-y-4 p-5 md:p-6">
+                <div>
+                  <h3 className="font-semibold text-foreground">Why we said this</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Factor breakdown from your check — change inputs above and run again to update.
+                  </p>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2" data-testid="container-bedtime-factors">
                   {result.factors.map((factor, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-3"
+                      className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/80 px-3 py-3 shadow-sm"
                       data-testid={`card-factor-${i}`}
                     >
                       <div className="mt-0.5 shrink-0">{getStatusIcon(factor.status)}</div>
@@ -1136,6 +1141,9 @@ export default function Bedtime() {
                 <h3 id="bedtime-section-glucose" className="text-[11px] font-semibold uppercase tracking-wider text-indigo-800 dark:text-indigo-200">
                   Glucose now
                 </h3>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  Your reading and whether it is stable, rising, or falling — we use both for overnight risk, not for dosing.
+                </p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="current-bg" className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -1225,7 +1233,7 @@ export default function Bedtime() {
                   Food & insulin
                 </h3>
                 <p className="text-xs text-muted-foreground leading-snug">
-                  Pick the closest options — the bedtime summary uses them to describe digestion and active mealtime insulin in your own words.
+                  How long since you ate and took rapid insulin — helps estimate food still digesting and insulin still working overnight.
                 </p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -1299,6 +1307,9 @@ export default function Bedtime() {
                 <h3 id="bedtime-section-sleep" className="text-[11px] font-semibold uppercase tracking-wider text-violet-900 dark:text-violet-100/90">
                   Tonight
                 </h3>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.
+                </p>
                 <div className="space-y-2">
                   <Label htmlFor="hours-sleep" className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-violet-700 dark:text-violet-300">
@@ -1328,28 +1339,49 @@ export default function Bedtime() {
               >
                 <div className="border-b border-border/50 bg-muted/25 px-4 py-2.5 dark:bg-muted/15">
                   <p className="text-xs font-medium text-muted-foreground">Anything else affecting tonight?</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/90">
+                    These switches shape your summary — they are only saved if you tap Save check.
+                  </p>
                 </div>
                 <div className="divide-y divide-border/50">
-                  <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    <Label htmlFor="exercised" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                      <Activity className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                      Exercised today?
-                    </Label>
-                    <Switch id="exercised" checked={exercisedToday} onCheckedChange={setExercisedToday} data-testid="switch-exercised" />
+                  <div className="flex items-start justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0 pr-2">
+                      <Label htmlFor="exercised" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                        <Activity className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                        Exercised today?
+                      </Label>
+                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
+                        Workouts can raise hypo risk for many hours overnight.
+                      </p>
+                      {lastExerciseLabel ? (
+                        <p className="mt-0.5 pl-6 text-[11px] text-muted-foreground/80">Detected: {lastExerciseLabel}</p>
+                      ) : null}
+                    </div>
+                    <Switch id="exercised" checked={exercisedToday} onCheckedChange={setExercisedToday} data-testid="switch-exercised" className="mt-0.5 shrink-0" />
                   </div>
-                  <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    <Label htmlFor="alcohol" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                      <Wine className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-                      Had alcohol?
-                    </Label>
-                    <Switch id="alcohol" checked={hadAlcohol} onCheckedChange={setHadAlcohol} data-testid="switch-alcohol" />
+                  <div className="flex items-start justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0 pr-2">
+                      <Label htmlFor="alcohol" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                        <Wine className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                        Had alcohol?
+                      </Label>
+                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
+                        Alcohol can delay lows — we weigh this more heavily than hypos alone.
+                      </p>
+                    </div>
+                    <Switch id="alcohol" checked={hadAlcohol} onCheckedChange={setHadAlcohol} data-testid="switch-alcohol" className="mt-0.5 shrink-0" />
                   </div>
-                  <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    <Label htmlFor="recent-hypos" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" aria-hidden />
-                      Any recent hypos?
-                    </Label>
-                    <Switch id="recent-hypos" checked={recentHypos} onCheckedChange={setRecentHypos} data-testid="switch-recent-hypos" />
+                  <div className="flex items-start justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0 pr-2">
+                      <Label htmlFor="recent-hypos" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" aria-hidden />
+                        Any recent hypos?
+                      </Label>
+                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
+                        A hypo in roughly the last 24 hours. On its own this usually means caution, not needs attention, unless glucose is low or falling too.
+                      </p>
+                    </div>
+                    <Switch id="recent-hypos" checked={recentHypos} onCheckedChange={setRecentHypos} data-testid="switch-recent-hypos" className="mt-0.5 shrink-0" />
                   </div>
                 </div>
               </section>

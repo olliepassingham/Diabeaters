@@ -131,6 +131,38 @@
     box-shadow: var(--shadow-sm);
   }
 
+  /* Ask Beatie CTA — halo on wrapper so hover-elevate on the button does not wipe it */
+  .coach-entry-glow {
+    box-shadow:
+      0 0 0 1px rgb(var(--color-primary) / 0.32),
+      0 0 22px 3px rgb(var(--color-primary) / 0.38),
+      0 10px 28px -8px rgb(var(--color-primary) / 0.48);
+    transition: box-shadow var(--app-motion-duration) var(--app-motion-ease);
+  }
+
+  .dark .coach-entry-glow {
+    box-shadow:
+      0 0 0 1px rgb(var(--color-primary) / 0.42),
+      0 0 28px 6px rgb(var(--color-primary) / 0.5),
+      0 12px 32px -6px rgb(var(--color-primary) / 0.58);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .coach-entry-glow:hover {
+      box-shadow:
+        0 0 0 1px rgb(var(--color-primary) / 0.4),
+        0 0 30px 8px rgb(var(--color-primary) / 0.48),
+        0 12px 32px -6px rgb(var(--color-primary) / 0.55);
+    }
+
+    .dark .coach-entry-glow:hover {
+      box-shadow:
+        0 0 0 1px rgb(var(--color-primary) / 0.5),
+        0 0 36px 10px rgb(var(--color-primary) / 0.58),
+        0 14px 36px -4px rgb(var(--color-primary) / 0.65);
+    }
+  }
+
   /* Apply to any tile/card/button-like surface */
   .pressable {
     -webkit-tap-highlight-color: transparent;
