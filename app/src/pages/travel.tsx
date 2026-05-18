@@ -1235,6 +1235,12 @@ export default function Travel() {
     });
   };
 
+  const handleActiveTripStyleChange = (tripStyle: TravelTripStyle) => {
+    const next = { ...plan, tripStyle };
+    setPlan(next);
+    storage.saveTravelPlan(next);
+  };
+
   const updatePackingItem = (index: number) => {
     setPackingList(prev => {
       const updated = [...prev];
@@ -1466,6 +1472,23 @@ export default function Travel() {
                     </p>
                   </div>
                 </div>
+                {(!plan.tripStyle || plan.tripStyle === "not_sure") && (
+                  <div className="space-y-1.5 border-t border-border/60 pt-2" data-testid="overview-trip-style-nudge">
+                    <p className="text-xs text-muted-foreground">Add trip type for better daily tips.</p>
+                    <Select value={plan.tripStyle ?? "not_sure"} onValueChange={handleActiveTripStyleChange}>
+                      <SelectTrigger className="h-9 text-sm" data-testid="select-overview-trip-style">
+                        <SelectValue placeholder="Choose the closest match" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="relax">Relaxing</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="city">City break</SelectItem>
+                        <SelectItem value="remote">Remote</SelectItem>
+                        <SelectItem value="family">Family visit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"

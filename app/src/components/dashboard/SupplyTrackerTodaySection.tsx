@@ -22,7 +22,7 @@ import {
   type Supply,
   type ScenarioState,
 } from "@/lib/storage";
-import { getTodayGlanceLine } from "@/lib/dashboard-health-status";
+import { getTodayGlanceLine, shouldOmitHeroGlanceLineDuplicatingTodayCard } from "@/lib/dashboard-health-status";
 import { collectAllActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
 
@@ -345,7 +345,6 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
         }),
     [supplies],
   );
-  const hasActiveScenario = scenarioState.travelModeActive || scenarioState.sickDayActive;
   const hour = new Date().getHours();
   const isEvening = hour >= 19 || hour < 6;
 
@@ -385,6 +384,7 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
   const holidayPrep: HolidayPrep | null = storage.getHolidayPrep?.() ?? null;
   const departDays = holidayPrep ? daysUntil(holidayPrep.departureDate) : null;
   const showTripCountdown = holidayPrep && departDays !== null && departDays >= 0 && departDays <= 7;
+  const showTravelCard = Boolean(showTripCountdown) || scenarioState.travelModeActive;
   const travelPlan: unknown = storage.getTravelPlan?.() ?? null;
   const travelType =
     travelPlan &&
@@ -395,6 +395,30 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
       ((travelPlan as { travelType?: unknown }).travelType as string) === "international")
       ? ((travelPlan as { travelType?: unknown }).travelType as "domestic" | "international")
       : null;
+  const travelDestination =
+    holidayPrep?.destination?.trim() ||
+    scenarioState.travelDestination?.trim() ||
+    (travelPlan &&
+    typeof travelPlan === "object" &&
+    "destination" in travelPlan &&
+    typeof (travelPlan as { destination?: unknown }).destination === "string"
+      ? (travelPlan as { destination: string }).destination.trim()
+      : "") ||
+    "Trip";
+  const travelSubtitleParts: string[] = [];
+  if (showTripCountdown && departDays !== null) {
+    travelSubtitleParts.push(departDays === 0 ? "Departs today" : `Departs in ${departDays}d`);
+  }
+  if (scenarioState.travelModeActive) {
+    travelSubtitleParts.push(
+      scenarioState.travelEndDate
+        ? `Active until ${new Date(scenarioState.travelEndDate).toLocaleDateString("en-GB")}`
+        : "Travel mode active",
+    );
+  }
+  const travelSubtitle = travelSubtitleParts.join(" · ");
+  const omitTravelStatusBanner =
+    showTravelCard && shouldOmitHeroGlanceLineDuplicatingTodayCard(status, supplies, scenarioState);
 
   const supplyBlock = (
     <div
@@ -480,7 +504,7 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
         </Link>
 
         <div className="flex flex-col gap-2">
-          {omitDuplicateStockBanner ? (
+          {omitDuplicateStockBanner || omitTravelStatusBanner ? (
             <span className="sr-only" data-testid="text-today-status">
               {status.message}
             </span>
@@ -507,7 +531,7 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
             </div>
           )}
 
-          {showTripCountdown ? (
+          {showTravelCard ? (
             <div data-testid="dashboard-today-extras">
               <Link href="/scenarios/travel" className="block">
                 <div
@@ -516,31 +540,22 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
                 >
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Travel</p>
                   <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-foreground">
-                    {holidayPrep?.destination?.trim()
-                      ? `${holidayPrep.destination.trim()}${travelType ? ` (${travelType})` : ""}`
-                      : "Trip coming up"}
+                    {travelDestination}
+                    {travelType ? ` (${travelType})` : ""}
                   </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {departDays === 0 ? "Departs today" : `Departs in ${departDays}d`}
-                  </p>
+                  {travelSubtitle ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground" data-testid="text-travel-card-subtitle">
+                      {travelSubtitle}
+                    </p>
+                  ) : null}
                 </div>
               </Link>
             </div>
           ) : null}
 
-          {hasActiveScenario ? (
-            <div className="flex flex-col gap-1.5">
-              {scenarioState.travelModeActive && (
-                <div className="rounded-lg bg-blue-50/90 px-2.5 py-2 text-sm leading-snug text-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
-                  Travel mode until{" "}
-                  {scenarioState.travelEndDate ? new Date(scenarioState.travelEndDate).toLocaleDateString("en-GB") : "unspecified"}
-                </div>
-              )}
-              {scenarioState.sickDayActive && (
-                <div className="rounded-lg bg-orange-50/90 px-2.5 py-2 text-sm leading-snug text-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
-                  Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
-                </div>
-              )}
+          {scenarioState.sickDayActive ? (
+            <div className="rounded-lg bg-orange-50/90 px-2.5 py-2 text-sm leading-snug text-orange-900 dark:bg-orange-950/40 dark:text-orange-100">
+              Sick day — {scenarioState.sickDaySeverity || "moderate"} severity
             </div>
           ) : null}
 

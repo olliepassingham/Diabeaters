@@ -40,9 +40,34 @@ const TRIP_STYLE_LABELS: Record<TravelTripStyle, string> = {
   not_sure: "General",
 };
 
+const TRIP_STYLE_FOCUS: Record<Exclude<TravelTripStyle, "not_sure">, string> = {
+  relax: "Keep hypos cool; don't skip checks in the heat.",
+  active: "Keep fast carbs handy between activity.",
+  city: "Late meals are common — plan when to check.",
+  remote: "Treat spares as essential, not optional.",
+  family: "Agree a simple hypo plan with people you're with.",
+};
+
+const TRIP_STYLE_COACH_STEM: Record<Exclude<TravelTripStyle, "not_sure">, string> = {
+  relax: "downtime, heat, and keeping a steady check routine",
+  active: "activity, hypos, and recovery between sessions",
+  city: "eating out, walking lots, and irregular mealtimes",
+  remote: "limited shops, backups, and emergency access",
+  family: "shared meals, routine changes, and telling people your hypo plan",
+};
+
 export function tripStyleLabel(style: TravelTripStyle | undefined): string | null {
   if (!style || style === "not_sure") return null;
   return TRIP_STYLE_LABELS[style];
+}
+
+function styleTodayFocus(plan: ActiveTravelPlanSlice): string | null {
+  const style = plan.tripStyle;
+  if (!style || style === "not_sure") return null;
+  if (style === "remote" && (plan.accessRisk === "limited" || plan.accessRisk === "unsure")) {
+    return null;
+  }
+  return TRIP_STYLE_FOCUS[style];
 }
 
 export function buildActiveTravelTripProfileChips(plan: ActiveTravelPlanSlice): TripProfileChip[] {
@@ -94,10 +119,21 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
     return "Aim for your local routine.";
   }
 
-  if (plan.tripStyle === "active") return "Keep fast carbs handy between activity.";
-  if (plan.tripStyle === "remote" || plan.accessRisk === "limited") return "Keep full backups on you.";
-  if (plan.weatherChange === "warmer") return "Keep hypos cool and within reach.";
-  if (plan.weatherChange === "colder") return "Warm up meters/CGM before trusting readings.";
+  if (plan.accessRisk === "limited" || plan.accessRisk === "unsure") {
+    return "Keep full backups on you.";
+  }
+
+  if (plan.weatherChange === "colder") {
+    return "Warm up meters/CGM before trusting readings.";
+  }
+
+  if (plan.weatherChange === "warmer") {
+    return "Keep hypos cool and within reach.";
+  }
+
+  const styleFocus = styleTodayFocus(plan);
+  if (styleFocus) return styleFocus;
+
   if (dayNumber <= 2) return "Decide where your kit lives on this trip.";
   return "Spares on you, not only at the hotel.";
 }
@@ -109,6 +145,10 @@ export function buildActiveTravelCoachPrompt(input: ActiveTravelProgressInput): 
     .map((c) => c.label)
     .join(", ");
   const focus = buildActiveTravelTodayFocus(input);
+  const style = plan.tripStyle;
+  const styleLabel = tripStyleLabel(style);
+  const styleStem =
+    style && style !== "not_sure" ? TRIP_STYLE_COACH_STEM[style] : null;
 
   let tripPhase: string;
   if (hasEnded) tripPhase = "My trip has just ended.";
@@ -121,12 +161,17 @@ export function buildActiveTravelCoachPrompt(input: ActiveTravelProgressInput): 
     tripPhase = `I'm on day ${dayNumber} of ${totalDays}.`;
   }
 
+  const question = styleStem
+    ? `What should I keep in mind for ${styleStem}?`
+    : "What else should I keep in mind today?";
+
   const parts = [
     tripPhase,
     dest ? `Destination: ${dest}.` : null,
-    chips ? `Trip: ${chips}.` : null,
+    styleLabel ? `Trip type: ${styleLabel}.` : null,
+    chips ? `Also: ${chips}.` : null,
     `Today's focus in the app: ${focus}`,
-    "What else should I keep in mind today?",
+    question,
   ].filter(Boolean);
 
   return parts.join(" ").slice(0, 500);

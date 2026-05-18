@@ -44,18 +44,64 @@ describe("buildActiveTravelTodayFocus", () => {
     expect(focus.split(".").length).toBeLessThanOrEqual(2);
   });
 
-  it("prioritises heat over generic day-1 copy", () => {
+  it("prioritises heat over relax style on day 1", () => {
     const focus = buildActiveTravelTodayFocus({ ...baseInput, dayNumber: 1 });
     expect(focus.toLowerCase()).toMatch(/cool|hypos/);
   });
 
-  it("prioritises limited pharmacies", () => {
+  it("prioritises limited pharmacies over relax style", () => {
     const focus = buildActiveTravelTodayFocus({
       ...baseInput,
       dayNumber: 1,
-      plan: { ...basePlan, weatherChange: "similar" as const, accessRisk: "limited" },
+      plan: {
+        ...basePlan,
+        weatherChange: "similar" as const,
+        accessRisk: "limited",
+        tripStyle: "relax",
+      },
     });
     expect(focus.toLowerCase()).toContain("backup");
+  });
+
+  it("uses city style when no higher-priority signals", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 3,
+      plan: {
+        ...basePlan,
+        weatherChange: "similar" as const,
+        tripStyle: "city",
+      },
+    });
+    expect(focus.toLowerCase()).toMatch(/late meals|check/);
+  });
+
+  it("uses family style when no higher-priority signals", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 3,
+      plan: {
+        ...basePlan,
+        weatherChange: "unknown" as const,
+        tripStyle: "family",
+      },
+    });
+    expect(focus.toLowerCase()).toMatch(/hypo plan/);
+  });
+
+  it("timezone beats trip style", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 1,
+      plan: {
+        ...basePlan,
+        timezoneChange: "major" as const,
+        timezoneHours: 6,
+        timezoneDirection: "east" as const,
+        tripStyle: "city",
+      },
+    });
+    expect(focus.toLowerCase()).toMatch(/time zone|basal|extra checks/);
   });
 
   it("guides pre-departure briefly", () => {
@@ -74,5 +120,23 @@ describe("buildActiveTravelCoachPrompt", () => {
     const q = buildActiveTravelCoachPrompt({ ...baseInput, dayNumber: 2 });
     expect(q).toContain("Morocco");
     expect(q.length).toBeLessThanOrEqual(500);
+  });
+
+  it("includes trip type and style-specific question for city breaks", () => {
+    const q = buildActiveTravelCoachPrompt({
+      ...baseInput,
+      dayNumber: 2,
+      plan: { ...basePlan, tripStyle: "city", weatherChange: "similar" as const },
+    });
+    expect(q).toContain("Trip type: City break");
+    expect(q.toLowerCase()).toMatch(/eating out|irregular/);
+  });
+
+  it("includes activity stem for active holidays", () => {
+    const q = buildActiveTravelCoachPrompt({
+      ...baseInput,
+      plan: { ...basePlan, tripStyle: "active", weatherChange: "similar" as const },
+    });
+    expect(q.toLowerCase()).toMatch(/activity|hypos/);
   });
 });
