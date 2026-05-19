@@ -66,6 +66,19 @@ function shortId(id: string) {
 
 type FeedTab = "everyone" | "following";
 
+const FEED_TAB_STORAGE_KEY = "diabeater.community.feed_tab";
+
+function readStoredFeedTab(): FeedTab {
+  if (typeof window === "undefined") return "everyone";
+  try {
+    const raw = window.localStorage.getItem(FEED_TAB_STORAGE_KEY);
+    if (raw === "following" || raw === "everyone") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "everyone";
+}
+
 const PAGE_SIZE = 20;
 
 const MAX_POLL_OPTIONS = 6;
@@ -434,7 +447,7 @@ export default function CommunityHomePage() {
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
-  const [feedTab, setFeedTab] = useState<FeedTab>("everyone");
+  const [feedTab, setFeedTab] = useState<FeedTab>(() => readStoredFeedTab());
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
   const [composerTopic, setComposerTopic] = useState<CommunityTopicId>(
@@ -524,6 +537,14 @@ export default function CommunityHomePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedOnly]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FEED_TAB_STORAGE_KEY, feedTab);
+    } catch {
+      // ignore
+    }
+  }, [feedTab]);
 
   const fetchFeedPage = useCallback(
     (limit: number, cursor: FeedCursor | null) =>
@@ -1075,19 +1096,25 @@ export default function CommunityHomePage() {
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               type="button"
+              className="h-9 w-9 shrink-0 rounded-xl"
               onClick={() => setPeopleOpen(true)}
               data-testid="button-find-people"
-              aria-label="Find people"
-              title="Find people"
+              aria-label="Find people by @handle"
+              title="Find people by @handle"
             >
               <SearchIcon className="h-4 w-4" aria-hidden />
             </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/community/messages">
-                <MessageCircle className="h-4 w-4 mr-1.5" />
-                Messages
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-xl sm:hidden" asChild>
+              <Link href="/community/messages" aria-label="Messages" title="Messages">
+                <MessageCircle className="h-4 w-4" aria-hidden />
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" className="hidden h-9 rounded-xl sm:inline-flex" asChild>
+              <Link href="/community/messages" aria-label="Messages" title="Open messages">
+                <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
+                <span>Messages</span>
               </Link>
             </Button>
           </div>
@@ -1277,7 +1304,7 @@ export default function CommunityHomePage() {
         <div
           role="tablist"
           aria-label="Feed topics"
-          className="flex gap-2 overflow-x-auto rounded-xl bg-muted/25 px-1 py-1.5 dark:bg-muted/15 [scrollbar-width:thin]"
+          className="hidden flex-wrap gap-2 rounded-xl bg-muted/25 px-1 py-1.5 dark:bg-muted/15 sm:flex"
         >
           <Button
             type="button"
@@ -1301,7 +1328,7 @@ export default function CommunityHomePage() {
               aria-selected={topicFilter === t.id && !savedOnly}
               variant={topicFilter === t.id && !savedOnly ? "default" : "outline"}
               size="sm"
-              className="shrink-0 whitespace-nowrap rounded-full"
+              className="max-w-[14rem] shrink-0 whitespace-normal rounded-full text-balance text-center leading-snug"
               onClick={() => {
                 setTopicFilter(t.id);
                 setSavedOnly(false);
@@ -1312,50 +1339,21 @@ export default function CommunityHomePage() {
           ))}
         </div>
 
-        {isMobile && !feedSearchExpanded ? (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant={savedOnly ? "secondary" : "outline"}
-              size="icon"
-              className="h-9 w-9 shrink-0 rounded-xl"
-              aria-pressed={savedOnly}
-              aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
-              onClick={() => {
-                setSavedOnly((s) => {
-                  const next = !s;
-                  if (next) setTopicFilter(null);
-                  return next;
-                });
-              }}
-            >
-              <Bookmark className="h-4 w-4" aria-hidden />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-9 w-9 shrink-0 rounded-xl"
-              aria-label="Open search"
-              onClick={() => setFeedSearchExpanded(true)}
-            >
-              <SearchIcon className="h-4 w-4" aria-hidden />
-            </Button>
-          </div>
-        ) : (
-          <div className="relative">
-            <SearchIcon
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              value={feedSearch}
-              onChange={(e) => setFeedSearch(e.target.value)}
-              placeholder="Search posts and people"
-              className="pl-9 pr-20"
-              aria-label="Search feed"
-            />
-            {isMobile && feedSearchExpanded ? (
+        {isMobile && feedSearchExpanded ? (
+          <div className="space-y-2">
+            <div className="relative">
+              <SearchIcon
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                value={feedSearch}
+                onChange={(e) => setFeedSearch(e.target.value)}
+                placeholder="Search posts…"
+                className="h-9 pl-9 pr-20"
+                aria-label="Search posts"
+                title="Search posts (header search finds people by @handle)"
+              />
               <Button
                 type="button"
                 variant="ghost"
@@ -1368,17 +1366,190 @@ export default function CommunityHomePage() {
               >
                 Close
               </Button>
-            ) : null}
+            </div>
+            <div className="flex items-center gap-2 sm:hidden">
+              <div className="min-w-0 flex-1">
+                {savedOnly ? (
+                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                    Saved posts
+                  </div>
+                ) : (
+                  <Select
+                    value={topicFilter === null ? "__all" : topicFilter}
+                    onValueChange={(v) => {
+                      setSavedOnly(false);
+                      if (v === "__all") setTopicFilter(null);
+                      else if (isCommunityTopicId(v)) setTopicFilter(v);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-full" aria-label="Feed topic">
+                      <SelectValue placeholder="Topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all">All topics</SelectItem>
+                      {orderedTopics.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant={savedOnly ? "secondary" : "outline"}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-pressed={savedOnly}
+                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+                onClick={() => {
+                  setSavedOnly((s) => {
+                    const next = !s;
+                    if (next) setTopicFilter(null);
+                    return next;
+                  });
+                }}
+              >
+                <Bookmark className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+            <div className="hidden items-center justify-end gap-2 sm:flex md:hidden">
+              <Button
+                type="button"
+                variant={savedOnly ? "secondary" : "outline"}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-pressed={savedOnly}
+                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+                onClick={() => {
+                  setSavedOnly((s) => {
+                    const next = !s;
+                    if (next) setTopicFilter(null);
+                    return next;
+                  });
+                }}
+              >
+                <Bookmark className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
           </div>
-        )}
+        ) : null}
+
+        {isMobile && !feedSearchExpanded ? (
+          <>
+            <div className="flex items-center gap-2 sm:hidden">
+              <div className="min-w-0 flex-1">
+                {savedOnly ? (
+                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                    Saved posts
+                  </div>
+                ) : (
+                  <Select
+                    value={topicFilter === null ? "__all" : topicFilter}
+                    onValueChange={(v) => {
+                      setSavedOnly(false);
+                      if (v === "__all") setTopicFilter(null);
+                      else if (isCommunityTopicId(v)) setTopicFilter(v);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 w-full" aria-label="Feed topic">
+                      <SelectValue placeholder="Topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all">All topics</SelectItem>
+                      {orderedTopics.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant={savedOnly ? "secondary" : "outline"}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-pressed={savedOnly}
+                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+                onClick={() => {
+                  setSavedOnly((s) => {
+                    const next = !s;
+                    if (next) setTopicFilter(null);
+                    return next;
+                  });
+                }}
+              >
+                <Bookmark className="h-4 w-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-label="Search posts"
+                title="Search posts"
+                onClick={() => setFeedSearchExpanded(true)}
+              >
+                <SearchIcon className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+            <div className="hidden items-center justify-end gap-2 sm:flex md:hidden">
+              <Button
+                type="button"
+                variant={savedOnly ? "secondary" : "outline"}
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-pressed={savedOnly}
+                aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
+                onClick={() => {
+                  setSavedOnly((s) => {
+                    const next = !s;
+                    if (next) setTopicFilter(null);
+                    return next;
+                  });
+                }}
+              >
+                <Bookmark className="h-4 w-4" aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-xl"
+                aria-label="Search posts"
+                title="Search posts"
+                onClick={() => setFeedSearchExpanded(true)}
+              >
+                <SearchIcon className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
+          </>
+        ) : null}
 
         {!isMobile ? (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <SearchIcon
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                value={feedSearch}
+                onChange={(e) => setFeedSearch(e.target.value)}
+                placeholder="Search posts…"
+                className="h-9 pl-9 pr-3"
+                aria-label="Search posts"
+                title="Search posts (header search finds people by @handle)"
+              />
+            </div>
             <Button
               type="button"
               variant={savedOnly ? "secondary" : "outline"}
               size="sm"
-              className="rounded-full"
+              className="h-9 shrink-0 rounded-full"
               aria-pressed={savedOnly}
               aria-label={savedOnly ? "Saved posts filter on" : "Show saved posts"}
               onClick={() => {
@@ -1548,7 +1719,7 @@ export default function CommunityHomePage() {
         searchQuery={feedSearch}
         pageSize={PAGE_SIZE}
         topicsForSelect={orderedTopics}
-        showRefreshButton
+        showRefreshButton={!isMobile}
         feedTab={feedTab}
         topicFilter={topicFilter}
         followingAuthorIds={followingAuthorIds}

@@ -606,7 +606,7 @@ export function FeedPostCard({
 
   return (
     <Card className="pressable card-interactive">
-      <CardContent className="pt-4 space-y-2">
+      <CardContent className="space-y-1.5 pt-3 sm:space-y-2 sm:pt-4">
         <div className="flex gap-3">
           <CommunityAuthorAvatar
             displayName={authorDisplayName}
@@ -615,24 +615,27 @@ export function FeedPostCard({
           />
           <div className="min-w-0 flex-1">
             <div className="flex justify-between gap-2 text-xs text-muted-foreground items-start">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 {authorLoading ? (
                   <div className="space-y-1">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-3 w-24" />
                   </div>
                 ) : (
-                  <>
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                     <Link
                       href={`/community/profile/${post.author_id}`}
-                      className="font-medium text-foreground truncate hover:underline underline-offset-2 block"
+                      className="max-w-full shrink font-medium text-foreground truncate hover:underline underline-offset-2"
                     >
                       {authorDisplayName}
                     </Link>
                     {authorPublicHandle?.trim() ? (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">@{authorPublicHandle.trim()}</p>
+                      <span className="shrink-0 text-muted-foreground">@{authorPublicHandle.trim()}</span>
                     ) : null}
-                  </>
+                    <span className="shrink-0 whitespace-nowrap text-muted-foreground" title={post.created_at}>
+                      · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
                 )}
               </div>
               <span className="flex shrink-0 items-center gap-1">
@@ -682,9 +685,6 @@ export function FeedPostCard({
                     </Link>
                   </Button>
                 ) : null}
-                <span title={post.created_at}>
-                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                </span>
               </span>
             </div>
             <div className="mt-1.5 max-w-full">
@@ -706,7 +706,9 @@ export function FeedPostCard({
             if (pollExtra && b === pollExtra.question.trim()) return null;
             if (eventExtra && b === eventExtra.title.trim()) return null;
             return (
-              <p className="text-sm whitespace-pre-wrap">{renderBodyWithMentions(post.body, post.mention_map)}</p>
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap sm:text-sm sm:leading-normal">
+                {renderBodyWithMentions(post.body, post.mention_map)}
+              </p>
             );
           })()}
           {eventExtra ? (
@@ -760,7 +762,7 @@ export function FeedPostCard({
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
           <div
-            className="flex flex-wrap items-center gap-0.5 border-t border-border/50 pt-2"
+            className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-1.5 sm:gap-0.5 sm:pt-2"
             data-testid="post-engagement-row"
           >
             <div className="flex items-center gap-0">
