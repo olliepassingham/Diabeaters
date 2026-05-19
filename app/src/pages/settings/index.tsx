@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   storage,
   UserProfile,
@@ -125,7 +126,7 @@ function ProfileTab({
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          {deliveryMethod === "pump" ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
+          {isPumpDeliveryMethod(deliveryMethod) ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
         </p>
       </div>
       <div className="space-y-1.5">
@@ -1057,7 +1058,7 @@ export default function Settings() {
     });
   };
 
-  const isPumpUser = deliveryMethod === "pump";
+  const isPumpUser = isPumpDeliveryMethod(deliveryMethod);
 
   const handleNotifToggle = (key: keyof NotificationSettings, value: boolean) => {
     const updated = { ...notifSettings, [key]: value };

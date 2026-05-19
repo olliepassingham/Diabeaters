@@ -1,8 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Drawer } from "vaul";
 import { Capacitor } from "@capacitor/core";
-import { Camera, type GalleryPhoto } from "@capacitor/camera";
 import {
   BarChart2,
   Bookmark,
@@ -15,8 +24,11 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
-import { FeedPostList } from "@/components/community/feed-post-list";
+import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
+
+const FeedPostList = lazy(() =>
+  import("@/components/community/feed-post-list").then((m) => ({ default: m.FeedPostList })),
+);
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -59,6 +71,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
+
+const CommunityFeedComposerDrawerLazy = lazy(() =>
+  import("./community-feed-composer-drawer").then((m) => ({ default: m.CommunityFeedComposerDrawer })),
+);
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -501,6 +517,12 @@ export default function CommunityHomePage() {
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
 
+  const feedCacheScope = useMemo(
+    () =>
+      ["main", feedTab, topicFilter ?? "_", savedOnly ? "s" : "a", feedSearch.trim(), String(feedListKey)].join(":"),
+    [feedTab, topicFilter, savedOnly, feedSearch, feedListKey],
+  );
+
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
 
@@ -867,8 +889,9 @@ export default function CommunityHomePage() {
       const remaining = Math.max(0, MAX_POST_IMAGES - composerFiles.length);
       if (remaining <= 0) return;
 
+      const { Camera } = await import("@capacitor/camera");
       const res = await Camera.pickImages({ limit: remaining });
-      const photos: GalleryPhoto[] = res?.photos ?? [];
+      const photos = res?.photos ?? [];
       if (photos.length === 0) return;
 
       const newFiles: File[] = [];
@@ -1667,92 +1690,62 @@ export default function CommunityHomePage() {
       ) : null}
 
       {isMobile ? (
-        <Drawer.Root
-          open={composerSheetOpen}
-          onOpenChange={setComposerSheetOpen}
-          handleOnly
-          shouldScaleBackground={false}
-        >
-          <Drawer.Portal>
-            <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
-            <Drawer.Content
-              className={cn(
-                "fixed inset-x-0 bottom-0 z-[110] flex h-[min(92dvh,calc(100dvh-0.5rem))] max-h-[100dvh] flex-col overflow-hidden rounded-t-3xl border-t border-border/60 bg-background p-0 pt-2 text-foreground shadow-2xl outline-none",
-              )}
+        <Suspense fallback={null}>
+          <CommunityFeedComposerDrawerLazy open={composerSheetOpen} onOpenChange={setComposerSheetOpen}>
+            <form
+              onSubmit={handlePost}
+              className="space-y-3 pb-2 text-foreground"
+              data-testid="feed-composer-form-sheet"
+              id="feed-composer-form-sheet"
             >
-              <div className="flex shrink-0 flex-col items-center px-4 pb-2 pt-1">
-                <Drawer.Handle
-                  className="!h-1 !w-12 shrink-0 !rounded-full !bg-muted-foreground/40"
-                  aria-label="Drag down to close"
-                />
-              </div>
-              <div className="relative shrink-0 space-y-1 px-4 pb-2 text-left">
-                <Drawer.Close className="absolute right-1 top-0 rounded-sm p-2 text-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                  <X className="h-5 w-5" aria-hidden />
-                  <span className="sr-only">Close</span>
-                </Drawer.Close>
-                <Drawer.Title className="font-display pr-11 text-lg tracking-tight text-foreground">
-                  New post
-                </Drawer.Title>
-                <Drawer.Description className="text-sm text-muted-foreground">
-                  Share with the community. Add photos, a poll, or an event.
-                </Drawer.Description>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
-                <form
-                  onSubmit={handlePost}
-                  className="space-y-3 pb-2 text-foreground"
-                  data-testid="feed-composer-form-sheet"
-                  id="feed-composer-form-sheet"
-                >
-                  <FeedComposerFormBody {...feedComposerFormBodyProps} />
-                </form>
-              </div>
-            </Drawer.Content>
-          </Drawer.Portal>
-        </Drawer.Root>
+              <FeedComposerFormBody {...feedComposerFormBodyProps} />
+            </form>
+          </CommunityFeedComposerDrawerLazy>
+        </Suspense>
       ) : null}
 
-      <FeedPostList
-        key={feedListKey}
-        viewerId={user?.id}
-        searchQuery={feedSearch}
-        pageSize={PAGE_SIZE}
-        topicsForSelect={orderedTopics}
-        showRefreshButton={!isMobile}
-        feedTab={feedTab}
-        topicFilter={topicFilter}
-        followingAuthorIds={followingAuthorIds}
-        searchMatchedAuthorIds={searchMatchedAuthorIds}
-        savedOnly={savedOnly}
-        feedListRevision={feedListKey}
-        onOpenFindPeople={() => setPeopleOpen(true)}
-        onSwitchToEveryone={() => {
-          setFeedTab("everyone");
-          setTopicFilter(null);
-          setSavedOnly(false);
-        }}
-        onClearSearch={() => {
-          setFeedSearch("");
-          setFeedSearchExpanded(false);
-        }}
-        onExploreTopicInEveryone={(tid) => {
-          setFeedTab("everyone");
-          setTopicFilter(tid);
-          setSavedOnly(false);
-        }}
-        emptyStateTitle="Nothing here yet"
-        emptyStateDescription={
-          feedTab === "following"
-            ? topicFilter
-              ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
-              : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
-            : topicFilter
-              ? "No posts in this topic yet. Try another topic or be the first to post here."
-              : "No posts yet. Be the first to post."
-        }
-        fetchPage={fetchFeedPage}
-      />
+      <Suspense key={feedListKey} fallback={<FeedLoadingSkeleton rows={5} />}>
+        <FeedPostList
+          viewerId={user?.id}
+          scopeKey={feedCacheScope}
+          searchQuery={feedSearch}
+          pageSize={PAGE_SIZE}
+          topicsForSelect={orderedTopics}
+          showRefreshButton={!isMobile}
+          feedTab={feedTab}
+          topicFilter={topicFilter}
+          followingAuthorIds={followingAuthorIds}
+          searchMatchedAuthorIds={searchMatchedAuthorIds}
+          savedOnly={savedOnly}
+          feedListRevision={feedListKey}
+          onOpenFindPeople={() => setPeopleOpen(true)}
+          onSwitchToEveryone={() => {
+            setFeedTab("everyone");
+            setTopicFilter(null);
+            setSavedOnly(false);
+          }}
+          onClearSearch={() => {
+            setFeedSearch("");
+            setFeedSearchExpanded(false);
+          }}
+          onExploreTopicInEveryone={(tid) => {
+            setFeedTab("everyone");
+            setTopicFilter(tid);
+            setSavedOnly(false);
+          }}
+          emptyStateTitle="Nothing here yet"
+          emptyStateDescription={
+            feedTab === "following"
+              ? topicFilter
+                ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
+                : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
+              : topicFilter
+                ? "No posts in this topic yet. Try another topic or be the first to post here."
+                : "No posts yet. Be the first to post."
+          }
+          fetchPage={fetchFeedPage}
+        />
+      </Suspense>
     </PageShell>
   );
 }

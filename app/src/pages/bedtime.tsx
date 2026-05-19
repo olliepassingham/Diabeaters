@@ -11,7 +11,8 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { storage, UserSettings, ScenarioState, BedtimeLog } from "@/lib/storage";
+import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -162,7 +163,7 @@ export default function Bedtime() {
   const [result, setResult] = useState<ReadinessResult | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aboutCheckOpen, setAboutCheckOpen] = useState(false);
@@ -199,10 +200,16 @@ export default function Bedtime() {
   }, []);
 
   useEffect(() => {
+    const onProfile = () => setProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
+  useEffect(() => {
     setAlarmNotification(readBedtimeAlarm());
   }, []);
 
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
   const getTargetRange = () => {
     if (userSettings?.targetBgLow && userSettings?.targetBgHigh) {

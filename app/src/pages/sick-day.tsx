@@ -21,7 +21,9 @@ import {
   SickDayMedicationLogEntry,
   SickDayMedicationDoseLogEntry,
   SickDayTemperatureEntry,
+  DIABEATER_PROFILE_CHANGED_EVENT,
 } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -511,7 +513,7 @@ export default function SickDay() {
     if (profile?.bgUnits) {
       setBgUnits(profile.bgUnits);
     }
-    setIsPumpUser(profile?.insulinDeliveryMethod === "pump");
+    setIsPumpUser(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
 
     setSupplies(storage.getSupplies());
 
@@ -544,6 +546,15 @@ export default function SickDay() {
     } else {
       localStorage.removeItem(SICK_DAY_STORAGE_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => {
+      const p = storage.getProfile();
+      setIsPumpUser(isPumpDeliveryMethod(p?.insulinDeliveryMethod));
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   useEffect(() => {

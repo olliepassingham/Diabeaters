@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { storage, type UserProfile } from "@/lib/storage";
+import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
 import {
   formatTargetBgInput,
@@ -87,6 +88,15 @@ export default function HypoHelpPage() {
       setTargetPrefilledFromRange(true);
     }
     setLastHypoDetail(lastHypoWithDetail(storage.getHypoTreatments()));
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => {
+      const p = storage.getProfile();
+      if (p) setProfile(p);
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   const calculateHypoTreatment = () => {
@@ -342,7 +352,7 @@ export default function HypoHelpPage() {
                   </div>
                 </Alert>
               )}
-              {profile?.insulinDeliveryMethod === "pump" && (
+              {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && (
                 <Alert data-testid="alert-hypo-pump-note">
                   <AlertDescription className="text-sm">
                     On a pump: an <strong>extended bolus</strong> or recent correction may still be bringing your BG

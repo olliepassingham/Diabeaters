@@ -52,6 +52,7 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -1138,7 +1139,7 @@ function PathDataSuppliesStep({
   pathCare: CareContext;
 }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
-  const isPump = data.insulinDeliveryMethod === "pump";
+  const isPump = isPumpDeliveryMethod(data.insulinDeliveryMethod);
   const defaultSuppliesTab = isPump ? "basics" : "usage";
   const [suppliesTab, setSuppliesTab] = useState(defaultSuppliesTab);
   const optionalTone = cn("text-xs sm:text-sm", supporterHeavy && "opacity-80");

@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, BookOpen, HeartPulse, Phone, ShieldAlert, User } from "lucide-react";
 import { Link } from "wouter";
-import { storage, UserProfile } from "@/lib/storage";
+import { storage, UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { useProfile } from "@/lib/profile";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
@@ -24,6 +25,12 @@ export default function HelpNow() {
     setProfile(storage.getProfile());
   }, []);
 
+  useEffect(() => {
+    const onProfile = () => setProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
   const primaryContact = toLegacyPrimaryContact(emergency);
   const displayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
 
@@ -35,7 +42,7 @@ export default function HelpNow() {
     handleCall("999");
   };
 
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
   const quickSymptoms = useMemo(
     () => ["Shaking", "Sweating", "Confused", "Slurred speech", "Drowsy", "Pale"],

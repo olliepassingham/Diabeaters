@@ -64,8 +64,11 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
 
   const idm = data.insulin_delivery_method;
   let insulin_delivery_method: string | null | undefined;
-  if (idm === "pen" || idm === "pump") insulin_delivery_method = idm;
-  else if (idm === null) insulin_delivery_method = null;
+  if (typeof idm === "string") {
+    const m = idm.trim().toLowerCase();
+    if (m === "pen" || m === "pump") insulin_delivery_method = m;
+    else insulin_delivery_method = null;
+  } else if (idm === null) insulin_delivery_method = null;
   else if (idm === undefined) insulin_delivery_method = undefined;
   else insulin_delivery_method = null;
 
@@ -388,10 +391,13 @@ export async function updateProfile(
   if (insulin_delivery_method !== undefined) {
     if (insulin_delivery_method === null) {
       update.insulin_delivery_method = null;
-    } else if (insulin_delivery_method === "pen" || insulin_delivery_method === "pump") {
-      update.insulin_delivery_method = insulin_delivery_method;
     } else {
-      update.insulin_delivery_method = null;
+      const m = String(insulin_delivery_method).trim().toLowerCase();
+      if (m === "pen" || m === "pump") {
+        update.insulin_delivery_method = m;
+      } else {
+        update.insulin_delivery_method = null;
+      }
     }
   }
   if (tdd !== undefined) {

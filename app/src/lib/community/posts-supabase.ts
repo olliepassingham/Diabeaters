@@ -831,7 +831,7 @@ export async function insertCommunityPost(
 
 export async function fetchCommentsForPost(
   postId: string,
-  options?: { limit?: number },
+  options?: { limit?: number; order?: "asc" | "desc" },
 ): Promise<{
   data: CommunityPostCommentRow[] | null;
   error: Error | null;
@@ -839,11 +839,13 @@ export async function fetchCommentsForPost(
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
 
+  const ascending = options?.order !== "desc";
+
   let q = supabase
     .from("community_post_comments")
     .select("*")
     .eq("post_id", postId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending });
 
   const lim = options?.limit;
   if (typeof lim === "number" && lim > 0) {

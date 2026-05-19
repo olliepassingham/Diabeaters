@@ -17,6 +17,7 @@ import {
   type PharmacyHoursDay,
   type UserProfile,
 } from "@/lib/storage";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 
 /** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
@@ -30,7 +31,9 @@ export function isMissingProfileColumnSchemaError(message: string, column: strin
 }
 
 function normalizeDeliveryFromCloud(raw: unknown): "pen" | "pump" | null {
-  if (raw === "pen" || raw === "pump") return raw;
+  if (typeof raw !== "string") return null;
+  const m = raw.trim().toLowerCase();
+  if (m === "pen" || m === "pump") return m;
   return null;
 }
 
@@ -269,8 +272,11 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
   const p = storage.getProfile();
   const s = storage.getSettings();
 
-  const insulin_delivery_method: "pen" | "pump" | undefined =
-    p?.insulinDeliveryMethod === "pump" ? "pump" : p?.insulinDeliveryMethod === "pen" ? "pen" : undefined;
+  const insulin_delivery_method: "pen" | "pump" | undefined = isPumpDeliveryMethod(p?.insulinDeliveryMethod)
+    ? "pump"
+    : isPenDeliveryMethod(p?.insulinDeliveryMethod)
+      ? "pen"
+      : undefined;
   const tdd = typeof s.tdd === "number" && s.tdd > 0 && Number.isFinite(s.tdd) ? s.tdd : null;
   const dobNorm = normalizeDateOfBirthInput(p?.dateOfBirth ?? null);
 

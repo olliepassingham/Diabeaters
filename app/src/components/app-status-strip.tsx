@@ -26,7 +26,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
+import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
@@ -201,6 +202,14 @@ export function AppStatusStrip() {
   const [stripClock, setStripClock] = useState(() => Date.now());
   const lastExPhaseKey = useRef<string>("");
   const exerciseAutoFinishKey = useRef<string | null>(null);
+
+  const [stripProfile, setStripProfile] = useState<UserProfile | null>(() => storage.getProfile());
+
+  useEffect(() => {
+    const onProfile = () => setStripProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
 
   useEffect(() => {
     const tick = window.setInterval(() => {
@@ -390,8 +399,8 @@ export function AppStatusStrip() {
     "flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2 backdrop-blur [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]";
   const btnClass = "h-7 px-2 text-xs";
 
-  const bgUnits = storage.getProfile?.()?.bgUnits || "mg/dL";
-  const isPump = storage.getProfile?.()?.insulinDeliveryMethod === "pump";
+  const bgUnits = stripProfile?.bgUnits || "mg/dL";
+  const isPump = isPumpDeliveryMethod(stripProfile?.insulinDeliveryMethod);
   const exercisePhaseTimerLabel =
     ex?.phase === "active" && ex.exerciseStartedAt
       ? (() => {

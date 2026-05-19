@@ -10,7 +10,8 @@ import { Utensils, Dumbbell, AlertCircle, Calculator, ChevronDown, ChevronUp, Pi
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
-import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat } from "@/lib/storage";
+import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { calculateMealDose, roundInsulinUnits, type MealDoseResult } from "@/lib/meal-dose";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -227,7 +228,7 @@ export default function Adviser() {
   const splitAbsorptionVisual = useMemo(() => getSplitFatAbsorptionVisual(splitFatLevel), [splitFatLevel]);
 
   const bgUnits = profile.bgUnits || "mmol/L";
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
   useEffect(() => {
     setSettings(storage.getSettings());
@@ -240,6 +241,20 @@ export default function Adviser() {
         setCarbUnit(storedProfile.carbUnits === "cp" ? "cp" : "grams");
       }
     }
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => {
+      const storedProfile = storage.getProfile();
+      if (storedProfile) {
+        setProfile(storedProfile);
+        if (storedProfile.carbUnits) {
+          setCarbUnit(storedProfile.carbUnits === "cp" ? "cp" : "grams");
+        }
+      }
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   // Split Bolus Calculator function

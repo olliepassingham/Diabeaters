@@ -16,7 +16,9 @@ import {
   ExerciseIntensity,
   ExerciseOutcome,
   type ExerciseBgTrend,
+  DIABEATER_PROFILE_CHANGED_EVENT,
 } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { getExerciseGuidanceForReading } from "@/lib/exercise-reading-guidance";
 import {
   calculateExercisePlan,
@@ -623,15 +625,21 @@ export function ActiveExerciseBanner() {
   const loadSession = useCallback(() => {
     const profile = storage.getProfile();
     setBgUnits(profile?.bgUnits || "mmol/L");
+    setIsPump(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
     const s = storage.getActiveExercise();
     setSession(s);
     if (s) {
       setPatterns(storage.getExercisePatterns(s.exerciseType, s.intensity));
-      setIsPump(profile?.insulinDeliveryMethod === "pump");
     } else {
       setPatterns(null);
     }
   }, []);
+
+  useEffect(() => {
+    const onP = () => loadSession();
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onP);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onP);
+  }, [loadSession]);
 
   useEffect(() => {
     loadSession();

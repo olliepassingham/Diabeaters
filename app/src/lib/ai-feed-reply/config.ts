@@ -1,3 +1,16 @@
+import { BEATIE_PROFILE_AVATAR_SRC } from "@/lib/beatie-avatar";
+
+/**
+ * Placeholder when the feed bot profile has no `avatar_url` (dedicated Beatie artwork).
+ */
+export const BEATIE_FEED_AVATAR_FALLBACK_SRC: string = BEATIE_PROFILE_AVATAR_SRC;
+
+/**
+ * Shown on Beatie's public profile when `profiles.bio` is empty (DB bio still wins if set).
+ */
+export const BEATIE_FEED_BOT_DEFAULT_BIO =
+  "I'm Beatie, Diabeaters' built-in AI coach. I share general information about living with diabetes on the community feed and in chat. For medical decisions, always follow advice from your own care team.";
+
 /**
  * Optional UI env: must match the Auth user id configured as `BEATIE_FEED_BOT_USER_ID`
  * on the Edge Function for badges and "Ask Beatie" visibility.

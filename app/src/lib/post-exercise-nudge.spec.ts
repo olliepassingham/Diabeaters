@@ -52,6 +52,7 @@ describe("inferPostExerciseLoadTier", () => {
 describe("insulinDeliveryForPostExerciseTips", () => {
   it("maps pump and pen", () => {
     expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "pump" })).toBe("pump");
+    expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "  PUMP  " })).toBe("pump");
     expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "pen" })).toBe("pen");
     expect(insulinDeliveryForPostExerciseTips({ insulinDeliveryMethod: "" })).toBe("unknown");
   });

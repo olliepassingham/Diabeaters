@@ -3,6 +3,7 @@
  * Requires tables/RPC from docs/sql/family_carers.sql (not executed from the app).
  */
 import { devWarn } from "./dev-log";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "./insulin-delivery-method";
 import { getSupabase } from "./supabase";
 import type {
   CarerInviteRow,
@@ -1248,8 +1249,12 @@ function parsePatientClinicalPrefsRpc(raw: unknown): PatientClinicalPrefsForCare
     dob === null || dob === undefined ? null : typeof dob === "string" ? dob.trim() || null : null;
   const idm = o.insulin_delivery_method;
   let insulin_delivery_method: string | null = null;
-  if (idm === "pen" || idm === "pump") insulin_delivery_method = idm;
-  else if (idm === null || idm === undefined || idm === "") insulin_delivery_method = null;
+  if (typeof idm === "string") {
+    if (isPumpDeliveryMethod(idm)) insulin_delivery_method = "pump";
+    else if (isPenDeliveryMethod(idm)) insulin_delivery_method = "pen";
+  } else if (idm === null || idm === undefined) {
+    insulin_delivery_method = null;
+  }
   const tddRaw = o.tdd;
   let tdd: number | null = null;
   if (typeof tddRaw === "number" && Number.isFinite(tddRaw) && tddRaw > 0) tdd = tddRaw;
@@ -1291,7 +1296,16 @@ export async function updatePatientClinicalPrefsForCarer(
   const p_fields: Record<string, unknown> = {};
   if ("date_of_birth" in fields) p_fields.date_of_birth = fields.date_of_birth ?? "";
   if ("insulin_delivery_method" in fields) {
-    p_fields.insulin_delivery_method = fields.insulin_delivery_method ?? "";
+    const v = fields.insulin_delivery_method;
+    if (v == null) {
+      p_fields.insulin_delivery_method = "";
+    } else if (isPumpDeliveryMethod(v)) {
+      p_fields.insulin_delivery_method = "pump";
+    } else if (isPenDeliveryMethod(v)) {
+      p_fields.insulin_delivery_method = "pen";
+    } else {
+      p_fields.insulin_delivery_method = "";
+    }
   }
   if ("tdd" in fields) {
     p_fields.tdd = fields.tdd == null ? null : fields.tdd;

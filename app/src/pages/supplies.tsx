@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, CheckCircle2, X, Lightbulb, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link, useSearch } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays, startOfDay } from "date-fns";
@@ -2439,6 +2440,7 @@ export default function Supplies() {
   const [previousSupplies, setPreviousSupplies] = useState<Supply[] | null>(null);
   const [prescriptionCycle, setPrescriptionCycle] = useState<PrescriptionCycle | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(() => storage.getProfile());
   const [activeTab, setActiveTab] = useState("all");
   const [highlightedSupplyId, setHighlightedSupplyId] = useState<string | null>(null);
   const [usualDialogOpen, setUsualDialogOpen] = useState(false);
@@ -2470,6 +2472,7 @@ export default function Supplies() {
     setUsualPrescription(storage.getUsualPrescription());
     setPrescriptionCycle(storage.getPrescriptionCycle());
     setScenarioState(storage.getScenarioState());
+    setLocalProfile(storage.getProfile());
     trackFeatureEngagement("supplies");
   }, []);
 
@@ -2477,6 +2480,12 @@ export default function Supplies() {
     const onScenario = () => setScenarioState(storage.getScenarioState());
     window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
     return () => window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => setLocalProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   const refreshSupplies = () => {
@@ -2729,8 +2738,8 @@ export default function Supplies() {
     return supplies.filter(s => s.type === type);
   };
 
-  const profile = storage.getProfile();
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const profile = localProfile;
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const showInfusionTab = isPumpUser || filterByType("infusion_set").length > 0;
   const showReservoirTab = isPumpUser || filterByType("reservoir").length > 0;
   const supplyTabValues = [

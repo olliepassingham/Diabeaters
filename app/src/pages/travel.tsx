@@ -50,7 +50,8 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { storage, Supply, UserSettings, UserProfile, HolidayPrep, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
+import { storage, Supply, UserSettings, UserProfile, HolidayPrep, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   buildTravelWeatherRiskWarnings,
@@ -999,7 +1000,7 @@ export default function Travel() {
   const [resultsTab, setResultsTab] = useState<"packing" | "emergency" | "climate">("packing");
   const [selectedLanguage, setSelectedLanguage] = useState("English");
 
-  const isPumpUser = profile?.insulinDeliveryMethod === "pump";
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const showClimateTab =
     plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
 
@@ -1094,7 +1095,7 @@ export default function Travel() {
         setPackingList(savedList);
         const warnings = calculateRiskWarnings(
           withDefaultTripDates((savedPlan || plan) as TravelPlan),
-          p?.insulinDeliveryMethod === "pump",
+          isPumpDeliveryMethod(p?.insulinDeliveryMethod),
         );
         setRiskWarnings(warnings);
       }
@@ -1107,9 +1108,9 @@ export default function Travel() {
           const list =
             draft.packingList.length > 0
               ? (draft.packingList as PackingItem[])
-              : calculatePackingList(nextPlan as TravelPlan, s, st, p?.insulinDeliveryMethod === "pump");
+              : calculatePackingList(nextPlan as TravelPlan, s, st, isPumpDeliveryMethod(p?.insulinDeliveryMethod));
           setPackingList(list);
-          setRiskWarnings(calculateRiskWarnings(nextPlan as TravelPlan, p?.insulinDeliveryMethod === "pump"));
+          setRiskWarnings(calculateRiskWarnings(nextPlan as TravelPlan, isPumpDeliveryMethod(p?.insulinDeliveryMethod)));
         } else {
           setPackingList([]);
           setRiskWarnings([]);
@@ -1125,6 +1126,12 @@ export default function Travel() {
     if (savedPrep) {
       setHolidayPrep(savedPrep);
     }
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => setProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   useEffect(() => {

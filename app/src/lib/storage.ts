@@ -14,6 +14,7 @@ import {
   pharmacyHasAnyHours,
   pharmacyOpenIntervalsForDay,
 } from "./pharmacy";
+import { isPumpDeliveryMethod } from "./insulin-delivery-method";
 import appPkg from "../../package.json";
 
 const STORAGE_KEYS = {
@@ -2232,7 +2233,7 @@ export const storage = {
   getPrimingWastePerDay(supplyType?: Supply["type"], settings?: UserSettings): number {
     const s = settings || this.getSettings();
     const profile = this.getProfile();
-    const isPump = profile?.insulinDeliveryMethod === "pump";
+    const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
     if (isPump) return 0;
     const unitsPerPrime = s.primingUnitsPerInjection || 0;
     if (unitsPerPrime <= 0) return 0;
@@ -2327,7 +2328,7 @@ export const storage = {
   syncSupplyUsageToSettings(supplyType: Supply["type"], newDailyUsage: number): void {
     const settings = this.getSettings();
     const profile = this.getProfile();
-    const isPump = profile?.insulinDeliveryMethod === "pump";
+    const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
     let changed = false;
 
     if (supplyType === "needle" && !isPump) {
@@ -2391,7 +2392,7 @@ export const storage = {
   getSuggestedDailyUsage(type: Supply["type"]): { value: number; source: string } | null {
     const s = this.getSettings();
     const profile = this.getProfile();
-    const isPump = profile?.insulinDeliveryMethod === "pump";
+    const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
     if (type === "needle") {
       if (s.injectionsPerDay && s.injectionsPerDay > 0) {

@@ -264,7 +264,7 @@ export type InsulinDeliveryForTips = "pump" | "pen" | "unknown";
 export function insulinDeliveryForPostExerciseTips(
   profile: { insulinDeliveryMethod?: string } | null | undefined,
 ): InsulinDeliveryForTips {
-  const m = String(profile?.insulinDeliveryMethod ?? "").toLowerCase();
+  const m = String(profile?.insulinDeliveryMethod ?? "").trim().toLowerCase();
   if (m === "pump") return "pump";
   if (m === "pen") return "pen";
   return "unknown";

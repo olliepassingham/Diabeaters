@@ -49,7 +49,13 @@ import {
   getProfilesByIds,
   type PublicCommunityProfile,
 } from "@/lib/profile";
+import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import {
+  BEATIE_FEED_AVATAR_FALLBACK_SRC,
+  BEATIE_FEED_BOT_DEFAULT_BIO,
+  getBeatieFeedBotUserIdFromEnv,
+} from "@/lib/ai-feed-reply/config";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -157,6 +163,10 @@ export default function CommunityProfilePage() {
 
   const displayName = profile?.full_name?.trim() || (userId ? shortId(userId) : "Member");
   const { displayUrl: avatarDisplayUrl } = useResolvedProfileImageUrl(profile?.avatar_url ?? null);
+  const beatieFeedBotUserId = useMemo(() => getBeatieFeedBotUserIdFromEnv(), []);
+  const isBeatieProfile = Boolean(beatieFeedBotUserId && userId === beatieFeedBotUserId);
+  const profileHeaderImageSrc =
+    avatarDisplayUrl ?? (isBeatieProfile ? BEATIE_FEED_AVATAR_FALLBACK_SRC : null);
 
   async function openList(kind: ListKind) {
     if (!userId) return;
@@ -333,11 +343,16 @@ export default function CommunityProfilePage() {
           <CardContent className="pt-6 space-y-4">
             <div className="flex gap-4">
               <div className="shrink-0">
-                {avatarDisplayUrl ? (
+                {profileHeaderImageSrc ? (
                   <img
-                    src={avatarDisplayUrl}
+                    src={profileHeaderImageSrc}
                     alt=""
-                    className="h-20 w-20 rounded-full object-cover border border-border"
+                    className={cn(
+                      "h-20 w-20 rounded-full border border-border",
+                      avatarDisplayUrl
+                        ? "object-cover bg-muted"
+                        : "object-cover",
+                    )}
                   />
                 ) : (
                   <CommunityAuthorAvatar displayName={displayName} avatarPath={profile.avatar_url} />
@@ -356,6 +371,8 @@ export default function CommunityProfilePage() {
 
             {profile.bio?.trim() ? (
               <p className="text-sm whitespace-pre-wrap text-foreground/90">{profile.bio}</p>
+            ) : isBeatieProfile ? (
+              <p className="text-sm whitespace-pre-wrap text-foreground/90">{BEATIE_FEED_BOT_DEFAULT_BIO}</p>
             ) : (
               <p className="text-sm text-muted-foreground italic">No bio yet.</p>
             )}
@@ -434,6 +451,7 @@ export default function CommunityProfilePage() {
             </div>
             <FeedPostList
               viewerId={user.id}
+              scopeKey={`profile:${userId}`}
               pageSize={20}
               showRefreshButton={false}
               emptyStateTitle="No posts yet"
@@ -450,6 +468,7 @@ export default function CommunityProfilePage() {
         kind={listKind}
         userIds={listIds}
         loading={listLoading}
+        beatieFeedBotUserId={beatieFeedBotUserId}
       />
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
@@ -503,6 +522,7 @@ function UserListDialog(props: {
   kind: ListKind;
   userIds: string[];
   loading: boolean;
+  beatieFeedBotUserId: string | null;
 }) {
   const [profilesById, setProfilesById] = useState<
     Record<string, { full_name: string; public_handle: string | null; avatar_url: string | null }>
@@ -564,6 +584,11 @@ function UserListDialog(props: {
                       avatarPath={profilesById[id]?.avatar_url ?? null}
                       size="sm"
                       className="h-9 w-9"
+                      fallbackSrc={
+                        props.beatieFeedBotUserId && id === props.beatieFeedBotUserId
+                          ? BEATIE_FEED_AVATAR_FALLBACK_SRC
+                          : undefined
+                      }
                     />
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">

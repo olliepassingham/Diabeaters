@@ -46,8 +46,8 @@ export function prefetchNotificationsPage(): void {
   void import("@/pages/notifications");
 }
 
-/** Feed + DM inbox + thread + `/notifications` — header / feed first hops. */
-function prefetchCommunityNavigationBundle(): void {
+/** Feed + DM inbox + thread + `/notifications` — warm together for social navigation. */
+export function prefetchCommunityNavigationBundle(): void {
   prefetchCommunity();
   prefetchCommunityMessages();
   prefetchCommunityThread();
@@ -267,8 +267,12 @@ export function BottomNav() {
     let rafOuter = 0;
     let rafInner = 0;
 
+    // While `useProfile()` is still loading, `showCommunityTab` is false — warm chunks anyway so the
+    // first Feed / Messages tap after login is not blocked on JS download + parse.
     const communityWarm =
-      (isCommunityEnabled && (showCommunityTab || isCommunityMode)) || (isCarerMode && isCommunityEnabled);
+      (isCommunityEnabled &&
+        (showCommunityTab || isCommunityMode || (!isCarerMode && !isCommunityMode && profileLoading))) ||
+      (isCarerMode && isCommunityEnabled);
 
     if (isCarerMode || isCommunityMode) {
       warmCommonTabs();
@@ -299,7 +303,7 @@ export function BottomNav() {
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [isCarerMode, isCommunityMode, showCommunityTab]);
+  }, [isCarerMode, isCommunityMode, showCommunityTab, profileLoading]);
 
   const tabs = isCarerMode
     ? carerTabs(showCommunityTab)

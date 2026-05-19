@@ -54,6 +54,7 @@ import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
+import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
 import {
   castPollVote,
   communityTopicLabel,
@@ -385,7 +386,11 @@ export function FeedPostCard({
   const [likersTruncated, setLikersTruncated] = useState(false);
 
   const [commentSort, setCommentSort] = useState<"oldest" | "newest">("oldest");
-  const [topCommentPreview, setTopCommentPreview] = useState<{ body: string; authorName: string } | null>(null);
+  const [topCommentPreview, setTopCommentPreview] = useState<{
+    body: string;
+    authorName: string;
+    fromBeatie: boolean;
+  } | null>(null);
   const commentMetaRef = useRef(commentMeta);
   commentMetaRef.current = commentMeta;
   const sortedComments = useMemo(() => {
@@ -400,22 +405,26 @@ export function FeedPostCard({
       return;
     }
     let cancelled = false;
-    void fetchCommentsForPost(post.id, { limit: 1 }).then((res) => {
+    void fetchCommentsForPost(post.id, { limit: 1, order: "desc" }).then((res) => {
       if (cancelled || res.error || !res.data?.[0]) {
         if (!cancelled) setTopCommentPreview(null);
         return;
       }
       const c = res.data[0];
       const meta = commentMetaRef.current(c.author_id);
+      const fromBeatie = Boolean(
+        beatieFeedBotUserId && c.author_id === beatieFeedBotUserId,
+      );
       setTopCommentPreview({
         body: c.body.trim(),
         authorName: meta.name,
+        fromBeatie,
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [post.id, post.comment_count, expanded]);
+  }, [post.id, post.comment_count, expanded, beatieFeedBotUserId]);
 
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
@@ -613,9 +622,9 @@ export function FeedPostCard({
   }
 
   return (
-    <Card className="pressable card-interactive">
-      <CardContent className="space-y-1.5 pt-3 sm:space-y-2 sm:pt-4">
-        <div className="flex gap-3">
+    <Card className="pressable card-interactive h-fit w-full">
+      <CardContent className="space-y-1.5 px-6 pb-3 pt-3 sm:space-y-2 sm:px-7 sm:pb-4 sm:pt-4">
+        <div className="flex items-start gap-3">
           <CommunityAuthorAvatar
             displayName={authorDisplayName}
             avatarPath={authorAvatarPath}
@@ -884,9 +893,20 @@ export function FeedPostCard({
           {!expanded && topCommentPreview && post.comment_count > 0 ? (
             <button
               type="button"
-              className="w-full rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/35"
+              className={cn(
+                "w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors",
+                topCommentPreview.fromBeatie
+                  ? "border-primary/35 bg-primary/[0.08] text-muted-foreground hover:bg-primary/[0.12] dark:bg-primary/10 dark:hover:bg-primary/[0.16]"
+                  : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/35",
+              )}
               onClick={onToggleComments}
             >
+              {topCommentPreview.fromBeatie ? (
+                <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-primary">
+                  <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
+                  Educational AI
+                </div>
+              ) : null}
               <span className="font-semibold text-foreground">{topCommentPreview.authorName}</span>
               <span className="text-muted-foreground"> · </span>
               <span className="line-clamp-2">{topCommentPreview.body}</span>
@@ -954,12 +974,21 @@ export function FeedPostCard({
                         beatieFeedBotUserId && c.author_id === beatieFeedBotUserId,
                       );
                       return (
-                        <li key={c.id} className="flex gap-2 rounded-md bg-muted/40 px-2 py-2">
+                        <li
+                          key={c.id}
+                          className={cn(
+                            "flex gap-2 rounded-md px-2 py-2",
+                            isBeatieComment
+                              ? "border border-primary/30 border-l-[3px] border-l-primary/70 bg-primary/[0.07] shadow-sm ring-1 ring-inset ring-primary/10 dark:bg-primary/[0.12]"
+                              : "bg-muted/40",
+                          )}
+                        >
                           <CommunityAuthorAvatar
                             size="sm"
                             displayName={cm.name}
                             avatarPath={cm.avatar_url}
                             profileHref={`/community/profile/${c.author_id}`}
+                            fallbackSrc={isBeatieComment ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-1">
@@ -971,8 +1000,11 @@ export function FeedPostCard({
                                   {cm.name}
                                 </Link>
                                 {isBeatieComment ? (
-                                  <Badge variant="secondary" className="px-1 py-0 text-[10px] font-normal leading-tight">
-                                    Beatie
+                                  <Badge
+                                    variant="outline"
+                                    className="border-primary/45 bg-background/60 px-1.5 py-0 text-[10px] font-medium leading-tight text-primary"
+                                  >
+                                    AI coach
                                   </Badge>
                                 ) : null}
                                 <span className="text-tiny text-muted-foreground" title={c.created_at}>

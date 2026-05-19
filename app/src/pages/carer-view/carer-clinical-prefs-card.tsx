@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Stethoscope } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getPatientClinicalPrefsForCarer, updatePatientClinicalPrefsForCarer } from "@/lib/carers";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 
 export function CarerClinicalPrefsCard({
@@ -40,7 +41,7 @@ export function CarerClinicalPrefsCard({
       return;
     }
     setDob(data.date_of_birth ?? "");
-    setDelivery(data.insulin_delivery_method === "pump" ? "pump" : data.insulin_delivery_method === "pen" ? "pen" : "");
+    setDelivery(isPumpDeliveryMethod(data.insulin_delivery_method) ? "pump" : isPenDeliveryMethod(data.insulin_delivery_method) ? "pen" : "");
     setTdd(data.tdd != null && data.tdd > 0 ? String(data.tdd) : "");
   }, [patientId, enabled]);
 

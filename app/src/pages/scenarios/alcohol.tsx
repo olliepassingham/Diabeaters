@@ -28,7 +28,8 @@ import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { storage, type UserProfile, type UserSettings } from "@/lib/storage";
+import { storage, type UserProfile, type UserSettings, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowAlcoholScenarios } from "@/lib/user-age";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import {
@@ -217,6 +218,11 @@ export default function AlcoholScenarioPage() {
     refreshFromStorage();
   }, []);
 
+  useEffect(() => {
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshFromStorage);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, refreshFromStorage);
+  }, []);
+
   const bgUnits = normalizeBgUnits(profile.bgUnits);
   const carbUnit: "grams" | "cp" = profile.carbUnits === "cp" ? "cp" : "grams";
 
@@ -372,7 +378,7 @@ export default function AlcoholScenarioPage() {
           <ScenarioToolDisclaimer className="mt-4" />
         </div>
 
-        {profile?.insulinDeliveryMethod === "pump" && (
+        {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && (
           <Alert data-testid="alert-alcohol-pump">
             <AlertTitle className="text-sm">Pump</AlertTitle>
             <AlertDescription className="text-sm">

@@ -1,4 +1,4 @@
-import logoImage from "@assets/image_1771412400865.png";
+import { BRAND_MARK_IMAGE_SRC } from "@/lib/brand-mark";
 
 interface FaceLogoProps {
   size?: number;
@@ -11,7 +11,7 @@ export function FaceLogo({
 }: FaceLogoProps) {
   return (
     <img
-      src={logoImage}
+      src={BRAND_MARK_IMAGE_SRC}
       alt="Diabeaters logo"
       width={size}
       height={size}

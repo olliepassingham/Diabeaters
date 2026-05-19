@@ -51,6 +51,16 @@ export default defineConfig(({ mode }) => {
       outDir: path.resolve(repoRoot, "dist"),
       assetsDir: "assets",
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (id.includes("framer-motion")) return "vendor-motion";
+            if (id.includes("@supabase")) return "vendor-supabase";
+            if (id.includes("recharts")) return "vendor-recharts";
+          },
+        },
+      },
     },
 
     server: {

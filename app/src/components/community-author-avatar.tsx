@@ -10,6 +10,8 @@ type Props = {
   className?: string;
   /** When set, the avatar is a link to this path (e.g. `/community/profile/:id`). */
   profileHref?: string;
+  /** Used when the profile image is missing or could not be resolved (e.g. branded bot avatar). */
+  fallbackSrc?: string | null;
 };
 
 /**
@@ -21,8 +23,12 @@ export function CommunityAuthorAvatar({
   size = "md",
   className,
   profileHref,
+  fallbackSrc,
 }: Props) {
   const { displayUrl } = useResolvedProfileImageUrl(avatarPath ?? null);
+  const trimmedFallback = fallbackSrc?.trim() || null;
+  const imageSrc = displayUrl ?? trimmedFallback;
+  const useFallbackPresentation = Boolean(!displayUrl && trimmedFallback);
   const initial = displayName.trim().slice(0, 1).toUpperCase() || "?";
   const rootClass = size === "sm" ? "h-8 w-8" : "h-10 w-10";
   const fallbackClass = size === "sm" ? "text-xs" : "text-sm";
@@ -31,7 +37,15 @@ export function CommunityAuthorAvatar({
 
   const avatar = (
     <Avatar className={cn(rootClass, "shrink-0", className)}>
-      {displayUrl ? <AvatarImage src={displayUrl} alt="" /> : null}
+      {imageSrc ? (
+        <AvatarImage
+          src={imageSrc}
+          alt=""
+          className={cn(
+            useFallbackPresentation && "object-cover object-center",
+          )}
+        />
+      ) : null}
       <AvatarFallback className={cn("bg-muted font-medium", fallbackClass)}>{initial}</AvatarFallback>
     </Avatar>
   );

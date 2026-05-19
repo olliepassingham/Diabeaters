@@ -39,8 +39,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   storage,
+  DIABEATER_PROFILE_CHANGED_EVENT,
   type ActiveExerciseSession,
   type ExerciseBgTrend,
   type ExerciseEnvironmentChoice,
@@ -218,9 +220,15 @@ export function ExerciseGuidedCoach() {
   const lastSyncedSessionId = useRef<string>("");
 
   const bgUnits = (profile.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
-  const isPump = profile.insulinDeliveryMethod === "pump";
+  const isPump = isPumpDeliveryMethod(profile.insulinDeliveryMethod);
 
   // ----- Mount: load profile, settings, and listen for session changes -----
+  useEffect(() => {
+    const onProfile = () => setProfile(storage.getProfile() ?? {});
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
   useEffect(() => {
     setProfile(storage.getProfile() ?? {});
     setSettings(storage.getSettings());

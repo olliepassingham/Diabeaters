@@ -23,6 +23,7 @@ import {
   type UserProfile,
   type UserSettings,
 } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -91,7 +92,7 @@ export default function CorrectionHelpPage() {
       : null;
 
   const unitLabel = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
-  const isPump = profile?.insulinDeliveryMethod === "pump";
+  const isPump = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const postExerciseCorrectionCopy = useMemo(() => {
     void postExerciseNudgeRev;
     if (!storage.shouldShowPostExerciseEducationalNudges()) return null;

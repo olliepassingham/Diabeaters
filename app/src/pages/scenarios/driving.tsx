@@ -24,7 +24,8 @@ import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { DISCLAIMER_TEXT } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
-import { storage, type UserProfile } from "@/lib/storage";
+import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
 import {
@@ -143,6 +144,15 @@ export default function DrivingScenarioPage() {
     trackFeatureEngagement("scenarios-driving");
     const p = storage.getProfile();
     if (p) setProfile(p);
+  }, []);
+
+  useEffect(() => {
+    const onProfile = () => {
+      const p = storage.getProfile();
+      if (p) setProfile(p);
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
   }, []);
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
@@ -532,7 +542,7 @@ export default function DrivingScenarioPage() {
         ) : null}
 
         <div className="space-y-4 border-t border-border/50 pt-6">
-          {profile?.insulinDeliveryMethod === "pump" && (
+          {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && (
             <Alert data-testid="alert-driving-pump">
               <AlertTitle className="text-sm">Pump</AlertTitle>
               <AlertDescription className="text-sm">

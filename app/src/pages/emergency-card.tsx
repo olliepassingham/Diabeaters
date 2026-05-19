@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Globe, Phone, Syringe, Heart, Download, Share2, Info } from "lucide-react";
-import { storage, UserProfile } from "@/lib/storage";
+import { storage, UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { useProfile } from "@/lib/profile";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
@@ -204,6 +205,12 @@ export default function EmergencyCard() {
     setProfile(storage.getProfile());
   }, []);
 
+  useEffect(() => {
+    const onProfile = () => setProfile(storage.getProfile());
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
   const t = TRANSLATIONS[selectedLang] || TRANSLATIONS.en;
   const primaryContact = toLegacyPrimaryContact(emergency);
   const displayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
@@ -211,7 +218,7 @@ export default function EmergencyCard() {
 
   const handleShare = async () => {
     const insulinInfo = profile?.usingInsulin 
-      ? `${t.needsInsulin}${profile.insulinDeliveryMethod === "pump" ? " (Insulin Pump)" : ""}`
+      ? `${t.needsInsulin}${isPumpDeliveryMethod(profile?.insulinDeliveryMethod) ? " (Insulin Pump)" : ""}`
       : "";
     const text = `${t.title}\n${t.hasDisease}\n${insulinInfo}\n\n${t.ifUnconscious}\n• ${t.doNotGiveInsulin}\n• ${t.giveGlucose}\n• ${t.callEmergency}${primaryContact ? `\n\n${t.emergencyContact}: ${primaryContact.name} - ${primaryContact.phone}` : ""}${emergency.phoneSecondary?.trim() ? `\n${t.emergencyContact} (2): ${emergency.phoneSecondary}` : ""}`;
     
@@ -287,7 +294,7 @@ export default function EmergencyCard() {
               <p className="text-lg font-medium text-red-600 dark:text-red-400 flex items-center justify-center gap-2 mt-2">
                 <Syringe className="h-5 w-5" />
                 {t.needsInsulin}
-                {profile.insulinDeliveryMethod === "pump" && " (Insulin Pump)"}
+                {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && " (Insulin Pump)"}
               </p>
             )}
           </div>

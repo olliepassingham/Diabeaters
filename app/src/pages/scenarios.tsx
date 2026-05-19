@@ -5,7 +5,8 @@ import { Card } from "@/components/ui/card";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
-import { storage } from "@/lib/storage";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageHeader, PageShell } from "@/components/layout";
 
@@ -102,9 +103,19 @@ export default function Scenarios() {
   const [showPumpFailureCard, setShowPumpFailureCard] = useState(false);
   useEffect(() => {
     const profile = storage.getProfile();
-    setShowPumpFailureCard(profile?.insulinDeliveryMethod === "pump");
+    setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
     setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
   }, [location]);
+
+  useEffect(() => {
+    const onProfile = () => {
+      const profile = storage.getProfile();
+      setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
+      setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
+    };
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
 
   useEffect(() => {
     if (location !== "/scenarios") return;

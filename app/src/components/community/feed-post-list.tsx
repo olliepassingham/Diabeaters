@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { Loader2, RefreshCw, SearchX, Users } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
@@ -83,8 +84,32 @@ function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
 
+function mapPostRowsInInfiniteData(
+  old: InfiniteData<CommunityPostRow[]> | undefined,
+  mapFn: (p: CommunityPostRow) => CommunityPostRow,
+): InfiniteData<CommunityPostRow[]> | undefined {
+  if (!old) return old;
+  return {
+    pageParams: old.pageParams,
+    pages: old.pages.map((page) => page.map(mapFn)),
+  };
+}
+
+function filterPostRowsInInfiniteData(
+  old: InfiniteData<CommunityPostRow[]> | undefined,
+  pred: (p: CommunityPostRow) => boolean,
+): InfiniteData<CommunityPostRow[]> | undefined {
+  if (!old) return old;
+  return {
+    pageParams: old.pageParams,
+    pages: old.pages.map((page) => page.filter(pred)),
+  };
+}
+
 export function FeedPostList(props: {
   viewerId: string | undefined;
+  /** Isolates React Query cache (main feed vs profile author tab, etc.). */
+  scopeKey: string;
   fetchPage: (
     limit: number,
     cursor: FeedCursor | null,
@@ -128,24 +153,9 @@ export function FeedPostList(props: {
   const authorIdsForServerSearch =
     props.searchMatchedAuthorIds && props.searchMatchedAuthorIds.length > 0 ? props.searchMatchedAuthorIds : null;
 
-  const [posts, setPosts] = useState<CommunityPostRow[]>([]);
-  const postsRef = useRef(posts);
-  postsRef.current = posts;
-
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [debouncedSearch, setDebouncedSearch] = useState(props.searchQuery ?? "");
-  const [newPostCount, setNewPostCount] = useState(0);
-  const blockedUserIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(props.searchQuery ?? ""), 250);
-    return () => window.clearTimeout(t);
-  }, [props.searchQuery]);
-
-  const useServerSearch = shouldUseFeedServerSearch(debouncedSearch);
+  const queryClient = useQueryClient();
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const pullAnchorRef = useRef<HTMLDivElement>(null);
 
   const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
   const [authorMetaPending, setAuthorMetaPending] = useState(false);
@@ -171,163 +181,145 @@ export function FeedPostList(props: {
   const [editImageAlts, setEditImageAlts] = useState<string[]>([]);
   const [editBusy, setEditBusy] = useState(false);
 
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
-  const pullAnchorRef = useRef<HTMLDivElement>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(props.searchQuery ?? "");
+  const [newPostCount, setNewPostCount] = useState(0);
+  const blockedUserIdsRef = useRef<Set<string>>(new Set());
 
-  const loadFirstPage = useCallback(async () => {
-    if (useServerSearch) {
-      const res = await searchCommunityPostsPage(
-        pageSize,
-        null,
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(props.searchQuery ?? ""), 250);
+    return () => window.clearTimeout(t);
+  }, [props.searchQuery]);
+
+  const useServerSearch = shouldUseFeedServerSearch(debouncedSearch);
+
+  const feedQueryKey = useMemo(
+    () =>
+      [
+        "community-feed",
+        props.scopeKey,
+        props.viewerId ?? "",
+        useServerSearch ? "search" : props.feedTab ?? "everyone",
+        topicFilter ?? "",
         debouncedSearch,
-        topicFilter,
-        authorIdsForServerSearch,
-      );
-      if (res.error) {
-        toast({ title: "Search failed", description: res.error.message, variant: "destructive" });
-        setPosts([]);
-        setHasMore(false);
-        return;
+        (authorIdsForServerSearch ?? []).slice().sort().join(","),
+        (followingAuthorIdsForSearch ?? []).slice().sort().join(","),
+        props.savedOnly ? "saved" : "all",
+      ] as const,
+    [
+      props.scopeKey,
+      props.viewerId,
+      useServerSearch,
+      props.feedTab,
+      topicFilter,
+      debouncedSearch,
+      authorIdsForServerSearch,
+      followingAuthorIdsForSearch,
+      props.savedOnly,
+    ],
+  );
+
+  const feedQuery = useInfiniteQuery({
+    queryKey: feedQueryKey,
+    initialPageParam: null as FeedCursor | null,
+    enabled: isSupabaseConfigured(),
+    staleTime: 45_000,
+    gcTime: 10 * 60_000,
+    queryFn: async ({ pageParam }) => {
+      if (useServerSearch) {
+        const res = await searchCommunityPostsPage(
+          pageSize,
+          pageParam,
+          debouncedSearch,
+          topicFilter,
+          authorIdsForServerSearch,
+        );
+        if (res.error) throw new Error(res.error.message);
+        return res.data ?? [];
       }
-      const list = res.data ?? [];
-      setPosts(list);
-      setHasMore(list.length >= pageSize);
-      return;
-    }
-
-    const res = await fetchPage(pageSize, null);
-    if (res.error) {
-      toast({ title: "Could not load posts", description: res.error.message, variant: "destructive" });
-      setPosts([]);
-      setHasMore(false);
-      return;
-    }
-    const list = res.data ?? [];
-    setPosts(list);
-    setHasMore(list.length >= pageSize);
-  }, [
-    useServerSearch,
-    debouncedSearch,
-    topicFilter,
-    authorIdsForServerSearch,
-    fetchPage,
-    pageSize,
-    toast,
-  ]);
-
-  const refresh = useCallback(async () => {
-    try {
-      await loadFirstPage();
-    } catch (e) {
-      console.error(e);
+      const res = await fetchPage(pageSize, pageParam);
+      if (res.error) throw new Error(res.error.message);
+      return res.data ?? [];
+    },
+    getNextPageParam: (lastPage) => {
+      if (!lastPage?.length || lastPage.length < pageSize) return undefined;
+      const last = lastPage[lastPage.length - 1];
+      if (!last) return undefined;
+      return { created_at: last.created_at, id: last.id };
+    },
+    onError: (err: Error) => {
       toast({
-        title: "Could not load posts",
-        description: e instanceof Error ? e.message : "Something went wrong.",
+        title: useServerSearch ? "Search failed" : "Could not load posts",
+        description: err.message,
         variant: "destructive",
       });
-      setPosts([]);
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadFirstPage, toast]);
+    },
+  });
+
+  const posts = useMemo(() => feedQuery.data?.pages.flatMap((p) => p) ?? [], [feedQuery.data]);
+  const postsRef = useRef(posts);
+  postsRef.current = posts;
+
+  const loadingPosts = feedQuery.status === "pending" && posts.length === 0;
+  const [refreshing, setRefreshing] = useState(false);
 
   const runRefresh = useCallback(async () => {
     setRefreshing(true);
     setNewPostCount(0);
     try {
-      await loadFirstPage();
+      await feedQuery.refetch();
     } finally {
       setRefreshing(false);
     }
-  }, [loadFirstPage]);
+  }, [feedQuery]);
 
-  const { pullProgress } = usePullToRefresh({
-    anchorRef: pullAnchorRef,
-    onRefresh: runRefresh,
-    enabled: isSupabaseConfigured(),
-    isBusy: refreshing || loading,
-  });
+  const feedQueryIdentity = useMemo(() => JSON.stringify(feedQueryKey), [feedQueryKey]);
 
   useEffect(() => {
-    setLoading(true);
-    void refresh();
     setExpanded({});
     setCommentsByPost({});
     setCommentDrafts({});
     setLoadingComments({});
     setNewPostCount(0);
-  }, [refresh]);
+  }, [feedQueryIdentity]);
 
-  const loadMore = useCallback(async () => {
-    if (!hasMore || loadingMore || loading) return;
-    const list = postsRef.current;
-    if (list.length === 0) return;
-    const last = list[list.length - 1];
-    if (!last) return;
-    setLoadingMore(true);
-
-    if (useServerSearch) {
-      const res = await searchCommunityPostsPage(
-        pageSize,
-        { created_at: last.created_at, id: last.id },
-        debouncedSearch,
-        topicFilter,
-        authorIdsForServerSearch,
+  const patchPostsInCache = useCallback(
+    (mapFn: (p: CommunityPostRow) => CommunityPostRow) => {
+      queryClient.setQueryData<InfiniteData<CommunityPostRow[]>>(feedQueryKey, (old) =>
+        mapPostRowsInInfiniteData(old, mapFn),
       );
-      setLoadingMore(false);
-      if (res.error) {
-        toast({ title: "Could not load more", description: res.error.message, variant: "destructive" });
-        return;
-      }
-      const next = res.data ?? [];
-      if (next.length === 0) {
-        setHasMore(false);
-        return;
-      }
-      setPosts((prev) => [...prev, ...next]);
-      setHasMore(next.length >= pageSize);
-      return;
-    }
+    },
+    [queryClient, feedQueryKey],
+  );
 
-    const res = await fetchPage(pageSize, { created_at: last.created_at, id: last.id });
-    setLoadingMore(false);
-    if (res.error) {
-      toast({ title: "Could not load more", description: res.error.message, variant: "destructive" });
-      return;
-    }
-    const next = res.data ?? [];
-    if (next.length === 0) {
-      setHasMore(false);
-      return;
-    }
-    setPosts((prev) => [...prev, ...next]);
-    setHasMore(next.length >= pageSize);
-  }, [
-    hasMore,
-    loadingMore,
-    loading,
-    fetchPage,
-    pageSize,
-    toast,
-    useServerSearch,
-    debouncedSearch,
-    topicFilter,
-    authorIdsForServerSearch,
-  ]);
+  const removePostFromCache = useCallback(
+    (postId: string) => {
+      queryClient.setQueryData<InfiniteData<CommunityPostRow[]>>(feedQueryKey, (old) =>
+        filterPostRowsInInfiniteData(old, (p) => p.id !== postId),
+      );
+    },
+    [queryClient, feedQueryKey],
+  );
+
+  const { pullProgress } = usePullToRefresh({
+    anchorRef: pullAnchorRef,
+    onRefresh: runRefresh,
+    enabled: isSupabaseConfigured(),
+    isBusy: refreshing || loadingPosts || feedQuery.isFetching,
+  });
 
   useEffect(() => {
     const el = loadMoreSentinelRef.current;
-    if (!el || !hasMore || loading) return;
+    if (!el || !feedQuery.hasNextPage || loadingPosts) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) void loadMore();
+        if (!entries[0]?.isIntersecting || feedQuery.isFetchingNextPage) return;
+        void feedQuery.fetchNextPage();
       },
       { rootMargin: "240px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasMore, loadMore, loading, posts.length]);
+  }, [feedQuery, feedQuery.hasNextPage, feedQuery.isFetchingNextPage, loadingPosts, posts.length]);
 
   useEffect(() => {
     if (!isSupabaseConfigured() || useServerSearch || !props.viewerId) return;
@@ -465,8 +457,8 @@ export function FeedPostList(props: {
     }
     const loaded = res.data ?? [];
     setCommentsByPost((m) => ({ ...m, [postId]: loaded }));
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, comment_count: Math.max(p.comment_count, loaded.length) } : p)),
+    patchPostsInCache((p) =>
+      p.id === postId ? { ...p, comment_count: Math.max(p.comment_count, loaded.length) } : p,
     );
   }
 
@@ -490,7 +482,7 @@ export function FeedPostList(props: {
     }
     setCommentDrafts((m) => ({ ...m, [postId]: "" }));
     setCommentsByPost((m) => ({ ...m, [postId]: [...(m[postId] ?? []), ...(res.data ? [res.data] : [])] }));
-    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)));
+    patchPostsInCache((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
   }
 
   async function onAskBeatie(postId: string) {
@@ -504,7 +496,7 @@ export function FeedPostList(props: {
       const res = await requestAiFeedReply(postId);
       if (res.ok) {
         setCommentsByPost((m) => ({ ...m, [postId]: [...(m[postId] ?? []), res.comment] }));
-        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)));
+        patchPostsInCache((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p));
         toast({ title: "Beatie replied", description: "Their reply appears in the thread below." });
         return;
       }
@@ -536,14 +528,12 @@ export function FeedPostList(props: {
       toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
       return;
     }
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-        const nextLiked = !p.liked_by_me;
-        const nextCount = Math.max(0, p.like_count + (nextLiked ? 1 : -1));
-        return { ...p, liked_by_me: nextLiked, like_count: nextCount };
-      }),
-    );
+    patchPostsInCache((p) => {
+      if (p.id !== postId) return p;
+      const nextLiked = !p.liked_by_me;
+      const nextCount = Math.max(0, p.like_count + (nextLiked ? 1 : -1));
+      return { ...p, liked_by_me: nextLiked, like_count: nextCount };
+    });
   }
 
   async function onSavePost(postId: string) {
@@ -554,11 +544,11 @@ export function FeedPostList(props: {
     const cur = postsRef.current.find((p) => p.id === postId);
     if (!cur) return;
     // Optimistic update; togglePostSave is idempotent (duplicate PK treated as success).
-    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p)));
+    patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: !p.saved_by_me } : p));
     const res = await togglePostSave(postId, cur.saved_by_me);
     if (res.error) {
       // Revert on failure.
-      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, saved_by_me: cur.saved_by_me } : p)));
+      patchPostsInCache((p) => (p.id === postId ? { ...p, saved_by_me: cur.saved_by_me } : p));
       toast({ title: "Could not update bookmark", description: res.error.message, variant: "destructive" });
     }
   }
@@ -595,9 +585,7 @@ export function FeedPostList(props: {
       return;
     }
     setCommentsByPost((m) => ({ ...m, [postId]: (m[postId] ?? []).filter((c) => c.id !== commentId) }));
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p)),
-    );
+    patchPostsInCache((p) => (p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p));
   }
 
   function openDeletePost(postId: string) {
@@ -613,7 +601,7 @@ export function FeedPostList(props: {
       toast({ title: "Could not delete", description: res.error.message, variant: "destructive" });
       return;
     }
-    setPosts((prev) => prev.filter((p) => p.id !== deletePostId));
+    removePostFromCache(deletePostId);
     setDeletePostId(null);
     toast({ title: "Deleted", description: "Your post was removed." });
   }
@@ -638,7 +626,7 @@ export function FeedPostList(props: {
       return;
     }
     if (res.data) {
-      setPosts((prev) => prev.map((p) => (p.id === editPost.id ? res.data! : p)));
+      patchPostsInCache((p) => (p.id === editPost.id ? res.data! : p));
     }
     setEditPost(null);
     toast({ title: "Updated", description: "Your post was updated." });
@@ -648,15 +636,15 @@ export function FeedPostList(props: {
   const searchNoResults =
     Boolean(searchLabelRaw) &&
     displayPosts.length === 0 &&
-    !loading &&
+    !loadingPosts &&
     (useServerSearch ? posts.length === 0 : posts.length > 0);
 
   const savedFilterEmpty =
-    Boolean(props.savedOnly) && !loading && posts.length > 0 && displayPosts.length === 0;
+    Boolean(props.savedOnly) && !loadingPosts && posts.length > 0 && displayPosts.length === 0;
 
   const followingOnboardingEmpty =
     props.feedTab === "following" &&
-    !loading &&
+    !loadingPosts &&
     posts.length === 0 &&
     !useServerSearch &&
     !props.savedOnly &&
@@ -687,7 +675,7 @@ export function FeedPostList(props: {
             size="sm"
             variant="outline"
             onClick={() => void runRefresh()}
-            disabled={refreshing || loading}
+            disabled={refreshing || loadingPosts}
             className="gap-1.5"
           >
             <RefreshCw className="h-4 w-4" aria-hidden />
@@ -710,7 +698,7 @@ export function FeedPostList(props: {
         </div>
       ) : null}
 
-      {loading ? (
+      {loadingPosts ? (
         <FeedLoadingSkeleton />
       ) : searchNoResults ? (
         <EmptyState
@@ -820,8 +808,8 @@ export function FeedPostList(props: {
                 onAskBeatie={beatieFeedBotUserId ? () => void onAskBeatie(post.id) : undefined}
                 askBeatieBusy={Boolean(askBeatieBusy[post.id])}
                 onLikersLoaded={({ visibleCount }) => {
-                  setPosts((prev) =>
-                    prev.map((p) => (p.id === post.id ? { ...p, like_count: Math.max(p.like_count, visibleCount) } : p)),
+                  patchPostsInCache((p) =>
+                    p.id === post.id ? { ...p, like_count: Math.max(p.like_count, visibleCount) } : p,
                   );
                 }}
               />
@@ -831,7 +819,7 @@ export function FeedPostList(props: {
       )}
 
       <div ref={loadMoreSentinelRef} className="h-10" />
-      {loadingMore ? (
+      {feedQuery.isFetchingNextPage ? (
         <div className="flex justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden />
         </div>

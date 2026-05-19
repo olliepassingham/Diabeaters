@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { BellOff, ChevronRight, EyeOff, MessageCircle, MoreHorizontal, Pin, Search } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -22,6 +23,7 @@ import {
   type DmMessageRow,
   upsertDmThreadUserSettings,
   type ThreadWithMembers,
+  DM_INBOX_CHANGED,
 } from "@/lib/community";
 import {
   getProfileIdByPublicHandle,
@@ -117,21 +119,155 @@ function writeThreadIdList(key: string, ids: string[]): void {
   }
 }
 
+const DM_INBOX_QK = ["dm-inbox"] as const;
+
+type DmInboxDetails = {
+  lastByThreadId: Record<string, DmMessageRow | null>;
+  labels: Record<string, string>;
+  avatarByUserId: Record<string, string | null>;
+  handleByUserId: Record<string, string>;
+  serverMutedByThreadId: Record<string, boolean>;
+  serverHiddenByThreadId: Record<string, boolean>;
+};
+
+async function fetchDmInboxThreadDetails(
+  list: ThreadWithMembers[],
+  viewerUserId: string,
+  onLastMessagesError?: (message: string) => void,
+): Promise<DmInboxDetails> {
+  const empty: DmInboxDetails = {
+    lastByThreadId: {},
+    labels: {},
+    avatarByUserId: {},
+    handleByUserId: {},
+    serverMutedByThreadId: {},
+    serverHiddenByThreadId: {},
+  };
+  if (list.length === 0) return empty;
+
+  const threadIds = list.map((t) => t.id);
+  const otherIds = [
+    ...new Set(
+      list
+        .map((t) => otherMemberUserId(t.members, viewerUserId))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const [lastRes, profileMap, settingsRes] = await Promise.all([
+    fetchLatestDmMessageForThreads(threadIds),
+    otherIds.length > 0 ? getProfilesByIds(otherIds) : Promise.resolve(new Map()),
+    isSupabaseConfigured() ? fetchDmThreadUserSettings(threadIds) : Promise.resolve({ data: new Map(), error: null }),
+  ]);
+
+  if (lastRes.error) {
+    onLastMessagesError?.(lastRes.error.message);
+  }
+
+  const lastRecord: Record<string, DmMessageRow | null> = {};
+  for (const [tid, row] of lastRes.data) {
+    lastRecord[tid] = row;
+  }
+
+  const av: Record<string, string | null> = {};
+  const lbl: Record<string, string> = {};
+  const hdl: Record<string, string> = {};
+  for (const id of otherIds) {
+    const p = profileMap.get(id);
+    av[id] = p?.avatar_url ?? null;
+    lbl[id] = p?.full_name?.trim() || shortId(id);
+    hdl[id] = (p?.public_handle ?? "").trim();
+  }
+
+  const muted: Record<string, boolean> = {};
+  const hidden: Record<string, boolean> = {};
+  if (settingsRes?.data) {
+    for (const [tid, row] of settingsRes.data.entries()) {
+      muted[tid] = Boolean(row.muted);
+      hidden[tid] = Boolean(row.hidden);
+    }
+  }
+
+  return {
+    lastByThreadId: lastRecord,
+    labels: lbl,
+    avatarByUserId: av,
+    handleByUserId: hdl,
+    serverMutedByThreadId: muted,
+    serverHiddenByThreadId: hidden,
+  };
+}
+
 export default function CommunityMessagesPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [threads, setThreads] = useState<ThreadWithMembers[]>([]);
-  const [loading, setLoading] = useState(true);
-  /** After thread rows render, last-message previews + avatars still loading. */
-  const [threadDetailsLoading, setThreadDetailsLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const userId = user?.id ?? "";
+
+  const threadsQuery = useQuery({
+    queryKey: [...DM_INBOX_QK, "threads", userId],
+    queryFn: async () => {
+      const res = await fetchDmThreadsForCurrentUser();
+      if (res.error) throw new Error(res.error.message);
+      return res.data ?? [];
+    },
+    enabled: Boolean(userId && isSupabaseConfigured()),
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+  });
+
+  const threadIdsSig = useMemo(() => {
+    const t = threadsQuery.data ?? [];
+    return t.map((x) => x.id).sort().join("|");
+  }, [threadsQuery.data]);
+
+  const detailsQuery = useQuery({
+    queryKey: [...DM_INBOX_QK, "details", userId, threadIdsSig],
+    queryFn: () =>
+      fetchDmInboxThreadDetails(threadsQuery.data ?? [], userId, (msg) => {
+        toast({ title: "Could not load last messages", description: msg, variant: "destructive" });
+      }),
+    enabled: Boolean(userId && threadIdsSig.length > 0 && isSupabaseConfigured()),
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+  });
+
+  const threads = threadsQuery.data ?? [];
+  const lastByThreadId = detailsQuery.data?.lastByThreadId ?? {};
+  const labels = detailsQuery.data?.labels ?? {};
+  const avatarByUserId = detailsQuery.data?.avatarByUserId ?? {};
+  const handleByUserId = detailsQuery.data?.handleByUserId ?? {};
+  const serverMutedByThreadId = detailsQuery.data?.serverMutedByThreadId ?? {};
+  const serverHiddenByThreadId = detailsQuery.data?.serverHiddenByThreadId ?? {};
+
+  const loading = threadsQuery.isPending && threadsQuery.data === undefined;
+  const threadDetailsLoading = Boolean(
+    (threadsQuery.data?.length ?? 0) > 0 && (detailsQuery.isPending || detailsQuery.isFetching),
+  );
+
+  const refresh = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
+    notifyDmInboxChanged();
+  }, [queryClient]);
+
+  useEffect(() => {
+    if (!threadsQuery.error) return;
+    toast({
+      title: "Could not load messages",
+      description: threadsQuery.error.message,
+      variant: "destructive",
+    });
+  }, [threadsQuery.error, toast]);
+
+  useEffect(() => {
+    const onInbox = () => void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
+    window.addEventListener(DM_INBOX_CHANGED, onInbox);
+    return () => window.removeEventListener(DM_INBOX_CHANGED, onInbox);
+  }, [queryClient]);
+
   const [handleInput, setHandleInput] = useState("");
   const [starting, setStarting] = useState(false);
-  /** Other user id -> display name (until profile batch loads) */
-  const [labels, setLabels] = useState<Record<string, string>>({});
-  const [lastByThreadId, setLastByThreadId] = useState<Record<string, DmMessageRow | null>>({});
-  const [avatarByUserId, setAvatarByUserId] = useState<Record<string, string | null>>({});
-  const [handleByUserId, setHandleByUserId] = useState<Record<string, string>>({});
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<
@@ -143,8 +279,6 @@ export default function CommunityMessagesPage() {
   const [mutedThreadIds, setMutedThreadIds] = useState<string[]>(() => readThreadIdList(DM_MUTES_KEY));
   const [hiddenThreadIds, setHiddenThreadIds] = useState<string[]>(() => readThreadIdList(DM_HIDDEN_KEY));
   const [showHidden, setShowHidden] = useState(false);
-  const [serverMutedByThreadId, setServerMutedByThreadId] = useState<Record<string, boolean>>({});
-  const [serverHiddenByThreadId, setServerHiddenByThreadId] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setPinnedThreadIds(readPinnedThreadIds());
@@ -264,9 +398,9 @@ export default function CommunityMessagesPage() {
         toast({ title: "Could not update mute", description: res.error.message, variant: "destructive" });
         return;
       }
-      setServerMutedByThreadId((m) => ({ ...m, [threadId]: next }));
+      void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
     },
-    [serverMutedByThreadId, toast, toggleMuted],
+    [serverMutedByThreadId, toast, toggleMuted, queryClient],
   );
 
   const hideThreadServerFirst = useCallback(
@@ -288,21 +422,20 @@ export default function CommunityMessagesPage() {
         toast({ title: "Could not hide conversation", description: res.error.message, variant: "destructive" });
         return;
       }
-      setServerHiddenByThreadId((m) => ({ ...m, [threadId]: true }));
+      void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
       toast({
         title: "Conversation hidden",
         description: "You can show hidden conversations using the toggle above.",
       });
       notifyDmInboxChanged();
     },
-    [toast, hideThread],
+    [toast, hideThread, queryClient],
   );
 
   const unhideThreadServerFirst = useCallback(
     async (threadId: string) => {
       // Always update local immediately so the UI responds even if server isn't ready.
       unhideThreadLocal(threadId);
-      setServerHiddenByThreadId((m) => ({ ...m, [threadId]: false }));
 
       if (!isSupabaseConfigured()) return;
       const res = await upsertDmThreadUserSettings(threadId, { hidden: false });
@@ -314,110 +447,12 @@ export default function CommunityMessagesPage() {
           return;
         }
         toast({ title: "Could not unhide conversation", description: res.error.message, variant: "destructive" });
+        return;
       }
+      void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
     },
-    [toast, unhideThreadLocal],
+    [toast, unhideThreadLocal, queryClient],
   );
-
-  const refresh = useCallback(async () => {
-    setThreadDetailsLoading(false);
-    setLoading(true);
-    const res = await fetchDmThreadsForCurrentUser();
-    if (res.error) {
-      toast({
-        title: "Could not load messages",
-        description: res.error.message,
-        variant: "destructive",
-      });
-      setThreads([]);
-      setLastByThreadId({});
-      setAvatarByUserId({});
-      setHandleByUserId({});
-      setLoading(false);
-      notifyDmInboxChanged();
-      return;
-    }
-
-    const list = res.data ?? [];
-    setThreads(list);
-
-    if (list.length === 0) {
-      setLastByThreadId({});
-      setAvatarByUserId({});
-      setHandleByUserId({});
-      setLoading(false);
-      notifyDmInboxChanged();
-      return;
-    }
-
-    // Show conversation rows immediately; fill previews + avatars in a follow-up (faster first paint).
-    setLoading(false);
-    setThreadDetailsLoading(true);
-
-    const threadIds = list.map((t) => t.id);
-    const otherIds = user?.id
-      ? [
-          ...new Set(
-            list
-              .map((t) => otherMemberUserId(t.members, user.id))
-              .filter((id): id is string => Boolean(id)),
-          ),
-        ]
-      : [];
-
-    try {
-      const [lastRes, profileMap, settingsRes] = await Promise.all([
-        fetchLatestDmMessageForThreads(threadIds),
-        otherIds.length > 0 ? getProfilesByIds(otherIds) : Promise.resolve(new Map()),
-        isSupabaseConfigured() ? fetchDmThreadUserSettings(threadIds) : Promise.resolve({ data: new Map(), error: null }),
-      ]);
-
-      if (lastRes.error) {
-        toast({
-          title: "Could not load last messages",
-          description: lastRes.error.message,
-          variant: "destructive",
-        });
-      }
-
-      const lastRecord: Record<string, DmMessageRow | null> = {};
-      for (const [tid, row] of lastRes.data) {
-        lastRecord[tid] = row;
-      }
-      setLastByThreadId(lastRecord);
-
-      const av: Record<string, string | null> = {};
-      const lbl: Record<string, string> = {};
-      const hdl: Record<string, string> = {};
-      for (const id of otherIds) {
-        const p = profileMap.get(id);
-        av[id] = p?.avatar_url ?? null;
-        lbl[id] = p?.full_name?.trim() || shortId(id);
-        hdl[id] = (p?.public_handle ?? "").trim();
-      }
-      setAvatarByUserId(av);
-      setLabels(lbl);
-      setHandleByUserId(hdl);
-
-      if (settingsRes?.data) {
-        const muted: Record<string, boolean> = {};
-        const hidden: Record<string, boolean> = {};
-        for (const [tid, row] of settingsRes.data.entries()) {
-          muted[tid] = Boolean(row.muted);
-          hidden[tid] = Boolean(row.hidden);
-        }
-        setServerMutedByThreadId(muted);
-        setServerHiddenByThreadId(hidden);
-      }
-    } finally {
-      setThreadDetailsLoading(false);
-      notifyDmInboxChanged();
-    }
-  }, [toast, user?.id]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   useEffect(() => {
     const raw = handleInput.trim().replace(/^@/, "");

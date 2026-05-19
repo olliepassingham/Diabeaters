@@ -9,14 +9,12 @@ import { DM_INBOX_CHANGED } from "@/lib/community/dm-inbox-events";
 import { INAPP_NOTIFICATIONS_CHANGED } from "@/lib/in-app-notifications-events";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
-import { prefetchCommunityMessages, prefetchCommunityThread, prefetchNotificationsPage } from "@/components/bottom-nav";
+import { prefetchCommunityNavigationBundle } from "@/components/bottom-nav";
 
 const POLL_MS = 50_000;
 
 function prefetchFromDmHeaderIcon(): void {
-  prefetchCommunityMessages();
-  prefetchCommunityThread();
-  prefetchNotificationsPage();
+  prefetchCommunityNavigationBundle();
 }
 
 /**
