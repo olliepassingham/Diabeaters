@@ -209,23 +209,26 @@ function refusalFallbackCoachReply(refusal: string): CoachReply {
 /**
  * Calls OpenAI Chat Completions with Structured Outputs (`json_schema` + strict)
  * when supported, with a one-time fallback to JSON mode if the API rejects the schema.
+ *
+ * Shared by private coach and community-feed Ask Beatie (different `messages` only).
  */
-export async function callOpenAiChatJson(args: {
+export async function callOpenAiStructuredCoachJson(args: {
   apiKey: string;
-  context: CoachContext;
-  history: CoachTurn[];
-  userMessage: string;
-  /** Defaults to `"patient"`. Selects the patient vs supporter system prompt. */
-  audience?: CoachAudience;
+  messages: ChatMessage[];
+  /** Completion cap; default 2048. Feed replies use a lower value to keep comments short. */
+  maxCompletionTokens?: number;
 }): Promise<LlmCallResult> {
-  const audience: CoachAudience = args.audience === "supporter" ? "supporter" : "patient";
-  const messages = buildMessages(args.context, args.history, args.userMessage, audience);
+  const maxTok = (() => {
+    const n = args.maxCompletionTokens;
+    if (n == null || !Number.isFinite(n)) return 2048;
+    return Math.min(4096, Math.max(128, Math.floor(n)));
+  })();
 
   const base = {
     model: MODEL,
-    messages,
+    messages: args.messages,
     temperature: 0.4,
-    max_tokens: 2048,
+    max_tokens: maxTok,
   };
 
   const structuredBody = {
@@ -310,4 +313,21 @@ export async function callOpenAiChatJson(args: {
   };
 
   return { reply: parsed, rawContent: content, usage };
+}
+
+/**
+ * Calls OpenAI Chat Completions with Structured Outputs (`json_schema` + strict)
+ * when supported, with a one-time fallback to JSON mode if the API rejects the schema.
+ */
+export async function callOpenAiChatJson(args: {
+  apiKey: string;
+  context: CoachContext;
+  history: CoachTurn[];
+  userMessage: string;
+  /** Defaults to `"patient"`. Selects the patient vs supporter system prompt. */
+  audience?: CoachAudience;
+}): Promise<LlmCallResult> {
+  const audience: CoachAudience = args.audience === "supporter" ? "supporter" : "patient";
+  const messages = buildMessages(args.context, args.history, args.userMessage, audience);
+  return callOpenAiStructuredCoachJson({ apiKey: args.apiKey, messages });
 }

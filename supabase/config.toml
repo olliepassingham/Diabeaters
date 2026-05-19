@@ -39,3 +39,7 @@ verify_jwt = false
 # AI Coach: user JWT verified at the gateway (default). Handler also validates with auth.getUser.
 [functions.ai_coach]
 verify_jwt = true
+
+# Ask Beatie on community feed — same gateway JWT pattern as ai_coach.
+[functions.ai_feed_reply]
+verify_jwt = true

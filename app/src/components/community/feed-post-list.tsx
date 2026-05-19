@@ -55,6 +55,8 @@ import {
   type CommunityTopicRow,
   type FeedCursor,
 } from "@/lib/community";
+import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
+import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
 import { getProfilesByIds } from "@/lib/profile";
 
 type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null; loading?: boolean };
@@ -152,6 +154,8 @@ export function FeedPostList(props: {
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const commentInputRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const beatieFeedBotUserId = useMemo(() => getBeatieFeedBotUserIdFromEnv(), []);
+  const [askBeatieBusy, setAskBeatieBusy] = useState<Record<string, boolean>>({});
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: "post" | "comment"; id: string } | null>(null);
@@ -489,6 +493,40 @@ export function FeedPostList(props: {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)));
   }
 
+  async function onAskBeatie(postId: string) {
+    if (!props.viewerId) {
+      toast({ title: "Sign in", description: "Log in to ask Beatie.", variant: "destructive" });
+      return;
+    }
+    if (askBeatieBusy[postId]) return;
+    setAskBeatieBusy((m) => ({ ...m, [postId]: true }));
+    try {
+      const res = await requestAiFeedReply(postId);
+      if (res.ok) {
+        setCommentsByPost((m) => ({ ...m, [postId]: [...(m[postId] ?? []), res.comment] }));
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: p.comment_count + 1 } : p)));
+        toast({ title: "Beatie replied", description: "Their reply appears in the thread below." });
+        return;
+      }
+      const desc =
+        res.message ||
+        (res.code === "beatie_already_replied"
+          ? "Beatie has already commented on this post."
+          : res.code === "consent_required"
+            ? "Accept Beatie consent in Coach first."
+            : res.code === "rate_limited"
+              ? "Daily limit reached — try again tomorrow."
+              : res.code);
+      toast({
+        title: "Ask Beatie did not run",
+        description: desc,
+        variant: "destructive",
+      });
+    } finally {
+      setAskBeatieBusy((m) => ({ ...m, [postId]: false }));
+    }
+  }
+
   async function onLike(postId: string) {
     if (!props.viewerId) return;
     const cur = postsRef.current.find((p) => p.id === postId);
@@ -778,6 +816,9 @@ export function FeedPostList(props: {
                 onMenuDelete={() => openDeletePost(post.id)}
                 onDeleteComment={(commentId) => void onDeleteComment(post.id, commentId)}
                 showPermalink
+                beatieFeedBotUserId={beatieFeedBotUserId}
+                onAskBeatie={beatieFeedBotUserId ? () => void onAskBeatie(post.id) : undefined}
+                askBeatieBusy={Boolean(askBeatieBusy[post.id])}
                 onLikersLoaded={({ visibleCount }) => {
                   setPosts((prev) =>
                     prev.map((p) => (p.id === post.id ? { ...p, like_count: Math.max(p.like_count, visibleCount) } : p)),

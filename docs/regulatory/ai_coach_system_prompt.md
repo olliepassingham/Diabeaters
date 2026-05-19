@@ -15,6 +15,17 @@ This file is the canonical specification for what the in-app assistant **Beatie*
 - **NOT intended use:** diagnosis, prescription, dose calculation, or any clinical decision support. Drift into clinical advice would reclassify the app as a medical device under UK MDR / EU MDR (Class IIa or higher).
 - **Out of scope users (clinical lanes):** gestational diabetes, type 2 management plans, in-patient acute care. Paediatric type 1 is in scope only as general education with paediatric deferrals; the app is not a substitute for a paediatric diabetes team.
 
+### 1b Community feed — “Ask Beatie on a post”
+
+- **Who can trigger it:** only the **author of the post** (original poster). Other readers cannot invoke the model for someone else’s thread from the app.
+- **What is sent to the model:** the post body, fixed topic id/label, and existing public comments on that post, in chronological order. **No** private coach context pack (no supplies counts, scenarios, fortnight aggregates, pharmacy text, etc.) is included by default.
+- **Consent and limits:** the same stored **Beatie / AI Coach consent** gate and a **separate per-user per-UTC-day rate limit** from private coach (`ai_feed_reply_rate_limits` vs `ai_coach_rate_limits`).
+- **Persistence:** one new row in `community_post_comments` with `author_id` set to a **dedicated feed bot user** (created in Supabase Auth). Normal clients cannot forge this author because RLS requires `author_id = auth.uid()` on insert; the Edge Function uses the **service role** to insert as the bot.
+- **Safety chain:** the same **keyword interceptor** and **post-filter** stack as private Beatie runs on the generated reply. If the interceptor fires, **no** public comment is inserted; the poster sees a short handoff message instead.
+- **Brevity:** the feed-specific prompt requires a **short** public `reply`; after the shared post-filter, the feed Edge handler **truncates** the stored comment to a small character budget so thread replies stay skimmable on mobile.
+- **Notifications:** the app does **not** call the `notify_feed_push` Edge Function for Beatie’s comment (unlike human comments). In-app notifications may still follow database triggers for “new comment on your post” depending on project SQL; product policy should treat the bot like any other comment for moderation/reporting.
+- **Operational setup:** see [`docs/operations/beatie_feed_bot_setup.md`](../operations/beatie_feed_bot_setup.md).
+
 ---
 
 ## 2. System prompt (production)
@@ -583,6 +594,7 @@ Add new rows here as edge cases surface in production.
 
 ## 10. Change log
 
+- _2026-05-19_ — §1b: community-feed “Ask Beatie” (OP-only, feed-safe context, bot insert, separate rate limit, interceptor/post-filter, no client `notify_feed_push`); replies shortened via feed prompt + post-filter truncation cap.
 - _2026-05-10_ — Beatie: system prompt distinguishes `/routines` (saved habits in the app) from `/education` (reading hub); post-filter rewrites `/education` → `/routines` when a button label clearly targets the Routines tool but the model returned the wrong href.
 - _2026-05-01_ — initial draft; pending review.
 - _2026-05-01_ — review pass: broaden refusals to cover device/equipment changes and CGM-arrow interpretation; ban clinician roleplay and refusal negotiation; expand href allow-list; tone bans (no emojis / exclamations / "good"-"bad" BG / control language); Personalise lane reframed as observation-not-interpretation; add cross-cutting rules (no behavioural moralising, no competitor recommendations); tighten `hypo` regex; add `refuse_device_change` template; post-filter catches worded numbers, hedges, and CGM-arrow actions; add 6 acceptance test rows.

@@ -48,6 +48,7 @@ export async function invokeEdgeFunctionPost<TJson>(
   body: Record<string, unknown>,
   env: { url: string; anonKey: string },
   auth: { Authorization: string },
+  fetchInit?: Pick<RequestInit, "signal">,
 ): Promise<{ data: TJson | null; error: Error | null }> {
   const url = `${env.url}/functions/v1/${functionName}`;
 
@@ -59,6 +60,7 @@ export async function invokeEdgeFunctionPost<TJson>(
       Authorization: auth.Authorization,
     },
     body: JSON.stringify(body),
+    signal: fetchInit?.signal,
   });
 
   const text = await res.text();
@@ -72,10 +74,16 @@ export async function invokeEdgeFunctionPost<TJson>(
   }
 
   if (!res.ok) {
-    const detail =
+    let detail =
       parsed && typeof parsed === "object" && parsed !== null && "error" in parsed
         ? String((parsed as { error?: unknown }).error)
         : text || res.statusText;
+    if (parsed && typeof parsed === "object" && parsed !== null) {
+      const msg = (parsed as { message?: unknown }).message;
+      if (typeof msg === "string" && msg.trim()) {
+        detail = `${detail}: ${msg.trim()}`;
+      }
+    }
     return { data: null, error: new Error(`${res.status}: ${detail}`) };
   }
 

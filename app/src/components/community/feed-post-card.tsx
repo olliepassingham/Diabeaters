@@ -13,6 +13,7 @@ import {
   Pencil,
   Reply,
   Share2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -311,6 +312,10 @@ type FeedPostCardProps = {
    * parent should use Math.max with existing count when merging).
    */
   onLikersLoaded?: (info: { visibleCount: number }) => void;
+  /** When set with `onAskBeatie`, post author sees Ask Beatie on expanded thread. */
+  beatieFeedBotUserId?: string | null;
+  onAskBeatie?: () => void;
+  askBeatieBusy?: boolean;
 };
 
 export function FeedPostCard({
@@ -340,6 +345,9 @@ export function FeedPostCard({
   onDeleteComment,
   showPermalink,
   onLikersLoaded,
+  beatieFeedBotUserId,
+  onAskBeatie,
+  askBeatieBusy,
 }: FeedPostCardProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -913,11 +921,38 @@ export function FeedPostCard({
                       </Button>
                     </div>
                   ) : null}
+                  {isAuthor && onAskBeatie ? (
+                    <div className="pb-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        disabled={askBeatieBusy}
+                        onClick={onAskBeatie}
+                      >
+                        {askBeatieBusy ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                            Beatie is writing…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            Ask Beatie (educational)
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : null}
                   <ul className="space-y-2">
                     {sortedComments.map((c) => {
                       const cm = commentMeta(c.author_id);
                       const canReportComment = viewerId && viewerId !== c.author_id;
                       const isCommentAuthor = Boolean(viewerId && viewerId === c.author_id);
+                      const isBeatieComment = Boolean(
+                        beatieFeedBotUserId && c.author_id === beatieFeedBotUserId,
+                      );
                       return (
                         <li key={c.id} className="flex gap-2 rounded-md bg-muted/40 px-2 py-2">
                           <CommunityAuthorAvatar
@@ -935,6 +970,11 @@ export function FeedPostCard({
                                 >
                                   {cm.name}
                                 </Link>
+                                {isBeatieComment ? (
+                                  <Badge variant="secondary" className="px-1 py-0 text-[10px] font-normal leading-tight">
+                                    Beatie
+                                  </Badge>
+                                ) : null}
                                 <span className="text-tiny text-muted-foreground" title={c.created_at}>
                                   {formatRelativeTime(c.created_at)}
                                 </span>

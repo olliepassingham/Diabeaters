@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -49,6 +49,8 @@ import {
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
+import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
+import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
 import { getProfilesByIds } from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -76,6 +78,8 @@ export default function CommunityPostPage() {
   const [commentDraft, setCommentDraft] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const beatieFeedBotUserId = useMemo(() => getBeatieFeedBotUserIdFromEnv(), []);
+  const [askBeatieBusy, setAskBeatieBusy] = useState(false);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: "post" | "comment"; id: string } | null>(
@@ -212,6 +216,36 @@ export default function CommunityPostPage() {
     if (res.data) {
       setComments((prev) => [...prev, res.data!]);
       setPost((p) => (p ? { ...p, comment_count: p.comment_count + 1 } : p));
+    }
+  }
+
+  async function handleAskBeatie() {
+    if (!postId || !post || !user) {
+      toast({ title: "Sign in", description: "Log in to ask Beatie.", variant: "destructive" });
+      return;
+    }
+    if (askBeatieBusy) return;
+    setAskBeatieBusy(true);
+    try {
+      const res = await requestAiFeedReply(postId);
+      if (res.ok) {
+        setComments((prev) => [...prev, res.comment]);
+        setPost((p) => (p ? { ...p, comment_count: p.comment_count + 1 } : p));
+        toast({ title: "Beatie replied", description: "Their reply appears in the thread below." });
+        return;
+      }
+      const desc =
+        res.message ||
+        (res.code === "beatie_already_replied"
+          ? "Beatie has already commented on this post."
+          : res.code === "consent_required"
+            ? "Accept Beatie consent in Coach first."
+            : res.code === "rate_limited"
+              ? "Daily limit reached — try again tomorrow."
+              : res.code);
+      toast({ title: "Ask Beatie did not run", description: desc, variant: "destructive" });
+    } finally {
+      setAskBeatieBusy(false);
     }
   }
 
@@ -376,6 +410,9 @@ export default function CommunityPostPage() {
         }}
         onMenuDelete={() => setDeletePostId(post.id)}
         onDeleteComment={(cid) => void handleDeleteComment(cid)}
+        beatieFeedBotUserId={beatieFeedBotUserId}
+        onAskBeatie={beatieFeedBotUserId ? () => void handleAskBeatie() : undefined}
+        askBeatieBusy={askBeatieBusy}
         onLikersLoaded={({ visibleCount }) => {
           setPost((prev) =>
             prev ? { ...prev, like_count: Math.max(prev.like_count, visibleCount) } : prev,
