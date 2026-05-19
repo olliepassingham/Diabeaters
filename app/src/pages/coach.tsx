@@ -23,10 +23,12 @@ import {
   AI_ASSISTANT_NAME,
   coachPageSubtitle,
   coachPageTitle,
+  coachPatientHeaderLead,
   coachSupporterHeaderLead,
   coachSupporterTopicScopeHint,
 } from "@/lib/ai-coach/persona";
 import { recordLastInteraction } from "@/lib/last-interaction";
+import { cn } from "@/lib/utils";
 
 function normalizeAudience(raw: string | null | undefined): CoachAudience {
   if (raw == null) return "patient";
@@ -481,17 +483,17 @@ export default function CoachPage() {
   }
 
   return (
-    <PageShell density="compact" className="flex min-h-0 flex-col pb-2">
+    <PageShell density="compact" className="flex min-h-0 min-w-0 flex-col pb-2">
       <PageHeader title={pageTitle} leading={<PageBackButton />} />
       <Card className="shrink-0 border-border/60 bg-muted/15 shadow-sm dark:bg-muted/10">
         <CardContent
-          className={isSupporter ? "flex gap-2 py-2 pl-3 pr-2 sm:pl-4" : "flex gap-3 py-3 sm:py-4"}
+          className={isSupporter ? "flex gap-2 py-2 pl-3 pr-2 sm:pl-4" : "flex gap-2 py-2 pl-3 pr-2 sm:gap-3 sm:py-3 sm:pl-4"}
         >
           <Info
             className={
               isSupporter
                 ? "mt-0.5 h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4"
-                : "mt-0.5 h-4 w-4 shrink-0 text-primary"
+                : "mt-0.5 h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4"
             }
             aria-hidden
           />
@@ -521,21 +523,36 @@ export default function CoachPage() {
               </details>
             </div>
           ) : (
-            <div className="min-w-0 space-y-1.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-              <p>{coachPageSubtitle("patient")}</p>
-              {effectiveTopic !== "general" ? (
-                <p>
-                  <span className="font-medium text-foreground">Topic</span>
-                  <span className="text-muted-foreground"> · </span>
-                  {topicCfg.label}
-                </p>
-              ) : null}
-              {messages.length === 0 && effectiveTopic !== "general" ? <p>{topicCfg.emptyHint}</p> : null}
+            <div className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground sm:text-xs">
+              <p className="text-foreground/90">{coachPatientHeaderLead()}</p>
+              <details className="group mt-1.5 border-t border-border/40 pt-1.5">
+                <summary className="cursor-pointer list-none text-[10px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                  <span className="underline">Full disclaimer and topic</span>
+                  <span className="ml-1 text-muted-foreground/80 no-underline group-open:hidden">▼</span>
+                  <span className="ml-1 hidden text-muted-foreground/80 no-underline group-open:inline">▲</span>
+                </summary>
+                <div className="mt-2 space-y-2 pb-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <p>{coachPageSubtitle("patient")}</p>
+                  {effectiveTopic !== "general" ? (
+                    <p>
+                      <span className="font-medium text-foreground">Topic</span>
+                      <span className="text-muted-foreground"> · </span>
+                      {topicCfg.label}
+                      {messages.length === 0 ? (
+                        <>
+                          <br />
+                          <span className="mt-1 inline-block">{topicCfg.emptyHint}</span>
+                        </>
+                      ) : null}
+                    </p>
+                  ) : null}
+                </div>
+              </details>
             </div>
           )}
         </CardContent>
       </Card>
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 sm:gap-3">
         {sendError ? (
           <Alert variant="destructive" className="shrink-0">
             <AlertTitle>Could not send</AlertTitle>
@@ -558,31 +575,32 @@ export default function CoachPage() {
         ) : null}
 
         <div
-          className={
+          className={cn(
+            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40",
             isSupporter
-              ? "flex min-h-0 max-h-[min(34rem,calc(100dvh-11rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
-              : "flex min-h-0 max-h-[min(32rem,calc(100dvh-14rem))] flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/25 to-muted/5 shadow-inner dark:from-muted/15 dark:to-background/40"
-          }
+              ? "max-h-[min(34rem,calc(100dvh-11rem))]"
+              : "max-h-[min(32rem,calc(100dvh-14rem))]",
+          )}
           role="region"
           aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
         >
           <div
-            className="flex min-h-0 flex-1 flex-col space-y-3 overflow-y-auto overscroll-contain p-4"
+            className="flex min-h-0 min-w-0 flex-1 flex-col space-y-2 overflow-y-auto overscroll-contain p-3 sm:space-y-3 sm:p-4"
             role="log"
             aria-live="polite"
           >
             {messages.length === 0 && topicCfg.starters.length > 0 ? (
-              <div className="flex flex-wrap gap-2 py-1" role="group" aria-label="Suggested prompts">
+              <div className="flex min-w-0 w-full flex-col gap-1.5 py-0.5 sm:gap-2 sm:py-1" role="group" aria-label="Suggested prompts">
                 {topicCfg.starters.map((q) => (
                   <Button
                     key={q}
                     type="button"
                     size="sm"
                     variant="secondary"
-                    className="h-auto min-h-10 max-w-full rounded-xl whitespace-normal border border-border/60 bg-background/80 text-left text-xs font-normal shadow-sm backdrop-blur-sm"
+                    className="flex h-auto min-h-0 w-full min-w-0 items-start justify-start whitespace-normal break-words rounded-lg border border-border/60 bg-background/80 px-2.5 py-2 text-left text-[11px] font-normal leading-snug text-pretty shadow-sm backdrop-blur-sm sm:rounded-xl sm:px-3 sm:py-2.5 sm:text-xs"
                     onClick={() => setDraft(q)}
                   >
-                    {q}
+                    <span className="block min-w-0 w-full">{q}</span>
                   </Button>
                 ))}
               </div>
@@ -667,8 +685,8 @@ export default function CoachPage() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type your question…"
-            rows={3}
-            className="min-h-[5.5rem] flex-1 resize-none rounded-xl border-border/60 bg-background shadow-sm"
+            rows={2}
+            className="min-h-[4.25rem] flex-1 resize-none rounded-xl border-border/60 bg-background shadow-sm sm:min-h-[5.5rem]"
             disabled={sendMutation.isPending}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -694,7 +712,39 @@ export default function CoachPage() {
           </Button>
         </div>
 
-        <Card className="shrink-0 border-border/60 bg-muted/10 shadow-sm dark:bg-muted/5">
+        <details className="group sm:hidden shrink-0 rounded-2xl border border-border/60 bg-muted/10 shadow-sm dark:bg-muted/5">
+          <summary className="cursor-pointer list-none px-3 py-2.5 text-xs font-semibold leading-none text-foreground [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2">
+              <Info className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              About this chat
+              <span className="text-[10px] font-normal text-muted-foreground no-underline group-open:hidden">▼</span>
+              <span className="hidden text-[10px] font-normal text-muted-foreground no-underline group-open:inline">▲</span>
+            </span>
+          </summary>
+          <div className="space-y-2 border-t border-border/50 px-3 pb-3 pt-2 text-[11px] leading-relaxed text-muted-foreground">
+            <p>
+              <span className="font-medium uppercase tracking-wide text-foreground/90">Educational only</span>
+              {" · "}
+              Not medical advice. For urgent symptoms,{" "}
+              <Link href="/help-now" className="font-medium text-foreground underline underline-offset-2">
+                open Help Now
+              </Link>
+              .
+            </p>
+            <p>After 2 hours without a new message, this thread clears on this device.</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <button type="button" className="font-medium text-foreground underline underline-offset-2" onClick={clearChat}>
+                Delete chat history now
+              </button>
+              <span aria-hidden>·</span>
+              <Link href="/privacy" className="font-medium text-foreground underline underline-offset-2">
+                Privacy
+              </Link>
+            </div>
+          </div>
+        </details>
+
+        <Card className="hidden shrink-0 border-border/60 bg-muted/10 shadow-sm dark:bg-muted/5 sm:block">
           <CardHeader className="space-y-0 pb-2 pt-4">
             <div className="flex items-center gap-2">
               <Info className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />

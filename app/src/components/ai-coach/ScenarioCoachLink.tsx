@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { MessageCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { isAiCoachEnabled } from "@/lib/flags";
 import type { CoachTopicSlug } from "@/lib/ai-coach/topics";
 import { buildCoachHref } from "@/lib/ai-coach/links";
@@ -11,6 +11,8 @@ type Props = {
   /** Visible label; keep short for header toolbars. */
   label?: string;
   className?: string;
+  /** Button surface; defaults to outline for scenario headers. */
+  variant?: ButtonProps["variant"];
   /** Pre-fill the coach message box (max 500 chars). */
   q?: string | null;
   /** Entry source for breadcrumbs / analytics. */
@@ -21,12 +23,13 @@ export function ScenarioCoachLink({
   topic,
   label = scenarioAskAssistantLinkLabel(),
   className,
+  variant = "outline",
   q,
   from = "scenario-link",
 }: Props) {
   if (!isAiCoachEnabled) return null;
   return (
-    <Button variant="outline" size="sm" className={className ?? "min-h-11 whitespace-nowrap"} asChild>
+    <Button variant={variant} size="sm" className={className ?? "min-h-11 whitespace-nowrap"} asChild>
       <Link href={buildCoachHref({ topic, q, from })} data-testid={`link-scenario-coach-${topic}`}>
         <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
         {label}

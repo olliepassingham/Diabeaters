@@ -45,11 +45,12 @@ import {
   Navigation,
   Luggage,
   Trash2,
-  Plus
+  Plus,
+  Dumbbell,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { storage, Supply, UserSettings, UserProfile, HolidayPrep } from "@/lib/storage";
+import { storage, Supply, UserSettings, UserProfile, HolidayPrep, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   buildTravelWeatherRiskWarnings,
@@ -68,7 +69,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { upsertScenario } from "@/lib/scenarios-supabase";
+import { fetchScenarioStateForUser, upsertScenario } from "@/lib/scenarios-supabase";
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
@@ -79,6 +80,11 @@ import {
   buildActiveTravelTripProfileChips,
   type TravelTripStyle,
 } from "@/lib/travel-active-guidance";
+import { buildExerciseScenarioPlannerHref } from "@/lib/exercise-planner-href";
+import {
+  ExerciseWorkoutProgressBar,
+  formatExerciseElapsedShort,
+} from "@/components/exercise-active-session-extras";
 
 interface TravelPlan {
   duration: number;
@@ -93,6 +99,41 @@ interface TravelPlan {
   weatherChange: "warmer" | "colder" | "similar" | "unknown";
   weatherSeverity: "slight" | "moderate" | "extreme";
   tripStyle?: TravelTripStyle;
+}
+
+function travelTripStyleForCloud(tripStyle: TravelTripStyle | undefined): string | null {
+  if (!tripStyle || tripStyle === "not_sure") return null;
+  return tripStyle;
+}
+
+function buildTravelScenarioSummary(plan: TravelPlan): string {
+  const tz =
+    plan.timezoneDirection === "none" || !plan.timezoneHours
+      ? "TZ 0h"
+      : `TZ ${plan.timezoneDirection === "west" ? "-" : "+"}${plan.timezoneHours}h`;
+  return `${plan.destination}${plan.startDate && plan.endDate ? ` · ${plan.startDate}–${plan.endDate}` : ""} · ${tz}`;
+}
+
+async function syncTravelScenarioCloudFromPlan(planSlice: TravelPlan): Promise<void> {
+  const remote = (await fetchScenarioStateForUser("travel")) ?? {};
+  const summary = buildTravelScenarioSummary(planSlice);
+  await upsertScenario({
+    scenarioKey: "travel",
+    title: "Travel",
+    label: `Travel mode: ${summary}`,
+    state: {
+      ...remote,
+      travel_active: true,
+      travelModeActive: true,
+      travel_start: planSlice.startDate || null,
+      travel_end: planSlice.endDate || null,
+      destination: planSlice.destination || null,
+      timezone_hours: planSlice.timezoneHours ?? null,
+      timezone_direction: planSlice.timezoneDirection ?? null,
+      travel_trip_style: travelTripStyleForCloud(planSlice.tripStyle),
+      summary,
+    },
+  });
 }
 
 interface PackingItem {
@@ -757,6 +798,25 @@ function parseISODateOrNull(value: string | null | undefined): Date | null {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
+function completedAtWithinInclusiveTripDates(completedAtIso: string, tripStart: Date, tripEnd: Date): boolean {
+  const t = new Date(completedAtIso);
+  if (!Number.isFinite(t.getTime())) return false;
+  const start = new Date(tripStart);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(tripEnd);
+  end.setHours(23, 59, 59, 999);
+  return t >= start && t <= end;
+}
+
+function countExerciseOutcomesInTripWindow(planStart: string, planEnd: string): number {
+  const start = parseISODateOrNull(planStart);
+  const end = parseISODateOrNull(planEnd);
+  if (!start || !end) return 0;
+  return storage
+    .getExerciseOutcomes()
+    .filter((o) => completedAtWithinInclusiveTripDates(o.completedAt, start, end)).length;
+}
+
 function formatGBDateOrEmpty(
   value: string | null | undefined,
   options: Intl.DateTimeFormatOptions,
@@ -979,6 +1039,26 @@ export default function Travel() {
     }
   }, []);
 
+  const [tripExerciseTick, setTripExerciseTick] = useState(0);
+  useEffect(() => {
+    const onExercise = () => setTripExerciseTick((n) => n + 1);
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onExercise);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onExercise);
+  }, []);
+
+  /** Live clock for active exercise elapsed / recovery timers on the active-trip dashboard. */
+  const [travelExerciseUiClock, setTravelExerciseUiClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setTravelExerciseUiClock(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const activeExerciseForTravel = useMemo(() => {
+    void tripExerciseTick;
+    void travelExerciseUiClock;
+    return storage.getActiveExercise();
+  }, [tripExerciseTick, travelExerciseUiClock]);
+
   useEffect(() => {
     if (!showClimateTab && resultsTab === "climate") setResultsTab("packing");
   }, [showClimateTab, resultsTab]);
@@ -1167,11 +1247,7 @@ export default function Travel() {
     storage.saveTravelPackingList(packingList);
     setIsTravelModeActive(true);
     const startedAt = new Date().toISOString();
-    const tz =
-      plan.timezoneDirection === "none" || !plan.timezoneHours
-        ? "TZ 0h"
-        : `TZ ${plan.timezoneDirection === "west" ? "-" : "+"}${plan.timezoneHours}h`;
-    const summary = `${plan.destination}${plan.startDate && plan.endDate ? ` · ${plan.startDate}–${plan.endDate}` : ""} · ${tz}`;
+    const summary = buildTravelScenarioSummary(plan);
     void upsertScenario({
       scenarioKey: "travel",
       title: "Travel",
@@ -1183,6 +1259,7 @@ export default function Travel() {
         destination: plan.destination || null,
         timezone_hours: plan.timezoneHours ?? null,
         timezone_direction: plan.timezoneDirection ?? null,
+        travel_trip_style: travelTripStyleForCloud(plan.tripStyle),
         summary,
         started_at: startedAt,
         ended_at: null,
@@ -1226,6 +1303,7 @@ export default function Travel() {
         travel_start: plan.startDate || null,
         travel_end: plan.endDate || null,
         destination: plan.destination || null,
+        travel_trip_style: null,
         ended_at: endedAt,
       },
     });
@@ -1239,6 +1317,8 @@ export default function Travel() {
     const next = { ...plan, tripStyle };
     setPlan(next);
     storage.saveTravelPlan(next);
+    if (!isTravelModeActive) return;
+    void syncTravelScenarioCloudFromPlan(next);
   };
 
   const updatePackingItem = (index: number) => {
@@ -1291,11 +1371,7 @@ export default function Travel() {
       recommendation: `Generated packing list with ${list.length} items`,
     });
 
-    const tz =
-      plan.timezoneDirection === "none" || !plan.timezoneHours
-        ? "TZ 0h"
-        : `TZ ${plan.timezoneDirection === "west" ? "-" : "+"}${plan.timezoneHours}h`;
-    const summary = `${plan.destination}${plan.startDate && plan.endDate ? ` · ${plan.startDate}–${plan.endDate}` : ""} · ${tz}`;
+    const summary = buildTravelScenarioSummary(plan);
     void upsertScenario({
       scenarioKey: "travel",
       title: "Travel",
@@ -1307,6 +1383,7 @@ export default function Travel() {
         destination: plan.destination || null,
         timezone_hours: plan.timezoneHours ?? null,
         timezone_direction: plan.timezoneDirection ?? null,
+        travel_trip_style: travelTripStyleForCloud(plan.tripStyle),
         summary,
         planned_at: new Date().toISOString(),
       },
@@ -1371,6 +1448,31 @@ export default function Travel() {
     const tripProfileChips = buildActiveTravelTripProfileChips(plan);
     const activeCoachPrompt = buildActiveTravelCoachPrompt(activeProgressInput);
 
+    void tripExerciseTick;
+    const tripExerciseSessionCount = countExerciseOutcomesInTripWindow(plan.startDate, plan.endDate);
+    const firstExerciseRoutine = storage.getRecentExercises(1)[0];
+    const travelExercisePlannerHref = firstExerciseRoutine
+      ? buildExerciseScenarioPlannerHref({
+          exerciseType: firstExerciseRoutine.exerciseType,
+          durationMinutes: firstExerciseRoutine.durationMinutes,
+          intensity: firstExerciseRoutine.intensity,
+          routineId: firstExerciseRoutine.id,
+          from: "travel",
+        })
+      : "/scenarios/exercise";
+
+    const liveTripExercise = activeExerciseForTravel;
+    const travelExerciseElapsedLabel =
+      liveTripExercise?.phase === "active" && liveTripExercise.exerciseStartedAt
+        ? formatExerciseElapsedShort(
+            travelExerciseUiClock - new Date(liveTripExercise.exerciseStartedAt).getTime(),
+          )
+        : liveTripExercise?.phase === "recovery" && liveTripExercise.exerciseEndedAt
+          ? formatExerciseElapsedShort(
+              travelExerciseUiClock - new Date(liveTripExercise.exerciseEndedAt).getTime(),
+            )
+          : null;
+
     const tripProgressShort = hasEnded
       ? "Ended"
       : hasStarted
@@ -1433,6 +1535,84 @@ export default function Travel() {
             </>
           }
         />
+
+        {plan.tripStyle === "active" && hasStarted && !hasEnded ? (
+          <Card
+            className="border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/25"
+            data-testid="card-travel-active-exercise"
+          >
+            <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:p-4">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium text-foreground">Activity on this trip</p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-trip-exercise-count">
+                    {`This trip: ${tripExerciseSessionCount} session${
+                      tripExerciseSessionCount === 1 ? "" : "s"
+                    } logged in Exercise.`}
+                  </p>
+                </div>
+
+                {liveTripExercise ? (
+                  <div
+                    className="space-y-2 rounded-xl border border-emerald-500/30 bg-background/70 px-3 py-2.5 dark:border-emerald-800/45 dark:bg-background/40"
+                    data-testid="travel-active-exercise-session"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{liveTripExercise.exerciseName}</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          {liveTripExercise.durationMinutes} min · {liveTripExercise.intensity} ·{" "}
+                          {liveTripExercise.exerciseType}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-foreground/90">
+                        {liveTripExercise.phase === "pre"
+                          ? "Before you start"
+                          : liveTripExercise.phase === "active"
+                            ? "During"
+                            : "Recovery"}
+                      </p>
+                      {travelExerciseElapsedLabel ? (
+                        <span
+                          className="text-xs tabular-nums text-muted-foreground"
+                          data-testid="text-travel-exercise-elapsed"
+                          title={
+                            liveTripExercise.phase === "active"
+                              ? "Workout elapsed"
+                              : "Time since workout ended"
+                          }
+                        >
+                          {travelExerciseElapsedLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                    {liveTripExercise.phase === "active" && liveTripExercise.exerciseStartedAt ? (
+                      <ExerciseWorkoutProgressBar
+                        phase="active"
+                        exerciseStartedAt={liveTripExercise.exerciseStartedAt}
+                        durationMinutes={liveTripExercise.durationMinutes}
+                        nowMs={travelExerciseUiClock}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                asChild
+                size="sm"
+                className="shrink-0 w-full sm:mt-0.5 sm:w-auto"
+                data-testid="button-travel-log-activity"
+              >
+                <Link href={liveTripExercise ? "/scenarios/exercise" : travelExercisePlannerHref}>
+                  <Dumbbell className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+                  {liveTripExercise ? "Continue" : "Log activity"}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Tabs value={activeTravelTab} onValueChange={(v) => setActiveTravelTab(v as any)} className="w-full" data-testid="travel-active-tabs">
           <TabsList className="grid h-9 w-full grid-cols-3">
@@ -2307,7 +2487,16 @@ export default function Travel() {
               </Label>
               <Select
                 value={plan.tripStyle ?? "not_sure"}
-                onValueChange={(value: TravelTripStyle) => setPlan((prev) => ({ ...prev, tripStyle: value }))}
+                onValueChange={(value: TravelTripStyle) => {
+                  setPlan((prev) => {
+                    const updated = { ...prev, tripStyle: value };
+                    if (isTravelModeActive) {
+                      storage.saveTravelPlan(updated);
+                      void syncTravelScenarioCloudFromPlan(updated);
+                    }
+                    return updated;
+                  });
+                }}
               >
                 <SelectTrigger data-testid="select-trip-style">
                   <SelectValue placeholder="Choose the closest match" />

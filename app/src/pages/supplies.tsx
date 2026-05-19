@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, RotateCcw, AlertTriangle, ClipboardList, Save, Undo2, Plug, Cylinder, TrendingDown, Plane, Thermometer, ArrowRight, Bell, CheckCircle2, X, Lightbulb, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel } from "@/lib/storage";
+import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link, useSearch } from "wouter";
 import { formatDistanceToNow, format, differenceInDays, addDays, startOfDay } from "date-fns";
@@ -739,6 +739,11 @@ function TravelImpactPanel({ supplies, scenarioState }: { supplies: Supply[]; sc
         <CardDescription>
           Uses trip dates, your saved travel buffer ({stockBuffer.toFixed(1)}×), and climate from Travel when saved (same rules as travel supply extras).
         </CardDescription>
+        {scenarioState.travelTripStyle === "active" ? (
+          <p className="text-xs text-muted-foreground pt-1" data-testid="text-travel-active-supplies-hint">
+            Activity trips often use more fast carbs and site changes — keep a buffer in your carry-on.
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
         {suppliesShort.length > 0 && (
@@ -2466,6 +2471,12 @@ export default function Supplies() {
     setPrescriptionCycle(storage.getPrescriptionCycle());
     setScenarioState(storage.getScenarioState());
     trackFeatureEngagement("supplies");
+  }, []);
+
+  useEffect(() => {
+    const onScenario = () => setScenarioState(storage.getScenarioState());
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
+    return () => window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
   }, []);
 
   const refreshSupplies = () => {

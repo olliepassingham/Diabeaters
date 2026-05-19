@@ -26,17 +26,23 @@ export function ScenarioActiveCard(props: {
 
   return (
     <Card
-      className={cn("overflow-hidden rounded-2xl shadow-sm ring-1 ring-border/30", tone, props.className)}
+      className={cn(
+        "overflow-hidden rounded-2xl shadow-sm ring-1 ring-border/30 max-sm:shadow-none max-sm:ring-border/40",
+        tone,
+        props.className,
+      )}
       data-testid={props["data-testid"]}
     >
-      <CardContent className="p-4">
+      <CardContent className="p-3.5 sm:p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               {props.icon ? <span className="shrink-0">{props.icon}</span> : null}
-              <div className="truncate text-sm font-semibold text-foreground">{props.title}</div>
+              <div className="min-w-0 truncate text-base font-semibold leading-tight tracking-tight text-foreground sm:text-sm">
+                {props.title}
+              </div>
               {props.badgeText ? (
-                <Badge variant="outline" className="ml-1 text-[11px]">
+                <Badge variant="secondary" className="shrink-0 rounded-full px-2 py-0 text-[11px] font-medium">
                   {props.badgeText}
                 </Badge>
               ) : null}
@@ -49,19 +55,34 @@ export function ScenarioActiveCard(props: {
         </div>
 
         {props.facts && props.facts.length > 0 ? (
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {props.facts.map((f) => (
-              <div key={f.label} className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {f.label}
+          <>
+            <div className="mt-3 flex flex-wrap gap-2 sm:hidden">
+              {props.facts.map((f) => (
+                <div
+                  key={f.label}
+                  className="inline-flex min-w-0 max-w-full items-baseline gap-2 rounded-full bg-background/80 px-3 py-1.5 ring-1 ring-border/50"
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    {f.label}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">{f.value}</span>
                 </div>
-                <div className="mt-0.5 text-sm font-semibold text-foreground">{f.value}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <div className="mt-3 hidden grid-cols-2 gap-2 sm:grid sm:grid-cols-3">
+              {props.facts.map((f) => (
+                <div key={f.label} className="rounded-xl border border-border/60 bg-background/60 px-3 py-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {f.label}
+                  </div>
+                  <div className="mt-0.5 text-sm font-semibold text-foreground">{f.value}</div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : null}
 
-        {props.children ? <div className="mt-3">{props.children}</div> : null}
+        {props.children ? <div className="mt-3 max-sm:mt-2.5">{props.children}</div> : null}
       </CardContent>
     </Card>
   );

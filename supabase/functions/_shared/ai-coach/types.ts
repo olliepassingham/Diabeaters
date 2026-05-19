@@ -41,6 +41,9 @@ export type PostFilterStatus = "pass" | "rewritten" | "refused" | "n/a";
  */
 export type CoachAudience = "patient" | "supporter";
 
+/** Trip intent mirrored from `scenarios.state` when travel is active — enum only, no free text. */
+export type CoachTravelTripStyle = "relax" | "active" | "city" | "remote" | "family";
+
 export type AllowedHref =
   | "/adviser"
   | "/adviser?tab=meal"
@@ -140,6 +143,8 @@ export interface CoachContext {
     exerciseSessions: number;
     sickDayActive: boolean;
     travelModeActive: boolean;
+    /** Present only when travel mode is active and a known style was saved to the travel scenario row. */
+    travelTripStyle?: CoachTravelTripStyle;
   };
   /**
    * Optional supply snapshot from `public.supplies` (server-read only).

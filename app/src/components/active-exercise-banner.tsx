@@ -22,6 +22,7 @@ import {
   calculateExercisePlan,
   getRecoveryInsulinHeadline,
   getRecoveryEducationBulletsFromPlan,
+  type ExercisePlanContext,
   type ExercisePlanResult,
 } from "@/lib/exercise-plan";
 import {
@@ -246,18 +247,17 @@ function computeBannerExercisePlan(session: ActiveExerciseSession, bgUnits: stri
   const bg = bgForPlannerFromActiveSession(session);
   const minutesUntilStart = session.phase === "pre" ? 60 : session.phase === "active" ? 30 : 0;
   try {
-    return calculateExercisePlan(
-      {
-        exerciseType: session.exerciseType,
-        durationMinutes: session.durationMinutes,
-        intensity: session.intensity,
-        minutesUntilStart,
-        bgUnits,
-        currentBg: bg ?? undefined,
-        hourOfDay: new Date().getHours(),
-      },
-      storage.getSettings(),
-    );
+    const ctx: ExercisePlanContext = {
+      exerciseType: session.exerciseType,
+      durationMinutes: session.durationMinutes,
+      intensity: session.intensity,
+      minutesUntilStart,
+      bgUnits,
+      currentBg: bg ?? undefined,
+      hourOfDay: new Date().getHours(),
+    };
+    if (session.preEnvironments?.length) ctx.environments = [...session.preEnvironments];
+    return calculateExercisePlan(ctx, storage.getSettings());
   } catch {
     return null;
   }
@@ -1323,6 +1323,7 @@ function ExerciseOutcomeDialog({
       bgSeverity,
       feltHypo,
       notes: notes || undefined,
+      duringTravel: storage.getScenarioState().travelModeActive ? true : undefined,
     });
     resetAndClose();
   };

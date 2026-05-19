@@ -576,6 +576,9 @@ Deno.serve(async (req: Request) => {
       sickDayActive: scenarioFlags.sickDayActive,
       travelModeActive: scenarioFlags.travelModeActive,
       exerciseSessions: exerciseFromDevice,
+      ...(scenarioFlags.travelModeActive && scenarioFlags.travelTripStyle
+        ? { travelTripStyle: scenarioFlags.travelTripStyle }
+        : {}),
     };
     const context = packContext({
       profile: {

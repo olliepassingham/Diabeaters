@@ -18,6 +18,11 @@ export function coachPageSubtitle(audience: "patient" | "supporter"): string {
     : "Friendly, educational answers and clinic-prep ideas for type 1 diabetes in the UK. Not medical advice — no insulin doses, ratios, or glucose targets.";
 }
 
+/** One-line lead for the patient coach header on small screens (full text in details). */
+export function coachPatientHeaderLead(): string {
+  return "UK · Education & clinic-prep — not medical advice or dosing. Tap below for topic & full disclaimer.";
+}
+
 /**
  * Compact one-line lead for the supporter coach header so prompts stay visible
  * without scrolling; full scope stays in the expandable details block.

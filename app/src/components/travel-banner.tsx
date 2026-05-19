@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Plane, X, ChevronRight, Power, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { storage, ScenarioState } from "@/lib/storage";
+import { storage, ScenarioState, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { useToast } from "@/hooks/use-toast";
 
 export function TravelBanner() {
@@ -51,7 +51,10 @@ export function TravelBanner() {
       }
     };
 
+    const onScenario = () => handleStorageChange();
+
     window.addEventListener("storage", handleStorageChange);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
     const interval = setInterval(() => {
       const state = storage.getScenarioState();
       if (state.travelModeActive !== scenarioState.travelModeActive) {
@@ -65,6 +68,7 @@ export function TravelBanner() {
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
       clearInterval(interval);
     };
   }, [scenarioState.travelModeActive]);

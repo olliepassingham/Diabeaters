@@ -151,6 +151,24 @@ describe("packContext — lastFortnight clamping", () => {
       ).lastFortnight.estimatedTimeInRangePct,
     ).toBeNull();
   });
+
+  it("includes travelTripStyle when travel is active and style is known", () => {
+    const ctx = packContext(
+      input({
+        lastFortnight: { ...baseFortnight, travelModeActive: true, travelTripStyle: "active" },
+      }),
+    );
+    expect(ctx.lastFortnight.travelTripStyle).toBe("active");
+  });
+
+  it("drops travelTripStyle when travel mode is off", () => {
+    const ctx = packContext(
+      input({
+        lastFortnight: { ...baseFortnight, travelModeActive: false, travelTripStyle: "active" },
+      }),
+    );
+    expect(ctx.lastFortnight.travelTripStyle).toBeUndefined();
+  });
 });
 
 describe("packContext — dataSparse", () => {

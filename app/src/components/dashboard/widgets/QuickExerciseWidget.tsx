@@ -3,7 +3,7 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ArrowRight, Plus, Clock, Flame, Zap, Wind, Footprints, Users, Waves, Play, CircleDot } from "lucide-react";
 import { Link } from "wouter";
-import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession } from "@/lib/storage";
+import { storage, ExerciseRoutine, ExerciseType, ActiveExerciseSession, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { buildExerciseScenarioPlannerHref, buildExerciseScenarioPlannerHrefFromSession } from "@/lib/exercise-planner-href";
 import { useToast } from "@/hooks/use-toast";
 import { WidgetCard } from "./WidgetCard";
@@ -29,6 +29,7 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
   const [exercises, setExercises] = useState<ExerciseRoutine[] | null>(null);
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [travelActiveTripHint, setTravelActiveTripHint] = useState(false);
   const { toast } = useToast();
 
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -53,13 +54,20 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
     const onVisible = () => {
       if (document.visibilityState === "visible") load();
     };
+    const onScenario = () => {
+      const s = storage.getScenarioState();
+      setTravelActiveTripHint(Boolean(s.travelModeActive && s.travelTripStyle === "active"));
+    };
+    onScenario();
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
     return () => {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
     };
   }, [load]);
 
@@ -188,6 +196,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
         <p className="text-small text-muted-foreground uppercase tracking-wide mt-1">Start a saved workout</p>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
+        {travelActiveTripHint ? (
+          <p className="text-xs text-muted-foreground -mt-1" data-testid="text-exercise-travel-active-hint">
+            On an active trip — logging sessions helps you spot patterns.
+          </p>
+        ) : null}
         {activeSession && (
           <div className="space-y-2.5 rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-teal-500/[0.04] px-3 py-3 dark:from-emerald-950/40 dark:to-transparent">
             <div className="flex items-start gap-2.5" data-testid="text-active-session-notice">

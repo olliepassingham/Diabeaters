@@ -69,7 +69,7 @@ import {
   scheduleExercisePreReminders,
 } from "@/lib/exercise-reminders";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 
 // ----- Type / intensity catalogues kept local so the form can be self-contained -----
 
@@ -94,6 +94,33 @@ const ENVIRONMENT_OPTIONS: Array<{ value: ExerciseEnvironmentChoice; label: stri
   { value: "altitude", label: "Altitude", icon: Wind },
 ];
 
+const VENUE_ENVIRONMENT_CHOICES = new Set<ExerciseEnvironmentChoice>([
+  "indoor",
+  "outdoor_normal",
+  "outdoor_hot",
+  "outdoor_cold",
+]);
+
+/** Venue pills are mutually exclusive; altitude toggles on top of any venue. */
+function toggleExerciseEnvironmentSelection(
+  current: ExerciseEnvironmentChoice[] | undefined,
+  value: ExerciseEnvironmentChoice,
+): ExerciseEnvironmentChoice[] | undefined {
+  const cur = current?.filter(Boolean) ?? [];
+  if (value === "altitude") {
+    if (cur.includes("altitude")) {
+      const next = cur.filter((v) => v !== "altitude");
+      return next.length > 0 ? next : undefined;
+    }
+    return [...cur, "altitude"];
+  }
+  const withoutVenue = cur.filter((v) => !VENUE_ENVIRONMENT_CHOICES.has(v));
+  if (cur.includes(value)) {
+    return withoutVenue.length > 0 ? withoutVenue : undefined;
+  }
+  return [...withoutVenue, value];
+}
+
 const SYMPTOM_OPTIONS: Array<{ value: ExerciseSymptomFlag; label: string }> = [
   { value: "fine", label: "Feeling fine" },
   { value: "lightheaded", label: "Lightheaded" },
@@ -104,15 +131,6 @@ const SYMPTOM_OPTIONS: Array<{ value: ExerciseSymptomFlag; label: string }> = [
 ];
 
 // ----- Helpers -----
-
-function formatElapsedShort(ms: number): string {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 function clampInt(value: string, min: number, max: number): number | null {
   const n = parseInt(value, 10);
@@ -155,7 +173,18 @@ function applyCoachDefaultsFromLastExercise(session: ActiveExerciseSession): Act
   if (!ctx) return session;
 
   const updates: Partial<ActiveExerciseSession> = {};
-  if (session.preEnvironment == null && ctx.environment) updates.preEnvironment = ctx.environment;
+  if (
+    (!session.preEnvironments || session.preEnvironments.length === 0) &&
+    ctx.environments &&
+    ctx.environments.length > 0
+  ) {
+    updates.preEnvironments = [...ctx.environments];
+  } else if (
+    (!session.preEnvironments || session.preEnvironments.length === 0) &&
+    ctx.environment
+  ) {
+    updates.preEnvironments = [ctx.environment];
+  }
   if (session.preCompetitive == null && ctx.competitive != null) updates.preCompetitive = ctx.competitive;
   if (session.preFasted == null && ctx.fasted != null) updates.preFasted = ctx.fasted;
 
@@ -284,7 +313,7 @@ export function ExerciseGuidedCoach() {
     if (activeSession.preSleepHours != null) ctx.sleepHoursLastNight = activeSession.preSleepHours;
     if (activeSession.preHydration) ctx.hydration = activeSession.preHydration;
     if (activeSession.preFeelingOff != null) ctx.feelingOff = activeSession.preFeelingOff;
-    if (activeSession.preEnvironment) ctx.environment = activeSession.preEnvironment;
+    if (activeSession.preEnvironments?.length) ctx.environments = [...activeSession.preEnvironments];
     if (activeSession.preCompetitive != null) ctx.competitive = activeSession.preCompetitive;
     if (activeSession.preCaffeine2h != null) ctx.caffeineLast2h = activeSession.preCaffeine2h;
     if (activeSession.preAlcoholLastNight != null) ctx.alcoholLastNight = activeSession.preAlcoholLastNight;
@@ -430,12 +459,12 @@ export function ExerciseGuidedCoach() {
     if (activeSession.phase === "active" && activeSession.exerciseStartedAt) {
       const t = new Date(activeSession.exerciseStartedAt).getTime();
       if (!Number.isFinite(t)) return null;
-      return formatElapsedShort(now - t);
+      return formatExerciseElapsedShort(now - t);
     }
     if (activeSession.phase === "recovery" && activeSession.exerciseEndedAt) {
       const t = new Date(activeSession.exerciseEndedAt).getTime();
       if (!Number.isFinite(t)) return null;
-      return formatElapsedShort(now - t);
+      return formatExerciseElapsedShort(now - t);
     }
     return null;
   }, [activeSession, now]);
@@ -443,8 +472,8 @@ export function ExerciseGuidedCoach() {
   // ----- Render -----
   if (!activeSession) {
     return (
-      <div className="space-y-4" data-testid="exercise-guided-coach-start">
-        <Card>
+      <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
+        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
           <CardHeader>
             <CardTitle className="text-h3 flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
@@ -505,7 +534,7 @@ export function ExerciseGuidedCoach() {
         </Card>
 
         {routines.length > 0 ? (
-          <Card>
+          <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
             <CardHeader>
               <CardTitle className="text-h3 flex items-center gap-2">
                 <Dumbbell className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -538,8 +567,8 @@ export function ExerciseGuidedCoach() {
   const phase = activeSession.phase;
 
   return (
-    <div className="space-y-4" data-testid="exercise-guided-coach">
-      <Card>
+    <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach">
+      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
         <CardHeader className="pb-2">
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-3">
@@ -1022,14 +1051,17 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
           <div className="flex flex-wrap gap-2">
             {ENVIRONMENT_OPTIONS.map((o) => {
               const Icon = o.icon;
+              const selected = session.preEnvironments?.includes(o.value) ?? false;
               return (
                 <Button
                   key={o.value}
                   type="button"
                   size="sm"
-                  variant={session.preEnvironment === o.value ? "default" : "outline"}
+                  variant={selected ? "default" : "outline"}
                   className="h-8 px-2.5 text-xs"
-                  onClick={() => update({ preEnvironment: session.preEnvironment === o.value ? undefined : o.value })}
+                  onClick={() =>
+                    update({ preEnvironments: toggleExerciseEnvironmentSelection(session.preEnvironments, o.value) })
+                  }
                   data-testid={`button-coach-env-${o.value}`}
                 >
                   <Icon className="h-3.5 w-3.5 mr-1" />
@@ -1138,8 +1170,8 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   const plannedEndMs = hasStarted ? (startedAtMs as number) + session.durationMinutes * 60_000 : null;
   const elapsedMs = hasStarted ? Math.max(0, nowMs - (startedAtMs as number)) : 0;
   const remainingMs = plannedEndMs != null ? Math.max(0, plannedEndMs - nowMs) : null;
-  const elapsedLabel = formatElapsedShort(elapsedMs);
-  const remainingLabel = remainingMs == null ? null : formatElapsedShort(remainingMs);
+  const elapsedLabel = formatExerciseElapsedShort(elapsedMs);
+  const remainingLabel = remainingMs == null ? null : formatExerciseElapsedShort(remainingMs);
   const progress =
     plannedEndMs != null && hasStarted ? Math.min(1, Math.max(0, elapsedMs / (session.durationMinutes * 60_000))) : null;
 

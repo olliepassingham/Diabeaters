@@ -11,6 +11,7 @@
 
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import type { TravelTripStyle } from "@/lib/travel-active-guidance";
 import {
   isPharmacyOpenAt,
   nextPharmacyOpeningAt,
@@ -41,6 +42,8 @@ export type AiCoachLastFortnightWire = {
   exerciseSessions: number;
   sickDayActive: boolean;
   travelModeActive: boolean;
+  /** Enum from local scenario when travel is on — mirrors cloud `travel_trip_style` for UI parity only. */
+  travelTripStyle?: Exclude<TravelTripStyle, "not_sure">;
 };
 
 export type AiCoachPharmacyStatusWire = {
@@ -180,6 +183,13 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
     };
   }
 
+  const coachTravelTripStyle =
+    scenario.travelModeActive &&
+    scenario.travelTripStyle &&
+    scenario.travelTripStyle !== "not_sure"
+      ? scenario.travelTripStyle
+      : undefined;
+
   return {
     lastFortnight: {
       bgReadings,
@@ -190,6 +200,7 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
       exerciseSessions: outcomes.length,
       sickDayActive: Boolean(scenario.sickDayActive),
       travelModeActive: Boolean(scenario.travelModeActive),
+      ...(coachTravelTripStyle ? { travelTripStyle: coachTravelTripStyle } : {}),
     },
     ratiosAreSet,
     bgUnits,

@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import {
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   DIABEATER_APPOINTMENTS_CHANGED_EVENT,
+  DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
   storage,
   type Appointment,
   type HolidayPrep,
@@ -25,6 +26,7 @@ import {
 import { getTodayGlanceLine, shouldOmitHeroGlanceLineDuplicatingTodayCard } from "@/lib/dashboard-health-status";
 import { collectAllActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
+import { tripStyleLabel } from "@/lib/travel-active-guidance";
 
 export function SupplyTrackerTodaySection() {
   const { user } = useAuth();
@@ -46,11 +48,13 @@ export function SupplyTrackerTodaySection() {
     window.addEventListener("focus", refresh);
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
     window.addEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
       window.removeEventListener(DIABEATER_APPOINTMENTS_CHANGED_EVENT, onAppt);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     };
   }, [user?.id]);
 
@@ -88,9 +92,12 @@ export function SupplyTrackerTodaySection() {
       return { type: "info" as const, message: "Sick day mode active" };
     }
     if (scenarioState.travelModeActive) {
+      const style = tripStyleLabel(scenarioState.travelTripStyle);
       return {
         type: "info" as const,
-        message: `Travel mode active${scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}`,
+        message: `Travel mode active${scenarioState.travelDestination ? ` — ${scenarioState.travelDestination}` : ""}${
+          style ? ` · ${style}` : ""
+        }`,
       };
     }
     return { type: "ok" as const, message: "All clear for now" };
@@ -229,9 +236,11 @@ export function SupplyTrackerEntryCard() {
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refresh);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -325,10 +334,12 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", refresh);
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", refresh);
       window.removeEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, refresh);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
     };
   }, []);
 
@@ -416,6 +427,8 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
         : "Travel mode active",
     );
   }
+  const tripStyleShort = tripStyleLabel(scenarioState.travelTripStyle);
+  if (tripStyleShort) travelSubtitleParts.push(tripStyleShort);
   const travelSubtitle = travelSubtitleParts.join(" · ");
   const omitTravelStatusBanner =
     showTravelCard && shouldOmitHeroGlanceLineDuplicatingTodayCard(status, supplies, scenarioState);

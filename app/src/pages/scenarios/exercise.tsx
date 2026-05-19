@@ -5,6 +5,8 @@ import { ScenarioToolDisclaimer } from "@/components/disclaimer";
 import { ExerciseGuidedCoach } from "@/components/scenarios/ExerciseGuidedCoach";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
+import { isAiCoachEnabled } from "@/lib/flags";
+import { cn } from "@/lib/utils";
 import { storage } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
@@ -27,17 +29,25 @@ export default function ScenarioExercisePage() {
     return () => window.clearInterval(t);
   }, []);
 
+  const headerActionBtn =
+    "min-h-10 w-full justify-center rounded-xl px-3 text-sm font-medium shadow-none sm:min-h-9 sm:w-auto";
+
   return (
-    <PageShell variant="standard" className="space-y-7">
+    <PageShell variant="standard" density="compact" className="space-y-4 max-sm:space-y-3 sm:space-y-6">
       <PageHeader
         stackActionsMaxSm
+        className="max-sm:gap-1.5"
         leading={<PageBackButton />}
         title="Exercise"
-        description="Guided steps for checks, carbs, and bolus timing around your activity."
         actions={
-          <>
-            <ScenarioCoachLink topic="exercise" />
-            <Button variant="outline" size="sm" className="min-h-11 whitespace-nowrap" asChild>
+          <div
+            className={cn(
+              "grid w-full min-w-0 gap-2 sm:flex sm:w-auto sm:justify-end sm:gap-2",
+              isAiCoachEnabled ? "grid-cols-2" : "grid-cols-1",
+            )}
+          >
+            <ScenarioCoachLink topic="exercise" variant="secondary" className={cn(headerActionBtn, "gap-1.5")} />
+            <Button variant="secondary" size="sm" className={cn(headerActionBtn)} asChild>
               <Link
                 href="/routines?section=exercise"
                 data-testid="link-exercise-routines-header"
@@ -47,7 +57,7 @@ export default function ScenarioExercisePage() {
                 <span className="hidden sm:inline">Exercise routines</span>
               </Link>
             </Button>
-          </>
+          </div>
         }
       />
 

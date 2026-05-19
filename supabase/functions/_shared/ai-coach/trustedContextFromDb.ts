@@ -7,7 +7,7 @@
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import type { LastFortnightInput } from "./contextPacker.ts";
 import { EMPTY_LAST_FORTNIGHT } from "./serverInputs.ts";
-import type { CoachSuppliesSummary } from "./types.ts";
+import type { CoachSuppliesSummary, CoachTravelTripStyle } from "./types.ts";
 
 /** Matches app `Supply["type"]` / cloud `category` when synced from Diabeaters. */
 export const COACH_ALLOWED_SUPPLY_CATEGORIES = new Set([
@@ -77,33 +77,53 @@ export function scenarioStateFlag(state: unknown, keys: readonly string[]): bool
   return false;
 }
 
+const COACH_TRIP_STYLES = new Set<CoachTravelTripStyle>(["relax", "active", "city", "remote", "family"]);
+
+function readTravelTripStyleFromScenarioState(state: unknown): CoachTravelTripStyle | undefined {
+  if (!state || typeof state !== "object") return undefined;
+  const o = state as Record<string, unknown>;
+  const raw = o.travel_trip_style ?? o.travelTripStyle;
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().toLowerCase() as CoachTravelTripStyle;
+  return COACH_TRIP_STYLES.has(v) ? v : undefined;
+}
+
 export type ScenarioFlagRow = { scenario_key: string; state: unknown };
+
+export type CoachScenarioFlags = {
+  sickDayActive: boolean;
+  travelModeActive: boolean;
+  travelTripStyle?: CoachTravelTripStyle;
+};
 
 /**
  * Derive sick-day / travel mode booleans from `public.scenarios` rows only.
  * Reads known boolean keys inside `state` — never passes titles, labels, or arbitrary JSON to the LLM.
  */
-export function deriveScenarioFlagsFromRows(rows: ReadonlyArray<ScenarioFlagRow>): {
-  sickDayActive: boolean;
-  travelModeActive: boolean;
-} {
+export function deriveScenarioFlagsFromRows(rows: ReadonlyArray<ScenarioFlagRow>): CoachScenarioFlags {
   let sickDayActive = false;
   let travelModeActive = false;
+  let travelTripStyle: CoachTravelTripStyle | undefined;
   for (const row of rows) {
     const key = typeof row.scenario_key === "string" ? row.scenario_key.trim() : "";
     if (key === "sick_day") {
       if (scenarioStateFlag(row.state, ["sick_day_active", "sickDayActive"])) sickDayActive = true;
     } else if (key === "travel") {
-      if (scenarioStateFlag(row.state, ["travel_active", "travelModeActive"])) travelModeActive = true;
+      const active = scenarioStateFlag(row.state, ["travel_active", "travelModeActive"]);
+      if (active) {
+        travelModeActive = true;
+        const ts = readTravelTripStyleFromScenarioState(row.state);
+        if (ts) travelTripStyle = ts;
+      }
     }
   }
-  return { sickDayActive, travelModeActive };
+  return { sickDayActive, travelModeActive, travelTripStyle };
 }
 
 export async function loadCoachScenarioFlags(
   admin: SupabaseClient,
   userId: string,
-): Promise<{ sickDayActive: boolean; travelModeActive: boolean }> {
+): Promise<CoachScenarioFlags> {
   try {
     const { data, error } = await admin
       .from("scenarios")

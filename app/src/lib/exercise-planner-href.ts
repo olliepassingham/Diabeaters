@@ -65,7 +65,7 @@ export type ExercisePlannerHrefParams = {
   /** When set, planner hydrates BG from matching active session */
   sync?: "active";
   phase?: ExercisePhase;
-  from?: "widget";
+  from?: "widget" | "travel";
 };
 
 /**
@@ -85,7 +85,7 @@ export function buildExerciseScenarioPlannerHref(p: ExercisePlannerHrefParams): 
 
 export function buildExerciseScenarioPlannerHrefFromSession(
   session: Pick<ActiveExerciseSession, "exerciseType" | "durationMinutes" | "intensity" | "routineId" | "phase">,
-  options?: { syncActive?: boolean; from?: "widget" },
+  options?: { syncActive?: boolean; from?: "widget" | "travel" },
 ): string {
   return buildExerciseScenarioPlannerHref({
     exerciseType: session.exerciseType,

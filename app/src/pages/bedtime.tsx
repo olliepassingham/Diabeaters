@@ -634,6 +634,9 @@ export default function Bedtime() {
         tips.push("Your body clock may still be adjusting — overnight patterns could differ from normal");
       }
       tips.push("Keep your hypo kit easily accessible in an unfamiliar room");
+      if (scenarioState.travelTripStyle === "active") {
+        tips.push("Big travel days can skew sleep and morning glucose — a quick bedtime check still helps");
+      }
     }
 
     if (mdiBasalForBed === "morning") {

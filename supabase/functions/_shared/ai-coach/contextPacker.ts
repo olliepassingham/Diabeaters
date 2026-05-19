@@ -12,7 +12,7 @@
  * Pure logic — runs under both Deno and Vitest.
  */
 
-import type { CoachContext, CoachSuppliesSummary } from "./types.ts";
+import type { CoachContext, CoachSuppliesSummary, CoachTravelTripStyle } from "./types.ts";
 
 const SPARSE_BG_THRESHOLD = 14;
 const SPARSE_EXERCISE_THRESHOLD = 1;
@@ -37,6 +37,7 @@ export interface LastFortnightInput {
   exerciseSessions: number;
   sickDayActive: boolean;
   travelModeActive: boolean;
+  travelTripStyle?: CoachTravelTripStyle;
 }
 
 export interface PackContextInput {
@@ -138,6 +139,13 @@ function clampPercent(n: unknown): number | null {
   return Math.round(n);
 }
 
+function clampCoachTravelTripStyle(raw: unknown): CoachTravelTripStyle | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().toLowerCase();
+  if (v === "relax" || v === "active" || v === "city" || v === "remote" || v === "family") return v;
+  return undefined;
+}
+
 /**
  * Build the §3 context block. Only fields explicitly listed in `CoachContext`
  * are included; any extra keys on the inputs are dropped silently to prevent
@@ -155,6 +163,8 @@ export function packContext(input: PackContextInput): CoachContext {
   };
 
   const lf = input.lastFortnight;
+  const travelTripStyle =
+    lf.travelModeActive ? clampCoachTravelTripStyle(lf.travelTripStyle) : undefined;
   const lastFortnight: CoachContext["lastFortnight"] = {
     bgReadings: clampNonNegative(lf.bgReadings),
     estimatedTimeInRangePct: clampPercent(lf.estimatedTimeInRangePct),
@@ -164,6 +174,7 @@ export function packContext(input: PackContextInput): CoachContext {
     exerciseSessions: clampNonNegative(lf.exerciseSessions),
     sickDayActive: Boolean(lf.sickDayActive),
     travelModeActive: Boolean(lf.travelModeActive),
+    ...(travelTripStyle ? { travelTripStyle } : {}),
   };
 
   // Sparse-data flag tells the model to admit when it cannot answer pattern

@@ -18,11 +18,20 @@ describe("scenarioStateFlag / deriveScenarioFlagsFromRows", () => {
         { scenario_key: "sick_day", state: { sick_day_active: true } },
         { scenario_key: "travel", state: { travel_active: true } },
       ]),
-    ).toEqual({ sickDayActive: true, travelModeActive: true });
+    ).toEqual({ sickDayActive: true, travelModeActive: true, travelTripStyle: undefined });
     expect(deriveScenarioFlagsFromRows([{ scenario_key: "travel", state: { travelModeActive: 1 } }])).toEqual({
       sickDayActive: false,
       travelModeActive: true,
+      travelTripStyle: undefined,
     });
+  });
+
+  it("reads travel_trip_style when travel is active", () => {
+    expect(
+      deriveScenarioFlagsFromRows([
+        { scenario_key: "travel", state: { travel_active: true, travel_trip_style: "active" } },
+      ]),
+    ).toEqual({ sickDayActive: false, travelModeActive: true, travelTripStyle: "active" });
   });
 });
 

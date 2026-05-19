@@ -21,14 +21,15 @@ import {
   Droplets,
   Sparkles,
   Shield,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase } from "@/lib/storage";
+import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase, DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { useToast } from "@/hooks/use-toast";
 import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
 import {
@@ -42,12 +43,19 @@ import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   formatLastExerciseSummaryLine,
   getPostExerciseEducationalCopy,
   getPostExercisePersonalizedTipBullets,
   inferPostExerciseLoadTier,
   insulinDeliveryForPostExerciseTips,
 } from "@/lib/post-exercise-nudge";
+import { tripStyleLabel } from "@/lib/travel-active-guidance";
 
 function exercisePhaseLabel(phase: ExercisePhase): string {
   if (phase === "active") return "during";
@@ -120,15 +128,6 @@ function daysRemaining(endIsoOrDate: string | undefined): number | null {
   today.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
   return Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatElapsedShort(ms: number): string {
-  const totalSec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 /** Icon + tint for post-exercise tip rows (copy-aware, educational only). */
@@ -213,8 +212,21 @@ export function AppStatusStrip() {
   }, []);
 
   useEffect(() => {
+    const onScenario = () => setSc(storage.getScenarioState());
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
+    return () => window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, onScenario);
+  }, []);
+
+  useEffect(() => {
     if (ex) setPostExerciseOpen(false);
   }, [ex]);
+
+  /** Combined travel + exercise strip has no "Check" toggle — keep the expanded panel closed. */
+  useEffect(() => {
+    if (sc.travelModeActive && ex) {
+      setExerciseExpanded(false);
+    }
+  }, [sc.travelModeActive, ex?.id]);
 
   useEffect(() => {
     if (!ex) {
@@ -236,12 +248,14 @@ export function AppStatusStrip() {
     void cancelExerciseReminders(ex.id);
     storage.finishExercisePhase();
     setEx(storage.getActiveExercise());
-    setExerciseExpanded(true);
+    if (!sc.travelModeActive) {
+      setExerciseExpanded(true);
+    }
     toast({
       title: "Recovery phase",
       description: "Your planned workout time has ended — you are now in the recovery window.",
     });
-  }, [ex, toast]);
+  }, [ex, toast, sc.travelModeActive]);
 
   useEffect(() => {
     if (!ex) {
@@ -264,6 +278,7 @@ export function AppStatusStrip() {
   }, [ex]);
 
   const travelDays = useMemo(() => daysRemaining(sc.travelEndDate), [sc.travelEndDate]);
+  const travelStyleBadge = tripStyleLabel(sc.travelTripStyle);
   const show =
     sc.sickDayActive || sc.travelModeActive || Boolean(ex) || inPostExerciseWindow || sc.pumpFailureActive || !online;
 
@@ -334,10 +349,14 @@ export function AppStatusStrip() {
     const updated = storage.getActiveExercise();
     if (updated) void scheduleExerciseActiveReminders(updated);
     setEx(storage.getActiveExercise());
-    setExerciseExpanded(true);
+    if (!sc.travelModeActive) {
+      setExerciseExpanded(true);
+    }
     toast({
       title: "Workout in progress",
-      description: "You are in During — the top bar can show session tips when you open Check.",
+      description: sc.travelModeActive
+        ? "You are in During — open Guides → Exercise for the full quick check."
+        : "You are in During — the top bar can show session tips when you open Check.",
     });
   };
 
@@ -347,10 +366,14 @@ export function AppStatusStrip() {
     void cancelExerciseReminders(s.id);
     storage.finishExercisePhase();
     setEx(storage.getActiveExercise());
-    setExerciseExpanded(true);
+    if (!sc.travelModeActive) {
+      setExerciseExpanded(true);
+    }
     toast({
       title: "Recovery phase",
-      description: "Post-workout window — delayed lows are still possible. Use Check for quick tips.",
+      description: sc.travelModeActive
+        ? "Post-workout window — open Guides → Exercise for recovery tips, or use your travel dashboard."
+        : "Post-workout window — delayed lows are still possible. Use Check for quick tips.",
     });
   };
 
@@ -374,13 +397,13 @@ export function AppStatusStrip() {
       ? (() => {
           const started = new Date(ex.exerciseStartedAt).getTime();
           if (!Number.isFinite(started)) return null;
-          return formatElapsedShort(Date.now() - started);
+          return formatExerciseElapsedShort(Date.now() - started);
         })()
       : ex?.phase === "recovery" && ex.exerciseEndedAt
         ? (() => {
             const ended = new Date(ex.exerciseEndedAt).getTime();
             if (!Number.isFinite(ended)) return null;
-            return formatElapsedShort(Date.now() - ended);
+            return formatExerciseElapsedShort(Date.now() - ended);
           })()
         : null;
 
@@ -405,6 +428,7 @@ export function AppStatusStrip() {
       bgTrend: trend ?? undefined,
       lastInsulinTiming: lastInsulinFromStripAnswer(ex.preRapidInsulin2h),
       hourOfDay: new Date().getHours(),
+      ...(ex.preEnvironments?.length ? { environments: [...ex.preEnvironments] } : {}),
     });
   }, [bgUnits, ex, exerciseBgInput]);
 
@@ -501,7 +525,7 @@ export function AppStatusStrip() {
   if (!show) return null;
 
   return (
-    <div className="relative z-40 -mt-2 mb-2 space-y-2" data-testid="app-status-strip">
+    <div className="relative z-40 -mt-2 mb-2 space-y-1.5 sm:space-y-2" data-testid="app-status-strip">
       {!online ? (
         <div className={rowClass}>
           <Badge className={cn("chip border border-border/60 bg-muted/50 text-muted-foreground", "max-w-full")} variant="secondary">
@@ -531,11 +555,12 @@ export function AppStatusStrip() {
         </div>
       ) : null}
 
-      {sc.travelModeActive ? (
+      {sc.travelModeActive && !ex ? (
         <div className={rowClass}>
           <Badge className="chip border border-blue-500/25 bg-blue-500/15 text-blue-900 dark:text-blue-200" variant="secondary">
             <Plane className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Travel{sc.travelDestination ? ` · ${sc.travelDestination}` : ""}
+            {travelStyleBadge ? ` · ${travelStyleBadge}` : ""}
             {travelDays != null && travelDays >= 0 ? ` · ${travelDays}d` : ""}
           </Badge>
           <div className="flex items-center gap-2">
@@ -553,39 +578,145 @@ export function AppStatusStrip() {
       ) : null}
 
       {ex ? (
-        <div className="space-y-2" data-testid="status-exercise">
-          <div className={rowClass}>
-            <Badge
-              className={cn(
-                "chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
-                readiness?.verdict ? getReadinessToneClasses(readiness.verdict.verdict) : null,
-              )}
-              variant="secondary"
-            >
-              <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Exercise · {exercisePhaseLabel(ex.phase)}
-            </Badge>
+        <div className="space-y-1.5 sm:space-y-2" data-testid="status-exercise">
+          <div className={cn(rowClass, sc.travelModeActive && "gap-y-1.5 py-1.5 sm:py-2")} data-testid={sc.travelModeActive ? "status-travel-exercise-combined" : undefined}>
+            {sc.travelModeActive ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="flex shrink-0 items-center" aria-hidden>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/25 text-blue-900 ring-2 ring-background dark:text-blue-100">
+                    <Plane className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/25 text-emerald-900 ring-2 ring-background dark:text-emerald-100">
+                    <Dumbbell className="h-3.5 w-3.5" />
+                  </span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold leading-tight text-foreground">
+                    <span className="text-blue-900 dark:text-blue-100">{sc.travelDestination ?? "Travel"}</span>
+                    <span className="font-normal text-muted-foreground"> · </span>
+                    <span className="text-emerald-900 dark:text-emerald-100 capitalize">
+                      {exercisePhaseLabel(ex.phase)}
+                    </span>
+                    {exercisePhaseTimerLabel ? (
+                      <span className="font-medium tabular-nums text-muted-foreground"> · {exercisePhaseTimerLabel}</span>
+                    ) : null}
+                  </p>
+                  {(travelStyleBadge || (travelDays != null && travelDays >= 0)) && (
+                    <p className="hidden truncate text-[10px] leading-snug text-muted-foreground sm:block">
+                      {travelStyleBadge ? `${travelStyleBadge}` : ""}
+                      {travelStyleBadge && travelDays != null && travelDays >= 0 ? " · " : ""}
+                      {travelDays != null && travelDays >= 0 ? `${travelDays}d in trip` : ""}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <Badge
+                className={cn(
+                  "chip border border-emerald-500/25 bg-emerald-500/15 text-emerald-900 dark:text-emerald-200",
+                  readiness?.verdict ? getReadinessToneClasses(readiness.verdict.verdict) : null,
+                )}
+                variant="secondary"
+              >
+                <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Exercise · {exercisePhaseLabel(ex.phase)}
+              </Badge>
+            )}
             {!isExerciseScenarioPage ? (
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={btnClass}
-                  onClick={() => setExerciseExpanded((v) => !v)}
-                  data-testid="status-exercise-check"
-                >
-                  {exerciseExpanded ? "Hide" : "Check"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={btnClass}
-                  onClick={handleEndExercise}
-                  data-testid="status-exercise-end"
-                >
-                  <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
-                  End
-                </Button>
+              sc.travelModeActive ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  <Link href="/scenarios/travel">
+                    <Button size="sm" variant="outline" className={cn(btnClass, "max-sm:px-2")} data-testid="status-travel-view">
+                      View <ChevronRight className="h-3.5 w-3.5 max-sm:hidden sm:ml-0.5" aria-hidden />
+                    </Button>
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className={cn(btnClass, "w-8 px-0")}
+                        aria-label="Travel and exercise options"
+                        data-testid="status-travel-exercise-more"
+                      >
+                        <MoreHorizontal className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[min(18rem,calc(100vw-2rem))]">
+                      <DropdownMenuItem
+                        onClick={handleEndTravel}
+                        className="cursor-pointer"
+                        data-testid="status-travel-end"
+                      >
+                        <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                        End travel mode
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleEndExercise}
+                        className="cursor-pointer"
+                        data-testid="status-exercise-end"
+                      >
+                        <Power className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                        End exercise session
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={btnClass}
+                    onClick={() => setExerciseExpanded((v) => !v)}
+                    data-testid="status-exercise-check"
+                  >
+                    {exerciseExpanded ? "Hide" : "Check"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={btnClass}
+                    onClick={handleEndExercise}
+                    data-testid="status-exercise-end"
+                  >
+                    <Power className="h-3.5 w-3.5 mr-1" aria-hidden />
+                    End
+                  </Button>
+                </div>
+              )
+            ) : sc.travelModeActive ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <Link href="/scenarios/travel">
+                  <Button size="sm" variant="outline" className={cn(btnClass, "max-sm:px-2")} data-testid="status-travel-view">
+                    View <ChevronRight className="h-3.5 w-3.5 max-sm:hidden sm:ml-0.5" aria-hidden />
+                  </Button>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn(btnClass, "w-8 px-0")}
+                      aria-label="Travel and exercise options"
+                      data-testid="status-travel-exercise-more"
+                    >
+                      <MoreHorizontal className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[min(18rem,calc(100vw-2rem))]">
+                    <DropdownMenuItem onClick={handleEndTravel} className="cursor-pointer" data-testid="status-travel-end">
+                      <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                      End travel mode
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleEndExercise} className="cursor-pointer" data-testid="status-exercise-end">
+                      <Power className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                      End exercise session
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : null}
           </div>

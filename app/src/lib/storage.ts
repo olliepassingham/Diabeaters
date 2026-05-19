@@ -5,6 +5,7 @@ import {
   travelWeatherSupplyShortfallMultiplier,
   tripCalendarDaysBetween,
 } from "./travel-supply-policy";
+import type { TravelTripStyle } from "./travel-active-guidance";
 import {
   formatPharmacyHHmm,
   latestPharmacyWindowEndingBefore,
@@ -242,6 +243,9 @@ export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
 
 /** Same-tab: quick exercise session JSON was written or cleared (`diabeater_active_exercise`). */
 export const DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT = "diabeater-active-exercise-changed";
+
+/** Same-tab: `saveScenarioState` updated travel/sick/etc. flags — widgets can re-read `getScenarioState()`. */
+export const DIABEATER_SCENARIO_STATE_CHANGED_EVENT = "diabeater-scenario-state-changed";
 
 export function notifyActiveExerciseChanged(): void {
   if (typeof window === "undefined") return;
@@ -779,6 +783,10 @@ export interface ScenarioState {
   travelEndDate?: string;
   travelTimezoneShift?: number; // hours difference (positive = east, negative = west)
   travelTimezoneDirection?: "east" | "west" | "none";
+  /** Mirrored from the saved travel plan while travel mode is on (for dashboard / coach parity). */
+  travelTripStyle?: TravelTripStyle;
+  /** Optional short note from the travel plan (local only). */
+  travelActivityNote?: string;
   sickDayActive: boolean;
   sickDaySeverity?: string;
   sickDayActivatedAt?: string;
@@ -1218,8 +1226,8 @@ export interface ActiveExerciseSession {
   preFeelingOff?: boolean;
   /** Pre: training fasted. */
   preFasted?: boolean;
-  /** Pre: environment for the session. */
-  preEnvironment?: ExerciseEnvironmentChoice;
+  /** Pre: venue (indoor / outdoor variants) plus optional altitude — see exercise-plan normalisation. */
+  preEnvironments?: ExerciseEnvironmentChoice[];
   /** Pre: competitive / group session. */
   preCompetitive?: boolean;
   /** Pre: caffeine in last ~2h. */
@@ -1261,6 +1269,7 @@ export type LastExerciseSummary = {
   /** Optional richer recall of session signals so other tools (Bedtime, Meal planner) can react. */
   context?: {
     environment?: ExerciseEnvironmentChoice;
+    environments?: ExerciseEnvironmentChoice[];
     competitive?: boolean;
     sleepHoursLastNight?: number;
     fasted?: boolean;
@@ -1286,6 +1295,8 @@ export interface ExerciseOutcome {
   bgSeverity?: "a_lot" | "a_little";
   feltHypo: boolean;
   notes?: string;
+  /** Set when the session was logged while travel mode was active (local patterns only). */
+  duringTravel?: boolean;
   completedAt: string;
 }
 
@@ -1343,7 +1354,11 @@ function generateId(): string {
 /** Build the optional `context` payload of LastExerciseSummary from the just-finished session. */
 function buildLastExerciseContextFromSession(session: ActiveExerciseSession): NonNullable<LastExerciseSummary["context"]> | undefined {
   const ctx: NonNullable<LastExerciseSummary["context"]> = {};
-  if (session.preEnvironment) ctx.environment = session.preEnvironment;
+  if (session.preEnvironments?.length) {
+    ctx.environments = [...session.preEnvironments];
+    const venue = session.preEnvironments.find((e) => e !== "altitude");
+    if (venue) ctx.environment = venue;
+  }
   if (session.preCompetitive != null) ctx.competitive = session.preCompetitive;
   if (session.preSleepHours != null) ctx.sleepHoursLastNight = session.preSleepHours;
   if (session.preFasted != null) ctx.fasted = session.preFasted;
@@ -1454,6 +1469,27 @@ export function peekDiabeatersBackup(jsonString: string): DiabeatersBackupPeek {
       error: "Could not read this file. Choose a .json file created with Download backup in Settings.",
     };
   }
+}
+
+const TRIP_STYLE_SET = new Set<TravelTripStyle>(["relax", "active", "city", "remote", "family", "not_sure"]);
+
+function normalizeTravelTripStyleFromStoredPlan(raw: unknown): TravelTripStyle | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim() as TravelTripStyle;
+  if (!TRIP_STYLE_SET.has(v)) return undefined;
+  if (v === "not_sure") return undefined;
+  return v;
+}
+
+function normalizeTravelActivityNoteFromPlan(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const t = raw.trim().slice(0, 120);
+  return t.length > 0 ? t : undefined;
+}
+
+function notifyScenarioStateChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DIABEATER_SCENARIO_STATE_CHANGED_EVENT));
 }
 
 function clearBackedUpDiabeatersStorage(): void {
@@ -2685,6 +2721,22 @@ export const storage = {
 
   saveScenarioState(state: ScenarioState): void {
     localStorage.setItem(STORAGE_KEYS.SCENARIO_STATE, JSON.stringify(state));
+    notifyScenarioStateChanged();
+  },
+
+  syncTravelMetaFromPlanToScenario(): void {
+    const state = this.getScenarioState();
+    if (!state.travelModeActive) return;
+    const plan = this.getTravelPlan();
+    let nextStyle: TravelTripStyle | undefined;
+    let nextNote: string | undefined;
+    if (plan && typeof plan === "object") {
+      const p = plan as Record<string, unknown>;
+      nextStyle = normalizeTravelTripStyleFromStoredPlan(p.tripStyle);
+      nextNote = normalizeTravelActivityNoteFromPlan(p.activityNote ?? p.travelActivityNote);
+    }
+    if (state.travelTripStyle === nextStyle && state.travelActivityNote === nextNote) return;
+    this.saveScenarioState({ ...state, travelTripStyle: nextStyle, travelActivityNote: nextNote });
   },
 
   activateTravelMode(destination: string, startDate: string, endDate: string, timezoneShift?: number, timezoneDirection?: "east" | "west" | "none"): void {
@@ -2716,6 +2768,8 @@ export const storage = {
     state.travelEndDate = undefined;
     state.travelTimezoneShift = undefined;
     state.travelTimezoneDirection = undefined;
+    state.travelTripStyle = undefined;
+    state.travelActivityNote = undefined;
     this.saveScenarioState(state);
     localStorage.removeItem(STORAGE_KEYS.TRAVEL_PLAN);
     localStorage.removeItem(STORAGE_KEYS.TRAVEL_PACKING_LIST);
@@ -2724,6 +2778,7 @@ export const storage = {
 
   saveTravelPlan(plan: any): void {
     localStorage.setItem(STORAGE_KEYS.TRAVEL_PLAN, JSON.stringify(plan));
+    this.syncTravelMetaFromPlanToScenario();
   },
 
   getTravelPlan(): any | null {
@@ -4111,7 +4166,29 @@ export const storage = {
         ) as ExerciseSymptomFlag[])
       : undefined;
 
-    return {
+    const ALLOWED_ENV: readonly ExerciseEnvironmentChoice[] = [
+      "indoor",
+      "outdoor_normal",
+      "outdoor_hot",
+      "outdoor_cold",
+      "altitude",
+    ];
+    const isAllowedEnv = (x: unknown): x is ExerciseEnvironmentChoice =>
+      typeof x === "string" && (ALLOWED_ENV as readonly string[]).includes(x);
+
+    const rawSession = session as ActiveExerciseSession & {
+      preEnvironments?: unknown;
+      preEnvironment?: unknown;
+    };
+    let preEnvironments: ExerciseEnvironmentChoice[] | undefined;
+    if (Array.isArray(rawSession.preEnvironments) && rawSession.preEnvironments.length > 0) {
+      preEnvironments = rawSession.preEnvironments.filter(isAllowedEnv);
+      if (preEnvironments.length === 0) preEnvironments = undefined;
+    } else if (isAllowedEnv(rawSession.preEnvironment)) {
+      preEnvironments = [rawSession.preEnvironment];
+    }
+
+    const normalized: ActiveExerciseSession = {
       ...session,
       id,
       exerciseName,
@@ -4124,7 +4201,10 @@ export const storage = {
       preChecklist,
       startedAt,
       midSymptoms: midSymptoms && midSymptoms.length > 0 ? midSymptoms : undefined,
+      preEnvironments,
     };
+    delete (normalized as Record<string, unknown>).preEnvironment;
+    return normalized;
   },
 
   getActiveExercise(): ActiveExerciseSession | null {

@@ -108,7 +108,13 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
   if (hasEnded) return "Trip done — restock when you're home.";
 
   if (!hasStarted) {
-    if (daysUntilStart <= 1) return "Final pack check today.";
+    if (daysUntilStart <= 1) {
+      if (plan.tripStyle === "active") return "Trip tomorrow — split kit across bags; keep carbs on you.";
+      return "Final pack check today.";
+    }
+    if (plan.tripStyle === "active" && daysUntilStart <= 3) {
+      return "Active trip soon — add fast carbs to your carry-on checklist.";
+    }
     return "Work through your packing list.";
   }
 
@@ -123,12 +129,20 @@ export function buildActiveTravelTodayFocus(input: ActiveTravelProgressInput): s
     return "Keep full backups on you.";
   }
 
+  if (plan.tripStyle === "active" && plan.weatherChange === "warmer" && dayNumber <= 2) {
+    return "Heat + effort early on — check more often today.";
+  }
+
   if (plan.weatherChange === "colder") {
     return "Warm up meters/CGM before trusting readings.";
   }
 
   if (plan.weatherChange === "warmer") {
     return "Keep hypos cool and within reach.";
+  }
+
+  if (plan.tripStyle === "active" && dayNumber === 1) {
+    return "Big day energy — extra fluids and fast carbs in your pack.";
   }
 
   const styleFocus = styleTodayFocus(plan);

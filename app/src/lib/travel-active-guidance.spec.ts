@@ -49,6 +49,37 @@ describe("buildActiveTravelTodayFocus", () => {
     expect(focus.toLowerCase()).toMatch(/cool|hypos/);
   });
 
+  it("combines active trip with warmer weather on early trip days", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 1,
+      plan: { ...basePlan, tripStyle: "active", weatherChange: "warmer" as const },
+    });
+    expect(focus.toLowerCase()).toMatch(/heat|effort|check/);
+  });
+
+  it("nudges active travellers the day before departure", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 0,
+      hasStarted: false,
+      daysUntilStart: 1,
+      plan: { ...basePlan, tripStyle: "active", weatherChange: "similar" as const },
+    });
+    expect(focus.toLowerCase()).toMatch(/tomorrow|carbs|bags/);
+  });
+
+  it("nudges active travellers a few days before departure", () => {
+    const focus = buildActiveTravelTodayFocus({
+      ...baseInput,
+      dayNumber: 0,
+      hasStarted: false,
+      daysUntilStart: 2,
+      plan: { ...basePlan, tripStyle: "active", weatherChange: "similar" as const },
+    });
+    expect(focus.toLowerCase()).toMatch(/carry-on|carbs|checklist/);
+  });
+
   it("prioritises limited pharmacies over relax style", () => {
     const focus = buildActiveTravelTodayFocus({
       ...baseInput,

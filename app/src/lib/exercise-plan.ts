@@ -101,8 +101,10 @@ export interface ExercisePlanContext {
   hydration?: "ok" | "low";
   /** Generic feeling-off / stress flag. */
   feelingOff?: boolean;
-  /** Environmental context (heat/cold/altitude shift fuel + caution). */
+  /** Environmental context (heat/cold/altitude shift fuel + caution). Legacy single-select. */
   environment?: ExerciseEnvironment;
+  /** When set, each matching environment applies its modifier (venue + altitude can stack). */
+  environments?: ExerciseEnvironment[];
   /** Group / competitive sessions tend to push harder than solo workouts. */
   competitive?: boolean;
   /** Caffeine in last ~2h (small alertness/glucose effect, mostly noted in tips). */
@@ -117,6 +119,29 @@ export interface ExercisePlanContext {
   iobUnits?: number;
   /** Bias from prior outcomes for the same routine. */
   historyBias?: ExerciseHistoryBias;
+}
+
+const VENUE_ENVIRONMENTS: readonly ExerciseEnvironment[] = ["indoor", "outdoor_normal", "outdoor_hot", "outdoor_cold"];
+
+/**
+ * Normalises environment inputs: at most one venue (indoor / outdoor variants) plus optional altitude.
+ * `environments` wins when non-empty; otherwise falls back to legacy `environment`.
+ */
+export function normalizeExercisePlanEnvironments(context: ExercisePlanContext): ExerciseEnvironment[] {
+  const raw: ExerciseEnvironment[] = [];
+  if (context.environments?.length) raw.push(...context.environments);
+  else if (context.environment) raw.push(context.environment);
+
+  let venue: ExerciseEnvironment | undefined;
+  let hasAltitude = false;
+  for (const e of raw) {
+    if (e === "altitude") hasAltitude = true;
+    else if ((VENUE_ENVIRONMENTS as readonly string[]).includes(e)) venue = e;
+  }
+  const out: ExerciseEnvironment[] = [];
+  if (venue) out.push(venue);
+  if (hasAltitude) out.push("altitude");
+  return out;
 }
 
 const EXERCISE_LABELS: Record<string, string> = {
@@ -177,14 +202,17 @@ function deeperContextCarbMultipliers(context: ExercisePlanContext): { pre: numb
   let during = 1;
   let post = 1;
 
-  if (context.environment === "outdoor_hot") {
-    during *= 1.15;
-    post *= 1.05;
-  } else if (context.environment === "outdoor_cold") {
-    pre *= 1.05;
-  } else if (context.environment === "altitude") {
-    during *= 1.1;
-    post *= 1.05;
+  const envs = normalizeExercisePlanEnvironments(context);
+  for (const e of envs) {
+    if (e === "outdoor_hot") {
+      during *= 1.15;
+      post *= 1.05;
+    } else if (e === "outdoor_cold") {
+      pre *= 1.05;
+    } else if (e === "altitude") {
+      during *= 1.1;
+      post *= 1.05;
+    }
   }
 
   if (context.competitive) {
@@ -578,11 +606,14 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     );
   }
 
-  if (context.environment === "outdoor_hot") {
+  const envsForTips = normalizeExercisePlanEnvironments(context);
+  if (envsForTips.includes("outdoor_hot")) {
     preTips.push("Hot environment — sweating increases hypo risk for some people. Sip fluids and keep extra fast carbs handy.");
-  } else if (context.environment === "outdoor_cold") {
+  }
+  if (envsForTips.includes("outdoor_cold")) {
     preTips.push("Cold weather can blunt hypo symptoms — set extra check reminders, especially if you train alone.");
-  } else if (context.environment === "altitude") {
+  }
+  if (envsForTips.includes("altitude")) {
     preTips.push("Altitude shifts insulin needs for some people — start gentler and build, and confirm any adjustments with your team.");
   }
 
@@ -675,7 +706,8 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     recoveryTips.push("Alcohol last night already increases delayed-low risk — pair with exercise recovery, plan a snack and an alarm if you feel unsure.");
   }
 
-  if (context.environment === "outdoor_hot") {
+  const envsRecovery = normalizeExercisePlanEnvironments(context);
+  if (envsRecovery.includes("outdoor_hot")) {
     recoveryTips.push("After heat: rehydrate steadily — recheck BG after fluids, since dehydrated readings can mislead recovery decisions.");
   }
 

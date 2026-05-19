@@ -171,6 +171,18 @@ describe("calculateExercisePlan deeper context modifiers", () => {
     expect(hot.pre.contextualNotes?.some((n) => n.toLowerCase().includes("hot"))).toBe(true);
   });
 
+  it("combines hot and altitude pre-session guidance when both environments apply", () => {
+    const ctx = { ...baseCtx, durationMinutes: 60 };
+    const hot = calculateExercisePlan({ ...ctx, environments: ["outdoor_hot"] });
+    const hotAltitude = calculateExercisePlan({ ...ctx, environments: ["outdoor_hot", "altitude"] });
+    const hotNotes = hot.pre.contextualNotes ?? [];
+    const bothNotes = hotAltitude.pre.contextualNotes ?? [];
+    expect(hotNotes.some((n) => n.toLowerCase().includes("hot"))).toBe(true);
+    expect(hotNotes.some((n) => n.toLowerCase().includes("altitude"))).toBe(false);
+    expect(bothNotes.some((n) => n.toLowerCase().includes("hot"))).toBe(true);
+    expect(bothNotes.some((n) => n.toLowerCase().includes("altitude"))).toBe(true);
+  });
+
   it("warns about low sleep and beta-blockers in pre tips", () => {
     const r = calculateExercisePlan({
       ...baseCtx,
