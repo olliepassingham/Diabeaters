@@ -1282,6 +1282,12 @@ export type LastExerciseSummary = {
     feltSymptomsDuring?: boolean;
     recoveryCarbsGrams?: number;
     alcoholTonight?: boolean;
+    /** Fingerstick trend when a pre-workout BG was logged (educational nudges only). */
+    preExerciseTrend?: ExerciseBgTrend;
+    /** Trend when a during-workout BG was logged. */
+    duringExerciseTrend?: ExerciseBgTrend;
+    /** Trend when a recovery BG was logged. */
+    recoveryExerciseTrend?: ExerciseBgTrend;
   };
 };
 
@@ -1375,6 +1381,15 @@ function buildLastExerciseContextFromSession(session: ActiveExerciseSession): No
   }
   if (session.recoveryCarbsGrams != null) ctx.recoveryCarbsGrams = session.recoveryCarbsGrams;
   if (session.alcoholTonight != null) ctx.alcoholTonight = session.alcoholTonight;
+  if (session.preBg != null && session.preTrend && session.preTrend !== "not_sure") {
+    ctx.preExerciseTrend = session.preTrend;
+  }
+  if (session.midBg != null && session.midTrend && session.midTrend !== "not_sure") {
+    ctx.duringExerciseTrend = session.midTrend;
+  }
+  if (session.recoveryBg != null && session.recoveryTrend && session.recoveryTrend !== "not_sure") {
+    ctx.recoveryExerciseTrend = session.recoveryTrend;
+  }
   return Object.keys(ctx).length > 0 ? ctx : undefined;
 }
 

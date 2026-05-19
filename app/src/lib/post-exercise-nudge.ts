@@ -1,4 +1,100 @@
-import type { ExerciseIntensity, ExerciseType, LastExerciseSummary } from "@/lib/storage";
+import type { ExerciseBgTrend, ExerciseType, LastExerciseSummary } from "@/lib/storage";
+
+const MAX_CONTEXT_EXTRAS = 2;
+
+function bgTrendContextLine(ctx: NonNullable<LastExerciseSummary["context"]>): string | null {
+  const t: ExerciseBgTrend | undefined =
+    ctx.recoveryExerciseTrend ?? ctx.duringExerciseTrend ?? ctx.preExerciseTrend;
+  if (!t || t === "not_sure") return null;
+  if (t === "falling") {
+    return "Your logged checks trended down at least once — delayed lows can still appear later; keep hypo treatment close and avoid tightening insulin aggressively without a repeat check.";
+  }
+  if (t === "rising") {
+    return "Your logged checks trended up at least once — refuelling and stress hormones can muddy the next few hours; follow your team’s correction rules and confirm the trend.";
+  }
+  return "Your logged checks looked steadier — still watch the next few hours if you add meal insulin or train again.";
+}
+
+/**
+ * Short educational lines derived from the last session’s optional context (pre/during/recovery).
+ * Used by the status strip; capped so the panel stays scannable.
+ */
+export function buildSessionContextTipExtras(summary: LastExerciseSummary | null): string[] {
+  if (!summary?.context) return [];
+  const c = summary.context;
+  const candidates: string[] = [];
+
+  if (c.feltSymptomsDuring) {
+    candidates.push(
+      "You noted symptoms during this session — take the hours after exercise seriously: favour your hypo plan and avoid guessing insulin changes without a trend.",
+    );
+  }
+  if (c.betaBlockerToday) {
+    candidates.push(
+      "Beta blockers can hide adrenaline warning signs for some people — lean on meter or CGM trends and your written hypo steps, not only how you feel.",
+    );
+  }
+  if (c.alcoholLastNight) {
+    candidates.push(
+      "You flagged alcohol last night — it can still interact with sensitivity today; be extra careful with corrections and overnight lows.",
+    );
+  }
+  if (c.alcoholTonight) {
+    candidates.push(
+      "You flagged alcohol planned later — pair that with your team’s evening guidance and extra caution after today’s session.",
+    );
+  }
+  if (c.fasted) {
+    candidates.push(
+      "You trained fasted or with minimal fuel — refuel thoughtfully and watch for delayed lows after any meal boluses.",
+    );
+  }
+  if (c.glp1Last24h) {
+    candidates.push(
+      "You flagged a GLP-1 medicine recently — appetite and stomach emptying can shift; align boluses with your clinician’s plan.",
+    );
+  }
+  const carbsDuring = c.midCarbsGramsTotal;
+  if (typeof carbsDuring === "number" && carbsDuring >= 20) {
+    candidates.push(
+      `You logged roughly ${Math.round(carbsDuring)}g carbs during the session — if glucose rises afterward, confirm the trend before stacking corrections.`,
+    );
+  }
+  if (c.competitive) {
+    candidates.push(
+      "You marked a competitive session — adrenaline can skew how hard it felt; some people see a delayed dip once effort stops.",
+    );
+  }
+  if (c.environment === "outdoor_hot") {
+    candidates.push(
+      "You logged hot conditions — hydration and heat can shift glucose; favour repeat checks before bold insulin changes.",
+    );
+  }
+  if (c.environment === "outdoor_cold") {
+    candidates.push(
+      "You logged cold conditions — keep fingers and sensors warm enough to trust readings before acting on them.",
+    );
+  }
+  const sleep = c.sleepHoursLastNight;
+  if (typeof sleep === "number" && sleep > 0 && sleep <= 5) {
+    candidates.push(
+      "Short sleep before training can blunt warning signs — favour gentle corrections and your usual overnight safety habits.",
+    );
+  }
+  const bgLine = bgTrendContextLine(c);
+  if (bgLine) candidates.push(bgLine);
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const line of candidates) {
+    if (out.length >= MAX_CONTEXT_EXTRAS) break;
+    const key = line.slice(0, 88);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(line);
+  }
+  return out;
+}
 
 export type PostExerciseLoadTier = "light" | "moderate" | "heavy";
 
@@ -174,7 +270,7 @@ export function insulinDeliveryForPostExerciseTips(
   return "unknown";
 }
 
-function exerciseTailTip(summary: LastExerciseSummary | null): string | null {
+function exerciseTailTip(summary: LastExerciseSummary | null, tier: PostExerciseLoadTier): string | null {
   if (!summary) return null;
   switch (summary.exerciseType) {
     case "hiit":
@@ -184,6 +280,12 @@ function exerciseTailTip(summary: LastExerciseSummary | null): string | null {
       return "After strength work, glucose can drift unpredictably while muscles refuel — respond to trends rather than chasing numbers quickly.";
     case "yoga":
     case "walking":
+      if (tier === "heavy") {
+        return "Long or brisk sessions in this format can still widen the hypo-risk window — keep fast carbs handy and watch trends, especially if glucose is sliding.";
+      }
+      if (tier === "moderate") {
+        return "Moderate sessions like this usually move glucose less than hard cardio — still use your usual caution if you stack doses or train again today.";
+      }
       return "Lower-impact sessions disturb glucose less for many people, but a late-day downward trend still deserves your usual caution.";
     case "court":
     case "field":
@@ -195,7 +297,8 @@ function exerciseTailTip(summary: LastExerciseSummary | null): string | null {
 }
 
 /**
- * Tips for the home status strip (expanded). Uses last session + load tier + pump vs pen vs unknown.
+ * Tips for the home status strip (expanded). Uses last session + load tier + pump vs pen vs unknown,
+ * plus up to two lines from pre/during/recovery context when the user logged it.
  */
 export function getPostExercisePersonalizedTipBullets(
   tier: PostExerciseLoadTier,
@@ -242,6 +345,8 @@ export function getPostExercisePersonalizedTipBullets(
     ? "If glucose is trending down toward bedtime, follow your hypo plan and any overnight guidance from your diabetes team."
     : "Keep fast carbs within reach for several hours, and repeat your usual pre-exercise checks if you train again today.";
 
-  const tail = exerciseTailTip(summary);
-  return tail ? [primary, secondary, tail] : [primary, secondary];
+  const contextExtras = buildSessionContextTipExtras(summary);
+  const tail = exerciseTailTip(summary, tier);
+  const core = [primary, secondary, ...contextExtras];
+  return tail ? [...core, tail] : core;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildSessionContextTipExtras,
   getPostExercisePersonalizedTipBullets,
   inferPostExerciseLoadTier,
   insulinDeliveryForPostExerciseTips,
@@ -56,6 +57,30 @@ describe("insulinDeliveryForPostExerciseTips", () => {
   });
 });
 
+describe("buildSessionContextTipExtras", () => {
+  it("returns alcohol-last-night line when flagged", () => {
+    const lines = buildSessionContextTipExtras(
+      sum({ context: { alcoholLastNight: true } }),
+    );
+    expect(lines.some((l) => /alcohol last night/i.test(l))).toBe(true);
+  });
+
+  it("caps at two lines when many flags are set", () => {
+    const lines = buildSessionContextTipExtras(
+      sum({
+        context: {
+          feltSymptomsDuring: true,
+          betaBlockerToday: true,
+          alcoholLastNight: true,
+          fasted: true,
+        },
+      }),
+    );
+    expect(lines.length).toBeLessThanOrEqual(2);
+    expect(lines.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
 describe("getPostExercisePersonalizedTipBullets", () => {
   it("mentions IOB for pump users on moderate load", () => {
     const bullets = getPostExercisePersonalizedTipBullets("moderate", sum({}), "pump", {
@@ -77,5 +102,40 @@ describe("getPostExercisePersonalizedTipBullets", () => {
     });
     expect(bullets.length).toBeGreaterThanOrEqual(2);
     expect(bullets.some((b) => /cardio|high-intensity|delayed lows/i.test(b))).toBe(true);
+  });
+
+  it("adds alcohol-last-night context line", () => {
+    const bullets = getPostExercisePersonalizedTipBullets(
+      "moderate",
+      sum({ context: { alcoholLastNight: true } }),
+      "unknown",
+      { mentionOvernight: false },
+    );
+    expect(bullets.some((b) => /alcohol last night/i.test(b))).toBe(true);
+  });
+
+  it("adds falling-trend context when recovery trend was logged", () => {
+    const bullets = getPostExercisePersonalizedTipBullets(
+      "moderate",
+      sum({ context: { recoveryExerciseTrend: "falling" } }),
+      "unknown",
+      { mentionOvernight: false },
+    );
+    expect(bullets.some((b) => /trended down/i.test(b))).toBe(true);
+  });
+
+  it("does not use the light-walking tail copy when load tier is heavy", () => {
+    const summary = sum({
+      exerciseType: "walking",
+      intensity: "intense",
+      durationMinutes: 120,
+      exerciseName: "Walking",
+    });
+    expect(inferPostExerciseLoadTier(summary)).toBe("heavy");
+    const bullets = getPostExercisePersonalizedTipBullets("heavy", summary, "pen", {
+      mentionOvernight: false,
+    });
+    expect(bullets.some((b) => /Lower-impact sessions disturb glucose less/i.test(b))).toBe(false);
+    expect(bullets.some((b) => /Long or brisk sessions in this format/i.test(b))).toBe(true);
   });
 });
