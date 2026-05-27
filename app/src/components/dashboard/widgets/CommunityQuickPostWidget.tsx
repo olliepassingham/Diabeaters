@@ -1,73 +1,25 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Loader2, Send } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
+import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
+import { useFeedComposer } from "@/hooks/use-feed-composer";
 import { useAuth } from "@/lib/auth-context";
 import { isCommunityEnabled } from "@/lib/flags";
 import { useProfile } from "@/lib/profile";
-import {
-  DEFAULT_COMMUNITY_TOPIC,
-  buildMentionsForPost,
-  insertFeedPost,
-} from "@/lib/community";
-import { ToastAction } from "@/components/ui/toast";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
-
-const PLACEHOLDER = "What is on your mind?";
 
 export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
   const { user } = useAuth();
   const { profile, loading } = useProfile();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [text, setText] = useState("");
-  const [posting, setPosting] = useState(false);
 
-  if (!isCommunityEnabled || loading || !profile?.is_public) return null;
-
-  const trimmed = text.trim();
-  const hasFeedHandle = Boolean(profile?.public_handle?.trim());
-  const canPost = trimmed.length > 0 && !posting && Boolean(user) && hasFeedHandle;
-
-  async function handlePost() {
-    if (!user || !trimmed) {
-      toast({
-        title: "Add something to post",
-        description: "Write a short message first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!hasFeedHandle) {
-      toast({
-        title: "Choose a @handle to post",
-        description: "Set your public handle in Feed profile settings first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setPosting(true);
-    try {
-      const mentions = await buildMentionsForPost(text, user.id);
-      const res = await insertFeedPost({
-        kind: "standard",
-        topic: DEFAULT_COMMUNITY_TOPIC,
-        body: text,
-        mentions,
-      });
-      if (res.error) {
-        toast({
-          title: "Could not post",
-          description: res.error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-      setText("");
+  const composer = useFeedComposer({
+    closeSheetOnPost: true,
+    suppressPostedToast: true,
+    onPosted: () => {
       toast({
         title: "Posted",
         description: "Your post is live on the community feed.",
@@ -77,64 +29,40 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
           </ToastAction>
         ),
       });
-    } finally {
-      setPosting(false);
-    }
-  }
+    },
+  });
+
+  if (!isCommunityEnabled || loading || !profile?.is_public) return null;
 
   return (
     <WidgetCard
       data-testid="widget-community-quick-post"
-      className="border-border/60 bg-gradient-to-b from-card to-muted/20 py-0 shadow-sm"
+      className="border-border/50 bg-gradient-to-b from-card/95 to-muted/15 py-0 shadow-sm"
     >
-      <CardContent className="px-3 py-3">
-        <form
-          className="flex flex-col gap-2 sm:flex-row sm:items-end"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handlePost();
-          }}
-        >
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                e.preventDefault();
-                void handlePost();
-              }
-            }}
-            placeholder={hasFeedHandle ? PLACEHOLDER : "Set a @handle in Feed profile to post from here"}
-            rows={2}
-            disabled={posting || !hasFeedHandle}
-            className="min-h-[4.25rem] resize-none text-base flex-1 border-muted-foreground/20 bg-background/80 shadow-inner focus-visible:ring-primary/25"
-            maxLength={8000}
-            data-testid="input-dashboard-quick-post"
-            aria-label={PLACEHOLDER}
-          />
-          <Button
-            type="submit"
-            size="sm"
-            disabled={!canPost}
-            className="h-9 shrink-0 gap-1.5 px-4 sm:self-stretch"
-            data-testid="button-dashboard-quick-post"
-          >
-            {posting ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <Send className="h-3.5 w-3.5" aria-hidden />
-            )}
-            Post
-          </Button>
-        </form>
-        {!hasFeedHandle ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            <Link href="/account#profile" className="font-medium text-primary underline-offset-4 hover:underline">
-              Open Profile
-            </Link>{" "}
-            to choose your @handle (required to post).
-          </p>
-        ) : null}
+      <CardContent className="px-3 py-3 sm:px-3.5">
+        <FeedComposerSheet
+          open={composer.sheetOpen}
+          onOpenChange={composer.setSheetOpen}
+          pillPreview={composer.pillPreview}
+          avatarDisplayName={composer.avatarDisplayName}
+          avatarPath={composer.avatarPath}
+          profileHref={composer.profileHref}
+          formBodyProps={composer.formBodyProps}
+          onSubmit={composer.handlePost}
+          disabled={!user}
+          pillTestId="dashboard-feed-composer-pill"
+          formTestId="dashboard-feed-composer-form"
+          footer={
+            !composer.hasFeedHandle ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                <Link href="/account#profile" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Open Profile
+                </Link>{" "}
+                to choose your @handle (required to post).
+              </p>
+            ) : null
+          }
+        />
       </CardContent>
     </WidgetCard>
   );

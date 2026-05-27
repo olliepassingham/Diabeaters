@@ -46,6 +46,14 @@ import appPackage from "../../../package.json";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
 import { profileQueryKey, useProfile } from "@/lib/profile";
+import {
+  formatWeightInputFromKg,
+  getBodyWeightKgFromProfile,
+  getWeightDisplayUnitFromProfile,
+  parseWeightInputToKg,
+  profileWeightRequiredForHypo,
+  type WeightDisplayUnit,
+} from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getSupabase } from "@/lib/supabase";
@@ -73,6 +81,11 @@ function ProfileTab({
   setDeliveryMethod,
   dateOfBirth,
   setDateOfBirth,
+  bodyWeightInput,
+  setBodyWeightInput,
+  weightDisplayUnit,
+  setWeightDisplayUnit,
+  weightRequiredForHypo,
   onSave,
 }: {
   bgUnits: string;
@@ -83,6 +96,11 @@ function ProfileTab({
   setDeliveryMethod: (v: "pen" | "pump") => void;
   dateOfBirth: string;
   setDateOfBirth: (v: string) => void;
+  bodyWeightInput: string;
+  setBodyWeightInput: (v: string) => void;
+  weightDisplayUnit: WeightDisplayUnit;
+  setWeightDisplayUnit: (v: WeightDisplayUnit) => void;
+  weightRequiredForHypo: boolean;
   onSave: () => void;
 }) {
   return (
@@ -161,6 +179,56 @@ function ProfileTab({
           onChange={(e) => setDateOfBirth(e.target.value)}
           data-testid="input-settings-dob"
         />
+      </div>
+      <div className="space-y-1.5">
+        <FieldLabelWithInfo
+          htmlFor="settings-body-weight"
+          info={
+            <p>
+              Used for hypo treatment estimates in Hypo help. Stored on this device only. Update when your weight
+              changes — especially important for under-18s.
+            </p>
+          }
+        >
+          Body weight {weightRequiredForHypo ? "(required for hypo help)" : "(optional)"}
+        </FieldLabelWithInfo>
+        <div className="flex gap-2">
+          <Input
+            id="settings-body-weight"
+            type="number"
+            inputMode="decimal"
+            placeholder={weightDisplayUnit === "kg" ? "e.g. 70" : "e.g. 154"}
+            value={bodyWeightInput}
+            onChange={(e) => setBodyWeightInput(e.target.value)}
+            className="flex-1"
+            data-testid="input-settings-body-weight"
+          />
+          <div className="flex shrink-0">
+            <Button
+              type="button"
+              variant={weightDisplayUnit === "kg" ? "default" : "outline"}
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => setWeightDisplayUnit("kg")}
+              data-testid="button-settings-weight-kg"
+            >
+              kg
+            </Button>
+            <Button
+              type="button"
+              variant={weightDisplayUnit === "lbs" ? "default" : "outline"}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setWeightDisplayUnit("lbs")}
+              data-testid="button-settings-weight-lbs"
+            >
+              lbs
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Pre-fills the hypo calculator so you do not need to enter weight during a hypo.
+        </p>
       </div>
       <div className="hidden justify-end pt-1 md:flex">
         <Button onClick={onSave} data-testid="button-save-profile">
@@ -657,7 +725,9 @@ export default function Settings() {
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [carbUnits, setCarbUnits] = useState("grams");
   const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
-  
+  const [bodyWeightInput, setBodyWeightInput] = useState("");
+  const [weightDisplayUnit, setWeightDisplayUnit] = useState<WeightDisplayUnit>("kg");
+
   const [tdd, setTdd] = useState("");
   const [breakfastRatio, setBreakfastRatio] = useState("");
   const [lunchRatio, setLunchRatio] = useState("");
@@ -737,8 +807,14 @@ export default function Settings() {
       setBgUnits(storedProfile.bgUnits || "mmol/L");
       setCarbUnits(storedProfile.carbUnits || "grams");
       setDeliveryMethod((storedProfile.insulinDeliveryMethod as "pen" | "pump") || "pen");
+      const unit = getWeightDisplayUnitFromProfile(storedProfile);
+      setWeightDisplayUnit(unit);
+      const kg = getBodyWeightKgFromProfile(storedProfile);
+      setBodyWeightInput(kg != null ? formatWeightInputFromKg(kg, unit) : "");
     } else {
       setProfile(defaultProfile);
+      setBodyWeightInput("");
+      setWeightDisplayUnit("kg");
     }
 
     const format: RatioFormat = storedProfile?.ratioFormat || "per10g";
@@ -877,12 +953,23 @@ export default function Settings() {
     const base = profile ?? storage.getProfile();
     if (!base) return { ok: false };
     const normalizedDob = normalizeDateOfBirthInput(base.dateOfBirth?.trim() || null);
+    const parsedKg = parseWeightInputToKg(bodyWeightInput, weightDisplayUnit);
+    if (profileWeightRequiredForHypo(normalizedDob) && parsedKg == null) {
+      toast({
+        title: "Weight required",
+        description: "Add body weight for hypo treatment estimates (required for under-18s and when date of birth is not set).",
+        variant: "destructive",
+      });
+      return { ok: false };
+    }
     const updatedProfile = {
       ...base,
       bgUnits,
       carbUnits,
       insulinDeliveryMethod: deliveryMethod,
       dateOfBirth: normalizedDob ?? "",
+      bodyWeightKg: parsedKg ?? undefined,
+      weightDisplayUnit,
     };
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
@@ -1110,7 +1197,9 @@ export default function Settings() {
       <section id="settings-personal" className="scroll-mt-24 space-y-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Units, delivery method, and optional date of birth.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Units, delivery method, body weight for hypo help, and optional date of birth.
+          </p>
         </div>
         <ProfileTab
           bgUnits={bgUnits}
@@ -1137,6 +1226,13 @@ export default function Settings() {
               };
             })
           }
+          bodyWeightInput={bodyWeightInput}
+          setBodyWeightInput={setBodyWeightInput}
+          weightDisplayUnit={weightDisplayUnit}
+          setWeightDisplayUnit={setWeightDisplayUnit}
+          weightRequiredForHypo={profileWeightRequiredForHypo(
+            normalizeDateOfBirthInput(profile?.dateOfBirth?.trim() || null),
+          )}
           onSave={() => void handleSaveProfile()}
         />
       </section>

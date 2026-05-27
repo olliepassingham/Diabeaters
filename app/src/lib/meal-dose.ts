@@ -189,9 +189,10 @@ export function getExerciseMealBolusPreview(
   settings: UserSettings,
   bgUnits: string,
   minutesUntilStart: number,
+  exerciseMeta?: MealExerciseMeta,
 ): MealDoseResult {
   const hours = mealDoseHoursFromPlannerMinutes(minutesUntilStart);
-  return calculateMealDose(carbs, mealType, settings, bgUnits, "before", hours);
+  return calculateMealDose(carbs, mealType, settings, bgUnits, "before", hours, exerciseMeta);
 }
 
 /** Bands for comparing optional user-entered planned units to the exercise-adjusted preview dose. */

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ScenarioToolDisclaimer } from "@/components/disclaimer";
+import { ExerciseFuelCalculator } from "@/components/scenarios/ExerciseFuelCalculator";
 import { ExerciseGuidedCoach } from "@/components/scenarios/ExerciseGuidedCoach";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
@@ -83,6 +84,7 @@ export default function ScenarioExercisePage() {
         </ScenarioActiveCard>
       ) : null}
 
+      <ExerciseFuelCalculator />
       <ExerciseGuidedCoach />
       <ScenarioToolDisclaimer className="mt-2" />
     </PageShell>

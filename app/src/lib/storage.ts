@@ -474,6 +474,10 @@ export interface UserProfile {
   ratioFormat?: RatioFormat;
   carbPortionSize?: number;
   accountType?: AccountType;
+  /** Canonical body weight in kg — used by hypo treatment estimates. */
+  bodyWeightKg?: number;
+  /** How weight is shown in profile and hypo help (storage remains kg). */
+  weightDisplayUnit?: "kg" | "lbs";
 }
 
 export function isCommunityAccountProfile(profile: UserProfile | null | undefined): boolean {

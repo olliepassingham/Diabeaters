@@ -12,6 +12,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  ChevronDown,
   CircleCheck,
   Coffee,
   Dumbbell,
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,9 +56,9 @@ import {
   type UserProfile,
   type UserSettings,
 } from "@/lib/storage";
+import { buildExercisePlanContextFromCoachSession } from "@/lib/exercise-coach-plan-context";
 import {
   calculateExercisePlan,
-  type ExercisePlanContext,
   type ExercisePlanResult,
   type ExerciseHistoryBias,
 } from "@/lib/exercise-plan";
@@ -211,6 +213,7 @@ export function ExerciseGuidedCoach() {
   const appliedDefaultsForSessionId = useRef<string | null>(null);
 
   // Quick start form (only relevant when no active session exists)
+  const [planWorkoutOpen, setPlanWorkoutOpen] = useState(true);
   const [startType, setStartType] = useState<ExerciseType>("cardio");
   const [startIntensity, setStartIntensity] = useState<ExerciseIntensity>("moderate");
   const [startDuration, setStartDuration] = useState<string>("45");
@@ -303,32 +306,17 @@ export function ExerciseGuidedCoach() {
   const exercisePlan: ExercisePlanResult | null = useMemo(() => {
     if (!activeSession) return null;
     const bgParsed = parseFloatOrNull(bgInput);
-    const ctx: ExercisePlanContext = {
-      exerciseType: activeSession.exerciseType,
-      durationMinutes: activeSession.durationMinutes,
-      intensity: activeSession.intensity,
-      minutesUntilStart: activeSession.phase === "pre" ? 30 : 0,
-      bgUnits,
-      hourOfDay: new Date().getHours(),
-    };
-    if (bgParsed != null) ctx.currentBg = bgParsed;
-    if (trendForReadiness && trendForReadiness !== "not_sure") ctx.bgTrend = trendForReadiness;
-    if (activeSession.preRapidInsulin2h === "yes") ctx.lastInsulinTiming = "lt_1h";
-    else if (activeSession.preRapidInsulin2h === "no") ctx.lastInsulinTiming = "none";
-    if (activeSession.prefuelGrams != null) ctx.approximateCarbsGrams = activeSession.prefuelGrams;
-    if (activeSession.preFasted) ctx.nutritionContext = "fasted";
-
-    if (activeSession.preSleepHours != null) ctx.sleepHoursLastNight = activeSession.preSleepHours;
-    if (activeSession.preHydration) ctx.hydration = activeSession.preHydration;
-    if (activeSession.preFeelingOff != null) ctx.feelingOff = activeSession.preFeelingOff;
-    if (activeSession.preEnvironments?.length) ctx.environments = [...activeSession.preEnvironments];
-    if (activeSession.preCompetitive != null) ctx.competitive = activeSession.preCompetitive;
-    if (activeSession.preCaffeine2h != null) ctx.caffeineLast2h = activeSession.preCaffeine2h;
-    if (activeSession.preAlcoholLastNight != null) ctx.alcoholLastNight = activeSession.preAlcoholLastNight;
-    if (activeSession.preIobUnits != null) ctx.iobUnits = activeSession.preIobUnits;
-    if (historyBias) ctx.historyBias = historyBias;
-
     try {
+      const ctx = buildExercisePlanContextFromCoachSession({
+        session: activeSession,
+        bgUnits,
+        currentBg: bgParsed ?? undefined,
+        bgTrend: trendForReadiness,
+        historyBias,
+      });
+      if (activeSession.phase !== "pre") {
+        ctx.minutesUntilStart = 0;
+      }
       return calculateExercisePlan(ctx);
     } catch {
       return null;
@@ -482,16 +470,33 @@ export function ExerciseGuidedCoach() {
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
         <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
-          <CardHeader>
-            <CardTitle className="text-h3 flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Plan a workout
-            </CardTitle>
-            <CardDescription>
-              Start a guided pre / during / recovery session. The deeper questions help tune the recommendations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 px-6 py-4 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                data-testid="coach-plan-workout-trigger"
+                aria-expanded={planWorkoutOpen}
+              >
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="text-h3 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary shrink-0" />
+                    Plan a workout
+                  </CardTitle>
+                  <CardDescription>
+                    {planWorkoutOpen
+                      ? "Start a guided pre / during / recovery session."
+                      : `${startDuration || "—"} min · ${startIntensity} · ${startType.replace(/_/g, " ")}`}
+                  </CardDescription>
+                </div>
+                <ChevronDown
+                  className="h-5 w-5 shrink-0 text-muted-foreground mt-0.5 transition-transform group-data-[state=open]:rotate-180"
+                  aria-hidden
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4 pt-0">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="start-type">Type</Label>
@@ -538,7 +543,9 @@ export function ExerciseGuidedCoach() {
               <Play className="h-4 w-4 mr-2" />
               Start guided session
             </Button>
-          </CardContent>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
         </Card>
 
         {routines.length > 0 ? (
@@ -773,26 +780,6 @@ export function ExerciseGuidedCoach() {
             </TabsContent>
           </Tabs>
 
-          {exercisePlan?.pre.contextualNotes && exercisePlan.pre.contextualNotes.length > 0 && phase === "pre" ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Info className="h-4 w-4 text-muted-foreground" />
-                  Notes from your inputs
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {exercisePlan.pre.contextualNotes.slice(0, 6).map((note, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="text-primary">•</span>
-                      <span>{note}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ) : null}
 
           {phase === "recovery" && exercisePlan ? (
             <Card>

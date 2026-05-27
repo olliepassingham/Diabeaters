@@ -1,29 +1,6 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Capacitor } from "@capacitor/core";
-import {
-  BarChart2,
-  Bookmark,
-  Calendar,
-  ChevronDown,
-  ImagePlus,
-  MessageCircle,
-  Plus,
-  Search as SearchIcon,
-  Send,
-  X,
-} from "lucide-react";
+import { Bookmark, ChevronDown, MessageCircle, Plus, Search as SearchIcon } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 
 const FeedPostList = lazy(() =>
@@ -34,47 +11,29 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { FeedComposerFormBody } from "@/components/community/feed-composer-form-body";
+import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
+import { useFeedComposer } from "@/hooks/use-feed-composer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
-  DEFAULT_COMMUNITY_TOPIC,
   isCommunityTopicId,
   fetchCommunityPostsFromFollowingPage,
   fetchCommunityPostsPage,
-  insertFeedPost,
-  buildMentionsForPost,
-  FEED_COMPOSER_DRAFT_KEY,
-  MAX_POST_IMAGES,
   readFeedComposerDraft,
-  type CommunityPostRow,
   type CommunityTopicId,
   type FeedCursor,
 } from "@/lib/community";
-import type { CommunityTopicRow } from "@/lib/community/topics";
 import { followUser, listFolloweeIdsForCurrentUser } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
-import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
-
-const CommunityFeedComposerDrawerLazy = lazy(() =>
-  import("./community-feed-composer-drawer").then((m) => ({ default: m.CommunityFeedComposerDrawer })),
-);
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -97,10 +56,6 @@ function readStoredFeedTab(): FeedTab {
 
 const PAGE_SIZE = 20;
 
-const MAX_POLL_OPTIONS = 6;
-
-type ComposerPostKind = "standard" | "poll" | "event";
-
 function initialFeedComposerOpen(): boolean {
   if (typeof window === "undefined") return true;
   try {
@@ -118,375 +73,25 @@ function initialFeedComposerOpen(): boolean {
   return window.matchMedia("(min-width: 768px)").matches;
 }
 
-type FeedComposerFormBodyProps = {
-  orderedTopics: readonly CommunityTopicRow[];
-  composerTopic: CommunityTopicId;
-  setComposerTopic: (v: CommunityTopicId) => void;
-  submitting: boolean;
-  user: { id: string } | null;
-  canComposeToFeed: boolean;
-  composerPostKind: ComposerPostKind;
-  pollQuestion: string;
-  setPollQuestion: (v: string) => void;
-  pollOptions: string[];
-  setPollOptions: Dispatch<SetStateAction<string[]>>;
-  eventTitle: string;
-  setEventTitle: (v: string) => void;
-  eventStartsAt: string;
-  setEventStartsAt: (v: string) => void;
-  eventLocation: string;
-  setEventLocation: (v: string) => void;
-  eventDetails: string;
-  setEventDetails: (v: string) => void;
-  composer: string;
-  setComposer: (v: string) => void;
-  composerPreviews: string[];
-  composerFiles: File[];
-  removeComposerImage: (index: number) => void;
-  composerImageAlts: string[];
-  setComposerImageAlts: Dispatch<SetStateAction<string[]>>;
-  fileInputRef: RefObject<HTMLInputElement | null>;
-  onPickImages: (files: FileList | null) => void;
-  pickImagesFromLibraryOnly: () => Promise<void>;
-  onPollModeClick: () => void;
-  onEventModeClick: () => void;
-  composerCanSubmit: boolean;
-};
-
-function FeedComposerFormBody({
-  orderedTopics,
-  composerTopic,
-  setComposerTopic,
-  submitting,
-  user,
-  canComposeToFeed,
-  composerPostKind,
-  pollQuestion,
-  setPollQuestion,
-  pollOptions,
-  setPollOptions,
-  eventTitle,
-  setEventTitle,
-  eventStartsAt,
-  setEventStartsAt,
-  eventLocation,
-  setEventLocation,
-  eventDetails,
-  setEventDetails,
-  composer,
-  setComposer,
-  composerPreviews,
-  composerFiles,
-  removeComposerImage,
-  composerImageAlts,
-  setComposerImageAlts,
-  fileInputRef,
-  onPickImages,
-  pickImagesFromLibraryOnly,
-  onPollModeClick,
-  onEventModeClick,
-  composerCanSubmit,
-}: FeedComposerFormBodyProps) {
-  return (
-    <>
-      <div className="space-y-1.5">
-        <Label htmlFor="feed-topic" className="text-sm font-medium text-foreground">
-          Topic
-        </Label>
-        <Select
-          value={composerTopic}
-          onValueChange={(v) => setComposerTopic(v as CommunityTopicId)}
-          disabled={submitting || !user || !canComposeToFeed}
-        >
-          <SelectTrigger
-            id="feed-topic"
-            className="h-11 w-full border-border/60 bg-muted/25 text-foreground dark:bg-muted/30 dark:text-foreground [&>span]:text-foreground"
-          >
-            <SelectValue placeholder="Choose a topic" />
-          </SelectTrigger>
-          <SelectContent>
-            {orderedTopics.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {composerPostKind === "poll" ? (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 text-foreground">
-          <div className="space-y-1">
-            <Label htmlFor="feed-poll-q">Poll question</Label>
-            <Input
-              id="feed-poll-q"
-              value={pollQuestion}
-              onChange={(e) => setPollQuestion(e.target.value.slice(0, 500))}
-              placeholder="What do you want to ask?"
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={500}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">2–6 options, each up to 500 characters.</p>
-          <div className="space-y-2">
-            {pollOptions.map((opt, i) => (
-              <div key={i} className="flex gap-2">
-                <Input
-                  value={opt}
-                  onChange={(e) =>
-                    setPollOptions((prev) => {
-                      const next = [...prev];
-                      next[i] = e.target.value.slice(0, 500);
-                      return next;
-                    })
-                  }
-                  placeholder={`Option ${i + 1}`}
-                  disabled={submitting || !user || !canComposeToFeed}
-                  maxLength={500}
-                  aria-label={`Poll option ${i + 1}`}
-                />
-                {pollOptions.length > 2 ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    disabled={submitting || !user || !canComposeToFeed}
-                    onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
-                    aria-label={`Remove option ${i + 1}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-            {pollOptions.length < MAX_POLL_OPTIONS ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={submitting || !user || !canComposeToFeed}
-                onClick={() => setPollOptions((prev) => [...prev, ""])}
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add option
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      {composerPostKind === "event" ? (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 text-foreground">
-          <div className="space-y-1">
-            <Label htmlFor="feed-event-title">Event name</Label>
-            <Input
-              id="feed-event-title"
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value.slice(0, 500))}
-              placeholder="Meetup title"
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={500}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="feed-event-start">Starts</Label>
-            <Input
-              id="feed-event-start"
-              type="datetime-local"
-              value={eventStartsAt}
-              onChange={(e) => setEventStartsAt(e.target.value)}
-              disabled={submitting || !user || !canComposeToFeed}
-              className="text-foreground dark:[color-scheme:dark]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="feed-event-loc">Location (optional)</Label>
-            <Input
-              id="feed-event-loc"
-              value={eventLocation}
-              onChange={(e) => setEventLocation(e.target.value.slice(0, 500))}
-              placeholder="Where?"
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={500}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="feed-event-details">Details (optional)</Label>
-            <Textarea
-              id="feed-event-details"
-              value={eventDetails}
-              onChange={(e) => setEventDetails(e.target.value.slice(0, 2000))}
-              placeholder="More about the event…"
-              rows={3}
-              disabled={submitting || !user || !canComposeToFeed}
-              maxLength={2000}
-              className="surface-field rounded-xl"
-            />
-          </div>
-        </div>
-      ) : null}
-      <Textarea
-        value={composer}
-        onChange={(e) => setComposer(e.target.value)}
-        placeholder={
-          composerPostKind === "poll"
-            ? "Optional intro before the poll…"
-            : composerPostKind === "event"
-              ? "Optional intro before the event details…"
-              : "Share something on the feed…"
-        }
-        rows={3}
-        maxLength={8000}
-        disabled={submitting || !user || !canComposeToFeed}
-        className="surface-field min-h-[5.5rem] rounded-xl"
-      />
-      <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
-      {composerPreviews.length > 0 && (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            Attached photos
-            <span className="ml-1.5 tabular-nums text-foreground/80">({composerPreviews.length})</span>
-          </p>
-          <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 pt-0.5 [scrollbar-width:thin]">
-            {composerPreviews.map((src, i) => {
-              const name = composerFiles[i]?.name?.trim() || `Photo ${i + 1}`;
-              return (
-                <div key={`${src}-${i}`} className="relative w-[5.5rem] shrink-0 sm:w-24">
-                  <div className="relative aspect-square overflow-hidden rounded-lg border border-border/70 bg-background shadow-sm">
-                    <img src={src} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/95 text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => removeComposerImage(i)}
-                      aria-label={`Remove ${name}`}
-                      disabled={submitting}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p
-                    className="mt-1.5 truncate text-center text-[10px] leading-tight text-muted-foreground sm:text-xs"
-                    title={name}
-                  >
-                    {name}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {composerPreviews.length > 0 ? (
-        <div className="space-y-2">
-          {composerPreviews.map((src, i) => (
-            <div key={src} className="space-y-1">
-              <Label htmlFor={`feed-composer-alt-${i}`} className="text-xs">
-                Photo {i + 1} description (optional)
-              </Label>
-              <Input
-                id={`feed-composer-alt-${i}`}
-                value={composerImageAlts[i] ?? ""}
-                onChange={(e) =>
-                  setComposerImageAlts((prev) => {
-                    const next = [...prev];
-                    next[i] = e.target.value.slice(0, 500);
-                    return next;
-                  })
-                }
-                placeholder="What’s in this image? Helps people using screen readers."
-                disabled={submitting || !user || !canComposeToFeed}
-                maxLength={500}
-              />
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          id="feed-composer-images"
-          disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
-          onChange={(e) => onPickImages(e.target.files)}
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
-          onClick={() => void pickImagesFromLibraryOnly()}
-          aria-label="Add photos to post"
-        >
-          <ImagePlus className="h-4 w-4 mr-1.5" />
-          Photo
-        </Button>
-        <Button
-          type="button"
-          variant={composerPostKind === "poll" ? "default" : "outline"}
-          size="sm"
-          disabled={submitting || !user}
-          onClick={onPollModeClick}
-          aria-pressed={composerPostKind === "poll"}
-          aria-label={composerPostKind === "poll" ? "Switch to normal post" : "Add poll"}
-        >
-          <BarChart2 className="h-4 w-4 mr-1.5" />
-          Poll
-        </Button>
-        <Button
-          type="button"
-          variant={composerPostKind === "event" ? "default" : "outline"}
-          size="sm"
-          disabled={submitting || !user}
-          onClick={onEventModeClick}
-          aria-pressed={composerPostKind === "event"}
-          aria-label={composerPostKind === "event" ? "Switch to normal post" : "Add event"}
-        >
-          <Calendar className="h-4 w-4 mr-1.5" />
-          Event
-        </Button>
-        <InlineInfoHint ariaLabel="Photo limits for posts" content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`} />
-        <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit || !canComposeToFeed}>
-          <Send className="h-4 w-4 mr-1.5" />
-          Post
-        </Button>
-      </div>
-    </>
-  );
-}
-
 export default function CommunityHomePage() {
   const { user } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
-  const orderedTopics = useCommunityTopicOrder();
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const [feedTab, setFeedTab] = useState<FeedTab>(() => readStoredFeedTab());
   /** `null` = all topics. */
   const [topicFilter, setTopicFilter] = useState<CommunityTopicId | null>(null);
-  const [composerTopic, setComposerTopic] = useState<CommunityTopicId>(
-    () => readFeedComposerDraft()?.topic ?? DEFAULT_COMMUNITY_TOPIC,
-  );
   const [feedSearch, setFeedSearch] = useState("");
 
-  const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
-  const [composerFiles, setComposerFiles] = useState<File[]>([]);
-  const [composerImageAlts, setComposerImageAlts] = useState<string[]>([]);
-  const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [composerPostKind, setComposerPostKind] = useState<ComposerPostKind>("standard");
-  const [pollQuestion, setPollQuestion] = useState("");
-  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventStartsAt, setEventStartsAt] = useState("");
-  const [eventLocation, setEventLocation] = useState("");
-  const [eventDetails, setEventDetails] = useState("");
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [feedListKey, setFeedListKey] = useState(0);
   const [composerPanelOpen, setComposerPanelOpen] = useState(initialFeedComposerOpen);
+  const isMobile = useIsMobile();
+  const feedComposer = useFeedComposer({
+    closeSheetOnPost: isMobile,
+    onPosted: () => setFeedListKey((k) => k + 1),
+  });
+  const orderedTopics = feedComposer.formBodyProps.orderedTopics;
 
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [peopleQuery, setPeopleQuery] = useState("");
@@ -503,15 +108,6 @@ export default function CommunityHomePage() {
   /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
   const [followeesLoading, setFolloweesLoading] = useState(false);
-  const isMobile = useIsMobile();
-  const [composerSheetOpen, setComposerSheetOpen] = useState(() => {
-    if (typeof window === "undefined") return false;
-    try {
-      return Boolean(readFeedComposerDraft()?.body?.trim());
-    } catch {
-      return false;
-    }
-  });
   const [savedOnly, setSavedOnly] = useState(false);
   const [feedSearchExpanded, setFeedSearchExpanded] = useState(false);
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
@@ -523,8 +119,8 @@ export default function CommunityHomePage() {
     [feedTab, topicFilter, savedOnly, feedSearch, feedListKey],
   );
 
-  const hasFeedHandle = Boolean(profile?.public_handle?.trim());
-  const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
+  const hasFeedHandle = feedComposer.hasFeedHandle;
+  const canComposeToFeed = feedComposer.canComposeToFeed;
 
   // Deep-link support: /community?saved=1
   useEffect(() => {
@@ -631,7 +227,7 @@ export default function CommunityHomePage() {
     const params = new URLSearchParams(raw);
     const qDraft = params.get("draft");
     if (qDraft == null || !qDraft.trim()) return;
-    setComposer(qDraft.trim());
+    feedComposer.formBodyProps.setComposer(qDraft.trim());
     params.delete("draft");
     const next = params.toString();
     setLocation(next ? `${pathname}?${next}` : pathname, { replace: true });
@@ -829,272 +425,10 @@ export default function CommunityHomePage() {
   }
 
   useEffect(() => {
-    const urls = composerFiles.map((f) => URL.createObjectURL(f));
-    setComposerPreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [composerFiles]);
-
-  useEffect(() => {
-    setComposerImageAlts((prev) => {
-      const n = composerFiles.length;
-      if (prev.length === n) return prev;
-      const next = prev.slice(0, n);
-      while (next.length < n) next.push("");
-      return next;
-    });
-  }, [composerFiles.length]);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      try {
-        if (!composer.trim()) {
-          localStorage.removeItem(FEED_COMPOSER_DRAFT_KEY);
-          return;
-        }
-        localStorage.setItem(
-          FEED_COMPOSER_DRAFT_KEY,
-          JSON.stringify({
-            body: composer,
-            topic: composerTopic,
-          }),
-        );
-      } catch {
-        /* quota / private mode */
-      }
-    }, 400);
-    return () => window.clearTimeout(t);
-  }, [composer, composerTopic]);
-
-  function onPickImages(files: FileList | null) {
-    if (!files?.length) return;
-    const next: File[] = [...composerFiles];
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      if (!f) continue;
-      if (next.length >= MAX_POST_IMAGES) break;
-      if (!f.type.startsWith("image/")) continue;
-      next.push(f);
-    }
-    setComposerFiles(next);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }
-
-  async function pickImagesFromLibraryOnly() {
-    // On native (Capacitor), use Photos-only picker to avoid "Take Photo" (camera) which is crashing.
-    if (!Capacitor.isNativePlatform()) {
-      fileInputRef.current?.click();
-      return;
-    }
-    try {
-      const remaining = Math.max(0, MAX_POST_IMAGES - composerFiles.length);
-      if (remaining <= 0) return;
-
-      const { Camera } = await import("@capacitor/camera");
-      const res = await Camera.pickImages({ limit: remaining });
-      const photos = res?.photos ?? [];
-      if (photos.length === 0) return;
-
-      const newFiles: File[] = [];
-      for (const p of photos) {
-        const webPath = p.webPath?.trim();
-        if (!webPath) continue;
-        const r = await fetch(webPath);
-        const blob = await r.blob();
-        if (!blob.type.startsWith("image/")) continue;
-        const name = p.path?.split("/").pop()?.trim() || `photo-${Date.now()}.jpg`;
-        newFiles.push(new File([blob], name, { type: blob.type }));
-        if (composerFiles.length + newFiles.length >= MAX_POST_IMAGES) break;
-      }
-      if (newFiles.length > 0) setComposerFiles((prev) => [...prev, ...newFiles].slice(0, MAX_POST_IMAGES));
-    } catch (e) {
-      // If the plugin isn't available (web) or permission denied, fall back to file input.
-      fileInputRef.current?.click();
-      toast({
-        title: "Could not open Photos",
-        description: e instanceof Error ? e.message : "Try selecting from your camera roll.",
-        variant: "destructive",
-      });
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  function removeComposerImage(index: number) {
-    setComposerFiles((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function resetComposerAfterPost() {
-    setComposer("");
-    setComposerFiles([]);
-    setComposerImageAlts([]);
-    setComposerPostKind("standard");
-    setPollQuestion("");
-    setPollOptions(["", ""]);
-    setEventTitle("");
-    setEventStartsAt("");
-    setEventLocation("");
-    setEventDetails("");
-    try {
-      localStorage.removeItem(FEED_COMPOSER_DRAFT_KEY);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  function onPollModeClick() {
-    if (composerPostKind === "poll") {
-      setComposerPostKind("standard");
-      return;
-    }
-    setEventTitle("");
-    setEventStartsAt("");
-    setEventLocation("");
-    setEventDetails("");
-    setComposerPostKind("poll");
-  }
-
-  function onEventModeClick() {
-    if (composerPostKind === "event") {
-      setComposerPostKind("standard");
-      return;
-    }
-    setPollQuestion("");
-    setPollOptions(["", ""]);
-    setComposerPostKind("event");
-  }
-
-  const composerCanSubmit = useMemo(() => {
-    if (!user) return false;
-    if (composerPostKind === "standard") {
-      const t = composer.trim();
-      return Boolean(t || composerFiles.length > 0);
-    }
-    if (composerPostKind === "poll") {
-      const q = pollQuestion.trim();
-      const opts = pollOptions.map((o) => o.trim()).filter(Boolean);
-      return q.length > 0 && opts.length >= 2 && opts.length <= MAX_POLL_OPTIONS;
-    }
-    const titleOk = eventTitle.trim().length > 0;
-    const whenOk = eventStartsAt.trim().length > 0;
-    return titleOk && whenOk;
-  }, [user, composerPostKind, composer, composerFiles.length, pollQuestion, pollOptions, eventTitle, eventStartsAt]);
-
-  const composerExpandSignal = useMemo(() => {
-    if (composer.trim()) return true;
-    if (composerFiles.length > 0) return true;
-    if (composerPostKind !== "standard") return true;
-    return false;
-  }, [composer, composerFiles.length, composerPostKind]);
-
-  useEffect(() => {
-    if (!composerExpandSignal) return;
-    if (isMobile) setComposerSheetOpen(true);
+    if (!feedComposer.composerExpandSignal) return;
+    if (isMobile) feedComposer.setSheetOpen(true);
     else setComposerPanelOpen(true);
-  }, [composerExpandSignal, isMobile]);
-
-  async function handlePost(e: React.FormEvent) {
-    e.preventDefault();
-    if (!user || !composerCanSubmit) return;
-    if (!canComposeToFeed) {
-      toast({
-        title: "Choose a @handle to post",
-        description: "Set your public handle in Feed profile settings — it powers mentions and your profile link.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setSubmitting(true);
-
-    const mentions = await buildMentionsForPost(composer, user.id);
-
-    let res: { data: CommunityPostRow | null; error: Error | null };
-    if (composerPostKind === "standard") {
-      res = await insertFeedPost({
-        kind: "standard",
-        topic: composerTopic,
-        body: composer,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        imageAlts: composerImageAlts,
-        mentions,
-      });
-    } else if (composerPostKind === "poll") {
-      res = await insertFeedPost({
-        kind: "poll",
-        topic: composerTopic,
-        body: composer,
-        question: pollQuestion,
-        options: pollOptions,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        imageAlts: composerImageAlts,
-        mentions,
-      });
-    } else {
-      const startDate = new Date(eventStartsAt);
-      if (Number.isNaN(startDate.getTime())) {
-        setSubmitting(false);
-        toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
-        return;
-      }
-      const iso = startDate.toISOString();
-      res = await insertFeedPost({
-        kind: "event",
-        topic: composerTopic,
-        body: composer,
-        title: eventTitle,
-        startsAt: iso,
-        location: eventLocation.trim() || undefined,
-        details: eventDetails.trim() || undefined,
-        imageFiles: composerFiles.length ? composerFiles : undefined,
-        imageAlts: composerImageAlts,
-        mentions,
-      });
-    }
-
-    setSubmitting(false);
-    if (res.error) {
-      toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
-      return;
-    }
-    resetComposerAfterPost();
-    if (res.data) setFeedListKey((k) => k + 1);
-    if (isMobile) setComposerSheetOpen(false);
-    toast({ title: "Posted" });
-  }
-
-  const feedComposerFormBodyProps: FeedComposerFormBodyProps = {
-    orderedTopics,
-    composerTopic,
-    setComposerTopic,
-    submitting,
-    user,
-    canComposeToFeed,
-    composerPostKind,
-    pollQuestion,
-    setPollQuestion,
-    pollOptions,
-    setPollOptions,
-    eventTitle,
-    setEventTitle,
-    eventStartsAt,
-    setEventStartsAt,
-    eventLocation,
-    setEventLocation,
-    eventDetails,
-    setEventDetails,
-    composer,
-    setComposer,
-    composerPreviews,
-    composerFiles,
-    removeComposerImage,
-    composerImageAlts,
-    setComposerImageAlts,
-    fileInputRef,
-    onPickImages,
-    pickImagesFromLibraryOnly,
-    onPollModeClick,
-    onEventModeClick,
-    composerCanSubmit,
-  };
+  }, [feedComposer.composerExpandSignal, isMobile, feedComposer.setSheetOpen]);
 
   if (!isSupabaseConfigured()) {
     return (
@@ -1286,24 +620,19 @@ export default function CommunityHomePage() {
         </DialogContent>
       </Dialog>
 
-      {isMobile ? (
-        <button
-          type="button"
-          className="flex w-full min-h-[2.75rem] items-center gap-2.5 rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/25 px-3.5 py-2.5 text-left shadow-sm ring-1 ring-border/45 active:scale-[0.99] transition-transform dark:from-card/95 dark:to-muted/20"
-          onClick={() => setComposerSheetOpen(true)}
-          data-testid="feed-composer-mobile-pill"
-        >
-          <CommunityAuthorAvatar
-            displayName={(profile?.full_name ?? user?.email ?? "You").trim() || "You"}
-            avatarPath={profile?.avatar_url ?? null}
-            size="sm"
-            profileHref={user?.id ? `/community/profile/${encodeURIComponent(user.id)}` : undefined}
-          />
-          <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-            {composer.trim() ? composer.trim() : "Share something on the feed…"}
-          </span>
-        </button>
-      ) : null}
+      <FeedComposerSheet
+        open={feedComposer.sheetOpen}
+        onOpenChange={feedComposer.setSheetOpen}
+        pillPreview={feedComposer.pillPreview}
+        avatarDisplayName={feedComposer.avatarDisplayName}
+        avatarPath={feedComposer.avatarPath}
+        profileHref={feedComposer.profileHref}
+        formBodyProps={feedComposer.formBodyProps}
+        onSubmit={feedComposer.handlePost}
+        showPill={isMobile}
+        pillTestId="feed-composer-mobile-pill"
+        formTestId="feed-composer-form-sheet"
+      />
 
       <div
         className={cn(
@@ -1667,8 +996,8 @@ export default function CommunityHomePage() {
                   />
                   <div className="min-w-0 flex-1 space-y-1">
                     <span className="font-display text-base font-semibold text-foreground tracking-tight">New post</span>
-                    {!composerPanelOpen && composer.trim() ? (
-                      <p className="line-clamp-2 text-sm text-muted-foreground">{composer}</p>
+                    {!composerPanelOpen && feedComposer.composer.trim() ? (
+                      <p className="line-clamp-2 text-sm text-muted-foreground">{feedComposer.composer}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1684,28 +1013,13 @@ export default function CommunityHomePage() {
           </CardHeader>
           <CollapsibleContent className="overflow-hidden">
             <CardContent className="pt-0">
-              <form onSubmit={handlePost} className="space-y-3 text-foreground" data-testid="feed-composer-form">
-                <FeedComposerFormBody {...feedComposerFormBodyProps} />
+              <form onSubmit={feedComposer.handlePost} className="space-y-3 text-foreground" data-testid="feed-composer-form">
+                <FeedComposerFormBody {...feedComposer.formBodyProps} />
               </form>
             </CardContent>
           </CollapsibleContent>
         </Card>
       </Collapsible>
-      ) : null}
-
-      {isMobile ? (
-        <Suspense fallback={null}>
-          <CommunityFeedComposerDrawerLazy open={composerSheetOpen} onOpenChange={setComposerSheetOpen}>
-            <form
-              onSubmit={handlePost}
-              className="space-y-3 pb-2 text-foreground"
-              data-testid="feed-composer-form-sheet"
-              id="feed-composer-form-sheet"
-            >
-              <FeedComposerFormBody {...feedComposerFormBodyProps} />
-            </form>
-          </CommunityFeedComposerDrawerLazy>
-        </Suspense>
       ) : null}
 
       <Suspense key={feedListKey} fallback={<FeedLoadingSkeleton rows={5} />}>

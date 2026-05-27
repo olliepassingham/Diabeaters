@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "wouter";
 import { Calculator, ChevronDown, ChevronUp, Droplet, Info } from "lucide-react";
@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import {
+  formatWeightInputFromKg,
+  formatWeightLabel,
+  getBodyWeightKgFromProfile,
+  getWeightDisplayUnitFromProfile,
+  resolveHypoCalculatorWeightKg,
+  type WeightDisplayUnit,
+} from "@/lib/body-weight";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
 import {
   formatTargetBgInput,
@@ -58,7 +66,8 @@ export default function HypoHelpPage() {
   const [currentBg, setCurrentBg] = useState("");
   const [targetBg, setTargetBg] = useState("");
   const [userWeight, setUserWeight] = useState("");
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
+  const [weightUnit, setWeightUnit] = useState<WeightDisplayUnit>("kg");
+  const [useProfileWeight, setUseProfileWeight] = useState(true);
   const [hypoResult, setHypoResult] = useState<{
     carbsNeeded: number;
     glucoseTablets: number;
@@ -76,10 +85,24 @@ export default function HypoHelpPage() {
     return getPostExerciseEducationalCopy(inferPostExerciseLoadTier(storage.getLastExerciseSummary()));
   }, [postExerciseNudgeRev]);
   const weightRequired = hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth);
+  const profileWeightKg = getBodyWeightKgFromProfile(profile);
+  const showingProfileWeight = useProfileWeight && profileWeightKg != null;
+
+  const applyWeightFromProfile = useCallback((p: Partial<UserProfile>) => {
+    const kg = getBodyWeightKgFromProfile(p);
+    if (kg == null) return;
+    const unit = getWeightDisplayUnitFromProfile(p);
+    setWeightUnit(unit);
+    setUserWeight(formatWeightInputFromKg(kg, unit));
+    setUseProfileWeight(true);
+  }, []);
 
   useEffect(() => {
     const p = storage.getProfile();
-    if (p) setProfile(p);
+    if (p) {
+      setProfile(p);
+      if (getBodyWeightKgFromProfile(p)) applyWeightFromProfile(p);
+    }
     const s = storage.getSettings();
     const units = p?.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
     const sug = suggestedRecoveryTargetBg(s, units);
@@ -88,31 +111,46 @@ export default function HypoHelpPage() {
       setTargetPrefilledFromRange(true);
     }
     setLastHypoDetail(lastHypoWithDetail(storage.getHypoTreatments()));
-  }, []);
+  }, [applyWeightFromProfile]);
 
   useEffect(() => {
     const onProfile = () => {
       const p = storage.getProfile();
-      if (p) setProfile(p);
+      if (!p) return;
+      setProfile(p);
+      if (useProfileWeight && getBodyWeightKgFromProfile(p)) applyWeightFromProfile(p);
     };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
-  }, []);
+  }, [applyWeightFromProfile, useProfileWeight]);
+
+  const hasResolvableWeight = useMemo(() => {
+    const resolved = resolveHypoCalculatorWeightKg({
+      profile,
+      useProfileWeight: showingProfileWeight,
+      inputValue: userWeight,
+      inputUnit: weightUnit,
+    });
+    return resolved.ok;
+  }, [profile, showingProfileWeight, userWeight, weightUnit]);
 
   const calculateHypoTreatment = () => {
     setHypoCalcError(null);
     if (!currentBg || !targetBg) return;
     const current = parseFloat(currentBg);
     const target = parseFloat(targetBg);
-    const parsedFromInput = userWeight.trim() ? parseFloat(userWeight) : Number.NaN;
-    const hasValidInputWeight = Number.isFinite(parsedFromInput) && parsedFromInput > 0;
-    if (weightRequired && !hasValidInputWeight) {
-      setHypoCalcError("Add your weight in kg or lbs so we do not assume an adult default.");
+    const resolved = resolveHypoCalculatorWeightKg({
+      profile,
+      useProfileWeight: showingProfileWeight,
+      inputValue: userWeight,
+      inputUnit: weightUnit,
+    });
+    if (!resolved.ok) {
+      setHypoCalcError(resolved.error);
       setHypoResult(null);
       return;
     }
-    const rawWeight = hasValidInputWeight ? parsedFromInput : 70;
-    const weight = weightUnit === "lbs" ? rawWeight * 0.4536 : rawWeight;
+    const weight = resolved.weightKg;
     if (Number.isNaN(current) || Number.isNaN(target)) return;
     const currentMmol = bgUnits === "mg/dL" ? current / 18 : current;
     const targetMmol = bgUnits === "mg/dL" ? target / 18 : target;
@@ -166,8 +204,12 @@ export default function HypoHelpPage() {
           {weightRequired && (
             <Alert data-testid="alert-hypo-minor-weight">
               <AlertDescription className="text-sm">
-                For under-18s we need your real weight to size this estimate — we will not guess from a typical adult
-                weight. Follow your hypo plan from your diabetes team first.
+                For under-18s we need your real weight to size this estimate — add it in{" "}
+                <Link href="/settings#settings-personal" className="font-medium text-primary underline-offset-4 hover:underline">
+                  Settings
+                </Link>{" "}
+                or below. We will not guess from a typical adult weight. Follow your hypo plan from your diabetes team
+                first.
               </AlertDescription>
             </Alert>
           )}
@@ -202,41 +244,95 @@ export default function HypoHelpPage() {
                 </p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-1">
               <Label htmlFor="user-weight">Your weight {weightRequired ? "(required)" : "(optional)"}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="user-weight"
-                  type="number"
-                  placeholder={weightUnit === "kg" ? "e.g., 70" : "e.g., 154"}
-                  value={userWeight}
-                  onChange={(e) => setUserWeight(e.target.value)}
-                  className="flex-1"
-                  data-testid="input-user-weight"
-                />
-                <div className="flex">
+              {showingProfileWeight ? (
+                <div
+                  className="flex min-h-10 items-center justify-between gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2"
+                  data-testid="hypo-weight-from-profile"
+                >
+                  <p className="text-sm text-foreground">
+                    Using{" "}
+                    <span className="font-medium tabular-nums">
+                      {formatWeightLabel(profileWeightKg, getWeightDisplayUnitFromProfile(profile))}
+                    </span>{" "}
+                    <span className="text-muted-foreground">from your profile</span>
+                  </p>
                   <Button
                     type="button"
-                    variant={weightUnit === "kg" ? "default" : "outline"}
+                    variant="ghost"
                     size="sm"
-                    className="rounded-r-none"
-                    onClick={() => setWeightUnit("kg")}
-                    data-testid="button-weight-kg"
+                    className="h-8 shrink-0 px-2 text-xs"
+                    onClick={() => {
+                      setUseProfileWeight(false);
+                      setUserWeight("");
+                    }}
+                    data-testid="button-hypo-weight-change"
                   >
-                    kg
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={weightUnit === "lbs" ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-l-none"
-                    onClick={() => setWeightUnit("lbs")}
-                    data-testid="button-weight-lbs"
-                  >
-                    lbs
+                    Change
                   </Button>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <Input
+                      id="user-weight"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder={weightUnit === "kg" ? "e.g., 70" : "e.g., 154"}
+                      value={userWeight}
+                      onChange={(e) => {
+                        setUseProfileWeight(false);
+                        setUserWeight(e.target.value);
+                      }}
+                      className="flex-1"
+                      data-testid="input-user-weight"
+                    />
+                    <div className="flex shrink-0">
+                      <Button
+                        type="button"
+                        variant={weightUnit === "kg" ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-r-none"
+                        onClick={() => setWeightUnit("kg")}
+                        data-testid="button-weight-kg"
+                      >
+                        kg
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={weightUnit === "lbs" ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-l-none"
+                        onClick={() => setWeightUnit("lbs")}
+                        data-testid="button-weight-lbs"
+                      >
+                        lbs
+                      </Button>
+                    </div>
+                  </div>
+                  {profileWeightKg != null ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-0 text-xs font-normal text-muted-foreground underline-offset-4 hover:underline"
+                      onClick={() => applyWeightFromProfile(profile)}
+                      data-testid="button-hypo-use-profile-weight"
+                    >
+                      Use profile weight (
+                      {formatWeightLabel(profileWeightKg, getWeightDisplayUnitFromProfile(profile))})
+                    </Button>
+                  ) : weightRequired ? (
+                    <p className="text-xs text-muted-foreground">
+                      <Link href="/settings#settings-personal" className="text-primary underline-offset-4 hover:underline">
+                        Add weight in Settings
+                      </Link>{" "}
+                      to pre-fill next time.
+                    </p>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
 
@@ -248,7 +344,7 @@ export default function HypoHelpPage() {
 
           <Button
             onClick={calculateHypoTreatment}
-            disabled={!currentBg || !targetBg || (weightRequired && !userWeight.trim())}
+            disabled={!currentBg || !targetBg || (weightRequired && !hasResolvableWeight)}
             className="w-full"
             data-testid="button-calculate-hypo"
           >

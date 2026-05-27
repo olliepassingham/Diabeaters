@@ -35,7 +35,7 @@ export const DASHBOARD_WIDGET_REGISTRY: DashboardWidgetDefinition[] = [
   {
     id: "community-quick-post",
     label: "Community",
-    description: "Short line to open the feed composer with draft text.",
+    description: "Tap to open the same new-post sheet as the Feed tab.",
     defaultEnabled: true,
     defaultSize: "half",
     component: CommunityQuickPostWidget,

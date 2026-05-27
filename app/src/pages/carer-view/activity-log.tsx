@@ -34,7 +34,10 @@ export default function CarerActivityLogPage() {
   }, []);
 
   const scopes = link ? normaliseScopes(link.scopes) : null;
-  const { events, loading, error } = useCarerActivityHistory(link?.patientId ?? null, scopes);
+  const { events, scenarioCalendarDays, loading, error } = useCarerActivityHistory(
+    link?.patientId ?? null,
+    scopes,
+  );
 
   if (booting) {
     return (
@@ -99,6 +102,7 @@ export default function CarerActivityLogPage() {
           linkable={false}
           persistFilter={false}
           emptyHomeHref="/carer-view"
+          scenarioCalendarDays={scenarioCalendarDays}
         />
       )}
     </PageShell>

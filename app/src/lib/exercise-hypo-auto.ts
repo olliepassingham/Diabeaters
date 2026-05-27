@@ -1,3 +1,4 @@
+import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
 import type { ActiveExerciseSession, UserProfile, UserSettings } from "@/lib/storage";
 import { suggestedRecoveryTargetBg } from "@/lib/hypo-context";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
@@ -81,7 +82,7 @@ export function computeExerciseHypoSuggestion(
     };
   }
 
-  const weightKg = 70;
+  const weightKg = getBodyWeightKgFromProfile(profile) ?? 70;
   const sensitivityFactor = 70 / weightKg;
   const baseRise = 0.25;
   const effectiveRise = baseRise * sensitivityFactor;

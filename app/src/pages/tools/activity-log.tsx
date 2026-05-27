@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { collectAllActivityEvents, type ActivityEvent } from "@/lib/activity-history";
+import { DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 
 export default function ActivityLogPage() {
   const [events, setEvents] = useState<ActivityEvent[]>(() => collectAllActivityEvents());
@@ -18,7 +19,11 @@ export default function ActivityLogPage() {
       if (document.visibilityState === "visible") refresh();
     };
     document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
+    window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+    };
   }, [refresh]);
 
   return (

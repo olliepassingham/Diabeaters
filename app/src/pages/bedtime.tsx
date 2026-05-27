@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
+import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -148,6 +149,30 @@ function formatBasalClockSummary(settings: UserSettings | null | undefined): str
   return t1;
 }
 
+const BEDTIME_SECTION_INFO = {
+  glucose:
+    "Your reading and whether it is stable, rising, or falling. We use both for overnight risk — not for dosing.",
+  foodInsulin:
+    "How long since you ate and took rapid insulin helps estimate food still digesting and insulin still working overnight.",
+  sleep: "If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.",
+  extras: "Optional switches that shape your summary. They are only saved if you tap Save check.",
+  exercise: "Workouts can raise hypo risk for many hours overnight.",
+  alcohol: "Alcohol can delay lows — we weigh this more heavily than hypos alone.",
+  recentHypos:
+    "A hypo in roughly the last 24 hours. On its own this usually means caution, not needs attention, unless glucose is low or falling too.",
+} as const;
+
+function BedtimeSectionTitle({ id, title, info }: { id: string; title: string; info: string }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <h3 id={id} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h3>
+      <InlineInfoHint ariaLabel={`More about ${title}`} content={<p className="text-sm leading-snug">{info}</p>} className="h-7 w-7" />
+    </div>
+  );
+}
+
 export default function Bedtime() {
   const [currentBg, setCurrentBg] = useState("");
   const [bgUnits, setBgUnits] = useState<"mmol/L" | "mg/dL">("mmol/L");
@@ -175,6 +200,7 @@ export default function Bedtime() {
   const [alarmCustomTime, setAlarmCustomTime] = useState("02:30");
   const [alarmNotification, setAlarmNotification] = useState<{ id: number; at: Date } | null>(() => readBedtimeAlarm());
   const [quickCheckOpen, setQuickCheckOpen] = useState(true);
+  const [extrasOpen, setExtrasOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
   const { toast } = useToast();
 
@@ -931,11 +957,10 @@ export default function Bedtime() {
   };
 
   return (
-    <PageShell variant="standard" className="space-y-7">
+    <PageShell variant="standard" density="compact" className="space-y-4 max-sm:space-y-3">
       <PageHeader
         leading={<PageBackButton />}
         title="Bedtime"
-        description="A quick check to reduce overnight surprises. Not medical advice."
         actions={<ScenarioCoachLink topic="bedtime" />}
       />
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
@@ -1063,12 +1088,7 @@ export default function Bedtime() {
           <CollapsibleContent>
             <Card className="rounded-2xl border-border/60 shadow-sm" data-testid="card-bedtime-factors">
               <CardContent className="space-y-4 p-5 md:p-6">
-                <div>
-                  <h3 className="font-semibold text-foreground">Why we said this</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Factor breakdown from your check — change inputs above and run again to update.
-                  </p>
-                </div>
+                <h3 className="font-semibold text-foreground">Why we said this</h3>
                 <div className="grid gap-3 sm:grid-cols-2" data-testid="container-bedtime-factors">
                   {result.factors.map((factor, i) => (
                     <div
@@ -1117,74 +1137,57 @@ export default function Bedtime() {
               aria-label={quickCheckOpen ? "Collapse quick check" : "Expand quick check"}
               data-testid="button-bedtime-quick-check-toggle"
             >
-              <div className="flex items-start gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pb-4 sm:pt-5">
+              <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
                 <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-700 shadow-inner shadow-indigo-950/10 dark:bg-indigo-400/10 dark:text-indigo-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-100"
                   aria-hidden
                 >
-                  <Moon className="h-5 w-5" />
+                  <Moon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-indigo-700/90 dark:text-indigo-300/90">
-                    Wind down
-                  </span>
-                  <span className="mt-0.5 block text-lg font-semibold tracking-tight text-foreground sm:text-xl">Quick check</span>
+                  <span className="block text-base font-semibold tracking-tight text-foreground">Quick check</span>
                   {!quickCheckOpen ? (
-                    <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground">
-                      {currentBg.trim() ? `Tap to edit • BG ${currentBg} ${bgUnits}` : "Tap to edit your inputs"}
+                    <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+                      {currentBg.trim() ? `BG ${currentBg} ${bgUnits}` : "Tap to fill in"}
                     </span>
                   ) : null}
                 </div>
-                <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground dark:bg-background/40">
-                  {quickCheckOpen ? <ChevronUp className="h-5 w-5" aria-hidden /> : <ChevronDown className="h-5 w-5" aria-hidden />}
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground">
+                  {quickCheckOpen ? <ChevronUp className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
                 </span>
               </div>
             </button>
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 pb-5 pt-4 backdrop-blur-[2px] dark:bg-background/30 sm:px-5 sm:pb-6 sm:pt-5">
-              <section
-                className="space-y-4 rounded-2xl border border-indigo-500/15 bg-indigo-500/[0.04] p-4 dark:bg-indigo-950/20"
-                aria-labelledby="bedtime-section-glucose"
-              >
-                <h3 id="bedtime-section-glucose" className="text-[11px] font-semibold uppercase tracking-wider text-indigo-800 dark:text-indigo-200">
-                  Glucose now
-                </h3>
-                <p className="text-xs leading-snug text-muted-foreground">
-                  Your reading and whether it is stable, rising, or falling — we use both for overnight risk, not for dosing.
-                </p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="current-bg" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-indigo-600 dark:text-indigo-300">
-                        <Activity className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Current blood glucose
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="current-bg"
-                        type="number"
-                        step="0.1"
-                        placeholder={bgUnits === "mmol/L" ? "e.g., 7.2" : "e.g., 130"}
-                        value={currentBg}
-                        onChange={(e) => setCurrentBg(e.target.value)}
-                        className="h-11 flex-1 border-border/70 bg-background/80 text-base shadow-sm dark:bg-background/60"
-                        data-testid="input-bedtime-bg"
-                      />
-                      <span className="flex items-center rounded-lg border border-border/60 bg-muted/30 px-3 text-sm font-medium text-muted-foreground">
-                        {bgUnits}
-                      </span>
-                    </div>
+            <CardContent className="space-y-3 border-t border-border/50 bg-background/45 px-4 pb-4 pt-3 dark:bg-background/30 sm:px-5">
+              <section className="space-y-2" aria-labelledby="bedtime-section-glucose">
+                <BedtimeSectionTitle id="bedtime-section-glucose" title="Glucose now" info={BEDTIME_SECTION_INFO.glucose} />
+                <div className="space-y-2">
+                  <Label htmlFor="current-bg" className="sr-only">
+                    Current blood glucose
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="current-bg"
+                      type="number"
+                      step="0.1"
+                      placeholder={bgUnits === "mmol/L" ? "e.g. 7.2" : "e.g. 130"}
+                      value={currentBg}
+                      onChange={(e) => setCurrentBg(e.target.value)}
+                      className="h-10 flex-1 text-base"
+                      data-testid="input-bedtime-bg"
+                    />
+                    <span className="flex h-10 items-center rounded-md border border-border/60 bg-muted/30 px-2.5 text-sm font-medium text-muted-foreground">
+                      {bgUnits}
+                    </span>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label id="label-bedtime-bg-direction" className="text-sm font-medium text-foreground">
-                      BG direction <span className="font-normal text-muted-foreground">(optional)</span>
-                    </Label>
+                  <div className="space-y-1">
+                    <span id="label-bedtime-bg-direction" className="text-sm font-medium text-foreground">
+                      Direction
+                    </span>
                     <div
-                      className="flex gap-1 rounded-xl border border-border/60 bg-muted/35 p-1 dark:bg-muted/25"
+                      className="flex gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5"
                       role="group"
                       aria-labelledby="label-bedtime-bg-direction"
                     >
@@ -1193,13 +1196,13 @@ export default function Bedtime() {
                         variant={bgTrend === "steady" ? "default" : "ghost"}
                         size="sm"
                         className={cn(
-                          "min-h-10 flex-1 rounded-lg shadow-none",
-                          bgTrend === "steady" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                          "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
+                          bgTrend === "steady" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "steady" ? "not_sure" : "steady"))}
                         data-testid="button-bedtime-bg-trend-stable"
                       >
-                        <Minus className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        <Minus className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
                         Stable
                       </Button>
                       <Button
@@ -1207,13 +1210,13 @@ export default function Bedtime() {
                         variant={bgTrend === "rising" ? "default" : "ghost"}
                         size="sm"
                         className={cn(
-                          "min-h-10 flex-1 rounded-lg shadow-none",
-                          bgTrend === "rising" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                          "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
+                          bgTrend === "rising" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
                         data-testid="button-bedtime-bg-trend-rising"
                       >
-                        <TrendingUp className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        <TrendingUp className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
                         Rising
                       </Button>
                       <Button
@@ -1221,13 +1224,13 @@ export default function Bedtime() {
                         variant={bgTrend === "falling" ? "default" : "ghost"}
                         size="sm"
                         className={cn(
-                          "min-h-10 flex-1 rounded-lg shadow-none",
-                          bgTrend === "falling" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground hover:bg-background/80",
+                          "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
+                          bgTrend === "falling" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
                         data-testid="button-bedtime-bg-trend-falling"
                       >
-                        <TrendingDown className="h-3.5 w-3.5 mr-1.5 shrink-0" aria-hidden />
+                        <TrendingDown className="mr-1 h-3.5 w-3.5 shrink-0" aria-hidden />
                         Falling
                       </Button>
                     </div>
@@ -1235,172 +1238,161 @@ export default function Bedtime() {
                 </div>
               </section>
 
-              <section
-                className="space-y-4 rounded-2xl border border-amber-500/12 bg-amber-500/[0.03] p-4 dark:bg-amber-950/10"
-                aria-labelledby="bedtime-section-fuel"
-              >
-                <h3 id="bedtime-section-fuel" className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 dark:text-amber-100/90">
-                  Food & insulin
-                </h3>
-                <p className="text-xs text-muted-foreground leading-snug">
-                  How long since you ate and took rapid insulin — helps estimate food still digesting and insulin still working overnight.
-                </p>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="hours-food" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
-                        <Utensils className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Hours since last food
+              <div className="border-t border-border/40" />
+
+              <section className="space-y-2" aria-labelledby="bedtime-section-fuel">
+                <BedtimeSectionTitle id="bedtime-section-fuel" title="Food & insulin" info={BEDTIME_SECTION_INFO.foodInsulin} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                    <Label htmlFor="hours-food" className="text-sm font-medium">
+                      Since food
                     </Label>
                     <Select value={hoursSinceFood} onValueChange={setHoursSinceFood}>
-                      <SelectTrigger id="hours-food" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-food">
-                        <SelectValue placeholder="Select..." />
+                      <SelectTrigger id="hours-food" className="h-10" data-testid="select-hours-food">
+                        <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0.5">Less than 1 hour</SelectItem>
-                        <SelectItem value="1">1 hour</SelectItem>
-                        <SelectItem value="2">2 hours</SelectItem>
-                        <SelectItem value="3">3 hours</SelectItem>
-                        <SelectItem value="4">4+ hours</SelectItem>
+                        <SelectItem value="0.5">&lt;1 hr</SelectItem>
+                        <SelectItem value="1">1 hr</SelectItem>
+                        <SelectItem value="2">2 hr</SelectItem>
+                        <SelectItem value="3">3 hr</SelectItem>
+                        <SelectItem value="4">4+ hr</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="meal-carbs" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
-                        <Utensils className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Meal carbs (optional)
+                  <div className="space-y-1.5">
+                    <Label htmlFor="meal-carbs" className="text-sm font-medium">
+                      Carbs (g)
                     </Label>
                     <Input
                       id="meal-carbs"
                       type="number"
                       inputMode="numeric"
-                      placeholder="e.g., 45"
+                      placeholder="opt."
                       value={mealCarbs}
                       onChange={(e) => setMealCarbs(e.target.value)}
-                      className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                      className="h-10"
                       data-testid="input-meal-carbs"
                     />
                   </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="hours-insulin" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
-                        <Syringe className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Hours since last mealtime dose
-                      <InfoTooltip {...DIABETES_TERMS.bolus} />
-                    </Label>
+                  <div className="space-y-1.5 col-span-2">
+                    <FieldLabelWithInfo htmlFor="hours-insulin" info={<p className="text-sm leading-snug">{DIABETES_TERMS.bolus.explanation}</p>}>
+                      Since bolus
+                    </FieldLabelWithInfo>
                     <Select value={hoursSinceInsulin} onValueChange={setHoursSinceInsulin}>
-                      <SelectTrigger id="hours-insulin" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-insulin">
-                        <SelectValue placeholder="Select..." />
+                      <SelectTrigger id="hours-insulin" className="h-10" data-testid="select-hours-insulin">
+                        <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="0.5">Less than 1 hour</SelectItem>
-                        <SelectItem value="1">1 hour</SelectItem>
-                        <SelectItem value="2">2 hours</SelectItem>
-                        <SelectItem value="3">3 hours</SelectItem>
-                        <SelectItem value="4">4+ hours</SelectItem>
+                        <SelectItem value="0.5">&lt;1 hr</SelectItem>
+                        <SelectItem value="1">1 hr</SelectItem>
+                        <SelectItem value="2">2 hr</SelectItem>
+                        <SelectItem value="3">3 hr</SelectItem>
+                        <SelectItem value="4">4+ hr</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               </section>
 
-              <section
-                className="space-y-3 rounded-2xl border border-violet-500/15 bg-violet-500/[0.04] p-4 dark:bg-violet-950/20"
-                aria-labelledby="bedtime-section-sleep"
-              >
-                <h3 id="bedtime-section-sleep" className="text-[11px] font-semibold uppercase tracking-wider text-violet-900 dark:text-violet-100/90">
-                  Tonight
-                </h3>
-                <p className="text-xs leading-snug text-muted-foreground">
-                  If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="hours-sleep" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-violet-700 dark:text-violet-300">
-                      <Clock className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                    How long until you plan to sleep?
+              <div className="border-t border-border/40" />
+
+              <section className="space-y-2" aria-labelledby="bedtime-section-sleep">
+                <BedtimeSectionTitle id="bedtime-section-sleep" title="Tonight" info={BEDTIME_SECTION_INFO.sleep} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="hours-sleep" className="text-sm font-medium">
+                    Sleep in
                   </Label>
                   <Select value={hoursUntilSleep} onValueChange={setHoursUntilSleep}>
-                    <SelectTrigger id="hours-sleep" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-hours-sleep">
-                      <SelectValue placeholder="Select..." />
+                    <SelectTrigger id="hours-sleep" className="h-10" data-testid="select-hours-sleep">
+                      <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0.25">Going to bed now</SelectItem>
-                      <SelectItem value="0.5">About 30 minutes</SelectItem>
-                      <SelectItem value="1">About 1 hour</SelectItem>
-                      <SelectItem value="1.5">About 1.5 hours</SelectItem>
-                      <SelectItem value="2">About 2 hours</SelectItem>
-                      <SelectItem value="3">3+ hours</SelectItem>
+                      <SelectItem value="0.25">Now</SelectItem>
+                      <SelectItem value="0.5">~30 min</SelectItem>
+                      <SelectItem value="1">~1 hr</SelectItem>
+                      <SelectItem value="1.5">~1.5 hr</SelectItem>
+                      <SelectItem value="2">~2 hr</SelectItem>
+                      <SelectItem value="3">3+ hr</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </section>
 
-              <section
-                className="overflow-hidden rounded-2xl border border-border/60 bg-muted/15 dark:bg-muted/10"
-                aria-label="Extra context"
-              >
-                <div className="border-b border-border/50 bg-muted/25 px-4 py-2.5 dark:bg-muted/15">
-                  <p className="text-xs font-medium text-muted-foreground">Anything else affecting tonight?</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/90">
-                    These switches shape your summary — they are only saved if you tap Save check.
-                  </p>
-                </div>
-                <div className="divide-y divide-border/50">
-                  <div className="flex items-start justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0 pr-2">
-                      <Label htmlFor="exercised" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                        <Activity className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                        Exercised today?
+              <Collapsible open={extrasOpen} onOpenChange={setExtrasOpen} className="group rounded-xl border border-border/50">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium hover:bg-muted/30"
+                    data-testid="button-bedtime-extras-toggle"
+                  >
+                    <span className="flex items-center gap-1">
+                      Extras
+                      <InlineInfoHint
+                        ariaLabel="About extras"
+                        content={<p className="text-sm leading-snug">{BEDTIME_SECTION_INFO.extras}</p>}
+                        className="h-7 w-7"
+                      />
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t border-border/50 divide-y divide-border/50">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <Activity className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                      <Label htmlFor="exercised" className="cursor-pointer truncate text-sm font-medium">
+                        Exercised today
                       </Label>
-                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
-                        Workouts can raise hypo risk for many hours overnight.
-                      </p>
                       {lastExerciseLabel ? (
-                        <p className="mt-0.5 pl-6 text-[11px] text-muted-foreground/80">Detected: {lastExerciseLabel}</p>
+                        <Badge variant="outline" className="max-w-[6.5rem] shrink truncate text-[10px] font-normal">
+                          {lastExerciseLabel}
+                        </Badge>
                       ) : null}
+                      <InlineInfoHint
+                        ariaLabel="About exercise and bedtime"
+                        content={<p className="text-sm leading-snug">{BEDTIME_SECTION_INFO.exercise}</p>}
+                        className="h-7 w-7"
+                      />
                     </div>
-                    <Switch id="exercised" checked={exercisedToday} onCheckedChange={setExercisedToday} data-testid="switch-exercised" className="mt-0.5 shrink-0" />
+                    <Switch id="exercised" checked={exercisedToday} onCheckedChange={setExercisedToday} data-testid="switch-exercised" className="shrink-0" />
                   </div>
-                  <div className="flex items-start justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0 pr-2">
-                      <Label htmlFor="alcohol" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                        <Wine className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-                        Had alcohol?
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <Wine className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                      <Label htmlFor="alcohol" className="cursor-pointer text-sm font-medium">
+                        Had alcohol
                       </Label>
-                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
-                        Alcohol can delay lows — we weigh this more heavily than hypos alone.
-                      </p>
+                      <InlineInfoHint
+                        ariaLabel="About alcohol and bedtime"
+                        content={<p className="text-sm leading-snug">{BEDTIME_SECTION_INFO.alcohol}</p>}
+                        className="h-7 w-7"
+                      />
                     </div>
-                    <Switch id="alcohol" checked={hadAlcohol} onCheckedChange={setHadAlcohol} data-testid="switch-alcohol" className="mt-0.5 shrink-0" />
+                    <Switch id="alcohol" checked={hadAlcohol} onCheckedChange={setHadAlcohol} data-testid="switch-alcohol" className="shrink-0" />
                   </div>
-                  <div className="flex items-start justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0 pr-2">
-                      <Label htmlFor="recent-hypos" className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
-                        <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" aria-hidden />
-                        Any recent hypos?
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-orange-600 dark:text-orange-400" aria-hidden />
+                      <Label htmlFor="recent-hypos" className="cursor-pointer text-sm font-medium">
+                        Recent hypos
                       </Label>
-                      <p className="mt-1 pl-6 text-xs leading-snug text-muted-foreground">
-                        A hypo in roughly the last 24 hours. On its own this usually means caution, not needs attention, unless glucose is low or falling too.
-                      </p>
+                      <InlineInfoHint
+                        ariaLabel="About recent hypos"
+                        content={<p className="text-sm leading-snug">{BEDTIME_SECTION_INFO.recentHypos}</p>}
+                        className="h-7 w-7"
+                      />
                     </div>
-                    <Switch id="recent-hypos" checked={recentHypos} onCheckedChange={setRecentHypos} data-testid="switch-recent-hypos" className="mt-0.5 shrink-0" />
+                    <Switch id="recent-hypos" checked={recentHypos} onCheckedChange={setRecentHypos} data-testid="switch-recent-hypos" className="shrink-0" />
                   </div>
-                </div>
-              </section>
+                </CollapsibleContent>
+              </Collapsible>
 
               <Button
                 onClick={calculateReadiness}
                 disabled={!canCalculate}
                 className={cn(
-                  "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                  "h-11 w-full rounded-xl text-base font-semibold shadow-sm",
                   "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500",
                   "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
                 )}

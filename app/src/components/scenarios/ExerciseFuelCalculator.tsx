@@ -1,0 +1,454 @@
+import { useMemo, useState } from "react";
+import { Link } from "wouter";
+import { Calculator, ChevronDown, Dumbbell, X } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import {
+  EXERCISE_INTENSITY_OPTIONS,
+  EXERCISE_MEAL_TYPE_OPTIONS,
+  EXERCISE_START_IN_OPTIONS,
+  EXERCISE_TYPE_OPTIONS,
+} from "@/lib/exercise-catalog";
+import {
+  computeExerciseFuelPlan,
+  type ExerciseFuelCalculatorResult,
+} from "@/lib/exercise-fuel-calculator";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { storage, DIABEATER_PROFILE_CHANGED_EVENT, type ExerciseBgTrend, type ExerciseIntensity, type ExerciseType } from "@/lib/storage";
+import { useEffect } from "react";
+
+type FoodMode = "known" | "suggest";
+
+/**
+ * Pre-exercise fuel & insulin calculator (meal-tool style).
+ */
+export function ExerciseFuelCalculator() {
+  const [exerciseType, setExerciseType] = useState<ExerciseType>("cardio");
+  const [intensity, setIntensity] = useState<ExerciseIntensity>("moderate");
+  const [duration, setDuration] = useState("45");
+  const [minutesUntilStart, setMinutesUntilStart] = useState<number>(30);
+  const [fasted, setFasted] = useState(false);
+  const [foodMode, setFoodMode] = useState<FoodMode>("known");
+  const [mealCarbs, setMealCarbs] = useState("");
+  const [mealType, setMealType] = useState("snack");
+  const [currentBg, setCurrentBg] = useState("");
+  const [bgTrend, setBgTrend] = useState<ExerciseBgTrend | "">("");
+  const [rapidInsulin2h, setRapidInsulin2h] = useState(false);
+  const [lastMealMins, setLastMealMins] = useState("");
+  const [lastMealCarbs, setLastMealCarbs] = useState("");
+  const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
+  const [bgUnits, setBgUnits] = useState("mmol/L");
+  const [isPump, setIsPump] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      const p = storage.getProfile();
+      if (p?.bgUnits) setBgUnits(p.bgUnits);
+      setIsPump(isPumpDeliveryMethod(p?.insulinDeliveryMethod));
+    };
+    sync();
+    window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
+  }, []);
+
+  const canCalculate = useMemo(() => {
+    const d = parseInt(duration, 10);
+    if (!Number.isFinite(d) || d < 1) return false;
+    if (foodMode === "known") {
+      const c = parseInt(mealCarbs, 10);
+      return Number.isFinite(c) && c > 0;
+    }
+    return true;
+  }, [duration, foodMode, mealCarbs]);
+
+  const handleCalculate = () => {
+    const durationMinutes = parseInt(duration, 10);
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return;
+
+    const settings = storage.getSettings();
+    const bgParsed = parseFloat(currentBg.replace(",", "."));
+    const mealCarbsGrams =
+      foodMode === "known" ? parseInt(mealCarbs, 10) : undefined;
+    const lastMins = lastMealMins.trim() ? parseInt(lastMealMins, 10) : undefined;
+    const lastCarbs = lastMealCarbs.trim() ? parseInt(lastMealCarbs, 10) : undefined;
+
+    setResult(
+      computeExerciseFuelPlan({
+        exerciseType,
+        intensity,
+        durationMinutes,
+        minutesUntilStart,
+        fasted,
+        bgUnits,
+        settings,
+        isPump,
+        mealCarbsGrams: mealCarbsGrams != null && Number.isFinite(mealCarbsGrams) ? mealCarbsGrams : undefined,
+        mealType,
+        currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
+        bgTrend: bgTrend || null,
+        rapidInsulinLast2h: rapidInsulin2h,
+        lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
+        lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
+      }),
+    );
+  };
+
+  const collapsedSummary =
+    result && !formOpen
+      ? `${result.mealCarbsIsSuggested ? "~" : ""}${result.mealCarbs}g carbs${
+          result.insulin ? ` · ${result.insulin.adjustedUnits}u insulin` : ""
+        }`
+      : null;
+
+  return (
+    <div className="space-y-4">
+      <Card className="surface-card border-border/70 shadow-sm overflow-hidden" data-testid="exercise-fuel-calculator">
+        <Collapsible open={formOpen} onOpenChange={setFormOpen} className="group">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-start justify-between gap-3 px-6 py-4 text-left hover:bg-muted/30 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              data-testid="efc-collapsible-trigger"
+              aria-expanded={formOpen}
+            >
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calculator className="h-5 w-5 text-primary shrink-0" aria-hidden />
+                  Pre-exercise fuel &amp; insulin
+                </CardTitle>
+                <CardDescription>
+                  {collapsedSummary ?? "Carb and insulin numbers for your session and food plan."}
+                </CardDescription>
+              </div>
+              <ChevronDown
+                className="h-5 w-5 shrink-0 text-muted-foreground mt-0.5 transition-transform group-data-[state=open]:rotate-180"
+                aria-hidden
+              />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-5 pt-0">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your session</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="efc-type">Activity</Label>
+                <Select value={exerciseType} onValueChange={(v) => setExerciseType(v as ExerciseType)}>
+                  <SelectTrigger id="efc-type" data-testid="efc-exercise-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXERCISE_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="efc-intensity">Intensity</Label>
+                <Select value={intensity} onValueChange={(v) => setIntensity(v as ExerciseIntensity)}>
+                  <SelectTrigger id="efc-intensity" data-testid="efc-intensity">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXERCISE_INTENSITY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="efc-duration">Duration (min)</Label>
+                <Input
+                  id="efc-duration"
+                  type="number"
+                  inputMode="numeric"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  data-testid="efc-duration"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Starting in</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {EXERCISE_START_IN_OPTIONS.map((m) => (
+                    <Button
+                      key={m}
+                      type="button"
+                      size="sm"
+                      variant={minutesUntilStart === m ? "default" : "outline"}
+                      className="h-8 px-2.5 text-xs"
+                      onClick={() => setMinutesUntilStart(m)}
+                      data-testid={`efc-start-${m}`}
+                    >
+                      {m === 0 ? "Now" : `${m}m`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1.5 sm:col-span-1">
+                <Label htmlFor="efc-bg">BG now ({bgUnits})</Label>
+                <Input
+                  id="efc-bg"
+                  inputMode="decimal"
+                  placeholder={bgUnits === "mmol/L" ? "optional" : "optional"}
+                  value={currentBg}
+                  onChange={(e) => setCurrentBg(e.target.value)}
+                  data-testid="efc-bg"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Trend</Label>
+                <Select
+                  value={bgTrend || "none"}
+                  onValueChange={(v) => setBgTrend(v === "none" ? "" : (v as ExerciseBgTrend))}
+                >
+                  <SelectTrigger data-testid="efc-trend">
+                    <SelectValue placeholder="Optional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Not set</SelectItem>
+                    <SelectItem value="flat">Flat</SelectItem>
+                    <SelectItem value="rising">Rising</SelectItem>
+                    <SelectItem value="falling">Falling</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={rapidInsulin2h} onCheckedChange={setRapidInsulin2h} data-testid="efc-rapid-insulin" />
+                  Insulin in last 2h
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/15 px-3 py-2">
+              <Label htmlFor="efc-fasted" className="text-sm cursor-pointer">
+                Training fasted
+              </Label>
+              <Switch
+                id="efc-fasted"
+                checked={fasted}
+                onCheckedChange={(v) => {
+                  setFasted(v);
+                  if (v) {
+                    setLastMealMins("");
+                    setLastMealCarbs("");
+                  }
+                }}
+                data-testid="efc-fasted"
+              />
+            </div>
+
+            {!fasted ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="efc-last-meal">Last meal (min ago)</Label>
+                  <Input
+                    id="efc-last-meal"
+                    type="number"
+                    placeholder="optional"
+                    value={lastMealMins}
+                    onChange={(e) => setLastMealMins(e.target.value)}
+                    data-testid="efc-last-meal-mins"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="efc-last-carbs">Carbs in that meal (g)</Label>
+                  <Input
+                    id="efc-last-carbs"
+                    type="number"
+                    placeholder="optional"
+                    value={lastMealCarbs}
+                    onChange={(e) => setLastMealCarbs(e.target.value)}
+                    data-testid="efc-last-meal-carbs"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-3 border-t border-border/50 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Food before exercise</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={foodMode === "known" ? "default" : "outline"}
+                onClick={() => setFoodMode("known")}
+                data-testid="efc-food-known"
+              >
+                I know my carbs
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={foodMode === "suggest" ? "default" : "outline"}
+                onClick={() => setFoodMode("suggest")}
+                data-testid="efc-food-suggest"
+              >
+                Suggest carbs for me
+              </Button>
+            </div>
+
+            {foodMode === "known" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="efc-meal-carbs">Carbs you will eat (g)</Label>
+                  <Input
+                    id="efc-meal-carbs"
+                    type="number"
+                    placeholder="e.g. 40"
+                    value={mealCarbs}
+                    onChange={(e) => setMealCarbs(e.target.value)}
+                    data-testid="efc-meal-carbs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="efc-meal-type">Meal type</Label>
+                  <Select value={mealType} onValueChange={setMealType}>
+                    <SelectTrigger id="efc-meal-type" data-testid="efc-meal-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXERCISE_MEAL_TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                We will suggest carbs from your activity, intensity, duration, and whether you are fasted — then
+                estimate insulin if ratios are set in Settings.
+              </p>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            className="w-full gap-2"
+            disabled={!canCalculate}
+            onClick={handleCalculate}
+            data-testid="efc-calculate"
+          >
+            <Dumbbell className="h-4 w-4" aria-hidden />
+            Calculate
+          </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
+      {result ? (
+        <Card className="border-primary/25 bg-primary/5 shadow-sm" data-testid="efc-result">
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-2">
+              <CardTitle className="text-lg">Your plan</CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => setResult(null)}
+                aria-label="Clear result"
+                data-testid="efc-clear"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <CardDescription>Target BG {result.targetBg} · educational only</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-base font-medium leading-snug text-foreground">{result.headline}</p>
+
+            <div className="grid gap-2 sm:grid-cols-2 text-sm">
+              <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground">Before exercise</p>
+                <p className="font-semibold tabular-nums text-foreground">
+                  {result.mealCarbsIsSuggested ? "~" : ""}
+                  {result.mealCarbs}g carbs
+                  {result.mealCarbsIsSuggested ? " suggested" : ""}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
+                <p className="text-xs text-muted-foreground">Keep on hand</p>
+                <p className="font-semibold tabular-nums text-foreground">~{result.onHandCarbs}g fast carbs</p>
+                {result.duringCarbs > 0 ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">~{result.duringCarbs}g during if BG drops</p>
+                ) : null}
+              </div>
+            </div>
+
+            {result.insulin ? (
+              <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Meal insulin estimate</p>
+                <p className="text-3xl font-bold tabular-nums text-foreground">{result.insulin.adjustedUnits} units</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Usually ~{result.insulin.standardUnits}u · −{result.insulin.reductionPercent}% for this session
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {result.insulin.carbsGrams}g {result.insulin.mealType}
+                </p>
+              </div>
+            ) : result.insulinNoRatios && result.mealCarbs > 0 ? (
+              <Alert>
+                <AlertDescription className="text-sm">
+                  Add meal ratios in{" "}
+                  <Link href="/settings" className="font-medium text-primary underline-offset-4 hover:underline">
+                    Settings
+                  </Link>{" "}
+                  for a dose in units. Many teams use about {result.bolusReductionBand} less meal insulin before
+                  exercise.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {result.pumpTip ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground/80">Pump: </span>
+                {result.pumpTip}
+              </p>
+            ) : null}
+
+            {result.notes.length > 0 ? (
+              <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-4">
+                {result.notes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            ) : null}
+
+            <MedicalNumericOutputDisclaimer compact />
+            <MedicalSourcesLink section="exercise" />
+
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <Link href="/adviser?tab=meal&exercise=1&exerciseTiming=before" data-testid="efc-adviser-link">
+                Open full meal calculator
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
