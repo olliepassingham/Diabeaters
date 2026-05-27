@@ -57,6 +57,7 @@ import {
   type FeedCursor,
 } from "@/lib/community";
 import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
 import { getProfilesByIds } from "@/lib/profile";
 
@@ -405,6 +406,14 @@ export function FeedPostList(props: {
       const next: Record<string, AuthorMeta> = {};
       for (const id of list) {
         const prof = map.get(id);
+        if (beatieFeedBotUserId && id === beatieFeedBotUserId) {
+          next[id] = {
+            name: AI_ASSISTANT_NAME,
+            avatar_url: prof?.avatar_url ?? null,
+            public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
+          };
+          continue;
+        }
         const postPreview = postsRef.current.find((p) => p.author_id === id)?.author_preview;
         next[id] = postPreview
           ? authorMetaFromPreviewFields(id, postPreview)
@@ -420,9 +429,17 @@ export function FeedPostList(props: {
     return () => {
       cancelled = true;
     };
-  }, [posts, commentsByPost]);
+  }, [posts, commentsByPost, beatieFeedBotUserId]);
 
   function metaFor(authorId: string): AuthorMeta {
+    if (beatieFeedBotUserId && authorId === beatieFeedBotUserId) {
+      const m = authorMeta[authorId];
+      if (m) return { ...m, name: AI_ASSISTANT_NAME };
+      if (authorMetaPending) {
+        return { name: AI_ASSISTANT_NAME, avatar_url: null, public_handle: null, loading: true };
+      }
+      return { name: AI_ASSISTANT_NAME, avatar_url: null, public_handle: null };
+    }
     const m = authorMeta[authorId];
     if (m) return m;
     if (authorMetaPending) return { name: "", avatar_url: null, public_handle: null, loading: true };
@@ -689,7 +706,7 @@ export function FeedPostList(props: {
           <Button
             type="button"
             size="sm"
-            className="w-full rounded-full shadow-sm"
+            className="h-9 w-full rounded-full text-xs font-medium shadow-sm"
             variant="secondary"
             onClick={() => void runRefresh()}
           >
@@ -764,7 +781,7 @@ export function FeedPostList(props: {
           description={props.emptyStateDescription ?? "When someone posts, it will show up here."}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5 sm:space-y-3">
           {displayPosts.map((post) => {
             const m = metaFor(post.author_id);
             return (

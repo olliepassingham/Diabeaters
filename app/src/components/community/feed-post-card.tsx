@@ -54,6 +54,7 @@ import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
+import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
 import {
   castPollVote,
@@ -77,6 +78,78 @@ const RECENT_DM_PEERS_LIMIT = 20;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function formatCommentPreviewBody(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed || trimmed === ".") return "";
+  return trimmed;
+}
+
+type CommentPreviewState = {
+  body: string;
+  authorName: string;
+  fromBeatie: boolean;
+};
+
+function FeedCommentPreviewButton({
+  preview,
+  beatieFeedBotUserId,
+  onOpenComments,
+}: {
+  preview: CommentPreviewState;
+  beatieFeedBotUserId?: string | null;
+  onOpenComments: () => void;
+}) {
+  const body = formatCommentPreviewBody(preview.body);
+  if (!body) return null;
+
+  if (preview.fromBeatie) {
+    const profileHref = beatieFeedBotUserId
+      ? `/community/profile/${beatieFeedBotUserId}`
+      : undefined;
+    return (
+      <button
+        type="button"
+        className="flex w-full items-start gap-2 rounded-xl border border-primary/30 bg-primary/[0.06] px-2.5 py-2 text-left transition-colors active:bg-primary/[0.12] hover:bg-primary/[0.1] dark:bg-primary/10"
+        onClick={onOpenComments}
+        data-testid="feed-comment-preview-beatie"
+      >
+        <CommunityAuthorAvatar
+          size="sm"
+          displayName={AI_ASSISTANT_NAME}
+          avatarPath={null}
+          profileHref={profileHref}
+          fallbackSrc={BEATIE_FEED_AVATAR_FALLBACK_SRC}
+          className="h-7 w-7"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground">{AI_ASSISTANT_NAME}</span>
+            <Badge
+              variant="outline"
+              className="border-primary/45 bg-background/60 px-1.5 py-0 text-[10px] font-medium leading-tight text-primary"
+            >
+              AI coach
+            </Badge>
+          </div>
+          <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{body}</p>
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="w-full rounded-xl border border-border/40 bg-muted/25 px-2.5 py-2 text-left transition-colors active:bg-muted/40 hover:bg-muted/35"
+      onClick={onOpenComments}
+      data-testid="feed-comment-preview"
+    >
+      <p className="text-xs font-semibold text-foreground">{preview.authorName}</p>
+      <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{body}</p>
+    </button>
+  );
 }
 
 function renderBodyWithMentions(body: string, mentionMap: Record<string, string>) {
@@ -417,7 +490,7 @@ export function FeedPostCard({
       );
       setTopCommentPreview({
         body: c.body.trim(),
-        authorName: meta.name,
+        authorName: fromBeatie ? AI_ASSISTANT_NAME : meta.name,
         fromBeatie,
       });
     });
@@ -621,17 +694,20 @@ export function FeedPostCard({
     }
   }
 
+  const topicLabel = communityTopicLabel(post.topic);
+
   return (
-    <Card className="pressable card-interactive h-fit w-full">
-      <CardContent className="space-y-1.5 px-6 pb-3 pt-3 sm:space-y-2 sm:px-7 sm:pb-4 sm:pt-4">
-        <div className="flex items-start gap-3">
+    <Card variant="glass" className="pressable card-interactive h-fit w-full overflow-hidden border-border/50 shadow-sm">
+      <CardContent className="space-y-2.5 px-3.5 pb-3 pt-3.5 sm:space-y-3 sm:px-4 sm:pb-4 sm:pt-4">
+        <div className="flex items-start gap-2.5">
           <CommunityAuthorAvatar
             displayName={authorDisplayName}
             avatarPath={authorAvatarPath}
             profileHref={`/community/profile/${post.author_id}`}
+            size="sm"
           />
           <div className="min-w-0 flex-1">
-            <div className="flex justify-between gap-2 text-xs text-muted-foreground items-start">
+            <div className="flex justify-between gap-1.5 text-xs text-muted-foreground items-start">
               <div className="min-w-0 flex-1">
                 {authorLoading ? (
                   <div className="space-y-1">
@@ -639,23 +715,27 @@ export function FeedPostCard({
                     <Skeleton className="h-3 w-24" />
                   </div>
                 ) : (
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                    <Link
-                      href={`/community/profile/${post.author_id}`}
-                      className="max-w-full shrink font-medium text-foreground truncate hover:underline underline-offset-2"
-                    >
-                      {authorDisplayName}
-                    </Link>
-                    {authorPublicHandle?.trim() ? (
-                      <span className="shrink-0 text-muted-foreground">@{authorPublicHandle.trim()}</span>
-                    ) : null}
-                    <span className="shrink-0 whitespace-nowrap text-muted-foreground" title={post.created_at}>
-                      · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                    </span>
+                  <div className="space-y-0.5">
+                    <div className="flex min-w-0 items-baseline gap-1">
+                      <Link
+                        href={`/community/profile/${post.author_id}`}
+                        className="truncate text-sm font-semibold text-foreground hover:underline underline-offset-2"
+                      >
+                        {authorDisplayName}
+                      </Link>
+                      {authorPublicHandle?.trim() ? (
+                        <span className="shrink-0 truncate text-xs text-muted-foreground">
+                          @{authorPublicHandle.trim()}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground" title={post.created_at}>
+                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                    </p>
                   </div>
                 )}
               </div>
-              <span className="flex shrink-0 items-center gap-1">
+              <span className="flex shrink-0 items-center gap-0.5">
                 {canReportPost && (
                   <Button
                     type="button"
@@ -704,26 +784,25 @@ export function FeedPostCard({
                 ) : null}
               </span>
             </div>
-            <div className="mt-1.5 max-w-full">
-              <Badge
-                variant="secondary"
-                className="w-full max-w-full font-normal truncate chip chip-muted"
+            {!authorLoading ? (
+              <span
+                className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-muted/55 px-2 py-0.5 text-[11px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
                 data-testid="feed-post-topic"
-                title={communityTopicLabel(post.topic)}
+                title={topicLabel}
               >
-                {communityTopicLabel(post.topic)}
-              </Badge>
-            </div>
+                <span className="truncate">{topicLabel}</span>
+              </span>
+            ) : null}
           </div>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {(() => {
             const b = post.body.trim();
             if (b.length === 0) return null;
             if (pollExtra && b === pollExtra.question.trim()) return null;
             if (eventExtra && b === eventExtra.title.trim()) return null;
             return (
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap sm:text-sm sm:leading-normal">
+              <p className="text-[15px] leading-[1.45] whitespace-pre-wrap text-foreground/95">
                 {renderBodyWithMentions(post.body, post.mention_map)}
               </p>
             );
@@ -779,141 +858,133 @@ export function FeedPostCard({
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
           <div
-            className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-1.5 sm:gap-0.5 sm:pt-2"
+            className="flex items-center justify-between gap-1 border-t border-border/40 pt-2"
             data-testid="post-engagement-row"
           >
-            <div className="flex items-center gap-0">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                disabled={!viewerId}
-                aria-pressed={post.liked_by_me}
-                aria-label={post.liked_by_me ? "Unlike" : "Like"}
-                onClick={onLike}
-              >
-                <Heart
-                  className={cn(
-                    "h-4 w-4 shrink-0 transition-all duration-200 ease-out",
-                    post.liked_by_me ? "fill-primary text-primary scale-110" : "scale-100",
-                  )}
-                />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 min-w-[2rem] px-1.5 text-muted-foreground hover:text-foreground"
-                disabled={!viewerId}
-                aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
-                onClick={() => setLikersOpen(true)}
-                data-testid="button-post-likers"
-              >
-                <span className="text-xs tabular-nums text-foreground">{post.like_count}</span>
-              </Button>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-              aria-expanded={expanded}
-              aria-label={
-                expanded
-                  ? "Hide comments"
-                  : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
-              }
-              onClick={onToggleComments}
-            >
-              <MessageSquare className="h-4 w-4 shrink-0" />
-              <span className="text-xs text-foreground">
-                {expanded
-                  ? "Hide comments"
-                  : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`}
-              </span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-              disabled={!viewerId}
-              aria-label="Reply"
-              onClick={onReplyFocus}
-            >
-              <Reply className="h-4 w-4 shrink-0" />
-              <span className="text-xs text-foreground">Reply</span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-              disabled={!viewerId}
-              aria-pressed={post.saved_by_me}
-              aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
-              onClick={onSavePost}
-            >
-              <Bookmark
-                className={cn(
-                  "h-4 w-4 shrink-0 transition-colors",
-                  post.saved_by_me && "fill-primary text-primary",
-                )}
-              />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <div className="flex min-w-0 flex-1 items-center">
+              <div className="flex items-center">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-9 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                  aria-label="Share post"
-                  data-testid="button-share-post-to-dm"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  disabled={!viewerId}
+                  aria-pressed={post.liked_by_me}
+                  aria-label={post.liked_by_me ? "Unlike" : "Like"}
+                  onClick={onLike}
                 >
-                  <Share2 className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="text-xs text-foreground">Share</span>
+                  <Heart
+                    className={cn(
+                      "h-[18px] w-[18px] shrink-0 transition-all duration-200 ease-out",
+                      post.liked_by_me ? "fill-primary text-primary scale-110" : "scale-100",
+                    )}
+                  />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-52">
-                <DropdownMenuItem disabled={!viewerId} onClick={() => setShareOpen(true)}>
-                  Send in message
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    void sharePostLinkExternally();
-                  }}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 min-w-7 px-1 text-muted-foreground hover:text-foreground"
+                  disabled={!viewerId}
+                  aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
+                  onClick={() => setLikersOpen(true)}
+                  data-testid="button-post-likers"
                 >
-                  Share link
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <span className="text-xs font-medium tabular-nums text-foreground">{post.like_count}</span>
+                </Button>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground"
+                aria-expanded={expanded}
+                aria-label={
+                  expanded
+                    ? "Hide comments"
+                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+                }
+                onClick={onToggleComments}
+              >
+                <MessageSquare className="h-[18px] w-[18px] shrink-0" />
+                <span className="text-xs font-medium tabular-nums text-foreground">
+                  {expanded ? (
+                    <span className="hidden sm:inline">Hide</span>
+                  ) : (
+                    post.comment_count
+                  )}
+                </span>
+                {expanded ? (
+                  <span className="hidden text-xs text-foreground sm:inline">comments</span>
+                ) : null}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                disabled={!viewerId}
+                aria-label="Reply"
+                onClick={onReplyFocus}
+              >
+                <Reply className="h-[18px] w-[18px] shrink-0" />
+              </Button>
+            </div>
+            <div className="flex shrink-0 items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                disabled={!viewerId}
+                aria-pressed={post.saved_by_me}
+                aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
+                onClick={onSavePost}
+              >
+                <Bookmark
+                  className={cn(
+                    "h-[18px] w-[18px] shrink-0 transition-colors",
+                    post.saved_by_me && "fill-primary text-primary",
+                  )}
+                />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    aria-label="Share post"
+                    data-testid="button-share-post-to-dm"
+                  >
+                    <Share2 className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem disabled={!viewerId} onClick={() => setShareOpen(true)}>
+                    Send in message
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void sharePostLinkExternally();
+                    }}
+                  >
+                    Share link
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           {!expanded && topCommentPreview && post.comment_count > 0 ? (
-            <button
-              type="button"
-              className={cn(
-                "w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors",
-                topCommentPreview.fromBeatie
-                  ? "border-primary/35 bg-primary/[0.08] text-muted-foreground hover:bg-primary/[0.12] dark:bg-primary/10 dark:hover:bg-primary/[0.16]"
-                  : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/35",
-              )}
-              onClick={onToggleComments}
-            >
-              {topCommentPreview.fromBeatie ? (
-                <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-primary">
-                  <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
-                  Educational AI
-                </div>
-              ) : null}
-              <span className="font-semibold text-foreground">{topCommentPreview.authorName}</span>
-              <span className="text-muted-foreground"> · </span>
-              <span className="line-clamp-2">{topCommentPreview.body}</span>
-            </button>
+            <FeedCommentPreviewButton
+              preview={topCommentPreview}
+              beatieFeedBotUserId={beatieFeedBotUserId}
+              onOpenComments={onToggleComments}
+            />
           ) : null}
           {expanded && (
-            <div className="border-t border-border/60 pt-3 space-y-2">
+            <div className="space-y-2 border-t border-border/40 pt-2.5">
               {loadingComments ? (
                 <p className="text-xs text-muted-foreground">Loading comments…</p>
               ) : (
@@ -997,7 +1068,7 @@ export function FeedPostCard({
                                   href={`/community/profile/${c.author_id}`}
                                   className="text-xs font-medium text-foreground hover:underline underline-offset-2"
                                 >
-                                  {cm.name}
+                                  {isBeatieComment ? AI_ASSISTANT_NAME : cm.name}
                                 </Link>
                                 {isBeatieComment ? (
                                   <Badge

@@ -228,6 +228,53 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   }
 }
 
+/** Postgres unique violation on profiles.public_handle (or migration index name). */
+export function isProfileHandleUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { code?: string; message?: string };
+  if (e.code === "23505") return true;
+  const msg = (e.message ?? "").toLowerCase();
+  return (
+    msg.includes("profiles_public_handle_unique") ||
+    (msg.includes("public_handle") && msg.includes("unique"))
+  );
+}
+
+export const PUBLIC_HANDLE_TAKEN_MESSAGE =
+  "That @handle is already taken. Please choose another.";
+
+/**
+ * Whether a normalized handle is free for the current user to claim.
+ * Pass `excludeUserId` so saving an unchanged handle does not count as taken.
+ */
+export async function isPublicHandleAvailable(
+  handle: string,
+  options?: { excludeUserId?: string },
+): Promise<{ available: boolean; normalized: string | null; error: Error | null }> {
+  let normalized: string;
+  try {
+    const n = normalizePublicHandleInput(handle.replace(/^@/, ""));
+    if (!n) {
+      return { available: false, normalized: null, error: new Error("Handle is required.") };
+    }
+    normalized = n;
+  } catch (e) {
+    return {
+      available: false,
+      normalized: null,
+      error: e instanceof Error ? e : new Error(String(e)),
+    };
+  }
+
+  const { userId, error } = await getProfileIdByPublicHandle(normalized);
+  if (error) return { available: false, normalized, error };
+  if (!userId) return { available: true, normalized, error: null };
+  if (options?.excludeUserId && userId === options.excludeUserId) {
+    return { available: true, normalized, error: null };
+  }
+  return { available: false, normalized, error: null };
+}
+
 export async function getProfileIdByPublicHandle(handle: string): Promise<{
   userId: string | null;
   error: Error | null;
@@ -382,7 +429,23 @@ export async function updateProfile(
     if (public_handle === null || public_handle === "") {
       update.public_handle = null;
     } else {
-      update.public_handle = normalizePublicHandleInput(public_handle);
+      try {
+        update.public_handle = normalizePublicHandleInput(public_handle);
+      } catch (e) {
+        return {
+          data: null,
+          error: e instanceof Error ? e : new Error(String(e)),
+        };
+      }
+      const availability = await isPublicHandleAvailable(String(update.public_handle), {
+        excludeUserId: id,
+      });
+      if (availability.error && !availability.normalized) {
+        return { data: null, error: availability.error };
+      }
+      if (!availability.available) {
+        return { data: null, error: new Error(PUBLIC_HANDLE_TAKEN_MESSAGE) };
+      }
     }
   }
   if (diabetes_onset_date !== undefined) {
@@ -428,12 +491,20 @@ export async function updateProfile(
       .select()
       .single();
 
-    if (error) return { data: null, error: new Error(error.message) };
+    if (error) {
+      if (isProfileHandleUniqueViolation(error)) {
+        return { data: null, error: new Error(PUBLIC_HANDLE_TAKEN_MESSAGE) };
+      }
+      return { data: null, error: new Error(error.message) };
+    }
     return {
       data: data ? rowFromData(data as Record<string, unknown>) : null,
       error: null,
     };
   } catch (e) {
+    if (isProfileHandleUniqueViolation(e)) {
+      return { data: null, error: new Error(PUBLIC_HANDLE_TAKEN_MESSAGE) };
+    }
     return {
       data: null,
       error: e instanceof Error ? e : new Error(String(e)),

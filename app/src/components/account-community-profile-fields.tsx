@@ -12,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   formatLivingWithDiabetesLine,
+  isPublicHandleAvailable,
   normalizePublicHandleInput,
+  PUBLIC_HANDLE_TAKEN_MESSAGE,
   updateProfile,
   useProfile,
 } from "@/lib/profile";
@@ -81,6 +83,9 @@ export function AccountCommunityProfileFields({
   const [saving, setSaving] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [handleAvailability, setHandleAvailability] = useState<
+    "idle" | "checking" | "available" | "taken" | "invalid"
+  >("idle");
   const profileIdRef = useRef<string | undefined>(undefined);
   const bioRef = useRef<HTMLTextAreaElement>(null);
   const clearedStaleDiabetesOnset = useRef(false);
@@ -154,6 +159,49 @@ export function AccountCommunityProfileFields({
     const id = requestAnimationFrame(() => adjustBioHeight());
     return () => cancelAnimationFrame(id);
   }, [isPublic, adjustBioHeight]);
+
+  const savedHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
+
+  useEffect(() => {
+    if (!isPublic || !editing) {
+      setHandleAvailability("idle");
+      return;
+    }
+    const slug = handleInput.replace(/^@/, "").trim().toLowerCase();
+    if (!slug) {
+      setHandleAvailability("idle");
+      return;
+    }
+    if (slug === savedHandleSlug) {
+      setHandleAvailability("available");
+      return;
+    }
+
+    let cancelled = false;
+    setHandleAvailability("checking");
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          normalizePublicHandleInput(slug);
+        } catch {
+          if (!cancelled) setHandleAvailability("invalid");
+          return;
+        }
+        const res = await isPublicHandleAvailable(slug, { excludeUserId: profile?.id });
+        if (cancelled) return;
+        if (res.error && !res.available) {
+          setHandleAvailability("invalid");
+          return;
+        }
+        setHandleAvailability(res.available ? "available" : "taken");
+      })();
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [handleInput, savedHandleSlug, profile?.id, isPublic, editing]);
 
   async function persistPublicChange(next: boolean) {
     if (!profile?.id) return;
@@ -277,6 +325,22 @@ export function AccountCommunityProfileFields({
       return;
     }
 
+    if (normalizedHandle !== savedHandleSlug) {
+      const availability = await isPublicHandleAvailable(normalizedHandle, {
+        excludeUserId: profile.id,
+      });
+      if (!availability.available) {
+        setSaving(false);
+        setHandleAvailability("taken");
+        toast({
+          title: "Handle taken",
+          description: PUBLIC_HANDLE_TAKEN_MESSAGE,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     const onsetVal = showOnsetDate ? onsetDateInput.trim() || null : null;
     const { error } = await updateProfile({
       id: profile.id,
@@ -301,8 +365,16 @@ export function AccountCommunityProfileFields({
   }
 
   const handleSlug = handleInput.replace(/^@/, "").trim().toLowerCase();
-  const readOnlyHandleSlug = (profile?.public_handle ?? "").replace(/^@/, "").trim().toLowerCase();
+  const readOnlyHandleSlug = savedHandleSlug;
   const livingLine = onsetDateInput.trim() ? formatLivingWithDiabetesLine(onsetDateInput) : null;
+  const handleSaveBlocked =
+    isPublic &&
+    editing &&
+    handleSlug.length > 0 &&
+    handleSlug !== savedHandleSlug &&
+    (handleAvailability === "taken" ||
+      handleAvailability === "checking" ||
+      handleAvailability === "invalid");
 
   const settingsName = storage.getProfile()?.name?.trim() ?? "";
   const displayNameReadOnly =
@@ -397,7 +469,8 @@ export function AccountCommunityProfileFields({
                   htmlFor={handleId}
                   info={
                     <>
-                      Required. 3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
+                      Required and unique across Diabeaters. 3–30 characters: lowercase letters, numbers,
+                      underscores. Share:{" "}
                       {handleInput.trim() ? (
                         <Link
                           href={`/community/u/${encodeURIComponent(handleSlug)}`}
@@ -428,8 +501,33 @@ export function AccountCommunityProfileFields({
                     maxLength={30}
                     disabled={loading || savingPublic}
                     data-testid="account-community-handle-input"
+                    aria-invalid={handleAvailability === "taken" || handleAvailability === "invalid"}
+                    aria-describedby={`${handleId}-status`}
                   />
                 </div>
+                <p
+                  id={`${handleId}-status`}
+                  className={cn(
+                    "text-xs",
+                    handleAvailability === "taken" || handleAvailability === "invalid"
+                      ? "text-destructive"
+                      : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
+                        ? "text-primary"
+                        : "text-muted-foreground",
+                  )}
+                  aria-live="polite"
+                  data-testid="account-community-handle-status"
+                >
+                  {handleAvailability === "checking"
+                    ? "Checking availability…"
+                    : handleAvailability === "taken"
+                      ? PUBLIC_HANDLE_TAKEN_MESSAGE
+                      : handleAvailability === "invalid"
+                        ? "Use 3–30 characters: letters, numbers, underscores only."
+                        : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
+                          ? "This handle is available."
+                          : "Handles are unique — you will need a different one if it is already in use."}
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -497,7 +595,11 @@ export function AccountCommunityProfileFields({
                 </div>
               ) : null}
 
-              <Button type="submit" disabled={saving || loading || savingPublic} data-testid="account-community-save">
+              <Button
+                type="submit"
+                disabled={saving || loading || savingPublic || handleSaveBlocked}
+                data-testid="account-community-save"
+              >
                 {saving ? "Saving…" : "Save"}
               </Button>
             </>

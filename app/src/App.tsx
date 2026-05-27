@@ -66,6 +66,7 @@ import { PatientOnboardingGate } from "@/components/patient-onboarding-gate";
 import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
 import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
+import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { IosPushForegroundSync } from "@/components/ios-push-foreground-sync";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
@@ -1195,7 +1196,12 @@ function AuthenticatedShell() {
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
-      {!suppressClinicalPollers ? <SupplyLowNotifyPoller /> : null}
+      {!suppressClinicalPollers ? (
+        <>
+          <AppointmentReminderPoller />
+          <SupplyLowNotifyPoller />
+        </>
+      ) : null}
       {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />

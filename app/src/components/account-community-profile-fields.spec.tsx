@@ -47,6 +47,7 @@ vi.mock("@/lib/profile", async (importOriginal) => {
     ...actual,
     useProfile: vi.fn(),
     updateProfile: vi.fn(),
+    isPublicHandleAvailable: vi.fn(),
   };
 });
 
@@ -77,6 +78,11 @@ function renderWithRouter(ui: ReactElement) {
 
 describe("AccountCommunityProfileFields", () => {
   beforeEach(() => {
+    vi.mocked(profileLib.isPublicHandleAvailable).mockResolvedValue({
+      available: true,
+      normalized: "myhandle",
+      error: null,
+    });
     vi.mocked(profileLib.useProfile).mockReturnValue({
       profile: profilePublic,
       loading: false,

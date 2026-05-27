@@ -199,7 +199,9 @@ export function NotificationsTab({
         <div className="flex items-center justify-between py-3 border-b border-border">
           <div className="space-y-0.5 pr-4">
             <Label className="text-small text-muted-foreground">Appointment reminders</Label>
-            <p className="text-small text-muted-foreground">Reminders before upcoming appointments</p>
+            <p className="text-small text-muted-foreground">
+              The evening before (6pm) and again about 2 hours before each appointment
+            </p>
           </div>
           <Switch
             checked={notifSettings.appointmentReminders}

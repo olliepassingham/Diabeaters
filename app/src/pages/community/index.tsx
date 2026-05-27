@@ -1109,12 +1109,10 @@ export default function CommunityHomePage() {
   }
 
   return (
-    <PageShell
-      variant="standard"
-      className="mx-auto max-w-lg space-y-6 pb-4"
-    >
+    <PageShell variant="narrow" density="compact" className="pb-2">
       <PageHeader
         title="Feed"
+        stackActionsMaxSm
         actions={
           <div className="flex items-center gap-1.5">
             <Button
@@ -1291,7 +1289,7 @@ export default function CommunityHomePage() {
       {isMobile ? (
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card/80 px-3 py-3 text-left shadow-sm ring-1 ring-border/40 backdrop-blur-sm dark:bg-card/50 min-h-[3rem]"
+          className="flex w-full min-h-[2.75rem] items-center gap-2.5 rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-muted/25 px-3.5 py-2.5 text-left shadow-sm ring-1 ring-border/45 active:scale-[0.99] transition-transform dark:from-card/95 dark:to-muted/20"
           onClick={() => setComposerSheetOpen(true)}
           data-testid="feed-composer-mobile-pill"
         >
@@ -1309,16 +1307,22 @@ export default function CommunityHomePage() {
 
       <div
         className={cn(
-          "space-y-2 rounded-2xl border border-border/50 bg-background/85 p-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/70",
+          "space-y-2 rounded-2xl border border-border/45 bg-card/90 p-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80",
           "sticky top-0 z-20 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
         )}
       >
-        <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full sm:max-w-md">
-          <TabsList className="grid h-10 w-full grid-cols-2 rounded-xl bg-muted/60 p-1 dark:bg-muted/40">
-            <TabsTrigger value="following" className="rounded-lg text-sm data-[state=active]:bg-card/95">
+        <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full">
+          <TabsList className="grid h-9 w-full grid-cols-2 rounded-full bg-muted/50 p-0.5 dark:bg-muted/35">
+            <TabsTrigger
+              value="following"
+              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               Following
             </TabsTrigger>
-            <TabsTrigger value="everyone" className="rounded-lg text-sm data-[state=active]:bg-card/95">
+            <TabsTrigger
+              value="everyone"
+              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
               Everyone
             </TabsTrigger>
           </TabsList>
@@ -1390,10 +1394,10 @@ export default function CommunityHomePage() {
                 Close
               </Button>
             </div>
-            <div className="flex items-center gap-2 sm:hidden">
+            <div className="flex items-center gap-1.5 sm:hidden">
               <div className="min-w-0 flex-1">
                 {savedOnly ? (
-                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <div className="flex h-9 w-full items-center rounded-xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
                     Saved posts
                   </div>
                 ) : (
@@ -1405,7 +1409,7 @@ export default function CommunityHomePage() {
                       else if (isCommunityTopicId(v)) setTopicFilter(v);
                     }}
                   >
-                    <SelectTrigger className="h-9 w-full" aria-label="Feed topic">
+                    <SelectTrigger className="h-9 w-full rounded-xl border-border/50 bg-background/80" aria-label="Feed topic">
                       <SelectValue placeholder="Topic" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1461,10 +1465,10 @@ export default function CommunityHomePage() {
 
         {isMobile && !feedSearchExpanded ? (
           <>
-            <div className="flex items-center gap-2 sm:hidden">
+            <div className="flex items-center gap-1.5 sm:hidden">
               <div className="min-w-0 flex-1">
                 {savedOnly ? (
-                  <div className="flex h-9 w-full items-center rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
+                  <div className="flex h-9 w-full items-center rounded-xl border border-border/50 bg-muted/30 px-3 text-sm text-muted-foreground">
                     Saved posts
                   </div>
                 ) : (
@@ -1476,7 +1480,7 @@ export default function CommunityHomePage() {
                       else if (isCommunityTopicId(v)) setTopicFilter(v);
                     }}
                   >
-                    <SelectTrigger className="h-9 w-full" aria-label="Feed topic">
+                    <SelectTrigger className="h-9 w-full rounded-xl border-border/50 bg-background/80" aria-label="Feed topic">
                       <SelectValue placeholder="Topic" />
                     </SelectTrigger>
                     <SelectContent>

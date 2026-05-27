@@ -1,22 +1,40 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import {
+  allAppointmentNotificationIds,
+  appointmentReminderTimes,
+  notificationIdForAppointment,
+  parseAppointmentScheduledAt,
+  reminderCopy,
+  type AppointmentReminderKind,
+} from "@/lib/appointment-reminder-schedule";
 import type { Appointment } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
-function notificationIdForAppointment(id: string): number {
-  // Stable-ish numeric id for Capacitor local notifications.
-  const hex = id.replace(/-/g, "").slice(0, 8);
-  const n = Number.parseInt(hex, 16);
-  return Number.isFinite(n) ? (n % 2_000_000_000) : Math.floor(Math.random() * 1_000_000_000);
-}
+type ScheduledNotification = {
+  id: number;
+  title: string;
+  body: string;
+  schedule: { at: Date };
+  extra: { appointment_id: string; reminder_kind: AppointmentReminderKind };
+};
 
-function parseLocalDateTime(date: string, time?: string): Date | null {
-  if (!date) return null;
-  const t = (time || "09:00").trim();
-  const iso = `${date}T${t.length === 5 ? t : "09:00"}:00`;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
+function buildReminder(
+  a: Appointment,
+  kind: AppointmentReminderKind,
+  remindAt: Date,
+  now: Date,
+): ScheduledNotification | null {
+  if (remindAt <= now) return null;
+  const { title, body } = reminderCopy(a, kind);
+  return {
+    id: notificationIdForAppointment(a.id, kind),
+    title,
+    body,
+    schedule: { at: remindAt },
+    extra: { appointment_id: a.id, reminder_kind: kind },
+  };
 }
 
 export async function rescheduleAppointmentReminders(appointments: Appointment[]): Promise<void> {
@@ -28,41 +46,32 @@ export async function rescheduleAppointmentReminders(appointments: Appointment[]
   if (perm.display !== "granted") return;
 
   const now = new Date();
-  const upcoming = appointments.filter((a) => !a.isCompleted);
+  const upcoming = appointments.filter((a) => !a.isCompleted && !a.deletedAt);
 
-  // Cancel and recreate to keep it simple and consistent.
-  const ids = upcoming.map((a) => ({ id: notificationIdForAppointment(a.id) }));
+  const ids = upcoming.flatMap((a) =>
+    allAppointmentNotificationIds(a.id).map((id) => ({ id })),
+  );
   try {
-    await LocalNotifications.cancel({ notifications: ids });
+    if (ids.length > 0) await LocalNotifications.cancel({ notifications: ids });
   } catch {
     // ignore
   }
 
-  const notifications = upcoming
-    .map((a) => {
-      const scheduledAt = parseLocalDateTime(a.date, a.time);
-      if (!scheduledAt) return null;
-      const remindAt = new Date(scheduledAt.getTime() - 24 * 60 * 60 * 1000);
-      if (remindAt <= now) return null;
+  const notifications: ScheduledNotification[] = [];
 
-      const timeLabel = a.time ? a.time : "time not set";
-      return {
-        id: notificationIdForAppointment(a.id),
-        title: "Appointment reminder",
-        body: `${a.title}${a.time ? ` · ${timeLabel}` : ""}`,
-        schedule: { at: remindAt },
-        extra: { appointment_id: a.id },
-      };
-    })
-    .filter(Boolean) as Array<{
-      id: number;
-      title: string;
-      body: string;
-      schedule: { at: Date };
-      extra: { appointment_id: string };
-    }>;
+  for (const a of upcoming) {
+    const scheduledAt = parseAppointmentScheduledAt(a.date, a.time);
+    if (!scheduledAt || scheduledAt <= now) continue;
+
+    const { eveningBefore, twoHoursBefore } = appointmentReminderTimes(scheduledAt);
+
+    const evening = buildReminder(a, "evening_before", eveningBefore, now);
+    const twoHours = buildReminder(a, "two_hours_before", twoHoursBefore, now);
+
+    if (evening) notifications.push(evening);
+    if (twoHours) notifications.push(twoHours);
+  }
 
   if (notifications.length === 0) return;
   await LocalNotifications.schedule({ notifications });
 }
-
