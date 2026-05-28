@@ -203,7 +203,6 @@ export function FeedPostList(props: {
         topicFilter ?? "",
         debouncedSearch,
         (authorIdsForServerSearch ?? []).slice().sort().join(","),
-        (followingAuthorIdsForSearch ?? []).slice().sort().join(","),
         props.savedOnly ? "saved" : "all",
       ] as const,
     [
@@ -214,7 +213,6 @@ export function FeedPostList(props: {
       topicFilter,
       debouncedSearch,
       authorIdsForServerSearch,
-      followingAuthorIdsForSearch,
       props.savedOnly,
     ],
   );
