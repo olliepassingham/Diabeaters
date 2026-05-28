@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { PageShell } from "@/components/layout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { useCarerActivityHistory } from "@/hooks/use-carer-activity-history";
@@ -67,6 +68,18 @@ export default function CarerActivityLogPage() {
 
   return (
     <PageShell variant="standard" className="mx-auto max-w-lg space-y-4 pb-2">
+      <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
+            <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
+          </div>
+          <Badge variant="secondary" className="rounded-full">
+            Viewing shared activity
+          </Badge>
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" className="gap-2 shrink-0" asChild>
           <Link href="/carer-view">
@@ -76,7 +89,7 @@ export default function CarerActivityLogPage() {
         </Button>
         <div className="min-w-0">
           <h1 className="text-h3 font-semibold text-foreground">Activity log</h1>
-          <p className="text-xs text-muted-foreground">Shared activity only — read-only.</p>
+          <p className="text-xs text-muted-foreground">Shared activity only.</p>
         </div>
       </div>
 

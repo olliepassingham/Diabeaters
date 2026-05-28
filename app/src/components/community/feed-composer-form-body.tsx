@@ -89,6 +89,9 @@ export function FeedComposerFormBody({
   onEventModeClick,
   composerCanSubmit,
 }: FeedComposerFormBodyProps) {
+  const audienceInfo =
+    "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
+
   return (
     <>
       <div className="space-y-1.5">
@@ -226,21 +229,27 @@ export function FeedComposerFormBody({
           </div>
         </div>
       ) : null}
-      <Textarea
-        value={composer}
-        onChange={(e) => setComposer(e.target.value)}
-        placeholder={
-          composerPostKind === "poll"
-            ? "Optional intro before the poll…"
-            : composerPostKind === "event"
-              ? "Optional intro before the event details…"
-              : "Share something on the feed…"
-        }
-        rows={3}
-        maxLength={8000}
-        disabled={submitting || !user || !canComposeToFeed}
-        className="surface-field min-h-[5.5rem] rounded-xl"
-      />
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-sm font-medium text-foreground">Post</Label>
+          <InlineInfoHint ariaLabel="Who can see this?" content={audienceInfo} />
+        </div>
+        <Textarea
+          value={composer}
+          onChange={(e) => setComposer(e.target.value)}
+          placeholder={
+            composerPostKind === "poll"
+              ? "Optional intro before the poll…"
+              : composerPostKind === "event"
+                ? "Optional intro before the event details…"
+                : "Share something on the feed…"
+          }
+          rows={3}
+          maxLength={8000}
+          disabled={submitting || !user || !canComposeToFeed}
+          className="surface-field min-h-[5.5rem] rounded-xl"
+        />
+      </div>
       <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
       {composerPreviews.length > 0 && (
         <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">

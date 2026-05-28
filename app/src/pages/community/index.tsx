@@ -112,6 +112,26 @@ export default function CommunityHomePage() {
   const [feedSearchExpanded, setFeedSearchExpanded] = useState(false);
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
+  const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
+
+  // Preserve scroll position across Everyone / Following toggles.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onScroll = () => {
+      const y = window.scrollY ?? 0;
+      setScrollByTab((prev) => (prev[feedTab] === y ? prev : { ...prev, [feedTab]: y }));
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [feedTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const y = scrollByTab[feedTab] ?? 0;
+    // Defer to next frame so layout is settled (prevents "jump then jump again" on mobile).
+    window.requestAnimationFrame(() => window.scrollTo({ top: y, left: 0, behavior: "auto" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedTab]);
 
   const feedCacheScope = useMemo(
     () =>
@@ -640,7 +660,18 @@ export default function CommunityHomePage() {
           "sticky top-0 z-20 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
         )}
       >
-        <Tabs value={feedTab} onValueChange={(v) => setFeedTab(v as FeedTab)} className="w-full">
+        <Tabs
+          value={feedTab}
+          onValueChange={(v) => {
+            // Save current tab scroll before switching.
+            if (typeof window !== "undefined") {
+              const y = window.scrollY ?? 0;
+              setScrollByTab((prev) => ({ ...prev, [feedTab]: y }));
+            }
+            setFeedTab(v as FeedTab);
+          }}
+          className="w-full"
+        >
           <TabsList className="grid h-9 w-full grid-cols-2 rounded-full bg-muted/50 p-0.5 dark:bg-muted/35">
             <TabsTrigger
               value="following"

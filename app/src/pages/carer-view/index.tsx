@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { HubLoadingSkeleton } from "@/components/empty-state";
 import {
   Eye,
   ArrowLeft,
@@ -1500,6 +1501,35 @@ export default function CarerViewPage() {
       ),
     [scopes.supplies, scopes.scenarios, supplies, sickDayState, scenarioRows],
   );
+  const travelSummary = useMemo(
+    () => travelScenarioSummary((scopes.scenarios ?? false) ? scenarioRows : []),
+    [scopes.scenarios, scenarioRows],
+  );
+
+  const latestHypoAt = useMemo(() => {
+    let best: Date | null = null;
+    for (const h of hypoLogs) {
+      const d = new Date(h.created_at);
+      if (Number.isNaN(d.getTime())) continue;
+      if (!best || d.getTime() > best.getTime()) best = d;
+    }
+    return best;
+  }, [hypoLogs]);
+
+  const suppliesTone = useMemo(() => {
+    if (!(scopes.supplies ?? false)) return null;
+    const tones = supplies.map((s) => supplyTone(s));
+    if (tones.includes("critical")) return "critical";
+    if (tones.includes("low")) return "low";
+    return "ok";
+  }, [scopes.supplies, supplies]);
+
+  const hideGlanceLine =
+    carerHeaderContext.glance.type === "info" &&
+    carerHeaderContext.showTravelChip &&
+    !carerHeaderContext.showSickChip &&
+    suppliesTone === "ok" &&
+    carerHeaderContext.glance.message.toLowerCase().includes("travel mode active");
 
   const refreshScenarios = useCallback(async () => {
     if (!activeLink?.patientId) return;
@@ -1531,12 +1561,22 @@ export default function CarerViewPage() {
     return (
       <>
         {devOverlay}
-        <div
-          className="max-w-2xl mx-auto px-4 py-12 text-center text-muted-foreground text-sm"
-          aria-busy="true"
-        >
-          Loading…
-        </div>
+        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4">
+          <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
+                <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
+              </div>
+              <Badge variant="secondary" className="rounded-full">
+                Loading…
+              </Badge>
+            </div>
+          </div>
+          <div className="px-1">
+            <HubLoadingSkeleton tiles={6} />
+          </div>
+        </PageShell>
       </>
     );
   }
@@ -1545,12 +1585,22 @@ export default function CarerViewPage() {
     return (
       <>
         {devOverlay}
-        <div
-          className="max-w-2xl mx-auto px-4 py-12 text-center text-muted-foreground text-sm"
-          data-testid="carer-view-redirecting"
-        >
-          Redirecting…
-        </div>
+        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4" data-testid="carer-view-redirecting">
+          <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
+                <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
+              </div>
+              <Badge variant="secondary" className="rounded-full">
+                Redirecting…
+              </Badge>
+            </div>
+          </div>
+          <div className="px-1">
+            <HubLoadingSkeleton tiles={4} />
+          </div>
+        </PageShell>
       </>
     );
   }
@@ -1559,12 +1609,22 @@ export default function CarerViewPage() {
     return (
       <>
         {devOverlay}
-        <div
-          className="max-w-2xl mx-auto px-4 py-12 text-center text-muted-foreground text-sm"
-          aria-busy="true"
-        >
-          Loading…
-        </div>
+        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4" aria-busy="true">
+          <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
+                <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
+              </div>
+              <Badge variant="secondary" className="rounded-full">
+                Loading…
+              </Badge>
+            </div>
+          </div>
+          <div className="px-1">
+            <HubLoadingSkeleton tiles={6} />
+          </div>
+        </PageShell>
       </>
     );
   }
@@ -1583,37 +1643,19 @@ export default function CarerViewPage() {
     <>
       {devOverlay}
       <PageShell variant="standard" className="max-w-3xl space-y-6 py-4">
-        <div className="flex flex-col gap-3 sm:gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="min-w-0">
-                <h1 className="text-h1 text-foreground flex items-center gap-2 flex-wrap" data-testid="heading-carer-view">
-                  <Eye className="h-6 w-6 text-primary shrink-0" />
-                  Supporter Mode
-                </h1>
-              </div>
+        <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
+              <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
             </div>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-secondary px-2.5 py-1.5 text-xs font-medium text-secondary-foreground",
-                    "hover:bg-secondary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                  aria-label="Read-only — you can view shared information and coordinate support."
-                  data-testid="button-carer-readonly-info"
-                >
-                  <Info className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                  Read-only
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[min(20rem,calc(100vw-2rem))] text-sm leading-snug">
-                Read-only — you can view shared information and coordinate support.
-              </TooltipContent>
-            </Tooltip>
+            <Badge variant="secondary" className="rounded-full">
+              Viewing shared info
+            </Badge>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:gap-4">
 
           <Card className="border-border/60 shadow-sm" data-testid="carer-view-header">
             <CardContent className="p-4 md:p-5 flex flex-col gap-3">
@@ -1640,34 +1682,56 @@ export default function CarerViewPage() {
                 {(scopes.emergency_info ?? false) && (
                   <a
                     href="#carer-emergency"
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 shrink-0"
+                    className={cn(
+                      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-3 text-xs font-semibold text-foreground shadow-sm",
+                      "hover:bg-background/80 hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
                     aria-label="Jump to emergency details"
                   >
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                     Emergency
                   </a>
                 )}
               </div>
 
-              <div
-                className={cn(
-                  "text-xs leading-snug",
-                  carerHeaderContext.glance.type === "warning"
-                    ? "text-red-700 dark:text-red-300"
-                    : carerHeaderContext.glance.type === "info"
-                      ? "text-amber-800 dark:text-amber-200"
-                      : "text-emerald-800 dark:text-emerald-200",
-                )}
-                data-testid="text-carer-glance"
-              >
-                {carerHeaderContext.glance.message}
+              {!hideGlanceLine ? (
+                <p className="text-xs leading-snug text-muted-foreground" data-testid="text-carer-glance">
+                  {carerHeaderContext.glance.message}
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-glance-chips">
+                <Badge variant="outline" className="rounded-full border-border/60 bg-background/50 text-xs">
+                  Activity: {carerActivityWeek.countLast7Days} {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
+                </Badge>
+                {(scopes.hypo_alerts ?? false) && latestHypoAt ? (
+                  <Badge variant="outline" className="rounded-full border-border/60 bg-background/50 text-xs">
+                    Last hypo {formatDistanceToNowStrict(latestHypoAt, { addSuffix: true })}
+                  </Badge>
+                ) : null}
+                {suppliesTone ? (
+                  <Badge
+                    variant={suppliesTone === "critical" ? "destructive" : suppliesTone === "low" ? "secondary" : "outline"}
+                    className={cn("rounded-full text-xs", suppliesTone === "ok" && "border-border/60 bg-background/50")}
+                  >
+                    {suppliesTone === "critical" ? "Supplies: critical" : suppliesTone === "low" ? "Supplies: low" : "Supplies: ok"}
+                  </Badge>
+                ) : null}
               </div>
 
               {(scopes.scenarios ?? false) &&
                 (carerHeaderContext.showSickChip || carerHeaderContext.showTravelChip) && (
                   <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-active-chips">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Active</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Active modes
+                    </span>
                     {carerHeaderContext.showSickChip ? (
-                      <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-full px-3 text-xs border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1]"
+                      >
                         <a href="#carer-sick-day-care" data-testid="chip-carer-sickday">
                           <Thermometer className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" aria-hidden />
                           Sick day
@@ -1675,10 +1739,15 @@ export default function CarerViewPage() {
                       </Button>
                     ) : null}
                     {carerHeaderContext.showTravelChip ? (
-                      <Button asChild variant="outline" size="sm" className="h-8 rounded-full px-3 text-xs">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="h-8 rounded-full px-3 text-xs border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1]"
+                      >
                         <a href="#carer-scenarios" data-testid="chip-carer-travel">
-                          <ArrowRight className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />
-                          Travel
+                          <Plane className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />
+                          {travelSummary.destination ? `Travel · ${travelSummary.destination}` : "Travel"}
                         </a>
                       </Button>
                     ) : null}

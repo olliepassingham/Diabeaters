@@ -867,7 +867,7 @@ export function FeedPostCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
                   disabled={!viewerId}
                   aria-pressed={post.liked_by_me}
                   aria-label={post.liked_by_me ? "Unlike" : "Like"}
@@ -884,7 +884,7 @@ export function FeedPostCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-8 min-w-7 px-1 text-muted-foreground hover:text-foreground"
+                  className="h-11 min-w-10 px-2 text-muted-foreground hover:text-foreground"
                   disabled={!viewerId}
                   aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
                   onClick={() => setLikersOpen(true)}
@@ -897,7 +897,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1 px-2 text-muted-foreground hover:text-foreground"
+                className="h-11 gap-1.5 px-3 text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
                 aria-label={
                   expanded
@@ -922,7 +922,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
                 aria-label="Reply"
                 onClick={onReplyFocus}
@@ -935,7 +935,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
                 aria-pressed={post.saved_by_me}
                 aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
@@ -954,7 +954,7 @@ export function FeedPostCard({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
                     aria-label="Share post"
                     data-testid="button-share-post-to-dm"
                   >

@@ -259,6 +259,7 @@ export function FeedPostList(props: {
   postsRef.current = posts;
 
   const loadingPosts = feedQuery.status === "pending" && posts.length === 0;
+  const feedError = feedQuery.status === "error" ? (feedQuery.error as Error | null) : null;
   const [refreshing, setRefreshing] = useState(false);
 
   const runRefresh = useCallback(async () => {
@@ -715,6 +716,16 @@ export function FeedPostList(props: {
 
       {loadingPosts ? (
         <FeedLoadingSkeleton />
+      ) : feedError ? (
+        <EmptyState
+          title={useServerSearch ? "Search failed" : "Could not load posts"}
+          description={feedError.message || "Please try again."}
+          icon={RefreshCw}
+        >
+          <Button type="button" size="sm" onClick={() => void runRefresh()} disabled={refreshing}>
+            Retry
+          </Button>
+        </EmptyState>
       ) : searchNoResults ? (
         <EmptyState
           title={`No matches for "${searchLabelRaw}"`}
