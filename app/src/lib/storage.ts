@@ -478,6 +478,10 @@ export interface UserProfile {
   bodyWeightKg?: number;
   /** How weight is shown in profile and hypo help (storage remains kg). */
   weightDisplayUnit?: "kg" | "lbs";
+  /** Drives units, emergency copy, and date locale defaults. */
+  region?: "UK" | "US" | "OTHER";
+  /** Optional override when region is OTHER or for travel. */
+  emergencyNumber?: string;
 }
 
 export function isCommunityAccountProfile(profile: UserProfile | null | undefined): boolean {

@@ -1,13 +1,14 @@
 // client/src/App.tsx
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Switch, Route, useLocation, useSearch, Redirect } from "wouter";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DevBanner } from "@/components/DevBanner";
 import { DevSupabaseDiagnostics } from "@/components/DevSupabaseDiagnostics";
+import { DevPerfDiagnostics } from "@/components/dev-perf-diagnostics";
 import { StagingBanner } from "@/components/StagingBanner";
 import { isAiCoachEnabled, isStaging } from "@/lib/flags";
 
@@ -51,7 +52,13 @@ const CarerSetup = lazy(() => import("@/pages/carer-setup"));
 const ModeChooser = lazy(() => import("@/pages/mode"));
 const NotificationsPage = lazy(() => import("@/pages/notifications"));
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getLinkedPatientForCarer, useLinkedPatient } from "@/lib/carers";
+import { useLinkedPatient } from "@/lib/carers";
+import {
+  invalidateLinkedPatientQuery,
+  useLinkedPatientQuery,
+} from "@/lib/carer-link-query";
+import { getProfile, profileQueryKey } from "@/lib/profile";
+import { scheduleDemoRoutePrefetch } from "@/lib/demo-route-prefetch";
 import {
   clearCarerClientSessionKeys,
   getActiveAppMode,
@@ -70,7 +77,6 @@ import { AppointmentReminderPoller } from "@/components/appointment-reminder-pol
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { IosPushForegroundSync } from "@/components/ios-push-foreground-sync";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
-import { getProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import type { ActiveExerciseSession } from "@/lib/storage";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -304,7 +310,7 @@ function SessionLoadingSkeleton() {
  */
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  const { loading: linkedPatientLoading } = useLinkedPatient();
+  const { loading: linkedPatientLoading, isFetched: linkedPatientFetched } = useLinkedPatient();
   const [pathname, setLocation] = useLocation();
   const search = useSearch();
   const pathOnly = (pathname || "/").split("?")[0] ?? pathname;
@@ -329,7 +335,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, search, setLocation, pathOnly]);
 
-  if (loading || linkedPatientLoading) {
+  if (loading || (linkedPatientLoading && !linkedPatientFetched)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">
@@ -979,6 +985,34 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
 }
 
 /**
+ * Mount children after first paint + idle so startup pollers do not compete with route content.
+ */
+function DeferredAfterFirstPaint({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let idleId = 0;
+    let timeoutId = 0;
+    const run = () => setReady(true);
+    const raf = window.requestAnimationFrame(() => {
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(run, { timeout: 2500 });
+      } else {
+        timeoutId = window.setTimeout(run, 800);
+      }
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      if (idleId) window.cancelIdleCallback(idleId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  if (!ready) return null;
+  return <>{children}</>;
+}
+
+/**
  * Minimal chrome for signed-in but unverified users on `/account` only (resend verification, profile basics).
  * Omits offline banner, status strip, supply/low-stock pollers, iOS notification upsell, and BottomNav
  * (other tabs would redirect unverified users to check-email).
@@ -1170,9 +1204,24 @@ function AuthenticatedShell() {
       }
     };
 
-    flush();
-    window.addEventListener("online", flush);
-    return () => window.removeEventListener("online", flush);
+    let idleId = 0;
+    let timeoutId = 0;
+    const run = () => void flush();
+    const schedule = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        idleId = window.requestIdleCallback(run, { timeout: 3000 });
+      } else {
+        timeoutId = window.setTimeout(run, 1200);
+      }
+    };
+    schedule();
+    const onOnline = () => void flush();
+    window.addEventListener("online", onOnline);
+    return () => {
+      if (idleId) window.cancelIdleCallback(idleId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+      window.removeEventListener("online", onOnline);
+    };
   }, [toast]);
 
   const slimUnverifiedAccount = Boolean(user && !isUserVerified(user) && pathOnly === "/account");
@@ -1195,15 +1244,17 @@ function AuthenticatedShell() {
       <IosPushForegroundSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
-      {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
-      {!suppressClinicalPollers ? (
-        <>
-          <AppointmentReminderPoller />
-          <SupplyLowNotifyPoller />
-        </>
-      ) : null}
-      {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
-      {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
+      <DeferredAfterFirstPaint>
+        {!suppressClinicalPollers ? <SickDayMedDuePoller /> : null}
+        {!suppressClinicalPollers ? (
+          <>
+            <AppointmentReminderPoller />
+            <SupplyLowNotifyPoller />
+          </>
+        ) : null}
+        {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
+        {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
+      </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       <OfflineBanner />
       <AppTopBar
@@ -1344,10 +1395,53 @@ function AppContent() {
   useNativeLocalNotificationDeepLinks();
   const [location, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
-  const [appGateReady, setAppGateReady] = useState(false);
-  const [linkedCarer, setLinkedCarer] = useState(false);
-  const [patientOnboardingSatisfied, setPatientOnboardingSatisfied] = useState(true);
+  const queryClient = useQueryClient();
+  const userId = user?.id;
+  const linkQuery = useLinkedPatientQuery();
   const pathOnly = location.split("?")[0] ?? location;
+
+  const carerPendingBlocksOnboarding =
+    Boolean(userId) &&
+    getPrimaryAppRole() !== "community" &&
+    (hasCarerIntent() || hasPendingCarer());
+
+  const skipProfileForGate = Boolean(linkQuery.data) || carerPendingBlocksOnboarding;
+
+  const profileQuery = useQuery({
+    queryKey: profileQueryKey(userId),
+    queryFn: async () => {
+      if (!userId) return null;
+      const { profile } = await getProfile(userId);
+      return profile;
+    },
+    enabled: Boolean(userId) && linkQuery.isFetched && !skipProfileForGate,
+    staleTime: 30_000,
+  });
+
+  const linkedCarer = Boolean(linkQuery.data);
+
+  const patientOnboardingSatisfied = useMemo(() => {
+    if (!userId) return true;
+    if (linkedCarer) return true;
+    if (carerPendingBlocksOnboarding) return true;
+    if (!profileQuery.isFetched) return true;
+    const fromDb = profileQuery.data?.onboarding_complete === true;
+    let fromLs = false;
+    try {
+      fromLs = localStorage.getItem("diabeater_onboarding_completed") === "true";
+    } catch {
+      fromLs = false;
+    }
+    return fromDb || fromLs;
+  }, [userId, linkedCarer, carerPendingBlocksOnboarding, profileQuery.data, profileQuery.isFetched]);
+
+  const appGateReady = useMemo(() => {
+    if (authLoading) return false;
+    if (!userId) return true;
+    if (!linkQuery.isFetched) return false;
+    if (skipProfileForGate) return true;
+    return profileQuery.isFetched;
+  }, [authLoading, userId, linkQuery.isFetched, skipProfileForGate, profileQuery.isFetched]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -1357,59 +1451,17 @@ function AppContent() {
   }, [authLoading, user?.id, pathOnly, setLocation]);
 
   useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (authLoading) return;
-      if (!user?.id) {
-        setLinkedCarer(false);
-        setPatientOnboardingSatisfied(true);
-        setAppGateReady(true);
-        return;
-      }
-      const link = await getLinkedPatientForCarer();
-      if (cancelled) return;
-      if (link.data) {
-        setLinkedCarer(true);
-        setPatientOnboardingSatisfied(true);
-        setAppGateReady(true);
-        return;
-      }
-      if ((hasCarerIntent() || hasPendingCarer()) && getPrimaryAppRole() !== "community") {
-        setLinkedCarer(false);
-        setPatientOnboardingSatisfied(true);
-        setAppGateReady(true);
-        return;
-      }
-      const { profile } = await getProfile(user.id);
-      if (cancelled) return;
-      const fromDb = profile?.onboarding_complete === true;
-      let fromLs = false;
-      try {
-        fromLs = localStorage.getItem("diabeater_onboarding_completed") === "true";
-      } catch {
-        fromLs = false;
-      }
-      setPatientOnboardingSatisfied(fromDb || fromLs);
-      setLinkedCarer(false);
-      setAppGateReady(true);
-    }
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, user?.id]);
+    if (!userId) return;
+    scheduleDemoRoutePrefetch();
+  }, [userId]);
 
   useEffect(() => {
     const bumpLinkedCarer = () => {
-      void (async () => {
-        if (!user?.id) return;
-        const link = await getLinkedPatientForCarer();
-        if (link.data) setLinkedCarer(true);
-      })();
+      void invalidateLinkedPatientQuery(queryClient, userId);
     };
     window.addEventListener("diabeater:carer-link-updated", bumpLinkedCarer);
     return () => window.removeEventListener("diabeater:carer-link-updated", bumpLinkedCarer);
-  }, [user?.id]);
+  }, [queryClient, userId]);
 
   const publicEntry = bypassesOnboardingGate(location);
 
@@ -1458,7 +1510,7 @@ function AppContent() {
     return (
       <PatientOnboardingGate
         onPatientComplete={() => {
-          setPatientOnboardingSatisfied(true);
+          void queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
         }}
       />
     );
@@ -1471,9 +1523,6 @@ function AppContent() {
       </div>
     );
   }
-
-  const carerPendingBlocksOnboarding =
-    getPrimaryAppRole() !== "community" && (hasCarerIntent() || hasPendingCarer());
 
   if (
     user?.id &&
@@ -1527,6 +1576,7 @@ export default function App() {
                  */}
                 <KeyboardInsets />
                 {import.meta.env.DEV ? <DevSupabaseDiagnostics /> : null}
+                {import.meta.env.DEV ? <DevPerfDiagnostics /> : null}
                 <AppContent />
               </EmergencyProfileProvider>
             </AuthProvider>

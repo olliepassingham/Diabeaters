@@ -11,6 +11,7 @@ import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageShell } from "@/components/layout";
+import { getEffectiveEmergencyNumber, getProfileRegion, getRegionDefaultsForProfile } from "@/lib/region";
 
 export default function HelpNow() {
   const { data: linkedPatient } = useLinkedPatient();
@@ -39,8 +40,11 @@ export default function HelpNow() {
   };
 
   const callEmergencyServices = () => {
-    handleCall("999");
+    handleCall(getEffectiveEmergencyNumber(profile));
   };
+
+  const regionDefaults = getRegionDefaultsForProfile(profile);
+  const emergencyLabel = `Call ${getEffectiveEmergencyNumber(profile)}`;
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
@@ -278,9 +282,9 @@ export default function HelpNow() {
       >
         <div className="mx-auto max-w-md rounded-2xl border border-border/70 bg-background/95 p-3 shadow-xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
           <div className="flex items-stretch gap-2">
-            <Button size="lg" className="flex-1 rounded-xl bg-red-600 dark:bg-red-700" onClick={callEmergencyServices} data-testid="button-call-999">
+            <Button size="lg" className="flex-1 rounded-xl bg-red-600 dark:bg-red-700" onClick={callEmergencyServices} data-testid="button-call-emergency">
               <Phone className="h-5 w-5 mr-2" />
-              Call 999
+              {emergencyLabel}
             </Button>
             {primaryContact ? (
               <Button

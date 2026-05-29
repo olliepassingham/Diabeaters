@@ -1,29 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { getLinkedPatientForCarer } from "@/lib/carers";
-import type { LinkedPatientInfo } from "@/lib/carers.types";
+import {
+  invalidateLinkedPatientQuery,
+  useLinkedPatientQuery,
+} from "@/lib/carer-link-query";
 
 export function useLinkedCarer() {
   const { user, loading: authLoading } = useAuth();
-  const [resolving, setResolving] = useState(true);
-  const [linked, setLinked] = useState<LinkedPatientInfo | null>(null);
+  const queryClient = useQueryClient();
+  const linkQuery = useLinkedPatientQuery();
 
   const refetch = useCallback(async () => {
-    if (!user?.id) {
-      setLinked(null);
-      setResolving(false);
-      return;
-    }
-    setResolving(true);
-    const r = await getLinkedPatientForCarer();
-    setLinked(r.data ?? null);
-    setResolving(false);
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    void refetch();
-  }, [authLoading, refetch]);
+    await invalidateLinkedPatientQuery(queryClient, user?.id);
+  }, [queryClient, user?.id]);
 
   useEffect(() => {
     const onLink = () => {
@@ -33,8 +23,10 @@ export function useLinkedCarer() {
     return () => window.removeEventListener("diabeater:carer-link-updated", onLink);
   }, [refetch]);
 
+  const linked = linkQuery.data ?? null;
+
   return {
-    loading: authLoading || resolving,
+    loading: authLoading || linkQuery.isLoading,
     linked,
     isCarer: Boolean(linked),
     refetch,

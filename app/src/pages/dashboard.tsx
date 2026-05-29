@@ -823,7 +823,7 @@ export default function Dashboard() {
     if (getSupabase()) {
       void repairSickDayCloudIfLocalInactive();
     }
-    const timer = setTimeout(() => setIsLoading(false), 400);
+    setIsLoading(false);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
@@ -852,7 +852,6 @@ export default function Dashboard() {
     window.addEventListener(DIABEATER_ACTIVE_USER_CHANGED_EVENT, onActiveUserChanged);
 
     return () => {
-      clearTimeout(timer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onSettingsChanged);

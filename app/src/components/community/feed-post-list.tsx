@@ -391,9 +391,12 @@ export function FeedPostList(props: {
     for (const arr of Object.values(commentsByPost)) {
       for (const c of arr) ids.add(c.author_id);
     }
-    const list = [...ids];
+    const list = [...ids].filter((id) => {
+      const fromPost = posts.find((p) => p.author_id === id)?.author_preview;
+      if (fromPost?.full_name?.trim() || fromPost?.public_handle?.trim()) return false;
+      return true;
+    });
     if (list.length === 0) {
-      setAuthorMeta({});
       setAuthorMetaPending(false);
       return;
     }

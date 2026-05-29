@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
+import { prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
@@ -257,6 +258,7 @@ export function BottomNav() {
     if (typeof window === "undefined") return;
 
     const warmCommonTabs = () => {
+      prefetchDemoCriticalRoutes();
       prefetchTools();
       prefetchAccount();
       if (!isCarerMode && !isCommunityMode) prefetchScenarios();

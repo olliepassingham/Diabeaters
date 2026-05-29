@@ -337,16 +337,16 @@ function validateImageFiles(files: File[]): Error | null {
 export async function getPostImageSignedUrls(paths: string[]): Promise<(string | null)[]> {
   const supabase = getSupabase();
   if (!supabase || paths.length === 0) return paths.map(() => null);
-  const out: (string | null)[] = paths.map(() => null);
-  for (let i = 0; i < paths.length; i++) {
-    const path = String(paths[i] ?? "").trim();
-    if (!path) continue;
-    const { data, error } = await supabase.storage
-      .from(COMMUNITY_POST_IMAGES_BUCKET)
-      .createSignedUrl(path, 3600);
-    if (!error && data?.signedUrl) out[i] = data.signedUrl;
-  }
-  return out;
+  return Promise.all(
+    paths.map(async (raw) => {
+      const path = String(raw ?? "").trim();
+      if (!path) return null;
+      const { data, error } = await supabase.storage
+        .from(COMMUNITY_POST_IMAGES_BUCKET)
+        .createSignedUrl(path, 3600);
+      return !error && data?.signedUrl ? data.signedUrl : null;
+    }),
+  );
 }
 
 export async function fetchCommunityPostsPage(

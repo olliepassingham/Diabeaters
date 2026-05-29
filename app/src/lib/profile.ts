@@ -31,6 +31,8 @@ export type ProfileRow = {
   pharmacy?: PharmacyJson | null;
   /** patient = full tools; community = learn + feed persona. */
   account_type?: "patient" | "community" | null;
+  app_region?: "UK" | "US" | "OTHER" | null;
+  emergency_number?: string | null;
 };
 
 /** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
@@ -92,6 +94,19 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
   else if (rawAccountType === "patient" || rawAccountType === "community") account_type = rawAccountType;
   else account_type = "patient";
 
+  const rawRegion = data.app_region;
+  let app_region: "UK" | "US" | "OTHER" | null | undefined;
+  if (rawRegion === null) app_region = null;
+  else if (rawRegion === undefined) app_region = undefined;
+  else if (rawRegion === "UK" || rawRegion === "US" || rawRegion === "OTHER") app_region = rawRegion;
+  else app_region = null;
+
+  const rawEmergency = data.emergency_number;
+  let emergency_number: string | null | undefined;
+  if (rawEmergency === null) emergency_number = null;
+  else if (rawEmergency === undefined) emergency_number = undefined;
+  else emergency_number = String(rawEmergency).trim() || null;
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -110,6 +125,8 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     date_of_birth,
     pharmacy,
     account_type,
+    app_region,
+    emergency_number,
   };
 }
 
@@ -397,6 +414,8 @@ export type ProfileUpdatePayload = {
     | "date_of_birth"
     | "pharmacy"
     | "account_type"
+    | "app_region"
+    | "emergency_number"
   >
 >;
 
@@ -419,6 +438,8 @@ export async function updateProfile(
     date_of_birth,
     pharmacy,
     account_type,
+    app_region,
+    emergency_number,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -482,6 +503,15 @@ export async function updateProfile(
   if (account_type !== undefined) {
     if (account_type === null) update.account_type = "patient";
     else if (account_type === "patient" || account_type === "community") update.account_type = account_type;
+  }
+  if (app_region !== undefined) {
+    if (app_region === null) update.app_region = null;
+    else if (app_region === "UK" || app_region === "US" || app_region === "OTHER") update.app_region = app_region;
+    else update.app_region = null;
+  }
+  if (emergency_number !== undefined) {
+    update.emergency_number =
+      emergency_number === null ? null : String(emergency_number).trim() || null;
   }
 
   try {

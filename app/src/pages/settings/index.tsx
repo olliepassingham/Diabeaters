@@ -55,7 +55,13 @@ import {
   type WeightDisplayUnit,
 } from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
-import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import {
+  APP_REGION_OPTIONS,
+  applyRegionUnitDefaults,
+  type AppRegion,
+  regionDefaults,
+} from "@/lib/region";
 import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
@@ -73,6 +79,10 @@ const SETTINGS_MOBILE_STICKY_FOOTER =
   "md:hidden fixed left-0 right-0 z-[110] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
 
 function ProfileTab({
+  appRegion,
+  setAppRegion,
+  emergencyNumber,
+  setEmergencyNumber,
   bgUnits,
   setBgUnits,
   carbUnits,
@@ -88,6 +98,10 @@ function ProfileTab({
   weightRequiredForHypo,
   onSave,
 }: {
+  appRegion: AppRegion;
+  setAppRegion: (v: AppRegion) => void;
+  emergencyNumber: string;
+  setEmergencyNumber: (v: string) => void;
   bgUnits: string;
   setBgUnits: (v: string) => void;
   carbUnits: string;
@@ -103,8 +117,54 @@ function ProfileTab({
   weightRequiredForHypo: boolean;
   onSave: () => void;
 }) {
+  const handleRegionChange = (next: AppRegion) => {
+    if (next === appRegion) return;
+    const offerUnits = window.confirm(
+      `Change region to ${APP_REGION_OPTIONS.find((o) => o.value === next)?.label ?? next}? Update blood glucose and weight units to match this region?`,
+    );
+    setAppRegion(next);
+    if (offerUnits) {
+      const units = applyRegionUnitDefaults(next, { bgUnits, weightDisplayUnit });
+      setBgUnits(units.bgUnits);
+      setWeightDisplayUnit(units.weightDisplayUnit);
+    }
+    if (next === "OTHER" && !emergencyNumber.trim()) {
+      setEmergencyNumber(regionDefaults("OTHER").emergencyNumber);
+    }
+  };
+
   return (
     <div className="space-y-3 rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="app-region">Region</Label>
+        <Select value={appRegion} onValueChange={(v) => handleRegionChange(v as AppRegion)}>
+          <SelectTrigger id="app-region" data-testid="select-app-region">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {APP_REGION_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Sets emergency numbers and safety wording. Units below can be changed separately.
+        </p>
+      </div>
+      {appRegion === "OTHER" ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="emergency-number">Local emergency number</Label>
+          <Input
+            id="emergency-number"
+            inputMode="tel"
+            value={emergencyNumber}
+            onChange={(e) => setEmergencyNumber(e.target.value)}
+            data-testid="input-emergency-number"
+          />
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="bg-units">Blood Glucose Units</Label>
@@ -727,6 +787,8 @@ export default function Settings() {
   const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
   const [bodyWeightInput, setBodyWeightInput] = useState("");
   const [weightDisplayUnit, setWeightDisplayUnit] = useState<WeightDisplayUnit>("kg");
+  const [appRegion, setAppRegion] = useState<AppRegion>("UK");
+  const [emergencyNumber, setEmergencyNumber] = useState("");
 
   const [tdd, setTdd] = useState("");
   const [breakfastRatio, setBreakfastRatio] = useState("");
@@ -811,6 +873,8 @@ export default function Settings() {
       setWeightDisplayUnit(unit);
       const kg = getBodyWeightKgFromProfile(storedProfile);
       setBodyWeightInput(kg != null ? formatWeightInputFromKg(kg, unit) : "");
+      setAppRegion(storedProfile.region ?? "UK");
+      setEmergencyNumber(storedProfile.emergencyNumber ?? "");
     } else {
       setProfile(defaultProfile);
       setBodyWeightInput("");
@@ -970,6 +1034,8 @@ export default function Settings() {
       dateOfBirth: normalizedDob ?? "",
       bodyWeightKg: parsedKg ?? undefined,
       weightDisplayUnit,
+      region: appRegion,
+      emergencyNumber: emergencyNumber.trim() || undefined,
     };
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
@@ -977,6 +1043,7 @@ export default function Settings() {
     let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
       cloud = await syncClinicalPrefsToCloud(user.id);
+      const regionCloud = await syncRegionToCloud(user.id);
       if (cloud.error) {
         toast({
           title: "Saved on this device",
@@ -984,6 +1051,13 @@ export default function Settings() {
           variant: "destructive",
         });
         return { ok: false };
+      }
+      if (regionCloud.error) {
+        toast({
+          title: "Saved on this device",
+          description: `Region saved locally; cloud sync failed: ${regionCloud.error.message}`,
+          variant: "destructive",
+        });
       }
     }
 
@@ -1202,6 +1276,10 @@ export default function Settings() {
           </p>
         </div>
         <ProfileTab
+          appRegion={appRegion}
+          setAppRegion={setAppRegion}
+          emergencyNumber={emergencyNumber}
+          setEmergencyNumber={setEmergencyNumber}
           bgUnits={bgUnits}
           setBgUnits={setBgUnits}
           carbUnits={carbUnits}

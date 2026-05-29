@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import type { LinkedPatientInfo } from "@/lib/carers.types";
-import { getLinkedPatientForCarer } from "@/lib/carers";
+import {
+  invalidateLinkedPatientQuery,
+  useLinkedPatientQuery,
+} from "@/lib/carer-link-query";
 import { getActiveAppMode } from "@/lib/carer-session";
 
 /**
@@ -11,29 +15,17 @@ import { getActiveAppMode } from "@/lib/carer-session";
 export function useLinkedPatient(): {
   data: LinkedPatientInfo | null;
   loading: boolean;
+  isFetched: boolean;
   refetch: () => Promise<void>;
 } {
   const { user, loading: authLoading } = useAuth();
-  const [resolving, setResolving] = useState(true);
-  const [linkedPatient, setLinkedPatient] = useState<LinkedPatientInfo | null>(null);
+  const queryClient = useQueryClient();
+  const linkQuery = useLinkedPatientQuery();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
 
   const refetch = useCallback(async () => {
-    if (!user?.id) {
-      setLinkedPatient(null);
-      setResolving(false);
-      return;
-    }
-    setResolving(true);
-    const result = await getLinkedPatientForCarer();
-    setLinkedPatient(result.data ?? null);
-    setResolving(false);
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (authLoading) return;
-    void refetch();
-  }, [authLoading, refetch]);
+    await invalidateLinkedPatientQuery(queryClient, user?.id);
+  }, [queryClient, user?.id]);
 
   useEffect(() => {
     const onLink = () => {
@@ -53,8 +45,9 @@ export function useLinkedPatient(): {
   }, []);
 
   return {
-    data: activeMode === "carer" ? linkedPatient : null,
-    loading: authLoading || resolving,
+    data: activeMode === "carer" ? (linkQuery.data ?? null) : null,
+    loading: authLoading || linkQuery.isLoading,
+    isFetched: linkQuery.isFetched,
     refetch,
   };
 }

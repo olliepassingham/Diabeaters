@@ -19,6 +19,7 @@ import {
 } from "@/lib/storage";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { normalizeAppRegion } from "@/lib/region";
 
 /** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
 export function isMissingProfileColumnSchemaError(message: string, column: string): boolean {
@@ -206,6 +207,20 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
       storage.savePharmacy(cloudPharmacy);
     }
   }
+
+  if (row.app_region === "UK" || row.app_region === "US" || row.app_region === "OTHER") {
+    const lp = storage.getProfile();
+    if (lp) {
+      const region = normalizeAppRegion(row.app_region);
+      const emergencyNumber =
+        typeof row.emergency_number === "string" && row.emergency_number.trim()
+          ? row.emergency_number.trim()
+          : lp.emergencyNumber;
+      if (lp.region !== region || lp.emergencyNumber !== emergencyNumber) {
+        storage.saveProfile({ ...lp, region, emergencyNumber });
+      }
+    }
+  }
 }
 
 export type ClinicalPrefsCloudSyncResult = {
@@ -343,6 +358,29 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
   }
 
   return { error: new Error("Clinical prefs sync: too many retries") };
+}
+
+/** Push region + optional emergency number override to `profiles`. Tolerates missing columns. */
+export async function syncRegionToCloud(userId: string): Promise<{ error: Error | null; skipped?: boolean }> {
+  const p = storage.getProfile();
+  const region = p?.region;
+  if (!region) return { error: null };
+  const { error } = await updateProfile({
+    id: userId,
+    app_region: region,
+    emergency_number: p.emergencyNumber?.trim() || null,
+  });
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (
+    isMissingProfileColumnSchemaError(error.message, "app_region") ||
+    isMissingProfileColumnSchemaError(error.message, "emergency_number")
+  ) {
+    return { error: null, skipped: true };
+  }
+  return { error };
 }
 
 /**

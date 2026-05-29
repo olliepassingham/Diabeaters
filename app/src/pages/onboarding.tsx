@@ -22,6 +22,7 @@ import {
   Clock,
   TrendingDown,
   ClipboardList,
+  Globe,
 } from "lucide-react";
 import { FaceLogo } from "@/components/face-logo";
 import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
@@ -53,6 +54,13 @@ import {
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import {
+  APP_REGION_OPTIONS,
+  applyRegionUnitDefaults,
+  type AppRegion,
+  regionDefaults,
+} from "@/lib/region";
+import { syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -62,6 +70,7 @@ type Step =
   | "welcome"
   | "care_context"
   | "struggle"
+  | "region"
   | "details"
   | "disclaimer"
   | "first_win";
@@ -223,6 +232,9 @@ interface OnboardingData {
   dateOfBirth: string;
   bgUnits: string;
   carbUnits: string;
+  region: AppRegion | "";
+  weightDisplayUnit: "kg" | "lbs";
+  emergencyNumber: string;
   hasAcceptedDisclaimer: boolean;
   tdd: string;
   breakfastRatio: string;
@@ -243,6 +255,7 @@ interface OnboardingProps {
 const ONBOARDING_STEP_LABELS: Partial<Record<Step, string>> = {
   care_context: "Care",
   struggle: "Focus",
+  region: "Region",
   details: "Details",
   disclaimer: "Terms",
 };
@@ -291,9 +304,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const showCommunityPath = accountPath === "community";
   const steps: Step[] = useMemo(() => {
     if (upgradeFlow) return ["details", "disclaimer", "first_win"];
-    if (showCommunityPath) return ["welcome", "disclaimer", "first_win"];
-    if (showBothPath) return ["welcome", "care_context", "struggle", "details", "disclaimer", "first_win"];
-    return ["welcome", "struggle", "details", "disclaimer", "first_win"];
+    if (showCommunityPath) return ["welcome", "region", "disclaimer", "first_win"];
+    if (showBothPath) return ["welcome", "care_context", "struggle", "region", "details", "disclaimer", "first_win"];
+    return ["welcome", "struggle", "region", "details", "disclaimer", "first_win"];
   }, [upgradeFlow, showCommunityPath, showBothPath]);
   const [currentStep, setCurrentStep] = useState<Step>(() =>
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1"
@@ -309,6 +322,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     dateOfBirth: "",
     bgUnits: "mmol/L",
     carbUnits: "grams",
+    region: "",
+    weightDisplayUnit: "kg",
+    emergencyNumber: "",
     hasAcceptedDisclaimer: false,
     tdd: "",
     breakfastRatio: "",
@@ -330,6 +346,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       name: p.name?.trim() ? p.name : prev.name,
       bgUnits: p.bgUnits || prev.bgUnits,
       carbUnits: p.carbUnits || prev.carbUnits,
+      region: p.region || prev.region,
+      weightDisplayUnit: p.weightDisplayUnit || prev.weightDisplayUnit,
+      emergencyNumber: p.emergencyNumber || prev.emergencyNumber,
       diabetesType: p.diabetesType && p.diabetesType !== "none" ? p.diabetesType : prev.diabetesType,
       insulinDeliveryMethod: p.insulinDeliveryMethod || prev.insulinDeliveryMethod,
       dateOfBirth: p.dateOfBirth || prev.dateOfBirth,
@@ -337,8 +356,24 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }));
   }, [upgradeFlow]);
 
-  const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext) => {
-    setData((prev) => ({ ...prev, [field]: value }));
+  const updateData = (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext | AppRegion) => {
+    setData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === "region" && (value === "UK" || value === "US" || value === "OTHER")) {
+        const units = applyRegionUnitDefaults(value, {
+          bgUnits: prev.bgUnits,
+          weightDisplayUnit: prev.weightDisplayUnit,
+        });
+        next.bgUnits = units.bgUnits;
+        next.weightDisplayUnit = units.weightDisplayUnit;
+        if (value === "OTHER" && !prev.emergencyNumber.trim()) {
+          next.emergencyNumber = regionDefaults("OTHER").emergencyNumber;
+        } else if (value !== "OTHER") {
+          next.emergencyNumber = "";
+        }
+      }
+      return next;
+    });
   };
 
   const currentStepIndex = steps.indexOf(currentStep);
@@ -359,6 +394,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       ratioFormat: prev?.ratioFormat,
       carbPortionSize: prev?.carbPortionSize,
       accountType: "patient",
+      region: data.region || prev?.region || "UK",
+      weightDisplayUnit: data.weightDisplayUnit,
+      emergencyNumber: data.emergencyNumber.trim() || undefined,
     });
 
     const settings: Record<string, number | string | undefined> = {};
@@ -413,10 +451,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleFinishCommunity = async (pathOverride?: string) => {
+    const region = data.region || "UK";
+    const units = applyRegionUnitDefaults(region, {
+      bgUnits: data.bgUnits,
+      weightDisplayUnit: data.weightDisplayUnit,
+    });
     storage.saveProfile({
       name: data.name,
       email: "",
-      bgUnits: "mmol/L",
+      bgUnits: units.bgUnits,
       carbUnits: "grams",
       diabetesType: "none",
       insulinDeliveryMethod: "pen",
@@ -424,6 +467,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       hasAcceptedDisclaimer: data.hasAcceptedDisclaimer,
       dateOfBirth: "",
       accountType: "community",
+      region,
+      weightDisplayUnit: units.weightDisplayUnit,
+      emergencyNumber: data.emergencyNumber.trim() || undefined,
     });
     try {
       localStorage.removeItem("diabeater_onboarding_struggle");
@@ -458,6 +504,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             variant: "destructive",
           });
         }
+        void syncRegionToCloud(user.id);
       }
     }
     toast({
@@ -522,6 +569,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             variant: "destructive",
           });
         }
+        void syncRegionToCloud(user.id);
       }
     }
     toast({
@@ -542,6 +590,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
+      case "region": return data.region === "UK" || data.region === "US" || data.region === "OTHER";
       case "details":
         return upgradeFlow || data.struggle !== null;
       case "disclaimer": return data.hasAcceptedDisclaimer;
@@ -565,6 +614,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
+      case "region":
+        return <RegionStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />;
       case "details":
         return (
           <div className="space-y-8">
@@ -1121,6 +1172,96 @@ function EssentialsStep({
               </div>
             </RadioGroup>
           </div>
+
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Weight display</Label>
+            <RadioGroup
+              value={data.weightDisplayUnit}
+              onValueChange={(value) => updateData("weightDisplayUnit", value as "kg" | "lbs")}
+              className="flex gap-3"
+            >
+              <div
+                className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border hover-elevate cursor-pointer ${data.weightDisplayUnit === "kg" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => updateData("weightDisplayUnit", "kg")}
+              >
+                <RadioGroupItem value="kg" id="ob-weight-kg" className="sr-only" />
+                <Label htmlFor="ob-weight-kg" className="font-normal cursor-pointer">kg</Label>
+              </div>
+              <div
+                className={`flex-1 flex items-center justify-center gap-2 p-3 rounded-lg border hover-elevate cursor-pointer ${data.weightDisplayUnit === "lbs" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => updateData("weightDisplayUnit", "lbs")}
+              >
+                <RadioGroupItem value="lbs" id="ob-weight-lbs" className="sr-only" />
+                <Label htmlFor="ob-weight-lbs" className="font-normal cursor-pointer">lbs</Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function RegionStep({
+  data,
+  updateData,
+  pathCare,
+}: {
+  data: OnboardingData;
+  updateData: (field: keyof OnboardingData, value: string | boolean | Struggle | CareContext | AppRegion) => void;
+  pathCare?: CareContext | null;
+}) {
+  const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
+
+  return (
+    <div className="space-y-6" data-testid="onboarding-region">
+      <div className="text-center space-y-2">
+        <div className="flex justify-center">
+          <div className="p-3 rounded-full bg-primary/10">
+            <Globe className="h-6 w-6 text-primary" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold">Where are you based?</h2>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
+          {supporterHeavy
+            ? "This sets default units and emergency numbers for the person you support. You can change units on the next step."
+            : "This sets your default blood glucose units, weight display, and local emergency number. You can override units on the next step."}
+        </p>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6 space-y-3">
+          {APP_REGION_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              data-testid={`onboarding-region-${opt.value}`}
+              className={cn(
+                "w-full text-left p-4 rounded-lg border hover-elevate transition-colors",
+                data.region === opt.value ? "border-primary bg-primary/5" : "border-border",
+              )}
+              onClick={() => updateData("region", opt.value)}
+            >
+              <p className="font-medium">{opt.label}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{opt.description}</p>
+            </button>
+          ))}
+
+          {data.region === "OTHER" ? (
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="ob-emergency-number" className="text-sm font-medium">
+                Local emergency number
+              </Label>
+              <Input
+                id="ob-emergency-number"
+                inputMode="tel"
+                placeholder="e.g. 112"
+                value={data.emergencyNumber}
+                onChange={(e) => updateData("emergencyNumber", e.target.value)}
+                data-testid="input-onboarding-emergency-number"
+              />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

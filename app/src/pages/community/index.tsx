@@ -363,6 +363,7 @@ export default function CommunityHomePage() {
   }, [peopleOpen, user?.id, suggestedLoading, suggested.length]);
 
   // Lightweight discovery: show suggested profiles on Following even before opening "Find people".
+  // Deferred until idle so the main feed load is not competing for bandwidth on weak WiFi.
   useEffect(() => {
     if (!user?.id) return;
     if (feedTab !== "following") return;
@@ -370,49 +371,70 @@ export default function CommunityHomePage() {
     // Avoid suggestions while user is actively searching or using Saved.
     if (savedOnly || feedSearch.trim()) return;
 
-    setSuggestedLoading(true);
-    void (async () => {
-      const [pageRes, followingRes] = await Promise.all([
-        fetchCommunityPostsPage(50, null),
-        listFolloweeIdsForCurrentUser(),
-      ]);
-      if (pageRes.error || followingRes.error) {
+    let cancelled = false;
+    let idleId = 0;
+    let timeoutId = 0;
+
+    const load = () => {
+      if (cancelled) return;
+      setSuggestedLoading(true);
+      void (async () => {
+        const [pageRes, followingRes] = await Promise.all([
+          fetchCommunityPostsPage(50, null),
+          listFolloweeIdsForCurrentUser(),
+        ]);
+        if (cancelled) return;
+        if (pageRes.error || followingRes.error) {
+          setSuggestedLoading(false);
+          return;
+        }
+        const followeeSet = new Set(followingRes.ids);
+        const ids: string[] = [];
+        for (const p of pageRes.data ?? []) {
+          const id = String(p.author_id);
+          if (!id || id === user.id) continue;
+          if (followeeSet.has(id)) continue;
+          if (!ids.includes(id)) ids.push(id);
+          if (ids.length >= 12) break;
+        }
+        if (ids.length === 0) {
+          setSuggested([]);
+          setSuggestedLoading(false);
+          return;
+        }
+        const profiles = await getProfilesByIds(ids);
+        if (cancelled) return;
+        const out = ids
+          .map((id) => {
+            const pr = profiles.get(id);
+            const handle = (pr?.public_handle ?? "").trim();
+            const isPublic = pr?.is_public !== false;
+            if (!handle || !isPublic) return null;
+            return {
+              id,
+              name: pr?.full_name?.trim() || shortId(id),
+              avatar_url: pr?.avatar_url ?? null,
+              handle,
+            };
+          })
+          .filter((x): x is NonNullable<typeof x> => Boolean(x))
+          .slice(0, 6);
+        setSuggested(out);
         setSuggestedLoading(false);
-        return;
-      }
-      const followeeSet = new Set(followingRes.ids);
-      const ids: string[] = [];
-      for (const p of pageRes.data ?? []) {
-        const id = String(p.author_id);
-        if (!id || id === user.id) continue;
-        if (followeeSet.has(id)) continue;
-        if (!ids.includes(id)) ids.push(id);
-        if (ids.length >= 12) break;
-      }
-      if (ids.length === 0) {
-        setSuggested([]);
-        setSuggestedLoading(false);
-        return;
-      }
-      const profiles = await getProfilesByIds(ids);
-      const out = ids
-        .map((id) => {
-          const pr = profiles.get(id);
-          const handle = (pr?.public_handle ?? "").trim();
-          const isPublic = pr?.is_public !== false;
-          if (!handle || !isPublic) return null;
-          return {
-            id,
-            name: pr?.full_name?.trim() || shortId(id),
-            avatar_url: pr?.avatar_url ?? null,
-            handle,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => Boolean(x))
-        .slice(0, 6);
-      setSuggested(out);
-      setSuggestedLoading(false);
-    })();
+      })();
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(load, { timeout: 4000 });
+    } else {
+      timeoutId = window.setTimeout(load, 2000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId) window.cancelIdleCallback(idleId);
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, [user?.id, feedTab, savedOnly, feedSearch, suggestedLoading, suggested.length]);
 
   async function handleFollow(id: string) {
