@@ -4,6 +4,14 @@ import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 let prefetchedDashboard = false;
 let prefetchedCarerView = false;
 let prefetchedDemoBundle = false;
+let prefetchedCommunityFeed = false;
+
+/** Feed list + cards — separate chunk from the community page shell. */
+export function prefetchCommunityFeedChunk(): void {
+  if (prefetchedCommunityFeed) return;
+  prefetchedCommunityFeed = true;
+  void import("@/components/community/feed-post-list");
+}
 
 /** Warm the home dashboard chunk (common demo landing page). */
 export function prefetchDashboardRoute(): void {
@@ -30,7 +38,24 @@ export function prefetchDemoCriticalRoutes(): void {
   prefetchDashboardRoute();
   prefetchCarerViewRoute();
   prefetchCommunityNavigationBundle();
+  prefetchCommunityFeedChunk();
   prefetchToolsHubLinkedChunks();
+}
+
+/** Warm community route chunks soon after gate (feed is often the slowest sub-chunk). */
+export function scheduleCommunityRoutePrefetch(): void {
+  if (typeof window === "undefined") return;
+  const run = () => {
+    prefetchCommunityNavigationBundle();
+    prefetchCommunityFeedChunk();
+  };
+  window.requestAnimationFrame(() => {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(run, { timeout: 1500 });
+    } else {
+      window.setTimeout(run, 0);
+    }
+  });
 }
 
 /** Schedule demo warm-up after first paint so it does not compete with startup gates. */

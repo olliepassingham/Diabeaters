@@ -1,4 +1,5 @@
 import { Redirect } from "wouter";
+import { FeedLoadingSkeleton } from "@/components/empty-state";
 import { isCommunityEnabled } from "@/lib/flags";
 import { useProfile } from "@/lib/profile";
 
@@ -18,11 +19,7 @@ export function CommunityFeatureGate({
   if (!isCommunityEnabled) return <Redirect to="/" replace />;
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-16 text-sm text-muted-foreground" aria-busy="true">
-        Loading…
-      </div>
-    );
+    return <FeedLoadingSkeleton rows={4} />;
   }
 
   if (requirePublicProfile && !profile?.is_public) return <Redirect to="/account#profile" replace />;

@@ -117,15 +117,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || !user?.id) return;
-    /** Run sequentially so push registration and prefs upsert do not fight GoTrue's auth storage lock. */
-    void (async () => {
-      await ensureNativePushRegistered();
-      await syncNotificationPreferences(storage.getNotificationSettings());
-    })();
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    let suppliesIdleId = 0;
+    let suppliesTimeoutId = 0;
+
+    const runPushAndPrefs = () => {
+      if (cancelled) return;
+      /** Sequential so push registration and prefs upsert do not fight GoTrue's auth storage lock. */
+      void (async () => {
+        await ensureNativePushRegistered();
+        if (cancelled) return;
+        await syncNotificationPreferences(storage.getNotificationSettings());
+      })();
+    };
+
+    const runSuppliesReconcile = () => {
+      if (cancelled) return;
       void import("@/lib/supplies").then((m) => m.reconcileSupplies());
-    }, 800);
-    return () => clearTimeout(timer);
+    };
+
+    const scheduleSupplies = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        suppliesIdleId = window.requestIdleCallback(runSuppliesReconcile, { timeout: 6000 });
+      } else {
+        suppliesTimeoutId = window.setTimeout(runSuppliesReconcile, 4000);
+      }
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const pushIdleId = window.requestIdleCallback(
+        () => {
+          runPushAndPrefs();
+          scheduleSupplies();
+        },
+        { timeout: 3000 },
+      );
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(pushIdleId);
+        if (suppliesIdleId) window.cancelIdleCallback(suppliesIdleId);
+        if (suppliesTimeoutId) window.clearTimeout(suppliesTimeoutId);
+      };
+    }
+
+    const pushTimer = window.setTimeout(() => {
+      runPushAndPrefs();
+      scheduleSupplies();
+    }, 1200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(pushTimer);
+      if (suppliesIdleId) window.cancelIdleCallback(suppliesIdleId);
+      if (suppliesTimeoutId) window.clearTimeout(suppliesTimeoutId);
+    };
   }, [loading, user?.id]);
 
   const value: AuthContextValue = { user, session, loading };

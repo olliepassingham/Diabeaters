@@ -635,7 +635,8 @@ export function useProfile() {
 
   return {
     profile: q.data ?? null,
-    loading: q.isPending,
+    /** False when React Query already has profile data (e.g. after app startup gate). */
+    loading: q.isPending && q.data === undefined,
     error,
     refresh,
   };

@@ -1,11 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Bookmark, ChevronDown, MessageCircle, Plus, Search as SearchIcon } from "lucide-react";
-import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
-
-const FeedPostList = lazy(() =>
-  import("@/components/community/feed-post-list").then((m) => ({ default: m.FeedPostList })),
-);
+import { EmptyState } from "@/components/empty-state";
+import { FeedPostList } from "@/components/community/feed-post-list";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -34,6 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
+import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -54,7 +52,7 @@ function readStoredFeedTab(): FeedTab {
   return "everyone";
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
 
 function initialFeedComposerOpen(): boolean {
   if (typeof window === "undefined") return true;
@@ -134,8 +132,7 @@ export default function CommunityHomePage() {
   }, [feedTab]);
 
   const feedCacheScope = useMemo(
-    () =>
-      ["main", feedTab, topicFilter ?? "_", savedOnly ? "s" : "a", feedSearch.trim(), String(feedListKey)].join(":"),
+    () => buildMainFeedScopeKey({ feedTab, topicFilter, savedOnly, feedSearch, feedListKey }),
     [feedTab, topicFilter, savedOnly, feedSearch, feedListKey],
   );
 
@@ -1075,48 +1072,47 @@ export default function CommunityHomePage() {
       </Collapsible>
       ) : null}
 
-      <Suspense key={feedListKey} fallback={<FeedLoadingSkeleton rows={5} />}>
-        <FeedPostList
-          viewerId={user?.id}
-          scopeKey={feedCacheScope}
-          searchQuery={feedSearch}
-          pageSize={PAGE_SIZE}
-          topicsForSelect={orderedTopics}
-          showRefreshButton={!isMobile}
-          feedTab={feedTab}
-          topicFilter={topicFilter}
-          followingAuthorIds={followingAuthorIds}
-          searchMatchedAuthorIds={searchMatchedAuthorIds}
-          savedOnly={savedOnly}
-          feedListRevision={feedListKey}
-          onOpenFindPeople={() => setPeopleOpen(true)}
-          onSwitchToEveryone={() => {
-            setFeedTab("everyone");
-            setTopicFilter(null);
-            setSavedOnly(false);
-          }}
-          onClearSearch={() => {
-            setFeedSearch("");
-            setFeedSearchExpanded(false);
-          }}
-          onExploreTopicInEveryone={(tid) => {
-            setFeedTab("everyone");
-            setTopicFilter(tid);
-            setSavedOnly(false);
-          }}
-          emptyStateTitle="Nothing here yet"
-          emptyStateDescription={
-            feedTab === "following"
-              ? topicFilter
-                ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
-                : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
-              : topicFilter
-                ? "No posts in this topic yet. Try another topic or be the first to post here."
-                : "No posts yet. Be the first to post."
-          }
-          fetchPage={fetchFeedPage}
-        />
-      </Suspense>
+      <FeedPostList
+        key={feedListKey}
+        viewerId={user?.id}
+        scopeKey={feedCacheScope}
+        searchQuery={feedSearch}
+        pageSize={PAGE_SIZE}
+        topicsForSelect={orderedTopics}
+        showRefreshButton={!isMobile}
+        feedTab={feedTab}
+        topicFilter={topicFilter}
+        followingAuthorIds={followingAuthorIds}
+        searchMatchedAuthorIds={searchMatchedAuthorIds}
+        savedOnly={savedOnly}
+        feedListRevision={feedListKey}
+        onOpenFindPeople={() => setPeopleOpen(true)}
+        onSwitchToEveryone={() => {
+          setFeedTab("everyone");
+          setTopicFilter(null);
+          setSavedOnly(false);
+        }}
+        onClearSearch={() => {
+          setFeedSearch("");
+          setFeedSearchExpanded(false);
+        }}
+        onExploreTopicInEveryone={(tid) => {
+          setFeedTab("everyone");
+          setTopicFilter(tid);
+          setSavedOnly(false);
+        }}
+        emptyStateTitle="Nothing here yet"
+        emptyStateDescription={
+          feedTab === "following"
+            ? topicFilter
+              ? "No posts in this topic from people you follow yet. Try All topics or follow more profiles."
+              : "No posts from people you follow yet. Follow profiles from the Everyone tab, or post something yourself."
+            : topicFilter
+              ? "No posts in this topic yet. Try another topic or be the first to post here."
+              : "No posts yet. Be the first to post."
+        }
+        fetchPage={fetchFeedPage}
+      />
     </PageShell>
   );
 }

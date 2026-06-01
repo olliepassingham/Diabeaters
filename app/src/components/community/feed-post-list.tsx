@@ -60,6 +60,11 @@ import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
 import { getProfilesByIds } from "@/lib/profile";
+import {
+  buildCommunityFeedQueryKey,
+  COMMUNITY_FEED_STALE_MS,
+  getCommunityFeedNextPageParam,
+} from "@/lib/community-feed-cache";
 
 type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null; loading?: boolean };
 
@@ -195,16 +200,16 @@ export function FeedPostList(props: {
 
   const feedQueryKey = useMemo(
     () =>
-      [
-        "community-feed",
-        props.scopeKey,
-        props.viewerId ?? "",
-        useServerSearch ? "search" : props.feedTab ?? "everyone",
-        topicFilter ?? "",
+      buildCommunityFeedQueryKey({
+        scopeKey: props.scopeKey,
+        viewerId: props.viewerId ?? "",
+        feedTab: props.feedTab,
+        topicFilter,
         debouncedSearch,
-        (authorIdsForServerSearch ?? []).slice().sort().join(","),
-        props.savedOnly ? "saved" : "all",
-      ] as const,
+        useServerSearch,
+        authorIdsForServerSearch,
+        savedOnly: props.savedOnly,
+      }),
     [
       props.scopeKey,
       props.viewerId,
@@ -221,8 +226,12 @@ export function FeedPostList(props: {
     queryKey: feedQueryKey,
     initialPageParam: null as FeedCursor | null,
     enabled: isSupabaseConfigured(),
-    staleTime: 45_000,
+    staleTime: COMMUNITY_FEED_STALE_MS,
     gcTime: 10 * 60_000,
+    refetchOnMount: (query) => {
+      const pages = query.state.data?.pages;
+      return !(pages?.[0]?.length);
+    },
     queryFn: async ({ pageParam }) => {
       if (useServerSearch) {
         const res = await searchCommunityPostsPage(
@@ -239,12 +248,7 @@ export function FeedPostList(props: {
       if (res.error) throw new Error(res.error.message);
       return res.data ?? [];
     },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage?.length || lastPage.length < pageSize) return undefined;
-      const last = lastPage[lastPage.length - 1];
-      if (!last) return undefined;
-      return { created_at: last.created_at, id: last.id };
-    },
+    getNextPageParam: (lastPage) => getCommunityFeedNextPageParam(lastPage, pageSize),
     onError: (err: Error) => {
       toast({
         title: useServerSearch ? "Search failed" : "Could not load posts",

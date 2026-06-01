@@ -59,6 +59,7 @@ import {
 } from "@/lib/carer-link-query";
 import { getProfile, profileQueryKey } from "@/lib/profile";
 import { scheduleDemoRoutePrefetch } from "@/lib/demo-route-prefetch";
+import { isCommunityMemberSession, scheduleCommunityWarmup } from "@/lib/community-feed-cache";
 import {
   clearCarerClientSessionKeys,
   getActiveAppMode,
@@ -1416,7 +1417,8 @@ function AppContent() {
       const { profile } = await getProfile(userId);
       return profile;
     },
-    enabled: Boolean(userId) && linkQuery.isFetched && !skipProfileForGate,
+    // Start as soon as we have a user id (parallel with carer link lookup — gate still waits when needed).
+    enabled: Boolean(userId) && !authLoading && !skipProfileForGate,
     staleTime: 30_000,
   });
 
@@ -1456,6 +1458,19 @@ function AppContent() {
     if (!userId) return;
     scheduleDemoRoutePrefetch();
   }, [userId]);
+
+  useEffect(() => {
+    if (!appGateReady || !userId) return;
+    const onCommunityPath = pathOnly === "/community" || pathOnly.startsWith("/community/");
+    const isCommunityMember = isCommunityMemberSession({
+      hasCarerLink: Boolean(linkQuery.data),
+      cloudProfile: profileQuery.data ?? null,
+    });
+    if (!isCommunityMember && !onCommunityPath) return;
+    scheduleCommunityWarmup(queryClient, userId, {
+      prefetchFeedData: isCommunityMember || onCommunityPath,
+    });
+  }, [appGateReady, userId, pathOnly, linkQuery.data, profileQuery.data, queryClient]);
 
   useEffect(() => {
     const bumpLinkedCarer = () => {
@@ -1519,7 +1534,7 @@ function AppContent() {
   }
 
   if (!appGateReady || authLoading) {
-    return (
+    return userId ? <SessionLoadingSkeleton /> : (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">Loading…</div>
       </div>

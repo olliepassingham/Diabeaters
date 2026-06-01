@@ -6,7 +6,23 @@ import { Label } from "@/components/ui/label";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Dumbbell, AlertCircle, Calculator, ChevronDown, ChevronUp, Pizza, X, ArrowRight, ArrowLeft, Search, Thermometer, Plane, BookOpen } from "lucide-react";
+import {
+  Utensils,
+  Dumbbell,
+  AlertCircle,
+  Calculator,
+  ChevronDown,
+  ChevronUp,
+  Pizza,
+  X,
+  ArrowRight,
+  ArrowLeft,
+  Search,
+  Thermometer,
+  Plane,
+  BookOpen,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
@@ -78,6 +94,7 @@ export default function Adviser() {
   );
   const didPrefillFromExerciseLink = useRef(false);
   const didPrefillFromAlcoholLink = useRef(false);
+  const splitCalculatorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const path = location.split("?")[0] ?? location;
@@ -704,6 +721,22 @@ export default function Adviser() {
                           <span className={getRatioForMeal("snack") === "Not set" ? "text-muted-foreground" : "font-medium"}>{getRatioForMeal("snack")}</span>
                         </div>
                       </div>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                        <p className="text-xs text-muted-foreground">
+                          Estimate or update ratios in the <span className="font-medium text-foreground">Ratios</span> tab above.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shrink-0"
+                          onClick={() => setActiveTab("ratios")}
+                          data-testid="button-ratios-from-current-ratios"
+                        >
+                          Open Ratios tab
+                          <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
@@ -722,6 +755,253 @@ export default function Adviser() {
               </Button>
             </CardContent>
           </Card>
+
+          {mealFoodType === "high_fat_protein" && !showSplitCalculator ? (
+            <Alert
+              className="border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/25"
+              data-testid="alert-high-fat-split-nudge"
+            >
+              <Pizza className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm text-foreground">Try the split dose calculator below.</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0 border-amber-500/30 bg-background/80"
+                  data-testid="button-open-split-from-nudge"
+                  onClick={() => {
+                    setShowSplitCalculator(true);
+                    window.requestAnimationFrame(() => {
+                      splitCalculatorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    });
+                  }}
+                >
+                  Open split calculator
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          <div ref={splitCalculatorRef}>
+          <Card
+            className={cn(
+              "overflow-hidden border-primary/30 shadow-md shadow-primary/5",
+              showSplitCalculator ? "ring-2 ring-primary/25" : "ring-1 ring-primary/15",
+            )}
+            data-testid="card-split-dose-calculator"
+          >
+            <div className="border-b border-primary/10 bg-gradient-to-br from-primary/14 via-primary/6 to-transparent px-4 py-4 sm:px-5">
+              <div className="flex items-start gap-3.5">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/20"
+                  aria-hidden
+                >
+                  <Pizza className="h-6 w-6" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                      Split dose calculator
+                    </h3>
+                    <Badge
+                      variant="secondary"
+                      className="rounded-full border-primary/20 bg-primary/10 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                    >
+                      High-fat meals
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
+              <div className="px-4 py-3 sm:px-5">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant={showSplitCalculator ? "secondary" : "default"}
+                    className="h-11 w-full gap-2 rounded-xl text-sm font-semibold shadow-sm"
+                    data-testid="button-split-calculator-toggle"
+                  >
+                    {showSplitCalculator ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Hide calculator
+                      </>
+                    ) : (
+                      <>
+                        <Calculator className="h-4 w-4" />
+                        Calculate split doses
+                      </>
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <CardContent className="space-y-4 border-t border-border/50 pt-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="split-carbs">Total carbs (g)</Label>
+                      <Input
+                        id="split-carbs"
+                        type="number"
+                        placeholder="e.g., 80"
+                        value={splitCarbs}
+                        onChange={(e) => setSplitCarbs(e.target.value)}
+                        data-testid="input-split-carbs"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="split-meal">Which meal?</Label>
+                      <Select value={splitMealTime} onValueChange={(v: "breakfast" | "lunch" | "dinner" | "snack") => setSplitMealTime(v)}>
+                        <SelectTrigger id="split-meal" data-testid="select-split-meal">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="breakfast">Breakfast</SelectItem>
+                          <SelectItem value="lunch">Lunch</SelectItem>
+                          <SelectItem value="dinner">Dinner</SelectItem>
+                          <SelectItem value="snack">Snack</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="split-fat">Fat content</Label>
+                      <Select value={splitFatLevel} onValueChange={(v: "low" | "medium" | "high") => setSplitFatLevel(v)}>
+                        <SelectTrigger id="split-fat" data-testid="select-split-fat">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low fat (pasta, rice)</SelectItem>
+                          <SelectItem value="medium">Medium fat (burgers, curries)</SelectItem>
+                          <SelectItem value="high">High fat (pizza, fish & chips)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Button onClick={calculateSplitBolus} disabled={!splitCarbs} className="w-full rounded-xl" data-testid="button-calculate-split">
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Calculate split doses
+                  </Button>
+
+                  {splitResult && (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <Pizza className="h-4 w-4 text-primary" />
+                          Split plan
+                        </h4>
+                        <Badge variant="secondary" className="font-mono text-xs tabular-nums">
+                          {splitResult.splitRatio}
+                        </Badge>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            {isPumpUser ? "FIRST PART — NOW" : "FIRST DOSE - NOW"}
+                          </p>
+                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{splitResult.firstDose} units</p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            {isPumpUser ? "Program or deliver at meal start" : "Take when you start eating"}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                            {isPumpUser ? "SECOND PART — LATER" : "SECOND DOSE - LATER"}
+                          </p>
+                          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{splitResult.secondDose} units</p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            {isPumpUser
+                              ? `Program remainder in ${splitResult.secondDoseDelay} h (or use extended bolus)`
+                              : `Take in ${splitResult.secondDoseDelay} hours`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <MealCarbAbsorptionPreview
+                        carbsGrams={parseInt(splitCarbs, 10)}
+                        visual={splitAbsorptionVisual}
+                        foodChoiceLabel={splitFatLevelShortLabel(splitFatLevel)}
+                        previewTestId="split-carb-absorption-preview"
+                      />
+
+                      <Collapsible open={showSplitResultDetails} onOpenChange={setShowSplitResultDetails}>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
+                            data-testid="button-toggle-split-result-details"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
+                              <span className="text-sm font-medium">More detail</span>
+                              <span className="text-xs text-muted-foreground truncate">Why split, ratio, tips</span>
+                            </div>
+                            {showSplitResultDetails ? (
+                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="pt-2 space-y-3">
+                            <MedicalNumericOutputDisclaimer compact />
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-sm text-blue-800 dark:text-blue-200">
+                                High-fat meals slow carb absorption.{" "}
+                                {isPumpUser
+                                  ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
+                                  : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
+                              </p>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>
+                                <strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs
+                              </p>
+                              <p className="text-xs">{splitResult.ratioUsed}</p>
+                              <p>
+                                <strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to{" "}
+                                {splitResult.secondDoseDelay + 1} hours.
+                              </p>
+                            </div>
+                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
+                              <p>
+                                <strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use
+                                a device that can deliver finer increments, follow your care team&apos;s guidance.
+                              </p>
+                              <p>
+                                <strong>Tip:</strong>{" "}
+                                {isPumpUser
+                                  ? "Set a timer for the second part; check BG and IOB before delivering."
+                                  : "Set a timer for your second dose! Check BG before taking it."}
+                              </p>
+                            </div>
+                            {isPumpUser && (
+                              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
+                                <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
+                                <p className="text-sm text-indigo-800 dark:text-indigo-200">
+                                  Your pump may have an extended/square wave bolus feature that handles this automatically. Check your
+                                  pump&apos;s manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
+                                </p>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              [Not medical advice. Everyone&apos;s response to fat varies. Start conservatively and adjust based on your
+                              experience.]
+                            </p>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+          </div>
 
           {mealResult && (
             <Card data-testid="card-meal-result">
@@ -906,196 +1186,6 @@ export default function Adviser() {
               </CardContent>
             </Card>
           )}
-
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-2"
-            data-testid="button-open-ratio-adviser"
-            onClick={() => setActiveTab("ratios")}
-          >
-            <Calculator className="h-4 w-4 text-primary" />
-            <span>Ratio Adviser</span>
-            <span className="ml-auto text-xs text-muted-foreground">Review or estimate your ratios</span>
-          </Button>
-
-          <Card>
-            <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between p-4 h-auto" data-testid="button-split-calculator-toggle">
-                  <div className="flex items-center gap-2">
-                    <Pizza className="h-5 w-5 text-primary" />
-                    <div className="text-left">
-                      <span className="font-medium">Split Dose Calculator</span>
-                      <p className="text-xs text-muted-foreground font-normal">Carbs, timing, absorption bar</p>
-                    </div>
-                  </div>
-                  {showSplitCalculator ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 space-y-4">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="split-carbs">Total carbs (g)</Label>
-                      <Input
-                        id="split-carbs"
-                        type="number"
-                        placeholder="e.g., 80"
-                        value={splitCarbs}
-                        onChange={(e) => setSplitCarbs(e.target.value)}
-                        data-testid="input-split-carbs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="split-meal">Which meal?</Label>
-                      <Select value={splitMealTime} onValueChange={(v: "breakfast" | "lunch" | "dinner" | "snack") => setSplitMealTime(v)}>
-                        <SelectTrigger id="split-meal" data-testid="select-split-meal">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="breakfast">Breakfast</SelectItem>
-                          <SelectItem value="lunch">Lunch</SelectItem>
-                          <SelectItem value="dinner">Dinner</SelectItem>
-                          <SelectItem value="snack">Snack</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="split-fat">Fat content</Label>
-                      <Select value={splitFatLevel} onValueChange={(v: "low" | "medium" | "high") => setSplitFatLevel(v)}>
-                        <SelectTrigger id="split-fat" data-testid="select-split-fat">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low fat (pasta, rice)</SelectItem>
-                          <SelectItem value="medium">Medium fat (burgers, curries)</SelectItem>
-                          <SelectItem value="high">High fat (pizza, fish & chips)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button onClick={calculateSplitBolus} disabled={!splitCarbs} className="w-full" data-testid="button-calculate-split">
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Calculate Split Doses
-                  </Button>
-
-                  {splitResult && (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="font-medium flex items-center gap-2">
-                          <Pizza className="h-4 w-4 text-primary" />
-                          Split plan
-                        </h4>
-                        <Badge variant="secondary" className="font-mono text-xs tabular-nums">
-                          {splitResult.splitRatio}
-                        </Badge>
-                      </div>
-
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            {isPumpUser ? "FIRST PART — NOW" : "FIRST DOSE - NOW"}
-                          </p>
-                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{splitResult.firstDose} units</p>
-                          <p className="text-xs text-green-600 dark:text-green-400">
-                            {isPumpUser ? "Program or deliver at meal start" : "Take when you start eating"}
-                          </p>
-                        </div>
-                        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                            {isPumpUser ? "SECOND PART — LATER" : "SECOND DOSE - LATER"}
-                          </p>
-                          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{splitResult.secondDose} units</p>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            {isPumpUser
-                              ? `Program remainder in ${splitResult.secondDoseDelay} h (or use extended bolus)`
-                              : `Take in ${splitResult.secondDoseDelay} hours`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <MealCarbAbsorptionPreview
-                        carbsGrams={parseInt(splitCarbs, 10)}
-                        visual={splitAbsorptionVisual}
-                        foodChoiceLabel={splitFatLevelShortLabel(splitFatLevel)}
-                        previewTestId="split-carb-absorption-preview"
-                      />
-
-                      <Collapsible open={showSplitResultDetails} onOpenChange={setShowSplitResultDetails}>
-                        <CollapsibleTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
-                            data-testid="button-toggle-split-result-details"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-                              <span className="text-sm font-medium">More detail</span>
-                              <span className="text-xs text-muted-foreground truncate">Why split, ratio, tips</span>
-                            </div>
-                            {showSplitResultDetails ? (
-                              <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="pt-2 space-y-3">
-                            <MedicalNumericOutputDisclaimer compact />
-                            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                              <p className="text-sm text-blue-800 dark:text-blue-200">
-                                High-fat meals slow carb absorption.{" "}
-                                {isPumpUser
-                                  ? "Delivering the full bolus at once can cause an early low then a late rise. Splitting matches digestion — on a pump, extended or dual-wave bolus often does this for you."
-                                  : "Taking all insulin upfront can cause an initial hypo, then a late spike. Split your dose to match the slower digestion."}
-                              </p>
-                            </div>
-                            <div className="text-sm text-muted-foreground space-y-1">
-                              <p>
-                                <strong>Total:</strong> {splitResult.totalUnits} units for {splitCarbs}g carbs
-                              </p>
-                              <p className="text-xs">{splitResult.ratioUsed}</p>
-                              <p>
-                                <strong>Why split?</strong> Fat slows carb absorption by {splitResult.secondDoseDelay - 1} to{" "}
-                                {splitResult.secondDoseDelay + 1} hours.
-                              </p>
-                            </div>
-                            <div className="p-2 bg-muted rounded text-xs text-muted-foreground space-y-1">
-                              <p>
-                                <strong>Rounding guide:</strong> This app rounds suggested doses to whole units (pen-friendly). If you use
-                                a device that can deliver finer increments, follow your care team&apos;s guidance.
-                              </p>
-                              <p>
-                                <strong>Tip:</strong>{" "}
-                                {isPumpUser
-                                  ? "Set a timer for the second part; check BG and IOB before delivering."
-                                  : "Set a timer for your second dose! Check BG before taking it."}
-                              </p>
-                            </div>
-                            {isPumpUser && (
-                              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800" data-testid="pump-tip-split-bolus">
-                                <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mb-1">Pump Users</p>
-                                <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                                  Your pump may have an extended/square wave bolus feature that handles this automatically. Check your
-                                  pump&apos;s manual for how to set up a dual-wave or combo bolus instead of manually splitting doses.
-                                </p>
-                              </div>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              [Not medical advice. Everyone&apos;s response to fat varies. Start conservatively and adjust based on your
-                              experience.]
-                            </p>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  )}
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
         </TabsContent>
 
         <TabsContent value="ratios" className="space-y-4 mt-4 animate-fade-in-up">
