@@ -1,113 +1,213 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Heart, ImagePlus, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import {
-  fetchDmMessages,
-  fetchDmThreadMembers,
+  dmThreadQueryKey,
+  fetchDmThreadBundle,
+  markDmThreadReadWhenOpened,
+} from "@/lib/dm-thread-query";
+import {
   insertDmMessage,
-  markIncomingDmMessagesAsReadInThread,
-  notifyDmInboxChanged,
-  otherMemberUserId,
   parseSharedFeedPostMessage,
   toggleDmMessageLike,
   type DmMessageRow,
 } from "@/lib/community";
-import { getProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { formatDistanceToNow } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 
-function shortId(id: string) {
-  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+function scrollToBottom(el: HTMLElement | null, behavior: ScrollBehavior) {
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior });
+}
+
+function dayDividerLabel(iso: string): string | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "d MMM yyyy");
+}
+
+function DmMessageBubble({
+  message: m,
+  mine,
+  onToggleLike,
+}: {
+  message: DmMessageRow;
+  mine: boolean;
+  onToggleLike: (m: DmMessageRow) => void;
+}) {
+  const shared = parseSharedFeedPostMessage(m.body);
+  const likeCount = m.like_count ?? 0;
+  const likedByMe = m.liked_by_me ?? false;
+  const showImage = Boolean(m.image_signed_url);
+  const hasText = !shared && Boolean(m.body.trim());
+
+  return (
+    <div className={cn("flex w-full", mine ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "max-w-[min(82%,17.5rem)] rounded-[1.15rem] px-3 py-2 text-[15px] leading-snug shadow-sm",
+          mine
+            ? "rounded-br-md bg-primary text-primary-foreground"
+            : "rounded-bl-md border border-border/50 bg-card text-foreground",
+          shared && "max-w-[min(92%,22rem)] p-2.5",
+        )}
+        onDoubleClick={!mine ? () => onToggleLike(m) : undefined}
+        title={!mine ? "Double-tap to like" : undefined}
+      >
+        {shared ? (
+          <>
+            {shared.note ? <div className="mb-2 whitespace-pre-wrap px-0.5">{shared.note}</div> : null}
+            <DmSharedPostPreview postId={shared.postId} />
+          </>
+        ) : null}
+        {showImage ? (
+          <div className={cn(shared && "mt-2")}>
+            <img
+              src={m.image_signed_url!}
+              alt=""
+              className="max-h-64 w-full rounded-xl object-cover bg-muted/30"
+              loading="lazy"
+            />
+          </div>
+        ) : null}
+        {hasText ? <div className={cn("whitespace-pre-wrap", showImage && "mt-2")}>{m.body}</div> : null}
+        {!shared && !showImage && m.image_storage_path && !m.image_signed_url ? (
+          <span className="text-xs opacity-70">Could not load image</span>
+        ) : null}
+        <div
+          className={cn(
+            "mt-1.5 flex items-center gap-2 text-[10px]",
+            mine ? "text-primary-foreground/75 justify-end" : "text-muted-foreground",
+          )}
+        >
+          <time dateTime={m.created_at}>{format(new Date(m.created_at), "HH:mm")}</time>
+          {!mine ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+                likedByMe ? "text-rose-500" : "hover:bg-muted/80",
+              )}
+              aria-label={likedByMe ? "Unlike" : "Like"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLike(m);
+              }}
+            >
+              <Heart className={cn("h-3.5 w-3.5", likedByMe && "fill-current")} />
+            </button>
+          ) : null}
+        </div>
+        {likeCount > 0 ? (
+          <div
+            className={cn(
+              "mt-0.5 flex items-center gap-1 text-[10px]",
+              mine ? "justify-end text-primary-foreground/75" : "text-muted-foreground",
+            )}
+          >
+            <Heart className="h-3 w-3 fill-current text-rose-500" aria-hidden />
+            <span>{likeCount}</span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export default function CommunityThreadPage() {
   const [match, params] = useRoute("/community/messages/:threadId");
   const threadId = match && params?.threadId ? params.threadId : null;
   const { user } = useAuth();
+  const userId = user?.id ?? "";
   const { toast } = useToast();
-  const [messages, setMessages] = useState<DmMessageRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [peerLabel, setPeerLabel] = useState<string | null>(null);
-  const [peerAvatarPath, setPeerAvatarPath] = useState<string | null>(null);
-  const [peerUserId, setPeerUserId] = useState<string | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const didInitialScrollRef = useRef(false);
+  const prevMessageCountRef = useRef(0);
 
-  const load = useCallback(async () => {
-    if (!threadId) return;
-    setLoading(true);
-    setPeerLabel(null);
-    setPeerAvatarPath(null);
-    setPeerUserId(null);
+  const threadQuery = useQuery({
+    queryKey: dmThreadQueryKey(threadId ?? undefined, userId),
+    queryFn: () => fetchDmThreadBundle(threadId!, userId),
+    enabled: Boolean(threadId && userId && isSupabaseConfigured()),
+    staleTime: 20_000,
+    gcTime: 10 * 60_000,
+  });
 
-    const [msgRes, memRes] = await Promise.all([
-      fetchDmMessages(threadId),
-      user?.id ? fetchDmThreadMembers(threadId) : Promise.resolve({ data: [], error: null }),
-    ]);
+  const messages = threadQuery.data?.messages ?? [];
+  const peer = threadQuery.data?.peer ?? null;
+  const loading = threadQuery.isPending && threadQuery.data === undefined;
 
-    if (msgRes.error) {
-      toast({ title: "Could not load messages", description: msgRes.error.message, variant: "destructive" });
-      setMessages([]);
-    } else {
-      const list = msgRes.data ?? [];
-      setMessages(list);
+  const setMessagesInCache = useCallback(
+    (updater: (prev: DmMessageRow[]) => DmMessageRow[]) => {
+      if (!threadId) return;
+      queryClient.setQueryData(dmThreadQueryKey(threadId, userId), (old: typeof threadQuery.data) => {
+        if (!old) return old;
+        return { ...old, messages: updater(old.messages) };
+      });
+    },
+    [queryClient, threadId, userId],
+  );
 
-      const hasIncomingUnread = user?.id
-        ? list.some((m) => m.sender_id !== user.id && m.read_at == null)
-        : false;
-      if (user?.id && hasIncomingUnread) {
-        const markRes = await markIncomingDmMessagesAsReadInThread(threadId);
-        if (!markRes.error && markRes.readAt) {
-          notifyDmInboxChanged();
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.sender_id !== user.id && m.read_at == null ? { ...m, read_at: markRes.readAt! } : m,
-            ),
-          );
-        }
-      }
+  const markedReadRef = useRef(false);
+  useEffect(() => {
+    markedReadRef.current = false;
+  }, [threadId]);
+  useEffect(() => {
+    if (!threadId || !userId || loading || markedReadRef.current) return;
+    markedReadRef.current = true;
+    markDmThreadReadWhenOpened(threadId, userId, messages);
+  }, [threadId, userId, loading, messages]);
+
+  useLayoutEffect(() => {
+    didInitialScrollRef.current = false;
+    prevMessageCountRef.current = 0;
+  }, [threadId]);
+
+  useLayoutEffect(() => {
+    if (loading || messages.length === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    if (!didInitialScrollRef.current) {
+      scrollToBottom(el, "instant");
+      didInitialScrollRef.current = true;
+      prevMessageCountRef.current = messages.length;
+      return;
     }
 
-    if (!user?.id) {
-      setPeerLabel(null);
-    } else if (memRes.error || !memRes.data?.length) {
-      setPeerLabel("Conversation");
-    } else {
-      const other = otherMemberUserId(memRes.data, user.id);
-      if (!other) {
-        setPeerLabel("Conversation");
-      } else {
-        const { profile } = await getProfile(other);
-        const name = profile?.full_name?.trim() || shortId(other);
-        setPeerLabel(name);
-        setPeerAvatarPath(profile?.avatar_url ?? null);
-        setPeerUserId(other);
-      }
+    if (messages.length > prevMessageCountRef.current) {
+      const last = messages[messages.length - 1];
+      const smooth = last?.sender_id === userId;
+      scrollToBottom(el, smooth ? "smooth" : "instant");
     }
-
-    setLoading(false);
-  }, [threadId, toast, user?.id]);
-
-  useEffect(() => {
-    if (!threadId) return;
-    void load();
-  }, [threadId, load]);
+    prevMessageCountRef.current = messages.length;
+  }, [loading, messages, userId]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (loading) return;
+    const t = window.setTimeout(() => composerRef.current?.focus(), 80);
+    return () => window.clearTimeout(t);
+  }, [loading, threadId]);
 
   useEffect(() => {
     if (!pendingImage) {
@@ -126,20 +226,20 @@ export default function CommunityThreadPage() {
       const prevCount = m.like_count ?? 0;
       const optimisticLiked = !wasLiked;
       const optimisticCount = Math.max(0, wasLiked ? prevCount - 1 : prevCount + 1);
-      setMessages((prev) =>
+      setMessagesInCache((prev) =>
         prev.map((x) =>
           x.id === m.id ? { ...x, liked_by_me: optimisticLiked, like_count: optimisticCount } : x,
         ),
       );
       const res = await toggleDmMessageLike(m.id);
       if (res.error) {
-        setMessages((prev) =>
+        setMessagesInCache((prev) =>
           prev.map((x) => (x.id === m.id ? { ...x, liked_by_me: wasLiked, like_count: prevCount } : x)),
         );
         toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
       }
     },
-    [toast, user],
+    [toast, user, setMessagesInCache],
   );
 
   async function handleSend(e: React.FormEvent) {
@@ -156,157 +256,137 @@ export default function CommunityThreadPage() {
     }
     setBody("");
     setPendingImage(null);
-    if (res.data) setMessages((prev) => [...prev, res.data!]);
+    if (res.data) {
+      setMessagesInCache((prev) => [...prev, res.data!]);
+      requestAnimationFrame(() => scrollToBottom(scrollRef.current, "smooth"));
+    }
   }
 
   if (!match || !threadId) return null;
 
-  const headerTitle =
-    peerUserId && peerLabel && peerLabel !== "Conversation" ? (
-      <span className="flex min-w-0 items-center gap-2.5">
-        <CommunityAuthorAvatar
-          size="sm"
-          displayName={peerLabel}
-          avatarPath={peerAvatarPath}
-          profileHref={`/community/profile/${encodeURIComponent(peerUserId)}`}
-        />
-        <span className="truncate">{peerLabel}</span>
-      </span>
-    ) : (
-      (peerLabel ?? "Chat")
-    );
+  const shellClass =
+    "fixed inset-0 z-[35] mx-auto flex w-full max-w-lg flex-col bg-background text-foreground";
 
   if (!isSupabaseConfigured()) {
     return (
-      <PageShell variant="standard" className="max-w-lg mx-auto space-y-4">
-        <PageHeader
-          leading={
-            <Link href="/community/messages">
-              <Button type="button" variant="ghost" size="icon" className="mr-2" aria-label="Back to messages">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
+      <div className={shellClass}>
+        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2 [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+          <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
+            <Link href="/community/messages" aria-label="Back">
+              <ChevronLeft className="h-6 w-6" />
             </Link>
-          }
-          title={headerTitle}
-        />
-        <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
-      </PageShell>
+          </Button>
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
+          <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
+        </div>
+      </div>
     );
   }
 
-  return (
-    <PageShell
-      variant="standard"
-      className="max-w-lg mx-auto flex min-h-[70vh] flex-col pb-4"
-    >
-      <PageHeader
-        leading={
-          <Link href="/community/messages">
-            <Button type="button" variant="ghost" size="icon" className="mr-2" aria-label="Back to messages">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-        }
-        title={headerTitle}
-      />
+  if (threadQuery.error) {
+    return (
+      <div className={shellClass}>
+        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2 [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+          <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
+            <Link href="/community/messages" aria-label="Back to messages">
+              <ChevronLeft className="h-6 w-6" />
+            </Link>
+          </Button>
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-sm text-destructive">{(threadQuery.error as Error).message}</p>
+          <Button variant="outline" size="sm" onClick={() => void threadQuery.refetch()}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-      <div className="flex-1 overflow-y-auto space-y-3 py-2">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : messages.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No messages yet. Say hello.</p>
+  const peerLabel = peer?.label ?? "Chat";
+
+  let lastDivider: string | null = null;
+
+  return (
+    <div className={shellClass} data-testid="dm-thread-shell">
+      <header className="z-10 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 py-2 shadow-sm [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11 shrink-0 rounded-full"
+          aria-label="Back to messages"
+          asChild
+        >
+          <Link href="/community/messages">
+            <ChevronLeft className="h-6 w-6" />
+          </Link>
+        </Button>
+        {peer ? (
+          <Link
+            href={`/community/profile/${encodeURIComponent(peer.userId)}`}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1 pr-2 transition-colors hover:bg-muted/40"
+          >
+            <CommunityAuthorAvatar
+              size="sm"
+              displayName={peerLabel}
+              avatarPath={peer.avatarPath}
+              profileHref={undefined}
+            />
+            <span className="truncate text-base font-semibold text-foreground">{peerLabel}</span>
+          </Link>
         ) : (
-          messages.map((m) => {
-            const mine = user?.id === m.sender_id;
-            const shared = parseSharedFeedPostMessage(m.body);
-            const likeCount = m.like_count ?? 0;
-            const likedByMe = m.liked_by_me ?? false;
-            const showImage = Boolean(m.image_signed_url);
-            return (
-              <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
-                    shared ? "" : "whitespace-pre-wrap",
-                    mine ? "bg-primary text-primary-foreground" : "bg-muted",
-                    !mine && "cursor-default select-none",
-                  )}
-                  onDoubleClick={!mine ? () => void toggleLike(m) : undefined}
-                  title={!mine ? "Double-click to like" : undefined}
-                >
-                  {shared ? (
-                    <>
-                      {shared.note ? (
-                        <div className="whitespace-pre-wrap">{shared.note}</div>
-                      ) : null}
-                      <div className={shared.note ? "mt-2" : ""}>
-                        <DmSharedPostPreview postId={shared.postId} />
-                      </div>
-                    </>
-                  ) : null}
-                  {showImage ? (
-                    <div className={shared ? "mt-2" : ""}>
-                      <img
-                        src={m.image_signed_url!}
-                        alt=""
-                        className="max-w-full max-h-72 rounded-lg object-contain bg-black/5"
-                      />
-                    </div>
-                  ) : null}
-                  {!shared && m.body.trim() ? (
-                    <div className={showImage ? "mt-2 whitespace-pre-wrap" : ""}>{m.body}</div>
-                  ) : null}
-                  {!shared && !showImage && m.image_storage_path && !m.image_signed_url ? (
-                    <span className="text-xs opacity-80">Could not load image</span>
-                  ) : null}
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 mt-1 text-[10px] opacity-80",
-                      mine ? "text-primary-foreground/80" : "",
-                    )}
-                  >
-                    <span className="flex-1 min-w-0">
-                      {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-                    </span>
-                    {!mine ? (
-                      <button
-                        type="button"
-                        className={cn(
-                          "shrink-0 rounded-md p-2 -mr-1 min-h-11 min-w-11 inline-flex items-center justify-center hover:opacity-100 opacity-70 transition-opacity",
-                          likedByMe && "opacity-100",
-                        )}
-                        aria-label={likedByMe ? "Unlike message" : "Like message"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void toggleLike(m);
-                        }}
-                      >
-                        <Heart className={cn("h-3.5 w-3.5", likedByMe && "fill-current")} />
-                      </button>
-                    ) : null}
-                  </div>
-                  {likeCount > 0 ? (
-                    <div
-                      className={cn(
-                        "text-[10px] mt-0.5 flex items-center gap-0.5 opacity-80",
-                        mine ? "text-primary-foreground/80 justify-end" : "",
-                      )}
-                    >
-                      <Heart className="h-3 w-3 fill-current" aria-hidden />
-                      <span>{likeCount}</span>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })
+          <div className="flex min-w-0 flex-1 items-center gap-3 py-1">
+            <Skeleton className="h-9 w-9 rounded-full" />
+            <Skeleton className="h-5 w-32 rounded-md" />
+          </div>
         )}
-        <div ref={bottomRef} />
+      </header>
+
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+        aria-label="Message history"
+      >
+        {loading ? (
+          <div className="space-y-3" aria-busy="true">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start" : "justify-end")}>
+                <Skeleton className={cn("h-14 rounded-2xl", i % 2 === 0 ? "w-[70%]" : "w-[55%]")} />
+              </div>
+            ))}
+          </div>
+        ) : messages.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No messages yet. Say hello.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {messages.map((m) => {
+              const divider = dayDividerLabel(m.created_at);
+              const showDivider = divider && divider !== lastDivider;
+              if (showDivider) lastDivider = divider;
+              const mine = userId === m.sender_id;
+              return (
+                <div key={m.id}>
+                  {showDivider ? (
+                    <div className="my-3 flex justify-center">
+                      <span className="rounded-full bg-muted/80 px-3 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {divider}
+                      </span>
+                    </div>
+                  ) : null}
+                  <DmMessageBubble message={m} mine={mine} onToggleLike={(msg) => void toggleLike(msg)} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
       </div>
 
       <form
         onSubmit={handleSend}
-        className="sticky bottom-[var(--bottom-nav-height,0px)] pt-2 pb-[env(safe-area-inset-bottom)] bg-background border-t border-border/60 mt-auto space-y-2"
+        className="z-10 shrink-0 border-t border-border/60 bg-background px-2 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.35)] pb-[calc(max(0.35rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]"
       >
         <input
           ref={fileInputRef}
@@ -321,41 +401,55 @@ export default function CommunityThreadPage() {
             e.target.value = "";
           }}
         />
-        <div className="flex gap-2 items-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="shrink-0"
-            disabled={sending || !user}
-            aria-label="Attach photo"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <ImagePlus className="h-4 w-4" />
-          </Button>
-          <Textarea
-            rows={2}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Message…"
-            maxLength={8000}
-            disabled={sending || !user}
-            className="min-h-[2.75rem] flex-1"
-          />
-        </div>
         {previewUrl ? (
-          <div className="flex items-start gap-2">
-            <img src={previewUrl} alt="" className="max-h-28 rounded-lg border border-border object-contain" />
+          <div className="mb-2 flex items-start gap-2">
+            <img src={previewUrl} alt="" className="max-h-24 rounded-xl border border-border object-contain" />
             <Button type="button" variant="ghost" size="sm" onClick={() => setPendingImage(null)}>
               Remove
             </Button>
           </div>
         ) : null}
-        <Button type="submit" size="sm" disabled={sending || (!body.trim() && !pendingImage) || !user}>
-          <Send className="h-4 w-4 mr-1.5" />
-          Send
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
+            disabled={sending || !user}
+            aria-label="Attach photo"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <ImagePlus className="h-5 w-5" />
+          </Button>
+          <Textarea
+            ref={composerRef}
+            rows={1}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Message…"
+            maxLength={8000}
+            disabled={sending || !user}
+            className="min-h-10 max-h-28 flex-1 resize-none rounded-2xl border-border/60 bg-muted/40 px-3 py-2 text-[16px] leading-snug"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!sending && (body.trim() || pendingImage) && user) {
+                  void handleSend(e as unknown as React.FormEvent);
+                }
+              }
+            }}
+          />
+          <Button
+            type="submit"
+            size="icon"
+            className="h-10 w-10 shrink-0 rounded-full"
+            disabled={sending || (!body.trim() && !pendingImage) || !user}
+            aria-label="Send message"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </form>
-    </PageShell>
+    </div>
   );
 }

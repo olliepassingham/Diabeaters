@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Calculator, ChevronDown, Dumbbell, X } from "lucide-react";
+import { Calculator, ChevronDown, Dumbbell, Minus, TrendingDown, TrendingUp, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,26 @@ import {
   type ExerciseType,
 } from "@/lib/storage";
 import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 type FoodMode = "known" | "suggest";
+
+const BG_TREND_BUTTONS: {
+  value: ExerciseBgTrend | "";
+  shortLabel: string;
+  ariaLabel: string;
+  testId: string;
+  icon?: "none" | "up" | "down";
+}[] = [
+  { value: "", shortLabel: "—", ariaLabel: "Trend not set", testId: "efc-trend-none" },
+  { value: "flat", shortLabel: "Flat", ariaLabel: "Flat trend", testId: "efc-trend-flat" },
+  { value: "rising", shortLabel: "Up", ariaLabel: "Rising trend", testId: "efc-trend-rising", icon: "up" },
+  { value: "falling", shortLabel: "Down", ariaLabel: "Falling trend", testId: "efc-trend-falling", icon: "down" },
+];
+
+/** Shared pill grid so timing/trend controls fit one row on narrow phones. */
+const EFC_PILL_GRID =
+  "grid w-full gap-1 [&_button]:h-9 [&_button]:min-w-0 [&_button]:px-1 [&_button]:text-[11px] sm:[&_button]:px-2 sm:[&_button]:text-xs";
 
 /**
  * Pre-exercise fuel & insulin calculator (meal-tool style).
@@ -54,7 +72,8 @@ export function ExerciseFuelCalculator() {
   const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [isPump, setIsPump] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(true);
+  const resultRef = useRef<HTMLDivElement>(null);
   const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
 
   useEffect(() => {
@@ -100,33 +119,38 @@ export function ExerciseFuelCalculator() {
     const lastMins = lastMealMins.trim() ? parseInt(lastMealMins, 10) : undefined;
     const lastCarbs = lastMealCarbs.trim() ? parseInt(lastMealCarbs, 10) : undefined;
 
-    setResult(
-      computeExerciseFuelPlan({
-        exerciseType,
-        intensity,
-        durationMinutes,
-        minutesUntilStart,
-        fasted,
-        bgUnits,
-        settings,
-        isPump,
-        mealCarbsGrams: mealCarbsGrams != null && Number.isFinite(mealCarbsGrams) ? mealCarbsGrams : undefined,
-        mealType,
-        currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
-        bgTrend: bgTrend || null,
-        rapidInsulinLast2h: rapidInsulin2h,
-        lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
-        lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
-      }),
-    );
+    const next = computeExerciseFuelPlan({
+      exerciseType,
+      intensity,
+      durationMinutes,
+      minutesUntilStart,
+      fasted,
+      bgUnits,
+      settings,
+      isPump,
+      mealCarbsGrams: mealCarbsGrams != null && Number.isFinite(mealCarbsGrams) ? mealCarbsGrams : undefined,
+      mealType,
+      currentBg: Number.isFinite(bgParsed) ? bgParsed : undefined,
+      bgTrend: bgTrend || null,
+      rapidInsulinLast2h: rapidInsulin2h,
+      lastMealMinutesAgo: Number.isFinite(lastMins) ? lastMins : undefined,
+      lastMealCarbsGrams: Number.isFinite(lastCarbs) ? lastCarbs : undefined,
+    });
+    setResult(next);
+    setFormOpen(false);
+    window.requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
-  const collapsedSummary =
-    result && !formOpen
-      ? `${result.mealCarbsIsSuggested ? "~" : ""}${result.mealCarbs}g carbs${
-          result.insulin ? ` · ${result.insulin.adjustedUnits}u insulin` : ""
-        }`
-      : null;
+  const collapsedSummary = useMemo(() => {
+    if (!result || formOpen) return null;
+    const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === exerciseType)?.label ?? exerciseType;
+    const intensityLabel = EXERCISE_INTENSITY_OPTIONS.find((o) => o.value === intensity)?.label ?? intensity;
+    const start =
+      minutesUntilStart <= 0 ? "now" : minutesUntilStart === 60 ? "~1h" : `${minutesUntilStart}m`;
+    return `${intensityLabel} ${typeLabel} · ${duration} min · ${start} — tap to edit`;
+  }, [result, formOpen, exerciseType, intensity, duration, minutesUntilStart]);
 
   return (
     <div className="space-y-4">
@@ -200,16 +224,16 @@ export function ExerciseFuelCalculator() {
                   data-testid="efc-duration"
                 />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Starting in</Label>
-                <div className="flex flex-wrap gap-1.5">
+                <div className={cn(EFC_PILL_GRID, "grid-cols-5")} role="group" aria-label="Minutes until exercise starts">
                   {EXERCISE_START_IN_OPTIONS.map((m) => (
                     <Button
                       key={m}
                       type="button"
                       size="sm"
                       variant={minutesUntilStart === m ? "default" : "outline"}
-                      className="h-8 px-2.5 text-xs"
+                      className="w-full tabular-nums"
                       onClick={() => setMinutesUntilStart(m)}
                       data-testid={`efc-start-${m}`}
                     >
@@ -220,40 +244,50 @@ export function ExerciseFuelCalculator() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5 sm:col-span-1">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="efc-bg">BG now ({bgUnits})</Label>
                 <Input
                   id="efc-bg"
                   inputMode="decimal"
-                  placeholder={bgUnits === "mmol/L" ? "optional" : "optional"}
+                  placeholder="optional"
                   value={currentBg}
                   onChange={(e) => setCurrentBg(e.target.value)}
                   data-testid="efc-bg"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>Trend</Label>
-                <Select
-                  value={bgTrend || "none"}
-                  onValueChange={(v) => setBgTrend(v === "none" ? "" : (v as ExerciseBgTrend))}
-                >
-                  <SelectTrigger data-testid="efc-trend">
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Not set</SelectItem>
-                    <SelectItem value="flat">Flat</SelectItem>
-                    <SelectItem value="rising">Rising</SelectItem>
-                    <SelectItem value="falling">Falling</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-end pb-1">
+              <div className="flex items-end pb-0.5">
                 <label className="flex items-center gap-2 text-sm">
                   <Switch checked={rapidInsulin2h} onCheckedChange={setRapidInsulin2h} data-testid="efc-rapid-insulin" />
                   Insulin in last 2h
                 </label>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Trend</Label>
+              <div className={cn(EFC_PILL_GRID, "grid-cols-4")} role="group" aria-label="Blood glucose trend">
+                {BG_TREND_BUTTONS.map((opt) => (
+                  <Button
+                    key={opt.testId}
+                    type="button"
+                    size="sm"
+                    variant={bgTrend === opt.value ? "default" : "outline"}
+                    className="w-full flex flex-col items-center justify-center gap-0.5 leading-none"
+                    onClick={() => setBgTrend(opt.value)}
+                    data-testid={opt.testId}
+                    aria-label={opt.ariaLabel}
+                    aria-pressed={bgTrend === opt.value}
+                  >
+                    {opt.value === "" ? (
+                      <Minus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    ) : opt.icon === "up" ? (
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    ) : opt.icon === "down" ? (
+                      <TrendingDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    ) : null}
+                    <span>{opt.shortLabel}</span>
+                  </Button>
+                ))}
               </div>
             </div>
 
@@ -379,7 +413,11 @@ export function ExerciseFuelCalculator() {
       </Card>
 
       {result && !hasActiveExercise ? (
-        <Card className="border-primary/25 bg-primary/5 shadow-sm" data-testid="efc-result">
+        <Card
+          ref={resultRef}
+          className="border-primary/25 bg-primary/5 shadow-sm scroll-mt-4"
+          data-testid="efc-result"
+        >
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-2">
               <CardTitle className="text-lg">Your plan</CardTitle>
@@ -388,7 +426,10 @@ export function ExerciseFuelCalculator() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 shrink-0"
-                onClick={() => setResult(null)}
+                onClick={() => {
+                  setResult(null);
+                  setFormOpen(true);
+                }}
                 aria-label="Clear result"
                 data-testid="efc-clear"
               >
@@ -398,7 +439,7 @@ export function ExerciseFuelCalculator() {
             <CardDescription>Target BG {result.targetBg} · educational only</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-base font-medium leading-snug text-foreground">{result.headline}</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{result.headline}</p>
 
             <div className="grid gap-2 sm:grid-cols-2 text-sm">
               <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
@@ -450,14 +491,22 @@ export function ExerciseFuelCalculator() {
             ) : null}
 
             {result.notes.length > 0 ? (
-              <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-4">
-                {result.notes.map((n, i) => (
-                  <li key={i}>{n}</li>
-                ))}
-              </ul>
+              <Collapsible>
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-left text-sm font-medium text-foreground">
+                  <span>Session notes ({result.notes.length})</span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ul className="mt-2 list-disc space-y-1.5 pl-4 text-sm text-muted-foreground">
+                    {result.notes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </CollapsibleContent>
+              </Collapsible>
             ) : null}
 
-            <MedicalNumericOutputDisclaimer compact />
+            <MedicalNumericOutputDisclaimer collapsible />
             <MedicalSourcesLink section="exercise" />
 
             <Button variant="outline" size="sm" className="w-full" asChild>

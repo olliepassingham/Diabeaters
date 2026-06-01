@@ -1,3 +1,8 @@
+import {
+  EXERCISE_INTENSITY_OPTIONS,
+  EXERCISE_MEAL_TYPE_OPTIONS,
+  EXERCISE_TYPE_OPTIONS,
+} from "@/lib/exercise-catalog";
 import { calculateExercisePlan, type ExercisePlanContext } from "@/lib/exercise-plan";
 import {
   getExerciseMealBolusPreview,
@@ -89,12 +94,45 @@ function buildPlanContext(input: ExerciseFuelCalculatorInput): ExercisePlanConte
   return ctx;
 }
 
+function activityLabel(type: ExerciseType): string {
+  return EXERCISE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type.replace(/_/g, " ");
+}
+
+function intensityLabel(intensity: ExerciseIntensity): string {
+  return EXERCISE_INTENSITY_OPTIONS.find((o) => o.value === intensity)?.label ?? intensity;
+}
+
+function mealTypeLabel(mealType: string): string {
+  return EXERCISE_MEAL_TYPE_OPTIONS.find((o) => o.value === mealType)?.label.toLowerCase() ?? mealType;
+}
+
+function startLabel(minutesUntilStart: number): string {
+  if (minutesUntilStart <= 0) return "starting now";
+  if (minutesUntilStart === 60) return "starts in about an hour";
+  if (minutesUntilStart < 60) return `starts in about ${minutesUntilStart} minutes`;
+  const hours = Math.round(minutesUntilStart / 60);
+  return `starts in about ${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
+/** Plain-language session line for the plan card (no dose maths). */
 function sessionLabel(input: ExerciseFuelCalculatorInput): string {
-  const start =
-    input.minutesUntilStart <= 0
-      ? "starting now"
-      : `starting in ~${input.minutesUntilStart} min`;
-  return `${input.durationMinutes} min ${input.intensity} ${input.exerciseType.replace(/_/g, " ")} · ${start}`;
+  return `${intensityLabel(input.intensity)} ${activityLabel(input.exerciseType)} · ${input.durationMinutes} min · ${startLabel(input.minutesUntilStart)}`;
+}
+
+function buildHeadline(
+  input: ExerciseFuelCalculatorInput,
+  mealCarbs: number,
+  mealCarbsIsSuggested: boolean,
+  onHandCarbs: number,
+): string {
+  const session = sessionLabel(input);
+  if (mealCarbs > 0) {
+    if (mealCarbsIsSuggested) {
+      return `${session}. Plan about ${mealCarbs}g carbs before you exercise.`;
+    }
+    return `${session}. ${mealCarbs}g ${mealTypeLabel(input.mealType)} before you start.`;
+  }
+  return `${session}. Keep about ${onHandCarbs}g fast carbs within reach.`;
 }
 
 function pickNotes(
@@ -144,7 +182,6 @@ function pickNotes(
  */
 export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): ExerciseFuelCalculatorResult {
   const plan = calculateExercisePlan(buildPlanContext(input));
-  const session = sessionLabel(input);
 
   const userMealCarbs = input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? input.mealCarbsGrams : 0;
   const mealCarbsIsSuggested = userMealCarbs <= 0;
@@ -184,18 +221,7 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     }
   }
 
-  let headline: string;
-  if (insulin) {
-    headline = mealCarbsIsSuggested
-      ? `For ${session}: about ${mealCarbs}g carbs before exercise → ~${insulin.adjustedUnits}u insulin (−${insulin.reductionPercent}% vs ~${insulin.standardUnits}u usual).`
-      : `For ${session}: your ${mealCarbs}g ${input.mealType} → ~${insulin.adjustedUnits}u insulin (−${insulin.reductionPercent}% vs ~${insulin.standardUnits}u usual).`;
-  } else if (mealCarbs > 0 && insulinNoRatios) {
-    headline = `For ${session}: ~${mealCarbs}g before exercise. Add meal ratios in Settings for a unit estimate (many plans use ~${plan.pre.bolusReduction} less insulin).`;
-  } else if (mealCarbs > 0) {
-    headline = `For ${session}: plan about ${mealCarbs}g carbs before you start.`;
-  } else {
-    headline = `For ${session}: keep ~${onHandCarbs}g fast carbs within reach.`;
-  }
+  const headline = buildHeadline(input, mealCarbs, mealCarbsIsSuggested, onHandCarbs);
 
   return {
     headline,

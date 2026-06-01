@@ -81,6 +81,7 @@ import { ensureNativeNotificationChannels } from "@/lib/native-local-notificatio
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 import type { ActiveExerciseSession } from "@/lib/storage";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import NotFound from "@/pages/not-found";
@@ -1062,6 +1063,7 @@ function AuthenticatedShell() {
   const { toast } = useToast();
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const pathOnly = location.split("?")[0] ?? location;
+  const isDmThreadView = /^\/community\/messages\/[^/]+$/.test(pathOnly);
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
@@ -1240,9 +1242,10 @@ function AuthenticatedShell() {
         />
       ) : (
     <div
-      className={`relative flex w-full min-w-0 flex-col bg-background text-foreground ${
-        lockShellHeightForExercise ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen"
-      }`}
+      className={cn(
+        "relative flex w-full min-w-0 flex-col bg-background text-foreground",
+        lockShellHeightForExercise || isDmThreadView ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen",
+      )}
     >
       <NativePushForegroundSync />
       <ClinicalPrefsCloudSync />
@@ -1259,14 +1262,16 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
-      <OfflineBanner />
-      <AppTopBar
-        isCarer={isCarerMode}
-        pathOnly={location.split("?")[0] ?? location}
-        onBrandClick={goBrandHome}
-        onLogout={handleLogout}
-      />
-      {!suppressClinicalPollers && iosNotifPrompt.show ? (
+      {!isDmThreadView ? <OfflineBanner /> : null}
+      {!isDmThreadView ? (
+        <AppTopBar
+          isCarer={isCarerMode}
+          pathOnly={location.split("?")[0] ?? location}
+          onBrandClick={goBrandHome}
+          onLogout={handleLogout}
+        />
+      ) : null}
+      {!suppressClinicalPollers && !isDmThreadView && iosNotifPrompt.show ? (
         <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">
           <Alert className="border-border/60 bg-background/55 backdrop-blur">
             <AlertDescription className="text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1285,20 +1290,25 @@ function AuthenticatedShell() {
           </Alert>
         </div>
       ) : null}
-      {!suppressClinicalPollers ? <AppStatusStrip /> : null}
+      {!suppressClinicalPollers && !isDmThreadView ? <AppStatusStrip /> : null}
       <main
         id="app-scroll-main"
-        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className={cn(
+          "relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+          isDmThreadView
+            ? "flex flex-col overflow-hidden p-0 md:p-0"
+            : "overflow-y-auto p-4 md:p-6",
+        )}
         style={{
-          paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
-          scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
+          paddingBottom: isDmThreadView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
+          scrollPaddingBottom: isDmThreadView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
         <AnimatedRouteOutlet>
           <InnerRouter />
         </AnimatedRouteOutlet>
       </main>
-      <BottomNav />
+      {!isDmThreadView ? <BottomNav /> : null}
     </div>
       )}
     </AskAnythingProvider>

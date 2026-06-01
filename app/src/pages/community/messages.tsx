@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { BellOff, ChevronRight, EyeOff, MessageCircle, MoreHorizontal, Pin, Search } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +30,7 @@ import {
   normalizePublicHandleInput,
   searchProfilesByHandlePrefix,
 } from "@/lib/profile";
+import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
 
@@ -198,6 +198,19 @@ async function fetchDmInboxThreadDetails(
   };
 }
 
+type DmInboxPayload = {
+  threads: ThreadWithMembers[];
+} & DmInboxDetails;
+
+function prefetchDmThreadRoute(queryClient: QueryClient, threadId: string, viewerId: string) {
+  void import("@/pages/community/thread");
+  void queryClient.prefetchQuery({
+    queryKey: dmThreadQueryKey(threadId, viewerId),
+    queryFn: () => fetchDmThreadBundle(threadId, viewerId),
+    staleTime: 20_000,
+  });
+}
+
 export default function CommunityMessagesPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -205,46 +218,43 @@ export default function CommunityMessagesPage() {
   const queryClient = useQueryClient();
   const userId = user?.id ?? "";
 
-  const threadsQuery = useQuery({
-    queryKey: [...DM_INBOX_QK, "threads", userId],
-    queryFn: async () => {
+  const inboxQuery = useQuery({
+    queryKey: [...DM_INBOX_QK, userId],
+    queryFn: async (): Promise<DmInboxPayload> => {
       const res = await fetchDmThreadsForCurrentUser();
       if (res.error) throw new Error(res.error.message);
-      return res.data ?? [];
+      const threads = res.data ?? [];
+      if (threads.length === 0) {
+        return {
+          threads: [],
+          lastByThreadId: {},
+          labels: {},
+          avatarByUserId: {},
+          handleByUserId: {},
+          serverMutedByThreadId: {},
+          serverHiddenByThreadId: {},
+        };
+      }
+      const details = await fetchDmInboxThreadDetails(threads, userId, (msg) => {
+        toast({ title: "Could not load last messages", description: msg, variant: "destructive" });
+      });
+      return { threads, ...details };
     },
     enabled: Boolean(userId && isSupabaseConfigured()),
-    staleTime: 30_000,
+    staleTime: 45_000,
     gcTime: 10 * 60_000,
   });
 
-  const threadIdsSig = useMemo(() => {
-    const t = threadsQuery.data ?? [];
-    return t.map((x) => x.id).sort().join("|");
-  }, [threadsQuery.data]);
+  const threads = inboxQuery.data?.threads ?? [];
+  const lastByThreadId = inboxQuery.data?.lastByThreadId ?? {};
+  const labels = inboxQuery.data?.labels ?? {};
+  const avatarByUserId = inboxQuery.data?.avatarByUserId ?? {};
+  const handleByUserId = inboxQuery.data?.handleByUserId ?? {};
+  const serverMutedByThreadId = inboxQuery.data?.serverMutedByThreadId ?? {};
+  const serverHiddenByThreadId = inboxQuery.data?.serverHiddenByThreadId ?? {};
 
-  const detailsQuery = useQuery({
-    queryKey: [...DM_INBOX_QK, "details", userId, threadIdsSig],
-    queryFn: () =>
-      fetchDmInboxThreadDetails(threadsQuery.data ?? [], userId, (msg) => {
-        toast({ title: "Could not load last messages", description: msg, variant: "destructive" });
-      }),
-    enabled: Boolean(userId && threadIdsSig.length > 0 && isSupabaseConfigured()),
-    staleTime: 30_000,
-    gcTime: 10 * 60_000,
-  });
-
-  const threads = threadsQuery.data ?? [];
-  const lastByThreadId = detailsQuery.data?.lastByThreadId ?? {};
-  const labels = detailsQuery.data?.labels ?? {};
-  const avatarByUserId = detailsQuery.data?.avatarByUserId ?? {};
-  const handleByUserId = detailsQuery.data?.handleByUserId ?? {};
-  const serverMutedByThreadId = detailsQuery.data?.serverMutedByThreadId ?? {};
-  const serverHiddenByThreadId = detailsQuery.data?.serverHiddenByThreadId ?? {};
-
-  const loading = threadsQuery.isPending && threadsQuery.data === undefined;
-  const threadDetailsLoading = Boolean(
-    (threadsQuery.data?.length ?? 0) > 0 && (detailsQuery.isPending || detailsQuery.isFetching),
-  );
+  const loading = inboxQuery.isPending && inboxQuery.data === undefined;
+  const inboxRefreshing = inboxQuery.isFetching && !loading;
 
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
@@ -252,13 +262,13 @@ export default function CommunityMessagesPage() {
   }, [queryClient]);
 
   useEffect(() => {
-    if (!threadsQuery.error) return;
+    if (!inboxQuery.error) return;
     toast({
       title: "Could not load messages",
-      description: threadsQuery.error.message,
+      description: inboxQuery.error.message,
       variant: "destructive",
     });
-  }, [threadsQuery.error, toast]);
+  }, [inboxQuery.error, toast]);
 
   useEffect(() => {
     const onInbox = () => void queryClient.invalidateQueries({ queryKey: [...DM_INBOX_QK] });
@@ -719,7 +729,13 @@ export default function CommunityMessagesPage() {
           </Button>
         </EmptyState>
       ) : (
-        <ul className="space-y-2.5">
+        <>
+          {inboxRefreshing ? (
+            <p className="text-center text-[11px] text-muted-foreground" aria-live="polite">
+              Updating…
+            </p>
+          ) : null}
+        <ul className="space-y-2">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -735,14 +751,19 @@ export default function CommunityMessagesPage() {
 
             return (
               <li key={t.id}>
-                <Link href={`/community/messages/${t.id}`} className="block">
-                  <Card
+                <Link
+                  href={`/community/messages/${t.id}`}
+                  className="block"
+                  onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
+                  onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
+                >
+                  <div
                     className={cn(
-                      "pressable card-interactive rounded-2xl border-border/60 shadow-sm transition-colors",
-                      "hover:border-primary/25 hover:bg-muted/25 dark:hover:bg-muted/15",
+                      "pressable flex items-center gap-3 rounded-2xl border border-border/50 bg-card/80 px-3 py-3.5 transition-colors",
+                      "hover:border-primary/30 hover:bg-muted/30 active:bg-muted/40",
+                      isUnread && "border-primary/25 bg-primary/[0.04]",
                     )}
                   >
-                    <CardContent className="flex items-center gap-3 py-3.5 pl-3 pr-2 sm:pl-4">
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}
@@ -762,12 +783,8 @@ export default function CommunityMessagesPage() {
                             <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-primary align-middle" aria-label="Unread" />
                           ) : null}
                         </p>
-                        <p className={`text-sm truncate ${isUnread ? "text-foreground" : "text-muted-foreground"}`}>
-                          {threadDetailsLoading ? (
-                            <Skeleton className="mt-0.5 h-4 w-[min(14rem,72%)] rounded-md" aria-hidden />
-                          ) : (
-                            preview
-                          )}
+                        <p className={`text-sm truncate ${isUnread ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+                          {preview}
                         </p>
                       </div>
                       <DropdownMenu>
@@ -836,13 +853,13 @@ export default function CommunityMessagesPage() {
                         </time>
                       ) : null}
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </CardContent>
-                  </Card>
+                  </div>
                 </Link>
               </li>
             );
           })}
         </ul>
+        </>
       )}
     </PageShell>
   );

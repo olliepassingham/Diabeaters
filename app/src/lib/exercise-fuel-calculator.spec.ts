@@ -27,6 +27,8 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.insulin!.adjustedUnits).toBeGreaterThan(0);
     expect(r.insulin!.reductionPercent).toBeGreaterThan(0);
     expect(r.headline).toContain("50g");
+    expect(r.headline).not.toContain("→");
+    expect(r.headline).not.toContain("usual");
   });
 
   it("suggests meal carbs when none entered", () => {
