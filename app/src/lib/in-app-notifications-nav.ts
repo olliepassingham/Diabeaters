@@ -19,7 +19,12 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   if (kind === "supplies_low") return "/supplies";
   if (kind === "hypo_logged_self") return "/tools/hypo-history";
   if (kind === "hypo_logged" || kind === "scenario_started") return "/carer-view";
-  if (kind === "feed_post_like" || kind === "feed_post_comment" || kind === "feed_post_mention") {
+  if (
+    kind === "feed_post_like" ||
+    kind === "feed_post_comment" ||
+    kind === "feed_post_mention" ||
+    kind === "feed_comment_mention"
+  ) {
     const postId = typeof data.post_id === "string" ? data.post_id : "";
     return postId ? `/community/post/${postId}` : "/community";
   }

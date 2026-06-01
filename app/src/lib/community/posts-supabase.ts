@@ -18,6 +18,7 @@ import {
   parsePostExtra,
   type CommunityPostKind,
 } from "./post-kinds";
+import { buildMentionsForPost } from "./post-mentions";
 import type { CommunityPostAuthorPreview, CommunityPostCommentRow, CommunityPostRow } from "./types";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -57,11 +58,15 @@ function wrapFeedRpcError(err: { message: string }): Error {
   if (
     msg.includes("post_kind") ||
     msg.includes("post_extra") ||
-    msg.includes("mention_map") ||
     msg.includes("community_poll_votes")
   ) {
     return new Error(
       `${msg} Apply migration 20260412120000_community_posts_poll_event_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
+  if (msg.includes("mention_map") || msg.includes("mentioned_user_ids")) {
+    return new Error(
+      `${msg} Apply migrations 20260412120000_community_posts_poll_event_mentions.sql and 20260601120000_community_comment_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
     );
   }
   return new Error(msg);
@@ -305,6 +310,8 @@ function mapComment(r: Record<string, unknown>): CommunityPostCommentRow {
     post_id: String(r.post_id),
     author_id: String(r.author_id),
     body: String(r.body ?? ""),
+    mention_map: parseMentionMap(r.mention_map),
+    mentioned_user_ids: parseMentionedUserIds(r.mentioned_user_ids),
     is_reported: Boolean(r.is_reported),
     created_at: String(r.created_at ?? ""),
   };
@@ -875,13 +882,23 @@ export async function insertCommunityComment(postId: string, body: string): Prom
   const trimmed = body.trim();
   if (!trimmed) return { data: null, error: new Error("Comment cannot be empty") };
 
+  const mentions = await buildMentionsForPost(trimmed, uid);
+  const mentioned_user_ids = [...new Set(mentions.userIds.filter((x) => x && x !== uid))].slice(0, 12);
+  const mention_map = { ...mentions.mentionMap };
+
   const { data, error } = await supabase
     .from("community_post_comments")
-    .insert({ post_id: postId, author_id: uid, body: trimmed })
+    .insert({
+      post_id: postId,
+      author_id: uid,
+      body: trimmed,
+      mention_map,
+      mentioned_user_ids,
+    })
     .select("*")
     .single();
 
-  if (error) return { data: null, error: new Error(error.message) };
+  if (error) return { data: null, error: wrapFeedRpcError(error) };
   if (!data) return { data: null, error: new Error("No row returned") };
   const out = mapComment(data as Record<string, unknown>);
 
@@ -890,6 +907,16 @@ export async function insertCommunityComment(postId: string, body: string): Prom
     .then(({ error: fnErr }) => {
       if (fnErr) logEdgeInvokeFailure("notify_feed_push comment", fnErr.message);
     });
+
+  for (const mentionId of mentioned_user_ids) {
+    void supabase.functions
+      .invoke("notify_feed_push", {
+        body: { kind: "feed_comment_mention", post_id: postId, comment_id: out.id, mentioned_user_id: mentionId },
+      })
+      .then(({ error: fnErr }) => {
+        if (fnErr) logEdgeInvokeFailure("notify_feed_push comment mention", fnErr.message);
+      });
+  }
 
   return { data: out, error: null };
 }

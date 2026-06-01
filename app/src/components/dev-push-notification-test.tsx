@@ -4,13 +4,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isPushTestUiEnabled } from "@/lib/flags";
-import { isIosDeviceForCapacitorPush, isIosShellForPushTestUi } from "@/lib/ios-user-agent";
+import { isNativePushPlatform, isNativeShellForPushTestUi, nativePlatformLabel } from "@/lib/native-platform";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
 import { getPushRegistrationDebugSnapshot } from "@/lib/push-tokens";
 
 function noPushTokenHint(): string {
-  return "No row in push_tokens for this user. On this iPhone: turn on Enable notifications + Push (iOS) in app settings, allow Diabeaters in iOS Settings → Notifications, then leave and reopen the app. If it persists, check Supabase → push_tokens for your user_id.";
+  return "No row in push_tokens for this user. On this device: turn on Enable notifications + Push in app settings, allow Diabeaters in system notification settings, then leave and reopen the app. If it persists, check Supabase → push_tokens for your user_id.";
 }
 
 function deliveryFailureHint(r: {
@@ -58,11 +58,11 @@ export function DevPushNotificationTestPanel() {
     setUnlocked(isPushTestUiUnlocked());
   }, [location]);
 
-  const iosShell = isIosShellForPushTestUi();
-  const showPanel = isPushTestUiEnabled || (unlocked && iosShell);
+  const nativeShell = isNativeShellForPushTestUi();
+  const showPanel = isPushTestUiEnabled || (unlocked && nativeShell);
 
   useEffect(() => {
-    if (!showPanel || !isIosDeviceForCapacitorPush()) return;
+    if (!showPanel || !isNativePushPlatform()) return;
     const tick = async () => {
       try {
         const snap = await getPushRegistrationDebugSnapshot();
@@ -78,16 +78,16 @@ export function DevPushNotificationTestPanel() {
 
   if (!showPanel) return null;
 
-  if (!iosShell) {
+  if (!nativeShell) {
     return (
       <div className="mt-6 rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
         <p className="text-xs text-muted-foreground leading-snug">
-          <strong className="text-foreground/90">Test push only runs on the native iOS app.</strong> In Safari or
-          Chrome (Vite dev), the app never registers with APNs, so Supabase has no{" "}
+          <strong className="text-foreground/90">Test push only runs on the native app.</strong> In Safari or
+          Chrome (Vite dev), the app never registers with APNs/FCM, so Supabase has no{" "}
           <code className="text-[11px]">push_tokens</code> row — you will always see{" "}
-          <code className="text-[11px]">no_push_token</code>. Open Diabeaters from the home screen or TestFlight on
-          an iPhone, enable Push in Notifications settings, then use Send test push there.
+          <code className="text-[11px]">no_push_token</code>. Open Diabeaters from the home screen on
+          an iPhone or Android device, enable Push in Notifications settings, then use Send test push there.
         </p>
       </div>
     );
@@ -147,15 +147,15 @@ export function DevPushNotificationTestPanel() {
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
       {unlocked && !isPushTestUiEnabled ? (
         <p className="text-xs text-muted-foreground leading-snug">
-          Unlocked on this iPhone from <strong className="text-foreground/85">About</strong> (link “Enable push test
+          Unlocked on this {nativePlatformLabel().toLowerCase()} from <strong className="text-foreground/85">About</strong> (link “Enable push test
           tools…” or seven quick taps on the version). Stored only on this device.
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground leading-snug">
         Calls the <code className="text-[11px]">notify_push_test</code> Edge Function with your session. Requires
         <strong className="text-foreground/85"> Enable notifications</strong> and{" "}
-        <strong className="text-foreground/85">Push notifications (iOS)</strong> above, a row in{" "}
-        <code className="text-[11px]">push_tokens</code>, and APNs secrets on the project.
+        <strong className="text-foreground/85">Push notifications</strong> above, a row in{" "}
+        <code className="text-[11px]">push_tokens</code>, and APNs/FCM secrets on the project.
       </p>
       <div className="rounded-md border border-amber-700/30 bg-black/25 p-2 space-y-1">
         <div className="flex items-start justify-between gap-2">
@@ -175,7 +175,8 @@ export function DevPushNotificationTestPanel() {
         <p className="text-[10px] text-muted-foreground leading-snug">
           macOS <strong className="text-foreground/80">Console</strong> usually does not show JavaScript logs from the
           app WebView. Use this JSON instead (updates every 2s). Ensure Supabase migrations{" "}
-          <code className="text-[10px]">register_ios_push_token</code> + grants are applied.
+          <code className="text-[10px]">register_ios_push_token</code> /{" "}
+          <code className="text-[10px]">register_android_push_token</code> + grants are applied.
         </p>
         <pre
           className="text-[10px] leading-tight text-foreground/90 font-mono whitespace-pre-wrap break-all max-h-36 overflow-y-auto select-text"

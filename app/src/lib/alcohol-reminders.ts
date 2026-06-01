@@ -1,13 +1,18 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
+import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type AlcoholReminder, type AlcoholReminderKind, type AlcoholSession } from "@/lib/storage";
 
 function notificationId(sessionId: string, kind: AlcoholReminderKind): number {
-  // Stable-ish numeric id for Capacitor local notifications.
   const hex = (sessionId + kind).replace(/-/g, "").slice(0, 8);
   const n = Number.parseInt(hex, 16);
   return Number.isFinite(n) ? (n % 2_000_000_000) : Math.floor(Math.random() * 1_000_000_000);
+}
+
+function androidChannel(): { channelId?: string } {
+  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_scenarios" } : {};
 }
 
 function buildNotificationBody(kind: AlcoholReminderKind): { title: string; body: string } {
@@ -38,7 +43,7 @@ function upcomingReminders(session: AlcoholSession, nowMs: number): AlcoholRemin
 }
 
 export async function cancelAlcoholReminders(sessionId: string): Promise<void> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+  if (!supportsNativeLocalNotifications()) return;
   try {
     await LocalNotifications.cancel({
       notifications: [
@@ -53,18 +58,17 @@ export async function cancelAlcoholReminders(sessionId: string): Promise<void> {
 }
 
 export async function scheduleAlcoholReminders(session: AlcoholSession): Promise<void> {
+  if (!supportsNativeLocalNotifications()) return;
   const settings = storage.getNotificationSettings();
   if (!settings.enabled) return;
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
-  const perm = await LocalNotifications.requestPermissions();
-  if (perm.display !== "granted") return;
+  const ok = await ensureNativeLocalNotificationPermission();
+  if (!ok) return;
 
   const nowMs = Date.now();
   const upcoming = upcomingReminders(session, nowMs);
   if (upcoming.length === 0) return;
 
-  // Cancel previous schedule for this session and recreate.
   await cancelAlcoholReminders(session.id);
 
   const notifications = upcoming
@@ -79,6 +83,7 @@ export async function scheduleAlcoholReminders(session: AlcoholSession): Promise
         body: copy.body,
         schedule: { at },
         extra: { alcohol_session_id: session.id, kind: r.kind },
+        ...androidChannel(),
       };
     })
     .filter(Boolean) as Array<{
@@ -92,4 +97,3 @@ export async function scheduleAlcoholReminders(session: AlcoholSession): Promise
   if (notifications.length === 0) return;
   await LocalNotifications.schedule({ notifications });
 }
-

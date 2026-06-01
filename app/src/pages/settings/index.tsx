@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
-import { ensureIosPushRegistered, resetIosPushRegistrationState } from "@/lib/push-tokens";
+import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -1228,10 +1228,10 @@ export default function Settings() {
     void syncNotificationPreferences(updated);
     if (key === "pushNotifications") {
       if (!value) {
-        resetIosPushRegistrationState();
+        resetNativePushRegistrationState();
       } else {
-        resetIosPushRegistrationState();
-        void ensureIosPushRegistered();
+        resetNativePushRegistrationState();
+        void ensureNativePushRegistered();
       }
     }
   };

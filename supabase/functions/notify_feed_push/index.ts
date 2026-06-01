@@ -14,7 +14,7 @@
  * Push: APNs (APNS_*) or legacy PUSH_NOTIFICATION_API_URL — see ../_shared/deliver-ios-push.ts
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +25,7 @@ type Body =
   | { kind: "feed_post_like"; post_id: string }
   | { kind: "feed_post_comment"; post_id: string; comment_id: string }
   | { kind: "feed_post_mention"; post_id: string; mentioned_user_id: string }
+  | { kind: "feed_comment_mention"; post_id: string; comment_id: string; mentioned_user_id: string }
   | { kind: "new_follower"; followee_id: string };
 
 function isUuid(s: string): boolean {
@@ -88,7 +89,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!iosPushDeliveryConfigured()) {
+    if (!mobilePushDeliveryConfigured()) {
       return new Response(JSON.stringify({ success: true, delivered_push: 0, detail: "push_not_configured" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -187,6 +188,27 @@ Deno.serve(async (req: Request) => {
       bodyText = `${actor} mentioned you in a post.`;
       deepLink = `/community/post/${postId}`;
       payload = { kind: "feed_post_mention", post_id: postId, actor_user_id: callerId, deep_link: deepLink };
+    } else if (body.kind === "feed_comment_mention") {
+      const postId = body.post_id?.trim() ?? "";
+      const commentId = body.comment_id?.trim() ?? "";
+      const mentionedUserId = body.mentioned_user_id?.trim() ?? "";
+      if (!isUuid(postId) || !isUuid(commentId) || !isUuid(mentionedUserId) || mentionedUserId === callerId) {
+        return new Response(JSON.stringify({ success: false, error: "invalid_ids" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      recipientId = mentionedUserId;
+      title = "You were mentioned";
+      bodyText = `${actor} mentioned you in a comment.`;
+      deepLink = `/community/post/${postId}`;
+      payload = {
+        kind: "feed_comment_mention",
+        post_id: postId,
+        comment_id: commentId,
+        actor_user_id: callerId,
+        deep_link: deepLink,
+      };
     }
 
     if (!recipientId || !isUuid(recipientId)) {
@@ -211,15 +233,10 @@ Deno.serve(async (req: Request) => {
 
     const { data: tokenRows } = await admin
       .from("push_tokens")
-      .select("token")
+      .select("platform, token")
       .eq("user_id", recipientId)
-      .eq("platform", "ios");
-    const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
-    let delivered = 0;
-    for (const t of tokens) {
-      const r = await deliverIosPushToDevice(t, title, bodyText, payload);
-      if (r.success) delivered += 1;
-    }
+      .in("platform", ["ios", "android"]);
+    const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, payload);
 
     return new Response(
       JSON.stringify({ success: true, delivered_push: delivered, recipient: recipientId, deep_link: deepLink }),

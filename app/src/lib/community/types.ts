@@ -43,6 +43,8 @@ export type CommunityPostCommentRow = {
   post_id: string;
   author_id: string;
   body: string;
+  mention_map: Record<string, string>;
+  mentioned_user_ids: string[];
   is_reported: boolean;
   created_at: string;
 };

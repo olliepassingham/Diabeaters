@@ -42,13 +42,20 @@ import {
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
 import { syncSickDayDeactivatedToCloud } from "@/lib/scenarios-supabase";
 import { cancelSickDayMedReminder } from "@/lib/sick-day-med-reminders";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { EXERCISE_TYPE_OPTIONS } from "@/lib/exercise-catalog";
 import {
   formatLastExerciseSummaryLine,
   getPostExerciseEducationalCopy,
@@ -61,6 +68,16 @@ import { tripStyleLabel } from "@/lib/travel-active-guidance";
 function exercisePhaseLabel(phase: ExercisePhase): string {
   if (phase === "active") return "during";
   return phase;
+}
+
+function exerciseTypeDisplayLabel(type: string): string {
+  return EXERCISE_TYPE_OPTIONS.find((o) => o.value === type)?.label ?? type;
+}
+
+function exerciseExtraInfoDialogTitle(phase: ExercisePhase): string {
+  if (phase === "pre") return "Before you start — more detail";
+  if (phase === "active") return "During workout — more detail";
+  return "Recovery — more detail";
 }
 
 function lastInsulinFromStripAnswer(pre: ActiveExerciseSession["preRapidInsulin2h"]): LastInsulinTiming | undefined {
@@ -198,6 +215,7 @@ export function AppStatusStrip() {
   }, [postExerciseRev, ex]);
   const [postExerciseOpen, setPostExerciseOpen] = useState(false);
   const [exerciseExpanded, setExerciseExpanded] = useState(false);
+  const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
   const [exerciseBgInput, setExerciseBgInput] = useState<string>("");
   const [stripClock, setStripClock] = useState(() => Date.now());
   const lastExPhaseKey = useRef<string>("");
@@ -478,6 +496,43 @@ export function AppStatusStrip() {
     return getRecoveryInsulinHeadline(exercisePlan, Boolean(isPump), new Date().getHours() >= 17);
   }, [ex?.phase, exercisePlan, isPump]);
 
+  const recoveryMinutesLeft = useMemo(() => {
+    if (!ex?.recoveryEndsAt) return null;
+    const t = new Date(ex.recoveryEndsAt).getTime() - Date.now();
+    if (!Number.isFinite(t)) return null;
+    return Math.max(0, Math.round(t / 60_000));
+  }, [ex?.recoveryEndsAt, ex]);
+
+  const exerciseExtraInfoLines = useMemo(() => {
+    if (!ex || !exercisePlan) return [];
+    const lines: string[] = [];
+
+    if (ex.phase === "recovery") {
+      if (recoveryInsulinLine) lines.push(recoveryInsulinLine);
+      lines.push(
+        `Recovery window (~${exercisePlan.recovery.monitorHours}): delayed lows can still happen — keep snacks and your hypo plan close.`,
+      );
+      if (recoveryMinutesLeft != null) {
+        lines.push(`About ${recoveryMinutesLeft} minutes left in your recovery window.`);
+      }
+    }
+
+    if (ex.phase === "active") {
+      lines.push(
+        exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
+          ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
+          : "Fuel: keep fast carbs within reach.",
+      );
+      if (exercisePlan.during.checkBg) {
+        lines.push("Long session: one glucose check around halfway is plenty.");
+      }
+    }
+
+    if (preCarbHintLine) lines.push(preCarbHintLine);
+
+    return lines;
+  }, [ex, exercisePlan, preCarbHintLine, recoveryInsulinLine, recoveryMinutesLeft]);
+
   const exerciseHypoStrip = useMemo(() => {
     if (!ex) return null;
     const u = (bgUnits === "mmol/L" ? "mmol/L" : "mg/dL") as "mmol/L" | "mg/dL";
@@ -485,13 +540,6 @@ export function AppStatusStrip() {
     if (bg == null) return null;
     return computeExerciseHypoSuggestion(bg, storage.getSettings(), u, storage.getProfile() ?? {});
   }, [ex, exerciseBgInput, bgUnits]);
-
-  const recoveryMinutesLeft = useMemo(() => {
-    if (!ex?.recoveryEndsAt) return null;
-    const t = new Date(ex.recoveryEndsAt).getTime() - Date.now();
-    if (!Number.isFinite(t)) return null;
-    return Math.max(0, Math.round(t / 60_000));
-  }, [ex?.recoveryEndsAt, ex]);
 
   const onExerciseBgInputChange = (value: string) => {
     setExerciseBgInput(value);
@@ -742,10 +790,7 @@ export function AppStatusStrip() {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{ex.exerciseName}</p>
                   <p className="text-xs text-muted-foreground">
-                    {ex.durationMinutes} min · {ex.intensity} · {ex.exerciseType}
-                    {ex.phase === "recovery" && recoveryMinutesLeft != null
-                      ? ` · ~${recoveryMinutesLeft} min left in recovery window`
-                      : null}
+                    {ex.durationMinutes} min · {ex.intensity} · {exerciseTypeDisplayLabel(ex.exerciseType)}
                   </p>
                 </div>
                 {ex.phase === "pre" ? (
@@ -786,21 +831,6 @@ export function AppStatusStrip() {
                     {exercisePhaseTimerLabel}
                   </span>
                 ) : null}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label="About this quick check"
-                    >
-                      <Info className="h-4 w-4" aria-hidden />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-snug">
-                    Short summary only — always follow your care team for targets and doses. For meal timing, pump temp-basal
-                    ideas, and longer recovery text, open <span className="font-medium">Guides → Exercise</span>.
-                  </TooltipContent>
-                </Tooltip>
               </div>
 
               {ex.phase === "active" && ex.exerciseStartedAt ? (
@@ -940,56 +970,70 @@ export function AppStatusStrip() {
               ) : null}
 
               {ex.phase === "active" && exercisePlan && readiness?.verdict ? (
-                <div className="space-y-2 pt-1">
+                <div className="pt-1">
                   {(() => {
                     const v = readiness.verdict;
                     const isCaution = v.verdict === "caution";
                     const isHighCaution = isCaution && v.title.toLowerCase().includes("high");
                     const mergedCarbCaution = isCaution && !isHighCaution && duringCarbBallpark(exercisePlan.during);
-                    const showFuelLineAbove = !mergedCarbCaution;
                     return (
-                      <>
-                        <div className={cn("rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75", getReadinessToneClasses(v.verdict))}>
+                      <div
+                        className={cn(
+                          "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
+                          getReadinessToneClasses(v.verdict),
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
                           <p className="text-base font-semibold leading-tight text-foreground">{v.title}</p>
-                          <p className="text-sm leading-snug text-foreground/90">
-                            {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
-                          </p>
+                          {exerciseExtraInfoLines.length > 0 ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                              onClick={() => setExerciseDetailOpen(true)}
+                              aria-label="More exercise guidance"
+                              data-testid="status-exercise-more-info"
+                            >
+                              <Info className="h-4 w-4" aria-hidden />
+                            </Button>
+                          ) : null}
                         </div>
-
-                        {showFuelLineAbove ? (
-                          <p className="text-xs text-muted-foreground leading-snug">
-                            {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
-                              ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
-                              : "Fuel: keep fast carbs within reach."}
-                          </p>
-                        ) : null}
-                        {exercisePlan.during.checkBg ? (
-                          <p className="text-xs text-muted-foreground leading-snug">
-                            Long session: one glucose check around halfway is plenty.
-                          </p>
-                        ) : null}
-                      </>
+                        <p className="text-sm leading-snug text-foreground/90">
+                          {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
+                        </p>
+                      </div>
                     );
                   })()}
                 </div>
               ) : null}
 
               {ex.phase === "recovery" && exercisePlan && readiness?.verdict ? (
-                <div className="space-y-2 pt-1">
+                <div className="pt-1">
                   <div
                     className={cn(
                       "rounded-2xl border px-3 py-3 space-y-1.5 bg-background/75",
                       getReadinessToneClasses(readiness.verdict.verdict),
                     )}
                   >
-                    <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                      {exerciseExtraInfoLines.length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => setExerciseDetailOpen(true)}
+                          aria-label="More recovery guidance"
+                          data-testid="status-exercise-more-info"
+                        >
+                          <Info className="h-4 w-4" aria-hidden />
+                        </Button>
+                      ) : null}
+                    </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
                   </div>
-
-                  {recoveryInsulinLine ? <p className="text-xs text-muted-foreground leading-snug">{recoveryInsulinLine}</p> : null}
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Recovery window (~{exercisePlan.recovery.monitorHours}): delayed lows still happen — keep snacks and your hypo plan close.
-                  </p>
                 </div>
               ) : null}
 
@@ -1001,7 +1045,22 @@ export function AppStatusStrip() {
                       getReadinessToneClasses(readiness.verdict.verdict),
                     )}
                   >
-                    <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-base font-semibold leading-tight text-foreground">{readiness.verdict.title}</p>
+                      {exerciseExtraInfoLines.length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 -mr-1 -mt-0.5 text-muted-foreground hover:text-foreground"
+                          onClick={() => setExerciseDetailOpen(true)}
+                          aria-label="More pre-workout guidance"
+                          data-testid="status-exercise-more-info"
+                        >
+                          <Info className="h-4 w-4" aria-hidden />
+                        </Button>
+                      ) : null}
+                    </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
                     {(() => {
                       const needsCarbPrompt = !ex.preChecklist.carbsConsidered;
@@ -1023,15 +1082,37 @@ export function AppStatusStrip() {
                   </div>
                 </div>
               ) : null}
-
-              {preCarbHintLine && ex.phase !== "pre" ? (
-                <p className="text-sm text-foreground/90 leading-snug">{preCarbHintLine}</p>
-              ) : null}
-
-              {/* Info tooltip moved up next to the section label to save space. */}
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {ex && exerciseExpanded && !isExerciseScenarioPage ? (
+        <Dialog open={exerciseDetailOpen} onOpenChange={setExerciseDetailOpen}>
+          <DialogContent className="max-w-md" data-testid="dialog-exercise-extra-info">
+            <DialogHeader>
+              <DialogTitle>{exerciseExtraInfoDialogTitle(ex.phase)}</DialogTitle>
+              <DialogDescription>
+                Optional reading — your care team knows your targets and doses best.
+              </DialogDescription>
+            </DialogHeader>
+            <ul className="space-y-2 text-sm leading-snug text-foreground/90">
+              {exerciseExtraInfoLines.map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/70" aria-hidden />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground leading-snug pt-1">
+              For meal timing, pump temp-basal ideas, and longer recovery guidance, open{" "}
+              <Link href="/scenarios/exercise" className="font-medium text-foreground underline-offset-2 hover:underline">
+                Guides → Exercise
+              </Link>
+              .
+            </p>
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       {!ex && inPostExerciseWindow && showPostExerciseEducational ? (

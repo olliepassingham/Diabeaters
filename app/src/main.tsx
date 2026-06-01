@@ -11,11 +11,13 @@ import {
   getStoredThemeMode,
   migrateLegacyThemeModeKey,
 } from "@/hooks/useThemeMode";
-import { applyIosNativeDocumentClass } from "@/lib/native-chrome";
+import { applyNativeDocumentClass } from "@/lib/native-chrome";
+import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
 
 migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));
-applyIosNativeDocumentClass();
+applyNativeDocumentClass();
+void ensureNativeNotificationChannels();
 
 if (import.meta.env.DEV) {
   console.info(

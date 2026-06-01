@@ -1,6 +1,8 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
+import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type ActiveExerciseSession } from "@/lib/storage";
 
 export type ExerciseReminderKind =
@@ -47,20 +49,16 @@ function copyFor(kind: ExerciseReminderKind, exerciseName: string): { title: str
   };
 }
 
-async function ensureIosPerm(): Promise<boolean> {
-  try {
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return false;
-    const settings = storage.getNotificationSettings();
-    if (!settings.enabled) return false;
-    const perm = await LocalNotifications.requestPermissions();
-    return perm.display === "granted";
-  } catch {
-    return false;
-  }
+function exerciseAndroidChannel(): { channelId?: string } {
+  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_exercise" } : {};
+}
+
+async function ensureReminderPermission(): Promise<boolean> {
+  return ensureNativeLocalNotificationPermission();
 }
 
 export async function cancelExerciseReminders(sessionId: string): Promise<void> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+  if (!supportsNativeLocalNotifications()) return;
   try {
     await LocalNotifications.cancel({
       notifications: [
@@ -77,7 +75,7 @@ export async function cancelExerciseReminders(sessionId: string): Promise<void> 
 }
 
 export async function scheduleExercisePreReminders(session: ActiveExerciseSession, minutesUntilStart: number): Promise<void> {
-  const ok = await ensureIosPerm();
+  const ok = await ensureReminderPermission();
   if (!ok) return;
 
   const nowMs = Date.now();
@@ -94,6 +92,7 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
       body: c.body,
       schedule: { at: new Date(soonMs) },
       extra: { exercise_session_id: session.id, kind: "start_soon" },
+      ...exerciseAndroidChannel(),
     });
   }
 
@@ -105,6 +104,7 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
       body: c.body,
       schedule: { at: new Date(startMs) },
       extra: { exercise_session_id: session.id, kind: "start_now" },
+      ...exerciseAndroidChannel(),
     });
   }
 
@@ -118,7 +118,7 @@ export async function scheduleExercisePreReminders(session: ActiveExerciseSessio
 }
 
 export async function scheduleExerciseActiveReminders(session: ActiveExerciseSession): Promise<void> {
-  const ok = await ensureIosPerm();
+  const ok = await ensureReminderPermission();
   if (!ok) return;
   if (!session.exerciseStartedAt) return;
 
@@ -147,6 +147,7 @@ export async function scheduleExerciseActiveReminders(session: ActiveExerciseSes
         body: c.body,
         schedule: { at: new Date(x.atMs) },
         extra: { exercise_session_id: session.id, kind: x.kind },
+        ...exerciseAndroidChannel(),
       };
     });
 

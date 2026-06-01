@@ -386,6 +386,23 @@ To open external links in `SFSafariViewController`, add `@capacitor/browser` and
 
 The WebView content (loaded from Vercel) must not make medical claims. Avoid diagnosis, treatment, or cure language.
 
+## Android (Capacitor)
+
+The same Capacitor shell pattern is available for Google Play under `/android`.
+
+### Build and sync
+
+1. **Build web assets**: `npm run build`
+2. **Sync to native**:
+   ```bash
+   npm run android:release:sync
+   ```
+3. **Open Android Studio**: `npm run cap:android`
+
+### Push (FCM)
+
+Copy Firebase `google-services.json` to `android/app/google-services.json` (see `android/app/google-services.json.example`). Set Supabase secret `FCM_SERVICE_ACCOUNT_JSON` and run migration `20260529160000_push_tokens_android.sql`. Full steps: [`docs/android_build_checklist.md`](docs/android_build_checklist.md).
+
 ## iOS Build & App Store Submission
 
 After `npx cap open ios`:

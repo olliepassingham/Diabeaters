@@ -102,6 +102,9 @@ async function sendViaApns(
     aps: {
       alert: { title: opts.title, body: opts.body },
       sound: "default",
+      badge: 1,
+      // iOS 15+: ensure alerts are not treated as passive/summary-only (Notification Centre only).
+      "interruption-level": "active",
     },
     ...custom,
   };
@@ -126,6 +129,7 @@ async function sendViaApns(
       "apns-topic": bundleId,
       "apns-push-type": "alert",
       "apns-priority": "10",
+      "apns-interruption-level": "active",
       "content-type": "application/json",
     },
     body: JSON.stringify(payload),

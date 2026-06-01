@@ -48,6 +48,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { MentionTextarea } from "@/components/community/mention-textarea";
+import { renderBodyWithMentions } from "@/components/community/render-body-with-mentions";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
@@ -150,39 +152,6 @@ function FeedCommentPreviewButton({
       <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{body}</p>
     </button>
   );
-}
-
-function renderBodyWithMentions(body: string, mentionMap: Record<string, string>) {
-  const re = /@([a-z0-9_]{3,30})/gi;
-  const out: ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let key = 0;
-  while ((m = re.exec(body)) !== null) {
-    if (m.index > last) {
-      out.push(<Fragment key={`t-${key++}`}>{body.slice(last, m.index)}</Fragment>);
-    }
-    const rawHandle = m[1]!;
-    const uid = mentionMap[rawHandle.toLowerCase()];
-    if (uid) {
-      out.push(
-        <Link
-          key={`m-${key++}`}
-          href={`/community/profile/${uid}`}
-          className="font-medium text-primary underline-offset-2 hover:underline"
-        >
-          @{rawHandle}
-        </Link>,
-      );
-    } else {
-      out.push(<Fragment key={`h-${key++}`}>@{rawHandle}</Fragment>);
-    }
-    last = re.lastIndex;
-  }
-  if (last < body.length) {
-    out.push(<Fragment key={`t-${key++}`}>{body.slice(last)}</Fragment>);
-  }
-  return out;
 }
 
 function formatEventWhen(iso: string): string {
@@ -1110,7 +1079,9 @@ export function FeedPostCard({
                                 )}
                               </span>
                             </div>
-                            <p className="text-sm whitespace-pre-wrap">{c.body}</p>
+                            <p className="text-sm whitespace-pre-wrap">
+                              {renderBodyWithMentions(c.body, c.mention_map ?? {})}
+                            </p>
                           </div>
                         </li>
                       );
@@ -1118,18 +1089,21 @@ export function FeedPostCard({
                   </ul>
                 </>
               )}
-              <div className="flex gap-2">
-                <Textarea
-                  ref={(el) => {
-                    commentInputRef(el);
-                  }}
-                  rows={2}
-                  placeholder="Write a comment…"
-                  value={commentDraft}
-                  onChange={(e) => onCommentDraftChange(e.target.value)}
-                  maxLength={4000}
-                />
-                <Button type="button" size="sm" onClick={onSubmitComment}>
+              <div className="flex gap-2 items-end">
+                <div className="min-w-0 flex-1">
+                  <MentionTextarea
+                    textareaRef={commentInputRef}
+                    value={commentDraft}
+                    onChange={onCommentDraftChange}
+                    currentUserId={viewerId}
+                    rows={2}
+                    maxLength={4000}
+                    hideHint
+                    placeholder="Write a comment… Type @ to mention."
+                    className="min-h-[3.5rem]"
+                  />
+                </div>
+                <Button type="button" size="sm" className="shrink-0" onClick={onSubmitComment}>
                   Reply
                 </Button>
               </div>

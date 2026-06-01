@@ -3,7 +3,7 @@
  * Used by `notify_supply_low` (patient JWT) and `notify_supply_low_cron` (service role).
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "./deliver-ios-push.ts";
+import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "./deliver-push.ts";
 
 type SupabaseAdmin = ReturnType<typeof createClient>;
 
@@ -111,23 +111,16 @@ export async function deliverSupplyLowAlerts(
     }
 
     const shouldSendPush =
-      prefs.push && iosPushDeliveryConfigured() && (inappInsertedFresh || !prefs.inapp);
+      prefs.push && mobilePushDeliveryConfigured() && (inappInsertedFresh || !prefs.inapp);
 
     if (shouldSendPush) {
       const { data: tokenRows } = await admin
         .from("push_tokens")
-        .select("token")
+        .select("platform, token")
         .eq("user_id", rid)
-        .eq("platform", "ios");
-      const tokens = (tokenRows ?? []).map((t: Record<string, unknown>) => String(t.token)).filter(Boolean);
-      for (const t of tokens) {
-        try {
-          const r = await deliverIosPushToDevice(t, title, bodyText, data);
-          if (r.success) pushDelivered += 1;
-        } catch (e) {
-          console.error("[supply-low-delivery] push send", e);
-        }
-      }
+        .in("platform", ["ios", "android"]);
+      const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, data);
+      pushDelivered += delivered;
     }
   }
 

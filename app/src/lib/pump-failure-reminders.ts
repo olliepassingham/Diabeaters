@@ -1,12 +1,18 @@
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
+import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
+import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage, type PumpFailureReminderKind, type PumpFailureSession } from "@/lib/storage";
 
 function notificationId(sessionId: string, kind: PumpFailureReminderKind): number {
   const hex = (sessionId + kind).replace(/-/g, "").slice(0, 8);
   const n = Number.parseInt(hex, 16);
   return Number.isFinite(n) ? (n % 2_000_000_000) : Math.floor(Math.random() * 1_000_000_000);
+}
+
+function androidChannel(): { channelId?: string } {
+  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_scenarios" } : {};
 }
 
 function copyFor(kind: PumpFailureReminderKind): { title: string; body: string } {
@@ -17,7 +23,7 @@ function copyFor(kind: PumpFailureReminderKind): { title: string; body: string }
 }
 
 export async function cancelPumpFailureReminders(sessionId: string): Promise<void> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
+  if (!supportsNativeLocalNotifications()) return;
   try {
     await LocalNotifications.cancel({
       notifications: [
@@ -34,12 +40,12 @@ export async function cancelPumpFailureReminders(sessionId: string): Promise<voi
 
 export async function schedulePumpFailureReminders(session: PumpFailureSession): Promise<void> {
   try {
+    if (!supportsNativeLocalNotifications()) return;
     const settings = storage.getNotificationSettings();
     if (!settings.enabled) return;
-    if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
-    const perm = await LocalNotifications.requestPermissions();
-    if (perm.display !== "granted") return;
+    const ok = await ensureNativeLocalNotificationPermission();
+    if (!ok) return;
 
     const nowMs = Date.now();
     const upcoming = session.reminders.filter((r) => {
@@ -62,6 +68,7 @@ export async function schedulePumpFailureReminders(session: PumpFailureSession):
           body: copy.body,
           schedule: { at },
           extra: { pump_failure_session_id: session.id, kind: r.kind },
+          ...androidChannel(),
         };
       })
       .filter(Boolean) as Array<{
@@ -78,4 +85,3 @@ export async function schedulePumpFailureReminders(session: PumpFailureSession):
     // Non-blocking: pump failure mode should still start/end even if scheduling fails.
   }
 }
-

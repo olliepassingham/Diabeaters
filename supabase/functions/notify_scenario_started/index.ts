@@ -4,7 +4,7 @@
  * Push: APNs (APNS_*) or legacy PUSH_NOTIFICATION_API_URL — see ../_shared/deliver-ios-push.ts
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -134,17 +134,14 @@ Deno.serve(async (req: Request) => {
         if (!error) deliveredInapp += 1;
       }
 
-      if (pushOn && iosPushDeliveryConfigured()) {
+      if (pushOn && mobilePushDeliveryConfigured()) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
-          .select("token")
+          .select("platform, token")
           .eq("user_id", rid)
-          .eq("platform", "ios");
-        const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
-        for (const t of tokens) {
-          const r = await deliverIosPushToDevice(t, title, bodyText, data);
-          if (r.success) deliveredPush += 1;
-        }
+          .in("platform", ["ios", "android"]);
+        const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, data);
+        deliveredPush += delivered;
       }
     }
 

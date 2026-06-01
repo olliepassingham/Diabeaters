@@ -11,7 +11,7 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import { SettingsBackLink, SettingsNavRow } from "./shared";
 import { useToast } from "@/hooks/use-toast";
-import { isIosShellForPushTestUi } from "@/lib/ios-user-agent";
+import { isNativeShellForPushTestUi } from "@/lib/native-platform";
 import { unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
 const SOURCES = [
@@ -139,7 +139,7 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
   const versionTapRef = useRef({ count: 0, lastAt: 0 });
 
   const onVersionTap = useCallback(() => {
-    if (!isIosShellForPushTestUi()) return;
+    if (!isNativeShellForPushTestUi()) return;
     const now = Date.now();
     const maxGapMs = 2500;
     const prev = versionTapRef.current;

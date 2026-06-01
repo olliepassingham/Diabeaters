@@ -10,7 +10,8 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
-import { ensureIosPushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
+import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
+import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
 import { SettingsBackLink } from "./shared";
 
 export function NotificationsTab({
@@ -48,8 +49,15 @@ export function NotificationsTab({
 
       <div className="flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
-          <Label className="text-small text-muted-foreground">Push notifications (iOS)</Label>
+          <Label className="text-small text-muted-foreground">Push notifications</Label>
           <p className="text-small text-muted-foreground">Receive alerts when the app is in the background</p>
+          {isNativePushPlatform() && notifSettings.pushNotifications ? (
+            <p className="text-small text-muted-foreground pt-1">
+              For banners and lock screen alerts, open your {nativePlatformLabel()} notification settings for
+              Diabeaters and turn on <span className="font-medium text-foreground">Lock Screen</span> and{" "}
+              <span className="font-medium text-foreground">Banners</span>.
+            </p>
+          ) : null}
         </div>
         <Switch
           checked={notifSettings.pushNotifications}
@@ -255,7 +263,7 @@ export function SettingsNotificationsRoute({
     /** One chained pass avoids overlapping getSession / auth locks with AuthProvider + Capacitor. */
     const t = window.setTimeout(() => {
       void (async () => {
-        await ensureIosPushRegistered();
+        await ensureNativePushRegistered();
         await syncRememberedPushTokenToSupabase();
       })();
     }, 300);

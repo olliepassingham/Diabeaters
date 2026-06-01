@@ -75,7 +75,9 @@ import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync"
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
-import { IosPushForegroundSync } from "@/components/ios-push-foreground-sync";
+import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
+import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
+import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import type { ActiveExerciseSession } from "@/lib/storage";
@@ -908,17 +910,17 @@ function InnerRouter() {
   );
 }
 
-function useIosLocalNotificationPermissionPrompt(visible: boolean) {
+function useNativeLocalNotificationPermissionPrompt(visible: boolean) {
   const { toast } = useToast();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
-    if (!Capacitor.isNativePlatform?.() || Capacitor.getPlatform?.() !== "ios") return;
+    if (!supportsNativeLocalNotifications()) return;
 
     let dismissed = false;
     try {
-      dismissed = localStorage.getItem("diabeater_ios_local_notif_prompt_dismissed_v1") === "true";
+      dismissed = localStorage.getItem("diabeater_native_local_notif_prompt_dismissed_v1") === "true";
     } catch {
       dismissed = false;
     }
@@ -932,7 +934,7 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
         if (cancelled) return;
         if (perm?.display === "granted") {
           try {
-            localStorage.setItem("diabeater_ios_local_notif_prompt_dismissed_v1", "true");
+            localStorage.setItem("diabeater_native_local_notif_prompt_dismissed_v1", "true");
           } catch {
             // ignore
           }
@@ -952,7 +954,7 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
 
   const dismiss = () => {
     try {
-      localStorage.setItem("diabeater_ios_local_notif_prompt_dismissed_v1", "true");
+      localStorage.setItem("diabeater_native_local_notif_prompt_dismissed_v1", "true");
     } catch {
       // ignore
     }
@@ -968,14 +970,14 @@ function useIosLocalNotificationPermissionPrompt(visible: boolean) {
       } else {
         toast({
           title: "Notifications not enabled",
-          description: "You can enable them later in iPhone Settings → Notifications → Diabeaters.",
+          description: "You can enable them later in your phone's Settings → Apps → Diabeaters → Notifications.",
           variant: "destructive",
         });
       }
     } catch {
       toast({
         title: "Could not request notifications",
-        description: "Try again later, or enable in iPhone Settings → Notifications → Diabeaters.",
+        description: "Try again later, or enable in your phone's notification settings for Diabeaters.",
         variant: "destructive",
       });
     }
@@ -1063,7 +1065,7 @@ function AuthenticatedShell() {
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
   const suppressClinicalPollers = isCarerMode || isCommunityMode;
-  const iosNotifPrompt = useIosLocalNotificationPermissionPrompt(!suppressClinicalPollers);
+  const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
 
   const [activeExerciseSession, setActiveExerciseSession] = useState<ActiveExerciseSession | null>(() =>
     storage.getActiveExercise(),
@@ -1241,7 +1243,7 @@ function AuthenticatedShell() {
         lockShellHeightForExercise ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen"
       }`}
     >
-      <IosPushForegroundSync />
+      <NativePushForegroundSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       <DeferredAfterFirstPaint>

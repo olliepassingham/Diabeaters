@@ -17,7 +17,16 @@ function mapComment(row: Record<string, unknown>): CommunityPostCommentRow | nul
   const created_at = typeof row.created_at === "string" ? row.created_at : "";
   const is_reported = Boolean(row.is_reported);
   if (!id || !post_id || !author_id || !body || !created_at) return null;
-  return { id, post_id, author_id, body, created_at, is_reported };
+  return {
+    id,
+    post_id,
+    author_id,
+    body,
+    created_at,
+    is_reported,
+    mention_map: {},
+    mentioned_user_ids: [],
+  };
 }
 
 /**

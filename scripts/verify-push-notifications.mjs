@@ -140,13 +140,13 @@ async function edgePushTest() {
   console.log(JSON.stringify(json, null, 2));
 
   if (json.error === "push_not_configured") {
-    console.error("\n→ Set APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY on Edge Functions secrets (or PUSH_NOTIFICATION_API_URL).");
+    console.error("\n→ Set APNS_* secrets for iOS and/or FCM_SERVICE_ACCOUNT_JSON for Android on Edge Functions (or PUSH_NOTIFICATION_API_URL).");
   }
   if (json.error === "no_push_token") {
     console.error("\n→ Open the native app on a device, enable Push in Settings → Notifications, then retry.");
   }
   if (json.success === true && json.delivered_push === 0 && (json.tokens ?? 0) > 0) {
-    console.error("\n→ APNs rejected the token (check APNS_USE_SANDBOX vs TestFlight/App Store, bundle id, revoked token). See Edge logs for [apns] send failed.");
+    console.error("\n→ Push provider rejected the token (iOS: check APNS_USE_SANDBOX vs TestFlight/App Store, bundle id; Android: check FCM_SERVICE_ACCOUNT_JSON and google-services.json). See Edge logs.");
   }
 }
 

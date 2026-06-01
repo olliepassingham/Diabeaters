@@ -8,7 +8,7 @@
 --
 -- Tables:
 -- - public.notifications: in-app inbox rows per recipient user_id
--- - public.push_tokens: device push tokens per user (iOS Capacitor)
+-- - public.push_tokens: device push tokens per user (iOS APNs + Android FCM)
 -- - public.notification_preferences: cloud-backed toggle state for Edge Functions
 
 -- ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ CREATE INDEX IF NOT EXISTS notifications_user_id_created_at_idx ON public.notifi
 CREATE TABLE IF NOT EXISTS public.push_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  platform text NOT NULL CHECK (platform IN ('ios')),
+  platform text NOT NULL CHECK (platform IN ('ios', 'android')),
   token text NOT NULL,
   device_id text,
   created_at timestamptz NOT NULL DEFAULT now(),

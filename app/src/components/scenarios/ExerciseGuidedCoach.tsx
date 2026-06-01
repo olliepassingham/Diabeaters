@@ -202,6 +202,16 @@ function applyCoachDefaultsFromLastExercise(session: ActiveExerciseSession): Act
 
 // ----- Component -----
 
+function scrollToActiveGuidedCoach(): void {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document
+        .querySelector('[data-testid="exercise-guided-coach"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
 export function ExerciseGuidedCoach() {
   const { toast } = useToast();
   const search = useSearch();
@@ -404,8 +414,10 @@ export function ExerciseGuidedCoach() {
     });
     const withDefaults = applyCoachDefaultsFromLastExercise(session);
     setActiveSession(withDefaults);
+    setPlanWorkoutOpen(false);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
     void scheduleExercisePreReminders(session, 0);
+    scrollToActiveGuidedCoach();
   };
 
   const onStartFromRoutine = (routine: ExerciseRoutine) => {
@@ -420,8 +432,10 @@ export function ExerciseGuidedCoach() {
     });
     const withDefaults = applyCoachDefaultsFromLastExercise(session);
     setActiveSession(withDefaults);
+    setPlanWorkoutOpen(false);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
     void scheduleExercisePreReminders(session, 0);
+    scrollToActiveGuidedCoach();
   };
 
   const onStartWorkout = () => {

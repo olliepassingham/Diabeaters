@@ -21,7 +21,7 @@
  * Invoke with user's JWT; body: { hypo_id, user_id } must match the hypo row and JWT sub.
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -206,21 +206,14 @@ Deno.serve(async (req: Request) => {
         else console.error("[notify_carers_on_hypo] notification insert", insErr);
       }
 
-      if (pushOn && iosPushDeliveryConfigured()) {
+      if (pushOn && mobilePushDeliveryConfigured()) {
         const { data: tokenRows } = await admin
           .from("push_tokens")
-          .select("token")
+          .select("platform, token")
           .eq("user_id", rid)
-          .eq("platform", "ios");
-        const tokens = (tokenRows ?? []).map((t: any) => String(t.token)).filter(Boolean);
-        for (const t of tokens) {
-          try {
-            const r = await deliverIosPushToDevice(t, title, bodyText, payload);
-            if (r.success) pushDelivered += 1;
-          } catch (e) {
-            console.error("[notify_carers_on_hypo] push send", e);
-          }
-        }
+          .in("platform", ["ios", "android"]);
+        const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, payload);
+        pushDelivered += delivered;
       }
     }
 

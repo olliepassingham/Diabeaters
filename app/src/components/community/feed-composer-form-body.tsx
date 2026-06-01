@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MAX_POST_IMAGES } from "@/lib/community";
@@ -234,20 +235,21 @@ export function FeedComposerFormBody({
           <Label className="text-sm font-medium text-foreground">Post</Label>
           <InlineInfoHint ariaLabel="Who can see this?" content={audienceInfo} />
         </div>
-        <Textarea
+        <MentionTextarea
           value={composer}
-          onChange={(e) => setComposer(e.target.value)}
+          onChange={setComposer}
+          currentUserId={user?.id}
+          hideHint={false}
           placeholder={
             composerPostKind === "poll"
-              ? "Optional intro before the poll…"
+              ? "Optional intro before the poll… Type @ to mention."
               : composerPostKind === "event"
-                ? "Optional intro before the event details…"
-                : "Share something on the feed…"
+                ? "Optional intro before the event… Type @ to mention."
+                : "Share something on the feed… Type @ to mention someone."
           }
           rows={3}
           maxLength={8000}
           disabled={submitting || !user || !canComposeToFeed}
-          className="surface-field min-h-[5.5rem] rounded-xl"
         />
       </div>
       <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>

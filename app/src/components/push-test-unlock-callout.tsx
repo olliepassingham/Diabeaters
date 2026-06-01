@@ -11,12 +11,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { isIosShellForPushTestUi } from "@/lib/ios-user-agent";
+import { isNativeShellForPushTestUi } from "@/lib/native-platform";
 import { isPushTestUiUnlocked, unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
 /**
  * Lets testers enable “Send test push” when Capacitor mis-reports `web` under remote `server.url`.
- * Shown on iPhone/iPad user agents while not already unlocked.
+ * Shown on native iOS/Android shells while not already unlocked.
  */
 export function PushTestUnlockCallout({ className }: { className?: string }) {
   const { toast } = useToast();
@@ -34,7 +34,7 @@ export function PushTestUnlockCallout({ className }: { className?: string }) {
     }, 450);
   }, [toast]);
 
-  if (!isIosShellForPushTestUi() || isPushTestUiUnlocked()) return null;
+  if (!isNativeShellForPushTestUi() || isPushTestUiUnlocked()) return null;
 
   return (
     <div className={className}>
@@ -54,7 +54,7 @@ export function PushTestUnlockCallout({ className }: { className?: string }) {
             <AlertDialogTitle>Enable push test tools?</AlertDialogTitle>
             <AlertDialogDescription>
               Adds &quot;Send test push&quot; under Settings → Notifications on this device (saved locally). Use it to
-              verify APNs and your Supabase <code className="text-[11px]">push_tokens</code> row.
+              verify APNs/FCM and your Supabase <code className="text-[11px]">push_tokens</code> row.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

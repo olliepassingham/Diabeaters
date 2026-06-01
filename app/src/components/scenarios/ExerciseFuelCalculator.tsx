@@ -22,7 +22,14 @@ import {
   type ExerciseFuelCalculatorResult,
 } from "@/lib/exercise-fuel-calculator";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { storage, DIABEATER_PROFILE_CHANGED_EVENT, type ExerciseBgTrend, type ExerciseIntensity, type ExerciseType } from "@/lib/storage";
+import {
+  storage,
+  DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  type ExerciseBgTrend,
+  type ExerciseIntensity,
+  type ExerciseType,
+} from "@/lib/storage";
 import { useEffect } from "react";
 
 type FoodMode = "known" | "suggest";
@@ -48,6 +55,7 @@ export function ExerciseFuelCalculator() {
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [isPump, setIsPump] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
 
   useEffect(() => {
     const sync = () => {
@@ -58,6 +66,17 @@ export function ExerciseFuelCalculator() {
     sync();
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    const onActiveExercise = () => {
+      const active = Boolean(storage.getActiveExercise());
+      setHasActiveExercise(active);
+      if (active) setFormOpen(false);
+    };
+    onActiveExercise();
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onActiveExercise);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onActiveExercise);
   }, []);
 
   const canCalculate = useMemo(() => {
@@ -359,7 +378,7 @@ export function ExerciseFuelCalculator() {
         </Collapsible>
       </Card>
 
-      {result ? (
+      {result && !hasActiveExercise ? (
         <Card className="border-primary/25 bg-primary/5 shadow-sm" data-testid="efc-result">
           <CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-2">

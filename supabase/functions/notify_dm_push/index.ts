@@ -9,7 +9,7 @@
  * Push: APNs (APNS_*) or legacy PUSH_NOTIFICATION_API_URL — see ../_shared/deliver-ios-push.ts
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { deliverIosPushToDevice, iosPushDeliveryConfigured } from "../_shared/deliver-ios-push.ts";
+import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -210,22 +210,15 @@ Deno.serve(async (req: Request) => {
       if (!shouldDeliverDmPush(prefsById.get(rid))) continue;
       const st = settingsByUserId.get(rid);
       if (st?.muted || st?.hidden) continue;
-      if (!iosPushDeliveryConfigured()) continue;
+      if (!mobilePushDeliveryConfigured()) continue;
 
       const { data: tokenRows } = await admin
         .from("push_tokens")
-        .select("token")
+        .select("platform, token")
         .eq("user_id", rid)
-        .eq("platform", "ios");
-      const tokens = (tokenRows ?? []).map((t: { token: string }) => String(t.token)).filter(Boolean);
-      for (const t of tokens) {
-        try {
-          const r = await deliverIosPushToDevice(t, "New message", bodyText, payload);
-          if (r.success) pushDelivered += 1;
-        } catch (e) {
-          console.error("[notify_dm_push] push send", e);
-        }
-      }
+        .in("platform", ["ios", "android"]);
+      const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], "New message", bodyText, payload);
+      pushDelivered += delivered;
     }
 
     return new Response(

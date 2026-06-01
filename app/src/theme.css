@@ -185,3 +185,8 @@ html.ios-native {
   --font-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
 }
+
+html.android-native {
+  --font-sans: ui-sans-serif, system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: ui-sans-serif, system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+}

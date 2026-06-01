@@ -5,7 +5,7 @@ import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
-import { ensureIosPushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
+import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { storage } from "@/lib/storage";
 
 type AuthContextValue = {
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (loading || !user?.id) return;
     /** Run sequentially so push registration and prefs upsert do not fight GoTrue's auth storage lock. */
     void (async () => {
-      await ensureIosPushRegistered();
+      await ensureNativePushRegistered();
       await syncNotificationPreferences(storage.getNotificationSettings());
     })();
     const timer = window.setTimeout(() => {

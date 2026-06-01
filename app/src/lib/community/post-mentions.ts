@@ -24,7 +24,7 @@ export async function buildMentionsForPost(
     if (!normalized) continue;
     const { userId, error } = await getProfileIdByPublicHandle(normalized);
     if (error || !userId || (authorId && userId === authorId)) continue;
-    mentionMap[raw] = userId;
+    mentionMap[normalized] = userId;
     if (!seen.has(userId)) {
       seen.add(userId);
       idOrder.push(userId);

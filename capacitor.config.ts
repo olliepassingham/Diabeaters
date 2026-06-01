@@ -2,8 +2,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
  * iOS wrapper MUST always load production URL for App Store builds.
+ * Android Play Store builds use the same remote URL pattern.
  * Do not point server.url at staging. For local staging tests, temporarily
- * override and run npx cap sync ios — revert before archiving.
+ * override and run npx cap sync ios|android — revert before archiving.
  *
  * When `server.url` is set, the WebView loads that host’s JS (e.g. Vercel). Vite
  * flags like `VITE_SHOW_PUSH_TEST` apply only if set on **that** deployment’s build,

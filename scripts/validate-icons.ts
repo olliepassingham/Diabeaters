@@ -45,7 +45,7 @@ function main() {
     if (!failed) console.log(`✓ ${SOURCE_1024}: 1024×1024, no alpha`);
   }
 
-  // 2. Check AppIcon.appiconset
+  // 2. Check AppIcon.appiconset (iOS)
   if (!existsSync(CONTENTS_JSON)) {
     console.error(`Missing: ${CONTENTS_JSON}`);
     failed = true;
@@ -64,6 +64,14 @@ function main() {
     if (!failed && images.length > 0) {
       console.log(`✓ AppIcon.appiconset: ${images.length} image(s) present`);
     }
+  }
+
+  // 3. Android launcher placeholders (Capacitor default mipmaps)
+  const androidMipmap = join(ROOT, "android", "app", "src", "main", "res", "mipmap-xxxhdpi", "ic_launcher.png");
+  if (!existsSync(androidMipmap)) {
+    console.warn(`Android launcher not found: ${androidMipmap} — run npx cap add android or replace mipmaps before Play upload.`);
+  } else {
+    console.log(`✓ Android mipmap present: ${androidMipmap}`);
   }
 
   if (failed) process.exit(1);

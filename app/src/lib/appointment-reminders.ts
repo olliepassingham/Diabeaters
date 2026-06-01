@@ -9,6 +9,8 @@ import {
   reminderCopy,
   type AppointmentReminderKind,
 } from "@/lib/appointment-reminder-schedule";
+import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
+import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import type { Appointment } from "@/lib/storage";
 import { storage } from "@/lib/storage";
 
@@ -18,7 +20,12 @@ type ScheduledNotification = {
   body: string;
   schedule: { at: Date };
   extra: { appointment_id: string; reminder_kind: AppointmentReminderKind };
+  channelId?: string;
 };
+
+function androidChannel(): { channelId?: string } {
+  return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_appointments" } : {};
+}
 
 function buildReminder(
   a: Appointment,
@@ -34,16 +41,17 @@ function buildReminder(
     body,
     schedule: { at: remindAt },
     extra: { appointment_id: a.id, reminder_kind: kind },
+    ...androidChannel(),
   };
 }
 
 export async function rescheduleAppointmentReminders(appointments: Appointment[]): Promise<void> {
+  if (!supportsNativeLocalNotifications()) return;
   const settings = storage.getNotificationSettings();
   if (!settings.enabled || !settings.appointmentReminders) return;
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") return;
 
-  const perm = await LocalNotifications.requestPermissions();
-  if (perm.display !== "granted") return;
+  const ok = await ensureNativeLocalNotificationPermission();
+  if (!ok) return;
 
   const now = new Date();
   const upcoming = appointments.filter((a) => !a.isCompleted && !a.deletedAt);

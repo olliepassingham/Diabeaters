@@ -6,6 +6,7 @@
 #   supabase functions deploy notify_supply_low --no-verify-jwt
 #   supabase functions deploy notify_supply_low_cron --no-verify-jwt
 #   supabase functions deploy notify_dm_push --no-verify-jwt
+#   supabase functions deploy notify_feed_push --no-verify-jwt
 #   supabase functions deploy notify_push_test --no-verify-jwt
 #
 # Gateway JWT verification is off for these functions; each handler validates the JWT with
@@ -31,6 +32,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.notify_dm_push]
+verify_jwt = false
+
+[functions.notify_feed_push]
 verify_jwt = false
 
 [functions.notify_push_test]

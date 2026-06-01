@@ -1,27 +1,18 @@
 /**
- * Supabase Edge Function: send a test push to the caller's iOS devices.
- *
- * Purpose: quickly verify that
- * - APNs secrets are configured correctly (or relay is configured),
- * - the caller has saved a push token in `public.push_tokens`,
- * - pushes can be delivered end-to-end to a real device.
- *
- * Secrets:
- * - SUPABASE_URL
- * - SUPABASE_ANON_KEY
- * - SUPABASE_SERVICE_ROLE_KEY
- *
- * Push: direct APNs (APNS_TEAM_ID, APNS_KEY_ID, APNS_PRIVATE_KEY, optional APNS_BUNDLE_ID, APNS_USE_SANDBOX)
- * or legacy relay (PUSH_NOTIFICATION_API_URL, optional PUSH_NOTIFICATION_API_KEY).
+ * Supabase Edge Function: send a test push to the caller's mobile devices (iOS + Android).
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   apnsDirectConfigured,
-  type DeliverIosPushResult,
-  deliverIosPushToDevice,
   getApnsEdgeSendContext,
-  iosPushDeliveryConfigured,
 } from "../_shared/deliver-ios-push.ts";
+import {
+  deliverPushToDevice,
+  getMobilePushEdgeContext,
+  mobilePushDeliveryConfigured,
+  type DeliverPushResult,
+} from "../_shared/deliver-push.ts";
+import { fcmDirectConfigured, getFcmEdgeSendContext } from "../_shared/deliver-android-push.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +41,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!iosPushDeliveryConfigured()) {
+    if (!mobilePushDeliveryConfigured()) {
       return new Response(JSON.stringify({ success: false, error: "push_not_configured" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -78,9 +69,9 @@ Deno.serve(async (req: Request) => {
 
     const { data: tokenRows, error: tokenErr } = await admin
       .from("push_tokens")
-      .select("token")
+      .select("platform, token")
       .eq("user_id", callerId)
-      .eq("platform", "ios");
+      .in("platform", ["ios", "android"]);
 
     if (tokenErr) {
       return new Response(JSON.stringify({ success: false, error: "tokens_fetch_failed", detail: tokenErr.message }), {
@@ -89,29 +80,31 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const tokens = (tokenRows ?? []).map((t: { token: string }) => String(t.token)).filter(Boolean);
-    if (tokens.length === 0) {
+    const rows = (tokenRows ?? []) as { platform: string; token: string }[];
+    if (rows.length === 0) {
       return new Response(JSON.stringify({ success: false, error: "no_push_token" }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    /** Normalized hex probe (matches Edge APNs path); safe prefix for comparing to in-app Copy JSON. */
     const tokenProbe = (raw: string) => {
       const h = raw.replace(/\s+/g, "").replace(/[<>]/g, "").toLowerCase();
       return { hex_length: h.length, hex_prefix_8: h.slice(0, 8) };
     };
 
     const title = "Diabeaters test push";
-    const body = "If you can read this, APNs delivery is working for your device.";
+    const body = "If you can read this, push delivery is working for your device.";
     const payload = { kind: "push_test", deep_link: "/settings/notifications" };
 
     let delivered = 0;
-    let lastFailure: Extract<DeliverIosPushResult, { success: false }> | undefined;
-    for (const t of tokens) {
+    let lastFailure: Extract<DeliverPushResult, { success: false }> | undefined;
+    for (const row of rows) {
+      const platform = row.platform === "android" ? "android" : "ios";
+      const t = String(row.token ?? "").trim();
+      if (!t) continue;
       try {
-        const r = await deliverIosPushToDevice(t, title, body, payload);
+        const r = await deliverPushToDevice(platform, t, title, body, payload);
         if (r.success) delivered += 1;
         else lastFailure = r;
       } catch (e) {
@@ -119,25 +112,32 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const ctx = getMobilePushEdgeContext();
     const out: Record<string, unknown> = {
       success: true,
-      tokens: tokens.length,
+      tokens: rows.length,
       delivered_push: delivered,
       delivered_ok: delivered > 0,
+      push_context: ctx,
     };
     if (delivered === 0 && lastFailure) {
       out.failure_channel = lastFailure.channel;
+      out.failure_platform = lastFailure.platform;
       out.detail = lastFailure.errorBody ?? null;
       if ("httpStatus" in lastFailure && lastFailure.httpStatus !== undefined) {
         out.http_status = lastFailure.httpStatus;
       }
-      if (apnsDirectConfigured()) {
-        const ctx = getApnsEdgeSendContext();
-        out.apns_environment = ctx.environment;
-        out.apns_bundle_id = ctx.bundleId;
-        out.apns_topic = ctx.bundleId;
-        out.apns_host = ctx.host;
-        out.token_probe = tokenProbe(tokens[0] ?? "");
+      const firstIos = rows.find((r) => r.platform === "ios");
+      if (apnsDirectConfigured() && firstIos) {
+        const apnsCtx = getApnsEdgeSendContext();
+        out.apns_environment = apnsCtx.environment;
+        out.apns_bundle_id = apnsCtx.bundleId;
+        out.apns_topic = apnsCtx.bundleId;
+        out.apns_host = apnsCtx.host;
+        out.token_probe = tokenProbe(firstIos.token);
+      }
+      if (fcmDirectConfigured()) {
+        out.fcm_project_id = getFcmEdgeSendContext().projectId;
       }
     }
 
@@ -153,4 +153,3 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
-
