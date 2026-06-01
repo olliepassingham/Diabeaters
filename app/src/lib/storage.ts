@@ -72,6 +72,8 @@ const STORAGE_KEYS = {
   LAST_EXERCISE_SUMMARY: "diabeater_last_exercise_summary",
   /** Epoch ms; when `Date.now()` is before this, post-exercise educational banners are hidden. */
   POST_EXERCISE_NUDGE_SNOOZE_UNTIL: "diabeater_post_exercise_nudge_snooze_until",
+  /** Last exercise `endedAt` the user dismissed post-exercise tips for (session-scoped). */
+  POST_EXERCISE_NUDGE_DISMISSED_ENDED_AT: "diabeater_post_exercise_nudge_dismissed_ended_at",
 } as const;
 
 type StorageLogicalKey = keyof typeof STORAGE_KEYS;
@@ -244,6 +246,18 @@ export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
 
 /** Same-tab: quick exercise session JSON was written or cleared (`diabeater_active_exercise`). */
 export const DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT = "diabeater-active-exercise-changed";
+
+/** Post-exercise snooze/dismiss changed — status strip and tool banners re-read localStorage. */
+export const DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT = "diabeater-post-exercise-nudge-changed";
+
+function emitPostExerciseNudgeChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Same-tab: `saveScenarioState` updated travel/sick/etc. flags — widgets can re-read `getScenarioState()`. */
 export const DIABEATER_SCENARIO_STATE_CHANGED_EVENT = "diabeater-scenario-state-changed";
@@ -1601,6 +1615,7 @@ export const storage = {
     try {
       const until = Date.now() + hours * 60 * 60 * 1000;
       localStorage.setItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_SNOOZE_UNTIL, String(until));
+      emitPostExerciseNudgeChanged();
     } catch {
       /* ignore */
     }
@@ -1609,15 +1624,55 @@ export const storage = {
   clearPostExerciseNudgeSnooze(): void {
     try {
       localStorage.removeItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_SNOOZE_UNTIL);
+      emitPostExerciseNudgeChanged();
     } catch {
       /* ignore */
     }
   },
 
-  /** In the post-exercise window and not in an active snooze — drives hypo/correction/adviser banners. */
+  getPostExerciseNudgeDismissedEndedAt(): string | null {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_DISMISSED_ENDED_AT);
+      return raw?.trim() ? raw : null;
+    } catch {
+      return null;
+    }
+  },
+
+  isPostExerciseNudgeDismissedForCurrentSession(): boolean {
+    const current =
+      this.getLastExerciseSummary()?.endedAt?.trim() || this.getLastExerciseEndedAt()?.trim() || null;
+    if (!current) return false;
+    return this.getPostExerciseNudgeDismissedEndedAt() === current;
+  },
+
+  dismissPostExerciseNudgesForCurrentSession(): void {
+    const endedAt =
+      this.getLastExerciseSummary()?.endedAt?.trim() || this.getLastExerciseEndedAt()?.trim() || null;
+    if (!endedAt) return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_DISMISSED_ENDED_AT, endedAt);
+      emitPostExerciseNudgeChanged();
+    } catch {
+      /* ignore */
+    }
+  },
+
+  clearPostExerciseNudgeDismissForCurrentSession(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.POST_EXERCISE_NUDGE_DISMISSED_ENDED_AT);
+      emitPostExerciseNudgeChanged();
+    } catch {
+      /* ignore */
+    }
+  },
+
+  /** In the post-exercise window and not snoozed or dismissed for this session — drives strip and tool banners. */
   shouldShowPostExerciseEducationalNudges(): boolean {
     if (!this.didExerciseRecently(24)) return false;
-    return !this.arePostExerciseNudgesSnoozed();
+    if (this.arePostExerciseNudgesSnoozed()) return false;
+    if (this.isPostExerciseNudgeDismissedForCurrentSession()) return false;
+    return true;
   },
 
   /** Record exercise end timestamp for “next 24h” educational nudges. */

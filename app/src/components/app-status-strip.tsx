@@ -22,11 +22,22 @@ import {
   Sparkles,
   Shield,
   MoreHorizontal,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { storage, type ScenarioState, type ActiveExerciseSession, type ExerciseBgTrend, type ExercisePhase, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import {
+  storage,
+  type ScenarioState,
+  type ActiveExerciseSession,
+  type ExerciseBgTrend,
+  type ExercisePhase,
+  DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
+  DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT,
+  type UserProfile,
+} from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
@@ -213,6 +224,19 @@ export function AppStatusStrip() {
     void postExerciseRev;
     return storage.shouldShowPostExerciseEducationalNudges();
   }, [postExerciseRev, ex]);
+  const postExerciseSnoozed = useMemo(() => {
+    void postExerciseRev;
+    return inPostExerciseWindow && storage.arePostExerciseNudgesSnoozed();
+  }, [postExerciseRev, inPostExerciseWindow]);
+  const postExerciseDismissed = useMemo(() => {
+    void postExerciseRev;
+    return (
+      inPostExerciseWindow &&
+      !showPostExerciseEducational &&
+      !postExerciseSnoozed &&
+      storage.isPostExerciseNudgeDismissedForCurrentSession()
+    );
+  }, [postExerciseRev, inPostExerciseWindow, showPostExerciseEducational, postExerciseSnoozed]);
   const [postExerciseOpen, setPostExerciseOpen] = useState(false);
   const [exerciseExpanded, setExerciseExpanded] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
@@ -227,6 +251,12 @@ export function AppStatusStrip() {
     const onProfile = () => setStripProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
+  useEffect(() => {
+    const onPostExerciseNudge = () => setPostExerciseRev((n) => n + 1);
+    window.addEventListener(DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT, onPostExerciseNudge);
+    return () => window.removeEventListener(DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT, onPostExerciseNudge);
   }, []);
 
   useEffect(() => {
@@ -1218,6 +1248,25 @@ export function AppStatusStrip() {
                       )}
                       Tips
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={cn(btnClass, "w-8 shrink-0 px-0")}
+                      aria-label="Dismiss post-exercise tips"
+                      onClick={() => {
+                        storage.dismissPostExerciseNudgesForCurrentSession();
+                        setPostExerciseOpen(false);
+                        setPostExerciseRev((n) => n + 1);
+                        toast({
+                          title: "Tips hidden",
+                          description: "Post-exercise tips are hidden until your next workout.",
+                        });
+                      }}
+                      data-testid="status-post-exercise-dismiss"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </Button>
                   </div>
                 </div>
                 {postExerciseOpen ? (
@@ -1281,7 +1330,7 @@ export function AppStatusStrip() {
         </div>
       ) : null}
 
-      {!ex && inPostExerciseWindow && !showPostExerciseEducational ? (
+      {!ex && inPostExerciseWindow && postExerciseSnoozed ? (
         <div
           className={cn(rowClass, sc.travelModeActive && "gap-y-1.5 py-1.5 sm:py-2")}
           data-testid={sc.travelModeActive ? "status-travel-post-exercise-snoozed-combined" : "status-post-exercise-snoozed"}
@@ -1360,7 +1409,96 @@ export function AppStatusStrip() {
                 setPostExerciseRev((n) => n + 1);
                 toast({ title: "Reminders on", description: "Post-exercise tips are visible again." });
               }}
-              data-testid="status-post-exercise-resume"
+              data-testid="status-post-exercise-resume-snooze"
+            >
+              Resume
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {!ex && postExerciseDismissed ? (
+        <div
+          className={cn(rowClass, sc.travelModeActive && "gap-y-1.5 py-1.5 sm:py-2")}
+          data-testid={
+            sc.travelModeActive ? "status-travel-post-exercise-dismissed-combined" : "status-post-exercise-dismissed"
+          }
+        >
+          {sc.travelModeActive ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="flex shrink-0 items-center" aria-hidden>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/25 text-blue-900 ring-2 ring-background dark:text-blue-100">
+                  <Plane className="h-3.5 w-3.5" />
+                </span>
+                <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/25 text-emerald-900 ring-2 ring-background dark:text-emerald-100">
+                  <Dumbbell className="h-3.5 w-3.5" />
+                </span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold leading-tight text-foreground">
+                  <span className="text-blue-900 dark:text-blue-100">{sc.travelDestination ?? "Travel"}</span>
+                  <span className="font-normal text-muted-foreground"> · </span>
+                  <span className="text-emerald-900 dark:text-emerald-100">Post-exercise · tips hidden</span>
+                </p>
+                {(travelStyleBadge || (travelDays != null && travelDays >= 0)) && (
+                  <p className="hidden truncate text-[10px] leading-snug text-muted-foreground sm:block">
+                    {travelStyleBadge ? `${travelStyleBadge}` : ""}
+                    {travelStyleBadge && travelDays != null && travelDays >= 0 ? " · " : ""}
+                    {travelDays != null && travelDays >= 0 ? `${travelDays}d in trip` : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <Badge
+              className="chip border border-emerald-500/20 bg-emerald-500/5 text-emerald-800 dark:text-emerald-300"
+              variant="secondary"
+            >
+              <Dumbbell className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Post‑exercise · tips hidden
+            </Badge>
+          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {sc.travelModeActive ? (
+              <>
+                <Link href="/scenarios/travel">
+                  <Button size="sm" variant="outline" className={cn(btnClass, "max-sm:px-2")} data-testid="status-travel-view">
+                    View <ChevronRight className="h-3.5 w-3.5 max-sm:hidden sm:ml-0.5" aria-hidden />
+                  </Button>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={cn(btnClass, "w-8 px-0")}
+                      aria-label="Travel options"
+                      data-testid="status-travel-post-exercise-dismissed-more"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[min(18rem,calc(100vw-2rem))]">
+                    <DropdownMenuItem onClick={handleEndTravel} className="cursor-pointer" data-testid="status-travel-end">
+                      <Plane className="mr-2 h-3.5 w-3.5 opacity-70" aria-hidden />
+                      End travel mode
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={btnClass}
+              onClick={() => {
+                storage.clearPostExerciseNudgeDismissForCurrentSession();
+                setPostExerciseRev((n) => n + 1);
+                toast({ title: "Tips visible again", description: "Post-exercise tips are back on your screen." });
+              }}
+              data-testid="status-post-exercise-resume-dismiss"
             >
               Resume
             </Button>
