@@ -40,8 +40,12 @@ import {
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
-import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import {
+  SickDayDisclaimerFooter,
+  SickDayResultsPanel,
+  SickDayUpdateReadingsCollapsible,
+  scrollToSickDayPageTop,
+} from "@/components/scenarios/sick-day-results-ui";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
 import { createSickDayMedInAppNotification } from "@/lib/sick-day-med-inapp";
 import {
@@ -400,25 +404,6 @@ function calculateSickDayRecommendations(
   };
 }
 
-function SickDayDisclaimerCard() {
-  return (
-    <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
-      <CardContent className="p-4">
-        <div className="flex gap-3">
-          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
-            <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-              Educational estimates only. Contact your healthcare team if you are unwell, especially with high glucose,
-              ketones, or worsening symptoms.
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 const SICK_DAY_STORAGE_KEY = "diabeater_sick_day_session";
 
 interface SickDaySession {
@@ -471,6 +456,7 @@ export default function SickDay() {
   const [journalFluids, setJournalFluids] = useState("");
   const [journalSymptoms, setJournalSymptoms] = useState("");
   const [journalNotes, setJournalNotes] = useState("");
+  const [updateReadingsOpen, setUpdateReadingsOpen] = useState(false);
   const [activeModeTab, setActiveModeTab] = useState<"now" | "checklist" | "log">(() => {
     if (typeof window === "undefined") return "now";
     const hash = window.location.hash;
@@ -1147,6 +1133,7 @@ export default function SickDay() {
     }
     
     setResults(recommendations);
+    setUpdateReadingsOpen(false);
     saveSession(recommendations);
     void pushSickDayScenario({
       inputs_summary: {
@@ -1167,9 +1154,10 @@ export default function SickDay() {
       recommendation: `Correction: ${recommendations.correctionDose}u, Ratios adjusted`,
     });
 
-    // After updating from the Update tab, bring the user back to "Now" to see the latest correction.
-    setActiveModeTab("now");
-    scrollToId("sickday-now-recommendations");
+    if (isSickDayActive) {
+      setActiveModeTab("now");
+    }
+    scrollToSickDayPageTop();
   };
 
   const getSickDayDuration = () => {
@@ -1330,6 +1318,7 @@ export default function SickDay() {
 
     return (
       <PageShell variant="standard" className="space-y-7">
+        <div id="sickday-page-top" tabIndex={-1} className="sr-only outline-none" aria-hidden />
         <PageHeader
           stackActionsMaxSm
           leading={<PageBackButton />}
@@ -1521,143 +1510,53 @@ export default function SickDay() {
           </TabsList>
 
           <TabsContent value="now" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-now">
-            <Card id="sickday-now-recommendations">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="text-base">Current Recommendations</CardTitle>
-                    <CardDescription>
-                      {lastCheckAtIso
+            <div id="sickday-now-recommendations" className="space-y-3">
+              {results ? (
+                <>
+                  <SickDayResultsPanel
+                    results={results}
+                    verdict={verdict}
+                    bgLevel={bgLevel}
+                    bgUnits={bgUnits}
+                    severity={severity}
+                    ketoneLevel={ketoneLevel}
+                    isPumpUser={isPumpUser}
+                    title="Current recommendations"
+                    lastUpdatedLabel={
+                      lastCheckAtIso
                         ? `Latest check: ${new Date(lastCheckAtIso).toLocaleString("en-GB", {
                             day: "numeric",
                             month: "short",
                             hour: "2-digit",
                             minute: "2-digit",
                           })}`
-                        : "Update your readings to get the latest correction estimate"}
-                    </CardDescription>
+                        : "Based on your last entered readings"
+                    }
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setActiveModeTab("log");
+                        setUpdateReadingsOpen(true);
+                        scrollToSickDayPageTop();
+                      }}
+                      data-testid="button-now-update-reading"
+                    >
+                      Update readings
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setActiveModeTab("log");
-                      scrollToId("sickday-log");
-                    }}
-                    data-testid="button-now-update-reading"
-                  >
-                    Update reading
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {results?.ketoneActionRequired === "emergency" && (
-                    <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-bold text-base text-white">Emergency — get medical help now</p>
-                          <p className="text-sm text-red-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                {results?.ketoneActionRequired === "urgent" && (
-                    <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent — contact your diabetes team</p>
-                          <p className="text-sm text-red-800 dark:text-red-200 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                {results ? (
-                  <>
-                    <div className="p-4 bg-primary/5 rounded-lg space-y-2">
-                      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-sm text-muted-foreground">Suggested correction</span>
-                          <span className="text-2xl font-semibold" data-testid="text-active-correction-dose">
-                            {results.correctionDose} units
-                          </span>
-                        </div>
-                      </div>
-
-                      <Collapsible className="group">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
-                          Educational estimate only
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="pt-2">
-                          <MedicalNumericOutputDisclaimer compact />
-                        </CollapsibleContent>
-                      </Collapsible>
-
-                      <Collapsible className="group">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground py-1">
-                          How this was calculated
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="text-xs text-muted-foreground pt-1">
-                          <p>{results.correctionExplanation}</p>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-
-                    {results.stackingWarning && (
-                    <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Spacing corrections</p>
-                          <p className="text-sm text-orange-800 dark:text-orange-200">{results.stackingWarningBrief || results.stackingWarning}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                    <Collapsible className="border rounded-lg px-3 py-2">
-                      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 text-sm font-medium py-2 hover:opacity-90">
-                        <span className="flex items-center gap-2 text-left">
-                          Adjusted mealtime ratios
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            x{results.ratioMultiplier}
-                          </span>
-                        </span>
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-3 pb-3 pt-1">
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            { label: "Breakfast", ratio: results.breakfastRatio, original: results.originalBreakfastRatio },
-                            { label: "Lunch", ratio: results.lunchRatio, original: results.originalLunchRatio },
-                            { label: "Dinner", ratio: results.dinnerRatio, original: results.originalDinnerRatio },
-                            { label: "Snacks", ratio: results.snackRatio, original: results.originalSnackRatio },
-                          ].map(r => (
-                            <div key={r.label} className="p-3 bg-muted rounded-lg">
-                              <p className="text-xs text-muted-foreground">{r.label}</p>
-                              <div className="flex items-baseline gap-2 mt-1">
-                                <p className="font-semibold">{r.ratio}</p>
-                                <span className="text-xs text-muted-foreground line-through">{r.original}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </>
-                ) : (
-                  <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground" data-testid="sickday-now-no-results">
-                    Add your current blood glucose, ketones, and how unwell you feel to see a suggested correction and updated guidance.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </>
+              ) : (
+                <Card className="rounded-2xl border-dashed border-border/70 bg-muted/15">
+                  <CardContent className="p-6 text-center text-sm text-muted-foreground" data-testid="sickday-now-no-results">
+                    Add your current blood glucose, ketones, and how unwell you feel on the Update tab to see guidance here.
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
             {isTravelAlsoActive && (
               <Card className="border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-travel-also-active">
@@ -2118,119 +2017,19 @@ export default function SickDay() {
           </TabsContent>
 
           <TabsContent value="log" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-update">
-            <Card
-              className={cn(
-                "overflow-hidden rounded-2xl border-orange-500/20 shadow-md ring-1 ring-orange-500/10 dark:ring-orange-400/10",
-                "bg-gradient-to-br from-orange-500/[0.06] via-card to-sky-500/[0.04] dark:from-orange-950/35 dark:via-card dark:to-sky-950/18",
-              )}
-            >
-              <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-3 pt-4 backdrop-blur-sm sm:px-5 sm:pt-5">
-                <div className="flex items-start gap-3">
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-700 shadow-inner shadow-orange-950/10 dark:bg-orange-400/10 dark:text-orange-200"
-                    aria-hidden
-                  >
-                    <Activity className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-orange-800/90 dark:text-orange-200/90">
-                      Recalculate
-                    </span>
-                    <CardTitle className="text-base tracking-tight sm:text-lg">Update your readings</CardTitle>
-                    <CardDescription className="mt-1 leading-relaxed">
-                      Change glucose, ketones, or severity and run the adviser again.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-5">
-                <section
-                  className="space-y-3 rounded-2xl border border-orange-500/18 bg-orange-500/[0.04] p-4 dark:bg-orange-950/15"
-                  aria-labelledby="sickday-update-section-severity"
-                >
-                  <h3 id="sickday-update-section-severity" className="text-[11px] font-semibold uppercase tracking-wider text-orange-900 dark:text-orange-100/90">
-                    Illness
-                  </h3>
-                  <div className="space-y-2">
-                    <Label htmlFor="update-severity-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-orange-700 dark:text-orange-300">
-                        <Thermometer className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Illness severity
-                    </Label>
-                    <Select value={severity} onValueChange={setSeverity}>
-                      <SelectTrigger id="update-severity-active" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-update-severity-active">
-                        <SelectValue placeholder="Select severity level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                        <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                        <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </section>
-                <section
-                  className="space-y-3 rounded-2xl border border-sky-500/15 bg-sky-500/[0.04] p-4 dark:bg-sky-950/15"
-                  aria-labelledby="sickday-update-section-readings"
-                >
-                  <h3 id="sickday-update-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-sky-900 dark:text-sky-100/90">
-                    Glucose & ketones
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="update-bg-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-sky-800 dark:text-sky-200">
-                          <Activity className="h-3.5 w-3.5" aria-hidden />
-                        </span>
-                        Blood glucose ({bgUnits})
-                      </Label>
-                      <Input
-                        id="update-bg-active"
-                        type="number"
-                        placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                        value={bgLevel}
-                        onChange={(e) => setBgLevel(e.target.value)}
-                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
-                        data-testid="input-update-bg-active"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="update-ketones-active" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-sky-800 dark:text-sky-200">
-                          <Droplets className="h-3.5 w-3.5" aria-hidden />
-                        </span>
-                        Ketone level
-                        <InfoTooltip {...DIABETES_TERMS.ketones} />
-                      </Label>
-                      <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
-                        <SelectTrigger id="update-ketones-active" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-update-ketone-active">
-                          <SelectValue placeholder="Select level" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None (negative)</SelectItem>
-                          <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
-                          <SelectItem value="small">Small (0.6-1.5)</SelectItem>
-                          <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
-                          <SelectItem value="large">Large (3.0+)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </section>
-                <Button
-                  onClick={handleCalculate}
-                  className={cn(
-                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
-                    "bg-gradient-to-r from-orange-600 to-sky-600 text-white hover:from-orange-500 hover:to-sky-500",
-                  )}
-                  data-testid="button-update-readings-active"
-                >
-                  <Activity className="mr-2 h-4 w-4" aria-hidden />
-                  Update recommendations
-                </Button>
-              </CardContent>
-            </Card>
+            <SickDayUpdateReadingsCollapsible
+              open={updateReadingsOpen}
+              onOpenChange={setUpdateReadingsOpen}
+              severity={severity}
+              onSeverityChange={setSeverity}
+              bgLevel={bgLevel}
+              onBgLevelChange={setBgLevel}
+              ketoneLevel={ketoneLevel}
+              onKetoneLevelChange={setKetoneLevel}
+              bgUnits={bgUnits}
+              onCalculate={handleCalculate}
+              idPrefix="active"
+            />
 
             {/* Sick Day Journal Summary */}
             {journalEntries.length > 0 && (
@@ -2691,25 +2490,6 @@ export default function SickDay() {
           </CardHeader>
         </Card>
 
-        <Card className="border-yellow-500/50 bg-yellow-50/50 dark:bg-yellow-950/20">
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-yellow-900 dark:text-yellow-100">Not Medical Advice</p>
-                <p className="text-yellow-800 dark:text-yellow-200 mt-1">
-                  This tool provides educational estimates only. Always consult your healthcare 
-                  provider when sick, especially if blood glucose is consistently high, you have 
-                  ketones, or symptoms worsen.
-                </p>
-                <div className="pt-2">
-                  <MedicalSourcesLink anchor="sickday" compact />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         <Card className={`${
           severity === "severe"
             ? "border-red-500/50 bg-red-50/30 dark:bg-red-950/20"
@@ -2742,6 +2522,8 @@ export default function SickDay() {
           </>
         ) : null}
 
+        <SickDayDisclaimerFooter />
+
         <div className="flex justify-center">
           <Link href="/">
             <Button variant="ghost" data-testid="link-back-dashboard-sick">
@@ -2756,6 +2538,7 @@ export default function SickDay() {
 
   return (
     <PageShell variant="standard" className="space-y-7">
+      <div id="sickday-page-top" tabIndex={-1} className="sr-only outline-none" aria-hidden />
       <PageHeader
         leading={<PageBackButton />}
         title="Sick day"
@@ -2937,7 +2720,7 @@ export default function SickDay() {
             </CardContent>
           </Card>
 
-          <SickDayDisclaimerCard />
+          <SickDayDisclaimerFooter />
           </>
         ) : (
           <>
@@ -2978,365 +2761,31 @@ export default function SickDay() {
               )}
             </CardContent>
           </Card>
-          {verdict ? (
-            <Card className="rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40" data-testid="card-sickday-verdict">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <CardTitle className="text-lg">{verdict.title}</CardTitle>
-                    <CardDescription>{verdict.message}</CardDescription>
-                  </div>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      verdict.tone === "critical"
-                        ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                        : verdict.tone === "caution"
-                          ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
-                          : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-                    }
-                  >
-                    {verdict.label}
-                  </Badge>
-                </div>
-              </CardHeader>
-            </Card>
-          ) : null}
-          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Update Your Readings
-              </CardTitle>
-              <CardDescription>Update your glucose, ketones, or severity and recalculate</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="update-severity" className="text-sm">Illness Severity</Label>
-                <Select value={severity} onValueChange={setSeverity}>
-                  <SelectTrigger id="update-severity" data-testid="select-update-severity">
-                    <SelectValue placeholder="Select severity level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                    <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                    <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="update-bg" className="text-sm">Blood Glucose ({bgUnits})</Label>
-                  <Input
-                    id="update-bg"
-                    type="number"
-                    placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                    value={bgLevel}
-                    onChange={(e) => setBgLevel(e.target.value)}
-                    data-testid="input-update-bg-level"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="update-ketones" className="text-sm flex items-center">
-                    Ketone Level
-                    <InfoTooltip {...DIABETES_TERMS.ketones} />
-                  </Label>
-                  <Select value={ketoneLevel} onValueChange={(val) => setKetoneLevel(val as KetoneLevel)}>
-                    <SelectTrigger id="update-ketones" data-testid="select-update-ketone-level">
-                      <SelectValue placeholder="Select level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None (negative)</SelectItem>
-                      <SelectItem value="trace">Trace (0.1-0.5)</SelectItem>
-                      <SelectItem value="small">Small (0.6-1.5)</SelectItem>
-                      <SelectItem value="moderate">Moderate (1.6-3.0)</SelectItem>
-                      <SelectItem value="large">Large (3.0+)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button 
-                onClick={handleCalculate} 
-                className="w-full"
-                data-testid="button-update-readings"
-              >
-                Update Recommendations
-              </Button>
-            </CardContent>
-          </Card>
+          <SickDayResultsPanel
+            results={results}
+            verdict={verdict}
+            bgLevel={bgLevel}
+            bgUnits={bgUnits}
+            severity={severity}
+            ketoneLevel={ketoneLevel}
+            isPumpUser={isPumpUser}
+          />
 
-          <SickDayDisclaimerCard />
+          <SickDayUpdateReadingsCollapsible
+            open={updateReadingsOpen}
+            onOpenChange={setUpdateReadingsOpen}
+            severity={severity}
+            onSeverityChange={setSeverity}
+            bgLevel={bgLevel}
+            onBgLevelChange={setBgLevel}
+            ketoneLevel={ketoneLevel}
+            onKetoneLevelChange={setKetoneLevel}
+            bgUnits={bgUnits}
+            onCalculate={handleCalculate}
+            idPrefix="standalone"
+          />
 
-          <Card className="border-primary/50">
-            <CardHeader>
-              <CardTitle>Sick day recommendations</CardTitle>
-              <CardDescription>Key numbers first; open sections below if you want detail.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {results.ketoneActionRequired === "emergency" && (
-                <div className="p-4 bg-red-600 dark:bg-red-700 rounded-lg border-2 border-red-700 dark:border-red-500">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-6 w-6 text-white flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-base text-white">Emergency — get medical help now</p>
-                      <p className="text-sm text-red-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
-                      <p className="text-sm text-white mt-2 font-medium">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
-                      <Collapsible className="group mt-3 border-t border-white/25 pt-2">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-sm text-white/95 py-1 hover:underline">
-                          Read full guidance
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-2 text-sm text-red-50 pt-2">
-                          <p>{results.ketoneWarning}</p>
-                          <p>{results.ketoneGuidance}</p>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {results.ketoneActionRequired === "urgent" && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm text-red-900 dark:text-red-100">Urgent — contact your diabetes team</p>
-                      <p className="text-sm text-red-800 dark:text-red-200 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
-                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
-                      <Collapsible className="group mt-2 border-t border-red-200/80 dark:border-red-800/80 pt-2">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-red-900 dark:text-red-100 py-1">
-                          Read full guidance
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-2 text-xs text-red-800 dark:text-red-200 pt-1">
-                          <p>{results.ketoneWarning}</p>
-                          <p>{results.ketoneGuidance}</p>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {results.ketoneActionRequired === "monitor" && results.ketoneGuidance && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm text-amber-900 dark:text-amber-100">Ketones — keep monitoring</p>
-                      {results.ketoneWarning && (
-                        <p className="text-sm text-amber-900 dark:text-amber-100 mt-1">{results.ketoneWarningBrief || results.ketoneWarning}</p>
-                      )}
-                      <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
-                      <Collapsible className="group mt-2 border-t border-amber-200 dark:border-amber-800 pt-2">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-amber-900 dark:text-amber-100 py-1">
-                          Read full guidance
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="space-y-2 text-xs text-amber-800 dark:text-amber-200 pt-1">
-                          {results.ketoneWarning && <p>{results.ketoneWarning}</p>}
-                          <p>{results.ketoneGuidance}</p>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {results.ketoneActionRequired === "none" && results.ketoneGuidance && (
-                <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-start gap-2">
-                    <Info className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-green-900 dark:text-green-100 font-medium">Ketones</p>
-                      <p className="text-sm text-green-800 dark:text-green-200 mt-0.5">{results.ketoneGuidanceBrief || results.ketoneGuidance}</p>
-                      {(results.ketoneGuidanceBrief && results.ketoneGuidance !== results.ketoneGuidanceBrief) && (
-                        <Collapsible className="group mt-2 border-t border-green-200 dark:border-green-800 pt-2">
-                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-green-900 dark:text-green-100 py-1">
-                            More detail
-                            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="text-xs text-green-800 dark:text-green-200 pt-1">
-                            <p>{results.ketoneGuidance}</p>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {results.correctionDose > 0 && (
-                <div className="p-4 bg-primary/5 rounded-lg space-y-2">
-                  <MedicalNumericOutputDisclaimer compact className="mb-3" />
-                  <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="text-sm text-muted-foreground">Suggested correction</span>
-                    <span className="text-2xl font-semibold" data-testid="text-correction-dose">
-                      {results.correctionDose} units
-                    </span>
-                  </div>
-                  <Collapsible className="group">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium text-foreground py-1">
-                      How we calculated this
-                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="text-xs text-muted-foreground space-y-2 border-t border-primary/10 pt-3">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="p-2 bg-background rounded text-center">
-                          <p className="text-[10px] uppercase tracking-wide opacity-70">Base</p>
-                          <p className="font-semibold text-sm">{results.baseCorrectionDose}u</p>
-                        </div>
-                        <div className="p-2 bg-background rounded text-center">
-                          <p className="text-[10px] uppercase tracking-wide opacity-70">Safety</p>
-                          <p className="font-semibold text-sm">×{results.severityModifier}</p>
-                        </div>
-                        <div className="p-2 bg-background rounded text-center">
-                          <p className="text-[10px] uppercase tracking-wide opacity-70">BG zone</p>
-                          <p className="font-semibold text-sm">×{results.bgZoneModifier}</p>
-                        </div>
-                      </div>
-                      <p className="text-[11px] italic">{results.correctionExplanation}</p>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </div>
-              )}
-
-              {results.stackingWarning && (
-                <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm text-orange-900 dark:text-orange-100">Spacing corrections</p>
-                      <p className="text-sm text-orange-800 dark:text-orange-200">{results.stackingWarningBrief || results.stackingWarning}</p>
-                      {results.stackingWarningBrief && results.stackingWarning !== results.stackingWarningBrief && (
-                        <Collapsible className="group mt-2 border-t border-orange-200 dark:border-orange-800 pt-2">
-                          <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-orange-900 dark:text-orange-100 py-1">
-                            Full wording
-                            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="text-xs text-orange-800 dark:text-orange-200 pt-1">
-                            <p>{results.stackingWarning}</p>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">Mealtime ratios</h3>
-                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">×{results.ratioMultiplier}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Breakfast</p>
-                    <div className="flex items-baseline gap-2 mt-1">
-                      <p className="font-semibold" data-testid="text-breakfast-ratio">{results.breakfastRatio}</p>
-                      <span className="text-xs text-muted-foreground line-through">{results.originalBreakfastRatio}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Lunch</p>
-                    <div className="flex items-baseline gap-2 mt-1">
-                      <p className="font-semibold" data-testid="text-lunch-ratio">{results.lunchRatio}</p>
-                      <span className="text-xs text-muted-foreground line-through">{results.originalLunchRatio}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Dinner</p>
-                    <div className="flex items-baseline gap-2 mt-1">
-                      <p className="font-semibold" data-testid="text-dinner-ratio">{results.dinnerRatio}</p>
-                      <span className="text-xs text-muted-foreground line-through">{results.originalDinnerRatio}</span>
-                    </div>
-                  </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Snacks</p>
-                    <div className="flex items-baseline gap-2 mt-1">
-                      <p className="font-semibold" data-testid="text-snack-ratio">{results.snackRatio}</p>
-                      <span className="text-xs text-muted-foreground line-through">{results.originalSnackRatio}</span>
-                    </div>
-                  </div>
-                </div>
-                <Collapsible className="group">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs text-muted-foreground py-1">
-                    Why ratios change
-                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="text-xs text-muted-foreground pt-1">
-                    Higher units per 10g means more meal insulin to offset illness-related resistance (your team may adjust differently).
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-
-              <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
-                <p className="text-sm font-medium">Basal, fluids, checks</p>
-                <div className="flex gap-3 text-sm">
-                  <Syringe className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-xs text-muted-foreground">{isPumpUser ? "Basal / pump" : "Long-acting"}</p>
-                    <p className="text-foreground">{results.basalAdjustmentBrief || results.basalAdjustment}</p>
-                    {isPumpUser && (
-                      <p className="text-xs text-muted-foreground mt-0.5">Use temp basal if your team agrees—not a full profile rewrite.</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-3 text-sm">
-                  <Droplets className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-xs text-muted-foreground">Fluids</p>
-                    <p className="text-foreground">{results.hydrationBrief || results.hydrationNote}</p>
-                  </div>
-                </div>
-                <div className="flex gap-3 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-xs text-muted-foreground">Checks</p>
-                    <p className="text-foreground">{results.monitoringBrief || results.monitoringFrequency}</p>
-                  </div>
-                </div>
-                <Collapsible>
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium py-1">
-                    Full wording for basal, fluids, and monitoring
-                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 text-xs text-muted-foreground border-t pt-2 mt-1">
-                    <p>{results.basalAdjustment}</p>
-                    <p>{results.hydrationNote}</p>
-                    <p>{results.monitoringFrequency}</p>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-
-              {isPumpUser && (
-                <Collapsible className="group rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20" data-testid="pump-tip-sick-day">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-3 text-left text-sm font-medium text-indigo-900 dark:text-indigo-100">
-                    Pump tips
-                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="px-3 pb-3 space-y-2 text-sm text-indigo-800 dark:text-indigo-200">
-                    <p>Change infusion set and site if glucose stays high after two corrections.</p>
-                    <p>Use your pump calculator; mind IOB.</p>
-                    {(ketoneLevel === "moderate" || ketoneLevel === "large") && (
-                      <p className="font-medium">Moderate/large ketones: pens may be safer than pump—ask your team.</p>
-                    )}
-                    <p>If you suspect pump failure, use backup pens and contact your supplier.</p>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
-              <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
-                <p className="font-medium">Quick reminders</p>
-                <ul className="text-xs text-muted-foreground space-y-1 ml-4 list-disc">
-                  <li>Do not skip basal insulin</li>
-                  <li>Recheck ketones if BG stays above {bgUnits === "mmol/L" ? "13.9 mmol/L" : "250 mg/dL"}</li>
-                  <li>Moderate/large ketones or worsening symptoms: get medical help</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+          <SickDayDisclaimerFooter />
           </>
         )}
 

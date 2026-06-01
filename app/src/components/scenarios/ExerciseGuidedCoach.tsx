@@ -223,7 +223,7 @@ export function ExerciseGuidedCoach() {
   const appliedDefaultsForSessionId = useRef<string | null>(null);
 
   // Quick start form (only relevant when no active session exists)
-  const [planWorkoutOpen, setPlanWorkoutOpen] = useState(true);
+  const [planWorkoutOpen, setPlanWorkoutOpen] = useState(false);
   const [startType, setStartType] = useState<ExerciseType>("cardio");
   const [startIntensity, setStartIntensity] = useState<ExerciseIntensity>("moderate");
   const [startDuration, setStartDuration] = useState<string>("45");

@@ -72,7 +72,7 @@ export function ExerciseFuelCalculator() {
   const [result, setResult] = useState<ExerciseFuelCalculatorResult | null>(null);
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [isPump, setIsPump] = useState(false);
-  const [formOpen, setFormOpen] = useState(true);
+  const [formOpen, setFormOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
 
