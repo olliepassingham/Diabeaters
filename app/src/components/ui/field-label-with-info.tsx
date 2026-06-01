@@ -42,6 +42,30 @@ type InlineInfoHintProps = {
   className?: string;
 };
 
+type StaticLabelWithInfoProps = {
+  children: React.ReactNode;
+  info: React.ReactNode;
+  ariaLabel?: string;
+  className?: string;
+  labelClassName?: string;
+};
+
+/** Label row without a field id — toggles, subsection titles, read-only values. */
+export function StaticLabelWithInfo({
+  children,
+  info,
+  ariaLabel = "More information",
+  className,
+  labelClassName,
+}: StaticLabelWithInfoProps) {
+  return (
+    <div className={cn("flex items-center gap-0.5", className)}>
+      <span className={cn("text-sm font-medium leading-snug", labelClassName)}>{children}</span>
+      <InlineInfoHint ariaLabel={ariaLabel} content={info} />
+    </div>
+  );
+}
+
 /** Standalone info icon that opens helper text (e.g. section intros). */
 export function InlineInfoHint({ content, ariaLabel, className }: InlineInfoHintProps) {
   return (

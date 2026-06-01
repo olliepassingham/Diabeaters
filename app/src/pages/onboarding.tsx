@@ -27,8 +27,8 @@ import {
 import { FaceLogo } from "@/components/face-logo";
 import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
-import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
+import { DIABETES_TERMS } from "@/components/info-tooltip";
+import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
@@ -64,6 +64,18 @@ import {
 import { syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
+
+const ONBOARDING_RATIO_FORMAT_LABEL = "units:10g";
+
+function diabetesTermInfo(term: { explanation: string; example?: string }, extra?: string) {
+  return (
+    <div className="space-y-2">
+      <p>{term.explanation}</p>
+      {term.example ? <p className="italic text-primary/80">Example: {term.example}</p> : null}
+      {extra ? <p>{extra}</p> : null}
+    </div>
+  );
+}
 
 type CareContext = "mostly_me" | "mostly_them" | "both_equally" | null;
 
@@ -805,7 +817,17 @@ function WelcomeStep({
 
           {!communityFlow ? (
           <div className="space-y-2">
-            <Label className="text-base">Diabetes type</Label>
+            <div className="flex items-center gap-1">
+              <Label className="text-base">Diabetes type</Label>
+              <InlineInfoHint
+                ariaLabel="About diabetes type"
+                content={
+                  <p>
+                    Diabeaters is built for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
+                  </p>
+                }
+              />
+            </div>
             <button
               type="button"
               onClick={() => updateData("diabetesType", "type1")}
@@ -819,9 +841,6 @@ function WelcomeStep({
               <span className="font-medium text-sm">Type 1</span>
               {data.diabetesType === "type1" && <Check className="h-4 w-4 text-primary" />}
             </button>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Diabeaters is built for Type&nbsp;1 diabetes management (insulin, carbs, and daily planning).
-            </p>
           </div>
           ) : null}
         </CardContent>
@@ -1061,11 +1080,20 @@ function EssentialsStep({
       <Card>
         <CardContent className="pt-6 space-y-6">
           <div className="space-y-3">
-            <Label className="text-sm font-medium">
+            <StaticLabelWithInfo
+              labelClassName="text-sm font-medium"
+              ariaLabel="About insulin delivery"
+              info={
+                <p>
+                  Pens (MDI) or pump — this shapes supply forecasts and which usage questions we ask later. You can
+                  change it anytime in Settings.
+                </p>
+              }
+            >
               {pathCare === "mostly_them"
                 ? "How does the person you support take insulin?"
                 : "How do you take your insulin?"}
-            </Label>
+            </StaticLabelWithInfo>
             <RadioGroup
               value={data.insulinDeliveryMethod}
               onValueChange={(value) => updateData("insulinDeliveryMethod", value)}
@@ -1321,11 +1349,13 @@ function PathDataSuppliesStep({
             </TabsList>
             <TabsContent value="basics" className="mt-4 space-y-4">
               {isPump ? (
-                <div className="space-y-2">
-                  <Label htmlFor="path-tdd" className="flex items-center gap-1">
+                <div className="space-y-1.5">
+                  <FieldLabelWithInfo
+                    htmlFor="path-tdd"
+                    info={diabetesTermInfo(DIABETES_TERMS.tdd, "All insulin the pump delivers in a day.")}
+                  >
                     Total Daily Dose (units)
-                    <InfoTooltip {...DIABETES_TERMS.tdd} />
-                  </Label>
+                  </FieldLabelWithInfo>
                   <Input
                     id="path-tdd"
                     type="number"
@@ -1335,30 +1365,42 @@ function PathDataSuppliesStep({
                     data-testid="input-onboarding-tdd"
                   />
                   <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-                  <p className="text-xs text-muted-foreground">All insulin your pump delivers in a day</p>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {supporterHeavy
-                    ? "We’ll use daily insulin totals in the next tab to estimate how quickly they go through pens and vials. Add sensor duration in CGM (optional) if they use a CGM."
-                    : "We’ll use your daily insulin totals in the next tab to estimate how quickly you go through pens and vials. Add sensor duration in CGM (optional) if you use a CGM."}
-                </p>
+                <div className="flex justify-end">
+                  <InlineInfoHint
+                    ariaLabel="About supply basics"
+                    content={
+                      <p>
+                        {supporterHeavy
+                          ? "We’ll use daily insulin totals in the next tab to estimate how quickly they go through pens and vials. Add sensor duration under CGM (optional) if they use a CGM."
+                          : "We’ll use your daily insulin totals in the next tab to estimate how quickly you go through pens and vials. Add sensor duration under CGM (optional) if you use a CGM."}
+                      </p>
+                    }
+                  />
+                </div>
               )}
             </TabsContent>
             <TabsContent value="usage" className="mt-4 space-y-4">
               {isPump ? (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {supporterHeavy
-                    ? "Pump therapy delivers basal and bolus together — total daily dose is the main number we use for supply forecasts. You can refine usage logs later in the Supply Tracker."
-                    : "Your pump delivers basal and bolus together — total daily dose is the main number we use for supply forecasts. You can refine usage logs later in the Supply Tracker."}
-                </p>
+                <div className="flex justify-end">
+                  <InlineInfoHint
+                    ariaLabel="About pump usage"
+                    content={
+                      <p>
+                        {supporterHeavy
+                          ? "Pump therapy delivers basal and bolus together — total daily dose is the main number for supply forecasts. Refine usage later in the Supply Tracker."
+                          : "Your pump delivers basal and bolus together — total daily dose is the main number for supply forecasts. Refine usage later in the Supply Tracker."}
+                      </p>
+                    }
+                  />
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="path-short" className="flex items-center gap-1">
+                  <div className="space-y-1.5">
+                    <FieldLabelWithInfo htmlFor="path-short" info={diabetesTermInfo(DIABETES_TERMS.shortActing)}>
                       Short-Acting (units/day)
-                      <InfoTooltip {...DIABETES_TERMS.shortActing} />
-                    </Label>
+                    </FieldLabelWithInfo>
                     <Input
                       id="path-short"
                       type="number"
@@ -1368,11 +1410,10 @@ function PathDataSuppliesStep({
                       data-testid="input-onboarding-short-acting"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="path-long" className="flex items-center gap-1">
+                  <div className="space-y-1.5">
+                    <FieldLabelWithInfo htmlFor="path-long" info={diabetesTermInfo(DIABETES_TERMS.longActing)}>
                       Long-Acting (units/day)
-                      <InfoTooltip {...DIABETES_TERMS.longActing} />
-                    </Label>
+                    </FieldLabelWithInfo>
                     <Input
                       id="path-long"
                       type="number"
@@ -1386,20 +1427,25 @@ function PathDataSuppliesStep({
               )}
             </TabsContent>
             <TabsContent value="optional" className="mt-4 space-y-4">
-              {supporterHeavy ? (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Only needed if they use a CGM/sensor. Skip if you’re not sure — you can add it later.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Optional — only needed if you use a CGM/sensor.
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="path-cgm" className="flex items-center gap-1">
+              <div className="flex justify-end">
+                <InlineInfoHint
+                  ariaLabel="About CGM settings"
+                  content={
+                    <div className="space-y-2">
+                      <p>
+                        {supporterHeavy
+                          ? "Only needed if they use a CGM/sensor. Skip if you’re not sure."
+                          : "Optional — only needed if you use a CGM/sensor."}
+                      </p>
+                      <p>You can update these anytime in Settings.</p>
+                    </div>
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <FieldLabelWithInfo htmlFor="path-cgm" info={diabetesTermInfo(DIABETES_TERMS.cgmDuration)}>
                   Sensor Duration (days)
-                  <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
-                </Label>
+                </FieldLabelWithInfo>
                 <Input
                   id="path-cgm"
                   type="number"
@@ -1409,9 +1455,6 @@ function PathDataSuppliesStep({
                   data-testid="input-onboarding-cgm"
                 />
               </div>
-              <p className="text-xs text-muted-foreground italic">
-                You can always update these later in Settings.
-              </p>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -1467,54 +1510,58 @@ function PathDataMealsStep({
               </TabsTrigger>
             </TabsList>
             <TabsContent value="ratios" className="mt-4 space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-1">
-                Carb Ratios (units:10g carbs)
-                <InfoTooltip {...DIABETES_TERMS.carbRatio} />
-              </Label>
+              <StaticLabelWithInfo
+                labelClassName="text-sm font-medium"
+                ariaLabel="About carb ratios"
+                info={
+                  <div className="space-y-2">
+                    {diabetesTermInfo(DIABETES_TERMS.carbRatio)}
+                    <p>
+                      Enter values as <strong>{ONBOARDING_RATIO_FORMAT_LABEL}</strong> carbs.
+                    </p>
+                  </div>
+                }
+              >
+                Carb ratios ({ONBOARDING_RATIO_FORMAT_LABEL} carbs)
+              </StaticLabelWithInfo>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Breakfast</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 1.0"
-                    value={data.breakfastRatio}
-                    onChange={(e) => updateData("breakfastRatio", e.target.value)}
-                    data-testid="input-onboarding-breakfast-ratio"
-                  />
-                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.breakfastRatio, "per10g"))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Lunch</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 0.8"
-                    value={data.lunchRatio}
-                    onChange={(e) => updateData("lunchRatio", e.target.value)}
-                    data-testid="input-onboarding-lunch-ratio"
-                  />
-                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.lunchRatio, "per10g"))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Dinner</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    placeholder="e.g., 1.0"
-                    value={data.dinnerRatio}
-                    onChange={(e) => updateData("dinnerRatio", e.target.value)}
-                    data-testid="input-onboarding-dinner-ratio"
-                  />
-                  <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(data.dinnerRatio, "per10g"))} />
-                </div>
+                {(
+                  [
+                    { label: "Breakfast", key: "breakfastRatio" as const, placeholder: "e.g., 1.0", testId: "breakfast" },
+                    { label: "Lunch", key: "lunchRatio" as const, placeholder: "e.g., 0.8", testId: "lunch" },
+                    { label: "Dinner", key: "dinnerRatio" as const, placeholder: "e.g., 1.0", testId: "dinner" },
+                  ] as const
+                ).map((meal) => (
+                  <div key={meal.key} className="space-y-1.5">
+                    <Label className="text-sm">{meal.label}</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      placeholder={meal.placeholder}
+                      value={data[meal.key]}
+                      onChange={(e) => updateData(meal.key, e.target.value)}
+                      data-testid={`input-onboarding-${meal.testId}-ratio`}
+                    />
+                    <ClinicalWarningHint
+                      warning={validateCarbRatio(parseInputToGramsPerUnit(data[meal.key], "per10g"))}
+                    />
+                    <p className="text-xs text-muted-foreground">{ONBOARDING_RATIO_FORMAT_LABEL}</p>
+                  </div>
+                ))}
               </div>
             </TabsContent>
-            <TabsContent value="corrections" className="mt-4 space-y-2">
-              <Label htmlFor="path-correction" className="flex items-center gap-1">
+            <TabsContent value="corrections" className="mt-4 space-y-1.5">
+              <FieldLabelWithInfo
+                htmlFor="path-correction"
+                info={diabetesTermInfo(
+                  DIABETES_TERMS.correctionFactor,
+                  pathCare === "mostly_them"
+                    ? `How much 1 unit lowers their blood sugar (${data.bgUnits}).`
+                    : `How much 1 unit lowers your blood sugar (${data.bgUnits}).`,
+                )}
+              >
                 Correction Factor
-                <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
-              </Label>
+              </FieldLabelWithInfo>
               <Input
                 id="path-correction"
                 type="number"
@@ -1525,17 +1572,17 @@ function PathDataMealsStep({
                 data-testid="input-onboarding-correction"
               />
               <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-              <p className="text-xs text-muted-foreground">
-                {pathCare === "mostly_them"
-                  ? "How much 1 unit lowers their blood sugar"
-                  : "How much 1 unit lowers your blood sugar"}
-              </p>
             </TabsContent>
-            <TabsContent value="optional" className="mt-4">
-              <p className="text-xs text-muted-foreground italic">
-                Not sure? No problem — you can always add these later in Settings, or use our Ratio Adviser to figure
-                them out.
-              </p>
+            <TabsContent value="optional" className="mt-4 flex justify-center py-4">
+              <InlineInfoHint
+                ariaLabel="About optional meal settings"
+                content={
+                  <p>
+                    Not sure? You can add ratios and corrections later in Settings, or use the Ratio Adviser to work
+                    them out.
+                  </p>
+                }
+              />
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -1587,11 +1634,18 @@ function PathDataExerciseStep({
                 Corrections
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="basics" className="mt-4 space-y-2">
-              <Label htmlFor="path-tdd-ex" className="flex items-center gap-1">
+            <TabsContent value="basics" className="mt-4 space-y-1.5">
+              <FieldLabelWithInfo
+                htmlFor="path-tdd-ex"
+                info={diabetesTermInfo(
+                  DIABETES_TERMS.tdd,
+                  pathCare === "mostly_them"
+                    ? "All insulin they take in a day — used for exercise adjustment suggestions."
+                    : "All insulin you take in a day — used for exercise adjustment suggestions.",
+                )}
+              >
                 Total Daily Dose (units)
-                <InfoTooltip {...DIABETES_TERMS.tdd} />
-              </Label>
+              </FieldLabelWithInfo>
               <Input
                 id="path-tdd-ex"
                 type="number"
@@ -1601,17 +1655,19 @@ function PathDataExerciseStep({
                 data-testid="input-onboarding-tdd"
               />
               <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-              <p className="text-xs text-muted-foreground">
-                {pathCare === "mostly_them"
-                  ? "All insulin they take in a day — this helps calculate exercise adjustments"
-                  : "All insulin you take in a day — this helps calculate exercise adjustments"}
-              </p>
             </TabsContent>
-            <TabsContent value="corrections" className="mt-4 space-y-2">
-              <Label htmlFor="path-correction-ex" className="flex items-center gap-1">
+            <TabsContent value="corrections" className="mt-4 space-y-1.5">
+              <FieldLabelWithInfo
+                htmlFor="path-correction-ex"
+                info={
+                  <div className="space-y-2">
+                    {diabetesTermInfo(DIABETES_TERMS.correctionFactor)}
+                    <p>You can update these anytime in Settings.</p>
+                  </div>
+                }
+              >
                 Correction Factor
-                <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
-              </Label>
+              </FieldLabelWithInfo>
               <Input
                 id="path-correction-ex"
                 type="number"
@@ -1622,9 +1678,6 @@ function PathDataExerciseStep({
                 data-testid="input-onboarding-correction"
               />
               <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-              <p className="text-xs text-muted-foreground italic mt-4">
-                You can always update these later in Settings.
-              </p>
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -1677,11 +1730,18 @@ function PathDataOverviewStep({
               </TabsTrigger>
             </TabsList>
             <TabsContent value="basics" className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="path-tdd-ov" className="flex items-center gap-1">
+              <div className="space-y-1.5">
+                <FieldLabelWithInfo
+                  htmlFor="path-tdd-ov"
+                  info={
+                    <div className="space-y-2">
+                      {diabetesTermInfo(DIABETES_TERMS.tdd)}
+                      <p>You can add more detail later in Settings — we&apos;ll prompt you when it&apos;s needed.</p>
+                    </div>
+                  }
+                >
                   Total Daily Dose (units)
-                  <InfoTooltip {...DIABETES_TERMS.tdd} />
-                </Label>
+                </FieldLabelWithInfo>
                 <Input
                   id="path-tdd-ov"
                   type="number"
@@ -1690,16 +1750,13 @@ function PathDataOverviewStep({
                   onChange={(e) => updateData("tdd", e.target.value)}
                   data-testid="input-onboarding-tdd"
                 />
+                <ClinicalWarningHint warning={validateTDD(data.tdd)} />
               </div>
-              <p className="text-xs text-muted-foreground italic">
-                You can add more detail later in Settings — we'll prompt you when it's needed.
-              </p>
             </TabsContent>
-            <TabsContent value="sensors" className="mt-4 space-y-2">
-              <Label htmlFor="path-cgm-ov" className="flex items-center gap-1">
+            <TabsContent value="sensors" className="mt-4 space-y-1.5">
+              <FieldLabelWithInfo htmlFor="path-cgm-ov" info={diabetesTermInfo(DIABETES_TERMS.cgmDuration)}>
                 Sensor Duration (days)
-                <InfoTooltip {...DIABETES_TERMS.cgmDuration} />
-              </Label>
+              </FieldLabelWithInfo>
               <Input
                 id="path-cgm-ov"
                 type="number"

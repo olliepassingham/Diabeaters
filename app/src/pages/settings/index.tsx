@@ -35,8 +35,8 @@ import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
-import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
+import { DIABETES_TERMS } from "@/components/info-tooltip";
+import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPerUnit, formatRatioForStorage, formatRatioInputPlaceholder, formatRatioInputLabel } from "@/lib/ratio-utils";
 import type { RatioFormat } from "@/lib/storage";
@@ -136,7 +136,16 @@ function ProfileTab({
   return (
     <div className="space-y-3 rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
       <div className="space-y-1.5">
-        <Label htmlFor="app-region">Region</Label>
+        <FieldLabelWithInfo
+          htmlFor="app-region"
+          info={
+            <p>
+              Sets emergency numbers and safety wording. Units below can be changed separately.
+            </p>
+          }
+        >
+          Region
+        </FieldLabelWithInfo>
         <Select value={appRegion} onValueChange={(v) => handleRegionChange(v as AppRegion)}>
           <SelectTrigger id="app-region" data-testid="select-app-region">
             <SelectValue />
@@ -149,9 +158,6 @@ function ProfileTab({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
-          Sets emergency numbers and safety wording. Units below can be changed separately.
-        </p>
       </div>
       {appRegion === "OTHER" ? (
         <div className="space-y-1.5">
@@ -193,7 +199,18 @@ function ProfileTab({
         </div>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="delivery-method">Insulin Delivery Method</Label>
+        <FieldLabelWithInfo
+          htmlFor="delivery-method"
+          info={
+            <p>
+              {isPumpDeliveryMethod(deliveryMethod)
+                ? "Using an insulin pump for continuous delivery."
+                : "Using pens or syringes for injections (MDI)."}
+            </p>
+          }
+        >
+          Insulin Delivery Method
+        </FieldLabelWithInfo>
         <Select value={deliveryMethod} onValueChange={(v) => setDeliveryMethod(v as "pen" | "pump")}>
           <SelectTrigger id="delivery-method" data-testid="select-delivery-method">
             <SelectValue />
@@ -203,9 +220,6 @@ function ProfileTab({
             <SelectItem value="pump">Insulin Pump</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
-          {isPumpDeliveryMethod(deliveryMethod) ? "Using an insulin pump for continuous delivery" : "Using pens or syringes for injections"}
-        </p>
       </div>
       <div className="space-y-1.5">
         <FieldLabelWithInfo
@@ -245,8 +259,9 @@ function ProfileTab({
           htmlFor="settings-body-weight"
           info={
             <p>
-              Used for hypo treatment estimates in Hypo help. Stored on this device only. Update when your weight
-              changes — especially important for under-18s.
+              Used for hypo treatment estimates in Hypo help. Pre-fills the hypo calculator so you do not need to enter
+              weight during a hypo. Stored on this device only. Update when your weight changes — especially important
+              for under-18s.
             </p>
           }
         >
@@ -286,9 +301,6 @@ function ProfileTab({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Pre-fills the hypo calculator so you do not need to enter weight during a hypo.
-        </p>
       </div>
       <div className="hidden justify-end pt-1 md:flex">
         <Button onClick={onSave} data-testid="button-save-profile">
@@ -322,47 +334,86 @@ function InsulinTab({
   carbPortionSize: string; onCarbPortionSizeChange: (size: string) => void;
   onSave: () => void;
 }) {
+  const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
+  const ratioFormatLabel = formatRatioInputLabel(ratioFormat, cpSize);
+  const ratioFormatPlaceholder = formatRatioInputPlaceholder(ratioFormat);
+
+  const diabetesTermInfo = (term: { explanation: string; example?: string }, extra?: string) => (
+    <div className="space-y-2">
+      <p>{term.explanation}</p>
+      {term.example ? <p className="italic text-primary/80">Example: {term.example}</p> : null}
+      {extra ? <p>{extra}</p> : null}
+    </div>
+  );
+
+  const mealRatioFields: {
+    id: string;
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    testId: string;
+  }[] = [
+    { id: "breakfast-ratio", label: "Breakfast", value: breakfastRatio, onChange: setBreakfastRatio, testId: "breakfast" },
+    { id: "lunch-ratio", label: "Lunch", value: lunchRatio, onChange: setLunchRatio, testId: "lunch" },
+    { id: "dinner-ratio", label: "Dinner", value: dinnerRatio, onChange: setDinnerRatio, testId: "dinner" },
+    { id: "snack-ratio", label: "Snack", value: snackRatio, onChange: setSnackRatio, testId: "snack" },
+  ];
+
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <Syringe className="h-5 w-5 text-primary" />
-            <CardTitle className="text-h3 font-semibold">Insulin Settings</CardTitle>
+            <Syringe className="h-5 w-5 text-primary" aria-hidden />
+            <StaticLabelWithInfo
+              labelClassName="text-h3 font-semibold"
+              ariaLabel="About insulin settings"
+              info={
+                <p>Configure your insulin ratios and targets for calculations across tools and advisers.</p>
+              }
+            >
+              Insulin Settings
+            </StaticLabelWithInfo>
           </div>
-          <CardDescription className="text-body text-muted-foreground">
-            Configure your insulin ratios and targets for calculations.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pb-28 md:pb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="tdd" className="flex items-center">
+          <div className="space-y-1.5">
+            <FieldLabelWithInfo
+              htmlFor="tdd"
+              info={diabetesTermInfo(DIABETES_TERMS.tdd, "Enter your typical total units per day.")}
+            >
               Total Daily Dose (TDD)
-              <InfoTooltip {...DIABETES_TERMS.tdd} />
-            </Label>
+            </FieldLabelWithInfo>
             <Input id="tdd" type="number" placeholder="e.g., 40" value={tdd} onChange={(e) => setTdd(e.target.value)} data-testid="input-tdd" />
             <ClinicalWarningHint warning={validateTDD(tdd)} />
-            <p className="text-xs text-muted-foreground">Units per day</p>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="correction-factor" className="flex items-center">
+          <div className="space-y-1.5">
+            <FieldLabelWithInfo
+              htmlFor="correction-factor"
+              info={diabetesTermInfo(
+                DIABETES_TERMS.correctionFactor,
+                `How much 1 unit lowers your blood sugar (${bgUnits}).`,
+              )}
+            >
               Correction Factor
-              <InfoTooltip {...DIABETES_TERMS.correctionFactor} />
-            </Label>
+            </FieldLabelWithInfo>
             <Input id="correction-factor" type="number" step="0.1" placeholder={bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"} value={correctionFactor} onChange={(e) => setCorrectionFactor(e.target.value)} data-testid="input-correction-factor" />
             <ClinicalWarningHint warning={validateCorrectionFactor(correctionFactor, bgUnits)} />
-            <p className="text-xs text-muted-foreground">How much 1 unit lowers your blood sugar</p>
           </div>
-          <div className="space-y-2">
-            <Label className="flex items-center">
+          <div className="space-y-1.5">
+            <StaticLabelWithInfo
+              ariaLabel="About target range"
+              info={diabetesTermInfo(DIABETES_TERMS.targetRange)}
+            >
               Target Range ({bgUnits})
-              <InfoTooltip {...DIABETES_TERMS.targetRange} />
-            </Label>
+            </StaticLabelWithInfo>
             <div className="flex items-center gap-2">
-              <Input type="number" placeholder="Low" value={targetBgLow} onChange={(e) => setTargetBgLow(e.target.value)} data-testid="input-target-bg-low" />
-              <span className="text-muted-foreground">-</span>
-              <Input type="number" placeholder="High" value={targetBgHigh} onChange={(e) => setTargetBgHigh(e.target.value)} data-testid="input-target-bg-high" />
+              <Input id="target-bg-low" type="number" placeholder="Low" value={targetBgLow} onChange={(e) => setTargetBgLow(e.target.value)} data-testid="input-target-bg-low" aria-label={`Target low (${bgUnits})`} />
+              <span className="text-muted-foreground" aria-hidden>
+                -
+              </span>
+              <Input id="target-bg-high" type="number" placeholder="High" value={targetBgHigh} onChange={(e) => setTargetBgHigh(e.target.value)} data-testid="input-target-bg-high" aria-label={`Target high (${bgUnits})`} />
             </div>
             <ClinicalWarningHint warning={validateTargetBgLow(targetBgLow, bgUnits)} />
             <ClinicalWarningHint warning={validateTargetBgHigh(targetBgHigh, bgUnits)} />
@@ -371,27 +422,50 @@ function InsulinTab({
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center gap-4 flex-wrap">
-            <Label className="text-sm font-medium">Ratio format:</Label>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <StaticLabelWithInfo
+              labelClassName="text-sm font-medium"
+              ariaLabel="About ratio format"
+              info={
+                <p>
+                  Choose how you enter carb coverage: units per 10g, units per carb portion (CP), or grams of carbs per
+                  1 unit.
+                </p>
+              }
+            >
+              Ratio format
+            </StaticLabelWithInfo>
             <RadioGroup value={ratioFormat} onValueChange={(v) => onRatioFormatChange(v as RatioFormat)} className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="per10g" id="ratio-format-per10g" data-testid="radio-ratio-format-per10g" />
-                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">Units:10g</Label>
+                <Label htmlFor="ratio-format-per10g" className="text-sm cursor-pointer">
+                  Units:10g
+                </Label>
               </div>
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="perCP" id="ratio-format-perCP" data-testid="radio-ratio-format-perCP" />
-                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">Units:1 CP</Label>
+                <Label htmlFor="ratio-format-perCP" className="text-sm cursor-pointer">
+                  Units:1 CP
+                </Label>
               </div>
               <div className="flex items-center gap-1.5">
                 <RadioGroupItem value="1toXg" id="ratio-format-1toXg" data-testid="radio-ratio-format-1toXg" />
-                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">1 unit:Xg</Label>
+                <Label htmlFor="ratio-format-1toXg" className="text-sm cursor-pointer">
+                  1 unit:Xg
+                </Label>
               </div>
             </RadioGroup>
           </div>
 
           {ratioFormat === "perCP" && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <Label className="text-sm text-muted-foreground">1 Carb Portion (CP) =</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <StaticLabelWithInfo
+                labelClassName="text-sm text-muted-foreground font-normal"
+                ariaLabel="About carb portion size"
+                info={<p>How many grams of carbohydrate count as one carb portion (CP) in your ratios.</p>}
+              >
+                1 Carb Portion (CP) =
+              </StaticLabelWithInfo>
               <div className="flex items-center gap-2">
                 {["10", "12", "15"].map((size) => (
                   <Button
@@ -415,6 +489,7 @@ function InsulinTab({
                   value={!["10", "12", "15"].includes(carbPortionSize) ? carbPortionSize : ""}
                   onChange={(e) => onCarbPortionSizeChange(e.target.value)}
                   data-testid="input-cp-size-custom"
+                  aria-label="Custom carb portion size in grams"
                 />
                 <span className="text-sm text-muted-foreground">g</span>
               </div>
@@ -422,40 +497,50 @@ function InsulinTab({
           )}
 
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <Label className="text-sm font-medium flex items-center">
-              Carb Ratios ({formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)})
-              <InfoTooltip {...DIABETES_TERMS.carbRatio} />
-            </Label>
-            <Link href="/adviser?tab=ratios" className="text-xs text-muted-foreground flex items-center gap-1 hover:underline" data-testid="link-go-ratio-adviser">
-              Not sure? Try the Ratio Adviser
-              <ArrowRight className="h-3 w-3" />
+            <StaticLabelWithInfo
+              labelClassName="text-sm font-medium"
+              ariaLabel="About carb ratios"
+              info={
+                <div className="space-y-2">
+                  {diabetesTermInfo(DIABETES_TERMS.carbRatio)}
+                  <p>
+                    Enter values as <strong>{ratioFormatLabel}</strong>. Placeholder shows the expected format.
+                  </p>
+                </div>
+              }
+            >
+              Carb ratios ({ratioFormatLabel})
+            </StaticLabelWithInfo>
+            <Link
+              href="/adviser?tab=ratios"
+              className="text-xs text-primary flex items-center gap-1 hover:underline shrink-0"
+              data-testid="link-go-ratio-adviser"
+            >
+              Ratio Adviser
+              <ArrowRight className="h-3 w-3" aria-hidden />
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="breakfast-ratio" className="text-xs text-muted-foreground">Breakfast</Label>
-              <Input id="breakfast-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={breakfastRatio} onChange={(e) => setBreakfastRatio(e.target.value)} data-testid="input-breakfast-ratio" />
-              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(breakfastRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lunch-ratio" className="text-xs text-muted-foreground">Lunch</Label>
-              <Input id="lunch-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={lunchRatio} onChange={(e) => setLunchRatio(e.target.value)} data-testid="input-lunch-ratio" />
-              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(lunchRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dinner-ratio" className="text-xs text-muted-foreground">Dinner</Label>
-              <Input id="dinner-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={dinnerRatio} onChange={(e) => setDinnerRatio(e.target.value)} data-testid="input-dinner-ratio" />
-              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(dinnerRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="snack-ratio" className="text-xs text-muted-foreground">Snack</Label>
-              <Input id="snack-ratio" type="number" step="0.1" placeholder={formatRatioInputPlaceholder(ratioFormat)} value={snackRatio} onChange={(e) => setSnackRatio(e.target.value)} data-testid="input-snack-ratio" />
-              <ClinicalWarningHint warning={validateCarbRatio(parseInputToGramsPerUnit(snackRatio, ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined))} />
-              <p className="text-xs text-muted-foreground">{formatRatioInputLabel(ratioFormat, carbPortionSize ? parseFloat(carbPortionSize) : undefined)}</p>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {mealRatioFields.map((meal) => (
+              <div key={meal.id} className="space-y-1.5">
+                <Label htmlFor={meal.id} className="text-sm">
+                  {meal.label}
+                </Label>
+                <Input
+                  id={meal.id}
+                  type="number"
+                  step="0.1"
+                  placeholder={ratioFormatPlaceholder}
+                  value={meal.value}
+                  onChange={(e) => meal.onChange(e.target.value)}
+                  data-testid={`input-${meal.testId}-ratio`}
+                />
+                <ClinicalWarningHint
+                  warning={validateCarbRatio(parseInputToGramsPerUnit(meal.value, ratioFormat, cpSize))}
+                />
+                <p className="text-xs text-muted-foreground">{ratioFormatLabel}</p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -524,18 +609,22 @@ function UsageTab({
 }) {
   const usageFieldInputClass = "h-10 border-border/60 bg-background/85 shadow-none";
   const usageSelectTriggerClass = "h-10 rounded-xl border-border/60 bg-background/85";
-  const usagePairedHintClass = "mt-1 min-h-[2.25rem] text-xs leading-snug text-muted-foreground";
   const longActingInjCount = parseInt(longActingInjectionsPerDay || "0", 10) || 0;
   const showSecondBasalTime = !isPumpUser && longActingInjCount === 2;
+  const unitsPerPenLabel = unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN);
 
   return (
     <div className="space-y-3">
         <div className="flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/15 px-3 py-2 sm:px-3 sm:py-2">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="text-sm font-medium leading-tight">Smarter supply forecast</p>
-            <p className="text-[11px] text-muted-foreground leading-snug sm:text-xs">
-              Optional: refine burn rate from recent adjustments/refills (last 7 days).
-            </p>
+          <div className="min-w-0 flex-1">
+            <StaticLabelWithInfo
+              ariaLabel="About smarter supply forecast"
+              info={
+                <p>Optional: refine burn rate from recent adjustments and refills (last 7 days).</p>
+              }
+            >
+              Smarter supply forecast
+            </StaticLabelWithInfo>
           </div>
           <Switch
             className="shrink-0"
@@ -550,25 +639,38 @@ function UsageTab({
             <p className="mb-2 text-xs font-medium text-muted-foreground">Pump &amp; CGM</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label>Total Daily Dose</Label>
+              <StaticLabelWithInfo
+                labelClassName="text-sm"
+                ariaLabel="About total daily dose"
+                info={
+                  <div className="space-y-2">
+                    <p>Uses your TDD from Insulin Settings (Ratios).</p>
+                    <p>
+                      If you use <strong>hybrid closed loop</strong> (e.g. Control-IQ, Loop), exercise and temp-basal
+                      tips in this app may overlap what automation already does — follow your care team and device manuals
+                      first.
+                    </p>
+                  </div>
+                }
+              >
+                Total Daily Dose
+              </StaticLabelWithInfo>
               <div className="flex h-10 items-center rounded-xl border border-border/60 bg-background/85 px-3">
                 <span className={`text-sm ${tdd ? "" : "text-muted-foreground"}`}>
                   {tdd ? `${tdd} units/day` : "Set under Ratios below"}
                 </span>
               </div>
-              <p className="text-xs leading-snug text-muted-foreground">Uses your TDD from Insulin Settings</p>
-              <p className="text-xs leading-snug text-muted-foreground border-t border-border/50 pt-2 mt-0.5">
-                If you use <strong>hybrid closed loop</strong> (e.g. Control-IQ, Loop), exercise and temp-basal tips in
-                this app may overlap what automation already does — follow your care team and device manuals first.
-              </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reservoir-capacity">Reservoir Capacity</Label>
+              <FieldLabelWithInfo htmlFor="reservoir-capacity" info={<p>Units per cartridge.</p>}>
+                Reservoir Capacity
+              </FieldLabelWithInfo>
               <Input id="reservoir-capacity" className={usageFieldInputClass} type="number" placeholder="e.g., 300" value={reservoirCapacity} onChange={(e) => setReservoirCapacity(e.target.value)} data-testid="input-reservoir-capacity" />
-              <p className={usagePairedHintClass}>Units per cartridge</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="site-change-days">Site Change Interval</Label>
+              <FieldLabelWithInfo htmlFor="site-change-days" info={<p>How often you change infusion sets.</p>}>
+                Site Change Interval
+              </FieldLabelWithInfo>
               <Select value={siteChangeDays} onValueChange={setSiteChangeDays}>
                 <SelectTrigger id="site-change-days" className={usageSelectTriggerClass} data-testid="select-site-change-days"><SelectValue placeholder="Days" /></SelectTrigger>
                 <SelectContent>
@@ -577,10 +679,11 @@ function UsageTab({
                   <SelectItem value="4">Every 4 days</SelectItem>
                 </SelectContent>
               </Select>
-              <p className={usagePairedHintClass}>How often you change infusion sets</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reservoir-change-days">Reservoir Change Interval</Label>
+              <FieldLabelWithInfo htmlFor="reservoir-change-days" info={<p>How often you change reservoirs.</p>}>
+                Reservoir Change Interval
+              </FieldLabelWithInfo>
               <Select value={reservoirChangeDays} onValueChange={setReservoirChangeDays}>
                 <SelectTrigger id="reservoir-change-days" className={usageSelectTriggerClass} data-testid="select-reservoir-change-days"><SelectValue placeholder="Days" /></SelectTrigger>
                 <SelectContent>
@@ -591,12 +694,15 @@ function UsageTab({
                   <SelectItem value="7">Every 7 days</SelectItem>
                 </SelectContent>
               </Select>
-              <p className={usagePairedHintClass}>How often you change reservoirs</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cgm-days">CGM Sensor Duration (days)</Label>
+              <FieldLabelWithInfo
+                htmlFor="cgm-days"
+                info={<p>Typical wear window for your sensor (often 7–14 days).</p>}
+              >
+                CGM Sensor Duration (days)
+              </FieldLabelWithInfo>
               <Input id="cgm-days" className={usageFieldInputClass} type="number" placeholder="e.g., 10" value={cgmDays} onChange={(e) => setCgmDays(e.target.value)} data-testid="input-cgm-days" />
-              <p className={usagePairedHintClass}>Typical wear window for your sensor (often 7–14 days).</p>
             </div>
           </div>
           </div>
@@ -605,28 +711,34 @@ function UsageTab({
             <p className="text-xs font-medium text-muted-foreground">Typical day (MDI)</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="short-acting-units">Short-Acting Units/Day</Label>
+              <FieldLabelWithInfo
+                htmlFor="short-acting-units"
+                info={<p>{unitsPerPenLabel} units = 1 pen.</p>}
+              >
+                Short-Acting Units/Day
+              </FieldLabelWithInfo>
               <Input id="short-acting-units" className={usageFieldInputClass} type="number" placeholder="e.g., 25" value={shortActingUnitsPerDay} onChange={(e) => setShortActingUnitsPerDay(e.target.value)} data-testid="input-short-acting-units" />
-              <p className={usagePairedHintClass}>
-                {unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN)} units = 1 pen
-              </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="long-acting-units">Long-Acting Units/Day</Label>
+              <FieldLabelWithInfo
+                htmlFor="long-acting-units"
+                info={<p>{unitsPerPenLabel} units = 1 pen.</p>}
+              >
+                Long-Acting Units/Day
+              </FieldLabelWithInfo>
               <Input id="long-acting-units" className={usageFieldInputClass} type="number" placeholder="e.g., 20" value={longActingUnitsPerDay} onChange={(e) => setLongActingUnitsPerDay(e.target.value)} data-testid="input-long-acting-units" />
-              <p className={usagePairedHintClass}>
-                {unitsPerInsulinPen || String(UK_DEFAULT_UNITS_PER_INSULIN_PEN)} units = 1 pen
-              </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="short-acting-injections">Short-Acting Injections/Day</Label>
+              <FieldLabelWithInfo htmlFor="short-acting-injections" info={<p>Meals + corrections.</p>}>
+                Short-Acting Injections/Day
+              </FieldLabelWithInfo>
               <Input id="short-acting-injections" className={usageFieldInputClass} type="number" placeholder="e.g., 3" value={shortActingInjectionsPerDay} onChange={(e) => setShortActingInjectionsPerDay(e.target.value)} data-testid="input-short-acting-injections" />
-              <p className={usagePairedHintClass}>Meals + corrections</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="long-acting-injections">Long-Acting Injections/Day</Label>
+              <FieldLabelWithInfo htmlFor="long-acting-injections" info={<p>Basal doses (usually 1 or 2).</p>}>
+                Long-Acting Injections/Day
+              </FieldLabelWithInfo>
               <Input id="long-acting-injections" className={usageFieldInputClass} type="number" placeholder="e.g., 1" value={longActingInjectionsPerDay} onChange={(e) => setLongActingInjectionsPerDay(e.target.value)} data-testid="input-long-acting-injections" />
-              <p className={usagePairedHintClass}>Basal doses (usually 1 or 2)</p>
             </div>
             </div>
 
@@ -635,7 +747,17 @@ function UsageTab({
               {showSecondBasalTime ? (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="settings-basal-time">First long-acting time</Label>
+                    <FieldLabelWithInfo
+                      htmlFor="settings-basal-time"
+                      info={
+                        <p>
+                          Home clock time; used for travel insulin timing (MDI) when you cross time zones (both basal
+                          doses).
+                        </p>
+                      }
+                    >
+                      First long-acting time
+                    </FieldLabelWithInfo>
                     <Input
                       id="settings-basal-time"
                       className={`${usageFieldInputClass} w-full max-w-[12rem]`}
@@ -646,7 +768,17 @@ function UsageTab({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="settings-basal-time-2">Second long-acting time</Label>
+                    <FieldLabelWithInfo
+                      htmlFor="settings-basal-time-2"
+                      info={
+                        <p>
+                          Home clock time; used for travel insulin timing (MDI) when you cross time zones (both basal
+                          doses).
+                        </p>
+                      }
+                    >
+                      Second long-acting time
+                    </FieldLabelWithInfo>
                     <Input
                       id="settings-basal-time-2"
                       className={`${usageFieldInputClass} w-full max-w-[12rem]`}
@@ -658,76 +790,101 @@ function UsageTab({
                   </div>
                 </div>
               ) : (
-                <>
-              <Label htmlFor="settings-basal-time">Usual long-acting injection time</Label>
-              <Input
-                id="settings-basal-time"
-                className={`${usageFieldInputClass} w-full max-w-[12rem]`}
-                type="time"
-                value={basalInjectionTime}
-                onChange={(e) => setBasalInjectionTime(e.target.value)}
-                data-testid="input-settings-basal-time"
-              />
-                </>
+                <div className="space-y-1.5">
+                  <FieldLabelWithInfo
+                    htmlFor="settings-basal-time"
+                    info={
+                      <p>
+                        Home clock time; used for travel insulin timing (MDI) when you cross time zones.
+                      </p>
+                    }
+                  >
+                    Usual long-acting injection time
+                  </FieldLabelWithInfo>
+                  <Input
+                    id="settings-basal-time"
+                    className={`${usageFieldInputClass} w-full max-w-[12rem]`}
+                    type="time"
+                    value={basalInjectionTime}
+                    onChange={(e) => setBasalInjectionTime(e.target.value)}
+                    data-testid="input-settings-basal-time"
+                  />
+                </div>
               )}
-              <p className="text-xs leading-snug text-muted-foreground">
-                Home clock time; used for travel insulin timing (MDI) when you cross time zones
-                {showSecondBasalTime ? " (both doses)." : "."}
-              </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <div className="flex min-h-[1.5rem] items-center gap-1.5">
-                <Label htmlFor="priming-units" className="mb-0">Pen Priming (units)</Label>
-                <InfoTooltip {...DIABETES_TERMS.penPriming} />
-              </div>
+              <FieldLabelWithInfo
+                htmlFor="priming-units"
+                info={
+                  <div className="space-y-2">
+                    <p>{DIABETES_TERMS.penPriming.explanation}</p>
+                    <p>Units you expel before each injection.</p>
+                  </div>
+                }
+              >
+                Pen Priming (units)
+              </FieldLabelWithInfo>
               <Input id="priming-units" className={usageFieldInputClass} type="number" min="0" max="5" step="0.5" placeholder="e.g., 2" value={primingUnits} onChange={(e) => setPrimingUnits(e.target.value)} data-testid="input-priming-units" />
-              <p className={usagePairedHintClass}>Units you expel before each injection</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cgm-days-mdi" className="flex min-h-[1.5rem] items-center">CGM Sensor Duration (days)</Label>
+              <FieldLabelWithInfo
+                htmlFor="cgm-days-mdi"
+                info={<p>Typical wear window for your sensor (often 7–14 days).</p>}
+              >
+                CGM Sensor Duration (days)
+              </FieldLabelWithInfo>
               <Input id="cgm-days-mdi" className={usageFieldInputClass} type="number" placeholder="e.g., 10" value={cgmDays} onChange={(e) => setCgmDays(e.target.value)} data-testid="input-cgm-days" />
-              <p className={usagePairedHintClass}>Typical wear window for your sensor (often 7–14 days).</p>
             </div>
             </div>
           </div>
         )}
 
         <div className="rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
-          <div className="flex items-start gap-2">
-            <Package className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0 space-y-0.5">
-              <Label className="text-sm font-medium leading-tight">Supply pack sizes</Label>
-              <p className="text-xs leading-snug text-muted-foreground">
-                Set how many units come in each pack or box you pick up. This controls the +/- buttons in Supply Tracker so one tap adds a whole pen or box.
-              </p>
-            </div>
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <StaticLabelWithInfo
+              ariaLabel="About supply pack sizes"
+              info={
+                <p>
+                  Set how many units come in each pack or box you pick up. This controls the +/- buttons in Supply
+                  Tracker so one tap adds a whole pen or box.
+                </p>
+              }
+            >
+              Supply pack sizes
+            </StaticLabelWithInfo>
           </div>
           <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {isPumpUser ? (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="insulin-cartridge-units">Units per Insulin Cartridge</Label>
+                  <FieldLabelWithInfo htmlFor="insulin-cartridge-units" info={<p>Units in one cartridge or vial.</p>}>
+                    Units per Insulin Cartridge
+                  </FieldLabelWithInfo>
                   <Input id="insulin-cartridge-units" className={usageFieldInputClass} type="number" min="1" placeholder="e.g., 300" value={insulinCartridgeUnits} onChange={(e) => setInsulinCartridgeUnits(e.target.value)} data-testid="input-insulin-cartridge-units" />
-                  <p className={usagePairedHintClass}>Units in one cartridge/vial</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="infusion-sets-per-box">Infusion Sets per Box</Label>
+                  <FieldLabelWithInfo htmlFor="infusion-sets-per-box" info={<p>Sets in one box.</p>}>
+                    Infusion Sets per Box
+                  </FieldLabelWithInfo>
                   <Input id="infusion-sets-per-box" className={usageFieldInputClass} type="number" min="1" placeholder="e.g., 10" value={infusionSetsPerBox} onChange={(e) => setInfusionSetsPerBox(e.target.value)} data-testid="input-infusion-sets-per-box" />
-                  <p className={usagePairedHintClass}>Sets in one box</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="reservoirs-per-box">Reservoirs per Box</Label>
+                  <FieldLabelWithInfo htmlFor="reservoirs-per-box" info={<p>Reservoirs in one box.</p>}>
+                    Reservoirs per Box
+                  </FieldLabelWithInfo>
                   <Input id="reservoirs-per-box" className={usageFieldInputClass} type="number" min="1" placeholder="e.g., 10" value={reservoirsPerBox} onChange={(e) => setReservoirsPerBox(e.target.value)} data-testid="input-reservoirs-per-box" />
-                  <p className={usagePairedHintClass}>Reservoirs in one box</p>
                 </div>
               </>
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <Label htmlFor="units-per-pen">Units per Insulin Pen</Label>
+                  <FieldLabelWithInfo htmlFor="units-per-pen" info={<p>Units in one disposable pen.</p>}>
+                    Units per Insulin Pen
+                  </FieldLabelWithInfo>
                   <Input
                     id="units-per-pen"
                     className={usageFieldInputClass}
@@ -738,10 +895,11 @@ function UsageTab({
                     onChange={(e) => setUnitsPerInsulinPen(e.target.value)}
                     data-testid="input-units-per-pen"
                   />
-                  <p className={usagePairedHintClass}>Units in one disposable pen</p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="needles-per-box">Needles per Box</Label>
+                  <FieldLabelWithInfo htmlFor="needles-per-box" info={<p>Needles or lancets in one box.</p>}>
+                    Needles per Box
+                  </FieldLabelWithInfo>
                   <Input
                     id="needles-per-box"
                     className={usageFieldInputClass}
@@ -752,7 +910,6 @@ function UsageTab({
                     onChange={(e) => setNeedlesPerBox(e.target.value)}
                     data-testid="input-needles-per-box"
                   />
-                  <p className={usagePairedHintClass}>Needles/lancets in one box</p>
                 </div>
               </>
             )}
@@ -1269,11 +1426,15 @@ export default function Settings() {
   const usageToolsInner = (
     <CardContent className="space-y-4 px-4 py-3 sm:px-5 sm:py-4 md:space-y-5 md:px-6 md:py-5 pb-36 md:pb-6">
       <section id="settings-personal" className="scroll-mt-24 space-y-2">
-        <div>
+        <div className="flex items-center gap-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Units, delivery method, body weight for hypo help, and optional date of birth.
-          </p>
+          <InlineInfoHint
+            ariaLabel="About profile settings"
+            content={
+              <p>Units, delivery method, body weight for hypo help, and optional date of birth.</p>
+            }
+            className="h-7 w-7"
+          />
         </div>
         <ProfileTab
           appRegion={appRegion}
@@ -1316,9 +1477,13 @@ export default function Settings() {
       </section>
 
       <section id="settings-usage" className="scroll-mt-24 space-y-2 border-t border-border/50 pt-4">
-        <div>
+        <div className="flex items-center gap-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Usage &amp; supplies</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Daily habits, sensor timing, and pack sizes for the tracker.</p>
+          <InlineInfoHint
+            ariaLabel="About usage and supplies"
+            content={<p>Daily habits, sensor timing, and pack sizes for the tracker.</p>}
+            className="h-7 w-7"
+          />
         </div>
         <UsageTab
           isPumpUser={isPumpUser}
@@ -1384,8 +1549,14 @@ export default function Settings() {
   const ratiosToolsInner = (
     <CardContent className="pt-6 pb-6 space-y-8">
       <div id="settings-ratios" className="scroll-mt-28 space-y-3 pb-28 md:pb-0">
-        <h3 className="text-h3 font-semibold text-foreground">Ratios</h3>
-        <p className="text-small text-muted-foreground">TDD, correction factor, targets, and meal ratios.</p>
+        <div className="flex items-center gap-1">
+          <h3 className="text-h3 font-semibold text-foreground">Ratios</h3>
+          <InlineInfoHint
+            ariaLabel="About ratios settings"
+            content={<p>TDD, correction factor, targets, and meal ratios used across tools and advisers.</p>}
+            className="h-7 w-7"
+          />
+        </div>
         <InsulinTab
           bgUnits={bgUnits}
           tdd={tdd}
