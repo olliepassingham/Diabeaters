@@ -1,0 +1,86 @@
+/**
+ * Shell + primary tokens (RGB space-separated for Tailwind rgb(var(--x) / <alpha>)).
+ * Primary hues: applyPrimaryThemeToDocument() in @/hooks/useTheme.
+ */
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  :root {
+    /* Page background tokens (space-separated RGB; synced with --background-current in JS) */
+    --bg-clean-light: 255 255 255;
+    --bg-soft-light: 247 248 250;
+    --bg-clean-dark: 0 0 0;
+    --bg-soft-dark: 18 18 18;
+    --background-current: var(--bg-clean-light);
+
+    --color-bg: 250 250 250;
+    --color-bg-card: 255 255 255;
+    --color-bg-muted: 244 244 245;
+    --color-bg-popover: 255 255 255;
+    --color-text: 23 23 23;
+    --color-text-muted: 113 113 122;
+    --color-border: 228 228 231;
+    --color-input: 212 212 216;
+
+    --color-primary: 59 130 246;
+    --color-primary-foreground: 255 255 255;
+    --color-primary-light: 239 246 255;
+    --color-primary-dark: 29 78 216;
+    --color-primary-border: 37 99 235;
+
+    --bg-tinted-light: var(--color-primary-light);
+    --bg-tinted-dark: var(--color-primary-dark);
+
+    /* Focus ring HSL (overridden by applyPrimaryThemeToDocument when primary changes) */
+    --ring: 221 83% 53%;
+  }
+
+  .dark {
+    --background-current: var(--bg-clean-dark);
+
+    --color-bg: 15 15 15;
+    --color-bg-card: 25 25 25;
+    --color-bg-muted: 34 34 36;
+    --color-bg-popover: 30 30 32;
+    --color-text: 230 230 230;
+    --color-text-muted: 160 160 168;
+    --color-border: 55 55 58;
+    --color-input: 58 58 62;
+
+    --color-primary: 96 165 250;
+    --color-primary-foreground: 15 23 42;
+    --color-primary-light: 30 58 138;
+    --color-primary-dark: 191 219 254;
+    --color-primary-border: 59 130 246;
+
+    --bg-tinted-light: var(--color-primary-light);
+    --bg-tinted-dark: var(--color-primary-dark);
+
+    --ring: 217 91% 60%;
+  }
+
+  /* Stronger text/border/card tokens when “High contrast” background is selected (class toggled in JS). */
+  html.appearance-high-contrast.light {
+    --color-text: 0 0 0;
+    --color-text-muted: 38 38 38;
+    --color-border: 0 0 0;
+    --color-input: 64 64 64;
+    --color-bg-card: 255 255 255;
+    --color-bg-muted: 245 245 245;
+    --color-bg-popover: 255 255 255;
+  }
+
+  html.appearance-high-contrast.dark {
+    --color-text: 255 255 255;
+    --color-text-muted: 240 240 240;
+    --color-border: 255 255 255;
+    --color-input: 220 220 220;
+    --color-bg-card: 0 0 0;
+    --color-bg-muted: 18 18 18;
+    --color-bg-popover: 10 10 10;
+  }
+}
