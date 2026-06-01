@@ -136,9 +136,15 @@ async function runHypoTreatmentPipeline(
             eligible === 1 ? "Your supporter has been notified." : "Your supporters have been notified.";
         } else if (eligible > 0 && delivered === 0) {
           description =
-            "Hypo logged. No alerts were delivered — check push API env or in-app supporter user IDs in Family & supporters.";
+            "Hypo logged. No alerts were delivered — ask your supporter to enable push in Diabeaters (Settings → Notifications) on their phone.";
+        } else if (eligible === 0) {
+          description =
+            "Saved to your record. No linked supporters received an alert — check Family & supporters and that Hypo logs sharing is on.";
         }
       }
+    } else {
+      description =
+        "Saved on this device. Cloud log failed — sign in again and retry if supporters should be notified.";
     }
   }
 

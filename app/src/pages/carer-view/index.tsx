@@ -53,6 +53,9 @@ import {
 import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { devWarn } from "@/lib/dev-log";
 import { DevNote } from "@/components/dev/DevNote";
+import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
+import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt";
+import { useAuth } from "@/lib/auth-context";
 import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
 import { PageShell } from "@/components/layout";
@@ -1217,6 +1220,7 @@ function deriveCarerHeaderContext(
 type CarerViewPhase = "loading_link" | "unlinked" | "loading_patient" | "ready";
 
 export default function CarerViewPage() {
+  const { user } = useAuth();
   const [location, setLocation] = useLocation();
   const [phase, setPhase] = useState<CarerViewPhase>("loading_link");
   const [linkedPatients, setLinkedPatients] = useState<LinkedPatientWithProfile[]>([]);
@@ -1234,6 +1238,7 @@ export default function CarerViewPage() {
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
+  const [supporterPushPromptOpen, setSupporterPushPromptOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const devOverlay =
@@ -1466,6 +1471,18 @@ export default function CarerViewPage() {
   }, [phase, activeLink]);
 
   const displayName = profile?.full_name?.trim() || "Linked person";
+
+  useEffect(() => {
+    if (phase !== "ready" || !user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const action = await resolveSupporterPushPromptAfterLink(user.id);
+      if (!cancelled && action === "show") setSupporterPushPromptOpen(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, user?.id]);
   const upcomingAppointments = useMemo(() => {
     const now = Date.now();
     return (appointmentRows ?? [])
@@ -2125,6 +2142,11 @@ export default function CarerViewPage() {
         This screen is for peace of mind and coordination. It does not give medical advice or replace their care team.
       </p>
       </PageShell>
+      <SupporterPushPromptDialog
+        open={supporterPushPromptOpen}
+        onOpenChange={setSupporterPushPromptOpen}
+        patientName={linkedBanner ?? displayName}
+      />
     </>
   );
 }

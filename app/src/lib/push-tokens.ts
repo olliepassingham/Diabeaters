@@ -274,6 +274,19 @@ function scheduleMissingTokenRegisterRetries(
   }
 }
 
+/** Current remote push permission without requesting (native only). */
+export async function checkNativePushPermission(): Promise<"granted" | "denied" | "prompt" | null> {
+  if (!isNativePushPlatform()) return null;
+  try {
+    const perm = await PushNotifications.checkPermissions();
+    if (perm.receive === "granted") return "granted";
+    if (perm.receive === "denied") return "denied";
+    return "prompt";
+  } catch {
+    return null;
+  }
+}
+
 export async function ensureNativePushRegistered(): Promise<void> {
   const platform = currentPushPlatform();
   if (!platform) return;

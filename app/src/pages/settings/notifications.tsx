@@ -25,10 +25,11 @@ export function NotificationsTab({
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   embedded?: boolean;
-  /** Supporter Mode: only alerts for the supporter’s own account (e.g. feed and messages), not the person they support. */
+  /** Supporter Mode: alerts from the linked person + this account’s community/DM. */
   supporterMode?: boolean;
 }) {
   const hypoOn = notifSettings.hypoAlerts !== false;
+  const supplyOn = notifSettings.supplyAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
@@ -50,7 +51,11 @@ export function NotificationsTab({
       <div className="flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Push notifications</Label>
-          <p className="text-small text-muted-foreground">Receive alerts when the app is in the background</p>
+          <p className="text-small text-muted-foreground">
+            {supporterMode
+              ? "Lock-screen alerts for hypos, supplies, and travel/sick-day updates from the person you support, plus your community and messages."
+              : "Receive alerts when the app is in the background"}
+          </p>
           {isNativePushPlatform() && notifSettings.pushNotifications ? (
             <p className="text-small text-muted-foreground pt-1">
               For banners and lock screen alerts, open your {nativePlatformLabel()} notification settings for
@@ -71,6 +76,53 @@ export function NotificationsTab({
         Push diagnostics intentionally removed for App Store review.
         Push can still be enabled via the switch above.
       */}
+
+      {supporterMode ? (
+        <div className="space-y-1 border-b border-border pb-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+            From the person you support
+          </p>
+          <p className="text-small text-muted-foreground pb-2">
+            Only sent when they allow it in Family &amp; supporters. In-app items also appear under Notifications.
+          </p>
+          <div className="flex items-center justify-between py-3 border-t border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Hypo treated</Label>
+              <p className="text-small text-muted-foreground">When they log a treated hypo</p>
+            </div>
+            <Switch
+              checked={hypoOn}
+              onCheckedChange={(checked) => onToggle("hypoAlerts", checked)}
+              disabled={!notifSettings.enabled}
+              data-testid="switch-hypo-alerts"
+            />
+          </div>
+          <div className="flex items-center justify-between py-3 border-t border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Supply alerts</Label>
+              <p className="text-small text-muted-foreground">When their shared supplies run low or critical</p>
+            </div>
+            <Switch
+              checked={supplyOn}
+              onCheckedChange={(checked) => onToggle("supplyAlerts", checked)}
+              disabled={!notifSettings.enabled}
+              data-testid="switch-supply-alerts"
+            />
+          </div>
+          <div className="flex items-center justify-between py-3 border-t border-border">
+            <div className="space-y-0.5 pr-4">
+              <Label className="text-small text-muted-foreground">Travel &amp; sick-day</Label>
+              <p className="text-small text-muted-foreground">When they start sick day or travel mode</p>
+            </div>
+            <Switch
+              checked={scenarioOn}
+              onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
+              disabled={!notifSettings.enabled}
+              data-testid="switch-scenario-alerts"
+            />
+          </div>
+        </div>
+      ) : null}
 
       {!supporterMode && (
         <>
@@ -177,6 +229,12 @@ export function NotificationsTab({
         </>
       )}
 
+      {supporterMode ? (
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+          Your supporter account
+        </p>
+      ) : null}
+
       <div id="notif-community" className="scroll-mt-28 flex items-center justify-between py-3 border-b border-border">
         <div className="space-y-0.5 pr-4">
           <Label className="text-small text-muted-foreground">Community feed</Label>
@@ -235,7 +293,7 @@ export function NotificationsTab({
         </div>
         <CardDescription className="text-body text-muted-foreground">
           {supporterMode
-            ? "Alerts for your supporter account: community and messages. The person you support manages their own clinical alerts."
+            ? "Hypos, supplies, and travel/sick-day from the person you support, plus community and messages on your account."
             : "Control alerts for hypos, supplies, travel and sick-day guides, community, and messages."}
         </CardDescription>
       </CardHeader>
@@ -283,7 +341,7 @@ export function SettingsNotificationsRoute({
         title="Notifications"
         description={
           supporterMode
-            ? "Feed, messages, and device alerts for your supporter account."
+            ? "Alerts from the person you support and for your own community activity."
             : "Hypo alerts, trend alerts, travel and sick-day guide alerts, and community feed."
         }
         actions={settingsInfoDialog}

@@ -23,6 +23,7 @@ import {
   markCarerLinkJustCompleted,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
+import { markSupporterPushPromptPending } from "@/lib/supporter-push-prompt";
 // Note: we intentionally avoid PageBackButton (history.back) here; we need a safe fallback.
 import { ChevronLeft, Info, Users } from "lucide-react";
 
@@ -130,6 +131,7 @@ export default function CarerSetupPage() {
     }
     setActiveAppMode("carer");
     markCarerLinkJustCompleted();
+    markSupporterPushPromptPending();
     emitCarerLinkUpdated();
     setCode("");
     toast({

@@ -32,6 +32,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
+import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
+import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -73,6 +75,7 @@ function initialFeedComposerOpen(): boolean {
 
 export default function CommunityHomePage() {
   const { user } = useAuth();
+  const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
   const { profile, loading: profileLoading } = useProfile();
   const { toast } = useToast();
   const [pathname, setLocation] = useLocation();
@@ -1112,6 +1115,10 @@ export default function CommunityHomePage() {
               : "No posts yet. Be the first to post."
         }
         fetchPage={fetchFeedPage}
+      />
+      <CommunityPushPromptDialog
+        open={communityPushPromptOpen}
+        onOpenChange={setCommunityPushPromptOpen}
       />
     </PageShell>
   );

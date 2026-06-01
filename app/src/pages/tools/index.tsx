@@ -23,6 +23,8 @@ import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-s
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
+import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
+import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
@@ -314,6 +316,7 @@ export function ToolsHubPage({
   hubVariant?: "patient" | "carer" | "community";
 }) {
   const byId = new Map(tools.map((t) => [t.id, t] as const));
+  const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
 
   useEffect(() => {
     const run = () => prefetchToolsHubLinkedChunks();
@@ -448,6 +451,12 @@ export function ToolsHubPage({
           ) : null}
         </>
       )}
+      {hubVariant === "community" ? (
+        <CommunityPushPromptDialog
+          open={communityPushPromptOpen}
+          onOpenChange={setCommunityPushPromptOpen}
+        />
+      ) : null}
     </PageShell>
   );
 }

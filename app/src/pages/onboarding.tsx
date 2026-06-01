@@ -53,6 +53,7 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { markCommunityPushPromptPending } from "@/lib/community-push-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   APP_REGION_OPTIONS,
@@ -479,6 +480,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
+    markCommunityPushPromptPending();
     setActiveAppMode("community");
     setPrimaryAppRole("community");
     if (user?.id) {
