@@ -4,7 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-const popoverTextClass = "w-full max-w-[min(18rem,calc(100vw-2rem))] text-sm text-muted-foreground sm:w-72";
+const popoverTextClass =
+  "w-full max-w-[min(18rem,calc(100vw-2rem))] text-sm leading-relaxed text-popover-foreground/90 sm:w-72";
 
 type FieldLabelWithInfoProps = {
   htmlFor: string;
@@ -24,7 +25,7 @@ export function FieldLabelWithInfo({ htmlFor, children, info, className }: Field
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="More information"
           >
             <Info className="h-4 w-4" aria-hidden />
@@ -74,7 +75,7 @@ export function InlineInfoHint({ content, ariaLabel, className }: InlineInfoHint
         <button
           type="button"
           className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             className,
           )}
           aria-label={ariaLabel}

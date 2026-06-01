@@ -2537,7 +2537,8 @@ export default function SickDay() {
   }
 
   return (
-    <PageShell variant="standard" className="space-y-7">
+    <>
+    <PageShell variant="standard" className={cn("space-y-7", !results && "pb-24 sm:pb-4")}>
       <div id="sickday-page-top" tabIndex={-1} className="sr-only outline-none" aria-hidden />
       <PageHeader
         leading={<PageBackButton />}
@@ -2625,7 +2626,6 @@ export default function SickDay() {
                       </p>
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground">Your typical total insulin per day (basal + bolus combined).</p>
                 </div>
               </section>
 
@@ -2703,13 +2703,12 @@ export default function SickDay() {
                     </Select>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Use a blood ketone meter or urine strips to check.</p>
               </section>
 
               <Button
                 onClick={handleCalculate}
                 className={cn(
-                  "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
+                  "hidden h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all sm:flex",
                   "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
                 )}
                 data-testid="button-calculate"
@@ -2791,5 +2790,25 @@ export default function SickDay() {
 
       </div>
     </PageShell>
+
+    {!results ? (
+      <div
+        className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+        data-testid="sickday-sticky-calculate"
+      >
+        <Button
+          onClick={handleCalculate}
+          className={cn(
+            "h-12 w-full rounded-2xl text-base font-semibold shadow-md",
+            "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
+          )}
+          data-testid="button-calculate-sticky"
+        >
+          <Activity className="mr-2 h-4 w-4" aria-hidden />
+          Calculate recommendations
+        </Button>
+      </div>
+    ) : null}
+    </>
   );
 }

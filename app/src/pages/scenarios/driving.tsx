@@ -271,7 +271,7 @@ export default function DrivingScenarioPage() {
 
   return (
     <div className="min-h-[50vh]">
-      <PageShell variant="standard" className="space-y-4">
+      <PageShell variant="standard" className={cn("space-y-4", phase === "form" && "pb-24 sm:pb-4")}>
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}
@@ -427,7 +427,7 @@ export default function DrivingScenarioPage() {
                       <Label htmlFor="driving-long" className="text-sm font-medium cursor-pointer leading-snug">
                         Longer journey (adds one planning tip)
                       </Label>
-                      <p className="text-xs text-muted-foreground">Optional — does not change the main recommendation.</p>
+                      <p className="text-xs text-foreground/75">Optional — does not change the main recommendation.</p>
                     </div>
                   </div>
                 </div>
@@ -439,11 +439,11 @@ export default function DrivingScenarioPage() {
                 </p>
               ) : null}
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4">
+              <div className="hidden flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4 sm:flex">
                 <Button
                   type="button"
                   variant="outline"
-                  className="gap-1.5 shrink-0"
+                  className="min-h-11 gap-1.5 shrink-0"
                   onClick={goPrevWizard}
                   disabled={wizardStep === 0}
                   data-testid="button-driving-wizard-back"
@@ -453,7 +453,7 @@ export default function DrivingScenarioPage() {
                 </Button>
                 <Button
                   type="button"
-                  className="gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
+                  className="min-h-11 gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
                   onClick={goNextWizard}
                   data-testid="button-driving-check"
                 >
@@ -579,6 +579,36 @@ export default function DrivingScenarioPage() {
           </Alert>
         </div>
       </PageShell>
+
+      {phase === "form" ? (
+        <div
+          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+          data-testid="driving-sticky-wizard"
+        >
+          <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 gap-1.5 shrink-0"
+              onClick={goPrevWizard}
+              disabled={wizardStep === 0}
+              data-testid="button-driving-wizard-back-sticky"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              type="button"
+              className="min-h-11 gap-1.5 min-w-[8.5rem] flex-1 sm:flex-initial"
+              onClick={goNextWizard}
+              data-testid="button-driving-check-sticky"
+            >
+              {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {phase !== "form" ? (
         <PageShell variant="standard" className="flex justify-start">

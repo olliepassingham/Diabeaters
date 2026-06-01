@@ -1811,21 +1811,22 @@ export default function Travel() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Link href="/emergency-card">
-                  <Button variant="outline" className="w-full" data-testid="button-active-emergency-card">
+                  <Button variant="outline" className="min-h-11 w-full" data-testid="button-active-emergency-card">
                     <Globe className="h-4 w-4 mr-2 text-red-600" />
                     View Full Emergency Card
                     <ChevronRight className="h-4 w-4 ml-auto" />
                   </Button>
                 </Link>
 
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="font-medium text-sm flex items-center gap-2">
-                      <Languages className="h-4 w-4" />
-                      Key Phrases
-                    </h4>
+                <Collapsible defaultOpen={false} className="group rounded-xl border border-border/60">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                    <CollapsibleTrigger className="flex min-h-11 flex-1 items-center gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+                      <Languages className="h-4 w-4 shrink-0" aria-hidden />
+                      Key phrases
+                      <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                    </CollapsibleTrigger>
                     <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                      <SelectTrigger className="w-40" data-testid="select-phrase-language">
+                      <SelectTrigger className="h-11 w-full min-w-[8.5rem] max-w-[10rem] sm:w-40" data-testid="select-phrase-language">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1836,6 +1837,7 @@ export default function Travel() {
                     </Select>
                   </div>
 
+                  <CollapsibleContent className="space-y-2 border-t border-border/60 px-3 pb-3 pt-1">
                   {selectedPhrases && (
                     <div className="grid grid-cols-1 gap-2">
                       <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
@@ -1859,10 +1861,11 @@ export default function Travel() {
                       </div>
                     </div>
                   )}
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
 
                 <Link href="/help-now">
-                  <Button variant="outline" className="w-full mt-2" data-testid="button-help-now-link">
+                  <Button variant="outline" className="min-h-11 w-full mt-2" data-testid="button-help-now-link">
                     <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
                     Help Now Page
                     <ChevronRight className="h-4 w-4 ml-auto" />
@@ -1885,7 +1888,13 @@ export default function Travel() {
                     {checkedCount}/{packingList.length} packed
                   </Badge>
                 </div>
-                <CardDescription>Tap items to mark them as packed</CardDescription>
+                <div className="flex items-center gap-0.5 pt-0.5">
+                  <CardDescription className="mb-0">Packing checklist</CardDescription>
+                  <InlineInfoHint
+                    ariaLabel="How to use the packing checklist"
+                    content="Tap each item when it is in your bag. Progress saves for this trip."
+                  />
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map(category => {

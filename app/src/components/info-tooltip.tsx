@@ -13,17 +13,21 @@ export function InfoTooltip({ term, explanation, example }: InfoTooltipProps) {
       <PopoverTrigger asChild>
         <button 
           type="button" 
-          className="inline-flex items-center justify-center w-4 h-4 ml-1 text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex min-h-11 min-w-11 -m-2.5 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           aria-label={`Learn more about ${term}`}
           data-testid={`button-info-${term.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
         >
           <HelpCircle className="h-3.5 w-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="max-w-xs p-3" side="top" align="center">
+      <PopoverContent
+        className="max-w-[min(18rem,calc(100vw-2rem))] p-3"
+        side="top"
+        align="center"
+      >
         <div className="space-y-1.5">
-          <p className="font-medium text-sm">{term}</p>
-          <p className="text-xs text-muted-foreground">{explanation}</p>
+          <p className="text-sm font-medium text-popover-foreground">{term}</p>
+          <p className="text-xs leading-relaxed text-popover-foreground/90">{explanation}</p>
           {example && (
             <p className="text-xs text-primary/80 italic">Example: {example}</p>
           )}
