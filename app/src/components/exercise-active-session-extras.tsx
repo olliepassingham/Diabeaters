@@ -92,6 +92,11 @@ export function ExerciseHypoTreatmentHint(props: {
                 Try about <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast
                 carbs, then recheck. Use your care team&apos;s hypo plan if it differs.
               </>
+            ) : suggestion.primaryTreatmentLine ? (
+              <>
+                About <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs (
+                {suggestion.primaryTreatmentLine}). Recheck soon.
+              </>
             ) : (
               <>
                 About <strong className="font-semibold text-foreground">{suggestion.carbsGrams}g</strong> fast carbs

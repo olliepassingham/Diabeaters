@@ -2,6 +2,8 @@
 
 Operational steps to ship the Capacitor Android shell. Like iOS, the native app loads the web UI from [`capacitor.config.ts`](../capacitor.config.ts) (`server.url`); production web + Supabase must match that URL.
 
+**Start here for a phased launch plan:** [play_store_launch_runbook.md](./play_store_launch_runbook.md) (tickable Week 1–3 runbook + owner one-pager).
+
 Links: [Supabase auth (self-serve)](./supabase_auth_self_serve.md), [iOS release checklist](./app_store_release.md), [README](../README.md).
 
 ---

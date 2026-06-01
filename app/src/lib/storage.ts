@@ -496,6 +496,8 @@ export interface UserProfile {
   region?: "UK" | "US" | "OTHER";
   /** Optional override when region is OTHER or for travel. */
   emergencyNumber?: string;
+  /** Usual first-line hypo treatment — personalizes carb-to-product hints app-wide. */
+  primaryHypoTreatment?: import("@/lib/hypo-treatment-display").PrimaryHypoTreatment;
 }
 
 export function isCommunityAccountProfile(profile: UserProfile | null | undefined): boolean {

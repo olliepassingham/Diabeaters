@@ -3,7 +3,35 @@
  * No insulin dosing — confirm changes with your care team.
  */
 
-import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType } from "@/lib/storage";
+import { isBgBelowHypoThreshold, hypoRangeThreshold } from "@/lib/exercise-hypo-auto";
+import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserSettings } from "@/lib/storage";
+
+export type PreExerciseInsulinSuppressedReason = "hypo" | "low_bg" | "below_target";
+
+export type ShouldSuggestPreExerciseMealInsulinInput = {
+  currentBg?: number;
+  bgTrend?: ExerciseBgTrend | null;
+  bgUnits: string;
+  mealCarbsIsSuggested: boolean;
+  /** Grams planned before exercise (suggested or user-entered). */
+  mealCarbsGrams?: number;
+  settings?: UserSettings;
+};
+
+export type ShouldSuggestPreExerciseMealInsulinResult = {
+  suggest: boolean;
+  suppressedReason?: PreExerciseInsulinSuppressedReason;
+};
+
+/** Lower bound of many people's pre-exercise target band (matches plan targetBg copy). */
+export function preExerciseIdealLowBg(bgUnits: string): number {
+  return bgUnits === "mmol/L" ? 7 : 126;
+}
+
+/** BG below typical exercise-start comfort band (5.6 mmol/L · 100 mg/dL). */
+export function isExerciseStartLow(bg: number, bgUnits: string): boolean {
+  return bgUnits === "mmol/L" ? bg < 5.6 : bg < 100;
+}
 
 export type ExerciseReadingPhase = "pre" | "active" | "recovery";
 
@@ -19,7 +47,62 @@ export interface ExerciseReadingContext {
 }
 
 function isLow(bg: number, bgUnits: string): boolean {
-  return bgUnits === "mmol/L" ? bg < 5.6 : bg < 100;
+  return isExerciseStartLow(bg, bgUnits);
+}
+
+const SMALL_PRE_EXERCISE_FUEL_GRAMS = 20;
+
+/**
+ * Whether to show a meal bolus estimate for pre-exercise fuel at the current reading.
+ * Suppresses when BG is hypo, low for exercise start, or below ideal pre-exercise band.
+ */
+export function shouldSuggestPreExerciseMealInsulin(
+  input: ShouldSuggestPreExerciseMealInsulinInput,
+): ShouldSuggestPreExerciseMealInsulinResult {
+  const bg = input.currentBg;
+  if (bg == null || !Number.isFinite(bg)) {
+    return { suggest: true };
+  }
+
+  const bgUnits = input.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+
+  if (isBgBelowHypoThreshold(bg, input.settings, bgUnits)) {
+    return { suggest: false, suppressedReason: "hypo" };
+  }
+
+  if (isExerciseStartLow(bg, bgUnits)) {
+    return { suggest: false, suppressedReason: "low_bg" };
+  }
+
+  const idealLow = preExerciseIdealLowBg(bgUnits);
+  if (bg < idealLow) {
+    if (input.mealCarbsIsSuggested) {
+      return { suggest: false, suppressedReason: "below_target" };
+    }
+    const mealCarbs = input.mealCarbsGrams ?? 0;
+    if (input.bgTrend === "falling" && mealCarbs > 0 && mealCarbs <= SMALL_PRE_EXERCISE_FUEL_GRAMS) {
+      return { suggest: false, suppressedReason: "below_target" };
+    }
+  }
+
+  return { suggest: true };
+}
+
+/** Short copy for UI when meal insulin is suppressed at this BG. */
+export function preExerciseInsulinSuppressedMessage(
+  reason: PreExerciseInsulinSuppressedReason,
+  bgUnits: string,
+  settings?: UserSettings,
+): string {
+  const units = bgUnits === "mg/dL" ? "mg/dL" : "mmol/L";
+  switch (reason) {
+    case "hypo":
+      return `Reading is below your hypo range (${hypoRangeThreshold(settings, units)} ${units}) — treat per your hypo plan and recheck before exercise. Carbs here are for treatment, not a meal bolus.`;
+    case "low_bg":
+      return "BG is below a typical exercise-start range for many people — use carbs to raise BG; no meal insulin suggested. Recheck before hard effort.";
+    case "below_target":
+      return `BG is below the usual pre-exercise band (about ${bgUnits === "mmol/L" ? "7–10" : "126–180"} ${bgUnits}) — fuel with carbs to reach your range; no meal insulin suggested at this reading.`;
+  }
 }
 
 function isHigh(bg: number, bgUnits: string): boolean {

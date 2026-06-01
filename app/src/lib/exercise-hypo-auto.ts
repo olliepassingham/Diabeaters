@@ -1,4 +1,9 @@
 import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
+import {
+  computeHypoCarbEquivalents,
+  formatPrimaryTreatmentShort,
+  getPrimaryHypoTreatmentFromProfile,
+} from "@/lib/hypo-treatment-display";
 import type { ActiveExerciseSession, UserProfile, UserSettings } from "@/lib/storage";
 import { suggestedRecoveryTargetBg } from "@/lib/hypo-context";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
@@ -36,6 +41,8 @@ export type ExerciseHypoSuggestion = {
   juiceMl: number;
   /** When true, use team-specific plan — estimate is a typical first step only. */
   approximate: boolean;
+  /** e.g. "about 4 glucose tablets" when user set a primary treatment. */
+  primaryTreatmentLine?: string;
 };
 
 function toMmol(bg: number, bgUnits: "mmol/L" | "mg/dL"): number {
@@ -54,12 +61,16 @@ export function computeExerciseHypoSuggestion(
 ): ExerciseHypoSuggestion | null {
   if (!isBgBelowHypoThreshold(bg, settings, bgUnits)) return null;
 
+  const primaryTreatment = getPrimaryHypoTreatmentFromProfile(profile);
+
   if (hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth)) {
+    const eq = computeHypoCarbEquivalents(15);
     return {
-      carbsGrams: 15,
-      glucoseTablets: 4,
-      juiceMl: 150,
+      carbsGrams: eq.carbsGrams,
+      glucoseTablets: eq.glucoseTablets,
+      juiceMl: eq.juiceMl,
       approximate: true,
+      primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
     };
   }
 
@@ -74,11 +85,13 @@ export function computeExerciseHypoSuggestion(
 
   const bgDifference = targetMmol - currentMmol;
   if (bgDifference <= 0) {
+    const eq = computeHypoCarbEquivalents(12);
     return {
-      carbsGrams: 12,
-      glucoseTablets: 3,
-      juiceMl: 120,
+      carbsGrams: eq.carbsGrams,
+      glucoseTablets: eq.glucoseTablets,
+      juiceMl: eq.juiceMl,
       approximate: false,
+      primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
     };
   }
 
@@ -87,12 +100,12 @@ export function computeExerciseHypoSuggestion(
   const baseRise = 0.25;
   const effectiveRise = baseRise * sensitivityFactor;
   const carbsNeeded = Math.ceil(bgDifference / effectiveRise);
-  const glucoseTablets = Math.ceil(carbsNeeded / 4);
-  const juiceMl = Math.round(carbsNeeded * 10);
+  const eq = computeHypoCarbEquivalents(carbsNeeded);
   return {
-    carbsGrams: Math.max(carbsNeeded, 10),
-    glucoseTablets: Math.max(glucoseTablets, 3),
-    juiceMl: Math.max(juiceMl, 100),
+    carbsGrams: eq.carbsGrams,
+    glucoseTablets: eq.glucoseTablets,
+    juiceMl: eq.juiceMl,
     approximate: false,
+    primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
   };
 }

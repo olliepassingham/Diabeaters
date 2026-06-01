@@ -390,6 +390,8 @@ The WebView content (loaded from Vercel) must not make medical claims. Avoid dia
 
 The same Capacitor shell pattern is available for Google Play under `/android`.
 
+**Before your first Play Store submission**, follow **[docs/play_store_launch_runbook.md](docs/play_store_launch_runbook.md)** (phased checklist: Console, legal, production Supabase, signing, QA, submit). Technical steps: [docs/android_build_checklist.md](docs/android_build_checklist.md).
+
 ### Build and sync
 
 1. **Build web assets**: `npm run build`

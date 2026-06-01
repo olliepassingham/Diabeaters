@@ -4,11 +4,21 @@ import {
   EXERCISE_TYPE_OPTIONS,
 } from "@/lib/exercise-catalog";
 import { calculateExercisePlan, type ExercisePlanContext } from "@/lib/exercise-plan";
+import { isBgBelowHypoThreshold } from "@/lib/exercise-hypo-auto";
+import {
+  getExerciseGuidanceForReading,
+  isExerciseStartLow,
+  preExerciseInsulinSuppressedMessage,
+  shouldSuggestPreExerciseMealInsulin,
+  type PreExerciseInsulinSuppressedReason,
+} from "@/lib/exercise-reading-guidance";
 import {
   getExerciseMealBolusPreview,
   type MealExerciseMeta,
 } from "@/lib/meal-dose";
 import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserSettings } from "@/lib/storage";
+
+export type { PreExerciseInsulinSuppressedReason };
 
 export type ExerciseFuelCalculatorInput = {
   exerciseType: ExerciseType;
@@ -49,6 +59,7 @@ export type ExerciseFuelCalculatorResult = {
   onHandCarbs: number;
   duringCarbs: number;
   insulin: ExerciseFuelInsulinResult | null;
+  insulinSuppressedReason: PreExerciseInsulinSuppressedReason | null;
   insulinNoRatios: boolean;
   /** Fallback % band when ratios are missing. */
   bolusReductionBand: string;
@@ -124,11 +135,18 @@ function buildHeadline(
   mealCarbs: number,
   mealCarbsIsSuggested: boolean,
   onHandCarbs: number,
+  insulinSuppressed: boolean,
 ): string {
   const session = sessionLabel(input);
   if (mealCarbs > 0) {
+    if (mealCarbsIsSuggested && insulinSuppressed) {
+      return `${session}. Plan about ${mealCarbs}g carbs to bring BG up before exercise — no meal insulin suggested at this reading.`;
+    }
     if (mealCarbsIsSuggested) {
       return `${session}. Plan about ${mealCarbs}g carbs before you exercise.`;
+    }
+    if (insulinSuppressed) {
+      return `${session}. ${mealCarbs}g ${mealTypeLabel(input.mealType)} before you start — no meal insulin suggested at this reading.`;
     }
     return `${session}. ${mealCarbs}g ${mealTypeLabel(input.mealType)} before you start.`;
   }
@@ -139,16 +157,42 @@ function pickNotes(
   input: ExerciseFuelCalculatorInput,
   plan: ReturnType<typeof calculateExercisePlan>,
   mealCarbs: number,
+  insulinSuppressedReason: PreExerciseInsulinSuppressedReason | null,
 ): string[] {
   const notes: string[] = [];
   const units = input.bgUnits;
-  const low = units === "mmol/L" ? 3.9 : 70;
+  const bgUnits = units === "mg/dL" ? "mg/dL" : "mmol/L";
   const high = units === "mmol/L" ? 13.9 : 250;
 
-  if (input.currentBg != null && input.currentBg < low) {
-    notes.push("Your BG looks low — treat and recheck before you rely on these numbers.");
+  if (insulinSuppressedReason) {
+    notes.push(preExerciseInsulinSuppressedMessage(insulinSuppressedReason, units, input.settings));
+  }
+
+  if (input.currentBg != null && isBgBelowHypoThreshold(input.currentBg, input.settings, bgUnits)) {
+    if (!insulinSuppressedReason) {
+      notes.push("Your BG looks low — treat and recheck before you rely on these numbers.");
+    }
+  } else if (input.currentBg != null && isExerciseStartLow(input.currentBg, units)) {
+    if (!insulinSuppressedReason) {
+      notes.push("Your BG is below a typical exercise-start range — treat and recheck before hard effort.");
+    }
   } else if (input.currentBg != null && input.currentBg > high) {
     notes.push("BG looks high — follow your team's advice on ketones and fluids before hard effort.");
+  }
+
+  if (input.currentBg != null && Number.isFinite(input.currentBg)) {
+    const readingTips = getExerciseGuidanceForReading({
+      bg: input.currentBg,
+      trend: input.bgTrend ?? undefined,
+      bgUnits: units,
+      exerciseType: input.exerciseType,
+      intensity: input.intensity,
+      phase: "pre",
+    });
+    for (const tip of readingTips) {
+      if (notes.length >= 3) break;
+      if (!notes.includes(tip)) notes.push(tip);
+    }
   }
 
   if (input.rapidInsulinLast2h) {
@@ -192,8 +236,18 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
 
   let insulin: ExerciseFuelInsulinResult | null = null;
   let insulinNoRatios = false;
+  let insulinSuppressedReason: PreExerciseInsulinSuppressedReason | null = null;
 
-  if (mealCarbs > 0) {
+  const insulinDecision = shouldSuggestPreExerciseMealInsulin({
+    currentBg: input.currentBg,
+    bgTrend: input.bgTrend,
+    bgUnits: input.bgUnits,
+    mealCarbsIsSuggested,
+    mealCarbsGrams: mealCarbs,
+    settings: input.settings,
+  });
+
+  if (mealCarbs > 0 && insulinDecision.suggest) {
     const meta: MealExerciseMeta = {
       exerciseType: input.exerciseType,
       intensity: input.intensity,
@@ -219,9 +273,17 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
         exactAdjusted: preview.exactDose,
       };
     }
+  } else if (mealCarbs > 0 && insulinDecision.suppressedReason) {
+    insulinSuppressedReason = insulinDecision.suppressedReason;
   }
 
-  const headline = buildHeadline(input, mealCarbs, mealCarbsIsSuggested, onHandCarbs);
+  const headline = buildHeadline(
+    input,
+    mealCarbs,
+    mealCarbsIsSuggested,
+    onHandCarbs,
+    insulinSuppressedReason != null,
+  );
 
   return {
     headline,
@@ -231,9 +293,10 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     onHandCarbs,
     duringCarbs,
     insulin,
+    insulinSuppressedReason,
     insulinNoRatios,
     bolusReductionBand: plan.pre.bolusReduction,
     pumpTip: input.isPump && plan.pumpTips.pre[0] ? plan.pumpTips.pre[0]! : null,
-    notes: pickNotes(input, plan, mealCarbs),
+    notes: pickNotes(input, plan, mealCarbs, insulinSuppressedReason),
   };
 }

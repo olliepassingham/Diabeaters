@@ -63,4 +63,83 @@ describe("computeExerciseFuelPlan", () => {
     });
     expect(r.notes.some((n) => n.includes("Rapid insulin"))).toBe(true);
   });
+
+  it("suppresses meal insulin at 5.5 mmol/L with suggested carbs (moderate strength 45 min)", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 0,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 5.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.mealCarbs).toBeGreaterThan(0);
+    expect(r.mealCarbsIsSuggested).toBe(true);
+    expect(r.insulin).toBeNull();
+    expect(r.insulinSuppressedReason).toBe("low_bg");
+    expect(r.headline).toContain("no meal insulin");
+    expect(r.notes.some((n) => n.toLowerCase().includes("meal insulin") || n.toLowerCase().includes("exercise-start"))).toBe(
+      true,
+    );
+  });
+
+  it("still shows meal insulin at 8.0 mmol/L with suggested carbs", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 8,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.mealCarbsIsSuggested).toBe(true);
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulinSuppressedReason).toBeNull();
+  });
+
+  it("suppresses insulin at 6.5 mmol/L when carbs are suggested (below ideal 7)", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 6.5,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.insulin).toBeNull();
+    expect(r.insulinSuppressedReason).toBe("below_target");
+  });
+
+  it("suppresses insulin at 5.5 mmol/L even when user enters 50g carbs", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 0,
+      fasted: false,
+      mealCarbsGrams: 50,
+      mealType: "snack",
+      currentBg: 5.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.insulin).toBeNull();
+    expect(r.insulinSuppressedReason).toBe("low_bg");
+  });
 });

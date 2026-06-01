@@ -23,6 +23,11 @@ import {
 } from "@/lib/exercise-fuel-calculator";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
+  formatPrimaryTreatmentShort,
+  getPrimaryHypoTreatmentFromProfile,
+  type PrimaryHypoTreatment,
+} from "@/lib/hypo-treatment-display";
+import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
@@ -75,12 +80,16 @@ export function ExerciseFuelCalculator() {
   const [formOpen, setFormOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
+  const [primaryHypoTreatment, setPrimaryHypoTreatment] = useState<PrimaryHypoTreatment | undefined>(() =>
+    getPrimaryHypoTreatmentFromProfile(storage.getProfile()),
+  );
 
   useEffect(() => {
     const sync = () => {
       const p = storage.getProfile();
       if (p?.bgUnits) setBgUnits(p.bgUnits);
       setIsPump(isPumpDeliveryMethod(p?.insulinDeliveryMethod));
+      setPrimaryHypoTreatment(getPrimaryHypoTreatmentFromProfile(p));
     };
     sync();
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
@@ -449,10 +458,20 @@ export function ExerciseFuelCalculator() {
                   {result.mealCarbs}g carbs
                   {result.mealCarbsIsSuggested ? " suggested" : ""}
                 </p>
+                {result.mealCarbs > 0 && formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment) ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment)}
+                  </p>
+                ) : null}
               </div>
               <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
                 <p className="text-xs text-muted-foreground">Keep on hand</p>
                 <p className="font-semibold tabular-nums text-foreground">~{result.onHandCarbs}g fast carbs</p>
+                {formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment) ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment)}
+                  </p>
+                ) : null}
                 {result.duringCarbs > 0 ? (
                   <p className="text-xs text-muted-foreground mt-0.5">~{result.duringCarbs}g during if BG drops</p>
                 ) : null}
@@ -470,6 +489,15 @@ export function ExerciseFuelCalculator() {
                   {result.insulin.carbsGrams}g {result.insulin.mealType}
                 </p>
               </div>
+            ) : result.insulinSuppressedReason && result.mealCarbs > 0 ? (
+              <Alert className="border-amber-500/40 bg-amber-500/10">
+                <AlertDescription className="text-sm text-foreground">
+                  <span className="font-medium">No meal insulin suggested</span>
+                  {" — "}
+                  Carbs here are to help bring BG into your pre-exercise range, not to cover a bolus meal at this
+                  reading. Recheck before hard effort.
+                </AlertDescription>
+              </Alert>
             ) : result.insulinNoRatios && result.mealCarbs > 0 ? (
               <Alert>
                 <AlertDescription className="text-sm">

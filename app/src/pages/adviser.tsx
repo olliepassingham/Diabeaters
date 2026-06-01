@@ -1201,15 +1201,19 @@ export default function Adviser() {
         </TabsContent>
       </Tabs>
 
-      <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pb-4 mt-4">
-        <span className="flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          Not medical advice — always follow your diabetes team's guidance
-        </span>
-      </div>
-      <div className="flex justify-center pb-6">
-        <MedicalSourcesLink anchor="insulin" compact />
-      </div>
+      {activeTab === "meal" ? (
+        <>
+          <div className="mt-4 flex items-center justify-center gap-3 pb-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" aria-hidden />
+              Not medical advice — always follow your diabetes team&apos;s guidance
+            </span>
+          </div>
+          <div className="flex justify-center pb-6">
+            <MedicalSourcesLink anchor="insulin" compact />
+          </div>
+        </>
+      ) : null}
     </PageShell>
   );
 }

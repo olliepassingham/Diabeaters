@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
   Copy,
   ChevronDown,
   BookOpen,
+  Pencil,
 } from "lucide-react";
 import { Link } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -36,6 +37,10 @@ import {
 } from "@/lib/ratio-utils";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { RatiosEditPanel } from "@/components/ratios-edit-panel";
+import { cn } from "@/lib/utils";
 
 type MealKey = "breakfast" | "lunch" | "dinner" | "snack";
 type PatternAnswer = "consistently_high" | "consistently_low" | "sometimes_high" | "on_target" | "not_sure";
@@ -162,6 +167,43 @@ interface RatioAdviserProps {
 
 type AdviserMode = "detect" | "refine" | "scratch_intro" | "scratch_tdd" | "scratch_result" | "scratch_saved";
 
+function RatioAdviserDisclaimerFooter({ className }: { className?: string }) {
+  return (
+    <Card
+      className={cn(
+        "rounded-2xl border-amber-500/40 bg-amber-50/60 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/25",
+        className,
+      )}
+      data-testid="ratio-adviser-disclaimer-footer"
+    >
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+          <div className="min-w-0 text-sm">
+            <p className="font-semibold text-amber-950 dark:text-amber-50">Not medical advice</p>
+            <p className="mt-1.5 leading-relaxed text-amber-900/90 dark:text-amber-100/90">
+              This tool helps you spot patterns and prepare for clinic — it does not prescribe ratio changes. Always
+              confirm adjustments with your diabetes team.
+            </p>
+            <div className="pt-2.5">
+              <MedicalSourcesLink anchor="insulin" compact />
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RatioAdviserShell({ children }: { children: ReactNode }) {
+  return (
+    <div className="space-y-4" data-testid="ratio-adviser-shell">
+      {children}
+      <RatioAdviserDisclaimerFooter />
+    </div>
+  );
+}
+
 export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigateToMeal }: RatioAdviserProps) {
   const { toast } = useToast();
   const hasAnyRatio = !!(settings.breakfastRatio || settings.lunchRatio || settings.dinnerRatio || settings.snackRatio);
@@ -183,6 +225,21 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const [previewMeal, setPreviewMeal] = useState<MealKey>("lunch");
   const [previewCarbs, setPreviewCarbs] = useState("");
   const [minorKnown, setMinorKnown] = useState(false);
+  const [ratiosEditOpen, setRatiosEditOpen] = useState(false);
+
+  const handleRatiosSaved = (updated: UserSettings) => {
+    onSettingsUpdate?.(updated);
+    setRatiosEditOpen(false);
+    const ratiosExist = !!(
+      updated.breakfastRatio ||
+      updated.lunchRatio ||
+      updated.dinnerRatio ||
+      updated.snackRatio
+    );
+    if (ratiosExist && mode === "detect") {
+      setMode("refine");
+    }
+  };
 
   useEffect(() => {
     const sync = () => {
@@ -198,6 +255,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   useEffect(() => {
     if (minorKnown && mode === "scratch_tdd") setMode("scratch_intro");
   }, [minorKnown, mode]);
+
+  useEffect(() => {
+    if (step !== 0) setRatiosEditOpen(false);
+  }, [step]);
 
   useEffect(() => {
     const profile = storage.getProfile();
@@ -372,56 +433,74 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
   if (mode === "detect") {
     return (
+      <RatioAdviserShell>
       <Card data-testid="card-ratio-adviser">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <Calculator className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Ratio Adviser</CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Calculator className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <CardTitle className="text-lg tracking-tight">Ratio Adviser</CardTitle>
+            </div>
+            <InlineInfoHint
+              ariaLabel="About starting ratios"
+              content="Estimated starting points only. Always confirm any ratio changes with your diabetes team before using them."
+            />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            It looks like you haven't set up your carb ratios yet. Would you like help working them out?
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Set up carb ratios to use the meal planner and this adviser.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted/30 rounded-lg p-3 space-y-1">
-            <p className="text-sm text-muted-foreground flex items-start gap-1">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span><strong>Not medical advice.</strong> This tool provides estimated starting points only. Always confirm any ratio changes with your diabetes team before using them.</span>
-            </p>
-          </div>
+          {ratiosEditOpen ? (
+            <RatiosEditPanel
+              settings={settings}
+              bgUnit={bgUnit}
+              ratioFormat={ratioFormat}
+              carbPortionSize={cpSize}
+              onSaved={handleRatiosSaved}
+              onCancel={() => setRatiosEditOpen(false)}
+              idPrefix="ratio-adviser-detect-edit"
+            />
+          ) : (
+            <Button
+              type="button"
+              className="min-h-12 w-full rounded-xl text-base font-semibold"
+              onClick={() => setRatiosEditOpen(true)}
+              data-testid="button-open-ratio-edit-detect"
+            >
+              <Pencil className="mr-2 h-4 w-4" aria-hidden />
+              Edit ratios &amp; targets
+            </Button>
+          )}
 
+          {!ratiosEditOpen ? (
           <div className="space-y-3">
             <p className="text-sm font-medium">What describes you best?</p>
             <Button
               variant="outline"
-              className="w-full h-auto py-3 justify-start text-left"
+              className="min-h-12 h-auto w-full justify-start py-3 text-left"
               onClick={() => setMode("scratch_intro")}
               data-testid="button-adviser-no-ratios"
             >
-              <div className="min-w-0 text-pretty">
-                <p className="font-medium text-sm">I don't know my ratios yet</p>
-                <p className="text-xs text-muted-foreground">Help me estimate starting ratios</p>
-              </div>
+              <p className="font-medium text-sm">I don&apos;t know my ratios yet</p>
             </Button>
             <Button
               variant="outline"
-              className="w-full h-auto py-3 justify-start text-left"
+              className="min-h-12 h-auto w-full justify-start py-3 text-left"
               onClick={() => setMode("refine")}
               data-testid="button-adviser-have-ratios"
             >
-              <div className="min-w-0 text-pretty">
-                <p className="font-medium text-sm">I have ratios to add</p>
-                <p className="text-xs text-muted-foreground">Save them in Settings, then return here to review.</p>
-              </div>
+              <p className="font-medium text-sm">I have ratios — check a pattern</p>
             </Button>
           </div>
+          ) : null}
         </CardContent>
       </Card>
+      </RatioAdviserShell>
     );
   }
 
   if (mode === "scratch_intro") {
     return (
+      <RatioAdviserShell>
       <Card data-testid="card-ratio-adviser">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
@@ -430,14 +509,15 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">
-              A <strong>carb ratio</strong> tells you how many grams of carbohydrate are covered by 1 unit of fast-acting insulin. For example, a ratio of 1:10 means 1 unit of insulin covers 10g of carbs.
-            </p>
+          <div className="flex items-center gap-0.5">
+            <p className="text-sm font-medium">How would you like to estimate?</p>
+            <InlineInfoHint
+              ariaLabel="What is a carb ratio"
+              content="A carb ratio is how many grams of carbohydrate 1 unit of fast-acting insulin covers — for example 1:10 means 1 unit covers 10g of carbs."
+            />
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium">How would you like to estimate your ratios?</p>
 
             {minorKnown ? (
               <Alert>
@@ -483,6 +563,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           <Button
             variant="ghost"
             size="sm"
+            className="min-h-11"
             onClick={() => setMode(hasAnyRatio ? "refine" : "detect")}
             data-testid="button-back-detect"
           >
@@ -491,11 +572,13 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           </Button>
         </CardContent>
       </Card>
+      </RatioAdviserShell>
     );
   }
 
   if (mode === "scratch_tdd") {
     return (
+      <RatioAdviserShell>
       <Card data-testid="card-ratio-adviser">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
@@ -504,14 +587,14 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground">
-              Your <strong>Total Daily Dose (TDD)</strong> is the total amount of insulin you take in a typical day, including both fast-acting (bolus) and long-acting (basal) insulin combined.
-            </p>
-          </div>
-
           <div className="space-y-2">
-            <Label htmlFor="tdd-input">Total Daily Dose (units)</Label>
+            <div className="flex items-center gap-0.5">
+              <Label htmlFor="tdd-input">Total Daily Dose (units)</Label>
+              <InlineInfoHint
+                ariaLabel="What is TDD"
+                content="Your total daily dose is all insulin in a typical day — fast-acting (bolus) and long-acting (basal) combined."
+              />
+            </div>
             <Input
               id="tdd-input"
               type="number"
@@ -527,23 +610,17 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             )}
           </div>
 
-          <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-            <p className="text-xs text-muted-foreground flex items-start gap-1">
-              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-              <span>
-                The <strong>500 rule</strong> estimates grams of carb covered by 1 unit as roughly{" "}
-                <strong>500 ÷ TDD</strong> (bolus + basal combined). Some teams use <strong>450</strong> or{" "}
-                <strong>400</strong> for people who are more sensitive to insulin — your team will choose what fits you.
-              </span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Breakfast is often a bit stronger (more insulin per gram) because of dawn phenomenon; dinner is sometimes
-              slightly stronger than lunch. These are starting points only.
-            </p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>Uses the 500 rule (500 ÷ TDD).</span>
+            <InlineInfoHint
+              ariaLabel="About the 500 rule"
+              content="The 500 rule estimates grams of carb per 1 unit as roughly 500 ÷ TDD. Some teams use 450 or 400. Breakfast is often a bit stronger; dinner sometimes slightly stronger than lunch. Starting points only."
+            />
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Button
+              className="min-h-11 w-full sm:w-auto"
               onClick={handleCalculateFromTDD}
               disabled={!tddInput || parseFloat(tddInput) <= 0}
               data-testid="button-calculate-ratios"
@@ -551,18 +628,20 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               <Calculator className="h-4 w-4 mr-1" />
               Calculate My Ratios
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-intro">
+            <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-intro">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back
             </Button>
           </div>
         </CardContent>
       </Card>
+      </RatioAdviserShell>
     );
   }
 
   if (mode === "scratch_result" && estimatedRatios) {
     return (
+      <RatioAdviserShell>
       <Card data-testid="card-ratio-adviser">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
@@ -572,12 +651,6 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
         </CardHeader>
         <CardContent className="space-y-4">
           <MedicalNumericOutputDisclaimer compact />
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-sm text-muted-foreground flex items-start gap-1">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span><strong>These are estimated starting points only.</strong> Please discuss these with your diabetes team before relying on them. Your actual ratios may differ.</span>
-            </p>
-          </div>
 
           <div className="grid grid-cols-2 gap-3">
             {([
@@ -630,23 +703,25 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             </p>
           )}
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button onClick={handleSaveEstimatedRatios} data-testid="button-save-estimated-ratios">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button className="min-h-11 w-full sm:w-auto" onClick={handleSaveEstimatedRatios} data-testid="button-save-estimated-ratios">
               <Save className="h-4 w-4 mr-1" />
               Save These Ratios
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-method">
+            <Button variant="ghost" size="sm" className="min-h-11" onClick={() => setMode("scratch_intro")} data-testid="button-back-scratch-method">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Try a different method
             </Button>
           </div>
         </CardContent>
       </Card>
+      </RatioAdviserShell>
     );
   }
 
   if (mode === "scratch_saved") {
     return (
+      <RatioAdviserShell>
       <Card data-testid="card-ratio-adviser">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
@@ -662,83 +737,38 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
             </p>
           </div>
 
-          <div className="bg-muted/30 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground flex items-start gap-1">
-              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
-              <span>Remember: these are starting estimates. Always discuss ratio changes with your diabetes team. You can edit your ratios any time in the Ratios page or Settings.</span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button data-testid="button-try-meal-planner" onClick={() => onNavigateToMeal?.()}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button className="min-h-11 w-full sm:w-auto" data-testid="button-try-meal-planner" onClick={() => onNavigateToMeal?.()}>
               <ArrowRight className="h-4 w-4 mr-1" />
               Try the Meal Planner
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { setMode("refine"); handleReset(); }} data-testid="button-check-ratios">
+            <Button variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => { setMode("refine"); handleReset(); }} data-testid="button-check-ratios">
               <Search className="h-4 w-4 mr-1" />
               Check a ratio
             </Button>
           </div>
         </CardContent>
       </Card>
+      </RatioAdviserShell>
     );
   }
 
   return (
+    <RatioAdviserShell>
     <Card data-testid="card-ratio-adviser">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <Search className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base">Ratio Adviser</CardTitle>
+      <CardHeader className="space-y-0 pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Search className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <CardTitle className="text-lg tracking-tight">Ratio Adviser</CardTitle>
+          </div>
+          <InlineInfoHint
+            ariaLabel="About Ratio Adviser"
+            content="Answer a few questions about post-meal blood sugars to spot patterns and prepare talking points for your clinic. This does not prescribe ratio changes."
+          />
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Wondering if a ratio needs adjusting? Answer a few questions to spot patterns.
-        </p>
       </CardHeader>
       <CardContent className="space-y-4">
-          {hasAnyRatio && step === 0 && (
-            <div
-              className="rounded-lg border border-primary/25 bg-primary/[0.04] dark:bg-primary/10 p-3 sm:p-4 space-y-3"
-              data-testid="adviser-saved-ratios-strip"
-            >
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your saved ratios</p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
-                  <div
-                    key={key}
-                    className="rounded-md border border-border/80 bg-background/60 dark:bg-background/40 px-2 py-2 text-center sm:text-left"
-                  >
-                    <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground sm:justify-start">
-                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <span className="font-medium text-foreground/90">{label}</span>
-                    </div>
-                    <p className="text-lg font-bold tabular-nums tracking-tight mt-0.5" data-testid={`adviser-strip-ratio-${key}`}>
-                      {ratio ?? "Not set"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm border-t border-border/60 pt-2">
-                <span>
-                  <span className="text-muted-foreground">ISF </span>
-                  <span className="font-semibold tabular-nums">
-                    {settings.correctionFactor != null
-                      ? `${settings.correctionFactor} ${bgUnit}`
-                      : <span className="text-muted-foreground italic font-normal">Not set</span>}
-                  </span>
-                </span>
-                <span>
-                  <span className="text-muted-foreground">Target </span>
-                  <span className="font-semibold tabular-nums">
-                    {settings.targetBgLow != null && settings.targetBgHigh != null
-                      ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
-                      : <span className="text-muted-foreground italic font-normal">Not set</span>}
-                  </span>
-                </span>
-              </div>
-            </div>
-          )}
-
           {step >= 1 && step < 4 && selectedMeal && (
             <div
               className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/30 px-3 py-2 text-sm"
@@ -768,6 +798,73 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
 
           {step === 0 && (
             <>
+              {ratiosEditOpen ? (
+                <RatiosEditPanel
+                  settings={settings}
+                  bgUnit={bgUnit}
+                  ratioFormat={ratioFormat}
+                  carbPortionSize={cpSize}
+                  onSaved={handleRatiosSaved}
+                  onCancel={() => setRatiosEditOpen(false)}
+                  idPrefix="ratio-adviser-edit"
+                />
+              ) : (
+                <Button
+                  type="button"
+                  className="min-h-12 w-full rounded-xl text-base font-semibold shadow-sm"
+                  onClick={() => setRatiosEditOpen(true)}
+                  data-testid="button-open-ratio-edit"
+                >
+                  <Pencil className="mr-2 h-4 w-4" aria-hidden />
+                  Edit ratios &amp; targets
+                </Button>
+              )}
+
+              {!ratiosEditOpen && hasAnyRatio && (
+                <div
+                  className="space-y-3 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 dark:bg-primary/10 sm:p-4"
+                  data-testid="adviser-saved-ratios-strip"
+                >
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your saved ratios</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mealOptions.map(({ key, label, icon: Icon, ratio }) => (
+                      <div
+                        key={key}
+                        className="rounded-lg border border-border/80 bg-background/60 px-2 py-2 dark:bg-background/40"
+                      >
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                          <span className="font-medium text-foreground/90">{label}</span>
+                        </div>
+                        <p className="mt-0.5 text-lg font-bold tabular-nums tracking-tight" data-testid={`adviser-strip-ratio-${key}`}>
+                          {ratio ?? "Not set"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-2 text-sm">
+                    <span>
+                      <span className="text-muted-foreground">ISF </span>
+                      <span className="font-semibold tabular-nums">
+                        {settings.correctionFactor != null
+                          ? `${settings.correctionFactor} ${bgUnit}`
+                          : <span className="font-normal italic text-muted-foreground">Not set</span>}
+                      </span>
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground">Target </span>
+                      <span className="font-semibold tabular-nums">
+                        {settings.targetBgLow != null && settings.targetBgHigh != null
+                          ? `${settings.targetBgLow}–${settings.targetBgHigh} ${bgUnit}`
+                          : <span className="font-normal italic text-muted-foreground">Not set</span>}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!ratiosEditOpen ? (
+              <>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Which meal do you want to check?</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -775,7 +872,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                     <Button
                       key={key}
                       variant="outline"
-                      className="h-auto py-3 justify-start gap-2 flex-col items-stretch text-left"
+                      className="min-h-[4.25rem] h-auto flex-col items-stretch justify-start gap-2 py-3 text-left"
                       onClick={() => handleSelectMeal(key)}
                       data-testid={`button-adviser-meal-${key}`}
                     >
@@ -796,97 +893,98 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
               </div>
 
               {hasAnyRatio && (
-                <div className="rounded-lg border border-border/80 bg-muted/20 p-3 sm:p-4 space-y-3" data-testid="adviser-quick-bolus-preview">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Calculator className="h-4 w-4 text-primary shrink-0" />
-                    Quick carb bolus preview
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {mealOptions.map(({ key, label, icon: Icon }) => (
-                      <Button
-                        key={key}
-                        type="button"
-                        size="sm"
-                        variant={previewMeal === key ? "default" : "outline"}
-                        className="h-auto min-h-9 justify-start gap-2 py-2"
-                        onClick={() => setPreviewMeal(key)}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
-                    <Input
-                      id="preview-carbs"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      step="1"
-                      placeholder="e.g. 45"
-                      value={previewCarbs}
-                      onChange={(e) => setPreviewCarbs(e.target.value)}
-                      data-testid="input-ratio-preview-carbs"
-                    />
-                  </div>
-                  {previewCarbsNum > 0 && (
-                    <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
-                      {!previewHasRatio ? (
-                        <p className="text-muted-foreground">
-                          No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Add it on the{" "}
-                          <Link href="/ratios" className="text-primary underline underline-offset-2">
-                            Ratios
-                          </Link>{" "}
-                          page.
-                        </p>
-                      ) : (
-                        <>
-                          <p>
-                            <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
-                            <span className="font-semibold tabular-nums text-lg">{previewRounded} units</span>
-                            {Math.abs(previewRounded - previewExact) >= 0.05 && (
-                              <span className="text-muted-foreground text-xs"> (exact {previewExact.toFixed(2)}u, rounded to whole units)</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Ratio used: {formatStoredRatio(previewRatioStr)} — carb-only; confirm with your team before dosing.
-                          </p>
-                        </>
-                      )}
+                <Collapsible defaultOpen={false} className="rounded-xl border border-border/80 bg-muted/15">
+                  <CollapsibleTrigger
+                    className="group flex w-full min-h-11 items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                    data-testid="adviser-quick-bolus-preview-trigger"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      Quick carb bolus preview
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 border-t border-border/60 px-3 pb-3 pt-2" data-testid="adviser-quick-bolus-preview">
+                    <div className="flex items-start gap-0.5">
+                      <p className="flex-1 text-xs text-muted-foreground">Carb-only estimate from your saved meal ratio.</p>
+                      <InlineInfoHint
+                        ariaLabel="About bolus preview"
+                        content="Uses only your meal ratio and carb grams — no correction for high BG, no IOB, no fat/protein bolus. Your team may use different rules."
+                      />
                     </div>
-                  )}
-                </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {mealOptions.map(({ key, label, icon: Icon }) => (
+                        <Button
+                          key={key}
+                          type="button"
+                          size="sm"
+                          variant={previewMeal === key ? "default" : "outline"}
+                          className="min-h-11 h-auto justify-start gap-2 py-2"
+                          onClick={() => setPreviewMeal(key)}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="preview-carbs">Carbs for this meal (g)</Label>
+                      <Input
+                        id="preview-carbs"
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="1"
+                        placeholder="e.g. 45"
+                        className="h-11 text-base"
+                        value={previewCarbs}
+                        onChange={(e) => setPreviewCarbs(e.target.value)}
+                        data-testid="input-ratio-preview-carbs"
+                      />
+                    </div>
+                    {previewCarbsNum > 0 && (
+                      <div className="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
+                        {!previewHasRatio ? (
+                          <p className="text-muted-foreground">
+                            No ratio saved for {mealLabel(previewMeal).toLowerCase()} yet. Use{" "}
+                            <span className="font-medium text-foreground">Edit ratios &amp; targets</span> above.
+                          </p>
+                        ) : (
+                          <>
+                            <p>
+                              <span className="text-muted-foreground">Carb bolus estimate:</span>{" "}
+                              <span className="text-lg font-semibold tabular-nums">{previewRounded} units</span>
+                              {Math.abs(previewRounded - previewExact) >= 0.05 && (
+                                <span className="text-xs text-muted-foreground">
+                                  {" "}
+                                  (exact {previewExact.toFixed(2)}u)
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Ratio: {formatStoredRatio(previewRatioStr)}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
               )}
 
-              <div className="bg-muted/30 rounded-lg p-3 space-y-1">
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span><strong>This tool does not give medical advice or prescribe ratio changes.</strong> It helps you recognise patterns in your blood sugars so you can have a more informed conversation with your diabetes team.</span>
-                </p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Answer a few questions about your post-meal blood sugars and we will help you spot patterns
-                and prepare talking points for your next clinic appointment.
-              </p>
-
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                {!hasAnyRatio && (
-                  <Button variant="outline" size="sm" className="justify-start" onClick={() => setMode("scratch_intro")} data-testid="button-open-estimate-flow">
-                    <Sparkles className="h-4 w-4" />
-                    Estimate starting ratios
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" className="justify-start" asChild data-testid="link-ratio-adviser-ratios-page">
-                  <Link href="/ratios">Edit ratios</Link>
+              {!hasAnyRatio && (
+                <Button
+                  variant="outline"
+                  className="min-h-11 w-full justify-start gap-2"
+                  onClick={() => setMode("scratch_intro")}
+                  data-testid="button-open-estimate-flow"
+                >
+                  <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+                  Estimate starting ratios
                 </Button>
-                <p className="text-xs text-muted-foreground sm:self-center w-full sm:w-auto">
-                  Includes insulin-to-carb ratios, ISF, and target range.
-                </p>
-              </div>
+              )}
+              </>
+              ) : null}
             </>
           )}
 
@@ -1151,13 +1249,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                 </Collapsible>
               )}
 
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Not medical advice — this tool helps you spot patterns, not prescribe changes. Always discuss ratio adjustments with your diabetes team.
-              </p>
             </div>
           )}
         </CardContent>
     </Card>
+    </RatioAdviserShell>
   );
 }

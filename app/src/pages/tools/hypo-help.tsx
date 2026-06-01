@@ -34,6 +34,11 @@ import {
   getPostExerciseEducationalCopy,
   inferPostExerciseLoadTier,
 } from "@/lib/post-exercise-nudge";
+import {
+  computeHypoCarbEquivalents,
+  formatPrimaryTreatmentShort,
+  getPrimaryHypoTreatmentFromProfile,
+} from "@/lib/hypo-treatment-display";
 
 const HYPO_RECHECK_FLOW_STEPS: StepLadderStep[] = [
   {
@@ -68,17 +73,13 @@ export default function HypoHelpPage() {
   const [userWeight, setUserWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<WeightDisplayUnit>("kg");
   const [useProfileWeight, setUseProfileWeight] = useState(true);
-  const [hypoResult, setHypoResult] = useState<{
-    carbsNeeded: number;
-    glucoseTablets: number;
-    juiceMl: number;
-    jellyBabies: number;
-  } | null>(null);
+  const [hypoResult, setHypoResult] = useState<ReturnType<typeof computeHypoCarbEquivalents> | null>(null);
   const [hypoCalcError, setHypoCalcError] = useState<string | null>(null);
   const [postExerciseNudgeRev, setPostExerciseNudgeRev] = useState(0);
   const [contextOpen, setContextOpen] = useState(false);
 
   const bgUnits = profile.bgUnits || "mmol/L";
+  const primaryHypoTreatment = getPrimaryHypoTreatmentFromProfile(profile);
   const postExerciseHypoCopy = useMemo(() => {
     void postExerciseNudgeRev;
     if (!storage.shouldShowPostExerciseEducationalNudges()) return null;
@@ -163,15 +164,7 @@ export default function HypoHelpPage() {
     const baseRise = 0.25;
     const effectiveRise = baseRise * sensitivityFactor;
     const carbsNeeded = Math.ceil(bgDifference / effectiveRise);
-    const glucoseTablets = Math.ceil(carbsNeeded / 4);
-    const juiceMl = Math.round(carbsNeeded * 10);
-    const jellyBabies = Math.ceil(carbsNeeded / 5);
-    setHypoResult({
-      carbsNeeded: Math.max(carbsNeeded, 10),
-      glucoseTablets: Math.max(glucoseTablets, 3),
-      juiceMl: Math.max(juiceMl, 100),
-      jellyBabies: Math.max(jellyBabies, 2),
-    });
+    setHypoResult(computeHypoCarbEquivalents(carbsNeeded));
   };
 
   return (
@@ -360,26 +353,47 @@ export default function HypoHelpPage() {
                 You need approximately:
               </h4>
               <div className="text-center p-4 bg-card rounded-lg border border-red-200/60 dark:border-red-800/50">
-                <p className="text-4xl font-bold text-red-600 dark:text-red-400">{hypoResult.carbsNeeded}g</p>
+                <p className="text-4xl font-bold text-red-600 dark:text-red-400">{hypoResult.carbsGrams}g</p>
                 <p className="text-small text-red-700 dark:text-red-300">fast-acting carbs</p>
+                {formatPrimaryTreatmentShort(hypoResult.carbsGrams, primaryHypoTreatment) ? (
+                  <p className="mt-2 text-sm font-medium text-red-800 dark:text-red-200">
+                    Your usual choice: {formatPrimaryTreatmentShort(hypoResult.carbsGrams, primaryHypoTreatment)}
+                  </p>
+                ) : null}
               </div>
-              <div className="grid gap-2 text-small">
-                <p className="font-medium text-red-800 dark:text-red-200">That&apos;s about:</p>
-                <div className="grid gap-2 md:grid-cols-3">
-                  <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.glucoseTablets}</p>
-                    <p className="text-tiny text-red-600 dark:text-red-400">glucose tablets</p>
+              <Collapsible>
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-red-200/60 bg-card/80 px-3 py-2 text-left text-sm font-medium text-red-800 dark:text-red-200 dark:border-red-900/50">
+                  <span>{primaryHypoTreatment ? "Other options" : "That's about"}</span>
+                  <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="grid gap-2 text-small pt-2">
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.glucoseTablets}</p>
+                        <p className="text-tiny text-red-600 dark:text-red-400">glucose tablets</p>
+                      </div>
+                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.juiceMl}ml</p>
+                        <p className="text-tiny text-red-600 dark:text-red-400">fruit juice</p>
+                      </div>
+                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
+                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.jellyBabies}</p>
+                        <p className="text-tiny text-red-600 dark:text-red-400">jelly babies</p>
+                      </div>
+                    </div>
+                    {!primaryHypoTreatment ? (
+                      <p className="text-xs text-muted-foreground">
+                        Set your usual hypo treatment in{" "}
+                        <Link href="/settings/usage#settings-personal" className="text-primary underline-offset-4 hover:underline">
+                          Settings
+                        </Link>{" "}
+                        to see your preferred option first.
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.juiceMl}ml</p>
-                    <p className="text-tiny text-red-600 dark:text-red-400">fruit juice</p>
-                  </div>
-                  <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.jellyBabies}</p>
-                    <p className="text-tiny text-red-600 dark:text-red-400">jelly babies</p>
-                  </div>
-                </div>
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
               <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-tiny text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
                 <strong>Remember:</strong> Wait 15 minutes, then recheck. If still low, treat again.
               </div>
