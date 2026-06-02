@@ -20,6 +20,7 @@ import {
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { normalizeAppRegion } from "@/lib/region";
+import { UK_DEFAULT_NEEDLES_PER_BOX, UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "@/lib/storage";
 
 /** PostgREST when a `profiles` column exists in repo migrations but not in the linked project (or schema cache is stale). */
 export function isMissingProfileColumnSchemaError(message: string, column: string): boolean {
@@ -229,6 +230,8 @@ export type ClinicalPrefsCloudSyncResult = {
   dateOfBirthCloudSkipped?: boolean;
   insulinDeliveryMethodCloudSkipped?: boolean;
   tddCloudSkipped?: boolean;
+  unitsPerInsulinPenCloudSkipped?: boolean;
+  needlesPerBoxCloudSkipped?: boolean;
 };
 
 /** User-facing second line when some clinical prefs could not be written to Supabase. */
@@ -251,11 +254,19 @@ export function describePartialClinicalPrefsCloudSync(result: ClinicalPrefsCloud
 
 function buildClinicalPrefsPayload(
   userId: string,
-  opts: { includeDelivery: boolean; includeTdd: boolean; includeDob: boolean },
+  opts: {
+    includeDelivery: boolean;
+    includeTdd: boolean;
+    includeDob: boolean;
+    includeUnitsPerPen: boolean;
+    includeNeedlesPerBox: boolean;
+  },
   values: {
     insulin_delivery_method: "pen" | "pump" | undefined;
     tdd: number | null;
     dobNorm: string | null;
+    unitsPerInsulinPen: number;
+    needlesPerBox: number;
   },
 ): ProfileUpdatePayload {
   const payload: ProfileUpdatePayload = { id: userId };
@@ -268,6 +279,12 @@ function buildClinicalPrefsPayload(
   if (opts.includeDob && values.dobNorm != null) {
     payload.date_of_birth = values.dobNorm;
   }
+  if (opts.includeUnitsPerPen) {
+    payload.units_per_insulin_pen = values.unitsPerInsulinPen;
+  }
+  if (opts.includeNeedlesPerBox) {
+    payload.needles_per_box = values.needlesPerBox;
+  }
   return payload;
 }
 
@@ -275,7 +292,9 @@ function payloadHasClinicalFields(payload: ProfileUpdatePayload): boolean {
   return (
     payload.insulin_delivery_method !== undefined ||
     payload.tdd !== undefined ||
-    payload.date_of_birth !== undefined
+    payload.date_of_birth !== undefined ||
+    payload.units_per_insulin_pen !== undefined ||
+    payload.needles_per_box !== undefined
   );
 }
 
@@ -294,26 +313,31 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
       : undefined;
   const tdd = typeof s.tdd === "number" && s.tdd > 0 && Number.isFinite(s.tdd) ? s.tdd : null;
   const dobNorm = normalizeDateOfBirthInput(p?.dateOfBirth ?? null);
+  const unitsPerInsulinPen = Math.max(
+    1,
+    s.unitsPerInsulinPen || s.insulinCartridgeUnits || UK_DEFAULT_UNITS_PER_INSULIN_PEN,
+  );
+  const needlesPerBox = Math.max(1, s.needlesPerBox || UK_DEFAULT_NEEDLES_PER_BOX);
 
-  if (insulin_delivery_method === undefined && tdd == null && !dobNorm && !String(p?.dateOfBirth ?? "").trim()) {
-    return { error: null };
-  }
-
-  const values = { insulin_delivery_method, tdd, dobNorm };
+  const values = { insulin_delivery_method, tdd, dobNorm, unitsPerInsulinPen, needlesPerBox };
   let includeDelivery = insulin_delivery_method !== undefined;
   let includeTdd = tdd != null;
   let includeDob = dobNorm != null;
+  let includeUnitsPerPen = true;
+  let includeNeedlesPerBox = true;
 
   const skipped = {
     dateOfBirth: false,
     insulinDeliveryMethod: false,
     tdd: false,
+    unitsPerInsulinPen: false,
+    needlesPerBox: false,
   };
 
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 7; attempt++) {
     const payload = buildClinicalPrefsPayload(
       userId,
-      { includeDelivery, includeTdd, includeDob },
+      { includeDelivery, includeTdd, includeDob, includeUnitsPerPen, includeNeedlesPerBox },
       values,
     );
     if (!payloadHasClinicalFields(payload)) {
@@ -323,6 +347,8 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
         dateOfBirthCloudSkipped: skipped.dateOfBirth,
         insulinDeliveryMethodCloudSkipped: skipped.insulinDeliveryMethod,
         tddCloudSkipped: skipped.tdd,
+        unitsPerInsulinPenCloudSkipped: skipped.unitsPerInsulinPen,
+        needlesPerBoxCloudSkipped: skipped.needlesPerBox,
       };
     }
 
@@ -334,6 +360,8 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
         dateOfBirthCloudSkipped: skipped.dateOfBirth,
         insulinDeliveryMethodCloudSkipped: skipped.insulinDeliveryMethod,
         tddCloudSkipped: skipped.tdd,
+        unitsPerInsulinPenCloudSkipped: skipped.unitsPerInsulinPen,
+        needlesPerBoxCloudSkipped: skipped.needlesPerBox,
       };
     }
 
@@ -351,6 +379,16 @@ export async function syncClinicalPrefsToCloud(userId: string): Promise<Clinical
     if (includeTdd && isMissingProfileColumnSchemaError(msg, "tdd")) {
       includeTdd = false;
       skipped.tdd = true;
+      continue;
+    }
+    if (includeUnitsPerPen && isMissingProfileColumnSchemaError(msg, "units_per_insulin_pen")) {
+      includeUnitsPerPen = false;
+      skipped.unitsPerInsulinPen = true;
+      continue;
+    }
+    if (includeNeedlesPerBox && isMissingProfileColumnSchemaError(msg, "needles_per_box")) {
+      includeNeedlesPerBox = false;
+      skipped.needlesPerBox = true;
       continue;
     }
 

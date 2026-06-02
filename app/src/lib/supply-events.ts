@@ -110,9 +110,14 @@ export async function pushSupplyEventToCloud(event: SupplyEvent): Promise<void> 
   const userId = userData?.user?.id;
   if (!userId) return;
 
+  const cloudSupplyId =
+    typeof event.meta?.cloudSupplyId === "string" && event.meta.cloudSupplyId.trim()
+      ? event.meta.cloudSupplyId.trim()
+      : null;
+
   await supabase.from("supply_events").insert({
     user_id: userId,
-    supply_id: event.supplyId,
+    supply_id: cloudSupplyId ?? event.supplyId,
     kind: event.kind,
     delta: event.delta,
     stock_now: event.stockNow,
@@ -127,7 +132,10 @@ export function enqueueSupplyEventForCloud(event: SupplyEvent): void {
     kind: "supply_events:add",
     clientId: event.id,
     payload: {
-      supply_id: event.supplyId,
+      supply_id:
+        typeof event.meta?.cloudSupplyId === "string" && event.meta.cloudSupplyId.trim()
+          ? event.meta.cloudSupplyId.trim()
+          : event.supplyId,
       kind: event.kind,
       delta: event.delta,
       stock_now: event.stockNow,
@@ -156,9 +164,15 @@ export async function flushSupplyEventsOfflineQueue(
     if (entry.kind !== "supply_events:add") continue;
     try {
       const p = entry.payload;
+      const meta =
+        p.meta && typeof p.meta === "object" ? (p.meta as Record<string, unknown>) : {};
+      const cloudSupplyId =
+        typeof meta.cloudSupplyId === "string" && meta.cloudSupplyId.trim()
+          ? meta.cloudSupplyId.trim()
+          : null;
       const { error } = await supabase.from("supply_events").insert({
         user_id: userId,
-        supply_id: p.supply_id,
+        supply_id: cloudSupplyId ?? p.supply_id,
         kind: p.kind,
         delta: p.delta,
         stock_now: p.stock_now,

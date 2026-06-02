@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import {
   normaliseScopes,
   fetchSuppliesForLinkedPatient,
   fetchSupplyEventsForLinkedPatient,
+  resolveSupplyEventItemName,
   fetchPatientProfileForCarer,
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
@@ -41,6 +43,11 @@ import {
 } from "@/lib/carers";
 import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
+import {
+  formatCarerSupplyEventDelta,
+  formatCarerSupplyQuantity,
+  type PatientSupplyPackPrefs,
+} from "@/lib/supply-display-for-carer";
 import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { getSupabase } from "@/lib/supabase";
 import {
@@ -305,7 +312,7 @@ function scenarioBannerLines(rows: Record<string, unknown>[]): string[] {
     }
 
     if (scenarioKey === "travel") {
-      const active = rawState?.travel_active === true || rawState?.travelActive === true;
+      const active = isTravelScenarioActive(rawState);
       const destination = typeof rawState?.destination === "string" ? rawState?.destination.trim() : null;
       const start = typeof rawState?.travel_start === "string" ? rawState?.travel_start.trim() : null;
       const end = typeof rawState?.travel_end === "string" ? rawState?.travel_end.trim() : null;
@@ -379,6 +386,44 @@ function isSickDayScenarioActive(raw: Record<string, unknown> | null | undefined
   }
   const flagOn = raw.sick_day_active === true || raw.sickDayActive === true;
   return flagOn;
+}
+
+/** End of scenario window (date-only ISO uses end of that calendar day). */
+function scenarioEndTimestampMs(iso: string): number {
+  const s = iso.trim();
+  if (!s) return NaN;
+  if (s.includes("T")) return new Date(s).getTime();
+  return new Date(`${s}T23:59:59.999`).getTime();
+}
+
+/**
+ * Travel is "active" for supporter UI when the flag is on and the trip has not ended
+ * (`ended_at` / past `travel_end`). Stale `travel_active: true` after the trip dates must not stick.
+ */
+function isTravelScenarioActive(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw) return false;
+  const flagOn = raw.travel_active === true || raw.travelActive === true;
+  if (!flagOn) return false;
+
+  const endedIso =
+    (typeof raw.ended_at === "string" && raw.ended_at.trim() ? raw.ended_at : null) ??
+    (typeof raw.deactivated_at === "string" && raw.deactivated_at.trim() ? raw.deactivated_at : null);
+  if (endedIso) {
+    const endMs = new Date(endedIso).getTime();
+    if (!Number.isNaN(endMs) && endMs <= Date.now()) {
+      return false;
+    }
+  }
+
+  const tripEnd = typeof raw.travel_end === "string" && raw.travel_end.trim() ? raw.travel_end.trim() : null;
+  if (tripEnd) {
+    const endMs = scenarioEndTimestampMs(tripEnd);
+    if (!Number.isNaN(endMs) && endMs <= Date.now()) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function sickDayScenarioState(rows: Record<string, unknown>[]): Record<string, unknown> | null {
@@ -1156,8 +1201,7 @@ function travelScenarioSummary(rows: Record<string, unknown>[]): { active: boole
       (row.payload && typeof row.payload === "object" ? (row.payload as Record<string, unknown>) : null) ??
       (row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : null);
     if (!rawState) continue;
-    const active = rawState.travel_active === true || rawState.travelActive === true;
-    if (!active) continue;
+    if (!isTravelScenarioActive(rawState)) continue;
     const destination = typeof rawState.destination === "string" ? rawState.destination.trim() : null;
     return { active: true, destination: destination || null };
   }
@@ -1541,6 +1585,14 @@ export default function CarerViewPage() {
     return "ok";
   }, [scopes.supplies, supplies]);
 
+  const patientSupplyPackPrefs = useMemo((): PatientSupplyPackPrefs | null => {
+    if (!profile) return null;
+    return {
+      unitsPerInsulinPen: profile.units_per_insulin_pen,
+      needlesPerBox: profile.needles_per_box,
+    };
+  }, [profile]);
+
   const hideGlanceLine =
     carerHeaderContext.glance.type === "info" &&
     carerHeaderContext.showTravelChip &&
@@ -1889,10 +1941,14 @@ export default function CarerViewPage() {
             <Card className="border-border/60 shadow-sm" data-testid="carer-view-activity">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 text-primary" />
-                  Activity log
+                  <History className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1">Activity log</span>
+                  <InlineInfoHint
+                    ariaLabel="About activity log"
+                    content={<p>Shared hypos, guides, and clinic visits by day — read-only.</p>}
+                    className="-mr-2 shrink-0"
+                  />
                 </CardTitle>
-                <CardDescription>Shared hypos, guides, and clinic visits by day — read-only.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {carerActivityWeek.countLast7Days === 0 ? (
@@ -1917,10 +1973,16 @@ export default function CarerViewPage() {
               <Card id="carer-scenarios" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-scenarios">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2">
-                    <Plane className="h-5 w-5 text-primary" />
-                    Guide status
+                    <Plane className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0 flex-1">Guide status</span>
+                    <InlineInfoHint
+                      ariaLabel="About guide status"
+                      content={
+                        <p>Shared travel, sick-day, and bedtime flags when their project allows it.</p>
+                      }
+                      className="-mr-2 shrink-0"
+                    />
                   </CardTitle>
-                  <CardDescription>Shared travel, sick-day, and bedtime flags when their project allows it.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {scenarioLines.length === 0 ? (
@@ -1960,10 +2022,14 @@ export default function CarerViewPage() {
               <Card className="border-border/60 shadow-sm" data-testid="carer-view-supplies">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-primary" />
-                    Supplies
+                    <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0 flex-1">Supplies</span>
+                    <InlineInfoHint
+                      ariaLabel="About supplies"
+                      content={<p>Cloud stock figures they have chosen to share.</p>}
+                      className="-mr-2 shrink-0"
+                    />
                   </CardTitle>
-                  <CardDescription>Cloud stock figures they have chosen to share.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {supplies.length === 0 ? (
@@ -1979,7 +2045,9 @@ export default function CarerViewPage() {
                           >
                             <span className="font-medium truncate">{s.name}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-muted-foreground tabular-nums">{s.quantity}</span>
+                              <span className="text-muted-foreground tabular-nums text-right">
+                                {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
+                              </span>
                               {tone === "critical" && (
                                 <Badge variant="destructive" className="text-xs">
                                   Out
@@ -2013,6 +2081,21 @@ export default function CarerViewPage() {
                             : formatDistanceToNowStrict(when, { addSuffix: true });
                           const delta =
                             e.delta == null || Number.isNaN(e.delta) ? null : Math.round(e.delta * 10) / 10;
+                          const itemName = resolveSupplyEventItemName(e, supplies);
+                          const linkedSupply =
+                            supplies.find((s) => s.id === e.supply_id) ??
+                            (itemName
+                              ? supplies.find((s) => s.name.trim().toLowerCase() === itemName.trim().toLowerCase())
+                              : undefined);
+                          const eventRowForFormat: CloudSupplyRow =
+                            linkedSupply ?? {
+                              id: e.supply_id,
+                              user_id: e.user_id,
+                              name: itemName ?? "Supply",
+                              quantity: 0,
+                              updated_at: e.created_at,
+                              category: null,
+                            };
                           return (
                             <div key={e.id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-1">
                               <div className="flex items-center justify-between gap-2">
@@ -2027,14 +2110,14 @@ export default function CarerViewPage() {
                                       }
                                     >
                                       {" "}
-                                      {delta > 0 ? `+${delta}` : `${delta}`}
+                                      {formatCarerSupplyEventDelta(delta, eventRowForFormat, patientSupplyPackPrefs)}
                                     </span>
                                   ) : null}
                                 </span>
                                 <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
                               </div>
-                              {typeof e.supply_id === "string" ? (
-                                <p className="text-xs text-muted-foreground">Item: {e.supply_id}</p>
+                              {itemName ? (
+                                <p className="text-xs text-muted-foreground">Item: {itemName}</p>
                               ) : null}
                             </div>
                           );
@@ -2054,10 +2137,14 @@ export default function CarerViewPage() {
             <Card className="border-border/60 shadow-sm" data-testid="carer-view-appointments">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Appointments
+                  <Calendar className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1">Appointments</span>
+                  <InlineInfoHint
+                    ariaLabel="About appointments"
+                    content={<p>Read-only — from their cloud appointments.</p>}
+                    className="-mr-2 shrink-0"
+                  />
                 </CardTitle>
-                <CardDescription>Read-only — from their cloud appointments.</CardDescription>
               </CardHeader>
               <CardContent>
                 {upcomingAppointments.length === 0 ? (
@@ -2100,12 +2187,19 @@ export default function CarerViewPage() {
             <Card id="carer-emergency" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-emergency">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-primary" />
-                  Emergency details
+                  <Phone className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1">Emergency details</span>
+                  <InlineInfoHint
+                    ariaLabel="About emergency details"
+                    content={
+                      <p>
+                        They entered this under Account or Settings. Use only as they intend — this is not
+                        emergency services.
+                      </p>
+                    }
+                    className="-mr-2 shrink-0"
+                  />
                 </CardTitle>
-                <CardDescription>
-                  They entered this under Account or Settings. Use only as they intend — this is not emergency services.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 {profile?.emergency_contact_name ? (

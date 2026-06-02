@@ -25,6 +25,10 @@ export type ProfileRow = {
   insulin_delivery_method?: string | null;
   /** Total daily insulin (units); optional owner sync from app settings. */
   tdd?: number | null;
+  /** Units per insulin pen; synced from app settings for supporter supply display. */
+  units_per_insulin_pen?: number | null;
+  /** Pen needles per box; synced from app settings for supporter supply display. */
+  needles_per_box?: number | null;
   /** Optional YYYY-MM-DD; owner or linked supporter (when permitted) may set on cloud profile. */
   date_of_birth?: string | null;
   /** Owner-managed primary pharmacy + opening hours JSON; never selected for community batches. */
@@ -411,6 +415,8 @@ export type ProfileUpdatePayload = {
     | "diabetes_onset_date"
     | "insulin_delivery_method"
     | "tdd"
+    | "units_per_insulin_pen"
+    | "needles_per_box"
     | "date_of_birth"
     | "pharmacy"
     | "account_type"
@@ -435,6 +441,8 @@ export async function updateProfile(
     diabetes_onset_date,
     insulin_delivery_method,
     tdd,
+    units_per_insulin_pen,
+    needles_per_box,
     date_of_birth,
     pharmacy,
     account_type,
@@ -488,6 +496,22 @@ export async function updateProfile(
     if (tdd === null) update.tdd = null;
     else if (typeof tdd === "number" && Number.isFinite(tdd) && tdd > 0) update.tdd = tdd;
     else update.tdd = null;
+  }
+  if (units_per_insulin_pen !== undefined) {
+    if (units_per_insulin_pen === null) update.units_per_insulin_pen = null;
+    else if (typeof units_per_insulin_pen === "number" && Number.isFinite(units_per_insulin_pen) && units_per_insulin_pen > 0) {
+      update.units_per_insulin_pen = Math.round(units_per_insulin_pen);
+    } else {
+      update.units_per_insulin_pen = null;
+    }
+  }
+  if (needles_per_box !== undefined) {
+    if (needles_per_box === null) update.needles_per_box = null;
+    else if (typeof needles_per_box === "number" && Number.isFinite(needles_per_box) && needles_per_box > 0) {
+      update.needles_per_box = Math.round(needles_per_box);
+    } else {
+      update.needles_per_box = null;
+    }
   }
   if (date_of_birth !== undefined) {
     if (date_of_birth === null) {

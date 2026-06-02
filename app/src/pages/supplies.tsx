@@ -2662,7 +2662,13 @@ export default function Supplies() {
         delta: args.delta,
         stockNow: args.nextQuantity,
         createdAt: new Date().toISOString(),
-        meta: { source: "stepper", unitLabel: args.unitLabel, unitAmount: args.unitAmount },
+        meta: {
+          source: "stepper",
+          unitLabel: args.unitLabel,
+          unitAmount: args.unitAmount,
+          supplyName: updated.name,
+          ...(updated.cloud_id ? { cloudSupplyId: updated.cloud_id } : {}),
+        },
       });
       enqueueSupplyEventForCloud(evt);
 
@@ -2684,7 +2690,13 @@ export default function Supplies() {
                   delta: -args.delta,
                   stockNow: prevQuantity,
                   createdAt: new Date().toISOString(),
-                  meta: { source: "undo", unitLabel: args.unitLabel, unitAmount: args.unitAmount },
+                  meta: {
+                    source: "undo",
+                    unitLabel: args.unitLabel,
+                    unitAmount: args.unitAmount,
+                    supplyName: undoUpdated.name,
+                    ...(undoUpdated.cloud_id ? { cloudSupplyId: undoUpdated.cloud_id } : {}),
+                  },
                 });
                 enqueueSupplyEventForCloud(undoEvt);
               }

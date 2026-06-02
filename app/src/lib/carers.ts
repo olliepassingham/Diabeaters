@@ -633,6 +633,18 @@ export type CloudSupplyEventRow = {
   created_at: string;
 };
 
+/** Human-readable supply name for carer/supporter event rows (never show raw client ids). */
+export function resolveSupplyEventItemName(
+  event: CloudSupplyEventRow,
+  supplies: { id: string; name: string }[],
+): string | null {
+  const fromMeta = event.meta?.supplyName ?? event.meta?.supply_name;
+  if (typeof fromMeta === "string" && fromMeta.trim()) return fromMeta.trim();
+  const byCloudId = supplies.find((s) => s.id === event.supply_id);
+  if (byCloudId?.name?.trim()) return byCloudId.name.trim();
+  return null;
+}
+
 /** Carer: supply event rows for linked patient (RLS + scope via supply_events policy). */
 export async function fetchSupplyEventsForLinkedPatient(
   patientId: string,
@@ -735,6 +747,8 @@ export type PatientEmergencyProfile = {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   emergency_notes: string | null;
+  units_per_insulin_pen: number | null;
+  needles_per_box: number | null;
 };
 
 /** Carer: patient profile subset when RLS allows (emergency + display). */
@@ -747,7 +761,7 @@ export async function fetchPatientProfileForCarer(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "full_name, avatar_url, emergency_contact_name, emergency_contact_phone, emergency_notes",
+      "full_name, avatar_url, emergency_contact_name, emergency_contact_phone, emergency_notes, units_per_insulin_pen, needles_per_box",
     )
     .eq("id", patientId)
     .maybeSingle();
@@ -763,6 +777,12 @@ export async function fetchPatientProfileForCarer(
       emergency_contact_name: (row.emergency_contact_name as string) ?? null,
       emergency_contact_phone: (row.emergency_contact_phone as string) ?? null,
       emergency_notes: (row.emergency_notes as string) ?? null,
+      units_per_insulin_pen:
+        typeof row.units_per_insulin_pen === "number" && row.units_per_insulin_pen > 0
+          ? row.units_per_insulin_pen
+          : null,
+      needles_per_box:
+        typeof row.needles_per_box === "number" && row.needles_per_box > 0 ? row.needles_per_box : null,
     },
     error: null,
   };

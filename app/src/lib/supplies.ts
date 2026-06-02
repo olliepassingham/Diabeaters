@@ -496,6 +496,13 @@ export async function reconcileSupplies(): Promise<void> {
     storage.importSupplyFromCloudReconcile(c);
   }
 
+  // Push locals that still have no cloud row (supporters only see public.supplies).
+  for (const local of storage.getSupplies()) {
+    if (!local.cloud_id) {
+      await syncToCloud(local);
+    }
+  }
+
   for (const l of storage.getSupplies()) {
     if (l.cloud_id) void writeSupplyForecastToCloud(l);
   }
