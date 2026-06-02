@@ -125,7 +125,7 @@ export default function Welcome() {
                       <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden />
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Learn and explore: education, tips, coach, and the feed — without clinical tracking.
+                      Learn and explore: education, tips, coach, and the feed.
                     </p>
                   </div>
                 </div>

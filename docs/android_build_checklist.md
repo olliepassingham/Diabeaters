@@ -23,6 +23,8 @@ Links: [Supabase auth (self-serve)](./supabase_auth_self_serve.md), [iOS release
 
 ## 2. Firebase + FCM (push notifications)
 
+**Step-by-step:** [android_push_setup.md](./android_push_setup.md)
+
 - [ ] Create Firebase project (or link existing) with Android app **`com.passingtime.diabeaters`**
 - [ ] Download **`google-services.json`** → `android/app/google-services.json` (see [`google-services.json.example`](../android/app/google-services.json.example))
 - [ ] Enable **Firebase Cloud Messaging** for the project
@@ -65,7 +67,7 @@ APNs secrets (`APNS_*`) remain required for iOS; Android uses FCM only.
 
 Verified in repo:
 
-- `INTERNET`, `POST_NOTIFICATIONS`, `CAMERA`, `VIBRATE`, exact-alarm permissions in [`AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml)
+- `INTERNET`, `POST_NOTIFICATIONS`, `CAMERA`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED` in [`AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml). **No** `USE_EXACT_ALARM` / `SCHEDULE_EXACT_ALARM` (Play policy — reminders use inexact scheduling).
 - Deep link intent filter for **`diabeaters://`** (auth email verify + in-app navigation)
 
 Manual QA:
