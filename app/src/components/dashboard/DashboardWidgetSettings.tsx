@@ -4,7 +4,6 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -203,6 +202,7 @@ function WidgetSettingsList({
   toggleWidget,
   setWidgetSize,
   allowResize,
+  scrollable = false,
 }: {
   sortedForUi: WidgetPlacement[];
   sensors: ReturnType<typeof useSensors>;
@@ -210,10 +210,17 @@ function WidgetSettingsList({
   toggleWidget: (id: WidgetType, enabled: boolean) => void;
   setWidgetSize: (id: WidgetType, size: WidgetSize) => void;
   allowResize: boolean;
+  /** When false, list is fixed height (better for drag-to-reorder on phone). */
+  scrollable?: boolean;
 }) {
   return (
     <div
-      className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 [-webkit-overflow-scrolling:touch] sm:px-4"
+      className={cn(
+        "px-3 py-2 sm:px-4",
+        scrollable
+          ? "min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]"
+          : "shrink-0 overflow-hidden",
+      )}
       data-testid="widget-settings-scroll"
     >
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -256,8 +263,7 @@ export function DashboardWidgetSettings({
   const enabledCount = sortedForUi.filter((p) => p.enabled).length;
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -285,12 +291,18 @@ export function DashboardWidgetSettings({
 
   if (isMobile) {
     return (
-      <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} repositionInputs={false}>
+      <Drawer.Root
+        open={open}
+        onOpenChange={onOpenChange}
+        handleOnly
+        shouldScaleBackground={false}
+        repositionInputs={false}
+      >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
           <Drawer.Content
             className={cn(
-              "fixed inset-x-2 z-[110] flex h-[var(--widget-settings-max-h)] max-h-[var(--widget-settings-max-h)] flex-col overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl outline-none",
+              "fixed inset-x-2 z-[110] flex h-auto max-h-[var(--widget-settings-max-h)] flex-col overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl outline-none",
               "bottom-[calc(var(--bottom-nav-height,7.5rem)+env(safe-area-inset-bottom,0px)+0.35rem)]",
             )}
             style={{ ["--widget-settings-max-h" as string]: MOBILE_PANEL_MAX_H }}
@@ -311,7 +323,7 @@ export function DashboardWidgetSettings({
               Drag to reorder widgets on your home screen.
             </Drawer.Description>
             <WidgetSettingsHeader enabledCount={enabledCount} />
-            <WidgetSettingsList {...listProps} />
+            <WidgetSettingsList {...listProps} scrollable={false} />
             <WidgetSettingsFooter onReset={resetWidgets} onDone={() => onOpenChange(false)} />
           </Drawer.Content>
         </Drawer.Portal>
@@ -330,7 +342,7 @@ export function DashboardWidgetSettings({
           <DialogDescription>Drag to reorder widgets on your home screen.</DialogDescription>
         </DialogHeader>
         <WidgetSettingsHeader enabledCount={enabledCount} />
-        <WidgetSettingsList {...listProps} />
+        <WidgetSettingsList {...listProps} scrollable />
         <DialogFooter className="p-0">
           <WidgetSettingsFooter onReset={resetWidgets} onDone={() => onOpenChange(false)} />
         </DialogFooter>
