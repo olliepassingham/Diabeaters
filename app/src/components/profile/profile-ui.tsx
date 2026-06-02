@@ -310,3 +310,92 @@ export function ProfileActionGrid({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+export const profileFormCardClass =
+  "dashboard-card-hover animate-soft-in overflow-hidden border border-border/50 bg-gradient-to-b from-muted/20 via-transparent to-transparent shadow-sm ring-1 ring-border/25 dark:from-muted/12";
+
+/** Settings-style profile editor card (Account tab). */
+export function ProfileFormCard({
+  children,
+  className,
+  id,
+  testId,
+}: {
+  children: ReactNode;
+  className?: string;
+  id?: string;
+  testId?: string;
+}) {
+  return (
+    <Card
+      id={id}
+      variant="glass-strong"
+      className={cn(profileFormCardClass, id && "scroll-mt-24", className)}
+      data-testid={testId}
+    >
+      <CardContent className="p-4 sm:p-5">{children}</CardContent>
+    </Card>
+  );
+}
+
+export function ProfileFormInset({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-border/50 bg-background/40 p-3 shadow-sm dark:bg-background/25 sm:p-3.5",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function ProfileFormStack({ children, className }: { children: ReactNode; className?: string }) {
+  return <dl className={cn("divide-y divide-border/40", className)}>{children}</dl>;
+}
+
+export function ProfileReadOnlyRow({
+  label,
+  children,
+  testId,
+}: {
+  label: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 py-2.5 first:pt-0 last:pb-0 sm:flex-row sm:items-baseline sm:gap-4" data-testid={testId}>
+      <dt className="text-xs font-medium text-muted-foreground sm:w-[7.5rem] sm:shrink-0">{label}</dt>
+      <dd className="min-w-0 text-sm text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+export function ProfileToggleRow({
+  label,
+  description,
+  hint,
+  control,
+  footer,
+}: {
+  label: ReactNode;
+  description?: string;
+  hint?: ReactNode;
+  control: ReactNode;
+  footer?: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-primary/12 bg-primary/[0.04] px-3 py-2.5 dark:border-primary/15 dark:bg-primary/[0.06]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-1 text-sm font-medium text-foreground">{label}</div>
+          {description ? <p className="text-xs leading-relaxed text-muted-foreground">{description}</p> : null}
+        </div>
+        <div className="shrink-0">{control}</div>
+      </div>
+      {hint ? <div className="mt-2 border-t border-border/30 pt-2">{hint}</div> : null}
+      {footer ? <div className="mt-1.5">{footer}</div> : null}
+    </div>
+  );
+}
