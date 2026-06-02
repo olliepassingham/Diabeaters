@@ -15,6 +15,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { useAuth } from "@/lib/auth-context";
 
@@ -161,8 +162,11 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3 p-4 pt-0 md:px-6 md:pb-6">
         {appointments.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-2 text-center">
-            <p className="text-body text-muted-foreground">No upcoming appointments.</p>
+          <HomeCardEmpty
+            icon={Calendar}
+            title="No upcoming appointments"
+            description="Add clinic visits to see them here and on your calendar."
+          >
             <Link href="/appointments" className="w-full max-w-xs">
               <Button
                 variant="secondary"
@@ -174,7 +178,7 @@ export function AppointmentsWidget(props: DashboardWidgetLayoutProps) {
                 Add appointment
               </Button>
             </Link>
-          </div>
+          </HomeCardEmpty>
         ) : (
           <div className="space-y-3">
             {list.map((appointment) => {

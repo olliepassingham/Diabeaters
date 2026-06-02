@@ -9,6 +9,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 
 const typeIcons: Record<string, typeof Package> = {
   needle: Syringe,
@@ -136,7 +137,11 @@ export function SupplySummaryWidget(props: DashboardWidgetLayoutProps) {
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5 p-4 pt-0 md:px-6 md:pb-5">
         {supplies.length === 0 ? (
-          <p className="text-body text-muted-foreground">No supplies tracked yet.</p>
+          <HomeCardEmpty
+            icon={Package}
+            title="No supplies tracked yet"
+            description="Add items in Supply Tracker to see stock and runway here."
+          />
         ) : minDays !== null ? (
           <div
             className={cn(

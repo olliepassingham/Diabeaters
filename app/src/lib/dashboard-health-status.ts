@@ -103,3 +103,32 @@ export function shouldOmitHeroGlanceLineDuplicatingTodayCard(
   }
   return false;
 }
+
+/**
+ * Hide the Today card status banner when the hero already signals the same urgency
+ * (StatusPill + optional hero glance line).
+ */
+export function shouldOmitTodayCardGlanceBanner(
+  glance: { type: TodayGlanceStatusType; message: string },
+  supplies: Supply[],
+  scenarioState: ScenarioState,
+  healthStatus: HealthStatus,
+): boolean {
+  if (shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies, scenarioState)) {
+    return true;
+  }
+
+  if (healthStatus === "action" && glance.type === "warning") {
+    const hasCritical = supplies.some((s) => storage.getSupplyStatus(s) === "critical");
+    if (hasCritical && glance.message === "Critical supplies need attention") return true;
+    if (scenarioState.sickDayActive && scenarioState.sickDaySeverity === "severe") return true;
+    if (scenarioState.sickDayActive && scenarioState.travelModeActive) return true;
+    if (glance.message.startsWith("Action may be needed")) return true;
+  }
+
+  if (healthStatus === "watch" && glance.type === "info" && scenarioState.sickDayActive) {
+    if (glance.message === "Sick day mode active") return true;
+  }
+
+  return false;
+}

@@ -262,6 +262,9 @@ function emitPostExerciseNudgeChanged(): void {
 /** Same-tab: `saveScenarioState` updated travel/sick/etc. flags — widgets can re-read `getScenarioState()`. */
 export const DIABEATER_SCENARIO_STATE_CHANGED_EVENT = "diabeater-scenario-state-changed";
 
+/** Dashboard quick action: open the hero hypo log dialog. */
+export const DIABEATER_OPEN_HYPO_DIALOG_EVENT = "diabeater-open-hypo-dialog";
+
 export function notifyActiveExerciseChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT));

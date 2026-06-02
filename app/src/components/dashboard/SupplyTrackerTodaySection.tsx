@@ -23,12 +23,17 @@ import {
   type Supply,
   type ScenarioState,
 } from "@/lib/storage";
-import { getTodayGlanceLine, shouldOmitHeroGlanceLineDuplicatingTodayCard } from "@/lib/dashboard-health-status";
+import {
+  getTodayGlanceLine,
+  shouldOmitHeroGlanceLineDuplicatingTodayCard,
+  shouldOmitTodayCardGlanceBanner,
+  type HealthStatus,
+} from "@/lib/dashboard-health-status";
 import { collectAllActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
 
-export function SupplyTrackerTodaySection() {
+export function SupplyTrackerTodaySection({ healthStatus }: { healthStatus: HealthStatus }) {
   const { user } = useAuth();
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
@@ -215,7 +220,7 @@ export function SupplyTrackerTodaySection() {
         }
       >
         {!hideSupplyShortcutCard ? <SupplyTrackerEntryCard /> : null}
-        <TodayAtAGlanceCard supplyShortcutHidden={hideSupplyShortcutCard} />
+        <TodayAtAGlanceCard supplyShortcutHidden={hideSupplyShortcutCard} healthStatus={healthStatus} />
       </div>
     </section>
   );
@@ -315,8 +320,12 @@ export function SupplyTrackerEntryCard() {
   );
 }
 
-export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
+export function TodayAtAGlanceCard(props: {
+  supplyShortcutHidden?: boolean;
+  healthStatus: HealthStatus;
+}) {
   const supplyShortcutHidden = props.supplyShortcutHidden === true;
+  const { healthStatus } = props;
   const [supplies, setSupplies] = useState<Supply[]>(() => storage.getSupplies());
   const [scenarioState, setScenarioState] = useState<ScenarioState>(() => storage.getScenarioState());
   const [activityTick, setActivityTick] = useState(0);
@@ -433,6 +442,16 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
   const omitTravelStatusBanner =
     showTravelCard && shouldOmitHeroGlanceLineDuplicatingTodayCard(status, supplies, scenarioState);
 
+  const omitHeroAlignedGlanceBanner = shouldOmitTodayCardGlanceBanner(
+    status,
+    supplies,
+    scenarioState,
+    healthStatus,
+  );
+
+  const hideVisibleGlanceBanner =
+    omitDuplicateStockBanner || omitTravelStatusBanner || omitHeroAlignedGlanceBanner;
+
   const supplyBlock = (
     <div
       className={
@@ -517,7 +536,7 @@ export function TodayAtAGlanceCard(props: { supplyShortcutHidden?: boolean }) {
         </Link>
 
         <div className="flex flex-col gap-2">
-          {omitDuplicateStockBanner || omitTravelStatusBanner ? (
+          {hideVisibleGlanceBanner ? (
             <span className="sr-only" data-testid="text-today-status">
               {status.message}
             </span>

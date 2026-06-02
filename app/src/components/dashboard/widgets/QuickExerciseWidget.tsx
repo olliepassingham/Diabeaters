@@ -10,6 +10,7 @@ import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
 import { cn } from "@/lib/utils";
+import { HomeCardEmpty } from "@/components/home/home-ui";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 
@@ -275,10 +276,11 @@ export function QuickExerciseWidget(props: DashboardWidgetLayoutProps) {
             )}
           </>
         ) : (
-          <div className="text-center py-2 space-y-1">
-            <p className="text-body text-muted-foreground">No saved exercises yet</p>
-            <p className="text-small text-muted-foreground">Save workouts under Tools → Routines (Exercise) for quick access here.</p>
-          </div>
+          <HomeCardEmpty
+            icon={Dumbbell}
+            title="No saved exercises yet"
+            description="Save workouts under Tools → Routines (Exercise) for quick access here."
+          />
         )}
 
         <Link href={plannerCtaHref} className="mt-auto">

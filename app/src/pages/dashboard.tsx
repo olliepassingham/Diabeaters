@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
   DIABEATER_SETTINGS_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
+  DIABEATER_OPEN_HYPO_DIALOG_EVENT,
   dismissSoftSetupNudge,
   dismissFirstWeekChecklist,
   isCommunityAccountProfile,
@@ -53,7 +54,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
-import { WelcomeWidget } from "@/components/widgets/welcome-widget";
+import { WelcomeWidget, shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
 import { StagingChip } from "@/components/StagingChip";
 import { useDashboardWidgets } from "@/hooks/useDashboardWidgets";
 import { DashboardWidgetSettings } from "@/components/dashboard/DashboardWidgetSettings";
@@ -69,7 +70,8 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
 import { FirstWeekChecklistCard } from "@/components/dashboard/FirstWeekChecklistCard";
-import { CoachEntryCard } from "@/components/dashboard/CoachEntryCard";
+import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
+import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import {
   getHealthStatus,
@@ -300,6 +302,7 @@ function HeroCard({
   status,
   profile,
   cloudFullName,
+  avatarUrl,
   supplies,
   scenarioState,
   onEditWidgets,
@@ -307,6 +310,7 @@ function HeroCard({
   status: HealthStatus;
   profile: UserProfile | null;
   cloudFullName: string | null;
+  avatarUrl?: string | null;
   supplies: LocalSupply[];
   scenarioState: ScenarioState;
   onEditWidgets: () => void;
@@ -335,6 +339,12 @@ function HeroCard({
       setHypoTreatment((prev) => prev || primaryHypoTreatmentLogLabel(primary));
     }
   }, [hypoDialogOpen, profile]);
+
+  useEffect(() => {
+    const openHypo = () => setHypoDialogOpen(true);
+    window.addEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
+    return () => window.removeEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
+  }, []);
 
   const handleLogHypo = () => {
     void runHypoTreatmentPipeline(
@@ -399,6 +409,14 @@ function HeroCard({
         <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 sm:gap-3">
+              {avatarUrl ? (
+                <div
+                  className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl ring-2 ring-background shadow-sm sm:h-14 sm:w-14"
+                  aria-hidden
+                >
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+              ) : null}
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <span
                   className="font-display text-lg font-semibold tracking-tight text-foreground text-balance sm:text-xl"
@@ -819,6 +837,7 @@ export default function Dashboard() {
   const [firstWeekChecklistDismissed, setFirstWeekChecklistDismissed] = useState(() => isFirstWeekChecklistDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const refreshData = () => {
@@ -907,9 +926,37 @@ export default function Dashboard() {
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
 
+  useEffect(() => {
+    const path = cloudProfile?.avatar_url ?? null;
+    if (!path?.trim()) {
+      setAvatarUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveProfileImageUrl(path).then((url) => {
+      if (!cancelled) setAvatarUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudProfile?.avatar_url]);
+
+  const scenariosQuickHref = useMemo(() => {
+    if (scenarioState.sickDayActive) return "/scenarios/sick-day";
+    if (scenarioState.travelModeActive) return "/scenarios/travel";
+    return "/scenarios";
+  }, [scenarioState.sickDayActive, scenarioState.travelModeActive]);
+
+  const showScenariosQuickLink = scenarioState.sickDayActive || scenarioState.travelModeActive;
+
   const mode = getActiveAppMode();
   const isCommunityDash =
     isCommunityAccountProfile(profile) && mode !== "patient" && mode !== "carer";
+
+  const dashboardDisplayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
+  const dashboardFirstName = dashboardDisplayName.split(" ")[0] || "";
+  const showWelcomeWidget =
+    !isCommunityDash && shouldOfferWelcomeWidget() && !dashboardFirstName;
 
   const inOnboardingSetupGrace = isWithinOnboardingPostFinishGracePeriod(ONBOARDING_SETUP_GRACE_DAYS);
   const showSoftSetupNudge =
@@ -949,7 +996,7 @@ export default function Dashboard() {
         }
       />
       {/* Today: high-signal cluster (reads as one section) */}
-      <section className="space-y-3 sm:space-y-4" data-testid="dashboard-today">
+      <section className="space-y-4 sm:space-y-5" data-testid="dashboard-today">
         {showVerifiedWelcome && (
           <Alert
             className="animate-fade-in-up border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20 dark:border-emerald-500/30"
@@ -987,9 +1034,19 @@ export default function Dashboard() {
               status={healthStatus}
               profile={profile}
               cloudFullName={cloudProfile?.full_name ?? null}
+              avatarUrl={avatarUrl}
               supplies={supplies}
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}
+            />
+          </div>
+        ) : null}
+
+        {!isCommunityDash ? (
+          <div className="animate-fade-in-up" style={{ animationDelay: "45ms" }}>
+            <DashboardQuickActions
+              showScenariosLink={showScenariosQuickLink}
+              scenariosHref={scenariosQuickHref}
             />
           </div>
         ) : null}
@@ -1007,15 +1064,13 @@ export default function Dashboard() {
           </div>
         )}
 
-        {!isCommunityDash ? (
+        {showWelcomeWidget ? (
           <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
             <WelcomeWidget />
           </section>
         ) : null}
 
-        <CoachEntryCard />
-
-        {!isCommunityDash ? <SupplyTrackerTodaySection /> : null}
+        {!isCommunityDash ? <SupplyTrackerTodaySection healthStatus={healthStatus} /> : null}
 
         {showSoftSetupNudge && (
           <section className="animate-fade-in-up" style={{ animationDelay: "70ms" }}>
