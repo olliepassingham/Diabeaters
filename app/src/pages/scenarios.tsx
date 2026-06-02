@@ -8,7 +8,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageShell } from "@/components/layout";
 
 type ScenarioCardDef = {
   href: string;
@@ -125,43 +125,46 @@ export default function Scenarios() {
     else if (tab === "travel") setLocation("/scenarios/travel");
   }, [location, search, setLocation]);
 
-  return (
-    <PageShell variant="standard" className="space-y-8">
-      <PageHeader
-        title="Situation guides"
-        description="Exercise, travel, sick days, bedtime, and more — tap the one you need."
-        actions={
-          <PageInfoDialog title="About situation guides" description="Step-by-step help for specific moments — not a substitute for your clinic.">
-            <InfoSection title="Exercise">
-              <p>Open structured exercise planning with carbs, checks, and bolus tips — moved here from Tools.</p>
-            </InfoSection>
-            <InfoSection title="Bedtime Check">
-              <p>A calm evening check to help you feel confident going to sleep.</p>
-            </InfoSection>
-            <InfoSection title="Sick day mode">
-              <p>When you&apos;re unwell, diabetes management changes. Activate sick day mode for adjusted guidance. Past sick day sessions are listed at the bottom of the Sick day page.</p>
-            </InfoSection>
-            <InfoSection title="Travel & pump backup">
-              <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
-            </InfoSection>
-            <InfoSection title="Alcohol">
-              <p>
-                Pick a situation for meal carb estimates using your saved ratios (same math as Meal Adviser), short prep
-                checklists, and red-flag routing to help. This is not medical advice — alcohol changes overnight risk;
-                always follow your clinic&apos;s plan.
-              </p>
-            </InfoSection>
-            <InfoSection title="Driving">
-              <p>
-                Answer a few quick questions for a readiness recommendation. This is not legal or medical advice and
-                does not replace local licensing rules or your clinic&apos;s plan.
-              </p>
-            </InfoSection>
-          </PageInfoDialog>
-        }
-      />
+  const guidesAboutDialog = (
+    <PageInfoDialog
+      compact
+      title="About situation guides"
+      description="Step-by-step help for specific moments — not a substitute for your clinic."
+    >
+      <InfoSection title="Exercise">
+        <p>Open structured exercise planning with carbs, checks, and bolus tips — moved here from Tools.</p>
+      </InfoSection>
+      <InfoSection title="Bedtime Check">
+        <p>A calm evening check to help you feel confident going to sleep.</p>
+      </InfoSection>
+      <InfoSection title="Sick day mode">
+        <p>When you&apos;re unwell, diabetes management changes. Activate sick day mode for adjusted guidance. Past sick day sessions are listed at the bottom of the Sick day page.</p>
+      </InfoSection>
+      <InfoSection title="Travel & pump backup">
+        <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
+      </InfoSection>
+      <InfoSection title="Alcohol">
+        <p>
+          Pick a situation for meal carb estimates using your saved ratios (same math as Meal Adviser), short prep
+          checklists, and red-flag routing to help. This is not medical advice — alcohol changes overnight risk;
+          always follow your clinic&apos;s plan.
+        </p>
+      </InfoSection>
+      <InfoSection title="Driving">
+        <p>
+          Answer a few quick questions for a readiness recommendation. This is not legal or medical advice and
+          does not replace local licensing rules or your clinic&apos;s plan.
+        </p>
+      </InfoSection>
+    </PageInfoDialog>
+  );
 
-      <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+  return (
+    <PageShell variant="standard" density="compact" className="pt-0 space-y-0">
+      <h1 className="sr-only">Guides</h1>
+
+      <div className="grid w-full grid-cols-1 gap-y-3 gap-x-5 md:grid-cols-2 md:gap-x-6 md:gap-y-4">
+        <div className="col-span-1 flex h-9 items-center justify-end md:col-span-2">{guidesAboutDialog}</div>
         {visibleScenarioCards.map((c, idx) => (
           <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
             <ScenarioCard {...c} />
@@ -181,7 +184,6 @@ export default function Scenarios() {
           </div>
         ) : null}
       </div>
-
     </PageShell>
   );
 }

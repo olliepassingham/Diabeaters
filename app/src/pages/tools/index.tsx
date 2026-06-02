@@ -354,13 +354,8 @@ export function ToolsHubPage({
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
 
   return (
-    <PageShell variant="standard" className="max-w-5xl space-y-10">
-      <PageHeader
-        className="max-w-2xl"
-        title="Tools"
-        description={hubVariant === "patient" ? "Quick answers, planning tools, and learn-at-your-pace reads." : undefined}
-        actions={<ToolsAboutDialog hubVariant={hubVariant} />}
-      />
+    <PageShell variant="standard" density="compact" className="max-w-5xl pt-0 space-y-6">
+      <h1 className="sr-only">Tools</h1>
 
       <DobUnknownNotice hidden={hubVariant === "carer" || hubVariant === "community"} testId="tools-dob-unknown-notice" />
 
@@ -370,9 +365,12 @@ export function ToolsHubPage({
           aria-label={hubVariant === "community" ? "Community tools" : "Supporter tools"}
           data-testid="tools-section-supporter"
         >
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" aria-hidden />
-            <SectionHeader title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"} />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Users className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <SectionHeader title={hubVariant === "community" ? "Learn & connect" : "Supporter tools"} />
+            </div>
+            <ToolsAboutDialog hubVariant={hubVariant} />
           </div>
           <ul className="grid list-none grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2" aria-label="Supporter tools">
             {supporterTools.map((t, idx) => (
@@ -389,10 +387,13 @@ export function ToolsHubPage({
       ) : (
         <>
           {actNow.length > 0 ? (
-            <section className="space-y-4" aria-label="Act now tools" data-testid="tools-section-act-now">
-              <div className="flex items-center gap-2">
-                <HeartPulse className="h-5 w-5 text-primary" aria-hidden />
-                <SectionHeader title="Act now" />
+            <section className="space-y-3" aria-label="Act now tools" data-testid="tools-section-act-now">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <HeartPulse className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <SectionHeader title="Act now" />
+                </div>
+                <ToolsAboutDialog hubVariant={hubVariant} />
               </div>
               <ul
                 className="grid list-none grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
@@ -431,9 +432,9 @@ export function ToolsHubPage({
           ) : null}
 
           {learn.length > 0 ? (
-            <section className="space-y-4" aria-label="Learn tools" data-testid="tools-section-learn">
+            <section className="space-y-3" aria-label="Learn tools" data-testid="tools-section-learn">
               <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" aria-hidden />
+                <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden />
                 <SectionHeader title="Learn" />
               </div>
               <ul className="list-none space-y-4" aria-label="Learn">
