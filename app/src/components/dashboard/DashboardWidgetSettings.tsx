@@ -4,6 +4,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -16,6 +17,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Drawer } from "vaul";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -28,13 +31,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Columns2, GripVertical, LayoutGrid, RectangleHorizontal } from "lucide-react";
 import { DASHBOARD_WIDGET_BY_ID } from "@/config/dashboard-widgets";
 import type { WidgetPlacement } from "@/hooks/useDashboardWidgets";
 import type { WidgetSize, WidgetType } from "@/lib/storage";
 import { shouldOfferWelcomeWidget } from "@/components/widgets/welcome-widget";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+
+/** Max panel height: viewport minus status bar, home indicator, and bottom tab bar. */
+const MOBILE_PANEL_MAX_H =
+  "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--bottom-nav-height, 7.5rem) - 0.75rem)";
 
 export type DashboardWidgetSettingsProps = {
   open: boolean;
@@ -138,6 +145,96 @@ function SortableRow({
   );
 }
 
+function WidgetSettingsHeader({ enabledCount }: { enabledCount: number }) {
+  return (
+    <div className="shrink-0 space-y-1 border-b border-border/60 px-4 py-2.5 pr-11 text-left sm:py-3">
+      <h2 className="flex items-center gap-2 text-base font-semibold sm:text-lg">
+        <LayoutGrid className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5" aria-hidden />
+        Customise dashboard
+      </h2>
+      <div className="flex items-start gap-1 text-xs text-muted-foreground sm:text-sm">
+        <span className="min-w-0 flex-1">Drag to reorder · {enabledCount} visible on home</span>
+        <InlineInfoHint
+          ariaLabel="About customising widgets"
+          className="h-9 w-9"
+          content="Choose which cards appear on your dashboard and drag them into your preferred order. Your choices are saved on this device."
+        />
+      </div>
+    </div>
+  );
+}
+
+function WidgetSettingsFooter({
+  onReset,
+  onDone,
+}: {
+  onReset: () => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-1.5 border-t border-border/60 bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-9 w-full rounded-xl text-muted-foreground sm:w-auto"
+        onClick={onReset}
+        data-testid="button-reset-widgets"
+      >
+        Reset to defaults
+      </Button>
+      <Button
+        type="button"
+        size="default"
+        className="w-full min-h-10 rounded-xl sm:w-auto"
+        onClick={onDone}
+        data-testid="button-done-editing"
+      >
+        Done
+      </Button>
+    </div>
+  );
+}
+
+function WidgetSettingsList({
+  sortedForUi,
+  sensors,
+  onDragEnd,
+  toggleWidget,
+  setWidgetSize,
+  allowResize,
+}: {
+  sortedForUi: WidgetPlacement[];
+  sensors: ReturnType<typeof useSensors>;
+  onDragEnd: (event: DragEndEvent) => void;
+  toggleWidget: (id: WidgetType, enabled: boolean) => void;
+  setWidgetSize: (id: WidgetType, size: WidgetSize) => void;
+  allowResize: boolean;
+}) {
+  return (
+    <div
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 [-webkit-overflow-scrolling:touch] sm:px-4"
+      data-testid="widget-settings-scroll"
+    >
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={sortedForUi.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+          <div className="flex flex-col gap-1.5 pb-1" data-testid="widget-library">
+            {sortedForUi.map((p) => (
+              <SortableRow
+                key={p.id}
+                placement={p}
+                onToggle={toggleWidget}
+                onResize={setWidgetSize}
+                allowResize={allowResize}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
+
 export function DashboardWidgetSettings({
   open,
   onOpenChange,
@@ -149,6 +246,7 @@ export function DashboardWidgetSettings({
   isSettingsComplete = false,
   allowResize = true,
 }: DashboardWidgetSettingsProps) {
+  const isMobile = useIsMobile();
   const sorted = useMemo(() => [...placements].sort((a, b) => a.order - b.order), [placements]);
   const sortedForUi = useMemo(() => {
     const base = isSettingsComplete ? sorted.filter((p) => p.type !== "settings-completion") : sorted;
@@ -158,7 +256,8 @@ export function DashboardWidgetSettings({
   const enabledCount = sortedForUi.filter((p) => p.enabled).length;
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -175,77 +274,65 @@ export function DashboardWidgetSettings({
     [sortedForUi, reorderWidgets],
   );
 
+  const listProps = {
+    sortedForUi,
+    sensors,
+    onDragEnd: handleDragEnd,
+    toggleWidget,
+    setWidgetSize,
+    allowResize,
+  };
+
+  if (isMobile) {
+    return (
+      <Drawer.Root open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} repositionInputs={false}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 z-[110] bg-black/80" />
+          <Drawer.Content
+            className={cn(
+              "fixed inset-x-2 z-[110] flex h-[var(--widget-settings-max-h)] max-h-[var(--widget-settings-max-h)] flex-col overflow-hidden rounded-2xl border border-border bg-background text-foreground shadow-2xl outline-none",
+              "bottom-[calc(var(--bottom-nav-height,7.5rem)+env(safe-area-inset-bottom,0px)+0.35rem)]",
+            )}
+            style={{ ["--widget-settings-max-h" as string]: MOBILE_PANEL_MAX_H }}
+            data-testid="dashboard-widget-settings-dialog"
+          >
+            <div className="flex shrink-0 justify-center pt-2">
+              <Drawer.Handle
+                className="!h-1 !w-12 shrink-0 !rounded-full !bg-muted-foreground/40"
+                aria-label="Drag down to close"
+              />
+            </div>
+            <Drawer.Close className="absolute right-3 top-3 rounded-sm p-1.5 text-foreground opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <X className="h-4 w-4" aria-hidden />
+              <span className="sr-only">Close</span>
+            </Drawer.Close>
+            <Drawer.Title className="sr-only">Customise dashboard</Drawer.Title>
+            <Drawer.Description className="sr-only">
+              Drag to reorder widgets on your home screen.
+            </Drawer.Description>
+            <WidgetSettingsHeader enabledCount={enabledCount} />
+            <WidgetSettingsList {...listProps} />
+            <WidgetSettingsFooter onReset={resetWidgets} onDone={() => onOpenChange(false)} />
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn(
-          "grid w-[calc(100%-1rem)] max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0",
-          "h-[min(calc(100dvh-var(--bottom-nav-height,7.5rem)-1rem),88dvh)]",
-          "top-auto bottom-[calc(var(--bottom-nav-height,7.5rem)+env(safe-area-inset-bottom,0px)+0.35rem)] translate-x-[-50%] translate-y-0",
-          "sm:top-[50%] sm:bottom-auto sm:h-[min(90dvh,40rem)] sm:translate-y-[-50%]",
-        )}
+        className="flex max-h-[min(90dvh,40rem)] w-full max-w-lg flex-col gap-0 overflow-hidden p-0 sm:rounded-lg"
         data-testid="dashboard-widget-settings-dialog"
       >
-        <DialogHeader className="space-y-1 border-b border-border/60 px-4 py-2.5 pr-11 text-left sm:py-3">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold sm:text-lg">
-            <LayoutGrid className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5" aria-hidden />
-            Customise dashboard
-          </DialogTitle>
-          <DialogDescription asChild>
-            <div className="flex items-start gap-1 text-xs text-muted-foreground sm:text-sm">
-              <span className="min-w-0 flex-1">
-                Drag to reorder · {enabledCount} visible on home
-              </span>
-              <InlineInfoHint
-                ariaLabel="About customising widgets"
-                content="Choose which cards appear on your dashboard and drag them into your preferred order. Your choices are saved on this device."
-              />
-            </div>
-          </DialogDescription>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Customise dashboard</DialogTitle>
+          <DialogDescription>Drag to reorder widgets on your home screen.</DialogDescription>
         </DialogHeader>
-
-        <ScrollArea className="h-full min-h-0" data-testid="widget-settings-scroll">
-          <div className="px-3 py-2 sm:px-4">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={sortedForUi.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                <div className="flex flex-col gap-1.5 pb-1" data-testid="widget-library">
-                  {sortedForUi.map((p) => (
-                    <SortableRow
-                      key={p.id}
-                      placement={p}
-                      onToggle={toggleWidget}
-                      onResize={setWidgetSize}
-                      allowResize={allowResize}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="flex-col gap-1.5 border-t border-border/60 bg-background px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-9 w-full rounded-xl text-muted-foreground sm:w-auto"
-            onClick={() => {
-              resetWidgets();
-            }}
-            data-testid="button-reset-widgets"
-          >
-            Reset to defaults
-          </Button>
-          <Button
-            type="button"
-            size="default"
-            className="w-full min-h-10 rounded-xl sm:w-auto"
-            onClick={() => onOpenChange(false)}
-            data-testid="button-done-editing"
-          >
-            Done
-          </Button>
+        <WidgetSettingsHeader enabledCount={enabledCount} />
+        <WidgetSettingsList {...listProps} />
+        <DialogFooter className="p-0">
+          <WidgetSettingsFooter onReset={resetWidgets} onDone={() => onOpenChange(false)} />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -41,6 +41,8 @@ type InlineInfoHintProps = {
   content: React.ReactNode;
   ariaLabel: string;
   className?: string;
+  /** Use a higher z-index when the hint sits inside a sheet or drawer (default popover is z-50). */
+  popoverClassName?: string;
 };
 
 type StaticLabelWithInfoProps = {
@@ -68,9 +70,9 @@ export function StaticLabelWithInfo({
 }
 
 /** Standalone info icon that opens helper text (e.g. section intros). */
-export function InlineInfoHint({ content, ariaLabel, className }: InlineInfoHintProps) {
+export function InlineInfoHint({ content, ariaLabel, className, popoverClassName }: InlineInfoHintProps) {
   return (
-    <Popover>
+    <Popover modal={false}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -83,7 +85,13 @@ export function InlineInfoHint({ content, ariaLabel, className }: InlineInfoHint
           <Info className="h-4 w-4" aria-hidden />
         </button>
       </PopoverTrigger>
-      <PopoverContent className={popoverTextClass}>{content}</PopoverContent>
+      <PopoverContent
+        side="top"
+        align="end"
+        className={cn(popoverTextClass, "z-[120]", popoverClassName)}
+      >
+        {content}
+      </PopoverContent>
     </Popover>
   );
 }
