@@ -1,15 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Redirect } from "wouter";
-import {
-  Car,
-  Droplet,
-  Phone,
-  RotateCcw,
-  ArrowLeft,
-  ArrowRight,
-  IdCard,
-  Shield,
-} from "lucide-react";
+import { Car, ArrowLeft, ArrowRight, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,17 +8,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { DISCLAIMER_TEXT } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { DrivingResultCard } from "@/components/scenarios/driving-result-card";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
 import { storage, type UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowDrivingReadiness } from "@/lib/user-age";
 import { normalizeBgUnits } from "@/lib/alcohol-night-tool";
+import {
+  getDrivingBgPrefill,
+  formatDrivingTargetRange,
+  getRecentHypoForDriving,
+} from "@/lib/driving-prefill";
+import { getPrimaryHypoTreatmentFromProfile } from "@/lib/hypo-treatment-display";
 import {
   buildDrivingReadinessOutcome,
   type DrivingReadinessOutcome,
@@ -101,27 +98,6 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: DrivingReadinessOutcome }) {
-  if (outcome.kind === "not_ready") {
-    return <Badge variant="destructive">Not ready</Badge>;
-  }
-  if (outcome.kind === "caution") {
-    return (
-      <Badge
-        variant="outline"
-        className="border-amber-500/70 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-      >
-        Caution
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="secondary" className="font-medium border-emerald-600/40 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100">
-      Likely OK
-    </Badge>
-  );
-}
-
 export default function DrivingScenarioPage() {
   const [profile, setProfile] = useState<Partial<UserProfile>>(() => storage.getProfile() ?? {});
   const [phase, setPhase] = useState<Phase>("form");
@@ -156,8 +132,24 @@ export default function DrivingScenarioPage() {
   }, []);
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
+  const settings = storage.getSettings();
+  const primaryHypoTreatment = getPrimaryHypoTreatmentFromProfile(profile);
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const targetRangeLine = formatDrivingTargetRange(settings, bgUnits);
+  const recentHypoLogged = getRecentHypoForDriving(4);
+  const bgPrefill = useMemo(() => getDrivingBgPrefill(), []);
+
   const progressPct =
     phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
+
+  const drivingContext = useMemo(
+    () => ({
+      settings,
+      primaryHypoTreatment,
+      isPump: isPumpUser,
+    }),
+    [settings, primaryHypoTreatment, isPumpUser],
+  );
 
   const runCheck = () => {
     setFormError(null);
@@ -197,6 +189,7 @@ export default function DrivingScenarioPage() {
         longJourney,
       },
       profile.bgUnits,
+      drivingContext,
     );
     setOutcome(o);
     setPhase("result");
@@ -354,6 +347,9 @@ export default function DrivingScenarioPage() {
                   </div>
                   {!bgSkipped ? (
                     <div className="space-y-4">
+                      {targetRangeLine ? (
+                        <p className="text-xs text-muted-foreground">{targetRangeLine}</p>
+                      ) : null}
                       <div className="space-y-2 max-w-xs">
                         <Label htmlFor="driving-bg">Reading ({bgUnits})</Label>
                         <Input
@@ -367,6 +363,18 @@ export default function DrivingScenarioPage() {
                           data-testid="input-driving-bg"
                         />
                       </div>
+                      {bgPrefill && !bgInput.trim() ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9"
+                          onClick={() => setBgInput(bgPrefill.value)}
+                          data-testid="button-driving-use-prefill"
+                        >
+                          Use recent reading ({bgPrefill.value} {bgUnits})
+                        </Button>
+                      ) : null}
                       <BgTrendThreeButtons
                         label="Trend (if you know it)"
                         value={bgTrend}
@@ -380,16 +388,23 @@ export default function DrivingScenarioPage() {
               ) : null}
 
               {wizardStep === 1 ? (
-                <ChoiceGroup
-                  name="driving-recent-hypo"
-                  label="Any hypo or hypo-like symptoms in the last few hours?"
-                  value={recentHypo}
-                  onChange={setRecentHypo}
-                  options={[
-                    { value: "no", title: "No" },
-                    { value: "yes", title: "Yes" },
-                  ]}
-                />
+                <div className="space-y-3">
+                  {recentHypoLogged ? (
+                    <p className="text-xs text-amber-800 dark:text-amber-200 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2">
+                      You logged a hypo recently — answer honestly; many teams advise waiting before driving.
+                    </p>
+                  ) : null}
+                  <ChoiceGroup
+                    name="driving-recent-hypo"
+                    label="Any hypo or hypo-like symptoms in the last few hours?"
+                    value={recentHypo}
+                    onChange={setRecentHypo}
+                    options={[
+                      { value: "no", title: "No" },
+                      { value: "yes", title: "Yes" },
+                    ]}
+                  />
+                </div>
               ) : null}
 
               {wizardStep === 2 ? (
@@ -466,83 +481,13 @@ export default function DrivingScenarioPage() {
         ) : null}
 
         {phase === "result" && outcome ? (
-          <div ref={resultsRef} className="space-y-4">
-            <Card
-              className={cn(
-                "surface-card border-2 overflow-hidden",
-                outcome.kind === "not_ready" && "border-destructive/60",
-                outcome.kind === "caution" && "border-amber-500/50",
-                outcome.kind === "likely_ok" && "border-emerald-600/35",
-              )}
-              data-testid="driving-result-card"
-            >
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2 min-w-0">
-                    <OutcomeBadge outcome={outcome} />
-                    <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
-                    <CardDescription className="text-base text-foreground/90">{outcome.lead}</CardDescription>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 shrink-0 self-start"
-                    onClick={reset}
-                    data-testid="button-driving-start-over"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Start over
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {outcome.bullets.length > 0 ? (
-                  <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                    {outcome.bullets.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                {outcome.kind === "likely_ok" ? (
-                  <Alert>
-                    <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
-                  </Alert>
-                ) : null}
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {outcome.links.hypoHelp ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/tools/hypo-help")}>
-                        <Droplet className="h-4 w-4 mr-1.5" />
-                        Hypo help
-                      </Link>
-                    </Button>
-                  ) : null}
-                  {outcome.links.emergencyCard ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/emergency-card")}>
-                        <IdCard className="h-4 w-4 mr-1.5" />
-                        Emergency card
-                      </Link>
-                    </Button>
-                  ) : null}
-                  {outcome.links.helpNow ? (
-                    <Button variant="secondary" size="sm" asChild>
-                      <Link href={linkWithFrom("/help-now")}>
-                        <Phone className="h-4 w-4 mr-1.5" />
-                        Help now
-                      </Link>
-                    </Button>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
+          <div ref={resultsRef} className="scroll-mt-4">
+            <DrivingResultCard outcome={outcome} onReset={reset} linkWithFrom={linkWithFrom} />
           </div>
         ) : null}
 
         <div className="space-y-4 border-t border-border/50 pt-6">
-          {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && (
+          {phase === "form" && isPumpUser && (
             <Alert data-testid="alert-driving-pump">
               <AlertTitle className="text-sm">Pump</AlertTitle>
               <AlertDescription className="text-sm">
