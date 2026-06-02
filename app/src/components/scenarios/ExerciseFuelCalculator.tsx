@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { Calculator, ChevronDown, Dumbbell, Minus, TrendingDown, TrendingUp, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import { preExerciseInsulinSuppressedMessage } from "@/lib/exercise-reading-guidance";
 import {
   EXERCISE_INTENSITY_OPTIONS,
   EXERCISE_MEAL_TYPE_OPTIONS,
@@ -56,6 +57,110 @@ const BG_TREND_BUTTONS: {
 /** Shared pill grid so timing/trend controls fit one row on narrow phones. */
 const EFC_PILL_GRID =
   "grid w-full gap-1 [&_button]:h-9 [&_button]:min-w-0 [&_button]:px-1 [&_button]:text-[11px] sm:[&_button]:px-2 sm:[&_button]:text-xs";
+
+function PlanDetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="text-sm leading-relaxed text-popover-foreground/90">{children}</div>
+    </div>
+  );
+}
+
+/** One-line hint from profile usual hypo treatment (e.g. "about 4 glucose tablets"). */
+function TreatmentHint({
+  carbsGrams,
+  treatment,
+  suffix,
+  className,
+}: {
+  carbsGrams: number;
+  treatment: PrimaryHypoTreatment | undefined;
+  suffix?: string;
+  className?: string;
+}) {
+  const line = formatPrimaryTreatmentShort(carbsGrams, treatment);
+  if (!line) return null;
+  return (
+    <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
+      {line}
+      {suffix ? ` ${suffix}` : null}
+    </p>
+  );
+}
+
+function ExerciseFuelPlanDetails({
+  result,
+  bgUnits,
+  sessionLine,
+  primaryHypoTreatment,
+}: {
+  result: ExerciseFuelCalculatorResult;
+  bgUnits: string;
+  sessionLine: string;
+  primaryHypoTreatment: PrimaryHypoTreatment | undefined;
+}) {
+  const settings = storage.getSettings();
+  const mealTreatment = formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment);
+  const onHandTreatment = formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment);
+  const duringTreatment =
+    result.duringCarbs > 0 ? formatPrimaryTreatmentShort(result.duringCarbs, primaryHypoTreatment) : null;
+  const showMealTreatmentInDetails = mealTreatment && !result.insulinSuppressedReason;
+
+  return (
+    <div className="space-y-3">
+      <PlanDetailSection title="Summary">
+        <p>{result.headline}</p>
+        <p className="mt-1 text-muted-foreground">{sessionLine}</p>
+        <p className="mt-1 text-muted-foreground">Target BG {result.targetBg} · educational only</p>
+      </PlanDetailSection>
+
+      {showMealTreatmentInDetails || onHandTreatment || duringTreatment ? (
+        <PlanDetailSection title="In your usual treatment">
+          {showMealTreatmentInDetails ? <p>Before exercise: {mealTreatment}</p> : null}
+          {onHandTreatment ? (
+            <p className={showMealTreatmentInDetails ? "mt-1" : undefined}>On hand: {onHandTreatment}</p>
+          ) : null}
+          {duringTreatment ? (
+            <p className={showMealTreatmentInDetails || onHandTreatment ? "mt-1" : undefined}>
+              During: {duringTreatment}
+            </p>
+          ) : null}
+        </PlanDetailSection>
+      ) : null}
+
+      {result.insulin ? (
+        <PlanDetailSection title="Meal insulin estimate">
+          <p>
+            Usually ~{result.insulin.standardUnits}u for {result.insulin.carbsGrams}g {result.insulin.mealType},
+            reduced by {result.insulin.reductionPercent}% for this session → {result.insulin.adjustedUnits} units shown.
+          </p>
+        </PlanDetailSection>
+      ) : null}
+
+      {result.insulinSuppressedReason ? (
+        <PlanDetailSection title="Why no meal insulin">
+          <p>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</p>
+        </PlanDetailSection>
+      ) : null}
+
+      {result.insulinNoRatios && result.mealCarbs > 0 ? (
+        <PlanDetailSection title="Insulin estimate">
+          <p>
+            Add meal ratios in Settings for a dose in units. Many teams use about {result.bolusReductionBand} less meal
+            insulin before exercise.
+          </p>
+        </PlanDetailSection>
+      ) : null}
+
+      {result.pumpTip ? (
+        <PlanDetailSection title="Pump">
+          <p>{result.pumpTip}</p>
+        </PlanDetailSection>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Pre-exercise fuel & insulin calculator (meal-tool style).
@@ -152,14 +257,18 @@ export function ExerciseFuelCalculator() {
     });
   };
 
-  const collapsedSummary = useMemo(() => {
-    if (!result || formOpen) return null;
+  const sessionLine = useMemo(() => {
     const typeLabel = EXERCISE_TYPE_OPTIONS.find((o) => o.value === exerciseType)?.label ?? exerciseType;
     const intensityLabel = EXERCISE_INTENSITY_OPTIONS.find((o) => o.value === intensity)?.label ?? intensity;
     const start =
       minutesUntilStart <= 0 ? "now" : minutesUntilStart === 60 ? "~1h" : `${minutesUntilStart}m`;
-    return `${intensityLabel} ${typeLabel} · ${duration} min · ${start} — tap to edit`;
-  }, [result, formOpen, exerciseType, intensity, duration, minutesUntilStart]);
+    return `${intensityLabel} ${typeLabel} · ${duration} min · ${start}`;
+  }, [exerciseType, intensity, duration, minutesUntilStart]);
+
+  const collapsedSummary = useMemo(() => {
+    if (!result || formOpen) return null;
+    return `${sessionLine} — tap to edit`;
+  }, [result, formOpen, sessionLine]);
 
   return (
     <div className="space-y-4">
@@ -427,7 +536,7 @@ export function ExerciseFuelCalculator() {
           className="border-primary/25 bg-primary/5 shadow-sm scroll-mt-4"
           data-testid="efc-result"
         >
-          <CardHeader className="pb-2">
+          <CardHeader className="space-y-2 pb-2">
             <div className="flex items-start justify-between gap-2">
               <CardTitle className="text-lg">Your plan</CardTitle>
               <Button
@@ -445,77 +554,125 @@ export function ExerciseFuelCalculator() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <CardDescription>Target BG {result.targetBg} · educational only</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">{result.headline}</p>
-
-            <div className="grid gap-2 sm:grid-cols-2 text-sm">
-              <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Before exercise</p>
-                <p className="font-semibold tabular-nums text-foreground">
-                  {result.mealCarbsIsSuggested ? "~" : ""}
-                  {result.mealCarbs}g carbs
-                  {result.mealCarbsIsSuggested ? " suggested" : ""}
-                </p>
-                {result.mealCarbs > 0 && formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment) ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment)}
-                  </p>
-                ) : null}
-              </div>
-              <div className="rounded-xl border border-border/50 bg-background/80 px-3 py-2.5">
-                <p className="text-xs text-muted-foreground">Keep on hand</p>
-                <p className="font-semibold tabular-nums text-foreground">~{result.onHandCarbs}g fast carbs</p>
-                {formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment) ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment)}
-                  </p>
-                ) : null}
-                {result.duringCarbs > 0 ? (
-                  <p className="text-xs text-muted-foreground mt-0.5">~{result.duringCarbs}g during if BG drops</p>
-                ) : null}
-              </div>
+            <div className="flex items-center gap-0.5">
+              <p className="min-w-0 flex-1 text-sm text-muted-foreground">{sessionLine}</p>
+              <InlineInfoHint
+                ariaLabel="About this plan"
+                className="h-9 w-9 shrink-0"
+                content={
+                  <ExerciseFuelPlanDetails
+                    result={result}
+                    bgUnits={bgUnits}
+                    sessionLine={sessionLine}
+                    primaryHypoTreatment={primaryHypoTreatment}
+                  />
+                }
+              />
             </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {result.mealCarbs > 0 ? (
+              <div className="rounded-2xl border border-primary/25 bg-background/90 px-4 py-4 text-center shadow-sm">
+                <p className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
+                  {result.mealCarbsIsSuggested ? "~" : ""}
+                  {result.mealCarbs}g
+                </p>
+                <p className="mt-1 text-sm font-medium text-foreground">carbs before exercise</p>
+                {result.insulinSuppressedReason ? (
+                  <TreatmentHint
+                    carbsGrams={result.mealCarbs}
+                    treatment={primaryHypoTreatment}
+                    suffix="to bring BG up"
+                    className="mt-1.5"
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-border/50 bg-background/80 px-4 py-3 text-center">
+                <p className="text-sm text-muted-foreground">No pre-exercise carbs suggested</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">~{result.onHandCarbs}g</p>
+                <p className="text-sm text-muted-foreground">fast carbs on hand</p>
+                <TreatmentHint
+                  carbsGrams={result.onHandCarbs}
+                  treatment={primaryHypoTreatment}
+                  className="mt-1"
+                />
+              </div>
+            )}
+
+            {result.mealCarbs > 0 ? (
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">On hand</p>
+                  <p className="font-semibold tabular-nums">~{result.onHandCarbs}g</p>
+                  <TreatmentHint carbsGrams={result.onHandCarbs} treatment={primaryHypoTreatment} className="mt-0.5" />
+                </div>
+                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">During</p>
+                  <p className="font-semibold tabular-nums">
+                    {result.duringCarbs > 0 ? `~${result.duringCarbs}g` : "—"}
+                  </p>
+                  {result.duringCarbs > 0 ? (
+                    <TreatmentHint carbsGrams={result.duringCarbs} treatment={primaryHypoTreatment} className="mt-0.5" />
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             {result.insulin ? (
-              <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Meal insulin estimate</p>
-                <p className="text-3xl font-bold tabular-nums text-foreground">{result.insulin.adjustedUnits} units</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Usually ~{result.insulin.standardUnits}u · −{result.insulin.reductionPercent}% for this session
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {result.insulin.carbsGrams}g {result.insulin.mealType}
-                </p>
+              <div className="flex items-center gap-1 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-muted-foreground">Meal insulin</p>
+                  <p className="text-2xl font-bold tabular-nums leading-none">{result.insulin.adjustedUnits} units</p>
+                </div>
+                <InlineInfoHint
+                  ariaLabel="Meal insulin estimate details"
+                  className="h-9 w-9 shrink-0"
+                  content={
+                    <p className="text-sm leading-relaxed">
+                      Usually ~{result.insulin.standardUnits}u for {result.insulin.carbsGrams}g{" "}
+                      {result.insulin.mealType}, reduced by {result.insulin.reductionPercent}% for this session.
+                    </p>
+                  }
+                />
               </div>
             ) : result.insulinSuppressedReason && result.mealCarbs > 0 ? (
-              <Alert className="border-amber-500/40 bg-amber-500/10">
-                <AlertDescription className="text-sm text-foreground">
-                  <span className="font-medium">No meal insulin suggested</span>
-                  {" — "}
-                  Carbs here are to help bring BG into your pre-exercise range, not to cover a bolus meal at this
-                  reading. Recheck before hard effort.
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-1 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+                <p className="min-w-0 flex-1 text-sm font-medium text-foreground">No meal insulin at this reading</p>
+                <InlineInfoHint
+                  ariaLabel="Why no meal insulin is suggested"
+                  className="h-9 w-9 shrink-0"
+                  content={
+                    <p className="text-sm leading-relaxed">
+                      {preExerciseInsulinSuppressedMessage(
+                        result.insulinSuppressedReason,
+                        bgUnits,
+                        storage.getSettings(),
+                      )}
+                    </p>
+                  }
+                />
+              </div>
             ) : result.insulinNoRatios && result.mealCarbs > 0 ? (
-              <Alert>
-                <AlertDescription className="text-sm">
-                  Add meal ratios in{" "}
+              <div className="flex items-center gap-1 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5">
+                <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                  Add ratios in{" "}
                   <Link href="/settings" className="font-medium text-primary underline-offset-4 hover:underline">
                     Settings
                   </Link>{" "}
-                  for a dose in units. Many teams use about {result.bolusReductionBand} less meal insulin before
-                  exercise.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
-            {result.pumpTip ? (
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground/80">Pump: </span>
-                {result.pumpTip}
-              </p>
+                  for a dose
+                </p>
+                <InlineInfoHint
+                  ariaLabel="About insulin estimates"
+                  className="h-9 w-9 shrink-0"
+                  content={
+                    <p className="text-sm leading-relaxed">
+                      Many teams use about {result.bolusReductionBand} less meal insulin before exercise. Add meal
+                      ratios in Settings for a dose in units.
+                    </p>
+                  }
+                />
+              </div>
             ) : null}
 
             {result.notes.length > 0 ? (
