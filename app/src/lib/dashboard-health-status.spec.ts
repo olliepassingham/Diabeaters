@@ -1,8 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import {
+  buildStableGlanceMessage,
   getHealthStatus,
   getTodayGlanceLine,
   shouldOmitHeroGlanceLineDuplicatingTodayCard,
+  shouldShowHeroGlanceLine,
 } from "./dashboard-health-status";
 import { storage } from "./storage";
 import type { ScenarioState, Supply } from "./storage";
@@ -62,6 +64,38 @@ describe("getTodayGlanceLine", () => {
     expect(line.type).toBe("info");
     expect(line.message).toMatch(/running low/i);
     expect(line.message).not.toMatch(/all clear/i);
+  });
+
+  it("uses specific stable copy instead of all clear when supplies are ok", () => {
+    vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
+    vi.spyOn(storage, "getDaysRemaining").mockReturnValue(56);
+    const line = getTodayGlanceLine([dummySupply], emptyScenario);
+    expect(line.type).toBe("ok");
+    expect(line.message).toMatch(/stock looks good/i);
+    expect(line.message).toMatch(/56d/);
+    expect(line.message).not.toMatch(/all clear/i);
+  });
+});
+
+describe("shouldShowHeroGlanceLine", () => {
+  it("hides stable stock insight on hero when supply cards cover it below", () => {
+    vi.spyOn(storage, "getSupplyStatus").mockReturnValue("ok");
+    vi.spyOn(storage, "getDaysRemaining").mockReturnValue(12);
+    const glance = getTodayGlanceLine([dummySupply], emptyScenario);
+    expect(
+      shouldShowHeroGlanceLine(glance, [dummySupply], emptyScenario, "stable"),
+    ).toBe(false);
+  });
+
+  it("hides add-supplies nudge on hero when Stable and entry card show below", () => {
+    const glance = getTodayGlanceLine([], emptyScenario);
+    expect(shouldShowHeroGlanceLine(glance, [], emptyScenario, "stable")).toBe(false);
+  });
+});
+
+describe("buildStableGlanceMessage", () => {
+  it("prompts to add supplies when none are tracked", () => {
+    expect(buildStableGlanceMessage([], emptyScenario)).toMatch(/add supplies/i);
   });
 });
 

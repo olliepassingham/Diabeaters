@@ -71,12 +71,12 @@ import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerT
 import { isCommunityEnabled } from "@/lib/flags";
 import { FirstWeekChecklistCard } from "@/components/dashboard/FirstWeekChecklistCard";
 import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
-import { resolveProfileImageUrl } from "@/lib/storage-profile";
+import { HomePrimaryStatusPill } from "@/components/home/home-ui";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
 import {
   getHealthStatus,
   getTodayGlanceLine,
-  shouldOmitHeroGlanceLineDuplicatingTodayCard,
+  shouldShowHeroGlanceLine,
   type HealthStatus,
 } from "@/lib/dashboard-health-status";
 
@@ -302,7 +302,6 @@ function HeroCard({
   status,
   profile,
   cloudFullName,
-  avatarUrl,
   supplies,
   scenarioState,
   onEditWidgets,
@@ -310,7 +309,6 @@ function HeroCard({
   status: HealthStatus;
   profile: UserProfile | null;
   cloudFullName: string | null;
-  avatarUrl?: string | null;
   supplies: LocalSupply[];
   scenarioState: ScenarioState;
   onEditWidgets: () => void;
@@ -389,15 +387,9 @@ function HeroCard({
   const displayName = cloudFullName?.trim() || profile?.name?.trim() || "";
   const firstName = displayName.split(" ")[0] || "";
   const glance = getTodayGlanceLine(supplies, scenarioState);
-  const omitHeroGlanceLine = shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies, scenarioState);
+  const showHeroGlanceLine = shouldShowHeroGlanceLine(glance, supplies, scenarioState, status);
   const activeExercise = storage.getActiveExercise();
   const pumpFailureActive = storage.getScenarioState().pumpFailureActive === true;
-  const glanceTone =
-    glance.type === "warning"
-      ? "text-red-700 dark:text-red-300"
-      : glance.type === "info"
-        ? "text-amber-800 dark:text-amber-200"
-        : "text-emerald-800 dark:text-emerald-200";
 
   return (
     <>
@@ -409,14 +401,6 @@ function HeroCard({
         <CardContent className="p-4 md:p-6 space-y-3 md:space-y-5">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 sm:gap-3">
-              {avatarUrl ? (
-                <div
-                  className="h-12 w-12 shrink-0 overflow-hidden rounded-2xl ring-2 ring-background shadow-sm sm:h-14 sm:w-14"
-                  aria-hidden
-                >
-                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                </div>
-              ) : null}
               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                 <span
                   className="font-display text-lg font-semibold tracking-tight text-foreground text-balance sm:text-xl"
@@ -449,10 +433,12 @@ function HeroCard({
                 <StatusPill status={status} />
               </div>
             </div>
-            {!omitHeroGlanceLine ? (
-              <div className={`text-xs leading-snug ${glanceTone}`} data-testid="text-dashboard-glance">
-                {glance.message}
-              </div>
+            {showHeroGlanceLine ? (
+              <HomePrimaryStatusPill
+                type={glance.type}
+                message={glance.message}
+                testId="text-dashboard-glance"
+              />
             ) : null}
           </div>
 
@@ -837,7 +823,6 @@ export default function Dashboard() {
   const [firstWeekChecklistDismissed, setFirstWeekChecklistDismissed] = useState(() => isFirstWeekChecklistDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const refreshData = () => {
@@ -925,21 +910,6 @@ export default function Dashboard() {
   }, [search, setLocation, openAskModal]);
 
   const healthStatus = getHealthStatus(supplies, scenarioState);
-
-  useEffect(() => {
-    const path = cloudProfile?.avatar_url ?? null;
-    if (!path?.trim()) {
-      setAvatarUrl(null);
-      return;
-    }
-    let cancelled = false;
-    void resolveProfileImageUrl(path).then((url) => {
-      if (!cancelled) setAvatarUrl(url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [cloudProfile?.avatar_url]);
 
   const scenariosQuickHref = useMemo(() => {
     if (scenarioState.sickDayActive) return "/scenarios/sick-day";
@@ -1034,7 +1004,6 @@ export default function Dashboard() {
               status={healthStatus}
               profile={profile}
               cloudFullName={cloudProfile?.full_name ?? null}
-              avatarUrl={avatarUrl}
               supplies={supplies}
               scenarioState={scenarioState}
               onEditWidgets={() => setWidgetsDialogOpen(true)}

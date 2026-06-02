@@ -6,6 +6,7 @@ import { DIABEATER_SETTINGS_CHANGED_EVENT, storage } from "@/lib/storage";
 import { isDateOfBirthUnknown } from "@/lib/user-age";
 import { cn } from "@/lib/utils";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
+import { SETTINGS_DATE_OF_BIRTH_HREF } from "@/lib/settings-nav";
 
 const DEFAULT_TITLE = "Add your date of birth to unlock adult-only sections";
 
@@ -73,7 +74,7 @@ export function DobUnknownNotice({
             <p className="text-sm font-medium text-foreground">{title}</p>
             <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{resolvedBody}</p>
             <Link
-              href="/settings#settings-dob"
+              href={SETTINGS_DATE_OF_BIRTH_HREF}
               className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               data-testid={`${testId}-cta`}
             >

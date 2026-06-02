@@ -78,7 +78,59 @@ export function getTodayGlanceLine(
     };
   }
 
-  return { type: "ok", message: "All clear for now" };
+  if (supplies.length === 0) {
+    return { type: "info", message: buildStableGlanceMessage(supplies, scenarioState) };
+  }
+  return { type: "ok", message: buildStableGlanceMessage(supplies, scenarioState) };
+}
+
+/** Specific calm-state copy — avoids generic "All clear for now" under the Stable pill. */
+export function buildStableGlanceMessage(supplies: Supply[], scenarioState: ScenarioState): string {
+  if (supplies.length === 0) {
+    return "Add supplies to track stock and runway";
+  }
+
+  const guidesQuiet = !scenarioState.sickDayActive && !scenarioState.travelModeActive;
+
+  let minDays: number | null = null;
+  for (const s of supplies) {
+    const d = storage.getDaysRemaining(s);
+    if (d >= 999) continue;
+    if (minDays === null || d < minDays) minDays = d;
+  }
+
+  if (guidesQuiet && minDays !== null) {
+    return `Stock looks good · ~${minDays}d shortest runway`;
+  }
+  if (guidesQuiet) {
+    return "Supplies OK · no active guides";
+  }
+  return "Supplies OK";
+}
+
+/**
+ * When the hero shows the Stable pill, skip the glance line — supply/today cards below
+ * already show stock runway and guide status.
+ */
+export function shouldOmitHeroGlanceLineDuplicatingStablePill(
+  healthStatus: HealthStatus,
+  glance: { type: TodayGlanceStatusType; message: string },
+): boolean {
+  if (healthStatus !== "stable") return false;
+  if (glance.type === "ok") return true;
+  if (glance.type === "info" && /add supplies/i.test(glance.message)) return true;
+  return glance.message === "All clear for now";
+}
+
+export function shouldShowHeroGlanceLine(
+  glance: { type: TodayGlanceStatusType; message: string },
+  supplies: Supply[],
+  scenarioState: ScenarioState,
+  healthStatus: HealthStatus,
+): boolean {
+  if (shouldOmitHeroGlanceLineDuplicatingTodayCard(glance, supplies, scenarioState)) return false;
+  if (shouldOmitHeroGlanceLineDuplicatingStablePill(healthStatus, glance)) return false;
+  return true;
 }
 
 /**
@@ -128,6 +180,10 @@ export function shouldOmitTodayCardGlanceBanner(
 
   if (healthStatus === "watch" && glance.type === "info" && scenarioState.sickDayActive) {
     if (glance.message === "Sick day mode active") return true;
+  }
+
+  if (healthStatus === "stable" && glance.type === "ok") {
+    return true;
   }
 
   return false;

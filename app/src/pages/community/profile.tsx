@@ -12,7 +12,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  ProfileAvatarTile,
+  ProfileBioPreview,
+  ProfileDisplayName,
+  ProfileFollowStats,
+  ProfileHandle,
+  ProfileHeroCard,
+  ProfileHeroRow,
+  ProfileMetaRow,
+  ProfileMutedCard,
+  ProfileSectionHeading,
+} from "@/components/profile/profile-ui";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +60,6 @@ import {
   getProfilesByIds,
   type PublicCommunityProfile,
 } from "@/lib/profile";
-import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
   BEATIE_FEED_AVATAR_FALLBACK_SRC,
@@ -59,6 +69,14 @@ import {
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
+}
+
+function profileInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+  }
+  return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
 type ListKind = "followers" | "following";
@@ -282,17 +300,22 @@ export default function CommunityProfilePage() {
     );
   }
 
+  const profileBio =
+    profile?.bio?.trim() ||
+    (isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "");
+  const livingWithLine =
+    showDiabetesJourneyLine && profile
+      ? formatLivingWithDiabetesLine(profile.diabetes_onset_date)
+      : null;
+
   return (
-    <PageShell
-      variant="standard"
-      className="max-w-lg mx-auto space-y-4 pb-4"
-    >
+    <PageShell variant="standard" className="max-w-lg mx-auto space-y-5 pb-4">
       <PageHeader
         leading={<PageBackButton />}
         title="Profile"
         actions={
           isSelf ? (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" className="rounded-full" asChild>
               <Link href="/account#profile">Edit</Link>
             </Button>
           ) : !isSelf && user && profile ? (
@@ -301,11 +324,9 @@ export default function CommunityProfilePage() {
                 type="button"
                 size="sm"
                 variant={followingThem ? "secondary" : "default"}
-                disabled={
-                  followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe
-                }
+                disabled={followBusy || blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
                 onClick={() => void toggleFollow()}
-                className="gap-1.5"
+                className="gap-1.5 rounded-full"
               >
                 {followingThem ? (
                   <UserCheck className="h-4 w-4 shrink-0" aria-hidden />
@@ -320,90 +341,66 @@ export default function CommunityProfilePage() {
                 variant="outline"
                 disabled={blockStatus.iBlockedThem || blockStatus.theyBlockedMe}
                 onClick={() => void openMessages()}
-                className="gap-1.5"
+                className="gap-1.5 rounded-full"
               >
                 <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
                 Message
               </Button>
             </div>
           ) : !isSelf && !user && profile && !loading && !authLoading ? (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={loginNextHref}>Sign in to follow or message</Link>
+            <Button variant="outline" size="sm" className="rounded-full" asChild>
+              <Link href={loginNextHref}>Sign in</Link>
             </Button>
           ) : null
         }
       />
 
       {loading || authLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <ProfileMutedCard>
+          <p className="text-sm text-muted-foreground">Loading profile…</p>
+        </ProfileMutedCard>
       ) : !profile ? (
-        <p className="text-sm text-muted-foreground">{loadError ?? "Profile not found."}</p>
+        <ProfileMutedCard>
+          <p className="text-sm text-muted-foreground">{loadError ?? "Profile not found."}</p>
+        </ProfileMutedCard>
       ) : (
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex gap-4">
-              <div className="shrink-0">
-                {profileHeaderImageSrc ? (
-                  <img
-                    src={profileHeaderImageSrc}
-                    alt=""
-                    className={cn(
-                      "h-20 w-20 rounded-full border border-border",
-                      avatarDisplayUrl
-                        ? "object-cover bg-muted"
-                        : "object-cover",
-                    )}
-                  />
-                ) : (
-                  <CommunityAuthorAvatar displayName={displayName} avatarPath={profile.avatar_url} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <h1 className="text-lg font-semibold leading-tight">{displayName}</h1>
-                {profile.public_handle ? (
-                  <p className="text-sm text-muted-foreground">@{profile.public_handle}</p>
-                ) : null}
+        <ProfileHeroCard testId="public-profile-hero">
+          <div className="flex flex-col gap-3">
+            <ProfileHeroRow
+              avatar={
+                <ProfileAvatarTile
+                  imageUrl={profileHeaderImageSrc}
+                  initials={profileInitials(displayName)}
+                  alt={displayName}
+                  size="md"
+                />
+              }
+            >
+              <ProfileDisplayName compact name={displayName} />
+              <ProfileMetaRow>
+                {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
                 {isSelf && !profile.is_public ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-400">Your profile is hidden from others.</p>
+                  <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] font-medium text-amber-950 dark:text-amber-100">
+                    Hidden from others
+                  </span>
                 ) : null}
-              </div>
-            </div>
+              </ProfileMetaRow>
+              <ProfileFollowStats
+                followers={counts.followers}
+                following={counts.following}
+                onFollowersClick={() => void openList("followers")}
+                onFollowingClick={() => void openList("following")}
+              />
+              <ProfileBioPreview
+                compact
+                bio={profileBio}
+                livingWithLine={livingWithLine}
+                emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
+              />
+            </ProfileHeroRow>
 
-            {profile.bio?.trim() ? (
-              <p className="text-sm whitespace-pre-wrap text-foreground/90">{profile.bio}</p>
-            ) : isBeatieProfile ? (
-              <p className="text-sm whitespace-pre-wrap text-foreground/90">{BEATIE_FEED_BOT_DEFAULT_BIO}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">No bio yet.</p>
-            )}
-
-            {showDiabetesJourneyLine && profile ? (
-              <p className="text-sm text-muted-foreground">
-                {formatLivingWithDiabetesLine(profile.diabetes_onset_date)}
-              </p>
-            ) : null}
-
-            <div className="flex flex-wrap gap-3 text-sm">
-              <button
-                type="button"
-                className="text-left hover:underline underline-offset-4"
-                onClick={() => void openList("followers")}
-              >
-                <span className="font-semibold text-foreground">{counts.followers}</span>{" "}
-                <span className="text-muted-foreground">followers</span>
-              </button>
-              <button
-                type="button"
-                className="text-left hover:underline underline-offset-4"
-                onClick={() => void openList("following")}
-              >
-                <span className="font-semibold text-foreground">{counts.following}</span>{" "}
-                <span className="text-muted-foreground">following</span>
-              </button>
-            </div>
-
-            {!isSelf && !user && profile ? (
-              <p className="text-sm text-muted-foreground pt-1">
+            {!isSelf && !user ? (
+              <p className="rounded-xl border border-border/50 bg-background/40 px-3 py-2 text-xs text-muted-foreground dark:bg-background/25 sm:text-sm">
                 <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
                   Sign in
                 </Link>{" "}
@@ -412,43 +409,42 @@ export default function CommunityProfilePage() {
             ) : null}
 
             {!isSelf && user ? (
-              <div className="flex flex-wrap gap-2 pt-1 border-t border-border/60">
+              <div className="flex flex-wrap gap-2 border-t border-border/40 pt-4">
                 {blockStatus.iBlockedThem ? (
-                  <Button type="button" size="sm" variant="outline" onClick={() => void handleUnblock()}>
+                  <Button type="button" size="sm" variant="outline" className="rounded-full" onClick={() => void handleUnblock()}>
                     Unblock
                   </Button>
                 ) : (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setBlockConfirmOpen(true)}>
+                  <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setBlockConfirmOpen(true)}>
                     Block
                   </Button>
                 )}
-                <Button type="button" size="sm" variant="ghost" onClick={() => setReportOpen(true)}>
+                <Button type="button" size="sm" variant="ghost" className="rounded-full" onClick={() => setReportOpen(true)}>
                   Report
                 </Button>
               </div>
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </ProfileHeroCard>
       )}
 
       {!loading && !authLoading && profile ? (
         !user ? (
-          <Card>
-            <CardContent className="pt-5 space-y-2">
-              <p className="text-sm font-medium text-foreground">Posts</p>
-              <p className="text-sm text-muted-foreground">
-                <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
-                  Sign in
-                </Link>{" "}
-                to view posts from this member.
-              </p>
-            </CardContent>
-          </Card>
+          <ProfileMutedCard>
+            <ProfileSectionHeading title="Posts" subtitle="Sign in to view this member's posts" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              <Link href={loginNextHref} className="font-medium text-primary underline-offset-4 hover:underline">
+                Sign in
+              </Link>{" "}
+              to see what they have shared on the Feed.
+            </p>
+          </ProfileMutedCard>
         ) : (
-          <div className="pt-1">
-            <div className="flex items-baseline justify-between pb-1">
-              <h2 className="text-sm font-semibold text-foreground">{isSelf ? "Your posts" : "Posts"}</h2>
-            </div>
+          <div className="space-y-3">
+            <ProfileSectionHeading
+              title={isSelf ? "Your posts" : "Posts"}
+              subtitle={isSelf ? "What you've shared on the Feed" : `Posts from ${displayName}`}
+            />
             <FeedPostList
               viewerId={user.id}
               scopeKey={`profile:${userId}`}

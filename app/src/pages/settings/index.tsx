@@ -55,6 +55,7 @@ import {
   type WeightDisplayUnit,
 } from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { scrollToSettingsHashTarget } from "@/lib/settings-nav";
 import {
   normalizePrimaryHypoTreatment,
   PRIMARY_HYPO_TREATMENT_OPTIONS,
@@ -230,7 +231,7 @@ function ProfileTab({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
+      <div id="settings-dob-section" className="scroll-mt-24 space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="settings-dob"
           info={
@@ -1176,6 +1177,8 @@ export default function Settings() {
     if (!raw) return;
     const hashRoutes: Record<string, string> = {
       "settings-personal": "/settings/usage#settings-personal",
+      "settings-dob": "/settings/usage#settings-dob",
+      "settings-dob-section": "/settings/usage#settings-dob-section",
       "settings-ratios": "/settings/ratios",
       "settings-usage": "/settings/usage#settings-usage",
       "settings-usage-tools": "/settings/usage",
@@ -1199,10 +1202,37 @@ export default function Settings() {
     if (pathOnly === "/settings") return;
     const raw = window.location.hash.replace(/^#/, "");
     if (!raw) return;
-    const t = window.setTimeout(() => {
-      document.getElementById(raw)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-    return () => clearTimeout(t);
+
+    let cancelled = false;
+    const isDobHash = raw === "settings-dob" || raw === "settings-dob-section";
+
+    const tryScroll = (attempt = 0) => {
+      if (cancelled) return;
+      let found = false;
+      if (isDobHash) {
+        const section = document.getElementById("settings-dob-section");
+        const input = document.getElementById("settings-dob");
+        const anchor = section ?? input;
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (input instanceof HTMLInputElement) {
+            window.setTimeout(() => input.focus({ preventScroll: true }), 280);
+          }
+          found = true;
+        }
+      } else {
+        found = scrollToSettingsHashTarget(raw);
+      }
+      if (!found && attempt < 15) {
+        window.setTimeout(() => tryScroll(attempt + 1), 100);
+      }
+    };
+
+    const t = window.setTimeout(() => tryScroll(), 50);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [location, pathOnly]);
 
   const handleSaveProfile = async (opts?: { quietSuccess?: boolean }): Promise<{

@@ -706,15 +706,13 @@ export function AccountCommunityProfileFields({
     return (
       <Card
         id={cardId}
-        className={cn(
-          "animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden scroll-mt-24",
-          className,
-        )}
+        variant="glass-muted"
+        className={cn("animate-soft-in border-0 shadow-sm overflow-hidden scroll-mt-24", className)}
       >
-        <CardHeader className="pb-2 space-y-0">
+        <CardHeader className="pb-2 space-y-0 sm:p-5 sm:pb-2">
           <div className="flex flex-row items-start justify-between gap-3">
             <div className="min-w-0 flex flex-wrap items-center gap-1.5">
-              <CardTitle className="text-[0.9375rem] font-semibold">Profile</CardTitle>
+              <CardTitle className="font-display text-base font-semibold tracking-tight">Profile</CardTitle>
               <InlineInfoHint
                 ariaLabel="About Profile"
                 content={
@@ -735,7 +733,7 @@ export function AccountCommunityProfileFields({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0"
+                className="shrink-0 rounded-full"
                 onClick={() => setEditing(true)}
                 disabled={savingPublic}
                 data-testid="account-community-edit"
@@ -745,7 +743,7 @@ export function AccountCommunityProfileFields({
             ) : null}
           </div>
         </CardHeader>
-        <CardContent className="pt-0">{form}</CardContent>
+        <CardContent className="pt-0 sm:px-5 sm:pb-5">{form}</CardContent>
       </Card>
     );
   }

@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
 import { ChevronRight } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
@@ -7,12 +9,24 @@ import { useLinkedPatient } from "@/lib/carers";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ProfileActionGrid,
+  ProfileAvatarTile,
+  ProfileDisplayName,
+  ProfileHeroCard,
+  ProfileHeroNameRow,
+  ProfileHeroRow,
+  ProfileMetaRow,
+  ProfileMutedCard,
+  ProfileSectionHeading,
+  ProfileVerifiedBadge,
+} from "@/components/profile/profile-ui";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader, PageShell } from "@/components/layout";
+import { cn } from "@/lib/utils";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
@@ -60,6 +74,14 @@ function getInitial(email: string): string {
   return first || "?";
 }
 
+type AccountPageTab = "account" | "public";
+
+function accountTabFromHash(hash: string): AccountPageTab {
+  const raw = hash.replace(/^#/, "");
+  if (raw === "public" || raw === "posts") return "public";
+  return "account";
+}
+
 export default function Account() {
   const { user } = useAuth();
   const { isCarer: hasCarerLink, loading: carerLinkLoading } = useLinkedCarer();
@@ -67,7 +89,10 @@ export default function Account() {
   const isCarer = !!linkedPatient;
   const { profile, loading: profileLoading, refresh } = useProfile();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const [accountTab, setAccountTab] = useState<AccountPageTab>(() =>
+    typeof window !== "undefined" ? accountTabFromHash(window.location.hash) : "account",
+  );
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const {
     displayUrl: avatarDisplayUrl,
@@ -335,7 +360,8 @@ export default function Account() {
   const displayName = profile?.full_name?.trim() || settingsName || "Your account";
   const nameForInitials = profile?.full_name?.trim() || settingsName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
-  const showPublicProfilePreview = isCommunityEnabled && profile?.is_public === true;
+  const showPublicProfileTab = isCommunityEnabled && !isCarer;
+  const isPublicProfile = profile?.is_public === true;
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
   const primaryRole = getPrimaryAppRole();
@@ -346,11 +372,14 @@ export default function Account() {
     (activeMode == null || activeMode === "patient")
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
-  const myPublicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
   const canOpenModeChooser = hasCarerLink;
 
   useEffect(() => {
-    if (!showPublicProfilePreview) {
+    setAccountTab(accountTabFromHash(typeof window !== "undefined" ? window.location.hash : ""));
+  }, [location]);
+
+  useEffect(() => {
+    if (!showPublicProfileTab) {
       setPublicCounts(null);
       return;
     }
@@ -364,7 +393,27 @@ export default function Account() {
     return () => {
       active = false;
     };
-  }, [showPublicProfilePreview, userId]);
+  }, [showPublicProfileTab, userId]);
+
+  const setAccountPageTab = useCallback(
+    (tab: AccountPageTab) => {
+      setAccountTab(tab);
+      const hash = tab === "public" ? "#public" : "";
+      setLocation(`/account${hash}`);
+      if (tab === "account" && typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    },
+    [setLocation],
+  );
+
+  const goToAccountProfileEditor = useCallback(() => {
+    setAccountTab("account");
+    setLocation("/account#profile");
+    window.setTimeout(() => {
+      document.getElementById("profile")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [setLocation]);
 
   async function openFollowList(kind: "followers" | "following") {
     setFollowListKind(kind);
@@ -391,226 +440,113 @@ export default function Account() {
     setFollowListLoading(false);
   }
 
-  return (
-    <PageShell variant="narrow" className="md:max-w-2xl space-y-6 py-4 md:py-8">
-      <PageHeader
-        title="Account"
-        description={
-          isCarer
-            ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
-            : isCommunityAccount
-              ? "Your community profile and sign-in options."
-              : "Your profile, emergency details, and sign-in options."
-        }
-        className="max-w-xl"
-      />
-      <DobUnknownNotice hidden={isCarer || isCommunityAccount} testId="account-dob-unknown-notice" />
-      <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm overflow-hidden">
-        <CardContent className="relative p-4 sm:p-5 space-y-0">
+  const accountHero = (
+    <ProfileHeroCard testId="account-hero-card">
+      <div className="flex flex-col gap-3">
+        <ProfileHeroRow
+          avatar={
+            <ProfileAvatarTile
+              size="md"
+              imageUrl={showAvatarImage ? avatarDisplayUrl : null}
+              initials={
+                nameForInitials
+                  ? nameForInitials
+                      .split(/\s+/)
+                      .map((s) => s[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()
+                  : initial
+              }
+              alt="Profile photo"
+              testId={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
+              onImageError={() => setAvatarImgFailed(true)}
+            />
+          }
+        >
+          <ProfileHeroNameRow>
+            <div className="min-w-0 flex-1">
+              <ProfileDisplayName compact name={displayName} />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 min-h-8 h-8 px-3 rounded-full border-border/60 bg-background/70 text-xs shadow-sm backdrop-blur-sm"
+              asChild
+            >
+              <Link href="/settings" data-testid="link-account-settings">
+                Settings
+              </Link>
+            </Button>
+          </ProfileHeroNameRow>
+          <ProfileMetaRow>
+            <ProfileVerifiedBadge compact verified={verified} />
+          </ProfileMetaRow>
+        </ProfileHeroRow>
+
+        <ProfileActionGrid>
+          {carerLinkLoading ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              data-testid="link-change-view"
+              aria-busy="true"
+              title="Loading supporter link…"
+            >
+              Change mode
+            </Button>
+          ) : canOpenModeChooser ? (
+            <Button variant="outline" size="sm" asChild data-testid="link-change-view">
+              <Link href="/mode">Change mode</Link>
+            </Button>
+          ) : null}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            id="avatar-file"
+            onChange={handleAvatarUpload}
+            disabled={uploadSubmitting}
+            aria-label="Choose profile photo"
+          />
           <Button
+            type="button"
             variant="outline"
             size="sm"
-            className="absolute right-4 top-4 z-10 min-h-11 sm:right-5 sm:top-5"
-            asChild
+            disabled={uploadSubmitting}
+            onClick={() => fileInputRef.current?.click()}
+            data-testid="avatar-upload"
           >
-            <Link href="/settings" data-testid="link-account-settings">
-              Settings
-            </Link>
+            {uploadSubmitting ? "Uploading…" : "Upload photo"}
           </Button>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-              {showPublicProfilePreview ? (
-                <Link
-                  href={myPublicProfileHref}
-                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
-                  data-testid="link-my-public-profile-avatar"
-                  aria-label="Open your public profile"
-                >
-                  {showAvatarImage ? (
-                    <img
-                      src={avatarDisplayUrl!}
-                      alt="Profile avatar"
-                      className="w-full h-full object-cover"
-                      data-testid="avatar-img"
-                      onError={() => setAvatarImgFailed(true)}
-                    />
-                  ) : (
-                    <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
-                      {nameForInitials
-                        ? nameForInitials
-                            .split(/\s+/)
-                            .map((s) => s[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()
-                        : initial}
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <div
-                  className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted/80 dark:bg-muted/50 avatar-hover-scale sm:h-24 sm:w-24"
-                  data-testid={showAvatarImage ? "avatar-preview" : "avatar-placeholder"}
-                  {...(!showAvatarImage && {
-                    role: "img" as const,
-                    "aria-label": "No avatar",
-                  })}
-                >
-                  {showAvatarImage ? (
-                    <img
-                      src={avatarDisplayUrl!}
-                      alt="Profile avatar"
-                      className="w-full h-full object-cover"
-                      data-testid="avatar-img"
-                      onError={() => setAvatarImgFailed(true)}
-                    />
-                  ) : (
-                    <span className="text-xl font-medium text-muted-foreground sm:text-2xl" aria-hidden>
-                      {nameForInitials
-                        ? nameForInitials
-                            .split(/\s+/)
-                            .map((s) => s[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()
-                        : initial}
-                    </span>
-                  )}
-                </div>
-              )}
 
-              <div className="min-w-0 flex-1 space-y-1 pr-20 text-left sm:pr-24">
-                {showPublicProfilePreview ? (
-                  <div className="min-w-0">
-                    <Link
-                      href={myPublicProfileHref}
-                      className="block min-w-0"
-                      data-testid="link-my-public-profile-name"
-                      aria-label="Open your public profile"
-                    >
-                      <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-                    </Link>
-                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-0.5">
-                      {publicHandle ? (
-                        <p className="text-sm text-muted-foreground">@{publicHandle}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          No handle set.{" "}
-                          <a href="#profile" className="text-primary underline-offset-4 hover:underline">
-                            Add one
-                          </a>
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4">
-                        <button
-                          type="button"
-                          className="text-sm text-foreground hover:underline underline-offset-4"
-                          data-testid="link-my-public-profile-followers"
-                          onClick={() => void openFollowList("followers")}
-                        >
-                          <span className="font-semibold tabular-nums">{publicCounts?.followers ?? 0}</span>{" "}
-                          <span className="text-muted-foreground">followers</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="text-sm text-foreground hover:underline underline-offset-4"
-                          data-testid="link-my-public-profile-following"
-                          onClick={() => void openFollowList("following")}
-                        >
-                          <span className="font-semibold tabular-nums">{publicCounts?.following ?? 0}</span>{" "}
-                          <span className="text-muted-foreground">following</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <h1 className="text-2xl font-semibold tracking-tight text-foreground">{displayName}</h1>
-                )}
+          {!isCarer && !isCommunityAccount && (
+            <Button variant="outline" size="sm" className="col-span-2" asChild>
+              <Link href="/family-carers" data-testid="link-manage-carers">
+                Manage supporters
+              </Link>
+            </Button>
+          )}
 
-                {showPublicProfilePreview ? (
-                  <div className="pt-1 space-y-0.5 min-w-0">
-                    <p className="text-sm text-muted-foreground italic truncate">
-                      {bioPreview ? bioPreview : "No bio yet."}
-                    </p>
-                    {livingWithLine ? <p className="text-sm text-muted-foreground">{livingWithLine}</p> : null}
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap items-center justify-start gap-2 pt-1">
-                  <span
-                    data-testid={verified ? "status-verified" : "status-unverified"}
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                      verified
-                        ? "text-green-700 bg-green-50 dark:bg-green-950/40 dark:text-green-400 border-green-200 dark:border-green-800/50"
-                        : "text-muted-foreground bg-muted/60 dark:bg-muted/40 border-border dark:border-border"
-                    }`}
-                  >
-                    {verified ? "Verified" : "Unverified"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="pt-2 pb-0.5">
-              <div className="grid w-full grid-cols-2 gap-2 [&_a]:w-full [&_button]:w-full">
-                {carerLinkLoading ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-11"
-                    disabled
-                    data-testid="link-change-view"
-                    aria-busy="true"
-                    title="Loading supporter link…"
-                  >
-                    Change mode
-                  </Button>
-                ) : canOpenModeChooser ? (
-                  <Button variant="outline" size="sm" className="min-h-11" asChild data-testid="link-change-view">
-                    <Link href="/mode">Change mode</Link>
-                  </Button>
-                ) : null}
+          {isCarer && (
+            <Button variant="outline" size="sm" className="col-span-2" asChild>
+              <Link href="/carer-view" data-testid="link-back-to-carer-view">
+                Back to Supporter Mode
+              </Link>
+            </Button>
+          )}
+        </ProfileActionGrid>
+      </div>
+    </ProfileHeroCard>
+  );
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  id="avatar-file"
-                  onChange={handleAvatarUpload}
-                  disabled={uploadSubmitting}
-                  aria-label="Choose profile photo"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={uploadSubmitting}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="min-h-11 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  data-testid="avatar-upload"
-                >
-                  {uploadSubmitting ? "Uploading…" : "Upload photo"}
-                </Button>
-
-                {!isCarer && !isCommunityAccount && (
-                  <Button variant="outline" size="sm" className="min-h-11 col-span-2" asChild>
-                    <Link href="/family-carers" data-testid="link-manage-carers">
-                      Manage supporters
-                    </Link>
-                  </Button>
-                )}
-
-                {isCarer && (
-                  <Button variant="outline" size="sm" className="min-h-11 col-span-2" asChild>
-                    <Link href="/carer-view" data-testid="link-back-to-carer-view">
-                      Back to Supporter Mode
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const accountTabPanel = (
+    <>
+      <DobUnknownNotice hidden={isCarer || isCommunityAccount} testId="account-dob-unknown-notice" />
+      {accountHero}
 
       {isCommunityEnabled && (
         <AccountCommunityProfileFields variant="standalone" cardId="profile" idPrefix="account" />
@@ -631,21 +567,14 @@ export default function Account() {
       )}
 
       {!isCarer && !isCommunityAccount && (
-        <Card
-          id="account-emergency"
-          className="animate-fade-in-up scroll-mt-24 rounded-2xl border-border/60 shadow-sm ring-1 ring-border/40"
-        >
-          <CardContent className="p-6 space-y-4">
-            <SettingsEmergencySection variant="embedded" showSyncButton={false} />
-          </CardContent>
-        </Card>
+        <ProfileMutedCard id="account-emergency" testId="account-emergency-card">
+          <SettingsEmergencySection variant="embedded" showSyncButton={false} />
+        </ProfileMutedCard>
       )}
 
-      <Card className="animate-fade-in-up rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xl font-semibold">Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <ProfileMutedCard testId="account-actions-card">
+        <ProfileSectionHeading title="Account actions" subtitle="Sign-in and security" />
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button
             variant="outline"
             size="default"
@@ -676,8 +605,93 @@ export default function Account() {
           >
             Request account deletion
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </ProfileMutedCard>
+    </>
+  );
+
+  return (
+    <PageShell
+      variant="narrow"
+      density={showPublicProfileTab ? "compact" : "default"}
+      className={cn(
+        "md:max-w-2xl",
+        showPublicProfileTab ? "pt-0 pb-4 md:pt-1 md:pb-6" : "space-y-6 py-4 md:py-8",
+      )}
+    >
+      {!showPublicProfileTab ? (
+        <PageHeader
+          title="Account"
+          description={
+            isCarer
+              ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
+              : isCommunityAccount
+                ? "Your community profile and sign-in options."
+                : "Your profile, emergency details, and sign-in options."
+          }
+          className="max-w-xl"
+        />
+      ) : null}
+
+      {showPublicProfileTab ? (
+        <Tabs
+          value={accountTab}
+          onValueChange={(v) => setAccountPageTab(v as AccountPageTab)}
+          className="w-full -mt-0.5"
+          data-testid="account-page-tabs"
+        >
+          <h1 className="sr-only">Account</h1>
+          <TabsList className="grid h-10 w-full grid-cols-2 rounded-full bg-muted/50 p-0.5 dark:bg-muted/35">
+            <TabsTrigger
+              value="account"
+              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              data-testid="account-tab-account"
+            >
+              Account
+            </TabsTrigger>
+            <TabsTrigger
+              value="public"
+              className="rounded-full text-xs font-medium sm:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              data-testid="account-tab-public"
+            >
+              Public profile
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="account" className="mt-5 space-y-6 focus-visible:outline-none">
+            {accountTabPanel}
+          </TabsContent>
+
+          <TabsContent value="public" className="mt-5 focus-visible:outline-none">
+            <AccountPublicProfileTab
+              userId={userId}
+              displayName={displayName}
+              avatarDisplayUrl={showAvatarImage ? avatarDisplayUrl : null}
+              avatarInitials={
+                nameForInitials
+                  ? nameForInitials
+                      .split(/\s+/)
+                      .map((s) => s[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()
+                  : initial
+              }
+              publicHandle={publicHandle}
+              bioPreview={bioPreview}
+              livingWithLine={livingWithLine}
+              isPublic={isPublicProfile}
+              followers={publicCounts?.followers ?? 0}
+              following={publicCounts?.following ?? 0}
+              onOpenFollowers={() => void openFollowList("followers")}
+              onOpenFollowing={() => void openFollowList("following")}
+              onEditProfile={goToAccountProfileEditor}
+            />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="space-y-6">{accountTabPanel}</div>
+      )}
 
       <AlertDialog open={accountDeletionOpen} onOpenChange={setAccountDeletionOpen}>
         <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
