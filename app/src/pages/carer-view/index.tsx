@@ -63,8 +63,20 @@ import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
 import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt";
 import { useAuth } from "@/lib/auth-context";
-import { CarerCoachEntryCard } from "@/components/dashboard/CarerCoachEntryCard";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
+import {
+  CarerCardEmpty,
+  CarerHypoTimelineItem,
+  CarerMutedCard,
+  CarerSectionHeading,
+  CarerUrgentCard,
+  sortSuppliesByUrgency,
+  SupporterHero,
+  SupporterPageFooter,
+  SupporterQuickActions,
+  SupplyStockIndicator,
+  type CarerGlanceType,
+} from "@/pages/carer-view/supporter-home-ui";
 import { PageShell } from "@/components/layout";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -73,23 +85,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-function SectionHeading({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="flex items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {subtitle ? <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p> : null}
-      </div>
-    </div>
-  );
-}
 
 function parseLocalDateTime(date: unknown, time: unknown): Date | null {
   if (typeof date !== "string") return null;
@@ -1208,8 +1203,6 @@ function travelScenarioSummary(rows: Record<string, unknown>[]): { active: boole
   return { active: false, destination: null };
 }
 
-type CarerGlanceType = "ok" | "info" | "warning";
-
 function deriveCarerHeaderContext(
   supplies: CloudSupplyRow[],
   sickState: Record<string, unknown> | null,
@@ -1567,16 +1560,6 @@ export default function CarerViewPage() {
     [scopes.scenarios, scenarioRows],
   );
 
-  const latestHypoAt = useMemo(() => {
-    let best: Date | null = null;
-    for (const h of hypoLogs) {
-      const d = new Date(h.created_at);
-      if (Number.isNaN(d.getTime())) continue;
-      if (!best || d.getTime() > best.getTime()) best = d;
-    }
-    return best;
-  }, [hypoLogs]);
-
   const suppliesTone = useMemo(() => {
     if (!(scopes.supplies ?? false)) return null;
     const tones = supplies.map((s) => supplyTone(s));
@@ -1593,12 +1576,24 @@ export default function CarerViewPage() {
     };
   }, [profile]);
 
-  const hideGlanceLine =
-    carerHeaderContext.glance.type === "info" &&
-    carerHeaderContext.showTravelChip &&
-    !carerHeaderContext.showSickChip &&
-    suppliesTone === "ok" &&
-    carerHeaderContext.glance.message.toLowerCase().includes("travel mode active");
+  const linkedPeopleForHero = useMemo(
+    () =>
+      linkedPatients.map((p) => ({
+        patientId: p.patientId,
+        label: p.patient_full_name?.trim() || "Linked person",
+        active: p.patientId === activePatientId,
+      })),
+    [linkedPatients, activePatientId],
+  );
+
+  const travelChipLabel = travelSummary.destination
+    ? `Travel · ${travelSummary.destination}`
+    : "Travel";
+
+  const sortedSupplies = useMemo(
+    () => sortSuppliesByUrgency(supplies, supplyTone),
+    [supplies],
+  );
 
   const refreshScenarios = useCallback(async () => {
     if (!activeLink?.patientId) return;
@@ -1630,20 +1625,16 @@ export default function CarerViewPage() {
     return (
       <>
         {devOverlay}
-        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4">
-          <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
-                <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
-              </div>
-              <Badge variant="secondary" className="rounded-full">
-                Loading…
-              </Badge>
-            </div>
-          </div>
+        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4" aria-busy="true">
+          <Card variant="glass-strong" className="border border-primary/10 shadow-sm">
+            <CardContent className="p-4 space-y-3">
+              <div className="h-14 w-14 rounded-2xl bg-muted animate-pulse" />
+              <div className="h-6 w-40 rounded-lg bg-muted animate-pulse" />
+              <div className="h-8 w-full max-w-xs rounded-full bg-muted animate-pulse" />
+            </CardContent>
+          </Card>
           <div className="px-1">
-            <HubLoadingSkeleton tiles={6} />
+            <HubLoadingSkeleton tiles={4} />
           </div>
         </PageShell>
       </>
@@ -1712,135 +1703,37 @@ export default function CarerViewPage() {
     <>
       {devOverlay}
       <PageShell variant="standard" className="max-w-3xl space-y-6 py-4">
-        <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
-              <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
-            </div>
-            <Badge variant="secondary" className="rounded-full">
-              Viewing shared info
-            </Badge>
-          </div>
-        </div>
+        <div className="flex flex-col gap-3 sm:gap-4 animate-stagger">
+          <SupporterHero
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            glance={carerHeaderContext.glance}
+            showEmergencyLink={scopes.emergency_info ?? false}
+            showSickChip={(scopes.scenarios ?? false) && carerHeaderContext.showSickChip}
+            showTravelChip={(scopes.scenarios ?? false) && carerHeaderContext.showTravelChip}
+            travelLabel={travelChipLabel}
+            linkedPeople={linkedPeopleForHero}
+            onPatientChange={onPatientChange}
+          />
 
-        <div className="flex flex-col gap-3 sm:gap-4">
-
-          <Card className="border-border/60 shadow-sm" data-testid="carer-view-header">
-            <CardContent className="p-4 md:p-5 flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden"
-                    aria-hidden={!avatarUrl}
-                  >
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <Heart className="h-6 w-6 text-primary" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Viewing</p>
-                    <p className="text-lg font-semibold text-foreground truncate" data-testid="text-carer-view-name">
-                      {displayName}
-                    </p>
-                  </div>
-                </div>
-
-                {(scopes.emergency_info ?? false) && (
-                  <a
-                    href="#carer-emergency"
-                    className={cn(
-                      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background/60 px-3 text-xs font-semibold text-foreground shadow-sm",
-                      "hover:bg-background/80 hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    )}
-                    aria-label="Jump to emergency details"
-                  >
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                    Emergency
-                  </a>
-                )}
-              </div>
-
-              {!hideGlanceLine ? (
-                <p className="text-xs leading-snug text-muted-foreground" data-testid="text-carer-glance">
-                  {carerHeaderContext.glance.message}
-                </p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-glance-chips">
-                <Badge variant="outline" className="rounded-full border-border/60 bg-background/50 text-xs">
-                  Activity: {carerActivityWeek.countLast7Days} {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
-                </Badge>
-                {(scopes.hypo_alerts ?? false) && latestHypoAt ? (
-                  <Badge variant="outline" className="rounded-full border-border/60 bg-background/50 text-xs">
-                    Last hypo {formatDistanceToNowStrict(latestHypoAt, { addSuffix: true })}
-                  </Badge>
-                ) : null}
-                {suppliesTone ? (
-                  <Badge
-                    variant={suppliesTone === "critical" ? "destructive" : suppliesTone === "low" ? "secondary" : "outline"}
-                    className={cn("rounded-full text-xs", suppliesTone === "ok" && "border-border/60 bg-background/50")}
-                  >
-                    {suppliesTone === "critical" ? "Supplies: critical" : suppliesTone === "low" ? "Supplies: low" : "Supplies: ok"}
-                  </Badge>
-                ) : null}
-              </div>
-
-              {(scopes.scenarios ?? false) &&
-                (carerHeaderContext.showSickChip || carerHeaderContext.showTravelChip) && (
-                  <div className="flex flex-wrap items-center gap-2" data-testid="wrap-carer-active-chips">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Active modes
-                    </span>
-                    {carerHeaderContext.showSickChip ? (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-full px-3 text-xs border-amber-500/30 bg-amber-500/[0.06] hover:bg-amber-500/[0.1]"
-                      >
-                        <a href="#carer-sick-day-care" data-testid="chip-carer-sickday">
-                          <Thermometer className="h-3.5 w-3.5 mr-1.5 text-amber-600 dark:text-amber-400" aria-hidden />
-                          Sick day
-                        </a>
-                      </Button>
-                    ) : null}
-                    {carerHeaderContext.showTravelChip ? (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-full px-3 text-xs border-blue-500/30 bg-blue-500/[0.06] hover:bg-blue-500/[0.1]"
-                      >
-                        <a href="#carer-scenarios" data-testid="chip-carer-travel">
-                          <Plane className="h-3.5 w-3.5 mr-1.5 text-blue-600 dark:text-blue-400" aria-hidden />
-                          {travelSummary.destination ? `Travel · ${travelSummary.destination}` : "Travel"}
-                        </a>
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-            </CardContent>
-          </Card>
-
-          <CarerCoachEntryCard />
+          <SupporterQuickActions
+            showActivity={showCarerActivityLog}
+            showEmergency={scopes.emergency_info ?? false}
+          />
 
           {activeLink?.patientId ? (
             <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
           ) : null}
 
           {linkedPatients.length > 1 ? (
-            <Card className="border-border/60 shadow-sm" data-testid="carer-linked-people">
+            <Card variant="glass-muted" className="border-0 shadow-sm" data-testid="carer-linked-people">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base font-semibold">
                   <Users className="h-5 w-5 text-primary shrink-0" aria-hidden />
                   People you support
                 </CardTitle>
                 <CardDescription>
-                  Each person chooses what you can see. Use{" "}
-                  <span className="font-medium text-foreground">Switch to</span> to change who you are viewing.
+                  Tap a name above to switch, or use the list below.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
@@ -1850,7 +1743,7 @@ export default function CarerViewPage() {
                     const active = p.patientId === activePatientId;
                     return (
                       <li key={p.patientId}>
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm bg-background/40">
                           <span className="min-w-0 font-medium text-foreground">{label}</span>
                           <div className="flex shrink-0 items-center gap-2">
                             {active ? (
@@ -1890,25 +1783,33 @@ export default function CarerViewPage() {
         </Alert>
       )}
 
-        <div className="space-y-3 sm:space-y-4">
-          <SectionHeading
+        <div className="space-y-4 sm:space-y-5 animate-stagger">
+          <CarerSectionHeading
             title="Now"
-            subtitle="High-signal items that might need attention."
+            subtitle="What may need your attention today."
+            icon={Heart}
           />
           {(scopes.hypo_alerts ?? false) && (
-            <Card className="border-border/60 shadow-sm" data-testid="carer-view-hypos">
+            <CarerUrgentCard
+              testId="carer-view-hypos"
+              accent={hypoLogs.length > 0 ? "rose" : "default"}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Heart className="h-5 w-5 text-primary shrink-0" aria-hidden />
                   Recent hypos
                 </CardTitle>
-                <CardDescription>Recent hypo logs they have chosen to share.</CardDescription>
+                <CardDescription>Shared hypo logs, newest first.</CardDescription>
               </CardHeader>
               <CardContent>
                 {hypoLogs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No hypo logs visible yet.</p>
+                  <CarerCardEmpty
+                    icon={Heart}
+                    title="No hypos shared yet"
+                    description="When they log a hypo and share alerts with you, it will appear here."
+                  />
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="space-y-3 m-0 list-none p-0">
                     {hypoLogs.slice(0, 4).map((h) => {
                       const when = new Date(h.created_at);
                       const whenText = Number.isNaN(when.getTime())
@@ -1919,154 +1820,93 @@ export default function CarerViewPage() {
                           ? null
                           : Math.round(h.blood_glucose * 10) / 10;
                       return (
-                        <li key={h.id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">{bg == null ? "Hypo logged" : `BG ${bg}`}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
-                          </div>
-                          {h.treatment ? <p className="text-muted-foreground">Treatment: {h.treatment}</p> : null}
-                          {h.notes ? (
-                            <p className="text-muted-foreground whitespace-pre-wrap">{h.notes}</p>
-                          ) : null}
-                        </li>
+                        <CarerHypoTimelineItem
+                          key={h.id}
+                          bgLabel={bg == null ? "Hypo logged" : `BG ${bg}`}
+                          whenText={whenText}
+                          treatment={h.treatment}
+                          notes={h.notes}
+                        />
                       );
                     })}
                   </ul>
                 )}
               </CardContent>
-            </Card>
+            </CarerUrgentCard>
           )}
 
-          {showCarerActivityLog ? (
-            <Card className="border-border/60 shadow-sm" data-testid="carer-view-activity">
+          {(scopes.scenarios ?? false) && isSickDayScenarioActive(sickDayState) && activeLink?.patientId ? (
+            <div id="carer-sick-day-care" className="scroll-mt-24">
+              <SickDaySupporterCareCard
+                patientId={activeLink.patientId}
+                sickState={sickDayState}
+                onUpdated={refreshScenarios}
+              />
+            </div>
+          ) : null}
+
+          {(scopes.supplies ?? false) && (
+            <CarerUrgentCard
+              testId="carer-view-supplies"
+              accent={suppliesTone === "critical" ? "amber" : suppliesTone === "low" ? "amber" : "default"}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                  <span className="min-w-0 flex-1">Activity log</span>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1">{displayName}&apos;s supplies</span>
                   <InlineInfoHint
-                    ariaLabel="About activity log"
-                    content={<p>Shared hypos, guides, and clinic visits by day — read-only.</p>}
+                    ariaLabel="About supplies"
+                    content={<p>Cloud stock they have chosen to share with you.</p>}
                     className="-mr-2 shrink-0"
                   />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {carerActivityWeek.countLast7Days === 0 ? (
-                  <p className="text-sm text-muted-foreground">No shared activity in the last 7 days.</p>
+              <CardContent>
+                {supplies.length === 0 ? (
+                  <CarerCardEmpty
+                    icon={Package}
+                    title="No supplies shared yet"
+                    description="They can enable supply sharing in their supporter link settings."
+                  />
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    <span className="text-2xl font-semibold tabular-nums text-foreground">
-                      {carerActivityWeek.countLast7Days}
-                    </span>{" "}
-                    {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
-                  </p>
+                  <ul className="space-y-2 m-0 list-none p-0">
+                    {sortedSupplies.map((s) => {
+                      const tone = supplyTone(s);
+                      return (
+                        <li
+                          key={s.id}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm",
+                            tone === "critical" && "border-destructive/35 bg-destructive/[0.04]",
+                            tone === "low" && "border-amber-500/30 bg-amber-500/[0.04]",
+                            tone === "ok" && "border-border/60 bg-background/40",
+                          )}
+                        >
+                          <SupplyStockIndicator tone={tone} />
+                          <span className="font-medium truncate min-w-0 flex-1">{s.name}</span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-muted-foreground tabular-nums text-right text-xs sm:text-sm">
+                              {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
+                            </span>
+                            {tone === "critical" && (
+                              <Badge variant="destructive" className="text-xs">
+                                Out
+                              </Badge>
+                            )}
+                            {tone === "low" && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                              >
+                                Low
+                              </Badge>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-                <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
-                  <Link href="/carer-view/activity">View calendar</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
-            {(scopes.scenarios ?? false) && (
-              <Card id="carer-scenarios" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-scenarios">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <Plane className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                    <span className="min-w-0 flex-1">Guide status</span>
-                    <InlineInfoHint
-                      ariaLabel="About guide status"
-                      content={
-                        <p>Shared travel, sick-day, and bedtime flags when their project allows it.</p>
-                      }
-                      className="-mr-2 shrink-0"
-                    />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {scenarioLines.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No guide status visible yet.</p>
-                  ) : (
-                    scenarioLines.map((line, i) => (
-                      <div
-                        key={`${line}-${i}`}
-                        className="flex items-start gap-2 text-sm rounded-lg border border-border/60 px-3 py-2 bg-muted/20"
-                      >
-                        {line.toLowerCase().includes("sick") ? (
-                          <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
-                        ) : line.toLowerCase().includes("travel") ? (
-                          <Plane className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
-                        ) : (
-                          <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
-                        )}
-                        <span>{line}</span>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {(scopes.scenarios ?? false) && isSickDayScenarioActive(sickDayState) && activeLink?.patientId ? (
-              <div id="carer-sick-day-care" className="scroll-mt-24">
-                <SickDaySupporterCareCard
-                  patientId={activeLink.patientId}
-                  sickState={sickDayState}
-                  onUpdated={refreshScenarios}
-                />
-              </div>
-            ) : null}
-
-            {(scopes.supplies ?? false) && (
-              <Card className="border-border/60 shadow-sm" data-testid="carer-view-supplies">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                    <span className="min-w-0 flex-1">Supplies</span>
-                    <InlineInfoHint
-                      ariaLabel="About supplies"
-                      content={<p>Cloud stock figures they have chosen to share.</p>}
-                      className="-mr-2 shrink-0"
-                    />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {supplies.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No supply rows visible yet.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {supplies.map((s) => {
-                        const tone = supplyTone(s);
-                        return (
-                          <li
-                            key={s.id}
-                            className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
-                          >
-                            <span className="font-medium truncate">{s.name}</span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-muted-foreground tabular-nums text-right">
-                                {formatCarerSupplyQuantity(s, patientSupplyPackPrefs)}
-                              </span>
-                              {tone === "critical" && (
-                                <Badge variant="destructive" className="text-xs">
-                                  Out
-                                </Badge>
-                              )}
-                              {tone === "low" && (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
-                                >
-                                  Low
-                                </Badge>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
 
                   {supplyEvents.length > 0 && (
                     <details className="mt-4">
@@ -2125,16 +1965,100 @@ export default function CarerViewPage() {
                       </div>
                     </details>
                   )}
+              </CardContent>
+            </CarerUrgentCard>
+          )}
+
+          {(scopes.scenarios ?? false) && (
+            <CarerMutedCard id="carer-scenarios" testId="carer-view-scenarios">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Plane className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0 flex-1">Situations</span>
+                  <InlineInfoHint
+                    ariaLabel="About situations"
+                    content={
+                      <p>Shared travel, sick-day, and bedtime flags when their project allows it.</p>
+                    }
+                    className="-mr-2 shrink-0"
+                  />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {scenarioLines.length === 0 ? (
+                  <CarerCardEmpty
+                    icon={Plane}
+                    title="No situations shared"
+                    description="Travel, sick day, or bedtime flags will show here when shared."
+                  />
+                ) : (
+                  scenarioLines.map((line, i) => (
+                    <div
+                      key={`${line}-${i}`}
+                      className="flex items-start gap-2 text-sm rounded-lg border border-border/50 px-3 py-2 bg-background/50"
+                    >
+                      {line.toLowerCase().includes("sick") ? (
+                        <Thermometer className="h-4 w-4 shrink-0 mt-0.5 text-orange-600" />
+                      ) : line.toLowerCase().includes("travel") ? (
+                        <Plane className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
+                      ) : (
+                        <Info className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+                      )}
+                      <span>{line}</span>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </CarerMutedCard>
+          )}
+
+          {showCarerActivityLog ? (
+            <>
+              <CarerSectionHeading
+                title="History"
+                subtitle="Browse shared activity over time."
+                icon={History}
+              />
+              <CarerMutedCard testId="carer-view-activity">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0 flex-1">Activity log</span>
+                    <InlineInfoHint
+                      ariaLabel="About activity log"
+                      content={<p>Shared hypos, guides, and clinic visits by day — read-only.</p>}
+                      className="-mr-2 shrink-0"
+                    />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {carerActivityWeek.countLast7Days === 0 ? (
+                    <CarerCardEmpty
+                      icon={History}
+                      title="Quiet week"
+                      description="No shared activity in the last 7 days."
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="text-2xl font-semibold tabular-nums text-foreground">
+                        {carerActivityWeek.countLast7Days}
+                      </span>{" "}
+                      {carerActivityWeek.countLast7Days === 1 ? "entry" : "entries"} this week
+                    </p>
+                  )}
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto min-h-10 rounded-xl" asChild>
+                    <Link href="/carer-view/activity">View calendar</Link>
+                  </Button>
                 </CardContent>
-              </Card>
-            )}
-          </div>
+              </CarerMutedCard>
+            </>
+          ) : null}
         </div>
 
         {(scopes.appointments ?? false) && (
-          <div className="space-y-3 sm:space-y-4">
-            <SectionHeading title="Upcoming" subtitle="Appointments coming up next." />
-            <Card className="border-border/60 shadow-sm" data-testid="carer-view-appointments">
+          <div className="space-y-4 sm:space-y-5">
+            <CarerSectionHeading title="Upcoming" subtitle="Appointments coming up next." icon={Calendar} />
+            <Card variant="glass-strong" className="dashboard-card-hover border border-border/60 shadow-sm" data-testid="carer-view-appointments">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -2148,7 +2072,11 @@ export default function CarerViewPage() {
               </CardHeader>
               <CardContent>
                 {upcomingAppointments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">No upcoming appointments visible yet.</p>
+                  <CarerCardEmpty
+                    icon={Calendar}
+                    title="No upcoming appointments"
+                    description="Shared clinic visits will appear here when scheduled."
+                  />
                 ) : (
                   <div className="space-y-2">
                     {upcomingAppointments.map((appt) => (
@@ -2182,9 +2110,14 @@ export default function CarerViewPage() {
         )}
 
         {(scopes.emergency_info ?? false) && (
-          <div className="space-y-3 sm:space-y-4">
-            <SectionHeading title="Reference" subtitle="Details for coordination and emergencies." />
-            <Card id="carer-emergency" className="border-border/60 shadow-sm scroll-mt-24" data-testid="carer-view-emergency">
+          <div className="space-y-4 sm:space-y-5">
+            <CarerSectionHeading title="Reference" subtitle="Details for coordination and emergencies." icon={Phone} />
+            <Card
+              id="carer-emergency"
+              variant="glass-strong"
+              className="scroll-mt-24 border border-border/60 shadow-sm"
+              data-testid="carer-view-emergency"
+            >
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <Phone className="h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -2232,8 +2165,9 @@ export default function CarerViewPage() {
           </div>
         )}
 
-      <p className="text-xs text-center text-muted-foreground px-2">
-        This screen is for peace of mind and coordination. It does not give medical advice or replace their care team.
+      <SupporterPageFooter />
+      <p className="text-xs text-center text-muted-foreground px-2 pb-2">
+        For peace of mind and coordination — not medical advice or a substitute for their care team.
       </p>
       </PageShell>
       <SupporterPushPromptDialog
