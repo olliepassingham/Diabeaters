@@ -98,11 +98,12 @@ async function sendViaApns(
     ? (opts.data as Record<string, unknown>)
     : {};
 
+  // Do not set aps.badge here — the native app syncs the icon badge from real unread counts
+  // (bell + DM inbox) via @capawesome/capacitor-badge when opened or after inbox changes.
   const payload: Record<string, unknown> = {
     aps: {
       alert: { title: opts.title, body: opts.body },
       sound: "default",
-      badge: 1,
       // iOS 15+: ensure alerts are not treated as passive/summary-only (Notification Centre only).
       "interruption-level": "active",
     },

@@ -76,6 +76,7 @@ import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync"
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
+import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
@@ -1248,6 +1249,7 @@ function AuthenticatedShell() {
       )}
     >
       <NativePushForegroundSync />
+      <NativeAppBadgeSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       <DeferredAfterFirstPaint>

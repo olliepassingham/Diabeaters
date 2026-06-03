@@ -30,6 +30,10 @@ const config: CapacitorConfig = {
     LocalNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
+    Badge: {
+      persist: false,
+      autoClear: false,
+    },
   },
 };
 

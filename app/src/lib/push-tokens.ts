@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
+import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
 import {
   getNativePushPlatform,
   isNativePushPlatform,
@@ -245,6 +246,7 @@ function attachPushListeners(
 
   PushNotifications.addListener("pushNotificationReceived", () => {
     writePushDiag({ state: "push_received_foreground", platform });
+    scheduleNativeAppBadgeSync();
   });
 
   pushListenersBound = true;
