@@ -14,7 +14,6 @@ import {
   ChevronDown,
   ChevronUp,
   Pizza,
-  X,
   ArrowRight,
   ArrowLeft,
   Search,
@@ -35,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
+import { MealDoseResultCard } from "@/components/meal-dose-result-card";
 
 import { Link, useLocation } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -77,9 +77,26 @@ function getInitialMealTime(): string {
   return "lunch";
 }
 
+function adviserSearchParams(location: string): URLSearchParams {
+  const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
+  return new URLSearchParams(qs);
+}
+
+function buildMealPlannerHref(params: URLSearchParams, opts?: { result?: boolean }): string {
+  const next = new URLSearchParams(params);
+  next.set("tab", "meal");
+  if (opts?.result) {
+    next.set("result", "1");
+  } else {
+    next.delete("result");
+  }
+  const qs = next.toString();
+  return qs ? `/adviser?${qs}` : "/adviser?tab=meal";
+}
+
 export default function Adviser() {
   const { toast } = useToast();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [settings, setSettings] = useState<UserSettings>({});
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [activeTab, setActiveTab] = useState(getInitialTab);
@@ -134,6 +151,36 @@ export default function Adviser() {
 
   const [mealResult, setMealResult] = useState<MealDoseResult | null>(null);
   const [showMealResultDetails, setShowMealResultDetails] = useState(false);
+
+  const showMealResultPage =
+    activeTab === "meal" &&
+    adviserSearchParams(location).get("result") === "1" &&
+    mealResult != null;
+
+  useEffect(() => {
+    const params = adviserSearchParams(location);
+    if (params.get("result") === "1" && !mealResult) {
+      setLocation(buildMealPlannerHref(params, { result: false }));
+    }
+  }, [location, mealResult, setLocation]);
+
+  const openMealResultPage = (result: MealDoseResult) => {
+    setMealResult(result);
+    setShowMealResultDetails(false);
+    setActiveTab("meal");
+    setLocation(buildMealPlannerHref(adviserSearchParams(location), { result: true }));
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const closeMealResultPage = (clearResult = false) => {
+    if (clearResult) setMealResult(null);
+    setLocation(buildMealPlannerHref(adviserSearchParams(location), { result: false }));
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
 
   const [mealCarbs, setMealCarbs] = useState("");
   const [carbUnit, setCarbUnit] = useState<"grams" | "cp">("grams");
@@ -367,7 +414,7 @@ export default function Adviser() {
     const freshSettings = storage.getSettings();
     const exerciseContext = planningAroundExercise ? exerciseTiming : undefined;
     const hoursAway = planningAroundExercise ? parseInt(exerciseWithin) : undefined;
-    
+
     const lastEx = storage.getLastExerciseSummary();
     const exerciseMeta =
       exerciseContext && lastEx && storage.didExerciseRecently(24)
@@ -375,8 +422,7 @@ export default function Adviser() {
         : undefined;
 
     const result = calculateMealDose(carbValue, mealTime, freshSettings, bgUnits, exerciseContext, hoursAway, exerciseMeta);
-    setMealResult(result);
-    
+
     try {
       storage.addActivityLog({
         activityType: "meal_planning",
@@ -384,6 +430,8 @@ export default function Adviser() {
         recommendation: `${result.dose} units`,
       });
     } catch {}
+
+    openMealResultPage(result);
   };
 
   const getRatioForMeal = (meal: string): string => {
@@ -407,7 +455,7 @@ export default function Adviser() {
       <PageHeader
         leading={<PageBackButton />}
         className="mb-4"
-        title="Meal &amp; ratios"
+        title={showMealResultPage ? "Your dose suggestion" : "Meal &amp; ratios"}
         actions={
           <PageInfoDialog title="About Meal &amp; ratios" description="Meal planning and ratio tools">
             <InfoSection title="Meal planner">
@@ -542,6 +590,37 @@ export default function Adviser() {
         </TabsList>
 
         <TabsContent value="meal" className="space-y-4 mt-4 animate-fade-in-up">
+          {showMealResultPage && mealResult ? (
+            <div className="space-y-4 animate-fade-in-up">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground -ml-2"
+                onClick={() => closeMealResultPage()}
+                data-testid="button-back-meal-planner"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to meal planner
+              </Button>
+              <MealDoseResultCard
+                mealResult={mealResult}
+                mealAbsorptionVisual={mealAbsorptionVisual}
+                mealFoodShortLabel={mealFoodShortLabel}
+                isPumpUser={isPumpUser}
+                showDetails={showMealResultDetails}
+                onShowDetailsChange={setShowMealResultDetails}
+                scenarioState={scenarioState}
+                onClose={() => closeMealResultPage(true)}
+                onGoToRatios={() => {
+                  closeMealResultPage(true);
+                  setActiveTab("ratios");
+                }}
+                variant="page"
+              />
+            </div>
+          ) : (
+            <>
           {cameFromRatios && (
             <Link href="/ratios">
               <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-back-to-ratios-meal">
@@ -743,10 +822,7 @@ export default function Adviser() {
               </div>
 
               <Button
-                onClick={() => {
-                  setShowMealResultDetails(false);
-                  handleQuickMealPlan();
-                }}
+                onClick={handleQuickMealPlan}
                 disabled={!mealCarbs}
                 className="w-full"
                 data-testid="button-get-meal-advice"
@@ -1002,189 +1078,7 @@ export default function Adviser() {
             </Collapsible>
           </Card>
           </div>
-
-          {mealResult && (
-            <Card data-testid="card-meal-result">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Utensils className="h-4 w-4 text-primary" />
-                    {mealResult.exerciseContext === "during" ? "During-Exercise Fuel" :
-                     mealResult.exerciseContext === "before" ? "Pre-Exercise Dose" :
-                     mealResult.exerciseContext === "after" ? "Post-Exercise Dose" :
-                     "Your Dose Suggestion"}
-                  </h4>
-                  <Button variant="ghost" size="icon" onClick={() => setMealResult(null)} data-testid="button-clear-meal-result">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {mealResult.error === "no_ratios" ? (
-                  <div className="p-4 bg-muted rounded-lg text-center space-y-2">
-                    <p className="text-sm text-muted-foreground">You need insulin-to-carb ratios before the meal planner can suggest doses.</p>
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setMealResult(null); setActiveTab("ratios"); }} data-testid="button-no-ratios-go-adviser">
-                      <Calculator className="h-3.5 w-3.5" />
-                      Go to Ratio Adviser
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    {mealResult.exerciseContext === "during" ? (
-                      <div className="space-y-3">
-                        <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 dark:border-blue-800/50 dark:bg-blue-950/25">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="space-y-1 min-w-0">
-                              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium uppercase tracking-wide">
-                                During exercise
-                              </p>
-                              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                                {isPumpUser ? "Usually no meal bolus" : "Usually no insulin"}
-                              </p>
-                              <p className="text-sm text-blue-700/80 dark:text-blue-200/80">
-                                {mealResult.carbs}g carbs
-                                {mealResult.standardDose != null
-                                  ? ` • Standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
-                                  : ""}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <MealCarbAbsorptionPreview
-                          carbsGrams={mealResult.carbs}
-                          visual={mealAbsorptionVisual}
-                          foodChoiceLabel={mealFoodShortLabel}
-                        />
-                        {mealResult.tips && (
-                          <ul className="text-sm text-muted-foreground space-y-1">
-                            {mealResult.tips.map((tip, i) => <li key={i} className="flex gap-2"><span className="text-primary">-</span>{tip}</li>)}
-                          </ul>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {mealResult.exerciseContext && mealResult.standardDose !== undefined && (
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-center">
-                              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Standard</p>
-                              <p className="text-xl font-bold line-through text-muted-foreground">
-                                {mealResult.standardDose}u
-                              </p>
-                              <p className="text-xs text-muted-foreground">{mealResult.carbs}g • {mealResult.mealType}</p>
-                            </div>
-                            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
-                              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">
-                                {mealResult.exerciseContext === "before" ? "Pre‑exercise" : "Post‑exercise"}
-                                {typeof mealResult.exerciseReduction === "number" ? ` • −${mealResult.exerciseReduction}%` : ""}
-                              </p>
-                              <p className="text-3xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
-                                {mealResult.dose}u
-                              </p>
-                              <p className="text-xs text-emerald-700/80 dark:text-emerald-200/80">
-                                {isPumpUser ? "Adjusted bolus (program on pump)" : "Adjusted dose"}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
-                          <p className="text-xs text-muted-foreground text-center">
-                            Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
-                          </p>
-                        ) : null}
-                        {!mealResult.exerciseContext && (
-                          <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center dark:border-emerald-800/50 dark:bg-emerald-950/25">
-                            <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium uppercase tracking-wide">Suggested</p>
-                            <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100" data-testid="text-meal-dose">
-                              {mealResult.dose}u
-                            </p>
-                            <p className="text-sm text-emerald-700/80 dark:text-emerald-200/80">
-                              {mealResult.carbs}g • {mealResult.mealType}
-                            </p>
-                            {isPumpUser ? (
-                              <p className="text-xs text-emerald-800/90 dark:text-emerald-200/90 pt-1">
-                                Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
-                              </p>
-                            ) : null}
-                          </div>
-                        )}
-                        <MealCarbAbsorptionPreview
-                          carbsGrams={mealResult.carbs}
-                          visual={mealAbsorptionVisual}
-                          foodChoiceLabel={mealFoodShortLabel}
-                        />
-                        <Collapsible open={showMealResultDetails} onOpenChange={setShowMealResultDetails}>
-                          <CollapsibleTrigger asChild>
-                            <button
-                              type="button"
-                              className="w-full flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left"
-                              data-testid="button-toggle-meal-result-details"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <BookOpen className="h-4 w-4 text-primary flex-shrink-0" />
-                                <span className="text-sm font-medium">More detail</span>
-                                <span className="text-xs text-muted-foreground truncate">
-                                  Tips, rounding, safety notes
-                                </span>
-                              </div>
-                              {showMealResultDetails ? (
-                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="pt-2 space-y-2">
-                              <MedicalNumericOutputDisclaimer compact />
-                              {mealResult.exerciseContext && mealResult.standardDose !== undefined && isPumpUser ? (
-                                <p className="text-xs text-muted-foreground text-center">
-                                  Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
-                                </p>
-                              ) : null}
-                              {mealResult.roundingAdvice && (
-                                <div className="p-2 bg-muted rounded text-xs text-muted-foreground">
-                                  <strong>Rounding guide:</strong> {mealResult.roundingAdvice}
-                                </div>
-                              )}
-                              {mealResult.tips && (
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                  {mealResult.tips.map((tip, i) => (
-                                    <li key={i} className="flex gap-2">
-                                      <span className="text-primary">-</span>
-                                      {tip}
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                              {scenarioState.sickDayActive && (
-                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="meal-note-sick-day">
-                                  <div className="flex items-start gap-2">
-                                    <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                                      <strong>Sick day note:</strong> Your ratios may need 10-30% more insulin during illness. The Sick day tool has adjusted ratios for you.
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-                              {scenarioState.travelModeActive && Math.abs(scenarioState.travelTimezoneShift || 0) >= 2 && (
-                                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="meal-note-travel">
-                                  <div className="flex items-start gap-2">
-                                    <Plane className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                                      <strong>Travel Note:</strong> You're in a different timezone. Your usual meal times and ratios may need adjusting as your body clock adapts.
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-                              <p className="text-xs text-muted-foreground">[Not medical advice. Always verify with your own calculations.]</p>
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
+            </>
           )}
         </TabsContent>
 
