@@ -19,6 +19,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { FeedCommentItem } from "@/components/community/feed-comment-item";
 import { FeedLinkPreview } from "@/components/community/feed-link-preview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,12 +57,10 @@ import { FieldLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { useToast } from "@/hooks/use-toast";
 import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInput } from "@/lib/profile";
 import { cn } from "@/lib/utils";
-import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
-import { BEATIE_FEED_AVATAR_FALLBACK_SRC } from "@/lib/ai-feed-reply/config";
+import { type FeedAuthorMeta } from "@/lib/community/feed-author-meta";
 import {
   castPollVote,
   communityTopicLabel,
-  fetchCommentsForPost,
   fetchDmThreadsForCurrentUser,
   fetchPollVoteState,
   getFirstWhitelistedFeedLink,
@@ -80,78 +79,6 @@ const RECENT_DM_PEERS_LIMIT = 20;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
-
-function formatCommentPreviewBody(body: string): string {
-  const trimmed = body.trim();
-  if (!trimmed || trimmed === ".") return "";
-  return trimmed;
-}
-
-type CommentPreviewState = {
-  body: string;
-  authorName: string;
-  fromBeatie: boolean;
-};
-
-function FeedCommentPreviewButton({
-  preview,
-  beatieFeedBotUserId,
-  onOpenComments,
-}: {
-  preview: CommentPreviewState;
-  beatieFeedBotUserId?: string | null;
-  onOpenComments: () => void;
-}) {
-  const body = formatCommentPreviewBody(preview.body);
-  if (!body) return null;
-
-  if (preview.fromBeatie) {
-    const profileHref = beatieFeedBotUserId
-      ? `/community/profile/${beatieFeedBotUserId}`
-      : undefined;
-    return (
-      <button
-        type="button"
-        className="flex w-full items-start gap-2 rounded-xl border border-primary/30 bg-primary/[0.06] px-2.5 py-2 text-left transition-colors active:bg-primary/[0.12] hover:bg-primary/[0.1] dark:bg-primary/10"
-        onClick={onOpenComments}
-        data-testid="feed-comment-preview-beatie"
-      >
-        <CommunityAuthorAvatar
-          size="sm"
-          displayName={AI_ASSISTANT_NAME}
-          avatarPath={null}
-          profileHref={profileHref}
-          fallbackSrc={BEATIE_FEED_AVATAR_FALLBACK_SRC}
-          className="h-7 w-7"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold text-foreground">{AI_ASSISTANT_NAME}</span>
-            <Badge
-              variant="outline"
-              className="border-primary/45 bg-background/60 px-1.5 py-0 text-[10px] font-medium leading-tight text-primary"
-            >
-              AI coach
-            </Badge>
-          </div>
-          <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{body}</p>
-        </div>
-      </button>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      className="w-full rounded-xl border border-border/40 bg-muted/25 px-2.5 py-2 text-left transition-colors active:bg-muted/40 hover:bg-muted/35"
-      onClick={onOpenComments}
-      data-testid="feed-comment-preview"
-    >
-      <p className="text-xs font-semibold text-foreground">{preview.authorName}</p>
-      <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{body}</p>
-    </button>
-  );
 }
 
 function formatEventWhen(iso: string): string {
@@ -320,7 +247,7 @@ function formatRelativeTime(iso: string): string {
   }
 }
 
-export type CommentAuthorMeta = { name: string; avatar_url: string | null };
+export type CommentAuthorMeta = FeedAuthorMeta;
 
 type FeedPostCardProps = {
   post: CommunityPostRow;
@@ -426,47 +353,6 @@ export function FeedPostCard({
   >([]);
   const [likersError, setLikersError] = useState<string | null>(null);
   const [likersTruncated, setLikersTruncated] = useState(false);
-
-  const [commentSort, setCommentSort] = useState<"oldest" | "newest">("oldest");
-  const [topCommentPreview, setTopCommentPreview] = useState<{
-    body: string;
-    authorName: string;
-    fromBeatie: boolean;
-  } | null>(null);
-  const commentMetaRef = useRef(commentMeta);
-  commentMetaRef.current = commentMeta;
-  const sortedComments = useMemo(() => {
-    const arr = [...comments];
-    if (commentSort === "newest") arr.reverse();
-    return arr;
-  }, [comments, commentSort]);
-
-  useEffect(() => {
-    if (expanded || post.comment_count === 0) {
-      setTopCommentPreview(null);
-      return;
-    }
-    let cancelled = false;
-    void fetchCommentsForPost(post.id, { limit: 1, order: "desc" }).then((res) => {
-      if (cancelled || res.error || !res.data?.[0]) {
-        if (!cancelled) setTopCommentPreview(null);
-        return;
-      }
-      const c = res.data[0];
-      const meta = commentMetaRef.current(c.author_id);
-      const fromBeatie = Boolean(
-        beatieFeedBotUserId && c.author_id === beatieFeedBotUserId,
-      );
-      setTopCommentPreview({
-        body: c.body.trim(),
-        authorName: fromBeatie ? AI_ASSISTANT_NAME : meta.name,
-        fromBeatie,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [post.id, post.comment_count, expanded, beatieFeedBotUserId]);
 
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
@@ -666,14 +552,15 @@ export function FeedPostCard({
   const topicLabel = communityTopicLabel(post.topic);
 
   return (
-    <Card variant="glass" className="pressable card-interactive h-fit w-full overflow-hidden border-border/50 shadow-sm">
-      <CardContent className="space-y-2.5 px-3.5 pb-3 pt-3.5 sm:space-y-3 sm:px-4 sm:pb-4 sm:pt-4">
-        <div className="flex items-start gap-2.5">
+    <Card variant="glass" className="pressable card-interactive h-fit w-full overflow-hidden border-border/40 shadow-sm">
+      <CardContent className="space-y-2 px-3 pb-2.5 pt-3 sm:space-y-2.5 sm:px-3.5 sm:pb-3 sm:pt-3.5">
+        <div className="flex items-start gap-2">
           <CommunityAuthorAvatar
             displayName={authorDisplayName}
             avatarPath={authorAvatarPath}
             profileHref={`/community/profile/${post.author_id}`}
             size="sm"
+            className="!h-9 !w-9"
           />
           <div className="min-w-0 flex-1">
             <div className="flex justify-between gap-1.5 text-xs text-muted-foreground items-start">
@@ -771,7 +658,7 @@ export function FeedPostCard({
             if (pollExtra && b === pollExtra.question.trim()) return null;
             if (eventExtra && b === eventExtra.title.trim()) return null;
             return (
-              <p className="text-[15px] leading-[1.45] whitespace-pre-wrap text-foreground/95">
+              <p className="text-[15px] leading-[1.4] whitespace-pre-wrap text-foreground">
                 {renderBodyWithMentions(post.body, post.mention_map)}
               </p>
             );
@@ -827,7 +714,7 @@ export function FeedPostCard({
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
           <div
-            className="flex items-center justify-between gap-1 border-t border-border/40 pt-2"
+            className="flex items-center justify-between gap-0.5 border-t border-border/35 pt-1.5"
             data-testid="post-engagement-row"
           >
             <div className="flex min-w-0 flex-1 items-center">
@@ -836,7 +723,7 @@ export function FeedPostCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
+                  className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
                   disabled={!viewerId}
                   aria-pressed={post.liked_by_me}
                   aria-label={post.liked_by_me ? "Unlike" : "Like"}
@@ -853,7 +740,7 @@ export function FeedPostCard({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-11 min-w-10 px-2 text-muted-foreground hover:text-foreground"
+                  className="h-9 min-w-9 px-1.5 text-muted-foreground hover:text-foreground"
                   disabled={!viewerId}
                   aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
                   onClick={() => setLikersOpen(true)}
@@ -866,7 +753,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-11 gap-1.5 px-3 text-muted-foreground hover:text-foreground"
+                className="h-9 gap-1 px-2.5 text-muted-foreground hover:text-foreground"
                 aria-expanded={expanded}
                 aria-label={
                   expanded
@@ -891,7 +778,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
                 aria-label="Reply"
                 onClick={onReplyFocus}
@@ -904,7 +791,7 @@ export function FeedPostCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
                 disabled={!viewerId}
                 aria-pressed={post.saved_by_me}
                 aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
@@ -923,7 +810,7 @@ export function FeedPostCard({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-11 w-11 p-0 text-muted-foreground hover:text-foreground"
+                    className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
                     aria-label="Share post"
                     data-testid="button-share-post-to-dm"
                   >
@@ -945,165 +832,80 @@ export function FeedPostCard({
               </DropdownMenu>
             </div>
           </div>
-          {!expanded && topCommentPreview && post.comment_count > 0 ? (
-            <FeedCommentPreviewButton
-              preview={topCommentPreview}
-              beatieFeedBotUserId={beatieFeedBotUserId}
-              onOpenComments={onToggleComments}
-            />
-          ) : null}
           {expanded && (
-            <div className="space-y-2 border-t border-border/40 pt-2.5">
+            <div className="space-y-2 border-t border-border/35 pt-2">
               {loadingComments ? (
-                <p className="text-xs text-muted-foreground">Loading comments…</p>
+                <div className="space-y-1.5" aria-busy="true">
+                  <Skeleton className="h-11 w-full rounded-lg" />
+                  <Skeleton className="h-11 w-full rounded-lg" />
+                </div>
               ) : (
-                <>
-                  {comments.length > 1 ? (
-                    <div className="flex flex-wrap items-center justify-end gap-1 pb-1">
-                      <span className="pr-1 text-tiny text-muted-foreground">Order</span>
-                      <Button
-                        type="button"
-                        variant={commentSort === "oldest" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setCommentSort("oldest")}
-                      >
-                        Oldest
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={commentSort === "newest" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setCommentSort("newest")}
-                      >
-                        Newest
-                      </Button>
-                    </div>
-                  ) : null}
+                <div className="space-y-2">
                   {isAuthor && onAskBeatie ? (
-                    <div className="pb-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        disabled={askBeatieBusy}
-                        onClick={onAskBeatie}
-                      >
-                        {askBeatieBusy ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                            Beatie is writing…
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            Ask Beatie (educational)
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1 rounded-full px-2.5 text-[11px]"
+                      disabled={askBeatieBusy}
+                      onClick={onAskBeatie}
+                    >
+                      {askBeatieBusy ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                          Beatie is writing…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          Ask Beatie (educational)
+                        </>
+                      )}
+                    </Button>
                   ) : null}
-                  <ul className="space-y-2">
-                    {sortedComments.map((c) => {
-                      const cm = commentMeta(c.author_id);
-                      const canReportComment = viewerId && viewerId !== c.author_id;
-                      const isCommentAuthor = Boolean(viewerId && viewerId === c.author_id);
-                      const isBeatieComment = Boolean(
-                        beatieFeedBotUserId && c.author_id === beatieFeedBotUserId,
-                      );
-                      return (
-                        <li
+                  {comments.length > 0 ? (
+                    <ul className="space-y-1" role="list">
+                      {comments.map((c) => (
+                        <FeedCommentItem
                           key={c.id}
-                          className={cn(
-                            "flex gap-2 rounded-md px-2 py-2",
-                            isBeatieComment
-                              ? "border border-primary/30 border-l-[3px] border-l-primary/70 bg-primary/[0.07] shadow-sm ring-1 ring-inset ring-primary/10 dark:bg-primary/[0.12]"
-                              : "bg-muted/40",
-                          )}
-                        >
-                          <CommunityAuthorAvatar
-                            size="sm"
-                            displayName={cm.name}
-                            avatarPath={cm.avatar_url}
-                            profileHref={`/community/profile/${c.author_id}`}
-                            fallbackSrc={isBeatieComment ? BEATIE_FEED_AVATAR_FALLBACK_SRC : undefined}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-1">
-                              <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0">
-                                <Link
-                                  href={`/community/profile/${c.author_id}`}
-                                  className="text-xs font-medium text-foreground hover:underline underline-offset-2"
-                                >
-                                  {isBeatieComment ? AI_ASSISTANT_NAME : cm.name}
-                                </Link>
-                                {isBeatieComment ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="border-primary/45 bg-background/60 px-1.5 py-0 text-[10px] font-medium leading-tight text-primary"
-                                  >
-                                    AI coach
-                                  </Badge>
-                                ) : null}
-                                <span className="text-tiny text-muted-foreground" title={c.created_at}>
-                                  {formatRelativeTime(c.created_at)}
-                                </span>
-                              </div>
-                              <span className="flex shrink-0 items-center gap-0.5">
-                                {canReportComment && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 shrink-0 px-1 text-muted-foreground"
-                                    onClick={() => onReportComment(c.id)}
-                                    aria-label="Report comment"
-                                  >
-                                    <Flag className="h-3 w-3" />
-                                  </Button>
-                                )}
-                                {isCommentAuthor && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 shrink-0 px-1 text-muted-foreground hover:text-destructive"
-                                    onClick={() => setPendingDeleteCommentId(c.id)}
-                                    aria-label="Delete comment"
-                                    data-testid={`button-delete-comment-${c.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </span>
-                            </div>
-                            <p className="text-sm whitespace-pre-wrap">
-                              {renderBodyWithMentions(c.body, c.mention_map ?? {})}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
+                          commentId={c.id}
+                          authorId={c.author_id}
+                          body={c.body}
+                          createdAt={c.created_at}
+                          mentionMap={c.mention_map}
+                          meta={commentMeta(c.author_id)}
+                          beatieFeedBotUserId={beatieFeedBotUserId}
+                          viewerId={viewerId}
+                          onReport={() => onReportComment(c.id)}
+                          onDelete={() => setPendingDeleteCommentId(c.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet.</p>
+                  )}
+                </div>
               )}
-              <div className="flex gap-2 items-end">
+              <div className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/15 py-1 pl-2 pr-1">
                 <div className="min-w-0 flex-1">
                   <MentionTextarea
                     textareaRef={commentInputRef}
                     value={commentDraft}
                     onChange={onCommentDraftChange}
                     currentUserId={viewerId}
-                    rows={2}
+                    rows={1}
                     maxLength={4000}
                     hideHint
-                    placeholder="Write a comment… Type @ to mention."
-                    className="min-h-[3.5rem]"
+                    placeholder="Add comment"
+                    className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-sm shadow-none focus-visible:ring-0"
                   />
                 </div>
-                <Button type="button" size="sm" className="shrink-0" onClick={onSubmitComment}>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 shrink-0 px-2.5 text-xs"
+                  onClick={onSubmitComment}
+                >
                   Reply
                 </Button>
               </div>

@@ -47,8 +47,8 @@ export default function ScenarioExercisePage() {
               isAiCoachEnabled ? "grid-cols-2" : "grid-cols-1",
             )}
           >
-            <ScenarioCoachLink topic="exercise" variant="secondary" className={cn(headerActionBtn, "gap-1.5")} />
-            <Button variant="secondary" size="sm" className={cn(headerActionBtn)} asChild>
+            <ScenarioCoachLink topic="exercise" className={cn(headerActionBtn, "gap-1.5")} />
+            <Button variant="outline" size="sm" className={cn(headerActionBtn)} asChild>
               <Link
                 href="/routines?section=exercise"
                 data-testid="link-exercise-routines-header"

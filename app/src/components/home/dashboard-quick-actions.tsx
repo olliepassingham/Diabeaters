@@ -21,6 +21,7 @@ export function DashboardQuickActions({
       icon: MessageCircle,
       href: buildCoachHref({ topic: pickCoachTopicSlugFromScenarioState() }),
       variant: "primary",
+      glow: true,
       testId: "link-dashboard-coach-open",
     });
   }

@@ -18,11 +18,14 @@ import {
   isCommunityTopicId,
   fetchCommunityPostsFromFollowingPage,
   fetchCommunityPostsPage,
+  fetchFollowSuggestions,
   readFeedComposerDraft,
+  followUser,
+  listFolloweeIdsForCurrentUser,
   type CommunityTopicId,
   type FeedCursor,
+  type FollowSuggestion,
 } from "@/lib/community";
-import { followUser, listFolloweeIdsForCurrentUser } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -55,6 +58,71 @@ function readStoredFeedTab(): FeedTab {
 }
 
 const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
+
+type FindPeoplePerson = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  handle: string;
+  reasonLabel?: string;
+};
+
+function FindPeoplePersonRow({
+  person,
+  alreadyFollowing,
+  busy,
+  waitFollowees,
+  isSelf,
+  hasUser,
+  showReason,
+  onFollow,
+}: {
+  person: FindPeoplePerson;
+  alreadyFollowing: boolean;
+  busy: boolean;
+  waitFollowees: boolean;
+  isSelf: boolean;
+  hasUser: boolean;
+  showReason?: boolean;
+  onFollow: () => void;
+}) {
+  return (
+    <li className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/50 px-2 py-1.5">
+      <CommunityAuthorAvatar
+        displayName={person.name}
+        avatarPath={person.avatar_url}
+        size="sm"
+        className="!h-8 !w-8"
+        profileHref={`/community/profile/${encodeURIComponent(person.id)}`}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium">{person.name}</p>
+        <p className="truncate text-[11px] text-muted-foreground">@{person.handle}</p>
+        {showReason && person.reasonLabel ? (
+          <p className="truncate text-[10px] text-muted-foreground/85">{person.reasonLabel}</p>
+        ) : null}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        className="h-7 shrink-0 px-2 text-xs"
+        variant={alreadyFollowing ? "secondary" : "outline"}
+        disabled={!hasUser || isSelf || busy || (waitFollowees && !alreadyFollowing) || alreadyFollowing}
+        onClick={onFollow}
+      >
+        {!hasUser
+          ? "Follow"
+          : busy || (waitFollowees && !alreadyFollowing)
+            ? "…"
+            : alreadyFollowing
+              ? "Following"
+              : isSelf
+                ? "You"
+                : "Follow"}
+      </Button>
+    </li>
+  );
+}
 
 function initialFeedComposerOpen(): boolean {
   if (typeof window === "undefined") return true;
@@ -101,10 +169,9 @@ export default function CommunityHomePage() {
   const [peopleResults, setPeopleResults] = useState<
     Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
   >([]);
-  const [suggested, setSuggested] = useState<
-    Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
-  >([]);
+  const [suggested, setSuggested] = useState<FollowSuggestion[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
+  const [suggestedOpen, setSuggestedOpen] = useState(false);
   const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
   /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
@@ -313,62 +380,27 @@ export default function CommunityHomePage() {
     return () => window.clearTimeout(t);
   }, [peopleOpen, peopleQuery]);
 
+  const loadSuggestedPeople = useCallback(async () => {
+    if (!user?.id) return;
+    setSuggestedLoading(true);
+    const res = await fetchFollowSuggestions(user.id, 12);
+    if (!res.error) setSuggested(res.data);
+    else setSuggested([]);
+    setSuggestedLoading(false);
+  }, [user?.id]);
+
   useEffect(() => {
     if (!peopleOpen) return;
     if (!user?.id) return;
     if (suggestedLoading || suggested.length > 0) return;
-    setSuggestedLoading(true);
-    void (async () => {
-      const [pageRes, followingRes] = await Promise.all([
-        fetchCommunityPostsPage(50, null),
-        listFolloweeIdsForCurrentUser(),
-      ]);
-      if (pageRes.error || followingRes.error) {
-        setSuggestedLoading(false);
-        return;
-      }
-      const followeeSet = new Set(followingRes.ids);
-      const ids: string[] = [];
-      for (const p of pageRes.data ?? []) {
-        const id = String(p.author_id);
-        if (!id || id === user.id) continue;
-        if (followeeSet.has(id)) continue;
-        if (!ids.includes(id)) ids.push(id);
-        if (ids.length >= 12) break;
-      }
-      if (ids.length === 0) {
-        setSuggested([]);
-        setSuggestedLoading(false);
-        return;
-      }
-      const profiles = await getProfilesByIds(ids);
-      const out = ids
-        .map((id) => {
-          const pr = profiles.get(id);
-          const handle = (pr?.public_handle ?? "").trim();
-          const isPublic = pr?.is_public !== false;
-          if (!handle || !isPublic) return null;
-          return {
-            id,
-            name: pr?.full_name?.trim() || shortId(id),
-            avatar_url: pr?.avatar_url ?? null,
-            handle,
-          };
-        })
-        .filter((x): x is NonNullable<typeof x> => Boolean(x))
-        .slice(0, 6);
-      setSuggested(out);
-      setSuggestedLoading(false);
-    })();
-  }, [peopleOpen, user?.id, suggestedLoading, suggested.length]);
+    void loadSuggestedPeople();
+  }, [peopleOpen, user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
-  // Lightweight discovery: show suggested profiles on Following even before opening "Find people".
-  // Deferred until idle so the main feed load is not competing for bandwidth on weak WiFi.
+  // Discovery on Following tab — deferred until idle so the feed load is not competing on weak WiFi.
   useEffect(() => {
     if (!user?.id) return;
     if (feedTab !== "following") return;
     if (suggestedLoading || suggested.length > 0) return;
-    // Avoid suggestions while user is actively searching or using Saved.
     if (savedOnly || feedSearch.trim()) return;
 
     let cancelled = false;
@@ -377,51 +409,7 @@ export default function CommunityHomePage() {
 
     const load = () => {
       if (cancelled) return;
-      setSuggestedLoading(true);
-      void (async () => {
-        const [pageRes, followingRes] = await Promise.all([
-          fetchCommunityPostsPage(50, null),
-          listFolloweeIdsForCurrentUser(),
-        ]);
-        if (cancelled) return;
-        if (pageRes.error || followingRes.error) {
-          setSuggestedLoading(false);
-          return;
-        }
-        const followeeSet = new Set(followingRes.ids);
-        const ids: string[] = [];
-        for (const p of pageRes.data ?? []) {
-          const id = String(p.author_id);
-          if (!id || id === user.id) continue;
-          if (followeeSet.has(id)) continue;
-          if (!ids.includes(id)) ids.push(id);
-          if (ids.length >= 12) break;
-        }
-        if (ids.length === 0) {
-          setSuggested([]);
-          setSuggestedLoading(false);
-          return;
-        }
-        const profiles = await getProfilesByIds(ids);
-        if (cancelled) return;
-        const out = ids
-          .map((id) => {
-            const pr = profiles.get(id);
-            const handle = (pr?.public_handle ?? "").trim();
-            const isPublic = pr?.is_public !== false;
-            if (!handle || !isPublic) return null;
-            return {
-              id,
-              name: pr?.full_name?.trim() || shortId(id),
-              avatar_url: pr?.avatar_url ?? null,
-              handle,
-            };
-          })
-          .filter((x): x is NonNullable<typeof x> => Boolean(x))
-          .slice(0, 6);
-        setSuggested(out);
-        setSuggestedLoading(false);
-      })();
+      void loadSuggestedPeople();
     };
 
     if (typeof window.requestIdleCallback === "function") {
@@ -435,7 +423,7 @@ export default function CommunityHomePage() {
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [user?.id, feedTab, savedOnly, feedSearch, suggestedLoading, suggested.length]);
+  }, [user?.id, feedTab, savedOnly, feedSearch, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
   async function handleFollow(id: string) {
     if (!user?.id) {
@@ -531,12 +519,12 @@ export default function CommunityHomePage() {
       ) : null}
 
       <Dialog open={peopleOpen} onOpenChange={setPeopleOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90dvh,32rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="shrink-0 space-y-1 px-6 pt-6 pb-2 text-left">
             <DialogTitle>Find people</DialogTitle>
             <DialogDescription>Search by handle (e.g. @ollie). We’ll suggest matches as you type.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="shrink-0 px-6 pb-3">
             <Input
               value={peopleQuery}
               onChange={(e) => setPeopleQuery(e.target.value)}
@@ -544,120 +532,65 @@ export default function CommunityHomePage() {
               aria-label="Search people by handle"
               data-testid="input-find-people"
             />
-
-            {peopleQuery.trim() ? (
-              <>
-                {peopleLoading ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
-                {peopleError ? <p className="text-sm text-destructive">{peopleError}</p> : null}
-                {!peopleLoading && !peopleError && peopleResults.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No matches.</p>
-                ) : null}
-                {peopleResults.length > 0 ? (
-                  <ul className="space-y-2">
-                    {peopleResults.map((p) => {
-                      const isSelf = Boolean(user?.id && p.id === user.id);
-                      const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
-                      const busy = Boolean(followBusyIds[p.id]);
-                      const waitFollowees = Boolean(user?.id && followeesLoading);
-                      return (
-                        <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
-                          <CommunityAuthorAvatar
-                            displayName={p.name}
-                            avatarPath={p.avatar_url}
-                            size="sm"
-                            profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{p.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={alreadyFollowing ? "secondary" : "outline"}
-                            disabled={
-                              !user ||
-                              isSelf ||
-                              busy ||
-                              (waitFollowees && !alreadyFollowing) ||
-                              alreadyFollowing
-                            }
-                            onClick={() => void handleFollow(p.id)}
-                          >
-                            {!user
-                              ? "Follow"
-                              : busy || (waitFollowees && !alreadyFollowing)
-                                ? "…"
-                                : alreadyFollowing
-                                  ? "Following"
-                                  : isSelf
-                                    ? "You"
-                                    : "Follow"}
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Suggested</p>
-                  {suggestedLoading ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
-                </div>
-                {suggested.length === 0 && !suggestedLoading ? (
-                  <p className="text-sm text-muted-foreground">No suggestions yet.</p>
-                ) : null}
-                {suggested.length > 0 ? (
-                  <ul className="space-y-2">
-                    {suggested.map((p) => {
-                      const isSelf = Boolean(user?.id && p.id === user.id);
-                      const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
-                      const busy = Boolean(followBusyIds[p.id]);
-                      const waitFollowees = Boolean(user?.id && followeesLoading);
-                      return (
-                        <li key={p.id} className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3">
-                          <CommunityAuthorAvatar
-                            displayName={p.name}
-                            avatarPath={p.avatar_url}
-                            size="sm"
-                            profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{p.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">@{p.handle}</p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={alreadyFollowing ? "secondary" : "outline"}
-                            disabled={
-                              !user ||
-                              isSelf ||
-                              busy ||
-                              (waitFollowees && !alreadyFollowing) ||
-                              alreadyFollowing
-                            }
-                            onClick={() => void handleFollow(p.id)}
-                          >
-                            {!user
-                              ? "Follow"
-                              : busy || (waitFollowees && !alreadyFollowing)
-                                ? "…"
-                                : alreadyFollowing
-                                  ? "Following"
-                                  : isSelf
-                                    ? "You"
-                                    : "Follow"}
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </>
-            )}
+          </div>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
+            data-testid="find-people-scroll"
+          >
+            <div className="space-y-3 pr-1">
+              {peopleQuery.trim() ? (
+                <>
+                  {peopleLoading ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
+                  {peopleError ? <p className="text-sm text-destructive">{peopleError}</p> : null}
+                  {!peopleLoading && !peopleError && peopleResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No matches.</p>
+                  ) : null}
+                  {peopleResults.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {peopleResults.map((p) => (
+                        <FindPeoplePersonRow
+                          key={p.id}
+                          person={p}
+                          isSelf={Boolean(user?.id && p.id === user.id)}
+                          alreadyFollowing={Boolean(user?.id && followeeIds.has(p.id))}
+                          busy={Boolean(followBusyIds[p.id])}
+                          waitFollowees={Boolean(user?.id && followeesLoading)}
+                          hasUser={Boolean(user?.id)}
+                          onFollow={() => void handleFollow(p.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">Suggested for you</p>
+                    {suggestedLoading ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
+                  </div>
+                  {suggested.length === 0 && !suggestedLoading ? (
+                    <p className="text-sm text-muted-foreground">No suggestions yet.</p>
+                  ) : null}
+                  {suggested.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {suggested.map((p) => (
+                        <FindPeoplePersonRow
+                          key={p.id}
+                          person={p}
+                          showReason
+                          isSelf={Boolean(user?.id && p.id === user.id)}
+                          alreadyFollowing={Boolean(user?.id && followeeIds.has(p.id))}
+                          busy={Boolean(followBusyIds[p.id])}
+                          waitFollowees={Boolean(user?.id && followeesLoading)}
+                          hasUser={Boolean(user?.id)}
+                          onFollow={() => void handleFollow(p.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -978,56 +911,91 @@ export default function CommunityHomePage() {
       </div>
 
       {feedTab === "following" && !savedOnly && !feedSearch.trim() && (suggestedLoading || suggested.length > 0) ? (
-        <Card variant="glass" className="overflow-hidden" data-testid="card-feed-suggested-following">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold">Suggested people</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => setPeopleOpen(true)}>
-                Find more
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {suggestedLoading ? (
-              <p className="text-xs text-muted-foreground">Loading…</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {suggested.slice(0, 3).map((p) => {
+        <Collapsible
+          open={suggestedOpen}
+          onOpenChange={setSuggestedOpen}
+          className="rounded-xl border border-border/40 bg-muted/15"
+          data-testid="card-feed-suggested-following"
+        >
+          <div className="flex items-center gap-0.5 pr-1">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-l-xl px-3 py-2 text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-expanded={suggestedOpen}
+              >
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    suggestedOpen && "rotate-180",
+                  )}
+                  aria-hidden
+                />
+                <span className="truncate text-xs font-medium">Suggested for you</span>
+                {suggestedLoading ? (
+                  <span className="text-[10px] text-muted-foreground">Loading…</span>
+                ) : suggested.length > 0 ? (
+                  <span className="rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                    {Math.min(3, suggested.length)}
+                  </span>
+                ) : null}
+              </button>
+            </CollapsibleTrigger>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-xs"
+              onClick={() => setPeopleOpen(true)}
+            >
+              Find people
+            </Button>
+          </div>
+          <CollapsibleContent>
+            <div className="space-y-1 border-t border-border/35 px-2 pb-2 pt-1">
+              {suggestedLoading ? (
+                <p className="px-1 py-1 text-[11px] text-muted-foreground">Finding people you may know…</p>
+              ) : (
+                suggested.slice(0, 3).map((p) => {
                   const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
                   const busy = Boolean(followBusyIds[p.id]);
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/60 px-3 py-2"
+                      className="flex items-center justify-between gap-2 rounded-lg px-1 py-1"
                     >
-                      <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/community/profile/${encodeURIComponent(p.id)}`}
+                        className="flex min-w-0 flex-1 items-center gap-2"
+                      >
                         <CommunityAuthorAvatar
                           displayName={p.name}
                           avatarPath={p.avatar_url ?? null}
                           size="sm"
-                          profileHref={`/community/profile/${encodeURIComponent(p.id)}`}
+                          className="!h-7 !w-7"
                         />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{p.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">@{p.handle}</p>
+                          <p className="truncate text-xs font-medium leading-tight">{p.name}</p>
+                          <p className="truncate text-[10px] text-muted-foreground">@{p.handle}</p>
                         </div>
-                      </div>
+                      </Link>
                       <Button
                         type="button"
                         size="sm"
+                        className="h-6 shrink-0 px-2 text-[11px]"
                         variant={alreadyFollowing ? "secondary" : "outline"}
                         disabled={alreadyFollowing || busy}
                         onClick={() => void handleFollow(p.id)}
                       >
-                        {alreadyFollowing ? "Following" : busy ? "Following…" : "Follow"}
+                        {alreadyFollowing ? "Following" : busy ? "…" : "Follow"}
                       </Button>
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                })
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       ) : null}
 
       {!isMobile ? (

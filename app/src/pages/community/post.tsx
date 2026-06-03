@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { FeedPostCard } from "@/components/community/feed-post-card";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -51,14 +51,14 @@ import {
 } from "@/lib/community";
 import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
 import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
-import { getProfilesByIds } from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase";
-
-function shortId(id: string) {
-  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
-
-type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null };
+import {
+  authorMetaFromPostPreview,
+  authorIdsNeedingProfileFetch,
+  displayAuthorName,
+  fetchAuthorMetaMap,
+  type FeedAuthorMeta,
+} from "@/lib/community/feed-author-meta";
 
 export default function CommunityPostPage() {
   const [, params] = useRoute("/community/post/:postId");
@@ -72,7 +72,7 @@ export default function CommunityPostPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
+  const [authorMeta, setAuthorMeta] = useState<Record<string, FeedAuthorMeta>>({});
   const [expanded, setExpanded] = useState(true);
   const [comments, setComments] = useState<CommunityPostCommentRow[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
@@ -143,6 +143,13 @@ export default function CommunityPostPage() {
     void loadComments();
   }, [post?.id, loadComments]);
 
+  useLayoutEffect(() => {
+    if (!post) return;
+    const seeded = authorMetaFromPostPreview(post);
+    if (!seeded) return;
+    setAuthorMeta((old) => ({ ...old, [post.author_id]: seeded }));
+  }, [post]);
+
   useEffect(() => {
     if (!post) {
       setAuthorMeta({});
@@ -150,29 +157,25 @@ export default function CommunityPostPage() {
     }
     const ids = new Set<string>([post.author_id]);
     for (const c of comments) ids.add(c.author_id);
-    const list = [...ids];
+    const list = authorIdsNeedingProfileFetch(ids, post ? [post] : [], beatieFeedBotUserId);
+    if (list.length === 0 && !(beatieFeedBotUserId && ids.has(beatieFeedBotUserId))) return;
     let cancelled = false;
     void (async () => {
-      const map = await getProfilesByIds(list);
+      const fetched = await fetchAuthorMetaMap([...ids], post ? [post] : [], beatieFeedBotUserId);
       if (cancelled) return;
-      const next: Record<string, AuthorMeta> = {};
-      for (const id of list) {
-        const prof = map.get(id);
-        next[id] = {
-          name: prof?.full_name?.trim() || shortId(id),
-          avatar_url: prof?.avatar_url ?? null,
-          public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
-        };
-      }
-      setAuthorMeta(next);
+      setAuthorMeta((old) => ({ ...old, ...fetched }));
     })();
     return () => {
       cancelled = true;
     };
-  }, [post, comments]);
+  }, [post, comments, beatieFeedBotUserId]);
 
-  function metaFor(authorId: string): AuthorMeta {
-    return authorMeta[authorId] ?? { name: shortId(authorId), avatar_url: null, public_handle: null };
+  function metaFor(authorId: string): FeedAuthorMeta {
+    const m = authorMeta[authorId];
+    if (m) {
+      return { ...m, name: displayAuthorName(m, authorId, beatieFeedBotUserId) };
+    }
+    return { name: "", avatar_url: null, public_handle: null, loading: true };
   }
 
   async function handleToggleLike(pid: string, currentlyLiked: boolean) {
@@ -382,6 +385,7 @@ export default function CommunityPostPage() {
         post={post}
         viewerId={user?.id}
         authorDisplayName={m.name}
+        authorLoading={Boolean(m.loading)}
         authorPublicHandle={m.public_handle}
         authorAvatarPath={m.avatar_url}
         expanded={expanded}

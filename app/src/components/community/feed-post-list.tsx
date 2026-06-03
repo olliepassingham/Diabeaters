@@ -49,7 +49,6 @@ import {
   togglePostSave,
   updateCommunityPost,
   shouldUseFeedServerSearch,
-  type CommunityPostAuthorPreview,
   type CommunityPostCommentRow,
   type CommunityPostRow,
   type CommunityTopicId,
@@ -57,38 +56,19 @@ import {
   type FeedCursor,
 } from "@/lib/community";
 import { requestAiFeedReply } from "@/lib/ai-feed-reply/client";
-import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getBeatieFeedBotUserIdFromEnv } from "@/lib/ai-feed-reply/config";
-import { getProfilesByIds } from "@/lib/profile";
+import {
+  authorMetaFromPostPreview,
+  authorIdsNeedingProfileFetch,
+  displayAuthorName,
+  fetchAuthorMetaMap,
+  type FeedAuthorMeta,
+} from "@/lib/community/feed-author-meta";
 import {
   buildCommunityFeedQueryKey,
   COMMUNITY_FEED_STALE_MS,
   getCommunityFeedNextPageParam,
 } from "@/lib/community-feed-cache";
-
-type AuthorMeta = { name: string; avatar_url: string | null; public_handle: string | null; loading?: boolean };
-
-function authorMetaFromPostPreview(post: CommunityPostRow): AuthorMeta | null {
-  const prev = post.author_preview;
-  if (!prev) return null;
-  return authorMetaFromPreviewFields(post.author_id, prev);
-}
-
-function authorMetaFromPreviewFields(authorId: string, prev: CommunityPostAuthorPreview): AuthorMeta {
-  const name =
-    prev.full_name?.trim() ||
-    (prev.public_handle ? `@${prev.public_handle}` : "") ||
-    shortId(authorId);
-  return {
-    name,
-    avatar_url: prev.avatar_url,
-    public_handle: prev.public_handle,
-  };
-}
-
-function shortId(id: string) {
-  return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
 
 function mapPostRowsInInfiniteData(
   old: InfiniteData<CommunityPostRow[]> | undefined,
@@ -163,7 +143,7 @@ export function FeedPostList(props: {
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const pullAnchorRef = useRef<HTMLDivElement>(null);
 
-  const [authorMeta, setAuthorMeta] = useState<Record<string, AuthorMeta>>({});
+  const [authorMeta, setAuthorMeta] = useState<Record<string, FeedAuthorMeta>>({});
   const [authorMetaPending, setAuthorMetaPending] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, CommunityPostCommentRow[]>>({});
@@ -395,41 +375,17 @@ export function FeedPostList(props: {
     for (const arr of Object.values(commentsByPost)) {
       for (const c of arr) ids.add(c.author_id);
     }
-    const list = [...ids].filter((id) => {
-      const fromPost = posts.find((p) => p.author_id === id)?.author_preview;
-      if (fromPost?.full_name?.trim() || fromPost?.public_handle?.trim()) return false;
-      return true;
-    });
-    if (list.length === 0) {
+    const list = authorIdsNeedingProfileFetch(ids, postsRef.current, beatieFeedBotUserId);
+    if (list.length === 0 && !(beatieFeedBotUserId && ids.has(beatieFeedBotUserId))) {
       setAuthorMetaPending(false);
       return;
     }
     let cancelled = false;
     setAuthorMetaPending(true);
     void (async () => {
-      const map = await getProfilesByIds(list);
+      const fetched = await fetchAuthorMetaMap([...ids], postsRef.current, beatieFeedBotUserId);
       if (cancelled) return;
-      const next: Record<string, AuthorMeta> = {};
-      for (const id of list) {
-        const prof = map.get(id);
-        if (beatieFeedBotUserId && id === beatieFeedBotUserId) {
-          next[id] = {
-            name: AI_ASSISTANT_NAME,
-            avatar_url: prof?.avatar_url ?? null,
-            public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
-          };
-          continue;
-        }
-        const postPreview = postsRef.current.find((p) => p.author_id === id)?.author_preview;
-        next[id] = postPreview
-          ? authorMetaFromPreviewFields(id, postPreview)
-          : {
-              name: prof?.full_name?.trim() || shortId(id),
-              avatar_url: prof?.avatar_url ?? null,
-              public_handle: prof?.public_handle?.trim() ? prof.public_handle.trim() : null,
-            };
-      }
-      setAuthorMeta(next);
+      setAuthorMeta((old) => ({ ...old, ...fetched }));
       setAuthorMetaPending(false);
     })();
     return () => {
@@ -437,19 +393,24 @@ export function FeedPostList(props: {
     };
   }, [posts, commentsByPost, beatieFeedBotUserId]);
 
-  function metaFor(authorId: string): AuthorMeta {
+  function metaFor(authorId: string): FeedAuthorMeta {
     if (beatieFeedBotUserId && authorId === beatieFeedBotUserId) {
       const m = authorMeta[authorId];
-      if (m) return { ...m, name: AI_ASSISTANT_NAME };
+      if (m) return m;
       if (authorMetaPending) {
-        return { name: AI_ASSISTANT_NAME, avatar_url: null, public_handle: null, loading: true };
+        return { name: "", avatar_url: null, public_handle: null, loading: true };
       }
-      return { name: AI_ASSISTANT_NAME, avatar_url: null, public_handle: null };
+      return { name: "", avatar_url: null, public_handle: null };
     }
     const m = authorMeta[authorId];
-    if (m) return m;
+    if (m) {
+      return {
+        ...m,
+        name: displayAuthorName(m, authorId, beatieFeedBotUserId),
+      };
+    }
     if (authorMetaPending) return { name: "", avatar_url: null, public_handle: null, loading: true };
-    return { name: shortId(authorId), avatar_url: null, public_handle: null };
+    return { name: "", avatar_url: null, public_handle: null, loading: true };
   }
 
   const displayPosts = useMemo(() => {
@@ -800,12 +761,13 @@ export function FeedPostList(props: {
         <div className="space-y-2.5 sm:space-y-3">
           {displayPosts.map((post) => {
             const m = metaFor(post.author_id);
+            const authorDisplayName = displayAuthorName(m, post.author_id, beatieFeedBotUserId);
             return (
               <FeedPostCard
                 key={post.id}
                 post={post}
                 viewerId={props.viewerId}
-                authorDisplayName={m.name}
+                authorDisplayName={authorDisplayName}
                 authorLoading={Boolean(m.loading)}
                 authorPublicHandle={m.public_handle}
                 authorAvatarPath={m.avatar_url}
@@ -828,10 +790,7 @@ export function FeedPostList(props: {
                 onSubmitComment={() => void onSubmitComment(post.id)}
                 onReportPost={() => openReport("post", post.id)}
                 onReportComment={(commentId) => openReport("comment", commentId)}
-                commentMeta={(authorId) => {
-                  const cm = metaFor(authorId);
-                  return { name: cm.name, avatar_url: cm.avatar_url };
-                }}
+                commentMeta={metaFor}
                 isAuthor={Boolean(props.viewerId && props.viewerId === post.author_id)}
                 onMenuEdit={() => openEditPost(post.id)}
                 onMenuDelete={() => openDeletePost(post.id)}

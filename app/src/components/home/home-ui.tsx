@@ -80,6 +80,8 @@ export type HomeQuickAction = {
   variant?: "primary" | "outline";
   testId?: string;
   className?: string;
+  /** Soft primary halo (home Ask Beatie). */
+  glow?: boolean;
 };
 
 export function HomeQuickActions({
@@ -100,9 +102,10 @@ export function HomeQuickActions({
       {actions.map((action) => {
         const Icon = action.icon;
         const isPrimary = action.variant === "primary";
+        const gridClass = isPrimary ? "col-span-2 sm:col-span-1" : undefined;
         const btnClass = cn(
-          "min-h-11 rounded-2xl w-full",
-          isPrimary && "font-semibold tracking-tight col-span-2 sm:col-span-1",
+          "min-h-11 w-full rounded-2xl shadow-none",
+          isPrimary && "font-semibold tracking-tight",
           action.className,
         );
         const content = (
@@ -112,23 +115,12 @@ export function HomeQuickActions({
           </>
         );
 
-        if (action.href) {
-          return (
-            <Button
-              key={action.id}
-              asChild
-              variant={isPrimary ? "default" : "outline"}
-              className={btnClass}
-              data-testid={action.testId}
-            >
-              <Link href={action.href}>{content}</Link>
-            </Button>
-          );
-        }
-
-        return (
+        const button = action.href ? (
+          <Button asChild variant={isPrimary ? "default" : "outline"} className={btnClass} data-testid={action.testId}>
+            <Link href={action.href}>{content}</Link>
+          </Button>
+        ) : (
           <Button
-            key={action.id}
             type="button"
             variant={isPrimary ? "default" : "outline"}
             className={btnClass}
@@ -137,6 +129,24 @@ export function HomeQuickActions({
           >
             {content}
           </Button>
+        );
+
+        if (action.glow) {
+          return (
+            <div
+              key={action.id}
+              className={cn("coach-entry-glow w-full rounded-2xl", gridClass)}
+              data-testid={action.testId ? `${action.testId}-glow` : undefined}
+            >
+              {button}
+            </div>
+          );
+        }
+
+        return (
+          <div key={action.id} className={cn("w-full", gridClass)}>
+            {button}
+          </div>
         );
       })}
     </div>

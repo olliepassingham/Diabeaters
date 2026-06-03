@@ -171,6 +171,7 @@ export function SupporterQuickActions({
       icon: MessageCircle,
       href: "/coach?audience=supporter",
       variant: "primary",
+      glow: true,
       testId: "link-carer-coach-open",
     });
   }
