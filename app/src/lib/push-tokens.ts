@@ -3,6 +3,7 @@ import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
+import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
 import {
   getNativePushPlatform,
   isNativePushPlatform,
@@ -244,9 +245,10 @@ function attachPushListeners(
     console.warn("[push_tokens] registration error:", err);
   });
 
-  PushNotifications.addListener("pushNotificationReceived", () => {
+  PushNotifications.addListener("pushNotificationReceived", (notification) => {
     writePushDiag({ state: "push_received_foreground", platform });
     scheduleNativeAppBadgeSync();
+    void presentAudiblePushNotificationFromRemote(notification);
   });
 
   pushListenersBound = true;

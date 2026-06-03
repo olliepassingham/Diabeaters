@@ -50,21 +50,22 @@ export async function showNativeSystemNotificationNow(params: {
   const id = hashToInt32(params.tag?.trim() || `${params.title}|${params.body}`);
   const at = new Date(Date.now() + 1_000);
 
+  const notification = {
+    id,
+    title: params.title,
+    body: params.body,
+    schedule: { at },
+    channelId: params.channelId ?? "diabeaters_general",
+    extra: {
+      deep_link: params.deepLink ?? null,
+      tag: params.tag ?? null,
+    },
+    ...(Capacitor.getPlatform() === "ios" ? { sound: "default" as const } : {}),
+  };
+
   try {
     await LocalNotifications.schedule({
-      notifications: [
-        {
-          id,
-          title: params.title,
-          body: params.body,
-          schedule: { at },
-          channelId: params.channelId ?? "diabeaters_general",
-          extra: {
-            deep_link: params.deepLink ?? null,
-            tag: params.tag ?? null,
-          },
-        },
-      ],
+      notifications: [notification],
     });
     return { shown: true, permission: "granted" };
   } catch {

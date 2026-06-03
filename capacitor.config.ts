@@ -18,13 +18,14 @@ const config: CapacitorConfig = {
     url: "https://diabeaters.vercel.app",
     cleartext: false,
   },
-  /**
-   * iOS: show notification banners/sounds while the app is open.
-   * Without this, iOS can suppress foreground presentation which makes it feel “broken”.
-   */
   plugins: {
+    /**
+     * iOS foreground remote pushes are re-posted as local notifications with sound
+     * (`presentAudiblePushNotificationFromRemote` in push-tokens.ts) because Capacitor’s
+     * remote handler often lands in Notification Centre without playing audio.
+     */
     PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
+      presentationOptions: [],
     },
     // Local notifications use the same iOS presentation mechanism.
     LocalNotifications: {

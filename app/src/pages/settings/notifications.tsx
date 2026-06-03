@@ -58,9 +58,12 @@ export function NotificationsTab({
           </p>
           {isNativePushPlatform() && notifSettings.pushNotifications ? (
             <p className="text-small text-muted-foreground pt-1">
-              For banners and lock screen alerts, open your {nativePlatformLabel()} notification settings for
-              Diabeaters and turn on <span className="font-medium text-foreground">Lock Screen</span> and{" "}
-              <span className="font-medium text-foreground">Banners</span>.
+              For audible alerts, open {nativePlatformLabel()} Settings → Notifications → Diabeaters and turn on{" "}
+              <span className="font-medium text-foreground">Sounds</span>,{" "}
+              <span className="font-medium text-foreground">Banners</span>, and{" "}
+              <span className="font-medium text-foreground">Lock Screen</span>. On iPhone, turn off{" "}
+              <span className="font-medium text-foreground">Deliver Quietly</span> for Diabeaters and make sure the
+              side mute switch is off (no orange visible).
             </p>
           ) : null}
         </div>
