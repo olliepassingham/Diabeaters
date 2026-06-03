@@ -75,7 +75,7 @@ export function FeedComposerSheet({
         <CommunityFeedComposerDrawerLazy open={open} onOpenChange={onOpenChange}>
           <form
             onSubmit={onSubmit}
-            className="space-y-3 pb-2 text-foreground"
+            className="min-w-0 space-y-3 pb-2 text-foreground"
             data-testid={formTestId}
           >
             <FeedComposerFormBody {...formBodyProps} />

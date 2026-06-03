@@ -181,8 +181,8 @@ export function FeedComposerFormBody({
         </div>
       ) : null}
       {composerPostKind === "event" ? (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 text-foreground">
-          <div className="space-y-1">
+        <div className="min-w-0 overflow-hidden space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 text-foreground">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor="feed-event-title">Event name</Label>
             <Input
               id="feed-event-title"
@@ -193,7 +193,7 @@ export function FeedComposerFormBody({
               maxLength={500}
             />
           </div>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor="feed-event-start">Starts</Label>
             <Input
               id="feed-event-start"
@@ -201,10 +201,10 @@ export function FeedComposerFormBody({
               value={eventStartsAt}
               onChange={(e) => setEventStartsAt(e.target.value)}
               disabled={submitting || !user || !canComposeToFeed}
-              className="text-foreground dark:[color-scheme:dark]"
+              className="feed-datetime-input min-w-0 max-w-full text-sm text-foreground dark:[color-scheme:dark]"
             />
           </div>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor="feed-event-loc">Location (optional)</Label>
             <Input
               id="feed-event-loc"
@@ -215,7 +215,7 @@ export function FeedComposerFormBody({
               maxLength={500}
             />
           </div>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             <Label htmlFor="feed-event-details">Details (optional)</Label>
             <Textarea
               id="feed-event-details"
@@ -230,7 +230,7 @@ export function FeedComposerFormBody({
           </div>
         </div>
       ) : null}
-      <div className="space-y-1.5">
+      <div className="min-w-0 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-sm font-medium text-foreground">Post</Label>
           <InlineInfoHint ariaLabel="Who can see this?" content={audienceInfo} />
@@ -242,10 +242,10 @@ export function FeedComposerFormBody({
           hideHint={false}
           placeholder={
             composerPostKind === "poll"
-              ? "Optional intro before the poll… Type @ to mention."
+              ? "Optional intro before the poll…"
               : composerPostKind === "event"
-                ? "Optional intro before the event… Type @ to mention."
-                : "Share something on the feed… Type @ to mention someone."
+                ? "Optional intro before the event…"
+                : "Share something on the feed…"
           }
           rows={3}
           maxLength={8000}
