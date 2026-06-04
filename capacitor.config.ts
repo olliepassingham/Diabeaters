@@ -28,10 +28,21 @@ const config: CapacitorConfig = {
     LocalNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
+    /** Android only — excluded from iOS via `ios.includePlugins` (badge-only permission broke alerts). */
     Badge: {
       persist: false,
       autoClear: false,
     },
+  },
+  ios: {
+    includePlugins: [
+      "@capacitor/app",
+      "@capacitor/camera",
+      "@capacitor/haptics",
+      "@capacitor/local-notifications",
+      "@capacitor/push-notifications",
+      "@capacitor/status-bar",
+    ],
   },
 };
 

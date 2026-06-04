@@ -1,10 +1,20 @@
+import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { isPushTestUiEnabled } from "@/lib/flags";
+import {
+  ensureNativeLocalNotificationPermission,
+} from "@/lib/native-local-notifications";
 import { isNativePushPlatform, isNativeShellForPushTestUi, nativePlatformLabel } from "@/lib/native-platform";
+import {
+  NotificationSettings,
+  notificationSettingsLookHealthy,
+  type NotificationSettingsSnapshot,
+} from "@/lib/notification-settings-native";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
 import { getPushRegistrationDebugSnapshot } from "@/lib/push-tokens";
@@ -54,6 +64,8 @@ export function DevPushNotificationTestPanel() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [pushDebugJson, setPushDebugJson] = useState<string>("");
+  const [iosNotifSettings, setIosNotifSettings] = useState<NotificationSettingsSnapshot | null>(null);
+  const [localCountdown, setLocalCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     setUnlocked(isPushTestUiUnlocked());
@@ -71,11 +83,20 @@ export function DevPushNotificationTestPanel() {
       } catch {
         setPushDebugJson("{}");
       }
+      if (Capacitor.getPlatform() === "ios") {
+        try {
+          setIosNotifSettings(await NotificationSettings.getSettings());
+        } catch {
+          setIosNotifSettings(null);
+        }
+      }
     };
     void tick();
     const id = window.setInterval(() => void tick(), 2000);
     return () => clearInterval(id);
   }, [showPanel]);
+
+  const iosHealth = notificationSettingsLookHealthy(iosNotifSettings);
 
   if (!showPanel) return null;
 
@@ -146,6 +167,64 @@ export function DevPushNotificationTestPanel() {
     }
   };
 
+  const runLocalAfterDelay = (seconds: number) => {
+    if (busy || localCountdown != null) return;
+    void (async () => {
+      const granted = await ensureNativeLocalNotificationPermission();
+      if (!granted) {
+        toast({
+          title: "Local notification permission needed",
+          description: "Enable notifications in app settings, then try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setBusy(true);
+      toast({
+        title: `Local alert in ${seconds}s`,
+        description: "Press Home and lock the phone now. This tests iOS only (no server).",
+      });
+      let remaining = seconds;
+      setLocalCountdown(remaining);
+      const tick = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) {
+          setLocalCountdown(remaining);
+          return;
+        }
+        window.clearInterval(tick);
+        setLocalCountdown(null);
+        void (async () => {
+          try {
+            await LocalNotifications.schedule({
+              notifications: [
+                {
+                  id: 9_900_001,
+                  title: "Diabeaters local test",
+                  body: "If you see this on the lock screen, iOS alerts work on this phone.",
+                  sound: "default",
+                  schedule: { at: new Date(Date.now() + 250) },
+                },
+              ],
+            });
+            toast({
+              title: "Local alert scheduled",
+              description: "Check lock screen / Notification Centre in a moment.",
+            });
+          } catch (e) {
+            toast({
+              title: "Local alert failed",
+              description: e instanceof Error ? e.message : String(e),
+              variant: "destructive",
+            });
+          } finally {
+            setBusy(false);
+          }
+        })();
+      }, 1000);
+    })();
+  };
+
   const runAfterDelay = (seconds: number) => {
     if (busy || countdown != null) return;
     setBusy(true);
@@ -189,12 +268,45 @@ export function DevPushNotificationTestPanel() {
         <strong className="text-foreground/85">Push notifications</strong> above, a row in{" "}
         <code className="text-[11px]">push_tokens</code>, and APNs/FCM secrets on the project.
       </p>
+      {Capacitor.getPlatform() === "ios" ? (
+        <div
+          className={`rounded-md border p-2 text-xs leading-snug ${
+            iosHealth.ok
+              ? "border-emerald-700/40 bg-emerald-950/20 text-muted-foreground"
+              : "border-destructive/50 bg-destructive/10 text-foreground"
+          }`}
+        >
+          <p className="font-semibold text-foreground/90">iOS notification channels</p>
+          {iosNotifSettings ? (
+            <ul className="mt-1 list-disc pl-4 space-y-0.5">
+              <li>Authorization: {iosNotifSettings.authorizationStatus}</li>
+              <li>Alerts/banners: {iosNotifSettings.alertSetting}</li>
+              <li>Lock Screen: {iosNotifSettings.lockScreenSetting}</li>
+              <li>Notification Centre: {iosNotifSettings.notificationCenterSetting}</li>
+              <li>Sounds: {iosNotifSettings.soundSetting}</li>
+            </ul>
+          ) : (
+            <p className="mt-1">Install TestFlight build <strong>1.0.5+</strong> to read channel settings here.</p>
+          )}
+          {!iosHealth.ok ? (
+            <p className="mt-2 text-destructive font-medium">{iosHealth.issues.join(" ")}</p>
+          ) : null}
+          {!iosHealth.ok ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="mt-2 h-7 text-[10px]"
+              onClick={() => void NotificationSettings.openAppSettings().catch(() => undefined)}
+            >
+              Open iOS Settings for Diabeaters
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <p className="text-xs text-muted-foreground leading-snug">
-        <strong className="text-foreground/85">Lock-screen test:</strong> tapping Send while the app is open often
-        will not show a banner on the lock screen (iOS delivers to the foreground app). Use{" "}
-        <strong className="text-foreground/85">Send in 5s</strong>, press Home immediately, then wait for the alert
-        and sound. TestFlight build <strong className="text-foreground/85">1.0.4 (5)</strong> or newer is required for
-        reliable sound while the app is open.
+        <strong className="text-foreground/85">Step 1:</strong> tap <strong className="text-foreground/85">Local in 5s</strong>, press Home, wait — if nothing appears, fix iOS Settings (or delete &amp; reinstall the app).{" "}
+        <strong className="text-foreground/85">Step 2:</strong> <strong className="text-foreground/85">Send in 5s (background)</strong> tests the server/APNs path. Build <strong className="text-foreground/85">1.0.5+</strong> removes the badge plugin that broke alerts.
       </p>
       <div className="rounded-md border border-amber-700/30 bg-black/25 p-2 space-y-1">
         <div className="flex items-start justify-between gap-2">
@@ -226,7 +338,16 @@ export function DevPushNotificationTestPanel() {
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run()}>
-          {busy && countdown == null ? "Sending…" : "Send test push"}
+          {busy && countdown == null && localCountdown == null ? "Sending…" : "Send test push"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => runLocalAfterDelay(5)}
+        >
+          {localCountdown != null ? `Local in ${localCountdown}s…` : "Local in 5s"}
         </Button>
         <Button
           type="button"
@@ -235,7 +356,7 @@ export function DevPushNotificationTestPanel() {
           disabled={busy}
           onClick={() => runAfterDelay(5)}
         >
-          {countdown != null ? `Sending in ${countdown}s…` : "Send in 5s (background)"}
+          {countdown != null ? `APNs in ${countdown}s…` : "Send in 5s (background)"}
         </Button>
       </div>
     </div>

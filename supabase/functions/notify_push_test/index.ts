@@ -99,16 +99,30 @@ Deno.serve(async (req: Request) => {
 
     let delivered = 0;
     let lastFailure: Extract<DeliverPushResult, { success: false }> | undefined;
+    const attempts: Array<{
+      platform: string;
+      success: boolean;
+      channel?: string;
+      http_status?: number;
+      errorBody?: string;
+    }> = [];
     for (const row of rows) {
       const platform = row.platform === "android" ? "android" : "ios";
       const t = String(row.token ?? "").trim();
       if (!t) continue;
       try {
         const r = await deliverPushToDevice(platform, t, title, body, payload);
+        attempts.push({
+          platform,
+          success: r.success,
+          channel: r.channel,
+          ...(!r.success && "httpStatus" in r ? { http_status: r.httpStatus, errorBody: r.errorBody } : {}),
+        });
         if (r.success) delivered += 1;
         else lastFailure = r;
       } catch (e) {
         console.error("[notify_push_test] push send", e);
+        attempts.push({ platform, success: false, errorBody: String(e) });
       }
     }
 
@@ -119,6 +133,7 @@ Deno.serve(async (req: Request) => {
       delivered_push: delivered,
       delivered_ok: delivered > 0,
       push_context: ctx,
+      attempts,
     };
     if (delivered === 0 && lastFailure) {
       out.failure_channel = lastFailure.channel;

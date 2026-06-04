@@ -37,6 +37,10 @@ jobs:
         run: |
           set -euo pipefail
           REF="${PROJECT_REF:-ffgcivxvbtdlmfnttwjm}"
+          if ! supabase projects list >/dev/null 2>&1; then
+            echo "::error::Supabase CLI returned Unauthorized. Regenerate SUPABASE_ACCESS_TOKEN at https://supabase.com/dashboard/account/tokens and update the GitHub Actions secret."
+            exit 1
+          fi
           supabase functions deploy notify_carers_on_hypo --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_scenario_started --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
