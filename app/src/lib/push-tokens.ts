@@ -2,7 +2,9 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
+import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
+import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
 import {
   getNativePushPlatform,
   isNativePushPlatform,
@@ -244,9 +246,12 @@ function attachPushListeners(
     console.warn("[push_tokens] registration error:", err);
   });
 
-  PushNotifications.addListener("pushNotificationReceived", () => {
+  PushNotifications.addListener("pushNotificationReceived", (notification) => {
     writePushDiag({ state: "push_received_foreground", platform });
     scheduleNativeAppBadgeSync();
+    if (platform === "ios") {
+      void presentAudiblePushNotificationFromRemote(notification);
+    }
   });
 
   pushListenersBound = true;
@@ -314,6 +319,9 @@ export async function ensureNativePushRegistered(): Promise<void> {
   }
 
   writePushDiag({ state: "permission_granted", platform });
+  if (platform === "ios") {
+    await ensureNativeLocalNotificationPermission();
+  }
   try {
     await PushNotifications.register();
     writePushDiag({ state: "register_called", platform });

@@ -51,6 +51,7 @@ export function DevPushNotificationTestPanel() {
   const { toast } = useToast();
   const [location] = useLocation();
   const [busy, setBusy] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [pushDebugJson, setPushDebugJson] = useState<string>("");
 
@@ -107,10 +108,7 @@ export function DevPushNotificationTestPanel() {
     }
   }, [pushDebugJson, toast]);
 
-  const run = async () => {
-    setBusy(true);
-    try {
-      const r = await invokeNotifyPushTest();
+  const showPushResult = (r: Awaited<ReturnType<typeof invokeNotifyPushTest>>) => {
       const lines = [
         `success: ${r.success}`,
         r.delivered_ok != null ? `delivered_ok: ${r.delivered_ok}` : null,
@@ -132,14 +130,48 @@ export function DevPushNotificationTestPanel() {
       ]
         .filter(Boolean)
         .join("\n");
-      toast({
-        title: r.success && (r.delivered_push ?? 0) > 0 ? "Test push delivered" : "Test push result",
-        description: lines,
-        variant: r.success && (r.delivered_push ?? 0) > 0 ? "default" : "destructive",
-      });
+    toast({
+      title: r.success && (r.delivered_push ?? 0) > 0 ? "Test push delivered" : "Test push result",
+      description: lines,
+      variant: r.success && (r.delivered_push ?? 0) > 0 ? "default" : "destructive",
+    });
+  };
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      showPushResult(await invokeNotifyPushTest());
     } finally {
       setBusy(false);
     }
+  };
+
+  const runAfterDelay = (seconds: number) => {
+    if (busy || countdown != null) return;
+    setBusy(true);
+    toast({
+      title: `Test push in ${seconds}s`,
+      description:
+        "Press Home (or lock your phone) now so Diabeaters is in the background when the alert arrives.",
+    });
+    let remaining = seconds;
+    setCountdown(remaining);
+    const tick = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setCountdown(remaining);
+        return;
+      }
+      window.clearInterval(tick);
+      setCountdown(null);
+      void (async () => {
+        try {
+          showPushResult(await invokeNotifyPushTest());
+        } finally {
+          setBusy(false);
+        }
+      })();
+    }, 1000);
   };
 
   return (
@@ -156,6 +188,13 @@ export function DevPushNotificationTestPanel() {
         <strong className="text-foreground/85"> Enable notifications</strong> and{" "}
         <strong className="text-foreground/85">Push notifications</strong> above, a row in{" "}
         <code className="text-[11px]">push_tokens</code>, and APNs/FCM secrets on the project.
+      </p>
+      <p className="text-xs text-muted-foreground leading-snug">
+        <strong className="text-foreground/85">Lock-screen test:</strong> tapping Send while the app is open often
+        will not show a banner on the lock screen (iOS delivers to the foreground app). Use{" "}
+        <strong className="text-foreground/85">Send in 5s</strong>, press Home immediately, then wait for the alert
+        and sound. TestFlight build <strong className="text-foreground/85">1.0.4 (5)</strong> or newer is required for
+        reliable sound while the app is open.
       </p>
       <div className="rounded-md border border-amber-700/30 bg-black/25 p-2 space-y-1">
         <div className="flex items-start justify-between gap-2">
@@ -185,9 +224,20 @@ export function DevPushNotificationTestPanel() {
           {pushDebugJson || "{}"}
         </pre>
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run()}>
-        {busy ? "Sending…" : "Send test push"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run()}>
+          {busy && countdown == null ? "Sending…" : "Send test push"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => runAfterDelay(5)}
+        >
+          {countdown != null ? `Sending in ${countdown}s…` : "Send in 5s (background)"}
+        </Button>
+      </div>
     </div>
   );
 }
