@@ -98,13 +98,13 @@ async function sendViaApns(
     ? (opts.data as Record<string, unknown>)
     : {};
 
-  // Do not set aps.badge here — the native app syncs the icon badge from real unread counts
-  // (bell + DM inbox) via @capawesome/capacitor-badge when opened or after inbox changes.
-  // Sound must be explicit for lock-screen / banner alerts; interruption-level belongs in HTTP headers only.
+  // Include badge so iOS shows the notification in Lock Screen / Notification Centre (required for visible alerts).
+  // The app also syncs the icon badge from unread counts when opened (AppIconBadge plugin on iOS).
   const payload: Record<string, unknown> = {
     aps: {
       alert: { title: opts.title, body: opts.body },
       sound: "default",
+      badge: 1,
     },
     ...custom,
   };

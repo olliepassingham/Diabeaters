@@ -20,14 +20,11 @@ const config: CapacitorConfig = {
   },
   plugins: {
     /**
-     * iOS foreground remote pushes are re-posted as local notifications with sound
-     * (`presentAudiblePushNotificationFromRemote` in push-tokens.ts) because Capacitor’s
-     * remote handler often lands in Notification Centre without playing audio.
+     * iOS: show banners and play sound while the app is open (same as lock-screen alerts).
      */
     PushNotifications: {
-      presentationOptions: [],
+      presentationOptions: ["badge", "sound", "alert"],
     },
-    // Local notifications use the same iOS presentation mechanism.
     LocalNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
