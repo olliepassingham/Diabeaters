@@ -9,6 +9,7 @@ import { Bell } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
+import { IosNotificationDisplayCard } from "@/components/ios-notification-display-card";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
@@ -74,6 +75,10 @@ export function NotificationsTab({
           data-testid="switch-push-notifications"
         />
       </div>
+
+      {isNativePushPlatform() && notifSettings.pushNotifications ? (
+        <IosNotificationDisplayCard />
+      ) : null}
 
       {/*
         Push diagnostics intentionally removed for App Store review.
