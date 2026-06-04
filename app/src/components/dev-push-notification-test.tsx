@@ -17,7 +17,7 @@ import {
 } from "@/lib/notification-settings-native";
 import { isPushTestUiUnlocked } from "@/lib/push-test-ui-unlock";
 import { invokeNotifyPushTest } from "@/lib/invoke-notify-push-test";
-import { getPushRegistrationDebugSnapshot } from "@/lib/push-tokens";
+import { getPushRegistrationDebugSnapshot, refreshPushTokenForDelivery } from "@/lib/push-tokens";
 
 function noPushTokenHint(): string {
   return "No row in push_tokens for this user. On this device: turn on Enable notifications + Push in app settings, allow Diabeaters in system notification settings, then leave and reopen the app. If it persists, check Supabase → push_tokens for your user_id.";
@@ -130,8 +130,12 @@ export function DevPushNotificationTestPanel() {
   }, [pushDebugJson, toast]);
 
   const showPushResult = (r: Awaited<ReturnType<typeof invokeNotifyPushTest>>) => {
+      const iosAttempt = r.attempts?.find((a) => a.platform === "ios");
+      const iosOk = r.ios_delivered === true || iosAttempt?.success === true;
       const lines = [
         `success: ${r.success}`,
+        r.ios_delivered != null ? `ios_delivered: ${r.ios_delivered}` : null,
+        r.attempts?.length ? `attempts: ${JSON.stringify(r.attempts)}` : null,
         r.delivered_ok != null ? `delivered_ok: ${r.delivered_ok}` : null,
         r.error ? `error: ${r.error}` : null,
         r.failure_channel ? `failure_channel: ${r.failure_channel}` : null,
@@ -152,9 +156,9 @@ export function DevPushNotificationTestPanel() {
         .filter(Boolean)
         .join("\n");
     toast({
-      title: r.success && (r.delivered_push ?? 0) > 0 ? "Test push delivered" : "Test push result",
+      title: iosOk ? "iOS APNs accepted" : r.success && (r.delivered_push ?? 0) > 0 ? "Push sent (check iOS)" : "Test push result",
       description: lines,
-      variant: r.success && (r.delivered_push ?? 0) > 0 ? "default" : "destructive",
+      variant: iosOk ? "default" : "destructive",
     });
   };
 
@@ -357,6 +361,35 @@ export function DevPushNotificationTestPanel() {
           onClick={() => runAfterDelay(5)}
         >
           {countdown != null ? `APNs in ${countdown}s…` : "Send in 5s (background)"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void (async () => {
+              try {
+                await refreshPushTokenForDelivery();
+                toast({
+                  title: "Push token refreshed",
+                  description:
+                    "Re-registered with Apple and saved the new token. Wait a few seconds, then try Send in 5s (background).",
+                });
+              } catch (e) {
+                toast({
+                  title: "Refresh failed",
+                  description: e instanceof Error ? e.message : String(e),
+                  variant: "destructive",
+                });
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+        >
+          Refresh push token
         </Button>
       </div>
     </div>

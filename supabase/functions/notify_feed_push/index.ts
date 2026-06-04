@@ -15,6 +15,7 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "../_shared/deliver-push.ts";
+import { fetchLatestPushTokensForUserId } from "../_shared/push-token-query.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -231,12 +232,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: tokenRows } = await admin
-      .from("push_tokens")
-      .select("platform, token")
-      .eq("user_id", recipientId)
-      .in("platform", ["ios", "android"]);
-    const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, payload);
+    const tokenRows = await fetchLatestPushTokensForUserId(admin, recipientId);
+    const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, payload);
 
     return new Response(
       JSON.stringify({ success: true, delivered_push: delivered, recipient: recipientId, deep_link: deepLink }),

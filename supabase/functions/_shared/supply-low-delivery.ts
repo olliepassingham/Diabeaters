@@ -4,6 +4,7 @@
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { deliverPushToTokenRows, mobilePushDeliveryConfigured } from "./deliver-push.ts";
+import { fetchLatestPushTokensForUserId } from "./push-token-query.ts";
 
 type SupabaseAdmin = ReturnType<typeof createClient>;
 
@@ -114,12 +115,8 @@ export async function deliverSupplyLowAlerts(
       prefs.push && mobilePushDeliveryConfigured() && (inappInsertedFresh || !prefs.inapp);
 
     if (shouldSendPush) {
-      const { data: tokenRows } = await admin
-        .from("push_tokens")
-        .select("platform, token")
-        .eq("user_id", rid)
-        .in("platform", ["ios", "android"]);
-      const { delivered } = await deliverPushToTokenRows(tokenRows ?? [], title, bodyText, data);
+      const tokenRows = await fetchLatestPushTokensForUserId(admin, rid);
+      const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, data);
       pushDelivered += delivered;
     }
   }

@@ -13,6 +13,7 @@ import {
   type DeliverPushResult,
 } from "../_shared/deliver-push.ts";
 import { fcmDirectConfigured, getFcmEdgeSendContext } from "../_shared/deliver-android-push.ts";
+import { fetchLatestPushTokensForUser } from "../_shared/push-token-query.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -67,20 +68,14 @@ Deno.serve(async (req: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const { data: tokenRows, error: tokenErr } = await admin
-      .from("push_tokens")
-      .select("platform, token")
-      .eq("user_id", callerId)
-      .in("platform", ["ios", "android"]);
+    const { rows, error: tokenErr } = await fetchLatestPushTokensForUser(admin, callerId);
 
     if (tokenErr) {
-      return new Response(JSON.stringify({ success: false, error: "tokens_fetch_failed", detail: tokenErr.message }), {
+      return new Response(JSON.stringify({ success: false, error: "tokens_fetch_failed", detail: tokenErr }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const rows = (tokenRows ?? []) as { platform: string; token: string }[];
     if (rows.length === 0) {
       return new Response(JSON.stringify({ success: false, error: "no_push_token" }), {
         status: 200,
@@ -127,29 +122,35 @@ Deno.serve(async (req: Request) => {
     }
 
     const ctx = getMobilePushEdgeContext();
+    const iosAttempt = attempts.find((a) => a.platform === "ios");
+    const iosDelivered = iosAttempt?.success === true;
+
     const out: Record<string, unknown> = {
       success: true,
       tokens: rows.length,
       delivered_push: delivered,
       delivered_ok: delivered > 0,
+      ios_delivered: iosDelivered,
       push_context: ctx,
       attempts,
     };
+
+    const firstIos = rows.find((r) => r.platform === "ios");
+    if (apnsDirectConfigured() && firstIos) {
+      const apnsCtx = getApnsEdgeSendContext();
+      out.apns_environment = apnsCtx.environment;
+      out.apns_bundle_id = apnsCtx.bundleId;
+      out.apns_topic = apnsCtx.bundleId;
+      out.apns_host = apnsCtx.host;
+      out.token_probe = tokenProbe(firstIos.token);
+    }
+
     if (delivered === 0 && lastFailure) {
       out.failure_channel = lastFailure.channel;
       out.failure_platform = lastFailure.platform;
       out.detail = lastFailure.errorBody ?? null;
       if ("httpStatus" in lastFailure && lastFailure.httpStatus !== undefined) {
         out.http_status = lastFailure.httpStatus;
-      }
-      const firstIos = rows.find((r) => r.platform === "ios");
-      if (apnsDirectConfigured() && firstIos) {
-        const apnsCtx = getApnsEdgeSendContext();
-        out.apns_environment = apnsCtx.environment;
-        out.apns_bundle_id = apnsCtx.bundleId;
-        out.apns_topic = apnsCtx.bundleId;
-        out.apns_host = apnsCtx.host;
-        out.token_probe = tokenProbe(firstIos.token);
       }
       if (fcmDirectConfigured()) {
         out.fcm_project_id = getFcmEdgeSendContext().projectId;

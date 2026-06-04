@@ -111,6 +111,7 @@ async function persistPushTokenToCloud(
   if (!rpc.error && rpc.data && typeof rpc.data === "object") {
     const row = rpc.data as { ok?: boolean; error?: string };
     if (row.ok === true) {
+      await pruneStalePushTokensForPlatform(supabase, uid, platform, t);
       writePushDiag({ state: "token_saved", savePath: "rpc", platform });
       return;
     }
@@ -125,6 +126,9 @@ async function persistPushTokenToCloud(
     { user_id: uid, platform, token: t },
     { onConflict: "user_id,platform,token" },
   );
+  if (!error) {
+    await pruneStalePushTokensForPlatform(supabase, uid, platform, t);
+  }
   writePushDiag({
     state: error ? "token_save_failed" : "token_saved",
     saveError: error?.message ?? null,
@@ -134,6 +138,32 @@ async function persistPushTokenToCloud(
   if (error) {
     console.warn("[push_tokens] upsert failed:", error.message);
   }
+}
+
+/** Remove older device tokens after reinstall / TestFlight upgrade (new APNs token). */
+async function pruneStalePushTokensForPlatform(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string,
+  platform: NativePushPlatform,
+  keepToken: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("push_tokens")
+    .delete()
+    .eq("user_id", userId)
+    .eq("platform", platform)
+    .neq("token", keepToken);
+  if (error) {
+    writePushDiag({ state: "token_prune_failed", saveError: error.message, platform });
+  } else {
+    writePushDiag({ state: "token_pruned_stale", platform });
+  }
+}
+
+/** Re-register with APNs and upsert the latest token to Supabase (use after reinstall). */
+export async function refreshPushTokenForDelivery(): Promise<void> {
+  await cleanupPushRegistration();
+  await ensureNativePushRegistered();
 }
 
 function writePushDiag(patch: Record<string, unknown>) {
