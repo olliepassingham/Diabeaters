@@ -36,7 +36,6 @@ import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import heic2any from "heic2any";
 import {
   AlertDialog,
@@ -797,8 +796,8 @@ export default function Account() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md max-h-[70vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[85dvh] !flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{followListKind === "following" ? "Following" : "Followers"}</DialogTitle>
             <DialogDescription className="sr-only">
               {followListKind === "following"
@@ -806,18 +805,18 @@ export default function Account() {
                 : "Accounts that follow you on the Feed."}
             </DialogDescription>
           </DialogHeader>
-          {followListLoading ? (
-            <div className="space-y-2 py-2" role="status" aria-label="Loading list">
-              <Skeleton className="h-10 w-full rounded-md" />
-              <Skeleton className="h-10 w-full rounded-md" />
-              <Skeleton className="h-10 w-full rounded-md" />
-            </div>
-          ) : followListError ? (
-            <p className="text-sm text-destructive">{followListError}</p>
-          ) : followListRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-2">No one yet.</p>
-          ) : (
-            <ScrollArea className="flex-1 pr-1">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+            {followListLoading ? (
+              <div className="space-y-2 py-2" role="status" aria-label="Loading list">
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </div>
+            ) : followListError ? (
+              <p className="text-sm text-destructive">{followListError}</p>
+            ) : followListRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">No one yet.</p>
+            ) : (
               <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card m-0 list-none p-0">
                 {followListRows.map((row) => (
                   <li key={row.id}>
@@ -842,8 +841,8 @@ export default function Account() {
                   </li>
                 ))}
               </ul>
-            </ScrollArea>
-          )}
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </PageShell>

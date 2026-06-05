@@ -30,7 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
@@ -553,11 +552,11 @@ function UserListDialog(props: {
 
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[70vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[85dvh] !flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
           {props.loading ? (
             <div className="py-2">
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -567,7 +566,7 @@ function UserListDialog(props: {
               <p className="text-sm text-muted-foreground">No one yet.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card">
+            <ul className="divide-y divide-border/60 rounded-lg border border-border/60 overflow-hidden bg-card m-0 list-none p-0">
               {props.userIds.map((id) => (
                 <li key={id}>
                   <Link
@@ -602,7 +601,7 @@ function UserListDialog(props: {
               ))}
             </ul>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
