@@ -28,7 +28,7 @@ describe("getExerciseReadinessVerdict recovery phase", () => {
     expect(r.detail.toLowerCase()).not.toContain("in range to start");
   });
 
-  it("omits pre-session carb hint for recovery", () => {
+  it("includes recovery fuel hint (not pre-session copy)", () => {
     const r = getExerciseReadinessVerdict({
       exercisePlanResult: plan,
       currentBg: 7,
@@ -37,7 +37,10 @@ describe("getExerciseReadinessVerdict recovery phase", () => {
       intensity: "moderate",
       phase: "recovery",
     });
-    expect(getExerciseCarbPlanHintLine(plan, r.verdict, { phase: "recovery" })).toBeNull();
+    const hint = getExerciseCarbPlanHintLine(plan, r.verdict, { phase: "recovery" });
+    expect(hint?.toLowerCase()).toContain("delayed low");
+    const recoveryFuel = getExerciseFuelPlanLines(plan, r.verdict, null, { phase: "recovery" });
+    expect(recoveryFuel.some((l) => l.id === "post")).toBe(true);
   });
 });
 
@@ -81,6 +84,20 @@ describe("getRecoveryReadinessVerdict", () => {
       phase: "recovery",
     });
     expect(r.verdict).toBe("caution");
+  });
+
+  it("is ready when in range and rising after effort", () => {
+    const r = getRecoveryReadinessVerdict({
+      exercisePlanResult: plan,
+      currentBg: 5.8,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      bgTrend: "rising",
+      phase: "recovery",
+    });
+    expect(r.verdict).toBe("ready");
+    expect(r.detail.toLowerCase()).toContain("rising");
   });
 });
 
@@ -204,5 +221,44 @@ describe("getExerciseFuelPlanLines", () => {
 
   it("returns empty for not_recommended verdict", () => {
     expect(getExerciseFuelPlanLines(strengthPlan, "not_recommended", null, { phase: "pre" })).toEqual([]);
+  });
+});
+
+describe("getExerciseReadinessVerdict active phase trend", () => {
+  const strengthPlan = calculateExercisePlan({
+    exerciseType: "strength",
+    durationMinutes: 45,
+    intensity: "moderate",
+    minutesUntilStart: 0,
+    bgUnits: "mmol/L",
+    currentBg: 5.8,
+  });
+
+  it("cautions when BG is borderline and falling during strength", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: strengthPlan,
+      currentBg: 5.8,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      bgTrend: "falling",
+      phase: "active",
+    });
+    expect(r.verdict).toBe("caution");
+    expect(r.detail.toLowerCase()).toContain("falling");
+  });
+
+  it("stays ready when BG is rising during strength", () => {
+    const r = getExerciseReadinessVerdict({
+      exercisePlanResult: strengthPlan,
+      currentBg: 5.8,
+      bgUnits: "mmol/L",
+      exerciseType: "strength",
+      intensity: "moderate",
+      bgTrend: "rising",
+      phase: "active",
+    });
+    expect(r.verdict).toBe("ready");
+    expect(r.detail.toLowerCase()).toContain("rising");
   });
 });

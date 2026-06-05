@@ -115,6 +115,16 @@ function duringQuickStatusBody(
     return v.detail.length > 130 ? `${v.detail.slice(0, 127)}…` : v.detail;
   }
   const ballpark = duringCarbBallpark(during);
+  const genericReady = "You look in range to start";
+  if (v.detail && !v.detail.startsWith(genericReady)) {
+    if (v.verdict === "caution" && carbLineMergedAbove && ballpark) {
+      return `${v.detail} ${ballpark}`;
+    }
+    if (ballpark && v.verdict === "ready") {
+      return `${v.detail} ${ballpark}`;
+    }
+    return v.detail;
+  }
   if (v.verdict === "caution") {
     if (v.title.toLowerCase().includes("high")) {
       return "BG is high — follow your team’s correction and ketone plan before you push intensity harder.";
@@ -528,11 +538,21 @@ export function AppStatusStrip() {
 
   const activeFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
+    if (readiness.bg == null) return [];
     return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "active",
       exerciseType: ex.exerciseType,
     });
-  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.verdict, stripProfile]);
+  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+
+  const recoveryFuelPlanLines = useMemo(() => {
+    if (ex?.phase !== "recovery" || !exercisePlan || !readiness?.verdict) return [];
+    if (readiness.bg == null) return [];
+    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+      phase: "recovery",
+      exerciseType: ex.exerciseType,
+    });
+  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
 
   const recoveryInsulinLine = useMemo(() => {
     if (!exercisePlan || ex?.phase !== "recovery") return null;
@@ -1090,6 +1110,9 @@ export function AppStatusStrip() {
                       ) : null}
                     </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
+                    {recoveryFuelPlanLines.length > 0 ? (
+                      <ExerciseFuelPlanSummary lines={recoveryFuelPlanLines} className="mt-2" />
+                    ) : null}
                   </div>
                 </div>
               ) : null}

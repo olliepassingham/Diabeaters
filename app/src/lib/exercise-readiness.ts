@@ -21,6 +21,12 @@ function parseNumericMaybe(value: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Upper band where “in range” BG + falling still warrants extra caution (matches recovery logic). */
+function exerciseApproachLowCeiling(bgUnits: string, lowThreshold: number): number {
+  const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
+  return lowThreshold + approachMargin;
+}
+
 export interface ExerciseReadinessInput {
   exercisePlanResult: ExercisePlanResult | null;
   /** Planner-style raw BG field */
@@ -190,6 +196,56 @@ function refineWithExerciseTypeAndTrend(
           "Trend is down — strength work often dips after; keep hypo treatment nearby for the post-workout window.",
       };
     }
+
+    if (phase === "active") {
+      const lowThreshold = parseNumericMaybe(input.exercisePlanResult?.pre.lowThreshold ?? null);
+      const approachCeiling =
+        lowThreshold != null ? exerciseApproachLowCeiling(input.bgUnits, lowThreshold) : null;
+
+      if (trend === "falling") {
+        if (approachCeiling != null && bg < approachCeiling) {
+          return {
+            verdict: "caution",
+            title: "Caution",
+            detail: strengthLike
+              ? "BG is toward the lower band and still falling — keep fast carbs handy; strength work often dips after."
+              : "BG is toward the lower band and falling — ease intensity and treat lows your usual way.",
+          };
+        }
+        if (strengthLike) {
+          return {
+            verdict: "caution",
+            title: "Caution",
+            detail:
+              "Trend is down during strength — delayed dips are common. Keep hypo treatment within reach.",
+          };
+        }
+        return {
+          verdict: "caution",
+          title: "Caution",
+          detail:
+            "Trend is down — keep fast carbs within reach and re-check if anything feels off.",
+        };
+      }
+
+      if (trend === "rising") {
+        return {
+          verdict: "ready",
+          title: "Ready",
+          detail: strengthLike
+            ? "BG is rising during effort — common with strength; still plan for a possible dip later."
+            : "BG is rising for now — re-check if you push harder; keep fast carbs within reach anyway.",
+        };
+      }
+
+      if (trend === "flat") {
+        return {
+          verdict: "ready",
+          title: "Ready",
+          detail: "Stable for now — keep monitoring as effort changes.",
+        };
+      }
+    }
   }
 
   return base;
@@ -278,10 +334,10 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
 
   if (trend === "rising") {
     return {
-      verdict: "caution",
-      title: "Caution",
+      verdict: "ready",
+      title: "Ready",
       detail:
-        "BG is rising for now — some people swing after effort; still plan for possible drops later and follow your team’s targets.",
+        "BG is rising after effort — that can be normal; still watch for delayed lows over the next few hours.",
     };
   }
 
@@ -410,12 +466,23 @@ export function getExerciseFuelPlanLines(
   options?: { phase?: "pre" | "active" | "recovery"; exerciseType?: string },
 ): ExerciseFuelPlanLine[] {
   const phase = options?.phase ?? "pre";
-  if (phase === "recovery" || verdict === "not_recommended") return [];
+  if (verdict === "not_recommended") return [];
 
   const lines: ExerciseFuelPlanLine[] = [];
   const pre = plan.pre.carbsIfLow;
   const during = plan.during.carbsNeeded;
   const post = plan.post.carbs;
+
+  if (phase === "recovery") {
+    if (post > 0) {
+      lines.push({
+        id: "post",
+        label: "Delayed low prep",
+        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} — lows can still appear in this window`,
+      });
+    }
+    return lines;
+  }
 
   if (phase === "pre") {
     if (pre > 0) {

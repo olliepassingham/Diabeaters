@@ -627,7 +627,7 @@ export function ActiveExerciseBanner() {
       preRapidInsulin2h: session.preRapidInsulin2h ?? null,
     });
     const fuelPlanLines =
-      bg != null && (session.phase === "pre" || session.phase === "active")
+      bg != null && (session.phase === "pre" || session.phase === "active" || session.phase === "recovery")
         ? getExerciseFuelPlanLines(planResult, readinessResult.verdict, profile, {
             phase: session.phase,
             exerciseType: session.exerciseType,
@@ -977,6 +977,19 @@ export function ActiveExerciseBanner() {
                   <div
                     className={`rounded-md border px-2.5 py-2 text-xs ${getReadinessToneClasses(readinessResult.verdict)}`}
                     data-testid="exercise-readiness-verdict"
+                  >
+                    <p className="font-semibold text-foreground">{readinessResult.title}</p>
+                    <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
+                    {fuelPlanLines.length > 0 ? (
+                      <ExerciseFuelPlanSummary lines={fuelPlanLines} className="mt-2" />
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {readinessResult && session.phase === "recovery" ? (
+                  <div
+                    className={`rounded-md border px-2.5 py-2 text-xs ${getReadinessToneClasses(readinessResult.verdict)}`}
+                    data-testid="exercise-readiness-verdict-recovery"
                   >
                     <p className="font-semibold text-foreground">{readinessResult.title}</p>
                     <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
