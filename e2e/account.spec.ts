@@ -261,6 +261,7 @@ test.describe("Account page", () => {
     });
 
     await page.goto("/account");
+    await page.getByTestId("account-tab-public").click();
     await expect(page.getByTestId("share-public-profile")).toHaveCount(0);
 
     await context.unroute("**/rest/v1/profiles**");
@@ -285,6 +286,7 @@ test.describe("Account page", () => {
     });
 
     await page.reload();
+    await page.getByTestId("account-tab-public").click();
     await expect(page.getByTestId("share-public-profile")).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("button", { name: "Share profile" })).toBeVisible();
   });

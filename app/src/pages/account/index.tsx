@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
-import { ChevronRight, Share2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/lib/carers";
@@ -36,7 +36,6 @@ import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
-import { sharePublicProfile } from "@/lib/share-public-profile";
 import heic2any from "heic2any";
 import {
   AlertDialog,
@@ -492,6 +491,7 @@ export default function Account() {
             <Button
               variant="outline"
               size="sm"
+              className="col-span-2"
               disabled
               data-testid="link-change-view"
               aria-busy="true"
@@ -500,7 +500,7 @@ export default function Account() {
               Change mode
             </Button>
           ) : canOpenModeChooser ? (
-            <Button variant="outline" size="sm" asChild data-testid="link-change-view">
+            <Button variant="outline" size="sm" className="col-span-2" asChild data-testid="link-change-view">
               <Link href="/mode">Change mode</Link>
             </Button>
           ) : null}
@@ -515,35 +515,6 @@ export default function Account() {
             disabled={uploadSubmitting}
             aria-label="Choose profile photo"
           />
-          {showPublicProfileTab && isPublicProfile ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid="share-public-profile"
-              onClick={() => {
-                void (async () => {
-                  const result = await sharePublicProfile({
-                    userId,
-                    displayName,
-                    publicHandle,
-                  });
-                  if (result === "copied") {
-                    toast({ title: "Link copied", description: "Paste to share your public profile." });
-                  } else if (result === "failed") {
-                    toast({
-                      title: "Could not share",
-                      description: "Try again or copy your profile link from the Public profile tab.",
-                      variant: "destructive",
-                    });
-                  }
-                })();
-              }}
-            >
-              <Share2 className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-              Share profile
-            </Button>
-          ) : null}
 
           {!isCarer && !isCommunityAccount && (
             <Button variant="outline" size="sm" className="col-span-2" asChild>

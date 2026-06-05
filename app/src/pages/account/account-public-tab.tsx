@@ -1,8 +1,9 @@
-import { Pencil } from "lucide-react";
+import { Pencil, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import {
+  ProfileActionGrid,
   ProfileAvatarTile,
   ProfileBioPreview,
   ProfileDisplayName,
@@ -16,6 +17,8 @@ import {
   ProfileSectionHeading,
 } from "@/components/profile/profile-ui";
 import { fetchCommunityPostsByAuthorPage } from "@/lib/community";
+import { sharePublicProfile } from "@/lib/share-public-profile";
+import { useToast } from "@/hooks/use-toast";
 
 export function AccountPublicProfileTab({
   userId,
@@ -46,7 +49,25 @@ export function AccountPublicProfileTab({
   onOpenFollowing: () => void;
   onEditProfile: () => void;
 }) {
+  const { toast } = useToast();
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
+
+  async function handleShareProfile() {
+    const result = await sharePublicProfile({
+      userId,
+      displayName,
+      publicHandle,
+    });
+    if (result === "copied") {
+      toast({ title: "Link copied", description: "Paste to share your public profile." });
+    } else if (result === "failed") {
+      toast({
+        title: "Could not share",
+        description: "Try again or copy your profile link from your browser.",
+        variant: "destructive",
+      });
+    }
+  }
 
   return (
     <div className="space-y-4 animate-soft-in">
@@ -64,57 +85,75 @@ export function AccountPublicProfileTab({
       ) : null}
 
       <ProfileHeroCard testId="account-public-profile-hero">
-        <ProfileHeroRow
-          avatar={
-            <ProfileAvatarTile
-              size="md"
-              imageUrl={avatarDisplayUrl}
-              initials={avatarInitials}
-              alt={displayName}
-              href={publicProfileHref}
-              testId="link-my-public-profile-avatar"
-            />
-          }
-        >
-          <ProfileHeroNameRow>
-            <div className="min-w-0 flex-1">
-              <ProfileDisplayName
-                compact
-                name={displayName}
+        <div className="flex flex-col gap-3">
+          <ProfileHeroRow
+            avatar={
+              <ProfileAvatarTile
+                size="md"
+                imageUrl={avatarDisplayUrl}
+                initials={avatarInitials}
+                alt={displayName}
                 href={publicProfileHref}
-                testId="link-my-public-profile-name"
+                testId="link-my-public-profile-avatar"
               />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0 min-h-8 h-8 px-3 rounded-full text-xs"
-              onClick={onEditProfile}
-            >
-              <Pencil className="h-3.5 w-3.5 mr-1" aria-hidden />
-              Edit
-            </Button>
-          </ProfileHeroNameRow>
+            }
+          >
+            <ProfileHeroNameRow>
+              <div className="min-w-0 flex-1">
+                <ProfileDisplayName
+                  compact
+                  name={displayName}
+                  href={publicProfileHref}
+                  testId="link-my-public-profile-name"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 min-h-8 h-8 px-3 rounded-full text-xs"
+                onClick={onEditProfile}
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1" aria-hidden />
+                Edit
+              </Button>
+            </ProfileHeroNameRow>
 
-          <ProfileMetaRow>
-            <ProfileHandle handle={publicHandle || null} />
-            {!isPublic ? (
-              <span className="text-[11px] font-medium text-muted-foreground">Not visible on Feed</span>
-            ) : null}
-          </ProfileMetaRow>
+            <ProfileMetaRow>
+              <ProfileHandle handle={publicHandle || null} />
+              {!isPublic ? (
+                <span className="text-[11px] font-medium text-muted-foreground">Not visible on Feed</span>
+              ) : null}
+            </ProfileMetaRow>
 
-          <ProfileFollowStats
-            followers={followers}
-            following={following}
-            onFollowersClick={onOpenFollowers}
-            onFollowingClick={onOpenFollowing}
-            followersTestId="link-my-public-profile-followers"
-            followingTestId="link-my-public-profile-following"
-          />
+            <ProfileFollowStats
+              followers={followers}
+              following={following}
+              onFollowersClick={onOpenFollowers}
+              onFollowingClick={onOpenFollowing}
+              followersTestId="link-my-public-profile-followers"
+              followingTestId="link-my-public-profile-following"
+            />
 
-          <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
-        </ProfileHeroRow>
+            <ProfileBioPreview compact bio={bioPreview} livingWithLine={livingWithLine} />
+          </ProfileHeroRow>
+
+          {isPublic ? (
+            <ProfileActionGrid>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="col-span-2"
+                data-testid="share-public-profile"
+                onClick={() => void handleShareProfile()}
+              >
+                <Share2 className="h-4 w-4 mr-2 shrink-0" aria-hidden />
+                Share profile
+              </Button>
+            </ProfileActionGrid>
+          ) : null}
+        </div>
       </ProfileHeroCard>
 
       <div className="space-y-3">
