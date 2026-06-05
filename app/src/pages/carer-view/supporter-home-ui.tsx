@@ -11,14 +11,12 @@ import {
   HomeHypoTimelineItem,
   HomeMutedCard,
   HomePrimaryStatusPill,
-  HomeQuickActions,
   HomeSectionHeading,
   HomeTrustFooter,
   HomeUrgentCard,
   SupplyStockIndicator,
   sortSuppliesByUrgency,
   type HomeGlanceType,
-  type HomeQuickAction,
 } from "@/components/home/home-ui";
 import { History, MessageCircle } from "lucide-react";
 
@@ -162,27 +160,39 @@ export function SupporterHero({
 }
 
 export function SupporterQuickActions({ showActivity }: { showActivity: boolean }) {
-  const actions: HomeQuickAction[] = [];
-  if (isAiCoachEnabled) {
-    actions.push({
-      id: "coach",
-      label: openAssistantCtaLabel(),
-      icon: MessageCircle,
-      href: "/coach?audience=supporter",
-      variant: "primary",
-      glow: true,
-      testId: "link-carer-coach-open",
-    });
-  }
-  if (showActivity) {
-    actions.push({
-      id: "activity",
-      label: "Activity",
-      icon: History,
-      href: "/carer-view/activity",
-    });
-  }
-  return <HomeQuickActions actions={actions} testId="carer-quick-actions" />;
+  const showCoach = isAiCoachEnabled;
+  if (!showCoach && !showActivity) return null;
+
+  return (
+    <div
+      className="flex flex-col gap-2 sm:gap-3 animate-soft-in"
+      style={{ animationDelay: "40ms" }}
+      data-testid="carer-quick-actions"
+    >
+      {showCoach ? (
+        <div className="coach-entry-glow w-full rounded-2xl" data-testid="link-carer-coach-open-glow">
+          <Button
+            asChild
+            variant="default"
+            className="min-h-11 w-full rounded-2xl font-semibold tracking-tight shadow-none"
+          >
+            <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
+              <MessageCircle className="h-4 w-4 mr-2 shrink-0" aria-hidden />
+              {openAssistantCtaLabel()}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
+      {showActivity ? (
+        <Button asChild variant="outline" className="min-h-11 w-full rounded-2xl shadow-none">
+          <Link href="/carer-view/activity" data-testid="link-carer-activity">
+            <History className="h-4 w-4 mr-2 shrink-0" aria-hidden />
+            Activity log
+          </Link>
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 export function SupporterPageFooter() {
