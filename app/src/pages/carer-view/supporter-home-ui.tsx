@@ -82,7 +82,6 @@ export function SupporterHero({
               >
                 {displayName}
               </p>
-              <p className="text-xs text-muted-foreground mt-0.5">Read-only · they control what you see</p>
             </div>
           </div>
           {showEmergencyLink ? (
