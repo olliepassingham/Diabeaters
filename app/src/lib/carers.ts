@@ -718,7 +718,8 @@ export async function fetchAppointmentsForLinkedPatient(
     )
     .eq("user_id", patientId)
     .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(60);
 
   if (error) return { data: null, error: new Error(error.message) };
   return { data: (data ?? []) as Record<string, unknown>[], error: null };

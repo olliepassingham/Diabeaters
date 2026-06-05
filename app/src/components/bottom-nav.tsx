@@ -3,11 +3,14 @@ import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { useLocation } from "wouter";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
-import { prefetchCommunityFeedChunk, prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
+import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { useAuth } from "@/lib/auth-context";
+import { prefetchLinkedPatientsQuery } from "@/lib/carer-link-query";
 import { getActiveAppMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
@@ -222,6 +225,8 @@ export function BottomNav() {
   const [hash, setHash] = useState(() =>
     typeof window !== "undefined" ? window.location.hash.slice(1) : "",
   );
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
@@ -249,6 +254,12 @@ export function BottomNav() {
     window.addEventListener("diabeater:app-mode", onMode);
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
+
+  useEffect(() => {
+    if (!hasCarerLink) return;
+    prefetchCarerViewRoute();
+    prefetchLinkedPatientsQuery(queryClient, user?.id);
+  }, [hasCarerLink, queryClient, user?.id]);
 
   /**
    * Warm lazy chunks for bottom-nav targets so first taps feel instant.

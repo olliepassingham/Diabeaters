@@ -31,8 +31,6 @@ import {
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
   fetchHypoLogsForLinkedPatient,
-  getLinkedPatientForCarer,
-  listLinkedPatientsForCarer,
   carerAppendSickDayTemperature,
   carerAppendSickDayMedNote,
   carerUpsertSickDayMedicationReminder,
@@ -53,16 +51,15 @@ import { getSupabase } from "@/lib/supabase";
 import {
   consumeCarerLinkedBannerMessage,
   clearCarerLinkJustCompleted,
-  getCarerLinkJustCompletedAt,
   getActiveCarerPatientId,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
 import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
-import { devWarn } from "@/lib/dev-log";
 import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
 import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt";
 import { useAuth } from "@/lib/auth-context";
+import { useLinkedPatientQuery, useLinkedPatientsForCarerQuery } from "@/lib/carer-link-query";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
 import {
   CarerCardEmpty,
@@ -1253,15 +1250,30 @@ function deriveCarerHeaderContext(
   };
 }
 
-/** Wouter + `LinkedPatientInfo`: load link → optionally load patient bundle → ready. */
-type CarerViewPhase = "loading_link" | "unlinked" | "loading_patient" | "ready";
+/** Wouter + `LinkedPatientInfo`: resolve link (cached when possible) → show shell → load patient bundle. */
+type CarerViewPhase = "loading_link" | "unlinked" | "ready";
 
 export default function CarerViewPage() {
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
-  const [phase, setPhase] = useState<CarerViewPhase>("loading_link");
-  const [linkedPatients, setLinkedPatients] = useState<LinkedPatientWithProfile[]>([]);
-  const [activePatientId, setActivePatientIdState] = useState<string | null>(null);
+  const cachedLinkQuery = useLinkedPatientQuery();
+  const linkedPatientsQuery = useLinkedPatientsForCarerQuery();
+  const linkedPatients = useMemo((): LinkedPatientWithProfile[] => {
+    const rows = linkedPatientsQuery.data;
+    if (rows && rows.length > 0) return rows;
+    if (cachedLinkQuery.data) {
+      return [
+        {
+          ...cachedLinkQuery.data,
+          patient_full_name: null,
+          patient_avatar_url: null,
+        },
+      ];
+    }
+    return [];
+  }, [linkedPatientsQuery.data, cachedLinkQuery.data]);
+  const [activePatientId, setActivePatientIdState] = useState<string | null>(() => getActiveCarerPatientId());
+  const [patientBundleLoading, setPatientBundleLoading] = useState(false);
   const activeLink = useMemo(
     () => linkedPatients.find((p) => p.patientId === activePatientId) ?? null,
     [linkedPatients, activePatientId],
@@ -1276,11 +1288,22 @@ export default function CarerViewPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
   const [supporterPushPromptOpen, setSupporterPushPromptOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const linkQueriesLoading =
+    (cachedLinkQuery.isLoading || linkedPatientsQuery.isLoading) && linkedPatients.length === 0;
+  const linkResolvedEmpty =
+    cachedLinkQuery.isFetched &&
+    linkedPatientsQuery.isFetched &&
+    linkedPatients.length === 0 &&
+    !linkedPatientsQuery.isError;
+  const phase: CarerViewPhase = linkQueriesLoading
+    ? "loading_link"
+    : linkResolvedEmpty || linkedPatientsQuery.isError
+      ? "unlinked"
+      : "ready";
 
   const devOverlay =
     import.meta.env.DEV ? (
-      <DevNote note="carer-view" error={error ?? loadError ?? undefined} />
+      <DevNote note="carer-view" error={loadError ?? undefined} />
     ) : null;
 
   useEffect(() => {
@@ -1334,101 +1357,30 @@ export default function CarerViewPage() {
   }, [phase, location]);
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const justLinkedAt = getCarerLinkJustCompletedAt();
-        const linkingGraceMs = 20_000;
-        const shouldRetry =
-          typeof justLinkedAt === "number" &&
-          Date.now() - justLinkedAt >= 0 &&
-          Date.now() - justLinkedAt < linkingGraceMs;
-        const delays = shouldRetry ? [300, 600, 1200, 2400, 4000] : [];
-
-        const sleep = (ms: number) =>
-          new Promise<void>((resolve) => {
-            setTimeout(resolve, ms);
-          });
-
-        let lastErr: Error | null = null;
-        let rows: LinkedPatientWithProfile[] = [];
-        for (let attempt = 0; attempt <= delays.length; attempt++) {
-          const res = await listLinkedPatientsForCarer();
-          if (!active) return;
-          lastErr = res.error;
-          rows = res.data ?? [];
-          if (!lastErr && rows.length > 0) break;
-          if (attempt < delays.length) await sleep(delays[attempt]!);
-        }
-
-        if (!active) return;
-        if (lastErr) {
-          console.error("carer-view: link error", lastErr);
-          setLinkedPatients([]);
-          setActivePatientIdState(null);
-          setError("unlinked or load error");
-          setPhase("unlinked");
-          return;
-        }
-        if (rows.length === 0) {
-          const fallback = await getLinkedPatientForCarer();
-          if (!active) return;
-          if (fallback.data && !fallback.error) {
-            const fp = fallback.data;
-            rows = [
-              {
-                linkId: fp.linkId,
-                patientId: fp.patientId,
-                carerId: fp.carerId,
-                scopes: fp.scopes,
-                patient_full_name: null,
-                patient_avatar_url: null,
-              },
-            ];
-          }
-        }
-        if (rows.length === 0) {
-          devWarn("carer-view: no linked patients");
-          setLinkedPatients([]);
-          setActivePatientIdState(null);
-          setError("unlinked or load error");
-          setPhase("unlinked");
-          return;
-        }
-        setError(null);
-        setLinkedPatients(rows);
-        const remembered = getActiveCarerPatientId();
-        const picked =
-          (remembered && rows.some((r) => r.patientId === remembered) && remembered) ||
-          rows[0]!.patientId;
-        setActiveCarerPatientId(picked);
-        setActivePatientIdState(picked);
-        setPhase("loading_patient");
-      } catch (e) {
-        console.error("carer-view: link error", e);
-        if (!active) return;
-        setLinkedPatients([]);
-        setActivePatientIdState(null);
-        setError("unlinked or load error");
-        setPhase("unlinked");
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (linkedPatients.length === 0) return;
+    const stillValid =
+      activePatientId != null && linkedPatients.some((p) => p.patientId === activePatientId);
+    if (stillValid) return;
+    const remembered = getActiveCarerPatientId();
+    const picked =
+      (remembered && linkedPatients.some((r) => r.patientId === remembered) && remembered) ||
+      linkedPatients[0]!.patientId;
+    setActiveCarerPatientId(picked);
+    setActivePatientIdState(picked);
+  }, [linkedPatients, activePatientId]);
 
   useEffect(() => {
-    if (phase !== "loading_patient" || !activeLink) return;
+    if (phase !== "ready" || !activeLink) return;
     let active = true;
+    const patientId = activeLink.patientId;
+    const rawScopes = normaliseScopes(activeLink.scopes);
+    setPatientBundleLoading(true);
     setLoadError(null);
     setAppointmentRows([]);
     setScenarioRows([]);
     setHypoLogs([]);
-    (async () => {
+    void (async () => {
       try {
-        const patientId = activeLink.patientId;
-        const rawScopes = normaliseScopes(activeLink.scopes);
         const [prof, sup, se, ap, sc, hl] = await Promise.all([
           fetchPatientProfileForCarer(patientId),
           rawScopes.supplies
@@ -1448,32 +1400,19 @@ export default function CarerViewPage() {
             : Promise.resolve({ data: [], error: null }),
         ]);
 
-        if (active) {
-          if (prof.error) setLoadError(prof.error.message);
-          setProfile(prof.data);
-
-          if (prof.data?.avatar_url) {
-            const url = await resolveProfileImageUrl(prof.data.avatar_url);
-            if (active) setAvatarUrl(url);
-          } else {
-            setAvatarUrl(null);
-          }
-
-          if (sup.error) setLoadError(sup.error.message);
-          setSupplies(sup.data ?? []);
-
-          if (se.error) setLoadError(se.error.message);
-          setSupplyEvents(se.data ?? []);
-
-          if (ap.error) setLoadError(ap.error.message);
-          setAppointmentRows(ap.data ?? []);
-
-          if (sc.error) setLoadError(sc.error.message);
-          setScenarioRows(sc.data ?? []);
-
-          if (hl.error) setLoadError(hl.error.message);
-          setHypoLogs(hl.data ?? []);
-        }
+        if (!active) return;
+        if (prof.error) setLoadError(prof.error.message);
+        setProfile(prof.data);
+        if (sup.error) setLoadError(sup.error.message);
+        setSupplies(sup.data ?? []);
+        if (se.error) setLoadError(se.error.message);
+        setSupplyEvents(se.data ?? []);
+        if (ap.error) setLoadError(ap.error.message);
+        setAppointmentRows(ap.data ?? []);
+        if (sc.error) setLoadError(sc.error.message);
+        setScenarioRows(sc.data ?? []);
+        if (hl.error) setLoadError(hl.error.message);
+        setHypoLogs(hl.data ?? []);
       } catch (e) {
         console.error("carer-view: patient data error", e);
         if (active) {
@@ -1486,14 +1425,29 @@ export default function CarerViewPage() {
       } finally {
         if (active) {
           clearCarerLinkJustCompleted();
-          setPhase("ready");
+          setPatientBundleLoading(false);
         }
       }
     })();
     return () => {
       active = false;
     };
-  }, [phase, activeLink]);
+  }, [phase, activeLink?.linkId, activeLink?.patientId]);
+
+  useEffect(() => {
+    const avatarPath = profile?.avatar_url ?? activeLink?.patient_avatar_url ?? null;
+    if (!avatarPath) {
+      setAvatarUrl(null);
+      return;
+    }
+    let active = true;
+    void resolveProfileImageUrl(avatarPath).then((url) => {
+      if (active) setAvatarUrl(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [profile?.avatar_url, activeLink?.patient_avatar_url]);
 
   useEffect(() => {
     if (phase === "unlinked") {
@@ -1507,7 +1461,8 @@ export default function CarerViewPage() {
     if (msg) setLinkedBanner(msg);
   }, [phase, activeLink]);
 
-  const displayName = profile?.full_name?.trim() || "Linked person";
+  const displayName =
+    profile?.full_name?.trim() || activeLink?.patient_full_name?.trim() || "Linked person";
 
   useEffect(() => {
     if (phase !== "ready" || !user?.id) return;
@@ -1665,30 +1620,6 @@ export default function CarerViewPage() {
     );
   }
 
-  if (phase === "loading_patient" || !activeLink) {
-    return (
-      <>
-        {devOverlay}
-        <PageShell variant="standard" className="max-w-3xl space-y-4 py-4" aria-busy="true">
-          <div className="sticky top-0 z-20 -mx-2 rounded-2xl border border-border/45 bg-card/90 px-3 py-2 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-card/80">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground truncate">Supporter Mode</p>
-                <p className="text-sm font-semibold text-foreground truncate">Read-only</p>
-              </div>
-              <Badge variant="secondary" className="rounded-full">
-                Loading…
-              </Badge>
-            </div>
-          </div>
-          <div className="px-1">
-            <HubLoadingSkeleton tiles={6} />
-          </div>
-        </PageShell>
-      </>
-    );
-  }
-
   if (phase !== "ready" || !activeLink) {
     return <>{devOverlay}</>;
   }
@@ -1696,13 +1627,16 @@ export default function CarerViewPage() {
   const onPatientChange = (patientId: string) => {
     setActiveCarerPatientId(patientId);
     setActivePatientIdState(patientId);
-    setPhase("loading_patient");
   };
 
   return (
     <>
       {devOverlay}
-      <PageShell variant="standard" className="max-w-3xl space-y-6 py-4">
+      <PageShell
+        variant="standard"
+        className="max-w-3xl space-y-6 py-4"
+        aria-busy={patientBundleLoading || undefined}
+      >
         <div className="flex flex-col gap-3 sm:gap-4 animate-stagger">
           <SupporterHero
             displayName={displayName}

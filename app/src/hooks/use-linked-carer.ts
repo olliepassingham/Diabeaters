@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import {
-  invalidateLinkedPatientQuery,
+  invalidateCarerLinkQueries,
   useLinkedPatientQuery,
 } from "@/lib/carer-link-query";
 
@@ -12,7 +12,7 @@ export function useLinkedCarer() {
   const linkQuery = useLinkedPatientQuery();
 
   const refetch = useCallback(async () => {
-    await invalidateLinkedPatientQuery(queryClient, user?.id);
+    await invalidateCarerLinkQueries(queryClient, user?.id);
   }, [queryClient, user?.id]);
 
   useEffect(() => {
