@@ -61,6 +61,7 @@ import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatientQuery, useLinkedPatientsForCarerQuery } from "@/lib/carer-link-query";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
+import { scrollToCarerViewHashTarget } from "@/pages/carer-view/carer-view-nav";
 import {
   CarerCardEmpty,
   CarerHypoTimelineItem,
@@ -1346,14 +1347,14 @@ export default function CarerViewPage() {
     if (phase !== "ready") return;
     if (typeof window === "undefined") return;
     const hash = window.location.hash;
-    requestAnimationFrame(() => {
-      if (hash === "#carer-scenarios") {
-        document.getElementById("carer-scenarios")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-      if (hash === "#carer-sick-day-care") {
-        document.getElementById("carer-sick-day-care")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    });
+    if (!hash) return;
+    const t = window.setTimeout(() => scrollToCarerViewHashTarget(hash), 50);
+    const onHash = () => scrollToCarerViewHashTarget(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("hashchange", onHash);
+    };
   }, [phase, location]);
 
   useEffect(() => {
@@ -1650,10 +1651,7 @@ export default function CarerViewPage() {
             onPatientChange={onPatientChange}
           />
 
-          <SupporterQuickActions
-            showActivity={showCarerActivityLog}
-            showEmergency={scopes.emergency_info ?? false}
-          />
+          <SupporterQuickActions showActivity={showCarerActivityLog} />
 
           {activeLink?.patientId ? (
             <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />

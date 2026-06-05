@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { openAssistantCtaLabel } from "@/lib/ai-coach/persona";
 import { cn } from "@/lib/utils";
+import { scrollToCarerViewSection } from "@/pages/carer-view/carer-view-nav";
 import {
   HomeCardEmpty,
   HomeHypoTimelineItem,
@@ -94,6 +95,10 @@ export function SupporterHero({
                 "hover:bg-background hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               aria-label="Jump to emergency details"
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToCarerViewSection("carer-emergency");
+              }}
             >
               <Phone className="h-4 w-4 text-destructive/80" aria-hidden />
               Emergency
@@ -156,13 +161,7 @@ export function SupporterHero({
   );
 }
 
-export function SupporterQuickActions({
-  showActivity,
-  showEmergency,
-}: {
-  showActivity: boolean;
-  showEmergency: boolean;
-}) {
+export function SupporterQuickActions({ showActivity }: { showActivity: boolean }) {
   const actions: HomeQuickAction[] = [];
   if (isAiCoachEnabled) {
     actions.push({
@@ -181,14 +180,6 @@ export function SupporterQuickActions({
       label: "Activity",
       icon: History,
       href: "/carer-view/activity",
-    });
-  }
-  if (showEmergency) {
-    actions.push({
-      id: "emergency",
-      label: "Emergency",
-      icon: Phone,
-      href: "#carer-emergency",
     });
   }
   return <HomeQuickActions actions={actions} testId="carer-quick-actions" />;
