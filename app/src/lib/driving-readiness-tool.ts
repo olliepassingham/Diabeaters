@@ -1,11 +1,12 @@
 import { normalizeBgUnits, isBgLow, isBgVeryHigh } from "@/lib/alcohol-night-tool";
+import { formatCarbsForScenario } from "@/lib/carb-source-preferences";
 import {
   formatPrimaryTreatmentShort,
   type PrimaryHypoTreatment,
 } from "@/lib/hypo-treatment-display";
 import { isExerciseStartLow } from "@/lib/exercise-reading-guidance";
 import { formatTargetBgInput } from "@/lib/hypo-context";
-import type { UserSettings } from "@/lib/storage";
+import type { UserProfile, UserSettings } from "@/lib/storage";
 
 /**
  * Quick driving readiness — heuristic only. Does not encode legal limits;
@@ -27,6 +28,8 @@ export type DrivingReadinessInput = {
 
 export type DrivingReadinessContext = {
   settings?: UserSettings;
+  profile?: Partial<UserProfile>;
+  /** Legacy fallback when profile is omitted (tests). */
   primaryHypoTreatment?: PrimaryHypoTreatment;
   isPump?: boolean;
 };
@@ -86,14 +89,21 @@ function isBelowUserTargetLow(bg: number, settings: UserSettings | undefined, u:
   return bg < low;
 }
 
-function treatmentDoNowLine(treatment: PrimaryHypoTreatment | undefined): string {
-  const hint = formatPrimaryTreatmentShort(HYPO_TREATMENT_GRAMS, treatment);
+function drivingTreatmentHint(grams: number, context: DrivingReadinessContext): string | null {
+  if (context.profile) {
+    return formatCarbsForScenario(grams, context.profile, "driving");
+  }
+  return formatPrimaryTreatmentShort(grams, context.primaryHypoTreatment);
+}
+
+function treatmentDoNowLine(context: DrivingReadinessContext): string {
+  const hint = drivingTreatmentHint(HYPO_TREATMENT_GRAMS, context);
   if (hint) return `Treat with ${hint} as your team taught you, wait about 15 minutes, then recheck.`;
   return "Treat with fast-acting carbohydrate as your team taught you, wait about 15 minutes, then recheck.";
 }
 
-function treatmentInCarLine(treatment: PrimaryHypoTreatment | undefined): string {
-  const hint = formatPrimaryTreatmentShort(HYPO_TREATMENT_GRAMS, treatment);
+function treatmentInCarLine(context: DrivingReadinessContext): string {
+  const hint = drivingTreatmentHint(HYPO_TREATMENT_GRAMS, context);
   if (hint) return `Put ${hint} where you can reach them without leaving your seat (passenger footwell is fine).`;
   return "Keep fast-acting carbs in the passenger area — not only in the boot.";
 }
@@ -145,7 +155,7 @@ export function buildDrivingReadinessOutcome(
   context: DrivingReadinessContext = {},
 ): DrivingReadinessOutcome {
   const u = normalizeBgUnits(profileBgUnits);
-  const { settings, primaryHypoTreatment, isPump = false } = context;
+  const { settings, isPump = false } = context;
   const readingSummary = formatReadingSummary(
     input.bgValue,
     input.bgSkipped ? null : input.bgTrend,
@@ -192,9 +202,9 @@ export function buildDrivingReadinessOutcome(
       return outcome("not_ready", {
         headline: "Treat glucose first",
         lead: `Reading is below the app’s low threshold (under ${u === "mg/dL" ? "72" : "4"} ${u}) — not a legal limit.`,
-        doNow: [treatmentDoNowLine(primaryHypoTreatment), "Only drive after you are back in range and feel well."],
+        doNow: [treatmentDoNowLine(context), "Only drive after you are back in range and feel well."],
         beforeYouGo: appendLongJourney(
-          ["Run this check again after you recheck.", treatmentInCarLine(primaryHypoTreatment)],
+          ["Run this check again after you recheck.", treatmentInCarLine(context)],
           input.longJourney,
         ),
         detailsForInfo: infoDetails,
@@ -222,7 +232,7 @@ export function buildDrivingReadinessOutcome(
     return outcome("caution", {
       headline: "Fix this before driving",
       lead: "Fast-acting carbohydrate should be within reach before you set off.",
-      doNow: [treatmentInCarLine(primaryHypoTreatment)],
+      doNow: [treatmentInCarLine(context)],
       beforeYouGo: appendLongJourney(
         ["Then run this check again if you want a quick follow-up."],
         input.longJourney,

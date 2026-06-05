@@ -1,11 +1,16 @@
 import {
+  carbSourcePreferencesFromCloud,
+  carbSourcePreferencesToCloud,
+  getCarbSourcePreferences,
+} from "@/lib/carb-source-preferences";
+import { queryClient } from "@/lib/queryClient";
+import {
   profileQueryKey,
   updateProfile,
   type PharmacyJson,
   type ProfileRow,
   type ProfileUpdatePayload,
 } from "@/lib/profile";
-import { queryClient } from "@/lib/queryClient";
 import {
   DIABEATER_SETTINGS_CHANGED_EVENT,
   emptyPharmacyHours,
@@ -219,6 +224,18 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
           : lp.emergencyNumber;
       if (lp.region !== region || lp.emergencyNumber !== emergencyNumber) {
         storage.saveProfile({ ...lp, region, emergencyNumber });
+      }
+    }
+  }
+
+  if (row.carb_source_prefs !== undefined) {
+    const cloudPrefs = carbSourcePreferencesFromCloud(row.carb_source_prefs);
+    const lp = storage.getProfile();
+    if (lp) {
+      if (cloudPrefs) {
+        storage.saveProfile({ ...lp, carbSourcePreferences: cloudPrefs });
+      } else if (row.carb_source_prefs === null && lp.carbSourcePreferences) {
+        storage.saveProfile({ ...lp, carbSourcePreferences: undefined });
       }
     }
   }
@@ -454,6 +471,26 @@ export async function syncPharmacyToCloud(userId: string): Promise<{ error: Erro
   }
   if (isMissingProfileColumnSchemaError(error.message, "pharmacy")) {
     return { error: null, pharmacyCloudSkipped: true };
+  }
+  return { error };
+}
+
+export async function syncCarbSourcePrefsToCloud(
+  userId: string,
+): Promise<{ error: Error | null; skipped?: boolean }> {
+  const lp = storage.getProfile();
+  const prefs = getCarbSourcePreferences(lp ?? undefined);
+  const payload: ProfileUpdatePayload = {
+    id: userId,
+    carb_source_prefs: carbSourcePreferencesToCloud(prefs),
+  };
+  const { error } = await updateProfile(payload);
+  if (!error) {
+    await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
+    return { error: null };
+  }
+  if (isMissingProfileColumnSchemaError(error.message, "carb_source_prefs")) {
+    return { error: null, skipped: true };
   }
   return { error };
 }

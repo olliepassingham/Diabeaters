@@ -1,9 +1,6 @@
 import { getBodyWeightKgFromProfile } from "@/lib/body-weight";
-import {
-  computeHypoCarbEquivalents,
-  formatPrimaryTreatmentShort,
-  getPrimaryHypoTreatmentFromProfile,
-} from "@/lib/hypo-treatment-display";
+import { formatCarbsForScenario } from "@/lib/carb-source-preferences";
+import { computeHypoCarbEquivalents } from "@/lib/hypo-treatment-display";
 import type { ActiveExerciseSession, UserProfile, UserSettings } from "@/lib/storage";
 import { suggestedRecoveryTargetBg } from "@/lib/hypo-context";
 import { hypoCalculatorRequiresExplicitWeight } from "@/lib/user-age";
@@ -61,8 +58,6 @@ export function computeExerciseHypoSuggestion(
 ): ExerciseHypoSuggestion | null {
   if (!isBgBelowHypoThreshold(bg, settings, bgUnits)) return null;
 
-  const primaryTreatment = getPrimaryHypoTreatmentFromProfile(profile);
-
   if (hypoCalculatorRequiresExplicitWeight(profile.dateOfBirth)) {
     const eq = computeHypoCarbEquivalents(15);
     return {
@@ -70,7 +65,7 @@ export function computeExerciseHypoSuggestion(
       glucoseTablets: eq.glucoseTablets,
       juiceMl: eq.juiceMl,
       approximate: true,
-      primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
+      primaryTreatmentLine: formatCarbsForScenario(eq.carbsGrams, profile, "exercise_during") ?? undefined,
     };
   }
 
@@ -91,7 +86,7 @@ export function computeExerciseHypoSuggestion(
       glucoseTablets: eq.glucoseTablets,
       juiceMl: eq.juiceMl,
       approximate: false,
-      primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
+      primaryTreatmentLine: formatCarbsForScenario(eq.carbsGrams, profile, "exercise_during") ?? undefined,
     };
   }
 
@@ -106,6 +101,6 @@ export function computeExerciseHypoSuggestion(
     glucoseTablets: eq.glucoseTablets,
     juiceMl: eq.juiceMl,
     approximate: false,
-    primaryTreatmentLine: formatPrimaryTreatmentShort(eq.carbsGrams, primaryTreatment) ?? undefined,
+    primaryTreatmentLine: formatCarbsForScenario(eq.carbsGrams, profile, "exercise_during") ?? undefined,
   };
 }

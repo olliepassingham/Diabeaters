@@ -22,12 +22,11 @@ import {
   computeExerciseFuelPlan,
   type ExerciseFuelCalculatorResult,
 } from "@/lib/exercise-fuel-calculator";
-import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
-  formatPrimaryTreatmentShort,
-  getPrimaryHypoTreatmentFromProfile,
-  type PrimaryHypoTreatment,
-} from "@/lib/hypo-treatment-display";
+  formatCarbsForScenario,
+  type CarbSourceScenario,
+} from "@/lib/carb-source-preferences";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
@@ -35,6 +34,7 @@ import {
   type ExerciseBgTrend,
   type ExerciseIntensity,
   type ExerciseType,
+  type UserProfile,
 } from "@/lib/storage";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -67,19 +67,21 @@ function PlanDetailSection({ title, children }: { title: string; children: React
   );
 }
 
-/** One-line hint from profile usual hypo treatment (e.g. "about 4 glucose tablets"). */
+/** One-line hint from profile carb source for this scenario (e.g. "about 3 Running gel"). */
 function TreatmentHint({
   carbsGrams,
-  treatment,
+  profile,
+  scenario,
   suffix,
   className,
 }: {
   carbsGrams: number;
-  treatment: PrimaryHypoTreatment | undefined;
+  profile: Partial<UserProfile> | undefined;
+  scenario: CarbSourceScenario;
   suffix?: string;
   className?: string;
 }) {
-  const line = formatPrimaryTreatmentShort(carbsGrams, treatment);
+  const line = formatCarbsForScenario(carbsGrams, profile, scenario);
   if (!line) return null;
   return (
     <p className={cn("text-[11px] leading-snug text-muted-foreground", className)}>
@@ -93,18 +95,18 @@ function ExerciseFuelPlanDetails({
   result,
   bgUnits,
   sessionLine,
-  primaryHypoTreatment,
+  profile,
 }: {
   result: ExerciseFuelCalculatorResult;
   bgUnits: string;
   sessionLine: string;
-  primaryHypoTreatment: PrimaryHypoTreatment | undefined;
+  profile: Partial<UserProfile> | undefined;
 }) {
   const settings = storage.getSettings();
-  const mealTreatment = formatPrimaryTreatmentShort(result.mealCarbs, primaryHypoTreatment);
-  const onHandTreatment = formatPrimaryTreatmentShort(result.onHandCarbs, primaryHypoTreatment);
+  const mealTreatment = formatCarbsForScenario(result.mealCarbs, profile, "hypo");
+  const onHandTreatment = formatCarbsForScenario(result.onHandCarbs, profile, "exercise_on_hand");
   const duringTreatment =
-    result.duringCarbs > 0 ? formatPrimaryTreatmentShort(result.duringCarbs, primaryHypoTreatment) : null;
+    result.duringCarbs > 0 ? formatCarbsForScenario(result.duringCarbs, profile, "exercise_during") : null;
   const showMealTreatmentInDetails = mealTreatment && !result.insulinSuppressedReason;
 
   return (
@@ -185,16 +187,14 @@ export function ExerciseFuelCalculator() {
   const [formOpen, setFormOpen] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const [hasActiveExercise, setHasActiveExercise] = useState(() => Boolean(storage.getActiveExercise()));
-  const [primaryHypoTreatment, setPrimaryHypoTreatment] = useState<PrimaryHypoTreatment | undefined>(() =>
-    getPrimaryHypoTreatmentFromProfile(storage.getProfile()),
-  );
+  const [profile, setProfile] = useState<Partial<UserProfile> | undefined>(() => storage.getProfile() ?? undefined);
 
   useEffect(() => {
     const sync = () => {
       const p = storage.getProfile();
+      setProfile(p ?? undefined);
       if (p?.bgUnits) setBgUnits(p.bgUnits);
       setIsPump(isPumpDeliveryMethod(p?.insulinDeliveryMethod));
-      setPrimaryHypoTreatment(getPrimaryHypoTreatmentFromProfile(p));
     };
     sync();
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, sync);
@@ -564,7 +564,7 @@ export function ExerciseFuelCalculator() {
                     result={result}
                     bgUnits={bgUnits}
                     sessionLine={sessionLine}
-                    primaryHypoTreatment={primaryHypoTreatment}
+                    profile={profile}
                   />
                 }
               />
@@ -581,7 +581,8 @@ export function ExerciseFuelCalculator() {
                 {result.insulinSuppressedReason ? (
                   <TreatmentHint
                     carbsGrams={result.mealCarbs}
-                    treatment={primaryHypoTreatment}
+                    profile={profile}
+                    scenario="hypo"
                     suffix="to bring BG up"
                     className="mt-1.5"
                   />
@@ -594,7 +595,8 @@ export function ExerciseFuelCalculator() {
                 <p className="text-sm text-muted-foreground">fast carbs on hand</p>
                 <TreatmentHint
                   carbsGrams={result.onHandCarbs}
-                  treatment={primaryHypoTreatment}
+                  profile={profile}
+                  scenario="exercise_on_hand"
                   className="mt-1"
                 />
               </div>
@@ -605,7 +607,7 @@ export function ExerciseFuelCalculator() {
                 <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">On hand</p>
                   <p className="font-semibold tabular-nums">~{result.onHandCarbs}g</p>
-                  <TreatmentHint carbsGrams={result.onHandCarbs} treatment={primaryHypoTreatment} className="mt-0.5" />
+                  <TreatmentHint carbsGrams={result.onHandCarbs} profile={profile} scenario="exercise_on_hand" className="mt-0.5" />
                 </div>
                 <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">During</p>
@@ -613,7 +615,7 @@ export function ExerciseFuelCalculator() {
                     {result.duringCarbs > 0 ? `~${result.duringCarbs}g` : "—"}
                   </p>
                   {result.duringCarbs > 0 ? (
-                    <TreatmentHint carbsGrams={result.duringCarbs} treatment={primaryHypoTreatment} className="mt-0.5" />
+                    <TreatmentHint carbsGrams={result.duringCarbs} profile={profile} scenario="exercise_during" className="mt-0.5" />
                   ) : null}
                 </div>
               </div>

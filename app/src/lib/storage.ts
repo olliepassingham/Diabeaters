@@ -501,6 +501,8 @@ export interface UserProfile {
   emergencyNumber?: string;
   /** Usual first-line hypo treatment — personalizes carb-to-product hints app-wide. */
   primaryHypoTreatment?: import("@/lib/hypo-treatment-display").PrimaryHypoTreatment;
+  /** Named carb favourites + per-scenario defaults (hypo, exercise, driving). */
+  carbSourcePreferences?: import("@/lib/carb-source-preferences").CarbSourcePreferences;
 }
 
 export function isCommunityAccountProfile(profile: UserProfile | null | undefined): boolean {

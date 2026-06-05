@@ -7,6 +7,7 @@ import { useAuth } from "./auth-context";
 import { getSupabase } from "./supabase";
 import { normalizeDateOfBirthInput } from "./user-age";
 import type { PublicProfileAchievement } from "./user-achievements";
+import { carbSourcePreferencesFromCloud } from "./carb-source-preferences";
 
 export type ProfileRow = {
   id: string;
@@ -40,6 +41,8 @@ export type ProfileRow = {
   emergency_number?: string | null;
   /** Achievement ids pinned to public profile (max 5). */
   pinned_achievement_ids?: string[] | null;
+  /** Named carb favourites + scenario defaults for hypo/exercise/driving hints. */
+  carb_source_prefs?: import("@/lib/carb-source-preferences").CarbSourcePreferences | null;
 };
 
 /** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
@@ -124,6 +127,14 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     pinned_achievement_ids = rawPinned.filter((id): id is string => typeof id === "string");
   } else pinned_achievement_ids = [];
 
+  const rawCarbPrefs = data.carb_source_prefs;
+  let carb_source_prefs: ProfileRow["carb_source_prefs"];
+  if (rawCarbPrefs === null) carb_source_prefs = null;
+  else if (rawCarbPrefs === undefined) carb_source_prefs = undefined;
+  else if (typeof rawCarbPrefs === "object") {
+    carb_source_prefs = carbSourcePreferencesFromCloud(rawCarbPrefs);
+  } else carb_source_prefs = null;
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -145,6 +156,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     app_region,
     emergency_number,
     pinned_achievement_ids,
+    carb_source_prefs,
   };
 }
 
@@ -446,6 +458,7 @@ export type ProfileUpdatePayload = {
     | "app_region"
     | "emergency_number"
     | "pinned_achievement_ids"
+    | "carb_source_prefs"
   >
 >;
 
@@ -473,6 +486,7 @@ export async function updateProfile(
     app_region,
     emergency_number,
     pinned_achievement_ids,
+    carb_source_prefs,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -568,6 +582,9 @@ export async function updateProfile(
     } else {
       update.pinned_achievement_ids = pinned_achievement_ids.filter((id) => typeof id === "string").slice(0, 5);
     }
+  }
+  if (carb_source_prefs !== undefined) {
+    update.carb_source_prefs = carb_source_prefs ?? null;
   }
 
   try {

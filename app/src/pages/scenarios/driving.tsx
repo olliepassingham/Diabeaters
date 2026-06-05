@@ -24,7 +24,6 @@ import {
   formatDrivingTargetRange,
   getRecentHypoForDriving,
 } from "@/lib/driving-prefill";
-import { getPrimaryHypoTreatmentFromProfile } from "@/lib/hypo-treatment-display";
 import {
   buildDrivingReadinessOutcome,
   type DrivingReadinessOutcome,
@@ -133,7 +132,6 @@ export default function DrivingScenarioPage() {
 
   const bgUnits = normalizeBgUnits(profile.bgUnits);
   const settings = storage.getSettings();
-  const primaryHypoTreatment = getPrimaryHypoTreatmentFromProfile(profile);
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
   const targetRangeLine = formatDrivingTargetRange(settings, bgUnits);
   const recentHypoLogged = getRecentHypoForDriving(4);
@@ -145,10 +143,10 @@ export default function DrivingScenarioPage() {
   const drivingContext = useMemo(
     () => ({
       settings,
-      primaryHypoTreatment,
+      profile,
       isPump: isPumpUser,
     }),
-    [settings, primaryHypoTreatment, isPumpUser],
+    [settings, profile, isPumpUser],
   );
 
   const runCheck = () => {

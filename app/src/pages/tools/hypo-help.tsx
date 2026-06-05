@@ -36,8 +36,8 @@ import {
 } from "@/lib/post-exercise-nudge";
 import {
   computeHypoCarbEquivalents,
-  formatPrimaryTreatmentShort,
-  getPrimaryHypoTreatmentFromProfile,
+  formatCarbsForScenario,
+  resolveCarbSource,
 } from "@/lib/hypo-treatment-display";
 
 const HYPO_RECHECK_FLOW_STEPS: StepLadderStep[] = [
@@ -79,7 +79,8 @@ export default function HypoHelpPage() {
   const [contextOpen, setContextOpen] = useState(false);
 
   const bgUnits = profile.bgUnits || "mmol/L";
-  const primaryHypoTreatment = getPrimaryHypoTreatmentFromProfile(profile);
+  const hypoCarbSource = resolveCarbSource(profile, "hypo");
+  const hypoTreatmentLine = (grams: number) => formatCarbsForScenario(grams, profile, "hypo");
   const postExerciseHypoCopy = useMemo(() => {
     void postExerciseNudgeRev;
     if (!storage.shouldShowPostExerciseEducationalNudges()) return null;
@@ -355,15 +356,15 @@ export default function HypoHelpPage() {
               <div className="text-center p-4 bg-card rounded-lg border border-red-200/60 dark:border-red-800/50">
                 <p className="text-4xl font-bold text-red-600 dark:text-red-400">{hypoResult.carbsGrams}g</p>
                 <p className="text-small text-red-700 dark:text-red-300">fast-acting carbs</p>
-                {formatPrimaryTreatmentShort(hypoResult.carbsGrams, primaryHypoTreatment) ? (
+                {hypoResult && hypoTreatmentLine(hypoResult.carbsGrams) ? (
                   <p className="mt-2 text-sm font-medium text-red-800 dark:text-red-200">
-                    Your usual choice: {formatPrimaryTreatmentShort(hypoResult.carbsGrams, primaryHypoTreatment)}
+                    Your usual choice: {hypoTreatmentLine(hypoResult.carbsGrams)}
                   </p>
                 ) : null}
               </div>
               <Collapsible>
                 <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-red-200/60 bg-card/80 px-3 py-2 text-left text-sm font-medium text-red-800 dark:text-red-200 dark:border-red-900/50">
-                  <span>{primaryHypoTreatment ? "Other options" : "That's about"}</span>
+                  <span>{hypoCarbSource ? "Other options" : "That's about"}</span>
                   <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -382,13 +383,13 @@ export default function HypoHelpPage() {
                         <p className="text-tiny text-red-600 dark:text-red-400">jelly babies</p>
                       </div>
                     </div>
-                    {!primaryHypoTreatment ? (
+                    {!hypoCarbSource ? (
                       <p className="text-xs text-muted-foreground">
-                        Set your usual hypo treatment in{" "}
-                        <Link href="/settings/usage#settings-personal" className="text-primary underline-offset-4 hover:underline">
-                          Settings
+                        Set your carb sources in{" "}
+                        <Link href="/settings/carb-sources" className="text-primary underline-offset-4 hover:underline">
+                          Settings → Carb sources
                         </Link>{" "}
-                        to see your preferred option first.
+                        for personalised hints.
                       </p>
                     ) : null}
                   </div>

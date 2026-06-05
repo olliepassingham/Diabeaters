@@ -29,6 +29,7 @@ import {
   AtSign,
   Building2,
   Sparkles,
+  Cookie,
 } from "lucide-react";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
@@ -56,11 +57,6 @@ import {
 } from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { scrollToSettingsHashTarget } from "@/lib/settings-nav";
-import {
-  normalizePrimaryHypoTreatment,
-  PRIMARY_HYPO_TREATMENT_OPTIONS,
-  type PrimaryHypoTreatment,
-} from "@/lib/hypo-treatment-display";
 import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import {
   APP_REGION_OPTIONS,
@@ -102,8 +98,6 @@ function ProfileTab({
   weightDisplayUnit,
   setWeightDisplayUnit,
   weightRequiredForHypo,
-  primaryHypoTreatment,
-  setPrimaryHypoTreatment,
   onSave,
 }: {
   appRegion: AppRegion;
@@ -123,8 +117,6 @@ function ProfileTab({
   weightDisplayUnit: WeightDisplayUnit;
   setWeightDisplayUnit: (v: WeightDisplayUnit) => void;
   weightRequiredForHypo: boolean;
-  primaryHypoTreatment: PrimaryHypoTreatment | "";
-  setPrimaryHypoTreatment: (v: PrimaryHypoTreatment | "") => void;
   onSave: () => void;
 }) {
   const handleRegionChange = (next: AppRegion) => {
@@ -313,33 +305,13 @@ function ProfileTab({
         </div>
       </div>
       <div className="space-y-1.5">
-        <FieldLabelWithInfo
-          htmlFor="primary-hypo-treatment"
-          info={
-            <p>
-              When the app suggests fast carbs (hypo help, exercise, and similar), it can show amounts in your usual
-              format — for example tablets or juice. Your care team&apos;s written hypo plan always comes first.
-            </p>
-          }
-        >
-          Usual hypo treatment <span className="text-muted-foreground font-normal">(optional)</span>
-        </FieldLabelWithInfo>
-        <Select
-          value={primaryHypoTreatment || "unset"}
-          onValueChange={(v) => setPrimaryHypoTreatment(v === "unset" ? "" : (v as PrimaryHypoTreatment))}
-        >
-          <SelectTrigger id="primary-hypo-treatment" data-testid="select-primary-hypo-treatment">
-            <SelectValue placeholder="Choose your usual first step" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="unset">Not set — show all options</SelectItem>
-            {PRIMARY_HYPO_TREATMENT_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <p className="text-sm text-muted-foreground">
+          Name your gels, drinks, and tablets for hypo and exercise advice in{" "}
+          <Link href="/settings/carb-sources" className="text-primary underline-offset-4 hover:underline">
+            Carb sources
+          </Link>
+          . Grams stay the main number — favourites translate them into what you carry.
+        </p>
       </div>
       <div className="hidden justify-end pt-1 md:flex">
         <Button onClick={onSave} data-testid="button-save-profile">
@@ -985,7 +957,6 @@ export default function Settings() {
   const [weightDisplayUnit, setWeightDisplayUnit] = useState<WeightDisplayUnit>("kg");
   const [appRegion, setAppRegion] = useState<AppRegion>("UK");
   const [emergencyNumber, setEmergencyNumber] = useState("");
-  const [primaryHypoTreatment, setPrimaryHypoTreatment] = useState<PrimaryHypoTreatment | "">("");
 
   const [tdd, setTdd] = useState("");
   const [breakfastRatio, setBreakfastRatio] = useState("");
@@ -1072,7 +1043,6 @@ export default function Settings() {
       setBodyWeightInput(kg != null ? formatWeightInputFromKg(kg, unit) : "");
       setAppRegion(storedProfile.region ?? "UK");
       setEmergencyNumber(storedProfile.emergencyNumber ?? "");
-      setPrimaryHypoTreatment(normalizePrimaryHypoTreatment(storedProfile.primaryHypoTreatment) ?? "");
     } else {
       setProfile(defaultProfile);
       setBodyWeightInput("");
@@ -1144,7 +1114,7 @@ export default function Settings() {
   useEffect(() => {
     if (
       hidePatientClinicalHub &&
-      (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios" || pathOnly === "/settings/pharmacy")
+      (pathOnly === "/settings/usage" || pathOnly === "/settings/ratios" || pathOnly === "/settings/pharmacy" || pathOnly === "/settings/carb-sources")
     ) {
       setLocation("/settings");
     }
@@ -1263,7 +1233,6 @@ export default function Settings() {
       weightDisplayUnit,
       region: appRegion,
       emergencyNumber: emergencyNumber.trim() || undefined,
-      primaryHypoTreatment: primaryHypoTreatment || undefined,
     };
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
@@ -1543,8 +1512,6 @@ export default function Settings() {
           weightRequiredForHypo={profileWeightRequiredForHypo(
             normalizeDateOfBirthInput(profile?.dateOfBirth?.trim() || null),
           )}
-          primaryHypoTreatment={primaryHypoTreatment}
-          setPrimaryHypoTreatment={setPrimaryHypoTreatment}
           onSave={() => void handleSaveProfile()}
         />
       </section>
@@ -1728,6 +1695,12 @@ export default function Settings() {
               label="Ratios"
               description="TDD, targets, correction factor, meal ratios"
               icon={Syringe}
+            />
+            <SettingsHubNavLink
+              href="/settings/carb-sources"
+              label="Carb sources"
+              description="Name your gels, drinks, and tablets — used in hypo and exercise advice"
+              icon={Cookie}
             />
             <SettingsHubNavLink
               href="/settings/pharmacy"

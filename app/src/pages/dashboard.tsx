@@ -36,7 +36,7 @@ import {
   HypoTreatment,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
-import { getPrimaryHypoTreatmentFromProfile, primaryHypoTreatmentLogLabel } from "@/lib/hypo-treatment-display";
+import { carbSourceLogLabel } from "@/lib/hypo-treatment-display";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -332,9 +332,9 @@ function HeroCard({
     if (!hypoDialogOpen) return;
     setHypoHistory(storage.getHypoTreatments());
     setShowHypoHistory(false);
-    const primary = getPrimaryHypoTreatmentFromProfile(profile);
-    if (primary) {
-      setHypoTreatment((prev) => prev || primaryHypoTreatmentLogLabel(primary));
+    const label = carbSourceLogLabel(profile, "hypo");
+    if (label) {
+      setHypoTreatment((prev) => prev || label);
     }
   }, [hypoDialogOpen, profile]);
 

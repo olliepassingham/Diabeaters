@@ -128,6 +128,7 @@ const Travel = lazy(() => import("@/pages/travel"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const SettingsEmergencyPage = lazy(() => import("@/pages/settings/emergency"));
 const SettingsPharmacyPage = lazy(() => import("@/pages/settings/pharmacy"));
+const SettingsCarbSourcesPage = lazy(() => import("@/pages/settings/carb-sources"));
 
 const Scenarios = lazy(() => import("@/pages/scenarios"));
 const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
@@ -875,6 +876,13 @@ function InnerRouter() {
         <PatientRouteGuard>
           <Suspense fallback={<RouteFallback />}>
             <SettingsPharmacyPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
+      <Route path="/settings/carb-sources">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <SettingsCarbSourcesPage />
           </Suspense>
         </PatientRouteGuard>
       </Route>

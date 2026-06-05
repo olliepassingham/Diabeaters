@@ -155,3 +155,12 @@ export function formatFastCarbsWithPrimaryTreatment(
   if (!primary) return grams;
   return `${grams} · ${primary}`;
 }
+
+export {
+  formatCarbsForScenario,
+  formatFastCarbsForScenario,
+  getCarbSourcePreferences,
+  carbSourceLogLabel,
+  resolveCarbSource,
+  type CarbSourceScenario,
+} from "@/lib/carb-source-preferences";
