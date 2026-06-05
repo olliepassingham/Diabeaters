@@ -41,13 +41,14 @@ import {
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
+import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
 import { useToast } from "@/hooks/use-toast";
 import { calculateExercisePlan, getRecoveryInsulinHeadline, type ExercisePlanResult, type LastInsulinTiming } from "@/lib/exercise-plan";
 import {
   getExerciseReadinessVerdict,
   getReadinessToneClasses,
   getExerciseCarbPlanHintLine,
+  getExerciseFuelPlanLines,
   type ExerciseReadinessResult,
 } from "@/lib/exercise-readiness";
 import { cancelExerciseReminders, scheduleExerciseActiveReminders } from "@/lib/exercise-reminders";
@@ -516,10 +517,22 @@ export function AppStatusStrip() {
     return { verdict: v, plan: exercisePlan, bg };
   }, [bgUnits, ex, exerciseBgInput, exercisePlan, sc.sickDayActive, sc.sickDaySeverity, trendForReadiness]);
 
-  const preCarbHintLine = useMemo(() => {
-    if (ex?.phase !== "pre" || !exercisePlan || !readiness?.verdict) return null;
-    return getExerciseCarbPlanHintLine(exercisePlan, readiness.verdict.verdict, { phase: "pre" });
-  }, [ex?.phase, exercisePlan, readiness?.verdict]);
+  const preFuelPlanLines = useMemo(() => {
+    if (ex?.phase !== "pre" || !exercisePlan || !readiness?.verdict) return [];
+    if (readiness.bg == null) return [];
+    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+      phase: "pre",
+      exerciseType: ex.exerciseType,
+    });
+  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+
+  const activeFuelPlanLines = useMemo(() => {
+    if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
+    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
+      phase: "active",
+      exerciseType: ex.exerciseType,
+    });
+  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.verdict, stripProfile]);
 
   const recoveryInsulinLine = useMemo(() => {
     if (!exercisePlan || ex?.phase !== "recovery") return null;
@@ -558,10 +571,21 @@ export function AppStatusStrip() {
       }
     }
 
-    if (preCarbHintLine) lines.push(preCarbHintLine);
+    if (preFuelPlanLines.length > 0) {
+      for (const line of preFuelPlanLines) {
+        lines.push(`${line.label}: ${line.text}`);
+      }
+    } else if (ex.phase === "pre" && readiness?.verdict) {
+      const hint = getExerciseCarbPlanHintLine(exercisePlan, readiness.verdict.verdict, {
+        phase: "pre",
+        exerciseType: ex.exerciseType,
+        profile: stripProfile,
+      });
+      if (hint) lines.push(hint);
+    }
 
     return lines;
-  }, [ex, exercisePlan, preCarbHintLine, recoveryInsulinLine, recoveryMinutesLeft]);
+  }, [ex, exercisePlan, preFuelPlanLines, readiness?.verdict, recoveryInsulinLine, recoveryMinutesLeft, stripProfile]);
 
   const exerciseHypoStrip = useMemo(() => {
     if (!ex) return null;
@@ -1032,6 +1056,9 @@ export function AppStatusStrip() {
                         <p className="text-sm leading-snug text-foreground/90">
                           {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
                         </p>
+                        {activeFuelPlanLines.length > 0 ? (
+                          <ExerciseFuelPlanSummary lines={activeFuelPlanLines} className="mt-2" />
+                        ) : null}
                       </div>
                     );
                   })()}
@@ -1092,8 +1119,11 @@ export function AppStatusStrip() {
                       ) : null}
                     </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
+                    {preFuelPlanLines.length > 0 ? (
+                      <ExerciseFuelPlanSummary lines={preFuelPlanLines} className="mt-2" />
+                    ) : null}
                     {(() => {
-                      const needsCarbPrompt = !ex.preChecklist.carbsConsidered;
+                      const needsCarbPrompt = !ex.preChecklist.carbsConsidered && preFuelPlanLines.length === 0;
                       const needsInsulinPrompt = !ex.preChecklist.basalAdjusted;
                       const show = needsCarbPrompt || needsInsulinPrompt;
                       if (!show) return null;

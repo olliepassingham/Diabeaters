@@ -5,7 +5,10 @@ import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { collectAllActivityEvents, type ActivityEvent } from "@/lib/activity-history";
 import { syncAchievementsFromActivity } from "@/lib/user-achievements";
-import { DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
+import {
+  DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
+  DIABEATER_SCENARIO_STATE_CHANGED_EVENT,
+} from "@/lib/storage";
 
 export default function ActivityLogPage() {
   const [events, setEvents] = useState<ActivityEvent[]>(() => collectAllActivityEvents());
@@ -22,9 +25,11 @@ export default function ActivityLogPage() {
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+    window.addEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, refresh);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(DIABEATER_SCENARIO_STATE_CHANGED_EVENT, refresh);
+      window.removeEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, refresh);
     };
   }, [refresh]);
 

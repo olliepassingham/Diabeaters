@@ -30,7 +30,7 @@ import {
 import {
   getExerciseReadinessVerdict,
   getReadinessToneClasses,
-  getExerciseCarbPlanHintLine,
+  getExerciseFuelPlanLines,
 } from "@/lib/exercise-readiness";
 import {
   bgForPlannerFromActiveSession,
@@ -49,7 +49,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 import { useToast } from "@/hooks/use-toast";
-import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
+import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
 import { computeExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
 
 const EXERCISE_LABELS: Record<ExerciseType, string> = {
@@ -598,13 +598,22 @@ export function ActiveExerciseBanner() {
   const [showExerciseTips, setShowExerciseTips] = useState(false);
   const [recoveryBgDialogOpen, setRecoveryBgDialogOpen] = useState(false);
 
-  const { readinessResult, carbPlanHint, exercisePlanResult } = useMemo(() => {
-    if (!session) return { readinessResult: null, carbPlanHint: null, exercisePlanResult: null };
+  const { readinessResult, fuelPlanLines, exercisePlanResult } = useMemo(() => {
+    if (!session) return { readinessResult: null, fuelPlanLines: [], exercisePlanResult: null };
     const scenarioState = storage.getScenarioState();
-    const bg = bgForPlannerFromActiveSession(session);
-    const trend = trendForPlannerFromActiveSession(session);
+    const profile = storage.getProfile();
+    let bg = bgForPlannerFromActiveSession(session);
+    let trend = trendForPlannerFromActiveSession(session);
+    if (session.phase === "pre" && bg == null) {
+      const draft = preDraftBg.trim().replace(",", ".");
+      if (draft !== "") {
+        const n = parseFloat(draft);
+        if (Number.isFinite(n)) bg = n;
+      }
+      if (preDraftTrend !== "not_sure") trend = preDraftTrend;
+    }
     const planResult = computeBannerExercisePlan(session, bgUnits);
-    if (!planResult) return { readinessResult: null, carbPlanHint: null, exercisePlanResult: null };
+    if (!planResult) return { readinessResult: null, fuelPlanLines: [], exercisePlanResult: null };
     const readinessResult = getExerciseReadinessVerdict({
       exercisePlanResult: planResult,
       currentBg: bg,
@@ -615,12 +624,17 @@ export function ActiveExerciseBanner() {
       intensity: session.intensity,
       bgTrend: trend ?? null,
       phase: session.phase,
+      preRapidInsulin2h: session.preRapidInsulin2h ?? null,
     });
-    const carbPlanHint = getExerciseCarbPlanHintLine(planResult, readinessResult.verdict, {
-      phase: session.phase,
-    });
-    return { readinessResult, carbPlanHint, exercisePlanResult: planResult };
-  }, [session, bgUnits]);
+    const fuelPlanLines =
+      bg != null && (session.phase === "pre" || session.phase === "active")
+        ? getExerciseFuelPlanLines(planResult, readinessResult.verdict, profile, {
+            phase: session.phase,
+            exerciseType: session.exerciseType,
+          })
+        : [];
+    return { readinessResult, fuelPlanLines, exercisePlanResult: planResult };
+  }, [session, bgUnits, preDraftBg, preDraftTrend]);
 
   const loadSession = useCallback(() => {
     const profile = storage.getProfile();
@@ -802,7 +816,7 @@ export function ActiveExerciseBanner() {
   const handleCancelSession = () => {
     const existing = storage.getActiveExercise();
     if (existing) void cancelExerciseReminders(existing.id);
-    storage.endExerciseSession();
+    storage.endExerciseSession({ abandon: true });
     setSession(null);
   };
 
@@ -966,15 +980,14 @@ export function ActiveExerciseBanner() {
                   >
                     <p className="font-semibold text-foreground">{readinessResult.title}</p>
                     <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
-                    {carbPlanHint ? (
-                      <p
-                        className="mt-1.5 border-t border-border/50 pt-1.5 text-[10px] leading-snug text-muted-foreground"
-                        data-testid="exercise-carb-plan-hint"
-                      >
-                        {carbPlanHint}
-                      </p>
+                    {fuelPlanLines.length > 0 ? (
+                      <ExerciseFuelPlanSummary lines={fuelPlanLines} className="mt-2" />
                     ) : null}
                   </div>
+                ) : null}
+
+                {readinessResult && session.phase === "pre" && fuelPlanLines.length > 0 ? (
+                  <ExerciseFuelPlanSummary lines={fuelPlanLines} />
                 ) : null}
 
                 {session.phase === "pre" && (
@@ -1322,17 +1335,26 @@ function ExerciseOutcomeDialog({
 
   const handleSave = () => {
     if (!session) { onClose(); return; }
-    storage.addExerciseOutcome({
-      exerciseType: session.exerciseType,
-      intensity: session.intensity,
-      durationMinutes: session.durationMinutes,
-      exerciseName: session.exerciseName,
+    const updated = storage.saveExerciseOutcomeFeedback(session.id, {
       bgResponse,
       bgSeverity,
       feltHypo,
       notes: notes || undefined,
-      duringTravel: storage.getScenarioState().travelModeActive ? true : undefined,
     });
+    if (!updated) {
+      storage.addExerciseOutcome({
+        sessionId: session.id,
+        exerciseType: session.exerciseType,
+        intensity: session.intensity,
+        durationMinutes: session.durationMinutes,
+        exerciseName: session.exerciseName,
+        bgResponse,
+        bgSeverity,
+        feltHypo,
+        notes: notes || undefined,
+        duringTravel: storage.getScenarioState().travelModeActive ? true : undefined,
+      });
+    }
     resetAndClose();
   };
 

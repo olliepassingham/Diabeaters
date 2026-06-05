@@ -247,6 +247,18 @@ export const DIABEATER_PROFILE_CHANGED_EVENT = "diabeater-profile-changed";
 /** Same-tab: quick exercise session JSON was written or cleared (`diabeater_active_exercise`). */
 export const DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT = "diabeater-active-exercise-changed";
 
+/** Exercise outcome rows added or updated — activity log and achievements re-read localStorage. */
+export const DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT = "diabeater-exercise-outcomes-changed";
+
+export function notifyExerciseOutcomesChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Post-exercise snooze/dismiss changed — status strip and tool banners re-read localStorage. */
 export const DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT = "diabeater-post-exercise-nudge-changed";
 
@@ -1323,6 +1335,8 @@ export type LastExerciseSummary = {
 
 export interface ExerciseOutcome {
   id: string;
+  /** Links outcome to the finished active session (avoids duplicates when enriching feedback). */
+  sessionId?: string;
   exerciseType: ExerciseType;
   intensity: ExerciseIntensity;
   durationMinutes: number;
@@ -4401,7 +4415,7 @@ export const storage = {
     });
   },
 
-  endExerciseSession(): ActiveExerciseSession | null {
+  endExerciseSession(options?: { abandon?: boolean }): ActiveExerciseSession | null {
     const session = this.getActiveExercise();
     // If a session actually started (active/recovery), record an end time for next-24h nudges.
     if (session?.exerciseStartedAt) {
@@ -4413,6 +4427,9 @@ export const storage = {
         durationMinutes: session.durationMinutes,
         context: buildLastExerciseContextFromSession(session),
       });
+      if (!options?.abandon) {
+        this.recordExerciseOutcomeFromSession(session);
+      }
     }
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_EXERCISE);
     notifyActiveExerciseChanged();
@@ -4438,6 +4455,44 @@ export const storage = {
     return migrated;
   },
 
+  recordExerciseOutcomeFromSession(session: ActiveExerciseSession): ExerciseOutcome | null {
+    if (!session.exerciseStartedAt) return null;
+    const outcomes = this.getExerciseOutcomes();
+    const existing = outcomes.find((o) => o.sessionId === session.id);
+    if (existing) return existing;
+
+    const duringTravel = this.getScenarioState().travelModeActive ? true : undefined;
+    const newOutcome: ExerciseOutcome = {
+      id: generateId(),
+      sessionId: session.id,
+      exerciseType: session.exerciseType,
+      intensity: session.intensity,
+      durationMinutes: session.durationMinutes,
+      exerciseName: session.exerciseName,
+      feltHypo: false,
+      duringTravel,
+      completedAt: session.exerciseEndedAt || new Date().toISOString(),
+    };
+    outcomes.unshift(newOutcome);
+    if (outcomes.length > 100) outcomes.pop();
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(outcomes));
+    notifyExerciseOutcomesChanged();
+    return newOutcome;
+  },
+
+  saveExerciseOutcomeFeedback(
+    sessionId: string,
+    feedback: Partial<Pick<ExerciseOutcome, "bgResponse" | "bgSeverity" | "feltHypo" | "notes">>,
+  ): ExerciseOutcome | null {
+    const outcomes = this.getExerciseOutcomes();
+    const idx = outcomes.findIndex((o) => o.sessionId === sessionId);
+    if (idx === -1) return null;
+    outcomes[idx] = { ...outcomes[idx], ...feedback };
+    localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(outcomes));
+    notifyExerciseOutcomesChanged();
+    return outcomes[idx];
+  },
+
   addExerciseOutcome(outcome: Omit<ExerciseOutcome, "id" | "completedAt">): ExerciseOutcome {
     const outcomes = this.getExerciseOutcomes();
     const newOutcome: ExerciseOutcome = {
@@ -4448,6 +4503,7 @@ export const storage = {
     outcomes.unshift(newOutcome);
     if (outcomes.length > 100) outcomes.pop();
     localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(outcomes));
+    notifyExerciseOutcomesChanged();
     return newOutcome;
   },
 

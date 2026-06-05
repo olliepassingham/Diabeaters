@@ -1,7 +1,8 @@
+import type { ExerciseFuelPlanLine } from "@/lib/exercise-readiness";
 import type { ExercisePhase } from "@/lib/storage";
 import type { ExerciseHypoSuggestion } from "@/lib/exercise-hypo-auto";
 import { cn } from "@/lib/utils";
-import { Droplet, Timer } from "lucide-react";
+import { Droplet, Timer, UtensilsCrossed } from "lucide-react";
 
 /** Elapsed time as `H:MM:SS` or `M:SS` — shared by status strip, travel, and coach timers. */
 export function formatExerciseElapsedShort(ms: number): string {
@@ -59,6 +60,41 @@ export function ExerciseWorkoutProgressBar(props: {
           style={{ width: `${pct}%` }}
           data-testid="progress-exercise"
         />
+      </div>
+    </div>
+  );
+}
+
+export function ExerciseFuelPlanSummary(props: {
+  lines: ExerciseFuelPlanLine[];
+  className?: string;
+}) {
+  const { lines, className } = props;
+  if (lines.length === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-teal-500/25 bg-gradient-to-br from-teal-500/[0.07] to-transparent",
+        "px-3 py-2.5 dark:from-teal-950/35",
+        className,
+      )}
+      data-testid="exercise-fuel-plan"
+    >
+      <div className="flex items-start gap-2">
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300">
+          <UtensilsCrossed className="h-3.5 w-3.5" aria-hidden />
+        </span>
+        <div className="min-w-0 space-y-1.5">
+          <p className="text-xs font-semibold text-foreground">Fuel plan</p>
+          <ul className="space-y-1">
+            {lines.map((line) => (
+              <li key={line.id} className="text-[11px] leading-snug text-muted-foreground">
+                <span className="font-medium text-foreground/90">{line.label}:</span> {line.text}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

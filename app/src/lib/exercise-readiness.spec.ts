@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateExercisePlan } from "./exercise-plan";
-import { getExerciseCarbPlanHintLine, getExerciseReadinessVerdict, getRecoveryReadinessVerdict } from "./exercise-readiness";
+import { getExerciseCarbPlanHintLine, getExerciseFuelPlanLines, getExerciseReadinessVerdict, getRecoveryReadinessVerdict } from "./exercise-readiness";
 
 const plan = calculateExercisePlan({
   exerciseType: "cardio",
@@ -159,5 +159,50 @@ describe("getExerciseReadinessVerdict rapid insulin (pre strip)", () => {
       preRapidInsulin2h: "yes",
     });
     expect(r.verdict).toBe("not_recommended");
+  });
+});
+
+describe("getExerciseFuelPlanLines", () => {
+  const strengthPlan = calculateExercisePlan({
+    exerciseType: "strength",
+    durationMinutes: 45,
+    intensity: "moderate",
+    minutesUntilStart: 0,
+    bgUnits: "mmol/L",
+    currentBg: 5.8,
+  });
+
+  it("includes on-hand and post-workout lines for strength pre-phase", () => {
+    const lines = getExerciseFuelPlanLines(strengthPlan, "caution", null, {
+      phase: "pre",
+      exerciseType: "strength",
+    });
+    expect(lines.some((l) => l.id === "on_hand")).toBe(true);
+    expect(lines.some((l) => l.id === "post")).toBe(true);
+    expect(lines.find((l) => l.id === "post")?.label).toBe("After workout");
+  });
+
+  it("uses carb favourites when configured", () => {
+    const fav = {
+      id: "f1",
+      label: "Gel",
+      carbsPerServing: 15,
+      unitLabel: "pack",
+    };
+    const profile = {
+      carbSourcePreferences: {
+        favorites: [fav],
+        defaultByScenario: { exercise_on_hand: fav.id, exercise_during: fav.id },
+      },
+    };
+    const lines = getExerciseFuelPlanLines(strengthPlan, "caution", profile, {
+      phase: "pre",
+      exerciseType: "strength",
+    });
+    expect(lines.find((l) => l.id === "on_hand")?.text).toContain("Gel");
+  });
+
+  it("returns empty for not_recommended verdict", () => {
+    expect(getExerciseFuelPlanLines(strengthPlan, "not_recommended", null, { phase: "pre" })).toEqual([]);
   });
 });

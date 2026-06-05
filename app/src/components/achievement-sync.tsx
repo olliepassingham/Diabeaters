@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { getAchievementDefinition, type AchievementId } from "@/lib/achievements";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
 import { mergeCloudAchievements, syncAchievementsFromActivity } from "@/lib/user-achievements";
 
 function runAchievementSync(userId: string | null, showToasts: boolean): void {
@@ -40,8 +41,16 @@ export function AchievementSync() {
       }
     };
 
+    const onExerciseOutcome = () => {
+      runAchievementSync(user?.id ?? null, true);
+    };
+
     document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
+    window.addEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onExerciseOutcome);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onExerciseOutcome);
+    };
   }, [user?.id]);
 
   return null;

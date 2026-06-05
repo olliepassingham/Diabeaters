@@ -3,8 +3,9 @@
  * Rule-based; not medical advice.
  */
 
+import { formatFastCarbsForScenario } from "@/lib/carb-source-preferences";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
-import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h } from "@/lib/storage";
+import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h, UserProfile } from "@/lib/storage";
 
 export type ExerciseReadinessVerdict = "ready" | "caution" | "not_recommended";
 
@@ -385,6 +386,82 @@ export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): stri
   return "border-amber-200/80 bg-amber-50/60 dark:border-amber-800/50 dark:bg-amber-950/25";
 }
 
+export type ExerciseFuelPlanLineId = "on_hand" | "during" | "post";
+
+export type ExerciseFuelPlanLine = {
+  id: ExerciseFuelPlanLineId;
+  label: string;
+  text: string;
+};
+
+function isDelayedLowExerciseType(type: string | undefined): boolean {
+  const t = (type ?? "").toLowerCase();
+  return t === "strength" || t === "hiit" || t === "yoga";
+}
+
+/**
+ * Structured fuel plan from {@link calculateExercisePlan} — intensity, duration, and type aware.
+ * Uses carb source favourites when configured (`exercise_on_hand` / `exercise_during`).
+ */
+export function getExerciseFuelPlanLines(
+  plan: ExercisePlanResult,
+  verdict: ExerciseReadinessVerdict,
+  profile: Partial<UserProfile> | null | undefined,
+  options?: { phase?: "pre" | "active" | "recovery"; exerciseType?: string },
+): ExerciseFuelPlanLine[] {
+  const phase = options?.phase ?? "pre";
+  if (phase === "recovery" || verdict === "not_recommended") return [];
+
+  const lines: ExerciseFuelPlanLine[] = [];
+  const pre = plan.pre.carbsIfLow;
+  const during = plan.during.carbsNeeded;
+  const post = plan.post.carbs;
+
+  if (phase === "pre") {
+    if (pre > 0) {
+      lines.push({
+        id: "on_hand",
+        label: "Have ready",
+        text: formatFastCarbsForScenario(pre, profile, "exercise_on_hand"),
+      });
+    }
+    if (during > 0) {
+      lines.push({
+        id: "during",
+        label: "During / if BG drops",
+        text: `${formatFastCarbsForScenario(during, profile, "exercise_during")} · ${plan.during.carbFrequency}`,
+      });
+    }
+    if (post > 0) {
+      lines.push({
+        id: "post",
+        label: isDelayedLowExerciseType(options?.exerciseType) ? "After workout" : "Recovery window",
+        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} for the post-workout window`,
+      });
+    }
+    return lines;
+  }
+
+  if (phase === "active") {
+    if (during > 0) {
+      lines.push({
+        id: "during",
+        label: "If BG drops",
+        text: `${formatFastCarbsForScenario(during, profile, "exercise_during")} · ${plan.during.carbFrequency}`,
+      });
+    }
+    if (post > 0 && (during <= 0 || isDelayedLowExerciseType(options?.exerciseType))) {
+      lines.push({
+        id: "post",
+        label: "After workout",
+        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} for recovery`,
+      });
+    }
+  }
+
+  return lines;
+}
+
 /**
  * One-line carb planning hint from {@link calculateExercisePlan} (intensity + duration).
  * Omit when not_recommended — low-BG copy already includes treat amounts; sick day is a hard stop.
@@ -392,21 +469,16 @@ export function getReadinessToneClasses(verdict: ExerciseReadinessVerdict): stri
 export function getExerciseCarbPlanHintLine(
   plan: ExercisePlanResult,
   verdict: ExerciseReadinessVerdict,
-  options?: { phase?: "pre" | "active" | "recovery" },
+  options?: {
+    phase?: "pre" | "active" | "recovery";
+    exerciseType?: string;
+    profile?: Partial<UserProfile> | null;
+  },
 ): string | null {
-  if (options?.phase === "recovery") return null;
-  if (verdict === "not_recommended") return null;
-
-  const pre = plan.pre.carbsIfLow;
-  const during = plan.during.carbsNeeded;
-  if (pre <= 0 && during <= 0) return null;
-
-  const parts: string[] = [];
-  if (pre > 0) {
-    parts.push(`~${pre}g fast carbs on hand before you start`);
-  }
-  if (during > 0) {
-    parts.push(`~${during}g during if BG drops (${plan.during.carbFrequency})`);
-  }
-  return `${parts.join(" · ")}.`;
+  const lines = getExerciseFuelPlanLines(plan, verdict, options?.profile, {
+    phase: options?.phase,
+    exerciseType: options?.exerciseType,
+  });
+  if (lines.length === 0) return null;
+  return `${lines.map((l) => `${l.label}: ${l.text}`).join(" · ")}.`;
 }
