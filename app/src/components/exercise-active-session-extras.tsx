@@ -65,12 +65,64 @@ export function ExerciseWorkoutProgressBar(props: {
   );
 }
 
+function splitCarbLineText(text: string): { amount: string; detail: string | null } {
+  const sep = " · ";
+  const idx = text.indexOf(sep);
+  if (idx === -1) return { amount: text, detail: null };
+  return {
+    amount: text.slice(0, idx),
+    detail: text.slice(idx + sep.length) || null,
+  };
+}
+
 export function ExerciseFuelPlanSummary(props: {
   lines: ExerciseFuelPlanLine[];
   className?: string;
+  /** Pre/during/recovery strip: larger type, action-first layout. */
+  variant?: "default" | "pre" | "active" | "recovery";
 }) {
-  const { lines, className } = props;
+  const { lines, className, variant = "default" } = props;
   if (lines.length === 0) return null;
+
+  if (variant === "pre" || variant === "active" || variant === "recovery") {
+    const primary = lines[0];
+    const { amount, detail } = splitCarbLineText(primary.text);
+    const extras = lines.slice(1);
+
+    return (
+      <div
+        className={cn(
+          "rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-teal-500/[0.03]",
+          "px-3.5 py-3 dark:from-teal-950/40",
+          className,
+        )}
+        data-testid="exercise-fuel-plan"
+      >
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 text-teal-700 dark:text-teal-300">
+            <UtensilsCrossed className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-sm font-semibold text-foreground">{primary.label}</p>
+            <p className="text-xl font-bold tabular-nums leading-none tracking-tight text-foreground">{amount}</p>
+            {detail ? <p className="text-sm leading-snug text-muted-foreground">{detail}</p> : null}
+            {extras.length > 0 ? (
+              <ul className="space-y-1.5 border-t border-teal-500/15 pt-2">
+                {extras.map((line) => (
+                  <li key={line.id} className="text-sm leading-snug">
+                    <span className="font-medium text-foreground">{line.label}</span>
+                    {line.text.trim() ? (
+                      <span className="text-muted-foreground"> — {line.text.trim()}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -90,7 +142,8 @@ export function ExerciseFuelPlanSummary(props: {
           <ul className="space-y-1">
             {lines.map((line) => (
               <li key={line.id} className="text-[11px] leading-snug text-muted-foreground">
-                <span className="font-medium text-foreground/90">{line.label}:</span> {line.text}
+                <span className="font-medium text-foreground/90">{line.label}</span>
+                {line.text.trim() ? <span>: {line.text.trim()}</span> : null}
               </li>
             ))}
           </ul>

@@ -63,6 +63,7 @@ import {
   type ExerciseHistoryBias,
 } from "@/lib/exercise-plan";
 import {
+  getExerciseFuelPlanLines,
   getExerciseReadinessVerdict,
   getReadinessToneClasses,
   type ExerciseReadinessResult,
@@ -73,7 +74,12 @@ import {
   scheduleExercisePreReminders,
 } from "@/lib/exercise-reminders";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
-import { ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
+import {
+  ExerciseFuelPlanSummary,
+  ExerciseHypoTreatmentHint,
+  ExerciseWorkoutProgressBar,
+  formatExerciseElapsedShort,
+} from "@/components/exercise-active-session-extras";
 
 // ----- Type / intensity catalogues kept local so the form can be self-contained -----
 
@@ -335,10 +341,13 @@ export function ExerciseGuidedCoach() {
 
   const readiness: ExerciseReadinessResult | null = useMemo(() => {
     if (!activeSession || !exercisePlan) return null;
+    const sc = storage.getScenarioState();
     return getExerciseReadinessVerdict({
       exercisePlanResult: exercisePlan,
       currentBg: parseFloatOrNull(bgInput),
       bgUnits,
+      sickDayActive: sc.sickDayActive,
+      sickDaySeverity: sc.sickDaySeverity,
       exerciseType: activeSession.exerciseType,
       intensity: activeSession.intensity,
       bgTrend: trendForReadiness,
@@ -350,6 +359,26 @@ export function ExerciseGuidedCoach() {
       hypoProneHistory: historyBias?.hypoProne === true,
     });
   }, [activeSession, bgInput, bgUnits, exercisePlan, historyBias, trendForReadiness]);
+
+  const fuelPlanLines = useMemo(() => {
+    if (!activeSession || !exercisePlan || !readiness) return [];
+    const bg = parseFloatOrNull(bgInput);
+    if (bg == null) return [];
+    return getExerciseFuelPlanLines(exercisePlan, readiness.verdict, profile, {
+      phase: activeSession.phase,
+      exerciseType: activeSession.exerciseType,
+      currentBg: bg,
+      bgUnits,
+      intensity: activeSession.intensity,
+    });
+  }, [activeSession, bgInput, bgUnits, exercisePlan, profile, readiness]);
+
+  const fuelPlanVariant =
+    activeSession?.phase === "pre"
+      ? "pre"
+      : activeSession?.phase === "active"
+        ? "active"
+        : "recovery";
 
   const hypoCoachSuggestion = useMemo(() => {
     if (!activeSession) return null;
@@ -694,6 +723,13 @@ export function ExerciseGuidedCoach() {
                     ) : null}
                   </div>
                   <p className="text-sm leading-snug text-foreground/90">{readiness.detail}</p>
+                  {fuelPlanLines.length > 0 ? (
+                    <ExerciseFuelPlanSummary
+                      lines={fuelPlanLines}
+                      variant={fuelPlanVariant}
+                      className="mt-2"
+                    />
+                  ) : null}
                   {historyBias && historyBias.totalSessions >= 2 ? (
                     <p className="text-xs text-muted-foreground pt-1 border-t border-border/40 mt-1">
                       Based on {historyBias.totalSessions} past {activeSession.exerciseType} sessions: BG typically{" "}
@@ -750,13 +786,6 @@ export function ExerciseGuidedCoach() {
                   onTrendChange={onTrendChange}
                   update={update}
                 />
-                {exercisePlan ? (
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    {exercisePlan.during.needsCarbs && exercisePlan.during.carbsNeeded > 0
-                      ? `Fuel: ~${exercisePlan.during.carbsNeeded}g if BG falls · ${exercisePlan.during.carbFrequency}.`
-                      : "Fuel: keep fast carbs within reach."}
-                  </p>
-                ) : null}
               </div>
             </TabsContent>
 
@@ -908,7 +937,15 @@ function PreQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange, up
       <FieldRow icon={Pill} label="Rapid-acting insulin in last 2h?">
         <YesNoToggle
           value={session.preRapidInsulin2h ?? null}
-          onChange={(v) => update({ preRapidInsulin2h: v === null ? undefined : v })}
+          onChange={(v) => {
+            const patch: Parameters<typeof update>[0] = {
+              preRapidInsulin2h: v === null ? undefined : v,
+            };
+            if (v === "no") {
+              patch.preChecklist = { ...session.preChecklist, basalAdjusted: true };
+            }
+            update(patch);
+          }}
         />
       </FieldRow>
 
@@ -1174,51 +1211,8 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
   const hypoRemainingLabel =
     hypoRemainingSec == null ? null : `${Math.floor(hypoRemainingSec / 60)}:${String(hypoRemainingSec % 60).padStart(2, "0")}`;
 
-  const startedAtMs = session.exerciseStartedAt ? new Date(session.exerciseStartedAt).getTime() : null;
-  const hasStarted = startedAtMs != null && Number.isFinite(startedAtMs);
-  const plannedEndMs = hasStarted ? (startedAtMs as number) + session.durationMinutes * 60_000 : null;
-  const elapsedMs = hasStarted ? Math.max(0, nowMs - (startedAtMs as number)) : 0;
-  const remainingMs = plannedEndMs != null ? Math.max(0, plannedEndMs - nowMs) : null;
-  const elapsedLabel = formatExerciseElapsedShort(elapsedMs);
-  const remainingLabel = remainingMs == null ? null : formatExerciseElapsedShort(remainingMs);
-  const progress =
-    plannedEndMs != null && hasStarted ? Math.min(1, Math.max(0, elapsedMs / (session.durationMinutes * 60_000))) : null;
-
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-border/40 bg-transparent px-3 py-2.5 space-y-2" data-testid="panel-coach-during-at-a-glance">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-muted-foreground">Workout</p>
-        </div>
-        {progress != null ? (
-          <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden" aria-hidden>
-            <div className="h-full bg-primary/50" style={{ width: `${Math.round(progress * 100)}%` }} />
-          </div>
-        ) : null}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="default"
-            className="h-9"
-            onClick={() => addCarbs(15)}
-            data-testid="button-coach-quick-addcarbs-15"
-          >
-            +15g carbs
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-9"
-            onClick={startHypoRecheckTimer}
-            data-testid="button-coach-feel-low"
-          >
-            I feel low
-          </Button>
-        </div>
-      </div>
-
       {hypoRecheckEndsAt != null ? (
         <div
           className="rounded-xl border border-amber-300/70 bg-amber-50/50 dark:border-amber-800/50 dark:bg-amber-950/20 px-3 py-2.5 text-sm"
@@ -1257,12 +1251,12 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
         inputRef={bgRef}
       />
 
-      <div className="border-t border-border/40 pt-3 space-y-2" data-testid="panel-coach-carbs">
+      <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3 space-y-2.5" data-testid="panel-coach-carbs">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-muted-foreground">Carbs during workout</p>
+          <p className="text-sm font-medium text-foreground">Log carbs taken</p>
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold tabular-nums text-foreground" data-testid="text-coach-carbs-total">
-              {carbsSoFar}g
+            <p className="text-sm font-semibold tabular-nums text-muted-foreground" data-testid="text-coach-carbs-total">
+              {carbsSoFar > 0 ? `${carbsSoFar}g logged` : "None yet"}
             </p>
             {carbsSoFar > 0 ? (
               <Button
@@ -1278,35 +1272,16 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
             ) : null}
           </div>
         </div>
-        {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              Last time: <span className="tabular-nums">{Math.round(lastCarbs)}g</span>
-            </p>
-            {carbsSoFar === 0 ? (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="h-7 px-2 text-xs"
-                onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
-                data-testid="button-coach-carbs-use-last"
-              >
-                Use
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
         <div className="flex flex-wrap gap-2">
           {[15, 25].map((g) => (
             <Button
               key={g}
               type="button"
               size="sm"
-              variant="secondary"
-              className="h-8 px-2.5 text-xs"
+              variant={g === 15 ? "default" : "secondary"}
+              className="h-9 px-3 text-xs"
               onClick={() => addCarbs(g)}
-              data-testid={`button-coach-addcarbs-${g}`}
+              data-testid={g === 15 ? "button-coach-quick-addcarbs-15" : `button-coach-addcarbs-${g}`}
             >
               +{g}g
             </Button>
@@ -1315,11 +1290,21 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
             type="button"
             size="sm"
             variant={customCarbsOpen ? "default" : "outline"}
-            className="h-8 px-2.5 text-xs"
+            className="h-9 px-3 text-xs"
             onClick={() => setCustomCarbsOpen((v) => !v)}
             data-testid="button-coach-addcarbs-custom"
           >
             Custom
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-9 px-3 text-xs"
+            onClick={startHypoRecheckTimer}
+            data-testid="button-coach-feel-low"
+          >
+            I feel low
           </Button>
         </div>
         {customCarbsOpen ? (
@@ -1347,6 +1332,19 @@ function DuringQuestions({ session, bgUnits, bgInput, onBgChange, onTrendChange,
               Add
             </Button>
           </div>
+        ) : null}
+        {lastIsSimilar && typeof lastCarbs === "number" && Number.isFinite(lastCarbs) && lastCarbs > 0 && carbsSoFar === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Last similar session: {Math.round(lastCarbs)}g —{" "}
+            <button
+              type="button"
+              className="font-medium text-foreground underline-offset-2 hover:underline"
+              onClick={() => update({ midCarbsGramsSoFar: Math.max(0, Math.min(400, Math.round(lastCarbs))) })}
+              data-testid="button-coach-carbs-use-last"
+            >
+              use that
+            </button>
+          </p>
         ) : null}
       </div>
 

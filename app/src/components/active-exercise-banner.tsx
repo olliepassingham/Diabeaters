@@ -631,6 +631,9 @@ export function ActiveExerciseBanner() {
         ? getExerciseFuelPlanLines(planResult, readinessResult.verdict, profile, {
             phase: session.phase,
             exerciseType: session.exerciseType,
+            currentBg: bg,
+            bgUnits,
+            intensity: session.intensity,
           })
         : [];
     return { readinessResult, fuelPlanLines, exercisePlanResult: planResult };
@@ -981,7 +984,7 @@ export function ActiveExerciseBanner() {
                     <p className="font-semibold text-foreground">{readinessResult.title}</p>
                     <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
                     {fuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={fuelPlanLines} className="mt-2" />
+                      <ExerciseFuelPlanSummary lines={fuelPlanLines} variant="active" className="mt-2" />
                     ) : null}
                   </div>
                 ) : null}
@@ -994,13 +997,13 @@ export function ActiveExerciseBanner() {
                     <p className="font-semibold text-foreground">{readinessResult.title}</p>
                     <p className="mt-0.5 leading-snug text-muted-foreground">{readinessResult.detail}</p>
                     {fuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={fuelPlanLines} className="mt-2" />
+                      <ExerciseFuelPlanSummary lines={fuelPlanLines} variant="recovery" className="mt-2" />
                     ) : null}
                   </div>
                 ) : null}
 
                 {readinessResult && session.phase === "pre" && fuelPlanLines.length > 0 ? (
-                  <ExerciseFuelPlanSummary lines={fuelPlanLines} />
+                  <ExerciseFuelPlanSummary lines={fuelPlanLines} variant="pre" />
                 ) : null}
 
                 {session.phase === "pre" && (

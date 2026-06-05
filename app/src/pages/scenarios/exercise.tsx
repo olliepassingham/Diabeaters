@@ -8,7 +8,7 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { cn } from "@/lib/utils";
-import { storage } from "@/lib/storage";
+import { storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ExerciseWorkoutProgressBar } from "@/components/exercise-active-session-extras";
@@ -22,6 +22,12 @@ export default function ScenarioExercisePage() {
     if (storage.getActiveExercise()) {
       recordLastInteraction("scenario:exercise");
     }
+  }, []);
+
+  useEffect(() => {
+    const onSessionChange = () => setTick((n) => n + 1);
+    window.addEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onSessionChange);
+    return () => window.removeEventListener(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, onSessionChange);
   }, []);
 
   useEffect(() => {
@@ -84,7 +90,7 @@ export default function ScenarioExercisePage() {
         </ScenarioActiveCard>
       ) : null}
 
-      <ExerciseFuelCalculator />
+      {!active ? <ExerciseFuelCalculator /> : null}
       <ExerciseGuidedCoach />
       <ScenarioToolDisclaimer className="mt-2" />
     </PageShell>

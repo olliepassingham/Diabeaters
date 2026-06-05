@@ -533,8 +533,11 @@ export function AppStatusStrip() {
     return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "pre",
       exerciseType: ex.exerciseType,
+      currentBg: readiness.bg,
+      bgUnits,
+      intensity: ex.intensity,
     });
-  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+  }, [bgUnits, ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
 
   const activeFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "active" || !exercisePlan || !readiness?.verdict) return [];
@@ -542,8 +545,9 @@ export function AppStatusStrip() {
     return getExerciseFuelPlanLines(exercisePlan, readiness.verdict.verdict, stripProfile, {
       phase: "active",
       exerciseType: ex.exerciseType,
+      intensity: ex.intensity,
     });
-  }, [ex?.exerciseType, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
+  }, [ex?.exerciseType, ex?.intensity, ex?.phase, exercisePlan, readiness?.bg, readiness?.verdict, stripProfile]);
 
   const recoveryFuelPlanLines = useMemo(() => {
     if (ex?.phase !== "recovery" || !exercisePlan || !readiness?.verdict) return [];
@@ -600,6 +604,9 @@ export function AppStatusStrip() {
         phase: "pre",
         exerciseType: ex.exerciseType,
         profile: stripProfile,
+        currentBg: readiness.bg,
+        bgUnits,
+        intensity: ex.intensity,
       });
       if (hint) lines.push(hint);
     }
@@ -1000,7 +1007,15 @@ export function AppStatusStrip() {
                           variant={ex.preRapidInsulin2h === o.id ? "default" : "outline"}
                           className={btnClass}
                           onClick={() => {
-                            storage.updateActiveExercise({ preRapidInsulin2h: ex.preRapidInsulin2h === o.id ? undefined : o.id });
+                            const togglingOff = ex.preRapidInsulin2h === o.id;
+                            const next = togglingOff ? undefined : o.id;
+                            const patch: Parameters<typeof storage.updateActiveExercise>[0] = {
+                              preRapidInsulin2h: next,
+                            };
+                            if (o.id === "no" && next === "no") {
+                              patch.preChecklist = { ...ex.preChecklist, basalAdjusted: true };
+                            }
+                            storage.updateActiveExercise(patch);
                             setEx(storage.getActiveExercise());
                           }}
                           data-testid={`status-exercise-rapid-insulin-${o.id}`}
@@ -1077,7 +1092,7 @@ export function AppStatusStrip() {
                           {duringQuickStatusBody(v, exercisePlan.during, Boolean(mergedCarbCaution))}
                         </p>
                         {activeFuelPlanLines.length > 0 ? (
-                          <ExerciseFuelPlanSummary lines={activeFuelPlanLines} className="mt-2" />
+                          <ExerciseFuelPlanSummary lines={activeFuelPlanLines} variant="active" className="mt-2" />
                         ) : null}
                       </div>
                     );
@@ -1111,7 +1126,7 @@ export function AppStatusStrip() {
                     </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
                     {recoveryFuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={recoveryFuelPlanLines} className="mt-2" />
+                      <ExerciseFuelPlanSummary lines={recoveryFuelPlanLines} variant="recovery" className="mt-2" />
                     ) : null}
                   </div>
                 </div>
@@ -1143,7 +1158,7 @@ export function AppStatusStrip() {
                     </div>
                     <p className="text-sm leading-snug text-foreground/90">{readiness.verdict.detail}</p>
                     {preFuelPlanLines.length > 0 ? (
-                      <ExerciseFuelPlanSummary lines={preFuelPlanLines} className="mt-2" />
+                      <ExerciseFuelPlanSummary lines={preFuelPlanLines} variant="pre" className="mt-2" />
                     ) : null}
                     {(() => {
                       const needsCarbPrompt = !ex.preChecklist.carbsConsidered && preFuelPlanLines.length === 0;

@@ -3,7 +3,7 @@
  * Rule-based; not medical advice.
  */
 
-import { formatFastCarbsForScenario } from "@/lib/carb-source-preferences";
+import { formatCarbsForScenario, formatFastCarbsForScenario } from "@/lib/carb-source-preferences";
 import type { ExercisePlanResult } from "@/lib/exercise-plan";
 import type { ExerciseBgTrend, ExerciseIntensity, PreRapidInsulin2h, UserProfile } from "@/lib/storage";
 
@@ -25,6 +25,43 @@ function parseNumericMaybe(value: string | null | undefined): number | null {
 function exerciseApproachLowCeiling(bgUnits: string, lowThreshold: number): number {
   const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
   return lowThreshold + approachMargin;
+}
+
+/** Matches {@link ExercisePlanResult.pre.targetBg} lower bound — tip-of-the-day “snack first” band. */
+export function exerciseIdealStartMinimum(bgUnits: string): number {
+  return bgUnits === "mmol/L" ? 7 : 126;
+}
+
+export function exerciseIdealStartMinimumLabel(bgUnits: string): string {
+  return bgUnits === "mmol/L" ? "~7 mmol/L" : "~126 mg/dL";
+}
+
+export function isCardioLikeExerciseType(exerciseType: string): boolean {
+  const t = exerciseType.toLowerCase();
+  return (
+    t === "cardio" ||
+    t === "hiit" ||
+    t === "walking" ||
+    t === "swimming" ||
+    t === "court" ||
+    t === "field"
+  );
+}
+
+/** Pre-workout: moderate/intense cardio below ideal start → eat carbs before starting, not just pack them. */
+export function shouldTakePreExerciseCarbsNow(input: {
+  currentBg?: number | null;
+  bgUnits: string;
+  exerciseType: string;
+  intensity: ExerciseIntensity;
+  phase?: "pre" | "active" | "recovery";
+}): boolean {
+  if (input.phase && input.phase !== "pre") return false;
+  const bg = input.currentBg;
+  if (bg == null || !Number.isFinite(bg)) return false;
+  if (!isCardioLikeExerciseType(input.exerciseType)) return false;
+  if (input.intensity !== "moderate" && input.intensity !== "intense") return false;
+  return bg < exerciseIdealStartMinimum(input.bgUnits);
 }
 
 export interface ExerciseReadinessInput {
@@ -87,7 +124,7 @@ function baseVerdict(input: ExerciseReadinessInput): ExerciseReadinessResult {
     return {
       verdict: "not_recommended",
       title: "Not recommended (low BG)",
-      detail: grams > 0 ? `Treat first (about ${grams}g fast carbs), then re-check.` : "Treat first, then re-check.",
+      detail: "Treat first, then re-check in 10–15 minutes.",
     };
   }
 
@@ -118,12 +155,7 @@ function refineWithExerciseTypeAndTrend(
   const { intensity } = input;
 
   const cardioLike =
-    t === "cardio" ||
-    t === "hiit" ||
-    t === "walking" ||
-    t === "swimming" ||
-    t === "court" ||
-    t === "field";
+    isCardioLikeExerciseType(input.exerciseType);
   const strengthLike = t === "strength";
 
   if (base.verdict === "caution" && base.title.startsWith("Caution (high BG)")) {
@@ -300,7 +332,7 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
       title: "Not recommended (low BG)",
       detail:
         grams > 0
-          ? `Low after exercise — treat first (~${grams}g fast carbs), then re-check per your hypo plan.`
+          ? "Low after exercise — treat first, then re-check per your hypo plan."
           : "Low after exercise — treat per your hypo plan, then re-check.",
     };
   }
@@ -355,6 +387,37 @@ export function getRecoveryReadinessVerdict(input: ExerciseReadinessInput): Exer
     title: "Ready",
     detail:
       "In range after exercise — if direction is unclear, a quick check beats guessing while muscles are still refuelling.",
+  };
+}
+
+function refineWithPreExerciseStartBand(
+  result: ExerciseReadinessResult,
+  input: ExerciseReadinessInput,
+): ExerciseReadinessResult {
+  if (input.phase !== "pre") return result;
+  if (result.verdict === "not_recommended") return result;
+  if (result.title.startsWith("Caution (high BG)")) return result;
+
+  const bg =
+    input.currentBg != null && Number.isFinite(input.currentBg)
+      ? input.currentBg
+      : parseNumericMaybe(input.currentBgInput);
+  if (bg == null) return result;
+
+  if (!isCardioLikeExerciseType(input.exerciseType)) return result;
+  if (input.intensity !== "moderate" && input.intensity !== "intense") return result;
+
+  const idealMin = exerciseIdealStartMinimum(input.bgUnits);
+  if (bg >= idealMin) return result;
+
+  const grams = input.exercisePlanResult?.pre.carbsIfLow ?? 0;
+  const carbHint = grams > 0 ? `about ${grams}g fast carbs` : "fast carbs";
+  const bandLabel = exerciseIdealStartMinimumLabel(input.bgUnits);
+
+  return {
+    verdict: "caution",
+    title: "Caution",
+    detail: `BG is below ${bandLabel} for ${input.intensity} ${input.exerciseType} — take ${carbHint} before you start, then re-check in 10–15 minutes.`,
   };
 }
 
@@ -428,7 +491,8 @@ export function getExerciseReadinessVerdict(input: ExerciseReadinessInput): Exer
   }
   const base = baseVerdict(input);
   const withTrends = refineWithExerciseTypeAndTrend(base, input);
-  const withInsulin = refineWithPreRapidInsulin(withTrends, input);
+  const withStartBand = refineWithPreExerciseStartBand(withTrends, input);
+  const withInsulin = refineWithPreRapidInsulin(withStartBand, input);
   return refineWithDeeperContext(withInsulin, input);
 }
 
@@ -450,9 +514,49 @@ export type ExerciseFuelPlanLine = {
   text: string;
 };
 
-function isDelayedLowExerciseType(type: string | undefined): boolean {
-  const t = (type ?? "").toLowerCase();
-  return t === "strength" || t === "hiit" || t === "yoga";
+/** Pre/recovery low BG: show Take now with carb favourites even when verdict is not_recommended. */
+function resolveTreatFirstFuelGrams(
+  plan: ExercisePlanResult,
+  phase: "pre" | "active" | "recovery",
+  bg: number | null | undefined,
+  bgUnits: string,
+): number | null {
+  if (phase !== "pre" && phase !== "recovery") return null;
+  const lowThreshold = parseNumericMaybe(plan.pre.lowThreshold);
+  if (bg == null || lowThreshold == null) return null;
+  const grams = plan.pre.carbsIfLow;
+  if (grams <= 0) return null;
+  if (bg < lowThreshold) return grams;
+  if (phase === "recovery") {
+    const approachMargin = bgUnits === "mmol/L" ? 0.9 : 16;
+    if (bg < lowThreshold + approachMargin) return grams;
+  }
+  return null;
+}
+
+/** During-workout carry + interval dose for the active strip (cardio: ~30g per 30 min). */
+export function computeActiveWorkoutFuelCarry(input: {
+  plan: ExercisePlanResult;
+  exerciseType: string;
+  intensity: ExerciseIntensity;
+}): { carryGrams: number; doseGrams: number; intervalMinutes: number } | null {
+  const { plan, exerciseType, intensity } = input;
+  const duration = plan.duration;
+
+  if (isCardioLikeExerciseType(exerciseType)) {
+    if (intensity === "light") {
+      const carry = Math.max(plan.during.carbsNeeded, 15);
+      return { carryGrams: carry, doseGrams: 15, intervalMinutes: 30 };
+    }
+    const doseGrams = intensity === "intense" ? 30 : 20;
+    const intervals = Math.max(1, Math.ceil(duration / 30));
+    const carryGrams = Math.max(plan.during.carbsNeeded, doseGrams * intervals);
+    return { carryGrams, doseGrams, intervalMinutes: 30 };
+  }
+
+  const carry = Math.max(plan.during.carbsNeeded, plan.pre.carbsIfLow > 0 ? 15 : 0);
+  if (carry <= 0) return null;
+  return { carryGrams: carry, doseGrams: Math.min(15, carry), intervalMinutes: 30 };
 }
 
 /**
@@ -463,22 +567,51 @@ export function getExerciseFuelPlanLines(
   plan: ExercisePlanResult,
   verdict: ExerciseReadinessVerdict,
   profile: Partial<UserProfile> | null | undefined,
-  options?: { phase?: "pre" | "active" | "recovery"; exerciseType?: string },
+  options?: {
+    phase?: "pre" | "active" | "recovery";
+    exerciseType?: string;
+    currentBg?: number | null;
+    bgUnits?: string;
+    intensity?: ExerciseIntensity;
+  },
 ): ExerciseFuelPlanLine[] {
   const phase = options?.phase ?? "pre";
-  if (verdict === "not_recommended") return [];
+  const bgUnits = options?.bgUnits ?? "mmol/L";
+
+  const treatFirstGrams = resolveTreatFirstFuelGrams(plan, phase, options?.currentBg, bgUnits);
+  if (verdict === "not_recommended") {
+    if (treatFirstGrams != null) {
+      return [
+        {
+          id: "on_hand",
+          label: "Take now",
+          text: formatFastCarbsForScenario(treatFirstGrams, profile, "exercise_on_hand"),
+        },
+      ];
+    }
+    return [];
+  }
 
   const lines: ExerciseFuelPlanLine[] = [];
   const pre = plan.pre.carbsIfLow;
   const during = plan.during.carbsNeeded;
   const post = plan.post.carbs;
+  const takeNow =
+    phase === "pre" &&
+    shouldTakePreExerciseCarbsNow({
+      currentBg: options?.currentBg,
+      bgUnits: options?.bgUnits ?? "mmol/L",
+      exerciseType: options?.exerciseType ?? "",
+      intensity: options?.intensity ?? "moderate",
+      phase,
+    });
 
   if (phase === "recovery") {
     if (post > 0) {
       lines.push({
         id: "post",
-        label: "Delayed low prep",
-        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} — lows can still appear in this window`,
+        label: "Have ready",
+        text: formatFastCarbsForScenario(post, profile, "exercise_on_hand"),
       });
     }
     return lines;
@@ -488,42 +621,50 @@ export function getExerciseFuelPlanLines(
     if (pre > 0) {
       lines.push({
         id: "on_hand",
-        label: "Have ready",
+        label: takeNow ? "Take now" : "Have ready",
         text: formatFastCarbsForScenario(pre, profile, "exercise_on_hand"),
       });
     }
     if (during > 0) {
+      const duringDetail = formatCarbsForScenario(during, profile, "exercise_during");
       lines.push({
         id: "during",
-        label: "During / if BG drops",
-        text: `${formatFastCarbsForScenario(during, profile, "exercise_during")} · ${plan.during.carbFrequency}`,
-      });
-    }
-    if (post > 0) {
-      lines.push({
-        id: "post",
-        label: isDelayedLowExerciseType(options?.exerciseType) ? "After workout" : "Recovery window",
-        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} for the post-workout window`,
+        label: `Have ~${Math.round(during)}g if BG drops`,
+        text: duringDetail ?? "",
       });
     }
     return lines;
   }
 
   if (phase === "active") {
-    if (during > 0) {
+    const carry = computeActiveWorkoutFuelCarry({
+      plan,
+      exerciseType: options?.exerciseType ?? "",
+      intensity: options?.intensity ?? "moderate",
+    });
+    if (carry) {
+      const carryDetail = formatCarbsForScenario(carry.carryGrams, profile, "exercise_during");
       lines.push({
         id: "during",
-        label: "If BG drops",
-        text: `${formatFastCarbsForScenario(during, profile, "exercise_during")} · ${plan.during.carbFrequency}`,
+        label: "Carry on you",
+        text: carryDetail
+          ? `~${Math.round(carry.carryGrams)}g fast carbs · ${carryDetail}`
+          : `~${Math.round(carry.carryGrams)}g fast carbs`,
       });
+      const showInterval =
+        isCardioLikeExerciseType(options?.exerciseType ?? "") &&
+        (options?.intensity === "moderate" || options?.intensity === "intense") &&
+        plan.duration > 30;
+      if (showInterval) {
+        const doseDetail = formatCarbsForScenario(carry.doseGrams, profile, "exercise_during");
+        lines.push({
+          id: "on_hand",
+          label: `Take ~${Math.round(carry.doseGrams)}g every ${carry.intervalMinutes} min`,
+          text: doseDetail ?? "",
+        });
+      }
     }
-    if (post > 0 && (during <= 0 || isDelayedLowExerciseType(options?.exerciseType))) {
-      lines.push({
-        id: "post",
-        label: "After workout",
-        text: `${formatFastCarbsForScenario(post, profile, "exercise_on_hand")} for recovery`,
-      });
-    }
+    return lines;
   }
 
   return lines;
@@ -540,11 +681,17 @@ export function getExerciseCarbPlanHintLine(
     phase?: "pre" | "active" | "recovery";
     exerciseType?: string;
     profile?: Partial<UserProfile> | null;
+    currentBg?: number | null;
+    bgUnits?: string;
+    intensity?: ExerciseIntensity;
   },
 ): string | null {
   const lines = getExerciseFuelPlanLines(plan, verdict, options?.profile, {
     phase: options?.phase,
     exerciseType: options?.exerciseType,
+    currentBg: options?.currentBg,
+    bgUnits: options?.bgUnits,
+    intensity: options?.intensity,
   });
   if (lines.length === 0) return null;
   return `${lines.map((l) => `${l.label}: ${l.text}`).join(" · ")}.`;
