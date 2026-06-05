@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AchievementsPanel } from "@/components/achievements/achievements-panel";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
@@ -112,6 +111,13 @@ const PATIENT_TOOLS: ToolDef[] = [
     icon: Lightbulb,
     title: "Tips",
     description: "A daily tip plus more short ideas you can dip into anytime.",
+  },
+  {
+    id: "achievements",
+    href: "/tools/achievements",
+    icon: Sparkles,
+    title: "Achievements",
+    description: "Streak badges for bedtime checks, exercise, and guides — pin favourites to your public profile.",
   },
 ];
 
@@ -350,7 +356,7 @@ export function ToolsHubPage({
     .map((id) => byId.get(id))
     .filter(Boolean) as ToolDef[];
 
-  const learn = (["education", "tips"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
+  const learn = (["education", "tips", "achievements"] as const).map((id) => byId.get(id)).filter(Boolean) as ToolDef[];
 
   const supporterTools =
     hubVariant === "carer" || hubVariant === "community" ? ([...actNow, ...learn] as ToolDef[]) : [];
@@ -450,24 +456,6 @@ export function ToolsHubPage({
                   </li>
                 ))}
               </ul>
-            </section>
-          ) : null}
-
-          {hubVariant === "patient" ? (
-            <section className="space-y-3" aria-label="Achievements" data-testid="tools-section-achievements">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                <SectionHeader title="Achievements" />
-              </div>
-              <AchievementsPanel compact />
-              <div className="px-1">
-                <Link
-                  href="/tools/achievements"
-                  className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  View all achievements
-                </Link>
-              </div>
             </section>
           ) : null}
         </>

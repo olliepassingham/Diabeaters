@@ -1,4 +1,4 @@
-import { Moon, Dumbbell, Package, Calendar, Map as MapIcon, UtensilsCrossed, Sparkles, type LucideIcon } from "lucide-react";
+import { Moon, Dumbbell, Map as MapIcon, UtensilsCrossed, Sparkles, type LucideIcon } from "lucide-react";
 
 import {
   computeStreakStats,
@@ -13,10 +13,6 @@ export type AchievementId =
   | "bedtime_streak_7"
   | "exercise_streak_3"
   | "exercise_streak_7"
-  | "supply_streak_3"
-  | "supply_streak_7"
-  | "appointment_streak_3"
-  | "appointment_streak_7"
   | "scenario_streak_3"
   | "scenario_streak_7"
   | "adviser_streak_3"
@@ -64,38 +60,6 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     streakKind: "exercise_session",
     requiredDays: 7,
     icon: Dumbbell,
-  },
-  {
-    id: "supply_streak_3",
-    title: "Supplies — 3 days",
-    description: "Updated supplies three days in a row.",
-    streakKind: "supply_event",
-    requiredDays: 3,
-    icon: Package,
-  },
-  {
-    id: "supply_streak_7",
-    title: "Supply steady — 1 week",
-    description: "Updated supplies seven days in a row.",
-    streakKind: "supply_event",
-    requiredDays: 7,
-    icon: Package,
-  },
-  {
-    id: "appointment_streak_3",
-    title: "Clinic ready — 3 days",
-    description: "Logged clinic activity three days in a row.",
-    streakKind: "appointment",
-    requiredDays: 3,
-    icon: Calendar,
-  },
-  {
-    id: "appointment_streak_7",
-    title: "Clinic steady — 1 week",
-    description: "Logged clinic activity seven days in a row.",
-    streakKind: "appointment",
-    requiredDays: 7,
-    icon: Calendar,
   },
   {
     id: "scenario_streak_3",

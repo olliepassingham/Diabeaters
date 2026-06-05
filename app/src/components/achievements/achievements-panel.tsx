@@ -25,25 +25,71 @@ function sortEarned(rows: EarnedAchievement[]): EarnedAchievement[] {
   return [...rows].sort((a, b) => b.earnedAt.localeCompare(a.earnedAt));
 }
 
+function useEarnedAchievementsState(): EarnedAchievement[] {
+  const [earned, setEarned] = useState<EarnedAchievement[]>(() => sortEarned(loadEarnedAchievements()));
+
+  useEffect(() => {
+    const refresh = () => setEarned(sortEarned(loadEarnedAchievements()));
+    window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+  }, []);
+
+  return earned;
+}
+
+/** Account → Public profile: earned badges only, with a link to the full Tools page. */
+export function AccountPublicAchievementsSummary({ className }: { className?: string }) {
+  const earned = useEarnedAchievementsState();
+
+  const earnedBadges = useMemo(
+    () =>
+      earned.map(({ id }) => ({
+        id,
+        title: getAchievementDefinition(id).title,
+      })),
+    [earned],
+  );
+
+  return (
+    <ProfileMutedCard testId="account-public-achievements" className={className}>
+      <div className="space-y-3">
+        <ProfileSectionHeading
+          title="Your achievements"
+          subtitle={
+            earned.length > 0
+              ? `${earned.length} earned — manage badges and profile pins in Tools.`
+              : "Earn badges from bedtime checks, exercise, and guides in Tools."
+          }
+        />
+
+        {earnedBadges.length > 0 ? (
+          <ProfileAchievementBadges achievements={earnedBadges} />
+        ) : (
+          <p className="text-sm text-muted-foreground">No badges earned yet.</p>
+        )}
+
+        <Button asChild variant="outline" size="sm" className="w-full sm:w-auto" data-testid="account-achievements-tools-link">
+          <Link href="/tools/achievements">Achievements in Tools</Link>
+        </Button>
+      </div>
+    </ProfileMutedCard>
+  );
+}
+
 export function AchievementsPanel({
   showProfileToggles = false,
-  compact = false,
   className,
   userId,
 }: {
   showProfileToggles?: boolean;
-  compact?: boolean;
   className?: string;
   userId?: string;
 }) {
-  const [earned, setEarned] = useState<EarnedAchievement[]>(() => sortEarned(loadEarnedAchievements()));
+  const earned = useEarnedAchievementsState();
   const [pinned, setPinned] = useState<AchievementId[]>(() => loadPinnedAchievementIds());
 
   useEffect(() => {
-    const refresh = () => {
-      setEarned(sortEarned(loadEarnedAchievements()));
-      setPinned(loadPinnedAchievementIds());
-    };
+    const refresh = () => setPinned(loadPinnedAchievementIds());
     window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
   }, []);
@@ -60,23 +106,25 @@ export function AchievementsPanel({
 
   const unlockedCount = earned.length;
 
+  const subtitle =
+    unlockedCount > 0
+      ? `${unlockedCount} earned — keep going at your own pace.`
+      : "Complete bedtime checks or exercise sessions on consecutive days to earn your first badge.";
+
+  const profileToggleNote = showProfileToggles ? (
+    <p className="text-[11px] text-muted-foreground">
+      Choose up to {MAX_PINNED_ACHIEVEMENTS} badges for your public profile. Clinical counts are never shown.
+    </p>
+  ) : null;
+
   return (
     <ProfileMutedCard testId="achievements-panel" className={className}>
-      <div className={cn("space-y-4", compact && "space-y-3")}>
+      <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <ProfileSectionHeading
-            title="Your achievements"
-            subtitle={
-              unlockedCount > 0
-                ? `${unlockedCount} earned — keep going at your own pace.`
-                : "Complete bedtime checks or exercise sessions on consecutive days to earn your first badge."
-            }
-          />
-          {!compact ? (
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link href="/tools/activity">View activity log</Link>
-            </Button>
-          ) : null}
+          <ProfileSectionHeading title="Your achievements" subtitle={subtitle} />
+          <Button asChild variant="outline" size="sm" className="shrink-0">
+            <Link href="/tools/activity">View activity log</Link>
+          </Button>
         </div>
 
         <ul className="list-none space-y-2.5" aria-label="Achievements">
@@ -130,11 +178,7 @@ export function AchievementsPanel({
           })}
         </ul>
 
-        {showProfileToggles ? (
-          <p className="text-[11px] text-muted-foreground">
-            Choose up to {MAX_PINNED_ACHIEVEMENTS} badges for your public profile. Clinical counts are never shown.
-          </p>
-        ) : null}
+        {profileToggleNote}
       </div>
     </ProfileMutedCard>
   );
