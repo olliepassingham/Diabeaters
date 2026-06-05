@@ -214,7 +214,10 @@ Deno.serve(async (req: Request) => {
       if (!mobilePushDeliveryConfigured()) continue;
 
       const tokenRows = await fetchLatestPushTokensForUserId(admin, rid);
-      const { delivered } = await deliverPushToTokenRows(tokenRows, "New message", bodyText, payload);
+      const { delivered } = await deliverPushToTokenRows(tokenRows, "New message", bodyText, payload, {
+        recipientUserId: rid,
+        admin,
+      });
       pushDelivered += delivered;
     }
 

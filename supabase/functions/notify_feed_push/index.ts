@@ -233,7 +233,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const tokenRows = await fetchLatestPushTokensForUserId(admin, recipientId);
-    const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, payload);
+    const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, payload, {
+      recipientUserId: recipientId,
+      admin,
+    });
 
     return new Response(
       JSON.stringify({ success: true, delivered_push: delivered, recipient: recipientId, deep_link: deepLink }),

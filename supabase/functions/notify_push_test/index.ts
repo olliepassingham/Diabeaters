@@ -2,6 +2,7 @@
  * Supabase Edge Function: send a test push to the caller's mobile devices (iOS + Android).
  */
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { fetchNativeAppBadgeCountForUser } from "../_shared/native-app-badge-count.ts";
 import {
   apnsDirectConfigured,
   getApnsEdgeSendContext,
@@ -92,6 +93,9 @@ Deno.serve(async (req: Request) => {
     const body = "If you can read this, push delivery is working for your device.";
     const payload = { kind: "push_test", deep_link: "/settings/notifications" };
 
+    const badgeRes = await fetchNativeAppBadgeCountForUser(admin, callerId);
+    const badgeCount = badgeRes.error ? 0 : badgeRes.count;
+
     let delivered = 0;
     let lastFailure: Extract<DeliverPushResult, { success: false }> | undefined;
     const attempts: Array<{
@@ -106,7 +110,7 @@ Deno.serve(async (req: Request) => {
       const t = String(row.token ?? "").trim();
       if (!t) continue;
       try {
-        const r = await deliverPushToDevice(platform, t, title, body, payload);
+        const r = await deliverPushToDevice(platform, t, title, body, payload, badgeCount);
         attempts.push({
           platform,
           success: r.success,

@@ -116,7 +116,10 @@ export async function deliverSupplyLowAlerts(
 
     if (shouldSendPush) {
       const tokenRows = await fetchLatestPushTokensForUserId(admin, rid);
-      const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, data);
+      const { delivered } = await deliverPushToTokenRows(tokenRows, title, bodyText, data, {
+        recipientUserId: rid,
+        admin,
+      });
       pushDelivered += delivered;
     }
   }

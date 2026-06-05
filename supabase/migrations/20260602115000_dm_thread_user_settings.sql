@@ -1,8 +1,6 @@
 -- DM per-user settings: mute + hide (delete from list) per conversation.
--- Canonical migration: supabase/migrations/20260602115000_dm_thread_user_settings.sql
--- Apply in Supabase SQL editor after `community.sql` / `community_social_v2.sql`.
+-- Required by count_unread_dm_threads_for_user (push badge) and notify_dm_push mute/hide checks.
 
--- 1) Table
 CREATE TABLE IF NOT EXISTS public.dm_thread_user_settings (
   thread_id uuid NOT NULL REFERENCES public.dm_threads (id) ON DELETE CASCADE,
   user_id uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
@@ -19,7 +17,6 @@ CREATE INDEX IF NOT EXISTS dm_thread_user_settings_user_id_idx
 CREATE INDEX IF NOT EXISTS dm_thread_user_settings_thread_id_idx
   ON public.dm_thread_user_settings (thread_id);
 
--- 2) updated_at helper
 CREATE OR REPLACE FUNCTION public.dm_thread_user_settings_set_updated_at()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -36,7 +33,6 @@ CREATE TRIGGER dm_thread_user_settings_touch_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION public.dm_thread_user_settings_set_updated_at();
 
--- 3) RLS
 ALTER TABLE public.dm_thread_user_settings ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS dm_thread_user_settings_select_own ON public.dm_thread_user_settings;
@@ -83,7 +79,6 @@ CREATE POLICY dm_thread_user_settings_delete_own
     AND public.dm_thread_has_member(thread_id, auth.uid())
   );
 
--- 4) RPC: upsert settings for current user (single source for mute/hide/unhide)
 CREATE OR REPLACE FUNCTION public.upsert_dm_thread_user_settings(
   p_thread_id uuid,
   p_muted boolean DEFAULT NULL,
@@ -130,4 +125,3 @@ GRANT EXECUTE ON FUNCTION public.upsert_dm_thread_user_settings(uuid, boolean, b
 
 COMMENT ON TABLE public.dm_thread_user_settings IS 'Per-user DM thread preferences (mute/hide).';
 COMMENT ON FUNCTION public.upsert_dm_thread_user_settings(uuid, boolean, boolean) IS 'Upsert per-user DM settings (mute/hide) for the current user.';
-

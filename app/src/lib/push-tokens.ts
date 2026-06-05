@@ -284,6 +284,11 @@ function attachPushListeners(
     }
   });
 
+  PushNotifications.addListener("pushNotificationActionPerformed", () => {
+    writePushDiag({ state: "push_action_performed", platform });
+    scheduleNativeAppBadgeSync();
+  });
+
   pushListenersBound = true;
 }
 

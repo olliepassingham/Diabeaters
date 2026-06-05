@@ -78,7 +78,7 @@ async function buildApnsJwt(): Promise<string> {
 
 async function sendViaApns(
   deviceToken: string,
-  opts: { title: string; body: string; data?: Record<string, unknown> },
+  opts: { title: string; body: string; data?: Record<string, unknown>; badge?: number },
 ): Promise<DeliverIosPushResult> {
   const bundleId = Deno.env.get("APNS_BUNDLE_ID")?.trim() || "com.passingtime.diabeaters";
   const useSandbox = (Deno.env.get("APNS_USE_SANDBOX") ?? "").trim().toLowerCase() === "true";
@@ -98,14 +98,16 @@ async function sendViaApns(
     ? (opts.data as Record<string, unknown>)
     : {};
 
-  // Include badge so iOS shows the notification in Lock Screen / Notification Centre (required for visible alerts).
-  // The app also syncs the icon badge from unread counts when opened (AppIconBadge plugin on iOS).
+  const aps: Record<string, unknown> = {
+    alert: { title: opts.title, body: opts.body },
+    sound: "default",
+  };
+  if (opts.badge !== undefined) {
+    aps.badge = Math.max(0, Math.floor(opts.badge));
+  }
+
   const payload: Record<string, unknown> = {
-    aps: {
-      alert: { title: opts.title, body: opts.body },
-      sound: "default",
-      badge: 1,
-    },
+    aps,
     ...custom,
   };
 
@@ -176,6 +178,7 @@ export async function deliverIosPushToDevice(
   title: string,
   body: string,
   data: unknown,
+  badgeCount?: number,
 ): Promise<DeliverIosPushResult> {
   const custom = data && typeof data === "object" && !Array.isArray(data)
     ? (data as Record<string, unknown>)
@@ -184,7 +187,7 @@ export async function deliverIosPushToDevice(
   let apnsFailure: Extract<DeliverIosPushResult, { success: false }> | undefined;
 
   if (apnsDirectConfigured()) {
-    const r = await sendViaApns(deviceToken, { title, body, data: custom });
+    const r = await sendViaApns(deviceToken, { title, body, data: custom, badge: badgeCount });
     if (r.success) return r;
     apnsFailure = r;
   }

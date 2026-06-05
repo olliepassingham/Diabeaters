@@ -27,7 +27,7 @@ export function NativeAppBadgeSync() {
 
     let listener: { remove: () => Promise<void> } | undefined;
     void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) scheduleNativeAppBadgeSync(200);
+      scheduleNativeAppBadgeSync(isActive ? 200 : 0);
     }).then((h) => {
       listener = h;
     });
