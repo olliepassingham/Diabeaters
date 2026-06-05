@@ -79,6 +79,7 @@ import { AppointmentReminderPoller } from "@/components/appointment-reminder-pol
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
 import { AchievementSync } from "@/components/achievement-sync";
+import { DmInboxQuerySync } from "@/components/dm-inbox-query-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
@@ -1273,6 +1274,7 @@ function AuthenticatedShell() {
       <NativePushForegroundSync />
       <NativeAppBadgeSync />
       <AchievementSync />
+      <DmInboxQuerySync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       <DeferredAfterFirstPaint>

@@ -31,6 +31,7 @@ import {
   searchProfilesByHandlePrefix,
 } from "@/lib/profile";
 import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
+import { DM_INBOX_QK, type DmInboxPayload } from "@/lib/dm-inbox-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { formatDistanceToNow } from "date-fns";
 
@@ -119,16 +120,15 @@ function writeThreadIdList(key: string, ids: string[]): void {
   }
 }
 
-const DM_INBOX_QK = ["dm-inbox"] as const;
-
-type DmInboxDetails = {
-  lastByThreadId: Record<string, DmMessageRow | null>;
-  labels: Record<string, string>;
-  avatarByUserId: Record<string, string | null>;
-  handleByUserId: Record<string, string>;
-  serverMutedByThreadId: Record<string, boolean>;
-  serverHiddenByThreadId: Record<string, boolean>;
-};
+type DmInboxDetails = Pick<
+  DmInboxPayload,
+  | "lastByThreadId"
+  | "labels"
+  | "avatarByUserId"
+  | "handleByUserId"
+  | "serverMutedByThreadId"
+  | "serverHiddenByThreadId"
+>;
 
 async function fetchDmInboxThreadDetails(
   list: ThreadWithMembers[],
@@ -243,6 +243,7 @@ export default function CommunityMessagesPage() {
     enabled: Boolean(userId && isSupabaseConfigured()),
     staleTime: 45_000,
     gcTime: 10 * 60_000,
+    refetchOnMount: "always",
   });
 
   const threads = inboxQuery.data?.threads ?? [];

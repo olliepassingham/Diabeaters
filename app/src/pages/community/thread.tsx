@@ -166,14 +166,18 @@ export default function CommunityThreadPage() {
     [queryClient, threadId, userId],
   );
 
-  const markedReadRef = useRef(false);
+  const markedReadRef = useRef<string | null>(null);
   useEffect(() => {
-    markedReadRef.current = false;
+    markedReadRef.current = null;
   }, [threadId]);
   useEffect(() => {
-    if (!threadId || !userId || loading || markedReadRef.current) return;
-    markedReadRef.current = true;
-    markDmThreadReadWhenOpened(threadId, userId, messages);
+    if (!threadId || !userId || loading) return;
+    const hasIncomingUnread = messages.some((m) => m.sender_id !== userId && m.read_at == null);
+    if (!hasIncomingUnread) return;
+    const token = `${threadId}:${messages.length}:${messages[messages.length - 1]?.id ?? ""}`;
+    if (markedReadRef.current === token) return;
+    markedReadRef.current = token;
+    void markDmThreadReadWhenOpened(threadId, userId, messages);
   }, [threadId, userId, loading, messages]);
 
   useLayoutEffect(() => {

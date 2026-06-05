@@ -6,7 +6,9 @@ import {
   otherMemberUserId,
   type DmMessageRow,
 } from "@/lib/community";
+import { invalidateDmInboxQueries, patchDmInboxLastMessageRead } from "@/lib/dm-inbox-query";
 import { getProfile } from "@/lib/profile";
+import { queryClient } from "@/lib/queryClient";
 
 export const dmThreadQueryKey = (threadId: string | undefined, viewerId: string | undefined) =>
   ["dm-thread", threadId ?? "", viewerId ?? ""] as const;
@@ -25,6 +27,8 @@ export type DmThreadBundle = {
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
 }
+
+const markingReadThreads = new Set<string>();
 
 export async function fetchDmThreadBundle(
   threadId: string,
@@ -55,11 +59,46 @@ export async function fetchDmThreadBundle(
   return { messages, peer };
 }
 
-/** Fire-and-forget after thread is visible — do not block first paint. */
-export function markDmThreadReadWhenOpened(threadId: string, viewerId: string, messages: DmMessageRow[]): void {
-  const hasIncomingUnread = messages.some((m) => m.sender_id !== viewerId && m.read_at == null);
-  if (!hasIncomingUnread) return;
-  void markIncomingDmMessagesAsReadInThread(threadId).then((markRes) => {
-    if (!markRes.error) notifyDmInboxChanged();
+function patchThreadMessagesRead(
+  threadId: string,
+  viewerId: string,
+  readAt: string,
+): void {
+  queryClient.setQueryData<DmThreadBundle>(dmThreadQueryKey(threadId, viewerId), (old) => {
+    if (!old) return old;
+    return {
+      ...old,
+      messages: old.messages.map((m) =>
+        m.sender_id !== viewerId && m.read_at == null ? { ...m, read_at: readAt } : m,
+      ),
+    };
   });
+}
+
+/** Mark incoming messages read, optimistically clear inbox unread, then refresh from server. */
+export async function markDmThreadReadWhenOpened(
+  threadId: string,
+  viewerId: string,
+  messages: DmMessageRow[],
+): Promise<void> {
+  const hasIncomingUnread = messages.some((m) => m.sender_id !== viewerId && m.read_at == null);
+  if (!hasIncomingUnread || markingReadThreads.has(threadId)) return;
+
+  markingReadThreads.add(threadId);
+  const readAt = new Date().toISOString();
+
+  patchDmInboxLastMessageRead(queryClient, viewerId, threadId, readAt);
+  patchThreadMessagesRead(threadId, viewerId, readAt);
+
+  try {
+    const markRes = await markIncomingDmMessagesAsReadInThread(threadId);
+    if (markRes.error) {
+      invalidateDmInboxQueries(queryClient);
+      return;
+    }
+    notifyDmInboxChanged();
+    invalidateDmInboxQueries(queryClient);
+  } finally {
+    markingReadThreads.delete(threadId);
+  }
 }
