@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { BadgeCheck, ShieldAlert } from "lucide-react";
+import { BadgeCheck, Camera, Loader2, ShieldAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { HomeSectionHeading } from "@/components/home/home-ui";
 import { cn } from "@/lib/utils";
@@ -59,6 +59,11 @@ type ProfileAvatarTileProps = {
   testId?: string;
   size?: "md" | "lg";
   onImageError?: () => void;
+  /** Opens file picker / upload flow; mutually exclusive with `href`. */
+  onClick?: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  actionLabel?: string;
 };
 
 const avatarSizeClass = {
@@ -74,24 +79,45 @@ export function ProfileAvatarTile({
   testId,
   size = "lg",
   onImageError,
+  onClick,
+  disabled = false,
+  busy = false,
+  actionLabel = "Change profile photo",
 }: ProfileAvatarTileProps) {
   const showImage = Boolean(imageUrl);
+  const interactive = Boolean(onClick) && !href;
+  const imgAlt = interactive ? "" : alt;
+
   const inner = (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/80 ring-2 ring-background shadow-sm dark:bg-muted/50",
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/80 ring-2 ring-background shadow-sm dark:bg-muted/50",
         avatarSizeClass[size],
-        href && "avatar-hover-scale transition-transform",
+        (href || interactive) && "avatar-hover-scale transition-transform",
+        interactive && !disabled && "group-hover:ring-primary/30",
       )}
-      data-testid={testId}
+      data-testid={interactive ? undefined : testId}
     >
       {showImage ? (
-        <img src={imageUrl!} alt={alt} className="h-full w-full object-cover" onError={onImageError} />
+        <img src={imageUrl!} alt={imgAlt} className="h-full w-full object-cover" onError={onImageError} />
       ) : (
         <span className="text-xl font-semibold text-muted-foreground sm:text-2xl" aria-hidden>
           {initials}
         </span>
       )}
+      {interactive && busy ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+        </div>
+      ) : null}
+      {interactive && !busy && !disabled ? (
+        <div
+          className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm"
+          aria-hidden
+        >
+          <Camera className="h-3 w-3" />
+        </div>
+      ) : null}
     </div>
   );
 
@@ -100,6 +126,25 @@ export function ProfileAvatarTile({
       <Link href={href} className="shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background" aria-label={alt}>
         {inner}
       </Link>
+    );
+  }
+
+  if (interactive) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
+        aria-label={busy ? "Uploading profile photo" : actionLabel}
+        data-testid={testId ?? "avatar-change"}
+        className={cn(
+          "group shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+          (disabled || busy) && "cursor-not-allowed opacity-80",
+        )}
+      >
+        {inner}
+      </button>
     );
   }
 

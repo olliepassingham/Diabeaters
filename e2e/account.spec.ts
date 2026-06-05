@@ -105,9 +105,7 @@ test.describe("Account page", () => {
     await expect(page.getByTestId("avatar-placeholder")).toBeVisible({
       timeout: 5000,
     });
-    await expect(
-      page.getByRole("img", { name: "No avatar" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Change profile photo" })).toBeVisible();
     expect(signRequestCount).toBe(0);
   });
 
@@ -158,12 +156,15 @@ test.describe("Account page", () => {
 
     await page.goto("/account");
     await expect(page.getByTestId("avatar-placeholder")).toBeVisible({ timeout: 5000 });
-    await page.locator("#avatar-file").setInputFiles({
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Change profile photo" }).click();
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles({
       name: "avatar.png",
       mimeType: "image/png",
       buffer: Buffer.from("x"),
     });
-    const img = page.getByTestId("avatar-img");
+    const img = page.getByTestId("avatar-preview").locator("img");
     await expect(img).toBeVisible({ timeout: 5000 });
     await expect(img).toHaveAttribute("src", /uploaded-avatar/);
   });
@@ -210,12 +211,82 @@ test.describe("Account page", () => {
     });
 
     await page.goto("/account");
-    await expect(page.getByTestId("avatar-upload")).toBeVisible({
+    await expect(page.getByTestId("avatar-preview")).toBeVisible({
       timeout: 5000,
     });
-    const img = page.getByTestId("avatar-img");
+    const img = page.getByTestId("avatar-preview").locator("img");
     await expect(img).toBeVisible({ timeout: 5000 });
     await expect(img).toHaveAttribute("src", /signed-avatar/);
+  });
+
+  test("share profile button visible only when public profile is on", async ({
+    page,
+    context,
+  }) => {
+    await seedSupabaseSession(page);
+    await context.route("**/auth/v1/user**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: {
+            id: "test-user-1",
+            email: "test@example.com",
+            email_confirmed_at: new Date().toISOString(),
+          },
+        }),
+      });
+    });
+    await context.route("**/rest/v1/profiles**", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([
+            {
+              id: "test-user-1",
+              full_name: "Test User",
+              avatar_url: null,
+              is_public: false,
+              public_handle: "testuser",
+            },
+          ]),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+    await context.route("**/rest/v1/carer_links**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+
+    await page.goto("/account");
+    await expect(page.getByTestId("share-public-profile")).toHaveCount(0);
+
+    await context.unroute("**/rest/v1/profiles**");
+    await context.route("**/rest/v1/profiles**", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([
+            {
+              id: "test-user-1",
+              full_name: "Test User",
+              avatar_url: null,
+              is_public: true,
+              public_handle: "testuser",
+            },
+          ]),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.reload();
+    await expect(page.getByTestId("share-public-profile")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole("button", { name: "Share profile" })).toBeVisible();
   });
 
   test("reset password link is present", async ({ page, context }) => {
