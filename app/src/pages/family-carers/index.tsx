@@ -254,7 +254,11 @@ export default function FamilyCarersPage() {
                     className="flex items-center justify-between gap-3 rounded-xl bg-gray-50/80 p-4 shadow-sm dark:bg-muted/40"
                     data-testid={`supporter-row-${link.id}`}
                   >
-                    <div className="flex min-w-0 items-center gap-3">
+                    <Link
+                      href={`/community/profile/${encodeURIComponent(link.carerId)}`}
+                      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg -m-1 p-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                      aria-label={`View ${label}'s public profile`}
+                    >
                       <AvatarBubble label={label} initials={initials} avatarUrl={link.carer_avatar_url ?? null} />
                       <div className="min-w-0">
                         <p className="truncate font-medium">{label}</p>
@@ -262,7 +266,7 @@ export default function FamilyCarersPage() {
                           Linked {format(new Date(link.linkedAt), "d MMM yyyy")}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                     <Button
                       type="button"
                       variant="ghost"
