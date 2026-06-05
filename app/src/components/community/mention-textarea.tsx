@@ -142,7 +142,7 @@ export function MentionTextarea({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className={cn("surface-field min-h-[5.5rem] rounded-xl", className)}
+        className={cn("surface-field min-h-[5.5rem] rounded-xl text-base", className)}
         aria-autocomplete="list"
         aria-controls={mentionStart != null ? "mention-suggestions" : undefined}
       />

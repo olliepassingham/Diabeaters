@@ -897,7 +897,7 @@ export function FeedPostCard({
                     maxLength={4000}
                     hideHint
                     placeholder="Add comment"
-                    className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-sm shadow-none focus-visible:ring-0"
+                    className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-base shadow-none focus-visible:ring-0"
                   />
                 </div>
                 <Button

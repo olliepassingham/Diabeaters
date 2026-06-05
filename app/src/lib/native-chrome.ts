@@ -9,8 +9,24 @@ export function applyNativeDocumentClass(): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const p = Capacitor.getPlatform();
-  root.classList.toggle(IOS_NATIVE_CLASS, Capacitor.isNativePlatform() && p === "ios");
-  root.classList.toggle(ANDROID_NATIVE_CLASS, Capacitor.isNativePlatform() && p === "android");
+  const isIosNative = Capacitor.isNativePlatform() && p === "ios";
+  const isAndroidNative = Capacitor.isNativePlatform() && p === "android";
+  root.classList.toggle(IOS_NATIVE_CLASS, isIosNative);
+  root.classList.toggle(ANDROID_NATIVE_CLASS, isAndroidNative);
+  if (isIosNative || isAndroidNative) {
+    applyNativeViewportNoZoom();
+  }
+}
+
+/** Disable pinch zoom in the native app WebView (focus zoom is handled via 16px inputs in index.css). */
+export function applyNativeViewportNoZoom(): void {
+  if (typeof document === "undefined" || !Capacitor.isNativePlatform()) return;
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  meta.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no",
+  );
 }
 
 /** @deprecated Use {@link applyNativeDocumentClass} */

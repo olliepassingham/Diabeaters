@@ -201,7 +201,7 @@ export function FeedComposerFormBody({
               value={eventStartsAt}
               onChange={(e) => setEventStartsAt(e.target.value)}
               disabled={submitting || !user || !canComposeToFeed}
-              className="feed-datetime-input min-w-0 max-w-full text-sm text-foreground dark:[color-scheme:dark]"
+              className="feed-datetime-input min-w-0 max-w-full text-base text-foreground dark:[color-scheme:dark]"
             />
           </div>
           <div className="min-w-0 space-y-1">
