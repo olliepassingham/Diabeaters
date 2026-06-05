@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-context";
 import { getSupabase } from "./supabase";
 import { normalizeDateOfBirthInput } from "./user-age";
+import type { PublicProfileAchievement } from "./user-achievements";
 
 export type ProfileRow = {
   id: string;
@@ -37,6 +38,8 @@ export type ProfileRow = {
   account_type?: "patient" | "community" | null;
   app_region?: "UK" | "US" | "OTHER" | null;
   emergency_number?: string | null;
+  /** Achievement ids pinned to public profile (max 5). */
+  pinned_achievement_ids?: string[] | null;
 };
 
 /** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
@@ -53,7 +56,9 @@ export type PharmacyJson = {
 export type PublicCommunityProfile = Pick<
   ProfileRow,
   "id" | "full_name" | "avatar_url" | "bio" | "public_handle" | "is_public" | "diabetes_onset_date"
->;
+> & {
+  achievements?: PublicProfileAchievement[];
+};
 
 export const profileQueryKey = (userId: string | undefined) => ["profile", userId] as const;
 
@@ -111,6 +116,14 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
   else if (rawEmergency === undefined) emergency_number = undefined;
   else emergency_number = String(rawEmergency).trim() || null;
 
+  const rawPinned = data.pinned_achievement_ids;
+  let pinned_achievement_ids: string[] | null | undefined;
+  if (rawPinned === null) pinned_achievement_ids = null;
+  else if (rawPinned === undefined) pinned_achievement_ids = undefined;
+  else if (Array.isArray(rawPinned)) {
+    pinned_achievement_ids = rawPinned.filter((id): id is string => typeof id === "string");
+  } else pinned_achievement_ids = [];
+
   return {
     id: String(data.id),
     full_name: (data.full_name as string | null) ?? null,
@@ -131,6 +144,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     account_type,
     app_region,
     emergency_number,
+    pinned_achievement_ids,
   };
 }
 
@@ -226,13 +240,21 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date")
+      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids")
       .eq("id", userId)
       .maybeSingle();
 
     if (error) return { profile: null, error: new Error(error.message) };
     if (!data) return { profile: null, error: null };
     const r = data as Record<string, unknown>;
+    const pinnedRaw = r.pinned_achievement_ids;
+    const pinnedIds = Array.isArray(pinnedRaw)
+      ? pinnedRaw.filter((id): id is string => typeof id === "string")
+      : [];
+
+    const { fetchPublicProfileAchievements } = await import("./user-achievements");
+    const achievements = await fetchPublicProfileAchievements(userId, pinnedIds);
+
     const profile: PublicCommunityProfile = {
       id: String(r.id),
       full_name: (r.full_name as string | null) ?? null,
@@ -241,6 +263,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       public_handle: (r.public_handle as string | null) ?? null,
       is_public: typeof r.is_public === "boolean" ? r.is_public : true,
       diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
+      achievements,
     };
     if (!profile.is_public) return { profile: null, error: null };
     return { profile, error: null };
@@ -422,6 +445,7 @@ export type ProfileUpdatePayload = {
     | "account_type"
     | "app_region"
     | "emergency_number"
+    | "pinned_achievement_ids"
   >
 >;
 
@@ -448,6 +472,7 @@ export async function updateProfile(
     account_type,
     app_region,
     emergency_number,
+    pinned_achievement_ids,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -536,6 +561,13 @@ export async function updateProfile(
   if (emergency_number !== undefined) {
     update.emergency_number =
       emergency_number === null ? null : String(emergency_number).trim() || null;
+  }
+  if (pinned_achievement_ids !== undefined) {
+    if (pinned_achievement_ids === null) {
+      update.pinned_achievement_ids = [];
+    } else {
+      update.pinned_achievement_ids = pinned_achievement_ids.filter((id) => typeof id === "string").slice(0, 5);
+    }
   }
 
   try {

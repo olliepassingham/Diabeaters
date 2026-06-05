@@ -2,6 +2,7 @@ import { Pencil, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FeedPostList } from "@/components/community/feed-post-list";
+import { AchievementsPanel } from "@/components/achievements/achievements-panel";
 import {
   ProfileActionGrid,
   ProfileAvatarTile,
@@ -155,6 +156,8 @@ export function AccountPublicProfileTab({
           ) : null}
         </div>
       </ProfileHeroCard>
+
+      <AchievementsPanel showProfileToggles userId={userId} />
 
       <div className="space-y-3">
         <ProfileSectionHeading title="Your posts" subtitle="What others see when they visit your profile" />

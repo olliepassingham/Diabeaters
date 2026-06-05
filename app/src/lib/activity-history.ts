@@ -15,7 +15,8 @@ export type ActivityKind =
   | "ratio_snapshot"
   | "supply_event"
   | "supply_pickup"
-  | "appointment";
+  | "appointment"
+  | "adviser_session";
 
 export type ActivitySource = "local" | "cloud";
 
@@ -203,6 +204,19 @@ function supplyNameForId(supplyId: string): string {
   return storage.getSupplies().find((s) => s.id === supplyId)?.name ?? "Supply";
 }
 
+function mapAdviserActivityLog(log: { id: string; activityType: string; activityDetails: string; createdAt: string }): ActivityEvent | null {
+  const mealTypes = new Set(["meal_planning"]);
+  if (!mealTypes.has(log.activityType)) return null;
+  return event({
+    id: `adviser-${log.id}`,
+    kind: "adviser_session",
+    at: log.createdAt,
+    title: "Meal planning",
+    subtitle: log.activityDetails?.trim() || undefined,
+    href: "/adviser?tab=meal",
+  });
+}
+
 /** Collect all activity events from local storage (newest first). */
 export function collectAllActivityEvents(): ActivityEvent[] {
   const byId = new Map<string, ActivityEvent>();
@@ -293,6 +307,11 @@ export function collectAllActivityEvents(): ActivityEvent[] {
     );
   }
 
+  for (const log of storage.getActivityLogs()) {
+    const mapped = mapAdviserActivityLog(log);
+    if (mapped) add(mapped);
+  }
+
   return [...byId.values()].sort((a, b) => {
     const ta = parseActivityTimestamp(a.at)?.getTime() ?? 0;
     const tb = parseActivityTimestamp(b.at)?.getTime() ?? 0;
@@ -348,6 +367,7 @@ export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
   supply_event: "Supplies",
   supply_pickup: "Pickup",
   appointment: "Appointment",
+  adviser_session: "Meal planner",
 };
 
 export const PRIMARY_ACTIVITY_KINDS: ActivityKind[] = [
@@ -369,6 +389,7 @@ const VALID_FILTERS = new Set<ActivityKind | "all">([
   "supply_event",
   "supply_pickup",
   "appointment",
+  "adviser_session",
   "appointment_past",
 ]);
 

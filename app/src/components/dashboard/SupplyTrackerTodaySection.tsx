@@ -30,6 +30,7 @@ import {
   type HealthStatus,
 } from "@/lib/dashboard-health-status";
 import { collectAllActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
+import { computeStreakStats } from "@/lib/activity-streaks";
 import { prefetchToolsDestinationHref } from "@/lib/tools-route-prefetch";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
 
@@ -391,6 +392,14 @@ export function TodayAtAGlanceCard(props: {
     [activityTick],
   );
 
+  const habitStreaks = useMemo(() => {
+    const events = collectAllActivityEvents();
+    return {
+      bedtime: computeStreakStats(events, "bedtime_check"),
+      exercise: computeStreakStats(events, "exercise_session"),
+    };
+  }, [activityTick]);
+
   const showSupplyAttentionRows = suppliesNeedingAttention.length > 0;
   const omitDuplicateStockBanner =
     showSupplyAttentionRows &&
@@ -521,9 +530,15 @@ export function TodayAtAGlanceCard(props: {
                 />
               </div>
               <p className="text-[11px] leading-tight text-muted-foreground transition-colors group-hover:text-foreground/75">
-                {activityWeek.countLast7Days === 0
-                  ? "Activity calendar"
-                  : `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`}
+                {habitStreaks.bedtime.current > 0 || habitStreaks.exercise.current > 0 ? (
+                  <>
+                    Bedtime {habitStreaks.bedtime.current}d · Exercise {habitStreaks.exercise.current}d
+                  </>
+                ) : activityWeek.countLast7Days === 0 ? (
+                  "Activity calendar"
+                ) : (
+                  `${activityWeek.countLast7Days} ${activityWeek.countLast7Days === 1 ? "entry" : "entries"} this week`
+                )}
               </p>
             </div>
           </div>

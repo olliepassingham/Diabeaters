@@ -78,6 +78,7 @@ import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
+import { AchievementSync } from "@/components/achievement-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
@@ -105,6 +106,7 @@ const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
 const ActivityLogPage = lazy(() => import("@/pages/tools/activity-log"));
+const AchievementsPage = lazy(() => import("@/pages/tools/achievements"));
 const CorrectionHelpPage = lazy(() => import("@/pages/tools/correction-help"));
 const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
@@ -779,6 +781,13 @@ function InnerRouter() {
           <ActivityLogPage />
         </Suspense>
       </Route>
+      <Route path="/tools/achievements">
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <AchievementsPage />
+          </Suspense>
+        </PatientRouteGuard>
+      </Route>
       <Route path="/tools/routines">
         <PatientRouteGuard>
           <Redirect to="/routines" replace />
@@ -1263,6 +1272,7 @@ function AuthenticatedShell() {
     >
       <NativePushForegroundSync />
       <NativeAppBadgeSync />
+      <AchievementSync />
       <ClinicalPrefsCloudSync />
       <SickDayCloudRepairSync />
       <DeferredAfterFirstPaint>

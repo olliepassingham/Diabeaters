@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { ActivityLogPanel } from "@/components/activity/activity-log-panel";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { collectAllActivityEvents, type ActivityEvent } from "@/lib/activity-history";
+import { syncAchievementsFromActivity } from "@/lib/user-achievements";
 import { DIABEATER_SCENARIO_STATE_CHANGED_EVENT } from "@/lib/storage";
 
 export default function ActivityLogPage() {
@@ -11,6 +12,7 @@ export default function ActivityLogPage() {
 
   const refresh = useCallback(() => {
     setEvents(collectAllActivityEvents());
+    syncAchievementsFromActivity({ showToasts: true });
   }, []);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { format } from "date-fns";
+import { Dumbbell, Moon } from "lucide-react";
 import { type DayProps, useDayRender } from "react-day-picker";
 
 import {
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useActivityCalendarContext } from "./activity-calendar-context";
 
 /**
- * Calendar day with subtle scenario tint and thin accent markers.
+ * Calendar day with scenario tint, activity dot, and optional habit markers.
  */
 export function ActivityCalendarDay({ date, displayMonth }: DayProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -22,6 +23,9 @@ export function ActivityCalendarDay({ date, displayMonth }: DayProps) {
   const dayKey = format(date, "yyyy-MM-dd");
   const modes = ctx ? scenarioModesOnDay(ctx.scenarioDays, dayKey) : [];
   const hasActivity = ctx?.activityDayKeys.has(dayKey) ?? false;
+  const hasBedtime = ctx?.habitDayKeys.bedtime_check?.has(dayKey) ?? false;
+  const hasExercise = ctx?.habitDayKeys.exercise_session?.has(dayKey) ?? false;
+  const inStreakRun = ctx?.streakRunDayKeys.has(dayKey) ?? false;
   const hasScenario = modes.length > 0;
   const boxClass = getScenarioDayBoxClass(modes);
 
@@ -40,6 +44,13 @@ export function ActivityCalendarDay({ date, displayMonth }: DayProps) {
         <span className={cn("pointer-events-none absolute inset-[4px]", boxClass)} aria-hidden />
       ) : null}
 
+      {inStreakRun ? (
+        <span
+          className="pointer-events-none absolute inset-[3px] rounded-lg ring-1 ring-emerald-500/35 dark:ring-emerald-400/30"
+          aria-hidden
+        />
+      ) : null}
+
       {modes.length > 1 ? (
         <span className="pointer-events-none absolute inset-x-[7px] bottom-[6px] z-20 flex gap-px" aria-hidden>
           {modes.map((mode) => (
@@ -56,7 +67,18 @@ export function ActivityCalendarDay({ date, displayMonth }: DayProps) {
         />
       ) : null}
 
-      {hasActivity ? (
+      {hasBedtime || hasExercise ? (
+        <span
+          className={cn(
+            "pointer-events-none absolute z-20 flex items-center gap-0.5 text-emerald-700/75 dark:text-emerald-400/80",
+            hasScenario ? "right-[5px] top-[5px]" : "bottom-[6px] left-1/2 -translate-x-1/2",
+          )}
+          aria-hidden
+        >
+          {hasBedtime ? <Moon className="h-2.5 w-2.5" strokeWidth={2.25} /> : null}
+          {hasExercise ? <Dumbbell className="h-2.5 w-2.5" strokeWidth={2.25} /> : null}
+        </span>
+      ) : hasActivity ? (
         <span
           className={cn(
             "pointer-events-none absolute z-20 h-1 w-1 rounded-full bg-emerald-600/55 dark:bg-emerald-500/50",

@@ -27,6 +27,13 @@ import {
   type ActivityKind,
 } from "@/lib/activity-history";
 import {
+  computeStreakStats,
+  isStreakFilterKind,
+  qualifyingDayKeysForKind,
+  streakKindLabel,
+  type StreakTrackKind,
+} from "@/lib/activity-streaks";
+import {
   SCENARIO_CALENDAR_STYLES,
   collectScenarioCalendarDays,
   formatScenarioModesLabel,
@@ -49,6 +56,7 @@ const PATIENT_FILTER_CHIPS: FilterChip[] = [
   { id: "ratio_snapshot", label: "Ratios" },
   { id: "supply_event", label: "Supplies" },
   { id: "appointment", label: "Clinic" },
+  { id: "adviser_session", label: "Meal planner" },
 ];
 
 const CARER_FILTER_CHIPS: FilterChip[] = [
@@ -69,6 +77,7 @@ const ACTIVITY_ROW_ACCENT: Partial<Record<ActivityKind, string>> = {
   supply_event: "from-amber-500/80 to-amber-500/0",
   supply_pickup: "from-amber-400/70 to-amber-400/0",
   appointment: "from-violet-500/80 to-violet-500/0",
+  adviser_session: "from-rose-500/80 to-rose-500/0",
 };
 
 function isFilterActive(kindFilter: ActivityKind | "all", chip: FilterChip): boolean {
@@ -80,6 +89,29 @@ function isFilterActive(kindFilter: ActivityKind | "all", chip: FilterChip): boo
     return kindFilter === "supply_event" || kindFilter === "supply_pickup";
   }
   return false;
+}
+
+function StreakSummaryBar({
+  kind,
+  stats,
+}: {
+  kind: StreakTrackKind;
+  stats: { current: number; best: number };
+}) {
+  return (
+    <div
+      className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-sm"
+      data-testid={`activity-streak-summary-${kind}`}
+    >
+      <p className="font-medium text-foreground">
+        {streakKindLabel(kind)} streak
+      </p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Current: <span className="tabular-nums font-medium text-foreground">{stats.current}</span> days · Best:{" "}
+        <span className="tabular-nums font-medium text-foreground">{stats.best}</span> days
+      </p>
+    </div>
+  );
 }
 
 function ActivityFilterBar({
@@ -284,6 +316,24 @@ export function ActivityLogPanel({
   const activityDayKeys = useMemo(() => getActivityDayKeys(filteredEvents), [filteredEvents]);
   const activityDayKeySet = useMemo(() => new Set(activityDayKeys), [activityDayKeys]);
 
+  const habitDayKeys = useMemo(
+    () => ({
+      bedtime_check: qualifyingDayKeysForKind(events, "bedtime_check"),
+      exercise_session: qualifyingDayKeysForKind(events, "exercise_session"),
+    }),
+    [events],
+  );
+
+  const streakStats = useMemo(() => {
+    if (!isStreakFilterKind(kindFilter)) return null;
+    return computeStreakStats(events, kindFilter);
+  }, [events, kindFilter]);
+
+  const streakRunDayKeys = useMemo(() => {
+    if (!streakStats) return new Set<string>();
+    return new Set(streakStats.currentRunDayKeys);
+  }, [streakStats]);
+
   const scenarioCalendarDays = useMemo(() => {
     if (scenarioCalendarDaysProp) return scenarioCalendarDaysProp;
     void scenarioRevision;
@@ -296,8 +346,13 @@ export function ActivityLogPanel({
   );
 
   const calendarContextValue = useMemo(
-    () => ({ scenarioDays: scenarioCalendarDays, activityDayKeys: activityDayKeySet }),
-    [scenarioCalendarDays, activityDayKeySet],
+    () => ({
+      scenarioDays: scenarioCalendarDays,
+      activityDayKeys: activityDayKeySet,
+      habitDayKeys,
+      streakRunDayKeys,
+    }),
+    [scenarioCalendarDays, activityDayKeySet, habitDayKeys, streakRunDayKeys],
   );
 
   const selectedKey = selected ? format(selected, "yyyy-MM-dd") : null;
@@ -350,6 +405,10 @@ export function ActivityLogPanel({
       </CardHeader>
 
       <CardContent className="space-y-4 px-3 pb-4 pt-4 sm:px-4 sm:pb-5">
+        {streakStats && isStreakFilterKind(kindFilter) ? (
+          <StreakSummaryBar kind={kindFilter} stats={streakStats} />
+        ) : null}
+
         <ActivityCalendarContext.Provider value={calendarContextValue}>
           <div
             className={cn(
