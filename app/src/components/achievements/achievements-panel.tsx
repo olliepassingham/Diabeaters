@@ -58,7 +58,7 @@ export function AccountPublicAchievementsSummary({ className }: { className?: st
           subtitle={
             earned.length > 0
               ? `${earned.length} earned — manage badges and profile pins in Tools.`
-              : "Earn badges from bedtime checks, exercise, and guides in Tools."
+              : "Earn badges from bedtime checks, exercise, showing up, and guides in Tools."
           }
         />
 
@@ -109,7 +109,7 @@ export function AchievementsPanel({
   const subtitle =
     unlockedCount > 0
       ? `${unlockedCount} earned — keep going at your own pace.`
-      : "Complete bedtime checks or exercise sessions on consecutive days to earn your first badge.";
+      : "Complete bedtime checks, exercise sessions, or show up on consecutive days to earn your first badge.";
 
   const profileToggleNote = showProfileToggles ? (
     <p className="text-[11px] text-muted-foreground">

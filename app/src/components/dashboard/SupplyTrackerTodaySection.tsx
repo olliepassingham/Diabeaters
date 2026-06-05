@@ -397,6 +397,7 @@ export function TodayAtAGlanceCard(props: {
     return {
       bedtime: computeStreakStats(events, "bedtime_check"),
       exercise: computeStreakStats(events, "exercise_session"),
+      showingUp: computeStreakStats(events, "app_check_in"),
     };
   }, [activityTick]);
 
@@ -534,6 +535,8 @@ export function TodayAtAGlanceCard(props: {
                   <>
                     Bedtime {habitStreaks.bedtime.current}d · Exercise {habitStreaks.exercise.current}d
                   </>
+                ) : habitStreaks.showingUp.current >= 2 ? (
+                  <>Showing up · {habitStreaks.showingUp.current} days</>
                 ) : activityWeek.countLast7Days === 0 ? (
                   "Activity calendar"
                 ) : (

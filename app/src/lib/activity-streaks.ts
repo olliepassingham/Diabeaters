@@ -6,6 +6,7 @@ import {
   type ActivityEvent,
   type ActivityKind,
 } from "@/lib/activity-history";
+import { storage } from "@/lib/storage";
 
 /** Tool categories that earn streaks and achievements (excludes hypos and reactive tools). */
 export type StreakTrackKind =
@@ -14,7 +15,8 @@ export type StreakTrackKind =
   | "supply_event"
   | "appointment"
   | "scenario_started"
-  | "adviser_session";
+  | "adviser_session"
+  | "app_check_in";
 
 export const STREAK_TRACK_KINDS: StreakTrackKind[] = [
   "bedtime_check",
@@ -23,6 +25,7 @@ export const STREAK_TRACK_KINDS: StreakTrackKind[] = [
   "appointment",
   "scenario_started",
   "adviser_session",
+  "app_check_in",
 ];
 
 export type StreakStats = {
@@ -48,6 +51,9 @@ export function qualifyingDayKeysForKind(
   events: ActivityEvent[],
   kind: StreakTrackKind,
 ): Set<string> {
+  if (kind === "app_check_in") {
+    return new Set(storage.getAppCheckInDayKeys());
+  }
   const keys = new Set<string>();
   for (const e of eventsForStreakKind(events, kind)) {
     const key = toActivityDayKey(e.at);
@@ -151,6 +157,7 @@ export function streakKindLabel(kind: StreakTrackKind): string {
     appointment: "Clinic",
     scenario_started: "Guides",
     adviser_session: "Meal planner",
+    app_check_in: "Showing up",
   };
   return labels[kind];
 }

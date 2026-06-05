@@ -1,4 +1,4 @@
-import { Moon, Dumbbell, Map as MapIcon, UtensilsCrossed, Sparkles, type LucideIcon } from "lucide-react";
+import { Calendar, Moon, Dumbbell, Map as MapIcon, UtensilsCrossed, Sparkles, type LucideIcon } from "lucide-react";
 
 import {
   computeStreakStats,
@@ -17,7 +17,9 @@ export type AchievementId =
   | "scenario_streak_7"
   | "adviser_streak_3"
   | "adviser_streak_7"
-  | "balanced_week";
+  | "balanced_week"
+  | "app_check_in_streak_3"
+  | "app_check_in_streak_7";
 
 export type AchievementDefinition = {
   id: AchievementId;
@@ -100,6 +102,22 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     streakKind: "balanced",
     requiredDays: 7,
     icon: Sparkles,
+  },
+  {
+    id: "app_check_in_streak_3",
+    title: "Showing up — 3 days",
+    description: "Opened Diabeaters three days in a row.",
+    streakKind: "app_check_in",
+    requiredDays: 3,
+    icon: Calendar,
+  },
+  {
+    id: "app_check_in_streak_7",
+    title: "Showing up — 1 week",
+    description: "Opened Diabeaters seven days in a row.",
+    streakKind: "app_check_in",
+    requiredDays: 7,
+    icon: Calendar,
   },
 ];
 

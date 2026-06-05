@@ -3,12 +3,21 @@ import { useEffect } from "react";
 import { getAchievementDefinition, type AchievementId } from "@/lib/achievements";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
+import {
+  DIABEATER_APP_CHECK_IN_CHANGED_EVENT,
+  DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
+  storage,
+} from "@/lib/storage";
 import { mergeCloudAchievements, syncAchievementsFromActivity } from "@/lib/user-achievements";
 
 function runAchievementSync(userId: string | null, showToasts: boolean): void {
   syncAchievementsFromActivity({ showToasts, userId });
   if (userId) void mergeCloudAchievements(userId);
+}
+
+function recordCheckInAndSync(userId: string | null, showToasts: boolean): void {
+  storage.recordAppDailyCheckIn();
+  runAchievementSync(userId, showToasts);
 }
 
 /** Keeps local achievements in sync with activity and shows unlock toasts. */
@@ -33,11 +42,11 @@ export function AchievementSync() {
   }, [toast]);
 
   useEffect(() => {
-    runAchievementSync(user?.id ?? null, true);
+    recordCheckInAndSync(user?.id ?? null, true);
 
     const onVisible = () => {
       if (document.visibilityState === "visible") {
-        runAchievementSync(user?.id ?? null, true);
+        recordCheckInAndSync(user?.id ?? null, true);
       }
     };
 
@@ -45,11 +54,17 @@ export function AchievementSync() {
       runAchievementSync(user?.id ?? null, true);
     };
 
+    const onAppCheckIn = () => {
+      runAchievementSync(user?.id ?? null, true);
+    };
+
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onExerciseOutcome);
+    window.addEventListener(DIABEATER_APP_CHECK_IN_CHANGED_EVENT, onAppCheckIn);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onExerciseOutcome);
+      window.removeEventListener(DIABEATER_APP_CHECK_IN_CHANGED_EVENT, onAppCheckIn);
     };
   }, [user?.id]);
 

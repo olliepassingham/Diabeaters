@@ -14,6 +14,8 @@ import {
   pharmacyHasAnyHours,
   pharmacyOpenIntervalsForDay,
 } from "./pharmacy";
+import { format, startOfDay } from "date-fns";
+
 import { isPumpDeliveryMethod } from "./insulin-delivery-method";
 import appPkg from "../../package.json";
 
@@ -74,7 +76,11 @@ const STORAGE_KEYS = {
   POST_EXERCISE_NUDGE_SNOOZE_UNTIL: "diabeater_post_exercise_nudge_snooze_until",
   /** Last exercise `endedAt` the user dismissed post-exercise tips for (session-scoped). */
   POST_EXERCISE_NUDGE_DISMISSED_ENDED_AT: "diabeater_post_exercise_nudge_dismissed_ended_at",
+  /** yyyy-MM-dd keys when the app was opened after onboarding (newest first). */
+  APP_CHECK_IN_DAYS: "diabeater_app_check_in_days",
 } as const;
+
+const MAX_APP_CHECK_IN_DAYS = 120;
 
 type StorageLogicalKey = keyof typeof STORAGE_KEYS;
 
@@ -137,6 +143,7 @@ const BACKUP_SCOPE_KEYS: Record<BackupScope, readonly StorageLogicalKey[]> = {
     "QUICK_ACTIONS",
     "BACKUP_REMINDER_DISMISSED",
     "LAST_BACKUP_DATE",
+    "APP_CHECK_IN_DAYS",
   ],
   // Anything that isn't already in a more specific bucket is "clinical" — see
   // `clinicalKeys()` below for the source of truth so we never silently miss a
@@ -261,6 +268,18 @@ export function notifyExerciseOutcomesChanged(): void {
 
 /** Post-exercise snooze/dismiss changed — status strip and tool banners re-read localStorage. */
 export const DIABEATER_POST_EXERCISE_NUDGE_CHANGED_EVENT = "diabeater-post-exercise-nudge-changed";
+
+/** Daily app check-in day list updated — achievements re-evaluate streaks. */
+export const DIABEATER_APP_CHECK_IN_CHANGED_EVENT = "diabeater-app-check-in-changed";
+
+export function notifyAppCheckInChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(DIABEATER_APP_CHECK_IN_CHANGED_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
 
 function emitPostExerciseNudgeChanged(): void {
   if (typeof window === "undefined") return;
@@ -1694,6 +1713,36 @@ export const storage = {
     if (this.arePostExerciseNudgesSnoozed()) return false;
     if (this.isPostExerciseNudgeDismissedForCurrentSession()) return false;
     return true;
+  },
+
+  getAppCheckInDayKeys(): string[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.APP_CHECK_IN_DAYS);
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d),
+      );
+    } catch {
+      return [];
+    }
+  },
+
+  /** One calendar day per local timezone after onboarding; returns true when a new day was recorded. */
+  recordAppDailyCheckIn(): boolean {
+    if (!this.isOnboardingCompleted()) return false;
+    const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
+    const existing = this.getAppCheckInDayKeys();
+    if (existing.includes(todayKey)) return false;
+    const next = [todayKey, ...existing].slice(0, MAX_APP_CHECK_IN_DAYS);
+    try {
+      localStorage.setItem(STORAGE_KEYS.APP_CHECK_IN_DAYS, JSON.stringify(next));
+      notifyAppCheckInChanged();
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   /** Record exercise end timestamp for “next 24h” educational nudges. */
