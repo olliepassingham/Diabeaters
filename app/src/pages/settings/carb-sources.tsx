@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { Apple, Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import {
   type UserProfile,
 } from "@/lib/storage";
 import { PageHeader, PageShell } from "@/components/layout";
+import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { SettingsBackLink } from "./shared";
 
 type DraftFavorite = {
@@ -88,6 +89,7 @@ export default function SettingsCarbSourcesPage() {
     Partial<Record<CarbSourceScenario, string>>
   >({});
   const [saving, setSaving] = useState(false);
+  const [templateSelectKey, setTemplateSelectKey] = useState(0);
 
   const loadFromProfile = useCallback((profile: UserProfile | null) => {
     const prefs = getCarbSourcePreferences(profile ?? undefined);
@@ -199,7 +201,17 @@ export default function SettingsCarbSourcesPage() {
       <SettingsBackLink href="/settings" />
       <PageHeader
         title="Carb sources"
-        description="Name the gels, drinks, and tablets you actually use. Grams stay the main number — these favourites translate them into what to carry."
+        actions={
+          <InlineInfoHint
+            ariaLabel="About carb sources"
+            content={
+              <p>
+                Name the gels, drinks, and tablets you actually use. Grams stay the main number — these favourites
+                translate them into what to carry.
+              </p>
+            }
+          />
+        }
       />
 
       <Card variant="glass-muted">
@@ -211,20 +223,30 @@ export default function SettingsCarbSourcesPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {COMMON_CARB_SOURCE_TEMPLATES.map((template) => (
-              <Button
-                key={template.label}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-full text-xs"
-                onClick={() => addDraft(createFavoriteFromTemplate(template))}
-              >
-                <Plus className="mr-1 h-3 w-3" aria-hidden />
-                {template.label}
-              </Button>
-            ))}
+          <div className="space-y-1.5">
+            <Label htmlFor="carb-source-template" className="text-xs text-muted-foreground">
+              Add from template
+            </Label>
+            <Select
+              key={templateSelectKey}
+              disabled={drafts.length >= MAX_CARB_SOURCE_FAVORITES}
+              onValueChange={(value) => {
+                const template = COMMON_CARB_SOURCE_TEMPLATES.find((t) => t.label === value);
+                if (template) addDraft(createFavoriteFromTemplate(template));
+                setTemplateSelectKey((k) => k + 1);
+              }}
+            >
+              <SelectTrigger id="carb-source-template">
+                <SelectValue placeholder="Choose a common product…" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMON_CARB_SOURCE_TEMPLATES.map((template) => (
+                  <SelectItem key={template.label} value={template.label}>
+                    {template.label} · {template.carbsPerServing}g per {template.unitLabel}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {drafts.length === 0 ? (
@@ -300,8 +322,13 @@ export default function SettingsCarbSourcesPage() {
             const meta = CARB_SOURCE_SCENARIO_LABELS[scenario];
             return (
               <div key={scenario} className="space-y-1.5">
-                <Label htmlFor={`scenario-${scenario}`}>{meta.title}</Label>
-                <p className="text-[11px] text-muted-foreground">{meta.description}</p>
+                <FieldLabelWithInfo
+                  htmlFor={`scenario-${scenario}`}
+                  className="items-center"
+                  info={<p>{meta.description}</p>}
+                >
+                  {meta.title}
+                </FieldLabelWithInfo>
                 <Select
                   value={defaultByScenario[scenario] ?? "unset"}
                   onValueChange={(v) =>
@@ -329,11 +356,6 @@ export default function SettingsCarbSourcesPage() {
         </CardContent>
       </Card>
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Grams are the clinical number. Favourites are approximate packaging helpers only — always follow your care
-        team&apos;s written hypo and exercise plan.
-      </p>
-
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button type="button" className="flex-1" disabled={saving} onClick={() => void handleSave()}>
           <Save className="mr-2 h-4 w-4" aria-hidden />
@@ -343,6 +365,11 @@ export default function SettingsCarbSourcesPage() {
           Clear all
         </Button>
       </div>
+
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Grams are the clinical number. Favourites are approximate packaging helpers only — always follow your care
+        team&apos;s written hypo and exercise plan.
+      </p>
 
       <p className="text-center text-xs text-muted-foreground">
         <Link href="/settings/usage#settings-personal" className="text-primary underline-offset-4 hover:underline">
