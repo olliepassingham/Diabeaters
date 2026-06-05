@@ -265,45 +265,57 @@ function useNativeLocalNotificationDeepLinks() {
 
 /** Mirrors signed-in shell (backdrop, top bar, content, bottom nav) while auth/session resolves. */
 function SessionLoadingSkeleton() {
+  const navTabCount = 4;
+
   return (
     <div
-      className="relative flex min-h-screen w-full min-w-0 flex-col bg-background text-foreground"
+      className="relative flex min-h-dvh w-full min-w-0 flex-col bg-background text-foreground"
       aria-busy="true"
       aria-label="Loading app"
     >
       <AppShellBackdrop tone="rich" />
-      <header className="relative z-[1] border-b border-border/50 bg-background/85 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-4xl items-center gap-3 px-4 md:px-6">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
-          <Skeleton className="h-6 flex-1 rounded-md skeleton-shimmer sm:max-w-[12rem]" />
-          <div className="flex shrink-0 gap-2">
-            <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
-            <Skeleton className="h-9 w-9 rounded-full skeleton-shimmer" />
+      <header className="surface-chrome relative z-[1] sticky top-0 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+        <div className="relative flex w-full min-w-0 items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
+            <Skeleton className="h-9 w-9 shrink-0 rounded-md skeleton-shimmer" />
+          </div>
+          <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2">
+            <Skeleton className="h-8 w-8 shrink-0 rounded-full skeleton-shimmer" />
+            <Skeleton className="h-5 w-24 max-w-[40vw] rounded-md skeleton-shimmer" />
+          </div>
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
+            <Skeleton className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
+            <Skeleton className="h-9 w-9 shrink-0 rounded-full skeleton-shimmer" />
           </div>
         </div>
       </header>
       <main
         id="app-scroll-main"
-        className="relative z-[1] min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
+        className="relative z-[1] min-h-0 w-full min-w-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] sm:space-y-4 md:p-6"
         style={{
           paddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
           scrollPaddingBottom: MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
-        <Skeleton className="h-8 w-52 max-w-full rounded-lg skeleton-shimmer" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Skeleton className="h-40 w-full rounded-2xl skeleton-shimmer" />
-          <Skeleton className="h-40 w-full rounded-2xl skeleton-shimmer" />
-        </div>
-        <Skeleton className="h-28 w-full rounded-2xl skeleton-shimmer" />
+        <Skeleton className="h-36 w-full rounded-2xl skeleton-shimmer" />
+        <Skeleton className="h-11 w-full rounded-2xl skeleton-shimmer" />
+        <Skeleton className="h-11 w-full rounded-2xl skeleton-shimmer" />
+        <Skeleton className="h-40 w-full rounded-2xl skeleton-shimmer" />
+        <Skeleton className="h-32 w-full rounded-2xl skeleton-shimmer" />
       </main>
-      <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-30 border-t border-border/50 bg-background/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg items-end justify-between gap-2">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-10 w-10 shrink-0 rounded-xl skeleton-shimmer" />
-          ))}
-        </div>
-      </div>
+      <nav
+        className="bottom-nav-vt surface-chrome pointer-events-none fixed bottom-[var(--keyboard-inset-bottom,0px)] inset-x-0 z-[100] grid place-items-center border-t border-border/35 px-1 pb-[env(safe-area-inset-bottom)] pt-2 [padding-left:max(0.25rem,env(safe-area-inset-left))] [padding-right:max(0.25rem,env(safe-area-inset-right))]"
+        style={{ gridTemplateColumns: `repeat(${navTabCount}, minmax(0, 1fr))` }}
+        aria-hidden
+      >
+        {Array.from({ length: navTabCount }, (_, i) => (
+          <div key={i} className="flex min-h-11 w-full min-w-0 flex-col items-center justify-center gap-1 py-2">
+            <Skeleton className="h-6 w-6 rounded-lg skeleton-shimmer" />
+            <Skeleton className="h-2.5 w-10 max-w-full rounded skeleton-shimmer" />
+          </div>
+        ))}
+      </nav>
     </div>
   );
 }
