@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { BellOff, ChevronRight, EyeOff, MessageCircle, MoreHorizontal, Pin, Search } from "lucide-react";
+import { BellOff, ChevronRight, EyeOff, MessageCircle, MoreHorizontal, Pin, Search, Users } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -612,7 +612,7 @@ export default function CommunityMessagesPage() {
         actions={
           <Button variant="outline" size="sm" asChild className="rounded-xl">
             <Link href="/community">
-              <MessageCircle className="mr-1.5 h-4 w-4" />
+              <Users className="mr-1.5 h-4 w-4" />
               Feed
             </Link>
           </Button>

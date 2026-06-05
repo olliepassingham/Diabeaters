@@ -265,12 +265,12 @@ export default function CommunityThreadPage() {
   if (!match || !threadId) return null;
 
   const shellClass =
-    "fixed inset-0 z-[35] mx-auto flex w-full max-w-lg flex-col bg-background text-foreground";
+    "mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground";
 
   if (!isSupabaseConfigured()) {
     return (
       <div className={shellClass}>
-        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2 [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
           <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
             <Link href="/community/messages" aria-label="Back">
               <ChevronLeft className="h-6 w-6" />
@@ -287,7 +287,7 @@ export default function CommunityThreadPage() {
   if (threadQuery.error) {
     return (
       <div className={shellClass}>
-        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2 [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
           <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
             <Link href="/community/messages" aria-label="Back to messages">
               <ChevronLeft className="h-6 w-6" />
@@ -310,7 +310,7 @@ export default function CommunityThreadPage() {
 
   return (
     <div className={shellClass} data-testid="dm-thread-shell">
-      <header className="z-10 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 py-2 shadow-sm [padding-top:max(0.5rem,env(safe-area-inset-top))]">
+      <header className="z-10 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 py-2 shadow-sm">
         <Button
           type="button"
           variant="ghost"
