@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Heart, ImagePlus, Send } from "lucide-react";
+import { Heart, ImagePlus, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
-import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -154,7 +153,6 @@ export default function CommunityThreadPage() {
   });
 
   const messages = threadQuery.data?.messages ?? [];
-  const peer = threadQuery.data?.peer ?? null;
   const loading = threadQuery.isPending && threadQuery.data === undefined;
 
   const setMessagesInCache = useCallback(
@@ -269,14 +267,7 @@ export default function CommunityThreadPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className={shellClass}>
-        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
-          <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
-            <Link href="/community/messages" aria-label="Back">
-              <ChevronLeft className="h-6 w-6" />
-            </Link>
-          </Button>
-        </header>
+      <div className={shellClass} data-testid="dm-thread-shell">
         <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
           <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
         </div>
@@ -286,14 +277,7 @@ export default function CommunityThreadPage() {
 
   if (threadQuery.error) {
     return (
-      <div className={shellClass}>
-        <header className="flex shrink-0 items-center gap-2 border-b px-2 py-2">
-          <Button type="button" variant="ghost" size="icon" className="h-11 w-11 rounded-full" asChild>
-            <Link href="/community/messages" aria-label="Back to messages">
-              <ChevronLeft className="h-6 w-6" />
-            </Link>
-          </Button>
-        </header>
+      <div className={shellClass} data-testid="dm-thread-shell">
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="text-sm text-destructive">{(threadQuery.error as Error).message}</p>
           <Button variant="outline" size="sm" onClick={() => void threadQuery.refetch()}>
@@ -304,49 +288,13 @@ export default function CommunityThreadPage() {
     );
   }
 
-  const peerLabel = peer?.label ?? "Chat";
-
   let lastDivider: string | null = null;
 
   return (
     <div className={shellClass} data-testid="dm-thread-shell">
-      <header className="z-10 flex shrink-0 items-center gap-2 border-b border-border/60 bg-background px-2 py-2 shadow-sm">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11 shrink-0 rounded-full"
-          aria-label="Back to messages"
-          asChild
-        >
-          <Link href="/community/messages">
-            <ChevronLeft className="h-6 w-6" />
-          </Link>
-        </Button>
-        {peer ? (
-          <Link
-            href={`/community/profile/${encodeURIComponent(peer.userId)}`}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-1 pr-2 transition-colors hover:bg-muted/40"
-          >
-            <CommunityAuthorAvatar
-              size="sm"
-              displayName={peerLabel}
-              avatarPath={peer.avatarPath}
-              profileHref={undefined}
-            />
-            <span className="truncate text-base font-semibold text-foreground">{peerLabel}</span>
-          </Link>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3 py-1">
-            <Skeleton className="h-9 w-9 rounded-full" />
-            <Skeleton className="h-5 w-32 rounded-md" />
-          </div>
-        )}
-      </header>
-
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
+        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-3"
         aria-label="Message history"
       >
         {loading ? (

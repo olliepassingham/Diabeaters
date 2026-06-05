@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 import { useLayoutEffect } from "react";
 import { useLocation, useSearch } from "wouter";
+import { cn } from "@/lib/utils";
 import { supportsViewTransition } from "@/lib/nav-view-transition";
 
 /** Snappy ease-out — close to iOS system curves */
@@ -14,7 +15,13 @@ const easeOut = [0.22, 1, 0.36, 1] as const;
  * (see `navigateWithViewTransition` in the bottom nav). Otherwise the outlet
  * keys by pathname for a short Framer transition on tab changes.
  */
-export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
+export function AnimatedRouteOutlet({
+  children,
+  fillHeight = false,
+}: {
+  children: ReactNode;
+  fillHeight?: boolean;
+}) {
   const [pathname] = useLocation();
   const search = useSearch();
   const reduceMotion = useReducedMotion();
@@ -60,7 +67,7 @@ export function AnimatedRouteOutlet({ children }: { children: ReactNode }) {
     <AnimatePresence initial={false} mode="sync">
       <motion.div
         key={routeKey}
-        className="min-w-0 w-full"
+        className={cn("min-w-0 w-full", fillHeight && "flex min-h-0 flex-1 flex-col h-full")}
         initial={initial}
         animate={{ opacity: 1, y: 0 }}
         exit={exit}

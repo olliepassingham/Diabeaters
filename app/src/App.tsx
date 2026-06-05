@@ -15,6 +15,7 @@ import { isAiCoachEnabled, isStaging } from "@/lib/flags";
 import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
 import { AppTopBar } from "@/components/app-top-bar";
+import { DmThreadSubheader } from "@/components/dm-thread-subheader";
 import { OfflineBanner } from "@/components/offline-banner";
 import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
@@ -1283,6 +1284,7 @@ function AuthenticatedShell() {
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
       />
+      {isDmThreadView ? <DmThreadSubheader /> : null}
       {!suppressClinicalPollers && !isDmThreadView && iosNotifPrompt.show ? (
         <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">
           <Alert className="border-border/60 bg-background/55 backdrop-blur">
@@ -1316,7 +1318,7 @@ function AuthenticatedShell() {
           scrollPaddingBottom: isDmThreadView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
-        <AnimatedRouteOutlet>
+        <AnimatedRouteOutlet fillHeight={isDmThreadView}>
           <InnerRouter />
         </AnimatedRouteOutlet>
       </main>
