@@ -7,10 +7,10 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { FeedComposerFormBody } from "@/components/community/feed-composer-form-body";
 import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
+import { FindPeoplePanel } from "@/components/community/find-people-panel";
 import { useFeedComposer } from "@/hooks/use-feed-composer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { getProfilesByIds, searchProfilesByHandlePrefix, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
+import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
@@ -58,71 +58,6 @@ function readStoredFeedTab(): FeedTab {
 }
 
 const PAGE_SIZE = MAIN_FEED_PAGE_SIZE;
-
-type FindPeoplePerson = {
-  id: string;
-  name: string;
-  avatar_url: string | null;
-  handle: string;
-  reasonLabel?: string;
-};
-
-function FindPeoplePersonRow({
-  person,
-  alreadyFollowing,
-  busy,
-  waitFollowees,
-  isSelf,
-  hasUser,
-  showReason,
-  onFollow,
-}: {
-  person: FindPeoplePerson;
-  alreadyFollowing: boolean;
-  busy: boolean;
-  waitFollowees: boolean;
-  isSelf: boolean;
-  hasUser: boolean;
-  showReason?: boolean;
-  onFollow: () => void;
-}) {
-  return (
-    <li className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/50 px-2 py-1.5">
-      <CommunityAuthorAvatar
-        displayName={person.name}
-        avatarPath={person.avatar_url}
-        size="sm"
-        className="!h-8 !w-8"
-        profileHref={`/community/profile/${encodeURIComponent(person.id)}`}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium">{person.name}</p>
-        <p className="truncate text-[11px] text-muted-foreground">@{person.handle}</p>
-        {showReason && person.reasonLabel ? (
-          <p className="truncate text-[10px] text-muted-foreground/85">{person.reasonLabel}</p>
-        ) : null}
-      </div>
-      <Button
-        type="button"
-        size="sm"
-        className="h-7 shrink-0 px-2 text-xs"
-        variant={alreadyFollowing ? "secondary" : "outline"}
-        disabled={!hasUser || isSelf || busy || (waitFollowees && !alreadyFollowing) || alreadyFollowing}
-        onClick={onFollow}
-      >
-        {!hasUser
-          ? "Follow"
-          : busy || (waitFollowees && !alreadyFollowing)
-            ? "…"
-            : alreadyFollowing
-              ? "Following"
-              : isSelf
-                ? "You"
-                : "Follow"}
-      </Button>
-    </li>
-  );
-}
 
 function initialFeedComposerOpen(): boolean {
   if (typeof window === "undefined") return true;
@@ -163,12 +98,6 @@ export default function CommunityHomePage() {
   const orderedTopics = feedComposer.formBodyProps.orderedTopics;
 
   const [peopleOpen, setPeopleOpen] = useState(false);
-  const [peopleQuery, setPeopleQuery] = useState("");
-  const [peopleLoading, setPeopleLoading] = useState(false);
-  const [peopleError, setPeopleError] = useState<string | null>(null);
-  const [peopleResults, setPeopleResults] = useState<
-    Array<{ id: string; name: string; avatar_url: string | null; handle: string }>
-  >([]);
   const [suggested, setSuggested] = useState<FollowSuggestion[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
   const [suggestedOpen, setSuggestedOpen] = useState(false);
@@ -346,40 +275,6 @@ export default function CommunityHomePage() {
     };
   }, [peopleOpen, user?.id]);
 
-  useEffect(() => {
-    if (!peopleOpen) return;
-    const t = window.setTimeout(() => {
-      const q = peopleQuery.trim();
-      if (!q) {
-        setPeopleLoading(false);
-        setPeopleError(null);
-        setPeopleResults([]);
-        return;
-      }
-      setPeopleLoading(true);
-      setPeopleError(null);
-      void searchProfilesByHandlePrefix(q, 10).then((res) => {
-        setPeopleLoading(false);
-        if (res.error) {
-          setPeopleError(res.error.message);
-          setPeopleResults([]);
-          return;
-        }
-        const mapped = (res.data ?? [])
-          .filter((p) => p.is_public === true)
-          .map((p) => ({
-            id: p.id,
-            name: p.full_name?.trim() || shortId(p.id),
-            avatar_url: p.avatar_url ?? null,
-            handle: (p.public_handle ?? "").trim(),
-          }))
-          .filter((p) => Boolean(p.handle));
-        setPeopleResults(mapped);
-      });
-    }, 250);
-    return () => window.clearTimeout(t);
-  }, [peopleOpen, peopleQuery]);
-
   const loadSuggestedPeople = useCallback(async () => {
     if (!user?.id) return;
     setSuggestedLoading(true);
@@ -389,12 +284,10 @@ export default function CommunityHomePage() {
     setSuggestedLoading(false);
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!peopleOpen) return;
-    if (!user?.id) return;
-    if (suggestedLoading || suggested.length > 0) return;
+  const refreshSuggestedForFindPeople = useCallback(() => {
+    if (!user?.id || suggestedLoading || suggested.length > 0) return;
     void loadSuggestedPeople();
-  }, [peopleOpen, user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
+  }, [user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
   // Discovery on Following tab — deferred until idle so the feed load is not competing on weak WiFi.
   useEffect(() => {
@@ -481,15 +374,15 @@ export default function CommunityHomePage() {
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              size="icon"
+              size="sm"
               type="button"
-              className="h-9 w-9 shrink-0 rounded-xl"
+              className="h-9 shrink-0 rounded-xl px-2.5 sm:px-3"
               onClick={() => setPeopleOpen(true)}
               data-testid="button-find-people"
-              aria-label="Find people by @handle"
-              title="Find people by @handle"
+              aria-label="Find people"
             >
-              <SearchIcon className="h-4 w-4" aria-hidden />
+              <SearchIcon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="text-xs font-medium sm:text-sm">Find people</span>
             </Button>
             <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-xl sm:hidden" asChild>
               <Link href="/community/messages" aria-label="Messages" title="Messages">
@@ -518,82 +411,18 @@ export default function CommunityHomePage() {
         </Alert>
       ) : null}
 
-      <Dialog open={peopleOpen} onOpenChange={setPeopleOpen}>
-        <DialogContent className="flex max-h-[min(90dvh,32rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-          <DialogHeader className="shrink-0 space-y-1 px-6 pt-6 pb-2 text-left">
-            <DialogTitle>Find people</DialogTitle>
-            <DialogDescription>Search by handle (e.g. @ollie). We’ll suggest matches as you type.</DialogDescription>
-          </DialogHeader>
-          <div className="shrink-0 px-6 pb-3">
-            <Input
-              value={peopleQuery}
-              onChange={(e) => setPeopleQuery(e.target.value)}
-              placeholder="Type a handle…"
-              aria-label="Search people by handle"
-              data-testid="input-find-people"
-            />
-          </div>
-          <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6"
-            data-testid="find-people-scroll"
-          >
-            <div className="space-y-3 pr-1">
-              {peopleQuery.trim() ? (
-                <>
-                  {peopleLoading ? <p className="text-sm text-muted-foreground">Searching…</p> : null}
-                  {peopleError ? <p className="text-sm text-destructive">{peopleError}</p> : null}
-                  {!peopleLoading && !peopleError && peopleResults.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No matches.</p>
-                  ) : null}
-                  {peopleResults.length > 0 ? (
-                    <ul className="space-y-1.5">
-                      {peopleResults.map((p) => (
-                        <FindPeoplePersonRow
-                          key={p.id}
-                          person={p}
-                          isSelf={Boolean(user?.id && p.id === user.id)}
-                          alreadyFollowing={Boolean(user?.id && followeeIds.has(p.id))}
-                          busy={Boolean(followBusyIds[p.id])}
-                          waitFollowees={Boolean(user?.id && followeesLoading)}
-                          hasUser={Boolean(user?.id)}
-                          onFollow={() => void handleFollow(p.id)}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">Suggested for you</p>
-                    {suggestedLoading ? <p className="text-xs text-muted-foreground">Loading…</p> : null}
-                  </div>
-                  {suggested.length === 0 && !suggestedLoading ? (
-                    <p className="text-sm text-muted-foreground">No suggestions yet.</p>
-                  ) : null}
-                  {suggested.length > 0 ? (
-                    <ul className="space-y-1.5">
-                      {suggested.map((p) => (
-                        <FindPeoplePersonRow
-                          key={p.id}
-                          person={p}
-                          showReason
-                          isSelf={Boolean(user?.id && p.id === user.id)}
-                          alreadyFollowing={Boolean(user?.id && followeeIds.has(p.id))}
-                          busy={Boolean(followBusyIds[p.id])}
-                          waitFollowees={Boolean(user?.id && followeesLoading)}
-                          hasUser={Boolean(user?.id)}
-                          onFollow={() => void handleFollow(p.id)}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <FindPeoplePanel
+        open={peopleOpen}
+        onOpenChange={setPeopleOpen}
+        userId={user?.id}
+        followeeIds={followeeIds}
+        followeesLoading={followeesLoading}
+        followBusyIds={followBusyIds}
+        onFollow={(id) => void handleFollow(id)}
+        suggested={suggested}
+        suggestedLoading={suggestedLoading}
+        onRefreshSuggested={refreshSuggestedForFindPeople}
+      />
 
       <FeedComposerSheet
         open={feedComposer.sheetOpen}
