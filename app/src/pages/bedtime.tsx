@@ -6,21 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Capacitor } from "@capacitor/core";
-import { LocalNotifications } from "@capacitor/local-notifications";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Calculator, Plane, Thermometer, ArrowRight, Clock, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
+import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { BedtimeCorrectionPanel } from "@/components/scenarios/bedtime-correction-panel";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { computeSimpleCorrectionDose } from "@/lib/correction-dose";
 import { upsertScenario } from "@/lib/scenarios-supabase";
@@ -66,42 +63,6 @@ interface ReadinessResult {
   factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
   correction: CorrectionSuggestion | null;
   snack: { grams: number; reason: string } | null;
-}
-
-const BEDTIME_ALARM_NOTIFICATION_ID_KEY = "diabeater_bedtime_alarm_notification_id";
-const BEDTIME_ALARM_NOTIFICATION_AT_KEY = "diabeater_bedtime_alarm_notification_at";
-
-function readBedtimeAlarm(): { id: number; at: Date } | null {
-  try {
-    const idRaw = localStorage.getItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY);
-    const atRaw = localStorage.getItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY);
-    if (!idRaw || !atRaw) return null;
-    const id = Number(idRaw);
-    const at = new Date(atRaw);
-    if (!Number.isFinite(id) || Number.isNaN(at.getTime())) return null;
-    if (at.getTime() <= Date.now()) return null;
-    return { id, at };
-  } catch {
-    return null;
-  }
-}
-
-function writeBedtimeAlarm(alarm: { id: number; at: Date }): void {
-  try {
-    localStorage.setItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY, String(alarm.id));
-    localStorage.setItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY, alarm.at.toISOString());
-  } catch {
-    // ignore
-  }
-}
-
-function clearBedtimeAlarm(): void {
-  try {
-    localStorage.removeItem(BEDTIME_ALARM_NOTIFICATION_ID_KEY);
-    localStorage.removeItem(BEDTIME_ALARM_NOTIFICATION_AT_KEY);
-  } catch {
-    // ignore
-  }
 }
 
 /** Home-clock hour from settings "HH:mm" (same source as travel MDI). Returns null if invalid. */
@@ -194,11 +155,6 @@ export default function Bedtime() {
   const [aboutCheckOpen, setAboutCheckOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [alarmPlanned, setAlarmPlanned] = useState(false);
-  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false);
-  const [alarmPreset, setAlarmPreset] = useState<"2h" | "3h" | "custom">("3h");
-  const [alarmCustomTime, setAlarmCustomTime] = useState("02:30");
-  const [alarmNotification, setAlarmNotification] = useState<{ id: number; at: Date } | null>(() => readBedtimeAlarm());
   const [quickCheckOpen, setQuickCheckOpen] = useState(true);
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
@@ -229,10 +185,6 @@ export default function Bedtime() {
     const onProfile = () => setProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
-  }, []);
-
-  useEffect(() => {
-    setAlarmNotification(readBedtimeAlarm());
   }, []);
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
@@ -704,7 +656,6 @@ export default function Bedtime() {
     });
     setSaved(false);
     setDetailsOpen(false);
-    setAlarmPlanned(false);
     setQuickCheckOpen(false);
     setTipsOpen(false);
 
@@ -809,7 +760,6 @@ export default function Bedtime() {
       bgTrend: bgTrend === "not_sure" ? undefined : bgTrend,
       mealCarbs: mealCarbs ? parseFloat(mealCarbs) : null,
       recentHypos,
-      alarmPlanned,
       exercisedToday,
       hadAlcohol,
       sickDayActive: scenarioState.sickDayActive,
@@ -820,7 +770,10 @@ export default function Bedtime() {
     storage.saveBedtimeLog(log);
     setBedtimeLogs(storage.getBedtimeLogs());
     setSaved(true);
-    toast({ title: "Bedtime check saved", description: "Your check has been logged." });
+    toast({
+      title: "Bedtime check saved",
+      description: "Logged for your streak and activity history.",
+    });
   };
 
   const getRecentLogs = () => {
@@ -863,98 +816,6 @@ export default function Bedtime() {
 
   const recentLogs = getRecentLogs();
   const patternInsight = getPatternInsight();
-
-  const scheduleBedtimeAlarm = async (at: Date) => {
-    if (!Capacitor.isNativePlatform()) {
-      toast({
-        title: "Not available here",
-        description: "Overnight alarms can only be set from the installed app on your phone.",
-      });
-      return;
-    }
-
-    const perm = await LocalNotifications.requestPermissions();
-    if (perm.display !== "granted") {
-      toast({
-        title: "Notifications not enabled",
-        description: "Enable notifications to get an overnight reminder.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const id = Math.floor(Date.now() % 2_000_000_000);
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id,
-          title: "Overnight check",
-          body: "Time to check your glucose.",
-          schedule: { at },
-          extra: { kind: "bedtime_overnight_check" },
-        },
-      ],
-    });
-
-    const next = { id, at };
-    writeBedtimeAlarm(next);
-    setAlarmNotification(next);
-    setAlarmPlanned(true);
-    toast({ title: "Alarm set", description: "We’ll remind you to do an overnight check." });
-  };
-
-  const cancelBedtimeAlarm = async () => {
-    const existing = alarmNotification ?? readBedtimeAlarm();
-    if (!existing) {
-      setAlarmPlanned(false);
-      return;
-    }
-
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await LocalNotifications.cancel({ notifications: [{ id: existing.id }] });
-      } catch {
-        // ignore
-      }
-    }
-
-    clearBedtimeAlarm();
-    setAlarmNotification(null);
-    setAlarmPlanned(false);
-    toast({ title: "Alarm removed", description: "No overnight reminder is scheduled." });
-  };
-
-  const confirmBedtimeAlarm = async () => {
-    const now = new Date();
-
-    if (alarmPreset === "2h" || alarmPreset === "3h") {
-      const hours = alarmPreset === "2h" ? 2 : 3;
-      await scheduleBedtimeAlarm(new Date(now.getTime() + hours * 60 * 60 * 1000));
-      setAlarmDialogOpen(false);
-      return;
-    }
-
-    const t = alarmCustomTime.trim();
-    if (!/^\d{2}:\d{2}$/.test(t)) {
-      toast({ title: "Choose a time", description: "Please enter a time like 02:30.", variant: "destructive" });
-      return;
-    }
-
-    const [hh, mm] = t.split(":").map(Number);
-    if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
-      toast({ title: "Invalid time", description: "Please choose a valid time.", variant: "destructive" });
-      return;
-    }
-
-    const at = new Date(now);
-    at.setHours(hh, mm, 0, 0);
-    if (at.getTime() <= now.getTime() + 60_000) {
-      at.setDate(at.getDate() + 1);
-    }
-
-    await scheduleBedtimeAlarm(at);
-    setAlarmDialogOpen(false);
-  };
 
   return (
     <PageShell variant="standard" density="compact" className="space-y-4 max-sm:space-y-3">
@@ -1067,6 +928,165 @@ export default function Bedtime() {
           </Card>
         );
       })()}
+
+      {result?.correction ? (
+        <BedtimeCorrectionPanel
+          correction={result.correction}
+          isPumpUser={isPumpUser}
+          hoursUntilSleep={hoursUntilSleep}
+        />
+      ) : null}
+
+      {result ? (
+        <div
+          className={cn(
+            "overflow-hidden rounded-2xl border-2 shadow-md",
+            saved
+              ? "border-emerald-500/35 bg-emerald-500/[0.08]"
+              : "border-indigo-500/40 bg-gradient-to-br from-indigo-500/[0.12] via-card to-violet-500/[0.08] ring-1 ring-indigo-500/15",
+          )}
+          data-testid="card-bedtime-save-prompt"
+        >
+          <div className="px-4 py-4 sm:px-5">
+            {saved ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">Check saved</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Logged for your bedtime streak and activity history.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <StaticLabelWithInfo
+                  ariaLabel="Why save your bedtime check"
+                  labelClassName="text-base font-semibold tracking-tight text-foreground"
+                  info={
+                    <p className="text-sm leading-relaxed">
+                      Your result isn&apos;t logged until you save. This counts toward your bedtime streak and appears
+                      in your activity log — including for supporters linked to your account.
+                    </p>
+                  }
+                >
+                  Save tonight&apos;s check
+                </StaticLabelWithInfo>
+                <Button
+                  onClick={handleSaveCheck}
+                  className={cn(
+                    "mt-3 h-12 w-full rounded-xl text-base font-semibold shadow-sm",
+                    "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500",
+                  )}
+                  data-testid="button-save-bedtime-check"
+                >
+                  <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden />
+                  Save check
+                </Button>
+              </>
+            )}
+            <div className="mt-3 flex justify-center">
+              <Button variant="link" size="sm" className="h-auto px-0 text-muted-foreground" asChild>
+                <Link href="/tools/hypo-help">Hypo help</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="space-y-3" data-testid="card-bedtime-result">
+          {isPumpUser && (result.level === "monitor" || result.level === "alert") ? (
+            <Collapsible className="overflow-hidden rounded-xl border border-border/60 bg-card" data-testid="card-pump-overnight">
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/20">
+                <span className="flex items-center gap-2">
+                  <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                  Pump overnight tips
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 border-t border-border/50 px-4 pb-4 pt-3 text-sm text-foreground/90">
+                {exercisedToday ? (
+                  <p data-testid="text-pump-post-exercise">
+                    {(() => {
+                      const last = storage.getLastExerciseSummary();
+                      const tier =
+                        last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
+                      const suffix = lastExerciseLabel ? ` (${lastExerciseLabel})` : "";
+                      return getPumpBedtimePostExerciseLine(tier, suffix);
+                    })()}
+                  </p>
+                ) : null}
+                {hadAlcohol ? (
+                  <p>Alcohol can cause delayed lows. Consider reducing basal by 10–20% overnight and setting an alarm.</p>
+                ) : null}
+                <p>If your BG is trending down, a small temporary basal reduction (80–90%) may help prevent an overnight low.</p>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+
+          {!isPumpUser && (result.level === "monitor" || result.level === "alert") && exercisedToday ? (
+            <Collapsible
+              className="overflow-hidden rounded-xl border border-border/60 bg-card"
+              data-testid="card-mdi-post-exercise"
+            >
+              <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/20">
+                <span className="flex items-center gap-2">
+                  <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                  After exercise (MDI)
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="border-t border-border/50 px-4 pb-4 pt-3 text-sm text-foreground/90">
+                {(() => {
+                  const last = storage.getLastExerciseSummary();
+                  const tier = last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
+                  return getMdiBedtimePostExerciseLine(tier);
+                })()}
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+
+          {result.tips.length > 0 ? (
+            <Collapsible open={tipsOpen} onOpenChange={setTipsOpen}>
+              <div data-testid="container-bedtime-tips">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 text-left hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    aria-label={tipsOpen ? "Hide tips for tonight" : "Show tips for tonight"}
+                    data-testid="button-toggle-bedtime-tips"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      Tips for tonight
+                      <span className="text-xs font-normal text-muted-foreground">({result.tips.length})</span>
+                    </span>
+                    {tipsOpen ? (
+                      <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ul className="mt-2 space-y-2">
+                    {result.tips.map((tip, i) => (
+                      <li
+                        key={i}
+                        className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed"
+                        data-testid={`text-tip-${i}`}
+                      >
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ) : null}
+        </div>
+      ) : null}
 
       {result ? (
         <div className="-mt-1">
@@ -1405,297 +1425,6 @@ export default function Bedtime() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
-
-      {result && (
-        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-result">
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={result.level === "steady" ? "outline" : result.level === "monitor" ? "secondary" : "destructive"}
-                  className="text-xs"
-                >
-                  {verdictLabel(result.level)}
-                </Badge>
-                <span className="text-sm text-muted-foreground">{result.title}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link href="/tools/hypo-help">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Info className="h-4 w-4" />
-                    Hypo help
-                  </Button>
-                </Link>
-              </div>
-            </div>
-
-            {(result.level !== "steady" || result.snack) && (
-              <div className="grid gap-2">
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={() => {
-                    if (alarmNotification) {
-                      void cancelBedtimeAlarm();
-                      return;
-                    }
-                    setAlarmDialogOpen(true);
-                  }}
-                  data-testid="button-plan-alarm"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  {alarmNotification ? "Cancel overnight alarm" : "Set an overnight alarm"}
-                </Button>
-              </div>
-            )}
-
-            <Dialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen}>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Overnight reminder</DialogTitle>
-                  <DialogDescription>Set a Diabeaters notification to remind you to do an overnight glucose check.</DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>When should we remind you?</Label>
-                    <Select value={alarmPreset} onValueChange={(v) => setAlarmPreset(v as "2h" | "3h" | "custom")}>
-                      <SelectTrigger className="min-h-11">
-                        <SelectValue placeholder="Choose a time" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="2h">In 2 hours</SelectItem>
-                        <SelectItem value="3h">In 3 hours</SelectItem>
-                        <SelectItem value="custom">Pick a time (e.g. 02:30)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {alarmPreset === "custom" ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="bedtime-alarm-time">Time</Label>
-                      <Input
-                        id="bedtime-alarm-time"
-                        type="time"
-                        value={alarmCustomTime}
-                        onChange={(e) => setAlarmCustomTime(e.target.value)}
-                        className="min-h-11"
-                      />
-                      <p className="text-xs text-muted-foreground">If the time has already passed, we’ll schedule it for tomorrow.</p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setAlarmDialogOpen(false)} className="min-h-11">
-                    Cancel
-                  </Button>
-                  <Button type="button" onClick={() => void confirmBedtimeAlarm()} className="min-h-11">
-                    Set reminder
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {result.correction && (
-              <Card className="border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20" data-testid="card-correction-suggestion">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Calculator className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    <h4 className="font-medium text-sm">Bedtime Correction Suggestion</h4>
-                  </div>
-
-                  <MedicalNumericOutputDisclaimer compact />
-
-                  <div className="p-3 rounded-lg bg-background/60 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Current:</span>
-                      <span className="font-mono font-medium" data-testid="text-correction-current-bg">
-                        {result.correction.currentBg} {result.correction.bgUnits}
-                      </span>
-                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-muted-foreground">Target:</span>
-                      <span className="font-mono font-medium" data-testid="text-correction-target-bg">
-                        {result.correction.targetBg} {result.correction.bgUnits}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      ({result.correction.currentBg} - {result.correction.targetBg}) / {result.correction.correctionFactor} = {result.correction.fullDose}u full correction
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-purple-100/50 dark:bg-purple-900/30">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Suggested bedtime dose</p>
-                        <p className="text-2xl font-bold font-mono text-purple-700 dark:text-purple-300" data-testid="text-correction-suggested-dose">
-                          {result.correction.suggestedDose}u
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        ~{Math.round((result.correction.suggestedDose / result.correction.fullDose) * 100)}% of full dose
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Reduced from {result.correction.fullDose}u because bedtime corrections carry overnight hypo risk. Many diabetes teams recommend a cautious approach at night.
-                    </p>
-                    {isPumpUser && (
-                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1" data-testid="text-pump-correction-tip">
-                        Your pump tracks active insulin (IOB). Check your pump's IOB before correcting — it may already account for recent boluses.
-                      </p>
-                    )}
-                  </div>
-
-                  {(result.correction.hasIOB || result.correction.exerciseWarning || result.correction.alcoholWarning || result.correction.sickDayWarning) && (
-                    <div className="space-y-2">
-                      {result.correction.iobWarning && (
-                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800 dark:text-amber-200" data-testid="text-correction-iob-warning">{result.correction.iobWarning}</p>
-                        </div>
-                      )}
-                      {result.correction.exerciseWarning && (
-                        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-                          <Activity className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800 dark:text-amber-200" data-testid="text-correction-exercise-warning">{result.correction.exerciseWarning}</p>
-                        </div>
-                      )}
-                      {result.correction.alcoholWarning && (
-                        <div className="flex items-start gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
-                          <Wine className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                          <p className="text-xs text-red-800 dark:text-red-200" data-testid="text-correction-alcohol-warning">{result.correction.alcoholWarning}</p>
-                        </div>
-                      )}
-                      {result.correction.sickDayWarning && (
-                        <div className="flex items-start gap-2 p-2 rounded-lg bg-orange-50 dark:bg-orange-950/30">
-                          <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
-                          <p className="text-xs text-orange-800 dark:text-orange-200" data-testid="text-correction-sick-warning">{result.correction.sickDayWarning}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {hoursUntilSleep && parseFloat(hoursUntilSleep) > 1.5 && (
-                    <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30">
-                      <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-blue-800 dark:text-blue-200" data-testid="text-correction-timing-note">
-                        You're not sleeping just yet. If you correct now, recheck before bed as your levels may change.
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {isPumpUser && result && (result.level === "monitor" || result.level === "alert") && (
-              <Card className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20" data-testid="card-pump-overnight">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <h4 className="font-medium text-sm">Pump Overnight Tips</h4>
-                  </div>
-                  <div className="space-y-1.5 text-sm text-indigo-800 dark:text-indigo-200">
-                    {exercisedToday ? (
-                      <p data-testid="text-pump-post-exercise">
-                        {(() => {
-                          const last = storage.getLastExerciseSummary();
-                          const tier =
-                            last && storage.didExerciseRecently(24)
-                              ? inferPostExerciseLoadTier(last)
-                              : "moderate";
-                          const suffix = lastExerciseLabel ? ` (${lastExerciseLabel})` : "";
-                          return getPumpBedtimePostExerciseLine(tier, suffix);
-                        })()}
-                      </p>
-                    ) : null}
-                    {hadAlcohol && (
-                      <p>Alcohol can cause delayed lows. Consider reducing basal by 10-20% overnight and setting an alarm.</p>
-                    )}
-                    <p>If your BG is trending down, a small temporary basal reduction (80-90%) may help prevent an overnight low.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {!isPumpUser && result && (result.level === "monitor" || result.level === "alert") && exercisedToday && (
-              <Card
-                className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/15"
-                data-testid="card-mdi-post-exercise"
-              >
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                    <h4 className="font-medium text-sm">After exercise (MDI)</h4>
-                  </div>
-                  <p className="text-sm text-indigo-800 dark:text-indigo-200">
-                    {(() => {
-                      const last = storage.getLastExerciseSummary();
-                      const tier =
-                        last && storage.didExerciseRecently(24) ? inferPostExerciseLoadTier(last) : "moderate";
-                      return getMdiBedtimePostExerciseLine(tier);
-                    })()}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            {result.tips.length > 0 && (
-              <Collapsible open={tipsOpen} onOpenChange={setTipsOpen}>
-                <div className="space-y-2" data-testid="container-bedtime-tips">
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                      aria-label={tipsOpen ? "Hide tips for tonight" : "Show tips for tonight"}
-                      data-testid="button-toggle-bedtime-tips"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium text-sm text-foreground">Tips for tonight</span>
-                          <span className="text-xs text-muted-foreground">({result.tips.length})</span>
-                        </div>
-                        {tipsOpen ? (
-                          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
-                        )}
-                      </div>
-                    </button>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent>
-                    <ul className="space-y-2">
-                      {result.tips.map((tip, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
-                          data-testid={`text-tip-${i}`}
-                        >
-                          <span className="mt-0.5 text-muted-foreground">•</span>
-                          <span className="min-w-0">{tip}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            )}
-
-            <div className="grid gap-2">
-              <Button
-                onClick={handleSaveCheck}
-                disabled={saved}
-                className="w-full"
-                data-testid="button-save-bedtime-check"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                {saved ? "Saved" : "Save check"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Collapsible open={aboutCheckOpen} onOpenChange={setAboutCheckOpen}>
         <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-disclaimer">

@@ -174,6 +174,9 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     if (ctx.sleepHours != null && ctx.sleepHours > 1.5) {
       pushUnique(lines, "Run this check again closer to lights-out.");
     }
+    if (ctx.hadAlcohol || ctx.recentHypos || ctx.exercisedToday || ctx.bgTrend === "falling") {
+      pushUnique(lines, "Consider setting a phone alarm for an overnight glucose check.");
+    }
     if (lines.length === 0) {
       pushUnique(lines, "Stay mindful overnight and follow your usual plan if you feel unwell.");
     } else {
@@ -264,7 +267,7 @@ export function buildBedtimePersonalizedCopy(ctx: BedtimePersonalizedCopyInput):
 
   const title =
     ctx.level === "alert"
-      ? "Set an alarm tonight"
+      ? "Extra attention overnight"
       : ctx.level === "monitor"
         ? "Worth keeping an eye on"
         : "Looking good for sleep";
