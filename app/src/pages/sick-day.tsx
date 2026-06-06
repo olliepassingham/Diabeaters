@@ -25,9 +25,7 @@ import {
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
-import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
-import { ScenarioToolHeroCard } from "@/components/scenarios/scenario-tool-hero-card";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -1309,15 +1307,8 @@ export default function SickDay() {
     const impactedSupplies = supplyImpact.filter(s => s.impacted);
     const isExtended = duration.days >= 2;
 
-    const sickHeroSurface =
-      severity === "severe"
-        ? "bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800"
-        : severity === "moderate"
-          ? "bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border-orange-200 dark:border-orange-800"
-          : "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800";
-
     return (
-      <PageShell variant="standard" className="space-y-7">
+      <PageShell variant="narrow" density="compact">
         <div id="sickday-page-top" tabIndex={-1} className="sr-only outline-none" aria-hidden />
         <PageHeader
           stackActionsMaxSm
@@ -1325,12 +1316,12 @@ export default function SickDay() {
           title={
             <span className="inline-flex min-w-0 flex-wrap items-center gap-2.5" data-testid="text-sick-day-dashboard-title">
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
                   severity === "severe"
-                    ? "bg-red-100 dark:bg-red-900"
+                    ? "bg-red-500/15"
                     : severity === "moderate"
-                      ? "bg-orange-100 dark:bg-orange-900"
-                      : "bg-amber-100 dark:bg-amber-900"
+                      ? "bg-orange-500/15"
+                      : "bg-amber-500/15"
                 }`}
               >
                 <Thermometer
@@ -1344,14 +1335,8 @@ export default function SickDay() {
                   aria-hidden
                 />
               </span>
-              <span className="min-w-0">Sick day mode</span>
+              <span className="min-w-0">Sick day</span>
             </span>
-          }
-          description={
-            <>
-              Active session · <span className="capitalize">{severity}</span> severity — track symptoms, glucose, and
-              ketones.
-            </>
           }
           actions={
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1360,25 +1345,16 @@ export default function SickDay() {
                   variant="secondary"
                   className={
                     verdict.tone === "critical"
-                      ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
+                      ? "bg-red-500/15 text-red-800 dark:text-red-200"
                       : verdict.tone === "caution"
-                        ? "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
-                        : "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                        ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                        : "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100"
                   }
                 >
                   {verdict.label}
                 </Badge>
               ) : null}
-              <Badge
-                variant="secondary"
-                className={
-                  severity === "severe"
-                    ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                    : severity === "moderate"
-                      ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300"
-                      : "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300"
-                }
-              >
+              <Badge variant="outline" className="rounded-full tabular-nums">
                 <Clock className="h-3 w-3 mr-1" aria-hidden />
                 {duration.label}
               </Badge>
@@ -1386,73 +1362,22 @@ export default function SickDay() {
           }
         />
 
-        <ScenarioToolHeroCard
-          className={sickHeroSurface}
-          classNames={{ content: "space-y-3" }}
-          body={
-            <>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">
-                    Started{" "}
-                    {sickDayActivatedAt
-                      ? new Date(sickDayActivatedAt).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "recently"}
-                  </span>
-                  <span className="font-medium" data-testid="text-sick-day-duration">
-                    {duration.label}
-                  </span>
-                </div>
-                <Progress
-                  value={Math.min(100, (duration.hours / 72) * 100)}
-                  className="h-2"
-                  data-testid="progress-sick-day"
-                />
-                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                  <span>0h</span>
-                  <span className={duration.hours >= 24 ? "font-medium text-foreground" : ""}>24h</span>
-                  <span className={duration.hours >= 48 ? "font-medium text-orange-600 dark:text-orange-400" : ""}>
-                    48h
-                  </span>
-                  <span className={duration.hours >= 72 ? "font-medium text-red-600 dark:text-red-400" : ""}>72h+</span>
-                </div>
-              </div>
-              {isExtended && (
-                <div
-                  className={`rounded-lg p-3 ${
-                    duration.days >= 3
-                      ? "border border-red-300 bg-red-100 dark:border-red-700 dark:bg-red-900/50"
-                      : "border border-orange-300 bg-orange-100 dark:border-orange-700 dark:bg-orange-900/50"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle
-                      className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        duration.days >= 3 ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400"
-                      }`}
-                    />
-                    <div>
-                      <p className="text-sm font-medium" data-testid="text-extended-sick-warning">
-                        {duration.days >= 3
-                          ? "You've been unwell for 3+ days — contact your diabetes team"
-                          : "You've been unwell for 2 days — consider contacting your diabetes team if not improving"}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Extended illness increases the risk of complications. Your healthcare team can provide specific
-                        guidance.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          }
-        />
+        {isExtended ? (
+          <p
+            className={cn(
+              "rounded-xl border px-3 py-2.5 text-sm leading-snug",
+              duration.days >= 3
+                ? "border-red-500/35 bg-red-500/10 text-foreground"
+                : "border-orange-500/35 bg-orange-500/10 text-foreground",
+            )}
+            data-testid="text-extended-sick-warning"
+          >
+            <AlertTriangle className="mb-1 inline h-4 w-4 shrink-0 align-text-bottom mr-1.5" aria-hidden />
+            {duration.days >= 3
+              ? "Unwell 3+ days — contact your diabetes team."
+              : "Unwell 2 days — contact your team if not improving."}
+          </p>
+        ) : null}
 
         <ScenarioActiveCard
           title="Sick day mode"
@@ -1503,10 +1428,28 @@ export default function SickDay() {
         />
 
         <Tabs value={activeModeTab} onValueChange={(v) => setActiveModeTab(v as "now" | "checklist" | "log")} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="now" className="text-xs sm:text-sm" data-testid="tab-sickday-now">Now</TabsTrigger>
-              <TabsTrigger value="checklist" className="text-xs sm:text-sm" data-testid="tab-sickday-checklist">Reminders</TabsTrigger>
-            <TabsTrigger value="log" className="text-xs sm:text-sm" data-testid="tab-sickday-update">Update</TabsTrigger>
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-xl bg-muted/50 p-1">
+            <TabsTrigger
+              value="now"
+              className="rounded-lg py-2 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-sm"
+              data-testid="tab-sickday-now"
+            >
+              Now
+            </TabsTrigger>
+            <TabsTrigger
+              value="checklist"
+              className="rounded-lg py-2 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-sm"
+              data-testid="tab-sickday-checklist"
+            >
+              Reminders
+            </TabsTrigger>
+            <TabsTrigger
+              value="log"
+              className="rounded-lg py-2 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm sm:text-sm"
+              data-testid="tab-sickday-update"
+            >
+              Update
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="now" className="mt-4 space-y-4 animate-fade-in-up" data-testid="tabcontent-sickday-now">
@@ -2538,12 +2481,11 @@ export default function SickDay() {
 
   return (
     <>
-    <PageShell variant="standard" className={cn("space-y-7", !results && "pb-24 sm:pb-4")}>
+    <PageShell variant="narrow" density="compact" className={cn(!results && "pb-24")}>
       <div id="sickday-page-top" tabIndex={-1} className="sr-only outline-none" aria-hidden />
       <PageHeader
         leading={<PageBackButton />}
         title="Sick day"
-        description="Calculate insulin adjustments when you're feeling unwell."
         actions={
           <div data-testid="link-sick-day-coach-wrap">
             <ScenarioCoachLink topic="sick-day" />
@@ -2551,7 +2493,7 @@ export default function SickDay() {
         }
       />
 
-      <div className="grid gap-7">
+      <div className="space-y-4">
         {!results ? (
           <>
           <Card
@@ -2572,14 +2514,11 @@ export default function SickDay() {
                   <span className="block text-[11px] font-semibold uppercase tracking-wider text-orange-800/90 dark:text-orange-200/90">
                     Sick day adviser
                   </span>
-                  <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Your details</CardTitle>
-                  <CardDescription className="mt-1 leading-relaxed">
-                    Enter readings and severity to see adjustment estimates.
-                  </CardDescription>
+                  <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Your readings</CardTitle>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-6 sm:py-6">
+            <CardContent className="space-y-4 border-t border-border/50 bg-background/45 px-4 py-4 sm:px-5 sm:py-5">
               <section
                 className="space-y-3 rounded-2xl border border-amber-500/15 bg-amber-500/[0.04] p-4 dark:bg-amber-950/15"
                 aria-labelledby="sickday-input-section-tdd"
@@ -2793,13 +2732,13 @@ export default function SickDay() {
 
     {!results ? (
       <div
-        className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+        className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border/80 bg-background/95 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/85 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:hidden"
         data-testid="sickday-sticky-calculate"
       >
         <Button
           onClick={handleCalculate}
           className={cn(
-            "h-12 w-full rounded-2xl text-base font-semibold shadow-md",
+            "mx-auto flex h-11 w-full max-w-lg rounded-xl font-semibold shadow-md",
             "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
           )}
           data-testid="button-calculate-sticky"

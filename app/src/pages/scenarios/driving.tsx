@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Redirect } from "wouter";
-import { Car, ArrowLeft, ArrowRight, Shield } from "lucide-react";
+import { Car, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { DISCLAIMER_TEXT } from "@/components/disclaimer";
+import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { DrivingResultCard } from "@/components/scenarios/driving-result-card";
 import { trackFeatureEngagement } from "@/components/discovery-prompts";
@@ -42,57 +39,51 @@ type Phase = "form" | "result";
 
 const FORM_WIZARD_STEPS = 4;
 
+const STEP_TITLES = ["Glucose", "Recent lows", "Alertness", "Carbs in reach"] as const;
+
 type YesNo = "yes" | "no" | "";
 
-type ChoiceProps<T extends string> = {
+function YesNoChoice({
+  label,
+  value,
+  onChange,
+  name,
+}: {
   label: string;
-  value: T | "";
-  onChange: (v: T) => void;
-  options: { value: T; title: string; description?: string }[];
+  value: YesNo;
+  onChange: (v: YesNo) => void;
   name: string;
-};
-
-function ChoiceGroup<T extends string>({ label, value, onChange, options, name }: ChoiceProps<T>) {
+}) {
+  const options: { value: YesNo; title: string }[] = [
+    { value: "no", title: "No" },
+    { value: "yes", title: "Yes" },
+  ];
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>
-      <RadioGroup
-        value={value === "" ? undefined : value}
-        onValueChange={(v) => onChange(v as T)}
-        className="space-y-2"
-      >
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={label}>
         {options.map((opt) => {
-          const id = `${name}-${opt.value}`;
+          const selected = value === opt.value;
           return (
-            <div
+            <button
               key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              name={name}
               className={cn(
-                "flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer",
-                (value === "" ? undefined : value) === opt.value && "border-primary bg-primary/5",
+                "min-h-11 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors",
+                selected
+                  ? "border-primary bg-primary/10 text-foreground shadow-sm"
+                  : "border-border/70 bg-card/40 text-foreground hover:bg-muted/40",
               )}
               onClick={() => onChange(opt.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onChange(opt.value);
-                }
-              }}
-              role="button"
-              tabIndex={0}
             >
-              <RadioGroupItem value={opt.value} id={id} className="mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <Label htmlFor={id} className="font-normal cursor-pointer leading-snug">
-                  {opt.title}
-                </Label>
-                {opt.description ? (
-                  <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
-                ) : null}
-              </div>
-            </div>
+              {opt.title}
+            </button>
           );
         })}
-      </RadioGroup>
+      </div>
     </div>
   );
 }
@@ -137,8 +128,7 @@ export default function DrivingScenarioPage() {
   const recentHypoLogged = getRecentHypoForDriving(4);
   const bgPrefill = useMemo(() => getDrivingBgPrefill(), []);
 
-  const progressPct =
-    phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
+  const progressPct = phase === "form" ? ((wizardStep + 1) / FORM_WIZARD_STEPS) * 100 : 100;
 
   const drivingContext = useMemo(
     () => ({
@@ -152,7 +142,7 @@ export default function DrivingScenarioPage() {
   const runCheck = () => {
     setFormError(null);
     if (recentHypo === "" || alertEnough === "" || treatmentInReach === "") {
-      setFormError("Answer each question to get a recommendation.");
+      setFormError("Answer each question to continue.");
       return;
     }
     if (!bgSkipped) {
@@ -250,6 +240,12 @@ export default function DrivingScenarioPage() {
     formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const editAnswers = () => {
+    setPhase("form");
+    setOutcome(null);
+    setWizardStep(0);
+  };
+
   useEffect(() => {
     if (phase === "result" && outcome) {
       resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -262,7 +258,7 @@ export default function DrivingScenarioPage() {
 
   return (
     <div className="min-h-[50vh]">
-      <PageShell variant="standard" className={cn("space-y-4", phase === "form" && "pb-24 sm:pb-4")}>
+      <PageShell variant="narrow" density="compact" className={cn(phase === "form" && "pb-24")}>
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}
@@ -270,7 +266,7 @@ export default function DrivingScenarioPage() {
             actions={
               <>
                 <ScenarioCoachLink topic="driving" />
-                <PageInfoDialog title="About this check" description="How to use this tool safely">
+                <PageInfoDialog title="About this check" description="Driving and glucose safety">
                   <InfoSection title="Legal and medical limits">
                     <p>
                       This app does not state legal blood-glucose limits for driving. Follow local licensing rules, road
@@ -290,249 +286,208 @@ export default function DrivingScenarioPage() {
         </div>
 
         {phase === "form" ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span className="font-medium uppercase tracking-wide">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span>
                 Step {wizardStep + 1} of {FORM_WIZARD_STEPS}
               </span>
             </div>
-            <Progress value={progressPct} className="h-1.5" data-testid="driving-progress" />
+            <Progress value={progressPct} className="h-1" data-testid="driving-progress" />
           </div>
+        ) : null}
+
+        {phase === "form" && isPumpUser ? (
+          <p
+            className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-snug text-muted-foreground"
+            data-testid="alert-driving-pump"
+          >
+            <span className="font-medium text-foreground">Pump:</span> Check IOB and alarms before you drive.
+          </p>
         ) : null}
 
         {phase === "form" ? (
-          <Card className="surface-card">
-            <CardHeader>
-              <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-                <Car className="h-6 w-6 text-primary shrink-0" />
-                {wizardStep === 0
-                  ? "Glucose"
-                  : wizardStep === 1
-                    ? "Recent lows"
-                    : wizardStep === 2
-                      ? "Alertness"
-                      : "Carbs within reach"}
-              </CardTitle>
-              <CardDescription>
-                {wizardStep === 0
-                  ? "Enter a reading or skip — takes under a minute in total."
-                  : wizardStep === 1
-                    ? "One question at a time."
-                    : wizardStep === 2
-                      ? "Be honest — this is for your safety."
-                      : "Almost done — optional longer trip tip below."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {wizardStep === 0 ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Label className="text-sm font-medium">Current blood glucose</Label>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="driving-bg-skip"
-                        checked={bgSkipped}
-                        onCheckedChange={(c) => {
-                          const on = c === true;
-                          setBgSkipped(on);
-                          if (on) setBgTrend("unknown");
-                        }}
-                      />
-                      <Label htmlFor="driving-bg-skip" className="text-sm font-normal cursor-pointer">
-                        Skip
-                      </Label>
-                    </div>
-                  </div>
-                  {!bgSkipped ? (
-                    <div className="space-y-4">
-                      {targetRangeLine ? (
-                        <p className="text-xs text-muted-foreground">{targetRangeLine}</p>
-                      ) : null}
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="driving-bg">Reading ({bgUnits})</Label>
-                        <Input
-                          id="driving-bg"
-                          type="text"
-                          inputMode="decimal"
-                          placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
-                          value={bgInput}
-                          onChange={(e) => setBgInput(e.target.value)}
-                          autoComplete="off"
-                          data-testid="input-driving-bg"
-                        />
-                      </div>
-                      {bgPrefill && !bgInput.trim() ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-9"
-                          onClick={() => setBgInput(bgPrefill.value)}
-                          data-testid="button-driving-use-prefill"
-                        >
-                          Use recent reading ({bgPrefill.value} {bgUnits})
-                        </Button>
-                      ) : null}
-                      <BgTrendThreeButtons
-                        label="Trend (if you know it)"
-                        value={bgTrend}
-                        onChange={(v) => setBgTrend(v as DrivingTrend)}
-                        unsetValue="unknown"
-                        flatLabel="Flat / stable"
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+          <section className="space-y-4 rounded-2xl border border-border/60 bg-card/40 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Car className="h-4 w-4 text-primary" aria-hidden />
+              </span>
+              <h2 className="text-base font-semibold text-foreground">{STEP_TITLES[wizardStep]}</h2>
+            </div>
 
-              {wizardStep === 1 ? (
-                <div className="space-y-3">
-                  {recentHypoLogged ? (
-                    <p className="text-xs text-amber-800 dark:text-amber-200 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2">
-                      You logged a hypo recently — answer honestly; many teams advise waiting before driving.
-                    </p>
-                  ) : null}
-                  <ChoiceGroup
-                    name="driving-recent-hypo"
-                    label="Any hypo or hypo-like symptoms in the last few hours?"
-                    value={recentHypo}
-                    onChange={setRecentHypo}
-                    options={[
-                      { value: "no", title: "No" },
-                      { value: "yes", title: "Yes" },
-                    ]}
-                  />
-                </div>
-              ) : null}
-
-              {wizardStep === 2 ? (
-                <ChoiceGroup
-                  name="driving-alert"
-                  label="Do you feel alert enough to concentrate safely?"
-                  value={alertEnough}
-                  onChange={setAlertEnough}
-                  options={[
-                    { value: "yes", title: "Yes" },
-                    { value: "no", title: "No" },
-                  ]}
-                />
-              ) : null}
-
-              {wizardStep === 3 ? (
-                <div className="space-y-6">
-                  <ChoiceGroup
-                    name="driving-treatment"
-                    label="Is fast-acting carbohydrate within reach (e.g. in the car with you)?"
-                    value={treatmentInReach}
-                    onChange={setTreatmentInReach}
-                    options={[
-                      { value: "yes", title: "Yes" },
-                      { value: "no", title: "No" },
-                    ]}
-                  />
-                  <div className="flex items-start gap-3 rounded-lg border border-border/80 p-4">
+            {wizardStep === 0 ? (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">Current glucose</Label>
+                  <div className="flex items-center gap-2">
                     <Checkbox
-                      id="driving-long"
-                      checked={longJourney}
-                      onCheckedChange={(c) => setLongJourney(c === true)}
+                      id="driving-bg-skip"
+                      checked={bgSkipped}
+                      onCheckedChange={(c) => {
+                        const on = c === true;
+                        setBgSkipped(on);
+                        if (on) setBgTrend("unknown");
+                      }}
                     />
-                    <div className="space-y-1">
-                      <Label htmlFor="driving-long" className="text-sm font-medium cursor-pointer leading-snug">
-                        Longer journey (adds one planning tip)
-                      </Label>
-                      <p className="text-xs text-foreground/75">Optional — does not change the main recommendation.</p>
-                    </div>
+                    <Label htmlFor="driving-bg-skip" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                      Skip
+                    </Label>
                   </div>
                 </div>
-              ) : null}
-
-              {formError ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {formError}
-                </p>
-              ) : null}
-
-              <div className="hidden flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4 sm:flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-11 gap-1.5 shrink-0"
-                  onClick={goPrevWizard}
-                  disabled={wizardStep === 0}
-                  data-testid="button-driving-wizard-back"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  className="min-h-11 gap-1.5 min-w-[10rem] w-full sm:w-auto sm:flex-initial"
-                  onClick={goNextWizard}
-                  data-testid="button-driving-check"
-                >
-                  {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+                {!bgSkipped ? (
+                  <div className="space-y-3">
+                    {targetRangeLine ? (
+                      <p className="text-xs text-muted-foreground">{targetRangeLine}</p>
+                    ) : null}
+                    <div className="space-y-1.5 max-w-xs">
+                      <Label htmlFor="driving-bg" className="text-xs text-muted-foreground">
+                        Reading ({bgUnits})
+                      </Label>
+                      <Input
+                        id="driving-bg"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={bgUnits === "mmol/L" ? "e.g. 5.6" : "e.g. 100"}
+                        value={bgInput}
+                        onChange={(e) => setBgInput(e.target.value)}
+                        autoComplete="off"
+                        data-testid="input-driving-bg"
+                      />
+                    </div>
+                    {bgPrefill && !bgInput.trim() ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9"
+                        onClick={() => setBgInput(bgPrefill.value)}
+                        data-testid="button-driving-use-prefill"
+                      >
+                        Use recent ({bgPrefill.value} {bgUnits})
+                      </Button>
+                    ) : null}
+                    <BgTrendThreeButtons
+                      label="Trend (if you know it)"
+                      value={bgTrend}
+                      onChange={(v) => setBgTrend(v as DrivingTrend)}
+                      unsetValue="unknown"
+                      flatLabel="Flat / stable"
+                    />
+                  </div>
+                ) : null}
               </div>
-            </CardContent>
-          </Card>
+            ) : null}
+
+            {wizardStep === 1 ? (
+              <div className="space-y-3">
+                {recentHypoLogged ? (
+                  <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-snug text-amber-950 dark:text-amber-100">
+                    You logged a hypo recently — many teams advise waiting before driving.
+                  </p>
+                ) : null}
+                <YesNoChoice
+                  name="driving-recent-hypo"
+                  label="Hypo or hypo-like symptoms in the last few hours?"
+                  value={recentHypo}
+                  onChange={setRecentHypo}
+                />
+              </div>
+            ) : null}
+
+            {wizardStep === 2 ? (
+              <YesNoChoice
+                name="driving-alert"
+                label="Feel alert enough to concentrate safely?"
+                value={alertEnough}
+                onChange={setAlertEnough}
+              />
+            ) : null}
+
+            {wizardStep === 3 ? (
+              <div className="space-y-4">
+                <YesNoChoice
+                  name="driving-treatment"
+                  label="Fast-acting carbs within reach in the car?"
+                  value={treatmentInReach}
+                  onChange={setTreatmentInReach}
+                />
+                <div className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+                  <Checkbox
+                    id="driving-long"
+                    checked={longJourney}
+                    onCheckedChange={(c) => setLongJourney(c === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="driving-long" className="cursor-pointer text-sm font-normal leading-snug">
+                    Longer journey <span className="text-muted-foreground">(optional tip)</span>
+                  </Label>
+                </div>
+              </div>
+            ) : null}
+
+            {formError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {formError}
+              </p>
+            ) : null}
+
+            <div className="hidden items-center justify-between gap-2 border-t border-border/50 pt-4 sm:flex">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={goPrevWizard}
+                disabled={wizardStep === 0}
+                data-testid="button-driving-wizard-back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <Button type="button" size="sm" className="gap-1.5" onClick={goNextWizard} data-testid="button-driving-check">
+                {wizardStep === FORM_WIZARD_STEPS - 1 ? "Check readiness" : "Continue"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </section>
         ) : null}
 
         {phase === "result" && outcome ? (
-          <div ref={resultsRef} className="scroll-mt-4">
+          <div ref={resultsRef} className="scroll-mt-4 space-y-3">
             <DrivingResultCard outcome={outcome} onReset={reset} linkWithFrom={linkWithFrom} />
+            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={editAnswers}>
+              <ArrowLeft className="h-4 w-4" />
+              Edit answers
+            </Button>
           </div>
         ) : null}
 
-        <div className="space-y-4 border-t border-border/50 pt-6">
-          {phase === "form" && isPumpUser && (
-            <Alert data-testid="alert-driving-pump">
-              <AlertTitle className="text-sm">Pump</AlertTitle>
-              <AlertDescription className="text-sm">
-                Before driving, check <strong>IOB</strong>, any active temp basal, and that your pump/CGM alarms are set how
-                your team recommends — automation may change delivery without a manual bolus.
-              </AlertDescription>
-            </Alert>
-          )}
-          <Alert
-            data-testid="driving-footer-disclosure"
-            className={cn(
-              "rounded-2xl border-border/60 bg-gradient-to-br from-muted/40 via-muted/15 to-background py-4 shadow-sm sm:py-5",
-              "[&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-muted-foreground [&>svg~*]:pl-11 sm:[&>svg]:left-5 sm:[&>svg]:top-5 sm:[&>svg~*]:pl-12",
-            )}
-          >
-            <Shield className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
-            <AlertDescription className="space-y-3 text-sm leading-relaxed sm:space-y-3.5">
-              <p className="text-pretty text-muted-foreground">{DISCLAIMER_TEXT}</p>
-              <div
-                className="flex flex-col gap-1.5 border-t border-border/50 pt-3 text-xs leading-relaxed text-muted-foreground sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2 sm:text-sm"
-                data-testid="medical-sources-link"
-              >
-                <Link
-                  href="/medical-sources#driving"
-                  className="inline-flex w-fit shrink-0 font-medium text-foreground underline decoration-border underline-offset-4 transition-colors hover:text-primary hover:decoration-primary/50"
-                >
-                  Sources
-                </Link>
-                <span className="text-muted-foreground sm:min-w-0 sm:flex-1">
-                  — references behind this check. Not a substitute for your clinic or local licensing rules.
-                </span>
-              </div>
-            </AlertDescription>
-          </Alert>
+        <div className="space-y-2 pt-1" data-testid="driving-footer-disclosure">
+          <Disclaimer className="text-center text-[11px] leading-relaxed opacity-80" />
+          <p className="text-center text-[11px] text-muted-foreground">
+            <Link
+              href="/medical-sources#driving"
+              className="font-medium text-foreground/80 underline decoration-border underline-offset-2 hover:text-primary"
+              data-testid="medical-sources-link"
+            >
+              Sources
+            </Link>
+            {" · "}
+            Not a substitute for your clinic or licensing rules.
+          </p>
         </div>
       </PageShell>
 
       {phase === "form" ? (
         <div
-          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden"
+          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border/80 bg-background/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85"
           data-testid="driving-sticky-wizard"
         >
-          <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center justify-between gap-2">
+          <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2">
             <Button
               type="button"
               variant="outline"
-              className="min-h-11 gap-1.5 shrink-0"
+              size="sm"
+              className="gap-1.5 shrink-0"
               onClick={goPrevWizard}
               disabled={wizardStep === 0}
               data-testid="button-driving-wizard-back-sticky"
@@ -542,7 +497,8 @@ export default function DrivingScenarioPage() {
             </Button>
             <Button
               type="button"
-              className="min-h-11 gap-1.5 min-w-[8.5rem] flex-1 sm:flex-initial"
+              size="sm"
+              className="ml-auto min-w-[9rem] flex-1 gap-1.5 sm:flex-none"
               onClick={goNextWizard}
               data-testid="button-driving-check-sticky"
             >
@@ -551,23 +507,6 @@ export default function DrivingScenarioPage() {
             </Button>
           </div>
         </div>
-      ) : null}
-
-      {phase !== "form" ? (
-        <PageShell variant="standard" className="flex justify-start">
-          <Button
-            type="button"
-            variant="outline"
-            className="gap-1.5"
-            onClick={() => {
-              setWizardStep(0);
-              setPhase("form");
-            }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Edit answers
-          </Button>
-        </PageShell>
       ) : null}
     </div>
   );

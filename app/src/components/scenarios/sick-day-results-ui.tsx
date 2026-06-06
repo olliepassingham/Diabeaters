@@ -1,11 +1,12 @@
 import { AlertCircle, Activity, ChevronDown, Clock, Droplets, Info, Syringe } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Disclaimer } from "@/components/disclaimer";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -59,29 +60,13 @@ export function scrollToSickDayPageTop() {
 
 export function SickDayDisclaimerFooter({ className }: { className?: string }) {
   return (
-    <Card
-      className={cn(
-        "rounded-2xl border-amber-500/40 bg-amber-50/60 shadow-sm dark:border-amber-500/25 dark:bg-amber-950/25",
-        className,
-      )}
-      data-testid="sickday-disclaimer-footer"
-    >
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
-          <div className="min-w-0 text-sm">
-            <p className="font-semibold text-amber-950 dark:text-amber-50">Not medical advice</p>
-            <p className="mt-1.5 leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-              Educational estimates only. Contact your healthcare team when you are unwell — especially with high glucose,
-              ketones, or worsening symptoms.
-            </p>
-            <div className="pt-2.5">
-              <MedicalSourcesLink anchor="sickday" compact />
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={cn("space-y-1 pt-1", className)} data-testid="sickday-disclaimer-footer">
+      <Disclaimer className="text-center text-[11px] leading-relaxed opacity-80" />
+      <MedicalSourcesLink anchor="sickday" compact className="text-center" />
+      <p className="text-center text-[11px] text-muted-foreground">
+        Contact your team when unwell — especially with high glucose or ketones.
+      </p>
+    </div>
   );
 }
 
@@ -255,49 +240,56 @@ export function SickDayResultsPanel({
 }: SickDayResultsPanelProps) {
   const verdictBadgeClass =
     verdict?.tone === "critical"
-      ? "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100"
+      ? "bg-red-500/15 text-red-800 dark:text-red-100"
       : verdict?.tone === "caution"
-        ? "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100"
-        : "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100";
+        ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+        : "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100";
+
+  const heroSurface =
+    verdict?.tone === "critical"
+      ? "border-red-500/35 bg-gradient-to-b from-red-500/15 via-card to-card"
+      : verdict?.tone === "caution"
+        ? "border-amber-500/35 bg-gradient-to-b from-amber-500/12 via-card to-card"
+        : "border-emerald-600/30 bg-gradient-to-b from-emerald-500/12 via-card to-card";
 
   return (
     <Card
-      className="overflow-hidden rounded-2xl border-border/60 shadow-md ring-1 ring-border/40"
+      className={cn("overflow-hidden rounded-2xl border shadow-sm", heroSurface)}
       data-testid="card-sickday-recommendations"
     >
-      <CardHeader className="space-y-4 border-b border-border/50 bg-muted/20 px-4 py-5 sm:px-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="space-y-3 border-b border-border/40 px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Your plan</p>
-            <CardTitle className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</CardTitle>
+            <h2 className="text-xl font-semibold leading-snug tracking-tight text-foreground sm:text-2xl">
+              {verdict?.title ?? title}
+            </h2>
             {lastUpdatedLabel ? (
-              <CardDescription className="text-sm">{lastUpdatedLabel}</CardDescription>
+              <p className="text-xs text-muted-foreground">{lastUpdatedLabel}</p>
             ) : verdict ? (
-              <CardDescription className="text-sm leading-relaxed">{verdict.message}</CardDescription>
-            ) : (
-              <CardDescription>Key numbers first — open sections below for detail.</CardDescription>
-            )}
+              <p className="text-sm leading-relaxed text-foreground/85">{verdict.message}</p>
+            ) : null}
           </div>
           {verdict ? (
-            <Badge variant="secondary" className={cn("shrink-0 font-medium", verdictBadgeClass)}>
+            <Badge variant="secondary" className={cn("shrink-0 rounded-full font-medium", verdictBadgeClass)}>
               {verdict.label}
             </Badge>
           ) : null}
         </div>
         <div className="flex flex-wrap gap-2" data-testid="sickday-results-snapshot">
-          <Badge variant="outline" className="rounded-full bg-background/80 font-normal">
+          <Badge variant="outline" className="rounded-full bg-background/70 font-normal tabular-nums">
             BG {bgLevel || "—"} {bgUnits}
           </Badge>
-          <Badge variant="outline" className="rounded-full bg-background/80 font-normal capitalize">
+          <Badge variant="outline" className="rounded-full bg-background/70 font-normal capitalize">
             {formatSeverity(severity)}
           </Badge>
-          <Badge variant="outline" className="rounded-full bg-background/80 font-normal">
+          <Badge variant="outline" className="rounded-full bg-background/70 font-normal">
             Ketones {formatKetone(ketoneLevel)}
           </Badge>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-4 px-4 py-5 sm:space-y-5 sm:px-6 sm:py-6">
+      <CardContent className="space-y-4 px-4 py-4 sm:space-y-5 sm:px-5 sm:py-5">
         {results.ketoneActionRequired === "emergency" && (
           <div className="rounded-xl border-2 border-red-600 bg-red-600 p-4 dark:border-red-500 dark:bg-red-700">
             <div className="flex items-start gap-2">
@@ -353,11 +345,13 @@ export function SickDayResultsPanel({
         ) : null}
 
         {results.correctionDose > 0 ? (
-          <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.08] via-card to-card p-5 shadow-sm">
-            <p className="text-sm font-medium text-muted-foreground">Suggested correction</p>
-            <p className="mt-1 flex items-baseline gap-2" data-testid="text-correction-dose">
-              <span className="text-4xl font-semibold tracking-tight tabular-nums">{results.correctionDose}</span>
-              <span className="text-lg font-medium text-muted-foreground">units</span>
+          <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.1] via-card to-card p-4 text-center shadow-sm sm:p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested correction</p>
+            <p className="mt-1 flex items-baseline justify-center gap-1.5" data-testid="text-correction-dose">
+              <span className="font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                {results.correctionDose}
+              </span>
+              <span className="text-lg font-medium text-muted-foreground">u</span>
             </p>
             <Collapsible className="group mt-3 border-t border-primary/15 pt-3">
               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 py-1 text-left text-sm font-medium text-foreground">
