@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart, ImagePlus, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,37 @@ function dayDividerLabel(iso: string): string | null {
   if (isToday(d)) return "Today";
   if (isYesterday(d)) return "Yesterday";
   return format(d, "d MMM yyyy");
+}
+
+function DmMessageImage({ src, className }: { src: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className={cn(
+          "block w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          className,
+        )}
+        onClick={() => setOpen(true)}
+        aria-label="View full size photo"
+        data-testid="dm-message-image-open"
+      >
+        <img src={src} alt="" className="max-h-64 w-full object-cover bg-muted/30" loading="lazy" />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[min(96vw,48rem)] overflow-hidden border-0 bg-transparent p-0 shadow-none">
+          <img
+            src={src}
+            alt=""
+            className="block h-auto max-h-[85vh] w-full rounded-lg bg-black/95 object-contain"
+            data-testid="dm-message-image-full"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function DmMessageBubble({
@@ -72,12 +104,7 @@ function DmMessageBubble({
         ) : null}
         {showImage ? (
           <div className={cn(shared && "mt-2")}>
-            <img
-              src={m.image_signed_url!}
-              alt=""
-              className="max-h-64 w-full rounded-xl object-cover bg-muted/30"
-              loading="lazy"
-            />
+            <DmMessageImage src={m.image_signed_url!} />
           </div>
         ) : null}
         {hasText ? <div className={cn("whitespace-pre-wrap", showImage && "mt-2")}>{m.body}</div> : null}
@@ -153,6 +180,7 @@ export default function CommunityThreadPage() {
   });
 
   const messages = threadQuery.data?.messages ?? [];
+  const messagingBlocked = threadQuery.data?.messagingBlocked ?? false;
   const loading = threadQuery.isPending && threadQuery.data === undefined;
 
   const setMessagesInCache = useCallback(
@@ -206,10 +234,10 @@ export default function CommunityThreadPage() {
   }, [loading, messages, userId]);
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || messagingBlocked) return;
     const t = window.setTimeout(() => composerRef.current?.focus(), 80);
     return () => window.clearTimeout(t);
-  }, [loading, threadId]);
+  }, [loading, messagingBlocked, threadId]);
 
   useEffect(() => {
     if (!pendingImage) {
@@ -340,6 +368,11 @@ export default function CommunityThreadPage() {
         onSubmit={handleSend}
         className="z-10 shrink-0 border-t border-border/60 bg-background px-2 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.35)] pb-[calc(max(0.35rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]"
       >
+        {messagingBlocked ? (
+          <p className="mb-2 px-1 text-center text-sm text-muted-foreground" data-testid="dm-thread-blocked-notice">
+            Messaging is unavailable because one of you has blocked the other.
+          </p>
+        ) : null}
         <input
           ref={fileInputRef}
           type="file"
@@ -367,7 +400,7 @@ export default function CommunityThreadPage() {
             variant="ghost"
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
-            disabled={sending || !user}
+            disabled={sending || !user || messagingBlocked}
             aria-label="Attach photo"
             onClick={() => fileInputRef.current?.click()}
           >
@@ -378,14 +411,14 @@ export default function CommunityThreadPage() {
             rows={1}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            placeholder="Message…"
+            placeholder={messagingBlocked ? "Messaging unavailable" : "Message…"}
             maxLength={8000}
-            disabled={sending || !user}
+            disabled={sending || !user || messagingBlocked}
             className="min-h-10 max-h-28 flex-1 resize-none rounded-2xl border-border/60 bg-muted/40 px-3 py-2 text-[16px] leading-snug"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!sending && (body.trim() || pendingImage) && user) {
+                if (!sending && !messagingBlocked && (body.trim() || pendingImage) && user) {
                   void handleSend(e as unknown as React.FormEvent);
                 }
               }
@@ -395,7 +428,7 @@ export default function CommunityThreadPage() {
             type="submit"
             size="icon"
             className="h-10 w-10 shrink-0 rounded-full"
-            disabled={sending || (!body.trim() && !pendingImage) || !user}
+            disabled={sending || messagingBlocked || (!body.trim() && !pendingImage) || !user}
             aria-label="Send message"
           >
             <Send className="h-4 w-4" />

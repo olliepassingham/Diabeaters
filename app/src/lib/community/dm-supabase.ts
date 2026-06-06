@@ -4,8 +4,18 @@
  */
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
 import { getSupabase } from "@/lib/supabase";
+import { getBlockStatus } from "./blocks-supabase";
 import { COMMUNITY_POST_IMAGES_BUCKET } from "./posts-supabase";
 import type { DmMessageRow, DmThreadMemberRow, DmThreadRow } from "./types";
+
+export function dmMessagingBlockedError(): Error {
+  return new Error("Messaging is not available (blocked).");
+}
+
+function isDmBlockedErrorMessage(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("dm_not_allowed") || m.includes("blocked") || m.includes("row-level security");
+}
 
 const MAX_DM_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -124,9 +134,34 @@ export async function getOrCreateDmThread(otherUserId: string): Promise<{
     p_other_user: otherUserId,
   });
 
-  if (error) return { data: null, error: new Error(error.message) };
+  if (error) {
+    if (isDmBlockedErrorMessage(error.message)) return { data: null, error: dmMessagingBlockedError() };
+    return { data: null, error: new Error(error.message) };
+  }
   if (data == null) return { data: null, error: new Error("No thread id returned") };
   return { data: String(data), error: null };
+}
+
+export async function isDmThreadBlockedForCurrentUser(threadId: string): Promise<{
+  blocked: boolean;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { blocked: false, error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { blocked: false, error: new Error("Not signed in") };
+
+  const memRes = await fetchDmThreadMembers(threadId);
+  if (memRes.error) return { blocked: false, error: memRes.error };
+
+  const other = otherMemberUserId(memRes.data ?? [], uid);
+  if (!other) return { blocked: false, error: null };
+
+  const { status, error } = await getBlockStatus(other);
+  if (error) return { blocked: false, error };
+  return { blocked: status.iBlockedThem || status.theyBlockedMe, error: null };
 }
 
 export type ThreadWithMembers = DmThreadRow & { members: DmThreadMemberRow[] };
@@ -369,6 +404,10 @@ export async function insertDmMessage(
   }
   if (!trimmed && !file) return { data: null, error: new Error("Add a message or a photo.") };
 
+  const blockRes = await isDmThreadBlockedForCurrentUser(threadId);
+  if (blockRes.error) return { data: null, error: blockRes.error };
+  if (blockRes.blocked) return { data: null, error: dmMessagingBlockedError() };
+
   let imagePath: string | null = null;
   if (file) {
     const ext = extFromFile(file);
@@ -395,6 +434,7 @@ export async function insertDmMessage(
     if (imagePath) {
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove([imagePath]);
     }
+    if (isDmBlockedErrorMessage(error.message)) return { data: null, error: dmMessagingBlockedError() };
     return { data: null, error: new Error(error.message) };
   }
   if (!data) return { data: null, error: new Error("No row returned") };

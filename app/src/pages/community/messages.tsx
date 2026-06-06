@@ -17,6 +17,7 @@ import {
   fetchDmThreadUserSettings,
   fetchLatestDmMessageForThreads,
   getOrCreateDmThread,
+  listBlockRelatedUserIdsForCurrentUser,
   notifyDmInboxChanged,
   otherMemberUserId,
   type DmMessageRow,
@@ -200,6 +201,7 @@ async function fetchDmInboxThreadDetails(
 
 type DmInboxPayload = {
   threads: ThreadWithMembers[];
+  blockedUserIds: Set<string>;
 } & DmInboxDetails;
 
 function prefetchDmThreadRoute(queryClient: QueryClient, threadId: string, viewerId: string) {
@@ -221,12 +223,17 @@ export default function CommunityMessagesPage() {
   const inboxQuery = useQuery({
     queryKey: [...DM_INBOX_QK, userId],
     queryFn: async (): Promise<DmInboxPayload> => {
-      const res = await fetchDmThreadsForCurrentUser();
+      const [res, blockRes] = await Promise.all([
+        fetchDmThreadsForCurrentUser(),
+        listBlockRelatedUserIdsForCurrentUser(),
+      ]);
       if (res.error) throw new Error(res.error.message);
+      const blockedUserIds = blockRes.error ? new Set<string>() : blockRes.ids;
       const threads = res.data ?? [];
       if (threads.length === 0) {
         return {
           threads: [],
+          blockedUserIds,
           lastByThreadId: {},
           labels: {},
           avatarByUserId: {},
@@ -238,7 +245,7 @@ export default function CommunityMessagesPage() {
       const details = await fetchDmInboxThreadDetails(threads, userId, (msg) => {
         toast({ title: "Could not load last messages", description: msg, variant: "destructive" });
       });
-      return { threads, ...details };
+      return { threads, blockedUserIds, ...details };
     },
     enabled: Boolean(userId && isSupabaseConfigured()),
     staleTime: 45_000,
@@ -253,6 +260,7 @@ export default function CommunityMessagesPage() {
   const handleByUserId = inboxQuery.data?.handleByUserId ?? {};
   const serverMutedByThreadId = inboxQuery.data?.serverMutedByThreadId ?? {};
   const serverHiddenByThreadId = inboxQuery.data?.serverHiddenByThreadId ?? {};
+  const blockedUserIds = inboxQuery.data?.blockedUserIds ?? new Set<string>();
 
   const loading = inboxQuery.isPending && inboxQuery.data === undefined;
   const inboxRefreshing = inboxQuery.isFetching && !loading;
@@ -330,7 +338,12 @@ export default function CommunityMessagesPage() {
 
   const filteredThreads = useMemo(() => {
     const q = threadQuery.trim().toLowerCase();
-    const base = sortedThreads().filter((t) => (showHidden ? true : !hiddenSet.has(t.id)));
+    const base = sortedThreads().filter((t) => {
+      if (!showHidden && hiddenSet.has(t.id)) return false;
+      const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
+      if (other && blockedUserIds.has(other)) return false;
+      return true;
+    });
     if (!q) return base;
     return base.filter((t) => {
       const last = lastByThreadId[t.id] ?? null;
@@ -344,7 +357,7 @@ export default function CommunityMessagesPage() {
         preview.toLowerCase().includes(q)
       );
     });
-  }, [threadQuery, sortedThreads, lastByThreadId, user?.id, labels, handleByUserId, hiddenSet, showHidden]);
+  }, [threadQuery, sortedThreads, lastByThreadId, user?.id, labels, handleByUserId, hiddenSet, showHidden, blockedUserIds]);
 
   const togglePinned = useCallback((threadId: string) => {
     setPinnedThreadIds((prev) => {
@@ -507,7 +520,14 @@ export default function CommunityMessagesPage() {
   async function navigateToDmThread(targetUserId: string): Promise<boolean> {
     const res = await getOrCreateDmThread(targetUserId);
     if (res.error) {
-      toast({ title: "Could not open chat", description: res.error.message, variant: "destructive" });
+      const blocked =
+        res.error.message.toLowerCase().includes("blocked") ||
+        res.error.message.toLowerCase().includes("dm_not_allowed");
+      toast({
+        title: blocked ? "Messaging unavailable" : "Could not open chat",
+        description: res.error.message,
+        variant: "destructive",
+      });
       return false;
     }
     if (res.data) {

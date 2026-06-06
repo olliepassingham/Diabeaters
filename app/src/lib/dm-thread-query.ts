@@ -6,6 +6,7 @@ import {
   otherMemberUserId,
   type DmMessageRow,
 } from "@/lib/community";
+import { getBlockStatus } from "@/lib/community/blocks-supabase";
 import { invalidateDmInboxQueries, patchDmInboxLastMessageRead } from "@/lib/dm-inbox-query";
 import { getProfile } from "@/lib/profile";
 import { queryClient } from "@/lib/queryClient";
@@ -22,6 +23,7 @@ export type DmThreadPeer = {
 export type DmThreadBundle = {
   messages: DmMessageRow[];
   peer: DmThreadPeer | null;
+  messagingBlocked: boolean;
 };
 
 function shortId(id: string) {
@@ -43,20 +45,24 @@ export async function fetchDmThreadBundle(
 
   const messages = msgRes.data ?? [];
   let peer: DmThreadPeer | null = null;
+  let messagingBlocked = false;
 
   if (!memRes.error && memRes.data?.length) {
     const other = otherMemberUserId(memRes.data, viewerId);
     if (other) {
-      const { profile } = await getProfile(other);
+      const [{ profile }, blockRes] = await Promise.all([getProfile(other), getBlockStatus(other)]);
       peer = {
         userId: other,
         label: profile?.full_name?.trim() || shortId(other),
         avatarPath: profile?.avatar_url ?? null,
       };
+      if (!blockRes.error) {
+        messagingBlocked = blockRes.status.iBlockedThem || blockRes.status.theyBlockedMe;
+      }
     }
   }
 
-  return { messages, peer };
+  return { messages, peer, messagingBlocked };
 }
 
 function patchThreadMessagesRead(

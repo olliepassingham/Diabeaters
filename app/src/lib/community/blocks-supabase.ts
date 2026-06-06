@@ -1,5 +1,5 @@
 /**
- * Blocks: user_blocks (Supabase + RLS). Feeds hide blocked users via RLS; DMs blocked at get_or_create_dm_thread.
+ * Blocks: user_blocks (Supabase + RLS). Feeds hide blocked users via RLS; DMs blocked on send and get_or_create_dm_thread.
  */
 import { getSupabase } from "@/lib/supabase";
 

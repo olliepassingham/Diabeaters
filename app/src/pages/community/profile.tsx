@@ -248,7 +248,7 @@ export default function CommunityProfilePage() {
     }
     setBlockStatus((s) => ({ ...s, iBlockedThem: true }));
     setFollowingThem(false);
-    toast({ title: "Blocked", description: "You will not see each other’s posts or start new chats." });
+    toast({ title: "Blocked", description: "You will not see each other’s posts or messages." });
     setLocation("/community");
   }
 
@@ -499,7 +499,7 @@ export default function CommunityProfilePage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Block this person?</AlertDialogTitle>
             <AlertDialogDescription>
-              You will not see each other’s posts or comments, and you cannot start a direct message thread.
+              You will not see each other’s posts or comments, and you cannot message each other.
               You can unblock later from their profile.
             </AlertDialogDescription>
           </AlertDialogHeader>
