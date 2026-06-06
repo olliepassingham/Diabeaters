@@ -11,7 +11,7 @@ import { usePeerTypingActive } from "@/lib/dm-thread-typing";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 /**
- * Full conversation header for DM threads (replaces AppTopBar on this route).
+ * Conversation chrome below AppTopBar: back to inbox + peer name/avatar.
  */
 export function DmThreadSubheader() {
   const [match, params] = useRoute("/community/messages/:threadId");
@@ -35,60 +35,58 @@ export function DmThreadSubheader() {
 
   return (
     <header
-      className="surface-chrome relative z-50 shrink-0 border-b border-border/40 bg-background/90 backdrop-blur-xl pt-[env(safe-area-inset-top)] [padding-left:max(0.75rem,env(safe-area-inset-left))] [padding-right:max(0.75rem,env(safe-area-inset-right))]"
+      className="relative z-40 flex shrink-0 items-center gap-1 border-b border-border/50 bg-background/95 px-2 py-1.5 shadow-sm backdrop-blur-md [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]"
       data-testid="dm-thread-subheader"
     >
-      <div className="flex min-h-[3.25rem] items-center gap-1 px-1 py-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 shrink-0 rounded-full text-foreground"
-          aria-label="Back to messages"
-          asChild
-        >
-          <Link href="/community/messages" data-testid="dm-thread-back">
-            <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
-          </Link>
-        </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 shrink-0 rounded-full"
+        aria-label="Back to messages"
+        asChild
+      >
+        <Link href="/community/messages" data-testid="dm-thread-back">
+          <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
+        </Link>
+      </Button>
 
-        {peer ? (
-          <Link
-            href={`/community/profile/${encodeURIComponent(peer.userId)}`}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl py-1 pr-3 transition-colors active:bg-muted/50"
-            data-testid="dm-thread-peer-link"
-          >
-            <CommunityAuthorAvatar
-              size="md"
-              displayName={peerLabel}
-              avatarPath={peer.avatarPath}
-              profileHref={undefined}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[17px] font-semibold leading-tight text-foreground" data-testid="dm-thread-peer-name">
-                {peerLabel}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">
-                {peerTyping ? (
-                  <span className="text-primary/80">Typing…</span>
-                ) : (
-                  "View profile"
-                )}
-              </p>
-            </div>
-          </Link>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3 py-1">
-            {loadingPeer ? <Skeleton className="h-11 w-11 shrink-0 rounded-full" /> : null}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[17px] font-semibold leading-tight text-foreground" data-testid="dm-thread-peer-name">
-                {peerLabel}
-              </p>
-              {loadingPeer ? <Skeleton className="mt-1.5 h-3 w-20 rounded-md" /> : null}
-            </div>
+      {peer ? (
+        <Link
+          href={`/community/profile/${encodeURIComponent(peer.userId)}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl py-0.5 pr-2 transition-colors active:bg-muted/50"
+          data-testid="dm-thread-peer-link"
+        >
+          <CommunityAuthorAvatar
+            size="sm"
+            displayName={peerLabel}
+            avatarPath={peer.avatarPath}
+            profileHref={undefined}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-semibold leading-tight text-foreground" data-testid="dm-thread-peer-name">
+              {peerLabel}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {peerTyping ? (
+                <span className="text-primary/80">Typing…</span>
+              ) : (
+                "View profile"
+              )}
+            </p>
           </div>
-        )}
-      </div>
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 py-0.5">
+          {loadingPeer ? <Skeleton className="h-8 w-8 shrink-0 rounded-full" /> : null}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-semibold leading-tight text-foreground" data-testid="dm-thread-peer-name">
+              {peerLabel}
+            </p>
+            {loadingPeer ? <Skeleton className="mt-1 h-3 w-20 rounded-md" /> : null}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

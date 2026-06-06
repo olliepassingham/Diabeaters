@@ -1323,14 +1323,12 @@ function AuthenticatedShell() {
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       {!isDmThreadView ? <OfflineBanner /> : null}
-      {!isDmThreadView ? (
-        <AppTopBar
-          isCarer={isCarerMode}
-          pathOnly={location.split("?")[0] ?? location}
-          onBrandClick={goBrandHome}
-          onLogout={handleLogout}
-        />
-      ) : null}
+      <AppTopBar
+        isCarer={isCarerMode}
+        pathOnly={location.split("?")[0] ?? location}
+        onBrandClick={goBrandHome}
+        onLogout={handleLogout}
+      />
       {isDmThreadView ? <DmThreadSubheader /> : null}
       {!suppressClinicalPollers && !isDmThreadView && iosNotifPrompt.show ? (
         <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">

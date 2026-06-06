@@ -6,7 +6,6 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
-import { DmInboxSwipeRow } from "@/components/dm-inbox-swipe-row";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { EmptyState } from "@/components/empty-state";
@@ -724,10 +723,6 @@ export default function CommunityMessagesPage() {
             ) : null}
           </div>
         ) : null}
-
-        {threads.length > 0 ? (
-          <p className="text-[11px] text-muted-foreground">Swipe left on a conversation to pin, mute, or hide.</p>
-        ) : null}
       </form>
 
       {loading ? (
@@ -761,7 +756,7 @@ export default function CommunityMessagesPage() {
               Updating…
             </p>
           ) : null}
-        <ul className="divide-y divide-border/40 overflow-hidden rounded-2xl border border-border/50 bg-card/60 shadow-sm">
+        <ul className="space-y-2">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -777,12 +772,11 @@ export default function CommunityMessagesPage() {
 
             return (
               <li key={t.id}>
-                <DmInboxSwipeRow
-                  isPinned={isPinned}
-                  isMuted={isMuted}
-                  onPin={() => togglePinned(t.id)}
-                  onMute={() => void toggleMutedServerFirst(t.id)}
-                  onHide={() => void hideThreadServerFirst(t.id)}
+                <div
+                  className={cn(
+                    "overflow-hidden rounded-2xl border border-border/50 bg-card/70 shadow-sm transition-colors",
+                    isUnread && "border-primary/20 bg-primary/[0.04]",
+                  )}
                 >
                   <Link
                     href={`/community/messages/${t.id}`}
@@ -790,13 +784,7 @@ export default function CommunityMessagesPage() {
                     onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                     onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                   >
-                    <div
-                      className={cn(
-                        "pressable flex items-center gap-3 px-3.5 py-3.5 transition-colors",
-                        "hover:bg-muted/35 active:bg-muted/50",
-                        isUnread && "bg-primary/[0.05]",
-                      )}
-                    >
+                    <div className="pressable flex items-center gap-3 px-3 py-3 active:bg-muted/30">
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}
@@ -806,16 +794,27 @@ export default function CommunityMessagesPage() {
                       ) : (
                         <div className="h-10 w-10 shrink-0 rounded-full bg-muted" aria-hidden />
                       )}
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="truncate text-[15px] font-semibold text-foreground">
-                          {label}
-                          {isPinned ? <Pin className="ml-2 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
-                          {isMuted ? <BellOff className="ml-2 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
-                          {showHidden && isHidden ? <EyeOff className="ml-2 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
-                          {isUnread ? (
-                            <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-primary align-middle" aria-label="Unread" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-[15px] font-semibold text-foreground">
+                            {label}
+                            {isPinned ? <Pin className="ml-1.5 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
+                            {isMuted ? <BellOff className="ml-1.5 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
+                            {showHidden && isHidden ? <EyeOff className="ml-1.5 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
+                            {isUnread ? (
+                              <span className="ml-1.5 inline-flex h-2 w-2 rounded-full bg-primary align-middle" aria-label="Unread" />
+                            ) : null}
+                          </p>
+                          {timeStr ? (
+                            <time
+                              dateTime={last?.created_at ?? t.updated_at}
+                              title={timeTitle}
+                              className="shrink-0 text-[11px] text-muted-foreground tabular-nums"
+                            >
+                              {timeStr}
+                            </time>
                           ) : null}
-                        </p>
+                        </div>
                         <p className={`truncate text-sm ${isUnread ? "font-medium text-foreground/90" : "text-muted-foreground"}`}>
                           {preview}
                         </p>
@@ -825,8 +824,8 @@ export default function CommunityMessagesPage() {
                           <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
-                            className="h-9 w-9 p-0 text-muted-foreground"
+                            size="icon"
+                            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
                             aria-label="Conversation actions"
                             onClick={(e) => {
                               e.preventDefault();
@@ -876,18 +875,9 @@ export default function CommunityMessagesPage() {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      {timeStr ? (
-                        <time
-                          dateTime={last?.created_at ?? t.updated_at}
-                          title={timeTitle}
-                          className="shrink-0 self-start pt-0.5 text-[11px] text-muted-foreground tabular-nums"
-                        >
-                          {timeStr}
-                        </time>
-                      ) : null}
                     </div>
                   </Link>
-                </DmInboxSwipeRow>
+                </div>
               </li>
             );
           })}
