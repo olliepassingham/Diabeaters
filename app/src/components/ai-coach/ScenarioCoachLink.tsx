@@ -50,6 +50,6 @@ export function ScenarioCoachLink({
   if (!glow) return button;
 
   return (
-    <span className="coach-entry-glow-subtle inline-flex w-full shrink-0 rounded-xl sm:w-auto">{button}</span>
+    <span className="coach-entry-glow-subtle inline-flex shrink-0 rounded-xl">{button}</span>
   );
 }

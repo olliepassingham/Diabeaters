@@ -3,6 +3,7 @@ import {
   calculateMealDose,
   comparePlannedBolusToPreview,
   getExerciseMealBolusPreview,
+  getMealDoseRoundingGuide,
   mealDoseHoursFromPlannerMinutes,
   parseOptionalBolusUnits,
   plannedBolusCompareMessage,
@@ -12,6 +13,20 @@ import type { UserSettings } from "./storage";
 const settingsWithSnackRatio: UserSettings = {
   snackRatio: "1:10g",
 };
+
+describe("getMealDoseRoundingGuide", () => {
+  it("returns down/up options with suggested dose flagged", () => {
+    const guide = getMealDoseRoundingGuide(8.5, 9, "mmol/L");
+    expect(guide?.exactLabel).toBe("8.5u");
+    expect(guide?.options).toHaveLength(2);
+    expect(guide?.options[0]).toMatchObject({ label: "8u", isSuggested: false });
+    expect(guide?.options[1]).toMatchObject({ label: "9u", isSuggested: true });
+  });
+
+  it("returns null when exact dose rounds to a single whole unit", () => {
+    expect(getMealDoseRoundingGuide(8, 8, "mmol/L")).toBeNull();
+  });
+});
 
 describe("mealDoseHoursFromPlannerMinutes", () => {
   it("matches planner and adviser (ceil hours, min 1)", () => {

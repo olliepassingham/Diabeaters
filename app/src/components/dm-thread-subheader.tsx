@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,16 @@ import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
 import { usePeerTypingActive } from "@/lib/dm-thread-typing";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
+function backFromDmThread(setLocation: (to: string, opts?: { replace?: boolean }) => void): void {
+  // Use browser history so profile → thread returns to profile, inbox → thread returns to inbox.
+  // A hard Link to /community/messages stacked a duplicate inbox entry and broke Messages back.
+  if (typeof window !== "undefined" && window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+  setLocation("/community/messages", { replace: true });
+}
+
 /**
  * Conversation chrome below AppTopBar: back to inbox + peer name/avatar.
  */
@@ -18,6 +28,7 @@ export function DmThreadSubheader() {
   const threadId = match && params?.threadId ? params.threadId : null;
   const { user } = useAuth();
   const userId = user?.id ?? "";
+  const [, setLocation] = useLocation();
 
   const threadQuery = useQuery({
     queryKey: dmThreadQueryKey(threadId ?? undefined, userId),
@@ -44,11 +55,10 @@ export function DmThreadSubheader() {
         size="icon"
         className="h-9 w-9 shrink-0 rounded-full"
         aria-label="Back to messages"
-        asChild
+        onClick={() => backFromDmThread(setLocation)}
+        data-testid="dm-thread-back"
       >
-        <Link href="/community/messages" data-testid="dm-thread-back">
-          <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
-        </Link>
+        <ChevronLeft className="h-5 w-5" strokeWidth={2.25} />
       </Button>
 
       {peer ? (

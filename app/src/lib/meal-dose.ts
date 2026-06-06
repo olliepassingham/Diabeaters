@@ -28,6 +28,53 @@ export function getRoundingAdvice(exactDose: number, roundedDose: number, bgUnit
   );
 }
 
+export type MealDoseRoundingOption = {
+  dose: number;
+  label: string;
+  when: string;
+  isSuggested: boolean;
+};
+
+export type MealDoseRoundingGuide = {
+  exactLabel: string;
+  options: MealDoseRoundingOption[];
+};
+
+/** Visual rounding choices for UI cards (same logic as {@link getRoundingAdvice}). */
+export function getMealDoseRoundingGuide(
+  exactDose: number,
+  roundedDose: number,
+  bgUnits: string,
+): MealDoseRoundingGuide | null {
+  const roundedDown = Math.floor(exactDose);
+  const roundedUp = Math.ceil(exactDose);
+  if (roundedDown === roundedUp) return null;
+
+  const lowWhen = bgUnits === "mmol/L" ? "Below 5 or falling" : "Below 90 or falling";
+  const highWhen = bgUnits === "mmol/L" ? "Above 10 or rising" : "Above 180 or rising";
+  const steadyWhen = bgUnits === "mmol/L" ? "Steady 5–10" : "Steady 90–180";
+
+  const options: MealDoseRoundingOption[] = [
+    {
+      dose: roundedDown,
+      label: `${roundedDown}u`,
+      when: lowWhen,
+      isSuggested: roundedDose === roundedDown,
+    },
+    {
+      dose: roundedUp,
+      label: `${roundedUp}u`,
+      when: roundedDose === roundedUp ? `${steadyWhen} · ${highWhen}` : highWhen,
+      isSuggested: roundedDose === roundedUp,
+    },
+  ];
+
+  return {
+    exactLabel: `${exactDose.toFixed(1)}u`,
+    options,
+  };
+}
+
 export type MealDoseResult = {
   carbs: number;
   mealType: string;

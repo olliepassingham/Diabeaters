@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Redirect } from "wouter";
+import type { LucideIcon } from "lucide-react";
 import {
   Wine,
   AlertTriangle,
@@ -12,20 +13,21 @@ import {
   Moon,
   Calculator,
   ChevronDown,
+  ChevronRight,
+  Sparkles,
+  CheckCircle2,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { ScenarioToolDisclaimer } from "@/components/disclaimer";
+import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
@@ -42,8 +44,10 @@ import {
   adviserLinkFromAlcohol,
   buildAlcoholSituationOutcome,
   type AlcoholSituationKind,
+  type AlcoholSituationLinks,
   type AlcoholSituationOutcome,
 } from "@/lib/alcohol-situation-tool";
+import { getMealDoseRoundingGuide, type MealDoseResult } from "@/lib/meal-dose";
 import { cn } from "@/lib/utils";
 import { BgTrendThreeButtons } from "@/components/bg-trend-three-buttons";
 
@@ -58,27 +62,32 @@ type Phase = "situation" | "inputs" | "result";
 const SITUATION_CARDS: {
   id: AlcoholSituationKind;
   title: string;
-  description: string;
+  icon: LucideIcon;
+  iconClass: string;
 }[] = [
   {
     id: "meal_with_drinks",
     title: "Meal or snacks with drinks",
-    description: "Carb estimate from your saved ratios.",
+    icon: Utensils,
+    iconClass: "text-primary",
   },
   {
     id: "late_snack",
-    title: "Eating after drinking / late snack",
-    description: "Late food and delayed-low reminders.",
+    title: "Late snack after drinking",
+    icon: Moon,
+    iconClass: "text-amber-600 dark:text-amber-400",
   },
   {
     id: "before_out",
     title: "Before I go out",
-    description: "Quick prep before you leave.",
+    icon: Wine,
+    iconClass: "text-violet-600 dark:text-violet-400",
   },
   {
     id: "feels_wrong",
     title: "Something feels wrong",
-    description: "Red flags and where to get help fast.",
+    icon: AlertTriangle,
+    iconClass: "text-destructive",
   },
 ];
 
@@ -92,17 +101,19 @@ type ChoiceProps<T extends string> = {
 
 function ChoiceGroup<T extends string>({ label, value, onChange, options, name }: ChoiceProps<T>) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>
-      <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} className="space-y-2">
+      <RadioGroup value={value} onValueChange={(v) => onChange(v as T)} className="grid gap-2">
         {options.map((opt) => {
           const id = `${name}-${opt.value}`;
           return (
             <div
               key={opt.value}
               className={cn(
-                "flex items-start space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer",
-                value === opt.value && "border-primary bg-primary/5",
+                "flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors cursor-pointer",
+                value === opt.value
+                  ? "border-primary bg-primary/5 shadow-sm"
+                  : "border-border/70 hover:bg-muted/40",
               )}
               onClick={() => onChange(opt.value)}
               onKeyDown={(e) => {
@@ -114,15 +125,10 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
               role="button"
               tabIndex={0}
             >
-              <RadioGroupItem value={opt.value} id={id} className="mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <Label htmlFor={id} className="font-normal cursor-pointer leading-snug">
-                  {opt.title}
-                </Label>
-                {opt.description ? (
-                  <p className="text-xs text-muted-foreground mt-1">{opt.description}</p>
-                ) : null}
-              </div>
+              <RadioGroupItem value={opt.value} id={id} />
+              <Label htmlFor={id} className="flex-1 font-normal cursor-pointer text-sm leading-snug">
+                {opt.title}
+              </Label>
             </div>
           );
         })}
@@ -131,41 +137,344 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: AlcoholSituationOutcome }) {
-  if (outcome.kind === "urgent") {
-    return <Badge variant="destructive">Urgent — seek help</Badge>;
-  }
-  if (outcome.kind === "hypo_first") {
-    return (
-      <Badge
-        variant="outline"
-        className="border-amber-500/70 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-      >
-        Treat glucose first
-      </Badge>
-    );
-  }
-  if (outcome.kind === "estimate") {
-    return (
-      <Badge variant="secondary" className="font-medium">
-        Carb coverage estimate
-      </Badge>
-    );
-  }
-  if (outcome.kind === "prep_only") {
-    return (
-      <Badge variant="outline" className="font-medium">
-        Planning
-      </Badge>
-    );
-  }
-  if (outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") {
-    return <Badge variant="outline">More info needed</Badge>;
-  }
+function formatMealTypeLabel(mealType: string): string {
+  if (!mealType) return "Meal";
+  return mealType.charAt(0).toUpperCase() + mealType.slice(1);
+}
+
+function AlcoholActionLinks({ links }: { links: AlcoholSituationLinks }) {
   return (
-    <Badge variant="outline" className="font-medium">
-      Safety
-    </Badge>
+    <div className="flex flex-wrap gap-2">
+      {links.hypoHelp ? (
+        <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+          <Link href={linkWithFrom("/tools/hypo-help")}>
+            <Droplet className="h-4 w-4" />
+            Hypo help
+          </Link>
+        </Button>
+      ) : null}
+      {links.sickDay ? (
+        <Button variant="secondary" size="sm" asChild>
+          <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
+        </Button>
+      ) : null}
+      {links.helpNow ? (
+        <Button variant="secondary" size="sm" className="gap-1.5" asChild>
+          <Link href={linkWithFrom("/help-now")}>
+            <Phone className="h-4 w-4" />
+            Help now
+          </Link>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function AlcoholEstimateResult({
+  meal,
+  tips,
+  bgUnits,
+  mealType,
+  tipsOpen,
+  onTipsOpenChange,
+  onEdit,
+  onReset,
+}: {
+  meal: MealDoseResult;
+  tips: string[];
+  bgUnits: string;
+  mealType: string;
+  tipsOpen: boolean;
+  onTipsOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+  onReset: () => void;
+}) {
+  const rounding = getMealDoseRoundingGuide(meal.exactDose, meal.dose, bgUnits);
+
+  return (
+    <div className="space-y-3" data-testid="alcohol-plan-card">
+      <div className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/12 via-card to-card shadow-sm ring-1 ring-primary/10">
+        <div className="relative px-5 pb-4 pt-5 text-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-2 h-8 gap-1 px-2 text-xs text-muted-foreground"
+            onClick={onReset}
+            data-testid="button-alcohol-edit-answers"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </Button>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested dose</p>
+          <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+            {meal.dose}
+            <span className="ml-0.5 text-2xl font-semibold text-muted-foreground">u</span>
+          </p>
+          {rounding ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Exact <span className="font-medium tabular-nums text-foreground/80">{rounding.exactLabel}</span>
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border/40 bg-background/25 px-4 py-3">
+          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium tabular-nums ring-1 ring-border/50">
+            {meal.carbs}g carbs
+          </span>
+          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium capitalize ring-1 ring-border/50">
+            {formatMealTypeLabel(meal.mealType)}
+          </span>
+        </div>
+      </div>
+
+      {rounding ? (
+        <div className="grid grid-cols-2 gap-2">
+          {rounding.options.map((opt) => (
+            <div
+              key={`${opt.dose}-${opt.when}`}
+              className={cn(
+                "rounded-xl border px-3 py-3 text-center transition-colors",
+                opt.isSuggested
+                  ? "border-primary/35 bg-primary/8 ring-1 ring-primary/15"
+                  : "border-border/60 bg-card/40",
+              )}
+            >
+              <p className="text-xl font-bold tabular-nums text-foreground">{opt.label}</p>
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{opt.when}</p>
+              {opt.isSuggested ? (
+                <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-primary">Suggested</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="flex gap-2">
+        <Button asChild className="min-h-11 flex-1 gap-2">
+          <Link href={linkWithFrom(adviserLinkFromAlcohol(meal.carbs, mealType))}>
+            <Calculator className="h-4 w-4" />
+            Open Meal Adviser
+          </Link>
+        </Button>
+        <Button type="button" variant="outline" className="min-h-11 shrink-0" onClick={onEdit}>
+          Edit
+        </Button>
+      </div>
+
+      {tips.length > 0 ? (
+        <Collapsible open={tipsOpen} onOpenChange={onTipsOpenChange}>
+          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/50 px-3.5 py-2.5 text-left text-sm font-medium outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
+              Alcohol tips
+              <span className="text-xs font-normal text-muted-foreground">({tips.length})</span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2 space-y-2">
+            {tips.map((tip) => (
+              <p key={tip} className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground/90">
+                {tip}
+              </p>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+    </div>
+  );
+}
+
+function AlcoholSafetyResult({
+  outcome,
+  onReset,
+}: {
+  outcome: Extract<AlcoholSituationOutcome, { kind: "urgent" | "hypo_first" }>;
+  onReset: () => void;
+}) {
+  const isUrgent = outcome.kind === "urgent";
+  return (
+    <div
+      className={cn(
+        "relative space-y-3 overflow-hidden rounded-2xl border shadow-sm",
+        isUrgent ? "border-destructive/40 bg-gradient-to-b from-destructive/10 to-card" : "border-amber-500/35 bg-gradient-to-b from-amber-500/10 to-card",
+      )}
+      data-testid="alcohol-plan-card"
+    >
+      <div className="flex items-start gap-3 px-4 pt-4">
+        <span
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+            isUrgent ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+          )}
+        >
+          <AlertTriangle className="h-5 w-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1 space-y-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-2 h-8 gap-1 px-2 text-xs text-muted-foreground"
+            onClick={onReset}
+            data-testid="button-alcohol-edit-answers"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset
+          </Button>
+          <h2 className="text-lg font-semibold leading-snug text-foreground">{outcome.headline}</h2>
+          <p className="text-sm leading-relaxed text-foreground/85">{outcome.lead}</p>
+        </div>
+      </div>
+      <ol className="space-y-2 px-4 pb-4" aria-label="Safety steps">
+        {outcome.bullets.map((b, i) => (
+          <li key={b} className="flex gap-3 text-sm leading-relaxed text-foreground/90">
+            <span
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                isUrgent ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+              )}
+              aria-hidden
+            >
+              {i + 1}
+            </span>
+            <span className="min-w-0 pt-0.5">{b}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="border-t border-border/40 px-4 py-3">
+        <AlcoholActionLinks links={outcome.links} />
+      </div>
+    </div>
+  );
+}
+
+function AlcoholPrepResult({
+  outcome,
+  tipsOpen,
+  onTipsOpenChange,
+  onEdit,
+  onReset,
+}: {
+  outcome: Extract<AlcoholSituationOutcome, { kind: "prep_only" }>;
+  tipsOpen: boolean;
+  onTipsOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="space-y-3" data-testid="alcohol-plan-card">
+      <div className="overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 to-card shadow-sm">
+        <div className="flex items-start gap-3 px-4 py-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+            <Moon className="h-5 w-5 text-amber-700 dark:text-amber-300" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="float-right -mt-1 h-8 gap-1 px-2 text-xs text-muted-foreground"
+              onClick={onReset}
+              data-testid="button-alcohol-edit-answers"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </Button>
+            <h2 className="text-lg font-semibold leading-snug text-foreground">{outcome.headline}</h2>
+          </div>
+        </div>
+        {outcome.checklist.length > 0 ? (
+          <ul className="space-y-2 border-t border-border/40 px-4 py-3">
+            {outcome.checklist.map((item) => (
+              <li key={item} className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary/80" aria-hidden />
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      {outcome.tips.length > 0 ? (
+        <Collapsible open={tipsOpen} onOpenChange={onTipsOpenChange}>
+          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/50 px-3.5 py-2.5 text-left text-sm font-medium outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
+              Tips
+              <span className="text-xs font-normal text-muted-foreground">({outcome.tips.length})</span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2 space-y-2">
+            {outcome.tips.map((tip) => (
+              <p key={tip} className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground/90">
+                {tip}
+              </p>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+
+      <Button type="button" variant="outline" className="w-full gap-1.5" onClick={onEdit}>
+        <ArrowLeft className="h-4 w-4" />
+        Edit details
+      </Button>
+    </div>
+  );
+}
+
+function AlcoholSimpleResult({
+  outcome,
+  onEdit,
+  onReset,
+}: {
+  outcome: AlcoholSituationOutcome;
+  onEdit: () => void;
+  onReset: () => void;
+}) {
+  const title =
+    outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs"
+      ? outcome.message
+      : outcome.kind === "feels_ok"
+        ? outcome.headline
+        : "Result";
+  const body = outcome.kind === "feels_ok" ? outcome.body : null;
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-border/60 bg-card/50 p-4 shadow-sm" data-testid="alcohol-plan-card">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-semibold leading-snug text-foreground">{title}</h2>
+          {body ? <p className="text-sm leading-relaxed text-foreground/85">{body}</p> : null}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+          onClick={onReset}
+          data-testid="button-alcohol-edit-answers"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset
+        </Button>
+      </div>
+      {(outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" asChild>
+            <Link href={linkWithFrom("/adviser?tab=ratios")}>Ratio Adviser</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/settings">Settings</Link>
+          </Button>
+        </div>
+      )}
+      {outcome.kind === "feels_ok" ? <AlcoholActionLinks links={outcome.links} /> : null}
+      <Button type="button" variant="outline" className="w-full gap-1.5" onClick={onEdit}>
+        <ArrowLeft className="h-4 w-4" />
+        Edit details
+      </Button>
+    </div>
   );
 }
 
@@ -198,6 +507,7 @@ export default function AlcoholScenarioPage() {
     veryHighBgOrKetones: false,
     cantKeepFluids: false,
   });
+  const [resultTipsOpen, setResultTipsOpen] = useState(false);
 
   const formTopRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -289,6 +599,7 @@ export default function AlcoholScenarioPage() {
     setSituation(null);
     setOutcome(null);
     setCarbsError(null);
+    setResultTipsOpen(false);
     setBgSkipped(false);
     setBgInput("");
     setBgTrend("unknown");
@@ -322,6 +633,7 @@ export default function AlcoholScenarioPage() {
   const backToInputs = () => {
     setPhase("inputs");
     setOutcome(null);
+    setResultTipsOpen(false);
   };
 
   useEffect(() => {
@@ -334,12 +646,8 @@ export default function AlcoholScenarioPage() {
     setRedFlags((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const estimateCarbsG = useMemo(() => {
-    if (outcome?.kind !== "estimate") return null;
-    return outcome.meal.carbs;
-  }, [outcome]);
-
-  const showSticky = phase !== "result";
+  const showSticky = phase === "inputs";
+  const activeSituation = situation ? SITUATION_CARDS.find((s) => s.id === situation) : null;
 
   if (!canShowAlcoholScenarios(profile.dateOfBirth)) {
     return <Redirect to="/scenarios" replace />;
@@ -348,18 +656,18 @@ export default function AlcoholScenarioPage() {
   return (
     <div className="min-h-[50vh]">
       <PageShell
-        variant="standard"
-        className={cn("space-y-7", showSticky && "pb-28 sm:pb-6")}
+        variant="narrow"
+        density="compact"
+        className={cn(showSticky && "pb-24")}
       >
         <div ref={formTopRef}>
           <PageHeader
             leading={<PageBackButton />}
             title="Alcohol"
-            description="Pick your situation — estimates use your saved ratios (like Meal Adviser). Not medical advice."
             actions={
               <>
                 <ScenarioCoachLink topic="alcohol" />
-                <PageInfoDialog title="About this tool" description="Alcohol and glucose — read before you rely on estimates">
+                <PageInfoDialog title="About this tool" description="Alcohol and glucose safety">
                   <InfoSection title="Delayed lows">
                     <p>
                       Alcohol can affect glucose for many hours after you stop drinking. Never treat a low with more alcohol.
@@ -367,108 +675,98 @@ export default function AlcoholScenarioPage() {
                   </InfoSection>
                   <InfoSection title="Estimates">
                     <p>
-                      Carb coverage numbers use the same ratio logic as Meal Adviser in this app. They do not replace your
-                      clinic&apos;s plan.
+                      Carb coverage numbers use the same ratio logic as Meal Adviser. They do not replace your clinic&apos;s plan.
                     </p>
                   </InfoSection>
                 </PageInfoDialog>
               </>
             }
           />
-          <ScenarioToolDisclaimer className="mt-4" />
         </div>
 
-        {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && (
-          <Alert data-testid="alert-alcohol-pump">
-            <AlertTitle className="text-sm">Pump</AlertTitle>
-            <AlertDescription className="text-sm">
-              Alcohol can make hypos more likely for many hours. Check <strong>IOB</strong> before extra meal or correction
-              boluses, and be cautious stacking insulin after drinking. Temp basals or extended boluses may need review —
-              follow your team&apos;s alcohol plan.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="font-medium uppercase tracking-wide">
-              Step {stepIndex + 1} of 3
-            </span>
+        {phase !== "result" ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span>Step {stepIndex + 1} of 3</span>
+            </div>
+            <Progress value={progressPct} className="h-1" data-testid="alcohol-question-progress" />
           </div>
-          <Progress value={progressPct} className="h-1.5" data-testid="alcohol-question-progress" />
-        </div>
+        ) : null}
+
+        {isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && phase !== "result" ? (
+          <p
+            className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-snug text-muted-foreground"
+            data-testid="alert-alcohol-pump"
+          >
+            <span className="font-medium text-foreground">Pump:</span> Check IOB before bolusing — hypos can linger for hours after drinking.
+          </p>
+        ) : null}
 
         {phase === "situation" ? (
-          <Card className="surface-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-h3 flex items-center gap-2 text-foreground">
-                <Wine className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
-                What&apos;s going on?
-              </CardTitle>
-              <CardDescription>Pick the closest situation. You can change it anytime.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-4">
-                Tap the info button above for delayed-low safety and how estimates work.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {SITUATION_CARDS.map((c) => (
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-foreground">What&apos;s going on?</h2>
+            <div className="grid gap-2">
+              {SITUATION_CARDS.map((c) => {
+                const Icon = c.icon;
+                return (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => pickSituation(c.id)}
                     className={cn(
-                      "text-left rounded-xl border p-4 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
+                      "active:scale-[0.99] hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       situation === c.id && "border-primary bg-primary/5",
                     )}
                     data-testid={`alcohol-situation-${c.id}`}
                   >
-                    <p className="font-semibold text-foreground">{c.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1.5 leading-snug">{c.description}</p>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                      <Icon className={cn("h-4 w-4", c.iconClass)} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{c.title}</span>
+                    <ChevronRight
+                      className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
                   </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                );
+              })}
+            </div>
+          </section>
         ) : null}
 
-        {phase === "inputs" && situation ? (
-          <Card className="surface-card">
-            <CardHeader className="space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <CardTitle className="text-h3">A few details</CardTitle>
-                  <CardDescription>
-                    {SITUATION_CARDS.find((s) => s.id === situation)?.title}
-                  </CardDescription>
+        {phase === "inputs" && situation && activeSituation ? (
+          <Card className="surface-card border-border/60 shadow-none">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                    <activeSituation.icon className={cn("h-4 w-4", activeSituation.iconClass)} aria-hidden />
+                  </span>
+                  <CardTitle className="text-base font-semibold leading-snug">{activeSituation.title}</CardTitle>
                 </div>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground shrink-0 -mt-1 sm:mt-0"
+                  className="h-8 shrink-0 px-2 text-xs text-muted-foreground"
                   onClick={backToSituation}
                   data-testid="button-alcohol-change-situation"
                 >
-                  Change situation
+                  Change
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-8">
+            <CardContent className="space-y-5 pt-0">
               {situation === "feels_wrong" ? (
-                <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Red flags — tick anything that applies now</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        If any apply, we will point you to urgent help rather than drinking guidance.
-                      </p>
-                    </div>
+                <div className="space-y-3 rounded-xl border border-destructive/25 bg-destructive/5 p-3.5">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-hidden />
+                    <p className="text-sm font-medium">Red flags — tick any that apply</p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2.5">
                     {RED_FLAG_ROWS.map(([key, text]) => (
-                      <div key={key} className="flex items-start gap-2">
+                      <div key={key} className="flex items-start gap-2.5">
                         <Checkbox
                           id={`rf-${key}`}
                           checked={redFlags[key]}
@@ -518,52 +816,44 @@ export default function AlcoholScenarioPage() {
               {situation === "before_out" ? (
                 <ChoiceGroup
                   name="intensity-before"
-                  label="How heavy do you expect drinking to be?"
+                  label="Expected drinking"
                   value={intensity}
                   onChange={setIntensity}
                   options={[
-                    { value: "light", title: "Light / one drink with food" },
+                    { value: "light", title: "Light — one drink with food" },
                     { value: "moderate", title: "Moderate social drinking" },
-                    {
-                      value: "long_or_heavy",
-                      title: "Longer night or heavier drinking",
-                      description: "Still not a recommendation to drink — only helps tailor reminders.",
-                    },
+                    { value: "long_or_heavy", title: "Longer or heavier night" },
                   ]}
                 />
               ) : situation !== "feels_wrong" ? (
                 <ChoiceGroup
                   name="intensity-meal"
-                  label="How heavy do you expect drinking to be?"
+                  label="Expected drinking"
                   value={intensity}
                   onChange={setIntensity}
                   options={[
-                    { value: "light", title: "Light / one drink with food" },
+                    { value: "light", title: "Light — one drink with food" },
                     { value: "moderate", title: "Moderate social drinking" },
-                    {
-                      value: "long_or_heavy",
-                      title: "Longer night or heavier drinking",
-                      description: "Used with trend to flag possible delayed-low risk.",
-                    },
+                    { value: "long_or_heavy", title: "Longer or heavier night" },
                   ]}
                 />
               ) : (
                 <ChoiceGroup
                   name="intensity-feels"
-                  label="If you add a glucose reading, how heavy was or will drinking be?"
+                  label="Drinking level"
                   value={intensity}
                   onChange={setIntensity}
                   options={[
-                    { value: "light", title: "Light / one drink" },
+                    { value: "light", title: "Light" },
                     { value: "moderate", title: "Moderate" },
                     { value: "long_or_heavy", title: "Longer or heavier" },
                   ]}
                 />
               )}
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label className="text-sm font-medium">Current glucose (optional)</Label>
+                  <Label className="text-sm font-medium">Glucose (optional)</Label>
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="bg-skip"
@@ -574,15 +864,17 @@ export default function AlcoholScenarioPage() {
                         if (on) setBgTrend("unknown");
                       }}
                     />
-                    <Label htmlFor="bg-skip" className="text-sm font-normal cursor-pointer">
-                      Skip — no reading
+                    <Label htmlFor="bg-skip" className="text-xs font-normal cursor-pointer text-muted-foreground">
+                      Skip
                     </Label>
                   </div>
                 </div>
                 {!bgSkipped ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2 max-w-xs">
-                      <Label htmlFor="alcohol-bg">Blood glucose ({bgUnits})</Label>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5 max-w-xs">
+                      <Label htmlFor="alcohol-bg" className="text-xs text-muted-foreground">
+                        Reading ({bgUnits})
+                      </Label>
                       <Input
                         id="alcohol-bg"
                         type="text"
@@ -615,244 +907,67 @@ export default function AlcoholScenarioPage() {
         ) : null}
 
         {phase === "result" && outcome ? (
-          <div ref={resultsRef} className="space-y-4">
-            <Card
-              className={cn(
-                "surface-card border-2 overflow-hidden",
-                outcome.kind === "urgent" && "border-destructive/60",
-                outcome.kind === "hypo_first" && "border-amber-500/50",
-                outcome.kind === "estimate" && "border-primary/30",
-              )}
-              data-testid="alcohol-plan-card"
-            >
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2 min-w-0">
-                    <OutcomeBadge outcome={outcome} />
-                    {outcome.kind === "estimate" ? (
-                      <>
-                        <CardTitle className="text-h3 leading-tight flex items-center gap-2">
-                          <Utensils className="h-6 w-6 text-primary shrink-0" />
-                          About {outcome.meal.dose} units
-                        </CardTitle>
-                        <CardDescription className="text-base text-foreground/90">
-                          For ~{outcome.meal.carbs}g carbs at {outcome.meal.mealType} using your saved ratios
-                          {outcome.meal.exactDose ? ` (exact ${outcome.meal.exactDose}u)` : ""}.
-                        </CardDescription>
-                        {outcome.meal.roundingAdvice ? (
-                          <p className="text-sm text-muted-foreground">{outcome.meal.roundingAdvice}</p>
-                        ) : null}
-                      </>
-                    ) : outcome.kind === "prep_only" ? (
-                      <>
-                        <CardTitle className="text-h3 leading-tight flex items-center gap-2">
-                          <Moon className="h-6 w-6 text-amber-600 dark:text-amber-400 shrink-0" />
-                          {outcome.headline}
-                        </CardTitle>
-                      </>
-                    ) : outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs" ? (
-                      <>
-                        <CardTitle className="text-h3 leading-tight">{outcome.message}</CardTitle>
-                      </>
-                    ) : outcome.kind === "feels_ok" ? (
-                      <>
-                        <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
-                        <CardDescription className="text-base text-foreground/90">{outcome.body}</CardDescription>
-                      </>
-                    ) : (
-                      <>
-                        <CardTitle className="text-h3 leading-tight">{outcome.headline}</CardTitle>
-                        <CardDescription className="text-base text-foreground/90">{outcome.lead}</CardDescription>
-                      </>
-                    )}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 shrink-0 self-start"
-                    onClick={resetFlow}
-                    data-testid="button-alcohol-edit-answers"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Start over
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {(outcome.kind === "urgent" || outcome.kind === "hypo_first") && (
-                  <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                    {outcome.bullets.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                )}
-
-                {outcome.kind === "estimate" && (
-                  <Collapsible className="group rounded-lg border border-border/60">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/50 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <span>Tips, safety note, and Meal Adviser</span>
-                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="border-t border-border/60 px-4 pb-4 pt-3 space-y-4">
-                      <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                        {outcome.tips.map((t) => (
-                          <li key={t}>{t}</li>
-                        ))}
-                      </ul>
-                      <Alert>
-                        <AlertDescription className="text-sm">{outcome.disclaimer}</AlertDescription>
-                      </Alert>
-                      <div className="flex flex-wrap gap-2">
-                        {estimateCarbsG != null ? (
-                          <Button asChild className="gap-2">
-                            <Link href={linkWithFrom(adviserLinkFromAlcohol(estimateCarbsG, mealType))}>
-                              <Calculator className="h-4 w-4" />
-                              Open in Meal Adviser
-                            </Link>
-                          </Button>
-                        ) : null}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-
-                {outcome.kind === "prep_only" && (
-                  <>
-                    <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
-                      {outcome.tips.map((t) => (
-                        <li key={t}>{t}</li>
-                      ))}
-                    </ul>
-                    {outcome.checklist.length > 0 ? (
-                      <Collapsible className="group rounded-lg border border-border/60">
-                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium hover:bg-muted/50 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          <span>Quick checklist</span>
-                          <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent className="border-t border-border/60 px-4 pb-4 pt-2">
-                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                            {outcome.checklist.map((c) => (
-                              <li key={c}>{c}</li>
-                            ))}
-                          </ul>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    ) : null}
-                  </>
-                )}
-
-                {(outcome.kind === "needs_ratios" || outcome.kind === "needs_carbs") && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" asChild>
-                      <Link href={linkWithFrom("/adviser?tab=ratios")}>Ratio Adviser</Link>
-                    </Button>
-                    <Button variant="outline" asChild>
-                      <Link href="/settings">Settings</Link>
-                    </Button>
-                  </div>
-                )}
-
-                {outcome.kind === "feels_ok" && (
-                  <div className="flex flex-wrap gap-2">
-                    {outcome.links.helpNow ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/help-now")}>
-                          <Phone className="h-4 w-4 mr-1.5" />
-                          Help now
-                        </Link>
-                      </Button>
-                    ) : null}
-                    {outcome.links.hypoHelp ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/tools/hypo-help")}>
-                          <Droplet className="h-4 w-4 mr-1.5" />
-                          Hypo help
-                        </Link>
-                      </Button>
-                    ) : null}
-                    {outcome.links.sickDay ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-
-                {(outcome.kind === "urgent" || outcome.kind === "hypo_first") && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {outcome.links.hypoHelp ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/tools/hypo-help")}>
-                          <Droplet className="h-4 w-4 mr-1.5" />
-                          Hypo help
-                        </Link>
-                      </Button>
-                    ) : null}
-                    {outcome.links.sickDay ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/sick-day")}>Sick day</Link>
-                      </Button>
-                    ) : null}
-                    {outcome.links.helpNow ? (
-                      <Button variant="secondary" size="sm" asChild>
-                        <Link href={linkWithFrom("/help-now")}>
-                          <Phone className="h-4 w-4 mr-1.5" />
-                          Help now
-                        </Link>
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div ref={resultsRef}>
+            {outcome.kind === "estimate" ? (
+              <AlcoholEstimateResult
+                meal={outcome.meal}
+                tips={outcome.tips}
+                bgUnits={bgUnits}
+                mealType={mealType}
+                tipsOpen={resultTipsOpen}
+                onTipsOpenChange={setResultTipsOpen}
+                onEdit={backToInputs}
+                onReset={resetFlow}
+              />
+            ) : outcome.kind === "urgent" || outcome.kind === "hypo_first" ? (
+              <AlcoholSafetyResult outcome={outcome} onReset={resetFlow} />
+            ) : outcome.kind === "prep_only" ? (
+              <AlcoholPrepResult
+                outcome={outcome}
+                tipsOpen={resultTipsOpen}
+                onTipsOpenChange={setResultTipsOpen}
+                onEdit={backToInputs}
+                onReset={resetFlow}
+              />
+            ) : (
+              <AlcoholSimpleResult outcome={outcome} onEdit={backToInputs} onReset={resetFlow} />
+            )}
           </div>
         ) : null}
+
+        <Disclaimer className="text-center text-[11px] leading-relaxed opacity-80" />
       </PageShell>
 
       {showSticky ? (
         <div
-          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
+          className="fixed bottom-[var(--bottom-nav-height,0px)] left-0 right-0 z-40 border-t border-border/80 bg-background/95 px-4 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/85"
           data-testid="alcohol-sticky-actions"
         >
-          {/* PageShell reserves nav padding-bottom; never use it inside this fixed bar or it balloons the footer height. */}
-          <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center justify-between gap-2">
+          <div className="mx-auto flex w-full min-w-0 max-w-lg items-center gap-2">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               className="gap-1.5 shrink-0"
-              onClick={phase === "inputs" ? backToSituation : undefined}
-              disabled={phase === "situation"}
+              onClick={backToSituation}
               data-testid="button-alcohol-back-step"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            {phase === "inputs" ? (
-              <Button
-                type="button"
-                className="gap-1.5 min-w-[8.5rem]"
-                onClick={runGuidance}
-                data-testid="button-alcohol-show-plan"
-              >
-                Show guidance
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <span className="text-sm text-muted-foreground sm:ml-auto line-clamp-2 text-right">
-                Choose a situation to continue
-              </span>
-            )}
+            <Button
+              type="button"
+              size="sm"
+              className="ml-auto min-w-[9rem] flex-1 gap-1.5 sm:flex-none"
+              onClick={runGuidance}
+              data-testid="button-alcohol-show-plan"
+            >
+              Show guidance
+              <ArrowRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      ) : (
-        <div className="mx-auto flex w-full min-w-0 max-w-3xl justify-start">
-          <Button type="button" variant="outline" className="gap-1.5" onClick={backToInputs}>
-            <ArrowLeft className="h-4 w-4" />
-            Edit details
-          </Button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
