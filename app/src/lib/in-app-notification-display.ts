@@ -60,3 +60,15 @@ export function primaryLineForNotification(
 export function showsProfileAvatar(row: InAppNotificationRow): boolean {
   return profileUserIdForInAppNotification(row) != null;
 }
+
+/** Short subtitle: prefer notification title when primary line is a person name. */
+export function subtitleForNotification(
+  row: InAppNotificationRow,
+  meta: { name: string } | undefined,
+): string | null {
+  const body = row.body?.trim();
+  if (body) return body;
+  const title = row.title?.trim();
+  if (meta?.name?.trim() && title && title !== meta.name.trim()) return title;
+  return null;
+}

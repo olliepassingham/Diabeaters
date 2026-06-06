@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -31,20 +30,17 @@ import {
 } from "@/lib/in-app-notifications-events";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getProfilesByIds } from "@/lib/profile";
 import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
-import { Bell, Check, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, Trash2 } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { FeedLoadingSkeleton } from "@/components/empty-state";
 import {
   collectProfileUserIdsForNotifications,
-  initialsFromDisplayName,
   isDmMessageInAppNotification,
-  primaryLineForNotification,
   profileUserIdForInAppNotification,
-  showsProfileAvatar,
 } from "@/lib/in-app-notification-display";
+import { NotificationEmptyState, NotificationInboxRow } from "@/components/notifications/notification-inbox-row";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -83,7 +79,6 @@ export default function NotificationsPage() {
     const nextRows = (res.data ?? []).filter((r) => !isDmMessageInAppNotification(r));
     setRows(nextRows);
 
-    // Enrich DM notifications with sender avatars/names.
     try {
       const senderIds = collectProfileUserIdsForNotifications(nextRows);
       if (senderIds.length === 0) {
@@ -101,7 +96,7 @@ export default function NotificationsPage() {
         setSenderMeta(meta);
       }
     } catch {
-      // ignore enrichment errors (keep list fast/robust)
+      // ignore enrichment errors
     }
   }, [configured, toast]);
 
@@ -175,6 +170,20 @@ export default function NotificationsPage() {
     notifyInAppNotificationsChanged({ skipPageRefresh: true });
   };
 
+  const handleMarkOneRead = async (row: InAppNotificationRow) => {
+    if (!configured || row.read) return;
+    const res = await markInAppNotificationRead(row.id);
+    if (res.error) {
+      toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read: true } : r)));
+    notifyInAppNotificationsChanged({ skipPageRefresh: true });
+  };
+
+  const pageDescription =
+    unread > 0 ? `${unread} unread · messages, community, and app updates` : "Messages, community, and app updates";
+
   return (
     <PageShell variant="narrow" density="compact" className="pb-6">
       <div className="flex items-center gap-2">
@@ -183,16 +192,24 @@ export default function NotificationsPage() {
       <PageHeader
         stackActionsMaxSm
         title="Notifications"
-        description="Updates from messages, your community, and the app."
+        description={pageDescription}
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={handleMarkAllRead} disabled={!configured || unread === 0} aria-label="Mark all read">
-              <Check className="h-4 w-4 sm:mr-2" />
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full sm:h-8 sm:w-auto sm:rounded-md sm:px-3"
+              onClick={handleMarkAllRead}
+              disabled={!configured || unread === 0}
+              aria-label="Mark all read"
+            >
+              <CheckCheck className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Mark all read</span>
             </Button>
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:text-destructive sm:h-8 sm:w-auto sm:rounded-md sm:px-3"
               type="button"
               onClick={() => setClearDialogOpen(true)}
               disabled={!configured || loading || rows.length === 0}
@@ -206,149 +223,69 @@ export default function NotificationsPage() {
         }
       />
 
-      <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="space-y-0 border-b border-border/50 bg-muted/20 px-4 py-3 sm:px-5">
-          <CardTitle className="text-base font-semibold tracking-tight">
-            Inbox{unread > 0 ? <span className="text-muted-foreground font-normal"> · {unread} unread</span> : null}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {!configured ? (
-            <div className="py-10 text-center text-muted-foreground px-2">
-              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm font-medium text-foreground">Notifications aren&apos;t configured</p>
-              <p className="text-xs mt-2 max-w-md mx-auto">
-                Set <span className="font-mono">VITE_SUPABASE_URL</span> and{" "}
-                <span className="font-mono">VITE_SUPABASE_ANON_KEY</span> in{" "}
-                <span className="font-mono">app/.env.local</span>, then restart the dev server. For hosted builds,
-                add the same variables in your deployment settings (see project README).
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                type="button"
-                onClick={() => setLocation("/settings/notifications")}
-              >
-                Open notification settings
-              </Button>
-            </div>
-          ) : loading ? (
+      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-sm">
+        {!configured ? (
+          <div className="px-4 py-10 text-center text-muted-foreground">
+            <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50">
+              <Bell className="h-5 w-5 opacity-60" aria-hidden />
+            </span>
+            <p className="text-sm font-medium text-foreground">Notifications aren&apos;t configured</p>
+            <p className="mx-auto mt-2 max-w-md text-xs">
+              Set <span className="font-mono">VITE_SUPABASE_URL</span> and{" "}
+              <span className="font-mono">VITE_SUPABASE_ANON_KEY</span> in{" "}
+              <span className="font-mono">app/.env.local</span>, then restart the dev server.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-4 rounded-xl"
+              type="button"
+              onClick={() => setLocation("/settings/notifications")}
+            >
+              Open notification settings
+            </Button>
+          </div>
+        ) : loading ? (
+          <div className="p-4">
             <FeedLoadingSkeleton rows={4} />
-          ) : fetchError ? (
-            <div className="py-8 text-center text-muted-foreground">
-              <p className="text-sm text-destructive">Could not load notifications</p>
-              <p className="text-xs mt-1 break-words max-w-md mx-auto">{fetchError}</p>
-              <Button variant="outline" size="sm" className="mt-4" type="button" onClick={() => void refresh()}>
-                Try again
-              </Button>
+          </div>
+        ) : fetchError ? (
+          <div className="px-4 py-8 text-center text-muted-foreground">
+            <p className="text-sm text-destructive">Could not load notifications</p>
+            <p className="mx-auto mt-1 max-w-md break-words text-xs">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-4 rounded-xl" type="button" onClick={() => void refresh()}>
+              Try again
+            </Button>
+          </div>
+        ) : rows.length === 0 ? (
+          <NotificationEmptyState />
+        ) : (
+          <ScrollArea className="max-h-[min(75dvh,36rem)]">
+            <div>
+              {rows.map((r) => {
+                const when = r.created_at
+                  ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true })
+                  : "";
+                const actorId = profileUserIdForInAppNotification(r);
+                const actor = actorId ? senderMeta.get(actorId) : undefined;
+                return (
+                  <NotificationInboxRow
+                    key={r.id}
+                    row={r}
+                    actor={actor}
+                    when={when}
+                    variant="page"
+                    testId={`notif-row-${r.id}`}
+                    onOpen={() => void handleOpen(r)}
+                    onMarkRead={() => void handleMarkOneRead(r)}
+                    onDelete={() => void handleDeleteOne(r)}
+                  />
+                );
+              })}
             </div>
-          ) : rows.length === 0 ? (
-            <div className="py-10 text-center text-muted-foreground">
-              <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No notifications</p>
-              <p className="text-xs mt-1">You&apos;re all caught up.</p>
-            </div>
-          ) : (
-            <ScrollArea className="max-h-[min(75dvh,32rem)]">
-              <ul className="divide-y divide-border/60">
-                {rows.map((r) => {
-                  const when = r.created_at
-                    ? formatDistanceToNowStrict(new Date(r.created_at), { addSuffix: true })
-                    : "";
-                  const actorId = profileUserIdForInAppNotification(r);
-                  const actor = actorId ? senderMeta.get(actorId) : undefined;
-                  const primary = primaryLineForNotification(r, actor);
-                  const showAvatar = showsProfileAvatar(r);
-                  return (
-                    <li key={r.id}>
-                      <div
-                        className={`group flex gap-2 px-3 py-3 transition-colors sm:gap-3 sm:px-4 ${
-                          r.read ? "bg-card hover:bg-muted/30" : "bg-primary/[0.04] hover:bg-primary/[0.07]"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className="flex min-w-0 flex-1 items-start gap-3 text-left"
-                          onClick={() => void handleOpen(r)}
-                          data-testid={`notif-row-${r.id}`}
-                        >
-                          {showAvatar ? (
-                            <Avatar className="mt-0.5 h-11 w-11 shrink-0 ring-1 ring-border/60">
-                              {actor?.avatarUrl ? <AvatarImage src={actor.avatarUrl} alt="" /> : null}
-                              <AvatarFallback className="text-xs font-semibold">
-                                {initialsFromDisplayName(primary)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ) : (
-                            <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/80 ring-1 ring-border/50">
-                              <Bell className="h-4 w-4 text-muted-foreground" aria-hidden />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                              <span className="truncate text-sm font-semibold text-foreground">{primary}</span>
-                              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{when}</span>
-                            </div>
-                            {r.body?.trim() ? (
-                              <p className="text-sm leading-snug text-muted-foreground line-clamp-4">{r.body}</p>
-                            ) : null}
-                          </div>
-                        </button>
-                        <div className="flex shrink-0 flex-col gap-1 border-l border-border/50 pl-2">
-                          {!r.read ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                              type="button"
-                              aria-label="Mark as read"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void (async () => {
-                                  const res = await markInAppNotificationRead(r.id);
-                                  if (res.error) {
-                                    toast({
-                                      title: "Could not update",
-                                      description: res.error.message,
-                                      variant: "destructive",
-                                    });
-                                    return;
-                                  }
-                                  setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, read: true } : x)));
-                                  notifyInAppNotificationsChanged({ skipPageRefresh: true });
-                                })();
-                              }}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void handleDeleteOne(r);
-                            }}
-                            aria-label="Delete notification"
-                            data-testid={`button-delete-notif-${r.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+          </ScrollArea>
+        )}
+      </div>
 
       <AlertDialog
         open={clearDialogOpen}

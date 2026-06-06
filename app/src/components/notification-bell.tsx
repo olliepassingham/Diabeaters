@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ToastAction } from "@/components/ui/toast";
 import {
@@ -20,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, Trash2 } from "lucide-react";
+import { Bell, CheckCheck, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { notifyDmInboxChanged } from "@/lib/community/dm-inbox-events";
@@ -39,11 +38,11 @@ import {
   collectProfileUserIdsForNotifications,
   initialsFromDisplayName,
   isDmMessageInAppNotification,
-  primaryLineForNotification,
   profileUserIdForInAppNotification,
-  showsProfileAvatar,
 } from "@/lib/in-app-notification-display";
+import { NotificationEmptyState, NotificationInboxRow } from "@/components/notifications/notification-inbox-row";
 import { prefetchNotificationsPage } from "@/components/bottom-nav";
+import { cn } from "@/lib/utils";
 
 function InAppToastContent(props: {
   title: string;
@@ -328,61 +327,68 @@ export function NotificationBell() {
             <Button
               variant="ghost"
               size="icon"
-              className="relative"
+              className={cn(
+                "relative h-9 w-9 shrink-0 rounded-full",
+                configured && unreadCount > 0 && "ring-1 ring-primary/30",
+              )}
               data-testid="button-notifications"
               aria-disabled={!configured}
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
               onPointerEnter={prefetchNotificationsPage}
               onTouchStart={prefetchNotificationsPage}
             >
-              <Bell className="h-5 w-5" />
-              {configured && unreadCount > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                >
+              <Bell className="h-5 w-5" strokeWidth={2} />
+              {configured && unreadCount > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground tabular-nums shadow-sm">
                   {unreadCount > 9 ? "9+" : unreadCount}
-                </Badge>
-              )}
+                </span>
+              ) : null}
             </Button>
           </PopoverTrigger>
           <PopoverContent
-            className="w-[calc(100vw-1rem)] max-w-sm overflow-hidden rounded-2xl border-border/60 p-0 shadow-lg sm:w-96"
+            className="w-[calc(100vw-1.25rem)] max-w-[22rem] overflow-hidden rounded-2xl border-border/50 bg-background/95 p-0 shadow-xl backdrop-blur-xl supports-[backdrop-filter]:bg-background/90"
             align="end"
-            sideOffset={8}
+            sideOffset={10}
           >
-            <div className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/30 px-3 py-2.5">
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">Notifications</h3>
+            <div className="flex items-center justify-between gap-2 border-b border-border/50 px-3.5 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">Notifications</h3>
+                {unreadCount > 0 ? (
+                  <p className="text-[11px] text-muted-foreground">{unreadCount} unread</p>
+                ) : null}
+              </div>
               {configured && !loading && !loadError && rows.length > 0 ? (
-                <div className="flex flex-wrap items-center justify-end gap-1">
+                <div className="flex shrink-0 items-center gap-0.5">
                   {unreadCount > 0 ? (
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-xs"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
                       type="button"
+                      aria-label="Mark all read"
                       onClick={() => void handleMarkAllRead()}
                     >
-                      Mark all read
+                      <CheckCheck className="h-4 w-4" />
                     </Button>
                   ) : null}
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
                     type="button"
+                    aria-label="Clear all notifications"
                     onClick={() => {
                       setOpen(false);
                       setClearDialogOpen(true);
                     }}
                     data-testid="button-bell-clear-all-notifications"
                   >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" aria-hidden />
-                    Clear all
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ) : null}
             </div>
-            <ScrollArea className="max-h-[min(70vh,22rem)]">
+            <ScrollArea className="max-h-[min(70vh,24rem)]">
               {!configured ? (
                 <div className="p-6 text-center text-muted-foreground">
                   <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -417,85 +423,49 @@ export function NotificationBell() {
                   </Button>
                 </div>
               ) : rows.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No notifications</p>
-                  <p className="text-xs mt-1">You&apos;re all caught up.</p>
-                </div>
+                <NotificationEmptyState compact />
               ) : (
-                <div className="space-y-0.5 p-1.5">
+                <div className="p-1.5">
                   {sortedRows.slice(0, 8).map((n) => {
                     const actorId = profileUserIdForInAppNotification(n);
                     const meta = actorId ? actorMeta.get(actorId) : undefined;
-                    const primary = primaryLineForNotification(n, meta);
                     const when = n.created_at
                       ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true })
                       : "";
-                    const showAvatar = showsProfileAvatar(n);
                     return (
-                      <div
+                      <NotificationInboxRow
                         key={n.id}
-                        className={`rounded-xl border transition-colors ${
-                          n.read
-                            ? "border-border/40 bg-transparent hover:bg-muted/40"
-                            : "border-primary/30 bg-primary/[0.06] hover:bg-primary/[0.09]"
-                        }`}
-                        data-testid={`bell-notif-row-${n.id}`}
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full min-w-0 items-start gap-3 py-2.5 pl-3 pr-3 text-left sm:pl-3.5"
-                          onClick={() => {
-                            void (async () => {
-                              if (!n.read) {
-                                const res = await markInAppNotificationRead(n.id);
-                                if (!res.error) {
-                                  setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
-                                  notifyInAppNotificationsChanged({ skipPageRefresh: true });
-                                }
+                        row={n}
+                        actor={meta}
+                        when={when}
+                        variant="popover"
+                        testId={`bell-notif-row-${n.id}`}
+                        onOpen={() => {
+                          void (async () => {
+                            if (!n.read) {
+                              const res = await markInAppNotificationRead(n.id);
+                              if (!res.error) {
+                                setRows((prev) => prev.map((r) => (r.id === n.id ? { ...r, read: true } : r)));
+                                notifyInAppNotificationsChanged({ skipPageRefresh: true });
                               }
-                              setOpen(false);
-                              const path = getPathForInAppNotification(n) ?? "/notifications";
-                              setLocation(path);
-                            })();
-                          }}
-                        >
-                          {showAvatar ? (
-                            <Avatar className="mt-0.5 h-10 w-10 shrink-0 ring-1 ring-border/60">
-                              {meta?.avatarUrl ? <AvatarImage src={meta.avatarUrl} alt="" /> : null}
-                              <AvatarFallback className="text-[11px] font-semibold">
-                                {initialsFromDisplayName(primary)}
-                              </AvatarFallback>
-                            </Avatar>
-                          ) : (
-                            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/80 ring-1 ring-border/50">
-                              <Bell className="h-4 w-4 text-muted-foreground" aria-hidden />
-                            </div>
-                          )}
-                          <div className="min-w-0 flex-1 space-y-0.5">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <span className="truncate text-sm font-semibold text-foreground">{primary}</span>
-                              {when ? (
-                                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">{when}</span>
-                              ) : null}
-                            </div>
-                            {n.body?.trim() ? (
-                              <p className="line-clamp-2 text-xs leading-snug text-muted-foreground">{n.body}</p>
-                            ) : null}
-                          </div>
-                        </button>
-                      </div>
+                            }
+                            setOpen(false);
+                            const path = getPathForInAppNotification(n) ?? "/notifications";
+                            setLocation(path);
+                          })();
+                        }}
+                      />
                     );
                   })}
                 </div>
               )}
             </ScrollArea>
             {configured && !loading && !loadError && rows.length > 0 && (
-              <div className="border-t border-border/60 bg-muted/10 p-2">
+              <div className="border-t border-border/50 bg-muted/10 p-2">
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  className="w-full text-xs"
+                  className="h-9 w-full rounded-xl text-xs font-medium"
                   onClick={() => {
                     setOpen(false);
                     setLocation("/notifications");
