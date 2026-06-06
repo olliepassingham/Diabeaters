@@ -3,10 +3,12 @@ import { Clock3 } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import {
+  ProfileCommunityPreview,
   ProfileFormCard,
   ProfileFormInset,
   ProfileFormStack,
   ProfileReadOnlyRow,
+  ProfileStatusPill,
   ProfileToggleRow,
 } from "@/components/profile/profile-ui";
 import { Input } from "@/components/ui/input";
@@ -25,7 +27,6 @@ import {
   useProfile,
 } from "@/lib/profile";
 import { getPrimaryAppRole } from "@/lib/carer-session";
-import { storage } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 
 type AccountCommunityProfileFieldsProps = {
@@ -209,6 +210,16 @@ export function AccountCommunityProfileFields({
     };
   }, [handleInput, savedHandleSlug, profile?.id, isPublic, editing]);
 
+  const resetFromProfile = useCallback(() => {
+    if (!profile) return;
+    setFullNameInput(profile.full_name ?? "");
+    setBio(profile.bio ?? "");
+    setHandleInput(profile.public_handle ?? "");
+    setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
+    setIsPublic(profile.is_public);
+    setEditing(!profile.is_public ? false : !isPublicProfileComplete(profile));
+  }, [profile, showOnsetDate]);
+
   async function persistPublicChange(next: boolean) {
     if (!profile?.id) return;
     const previous = profile.is_public;
@@ -382,22 +393,60 @@ export function AccountCommunityProfileFields({
       handleAvailability === "checking" ||
       handleAvailability === "invalid");
 
-  const settingsName = storage.getProfile()?.name?.trim() ?? "";
-  const displayNameReadOnly =
-    profile?.full_name?.trim() || settingsName || "Your account";
-
   const readOnlyPublicSummary = Boolean(isPublic && profile && isPublicProfileComplete(profile) && !editing);
-  const showNameInput = !isPublic ? editing : !readOnlyPublicSummary;
+  const showNameInput = editing && (!readOnlyPublicSummary || !isPublic);
 
-  const formBody = (
-    <>
-      <ProfileFormInset>
+  const publicToggle = (
+    <ProfileToggleRow
+      label={
+        <span className="inline-flex items-center gap-1">
+          <Label htmlFor={pubId} className="mb-0 cursor-pointer text-sm font-medium">
+            Public profile
+          </Label>
+          <InlineInfoHint
+            ariaLabel="About public profile"
+            content={
+              showAccountLinkInCopy ? (
+                <>
+                  Let signed-in members see your community card. Photo and name are on{" "}
+                  <Link href="/account#profile" className="text-primary underline-offset-4 hover:underline">
+                    Account
+                  </Link>
+                  .
+                </>
+              ) : (
+                "When on, add your name and @handle to finish your profile. Bio and diagnosis date are optional."
+              )
+            }
+          />
+        </span>
+      }
+      description="Visible to signed-in members on the Feed."
+      control={
+        <Switch
+          id={pubId}
+          checked={isPublic}
+          onCheckedChange={(checked) => void persistPublicChange(checked)}
+          disabled={loading || saving || savingPublic}
+          data-testid="account-community-public-switch"
+        />
+      }
+      footer={
+        savingPublic ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Saving…
+          </p>
+        ) : undefined
+      }
+    />
+  );
+
+  const editFields = (
+    <div className="space-y-4">
+      {showNameInput ? (
         <div className="space-y-2">
           <div className="flex items-center gap-0.5">
-            <Label
-              htmlFor={showNameInput ? fullNameId : undefined}
-              className="text-xs font-medium text-muted-foreground"
-            >
+            <Label htmlFor={fullNameId} className="text-xs font-medium text-muted-foreground">
               Display name
             </Label>
             <InlineInfoHint
@@ -409,290 +458,255 @@ export function AccountCommunityProfileFields({
               }
             />
           </div>
-          {showNameInput ? (
-            <Input
-              id={fullNameId}
-              value={fullNameInput}
-              onChange={(e) => setFullNameInput(e.target.value)}
-              autoComplete="name"
-              placeholder="Your name"
-              disabled={loading || savingPublic}
-              className="rounded-lg border-border/60 bg-background/80"
-              data-testid="account-profile-display-name-input"
-            />
-          ) : (
-            <p
-              className="text-base font-semibold tracking-tight text-foreground truncate"
-              data-testid="account-profile-display-name-readonly"
-            >
-              {displayNameReadOnly}
-            </p>
-          )}
+          <Input
+            id={fullNameId}
+            value={fullNameInput}
+            onChange={(e) => setFullNameInput(e.target.value)}
+            autoComplete="name"
+            placeholder="Your name"
+            disabled={loading || savingPublic}
+            className="h-10 rounded-xl border-border/60 bg-background/80"
+            data-testid="account-profile-display-name-input"
+          />
           {accountEmail ? (
             <p className="text-xs text-muted-foreground break-all" data-testid="account-profile-email-readonly">
               {accountEmail}
             </p>
           ) : null}
         </div>
-      </ProfileFormInset>
-
-      <ProfileToggleRow
-        label={
-          <span className="inline-flex items-center gap-1">
-            <Label htmlFor={pubId} className="mb-0 cursor-pointer text-sm font-medium">
-              Public profile
-            </Label>
-            <InlineInfoHint
-              ariaLabel="About public profile"
-              content={
-                showAccountLinkInCopy ? (
-                  <>
-                    Let signed-in members see your community card. Photo and name are on{" "}
-                    <Link href="/account#profile" className="text-primary underline-offset-4 hover:underline">
-                      Account
-                    </Link>
-                    .
-                  </>
-                ) : (
-                  "When on, add your name and @handle to finish your profile. Bio and diagnosis date are optional."
-                )
-              }
-            />
-          </span>
-        }
-        description="Visible to signed-in members on the Feed."
-        control={
-          <Switch
-            id={pubId}
-            checked={isPublic}
-            onCheckedChange={(checked) => void persistPublicChange(checked)}
-            disabled={loading || saving || savingPublic}
-            data-testid="account-community-public-switch"
-          />
-        }
-        footer={
-          savingPublic ? (
-            <p className="text-xs text-muted-foreground" aria-live="polite">
-              Saving…
-            </p>
-          ) : undefined
-        }
-      />
+      ) : null}
 
       {isPublic ? (
         <>
-          {!readOnlyPublicSummary ? (
-            <ProfileFormInset className="space-y-4">
-              <div className="space-y-2">
-                <FieldLabelWithInfo
-                  htmlFor={handleId}
-                  info={
-                    <>
-                      Required and unique across Diabeaters. 3–30 characters: lowercase letters, numbers,
-                      underscores. Share:{" "}
-                      {handleInput.trim() ? (
-                        <Link
-                          href={`/community/u/${encodeURIComponent(handleSlug)}`}
-                          className="text-primary underline-offset-4 hover:underline"
-                        >
-                          /community/u/{handleSlug}
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">set a handle for a link</span>
-                      )}
-                    </>
-                  }
-                >
-                  Feed handle
-                </FieldLabelWithInfo>
-                <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/80 px-3 focus-within:ring-2 focus-within:ring-ring">
-                  <span className="text-sm font-medium text-muted-foreground select-none" aria-hidden>
-                    @
-                  </span>
-                  <Input
-                    id={handleId}
-                    placeholder="your_handle"
-                    value={handleInput}
-                    onChange={(e) => setHandleInput(e.target.value)}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    maxLength={30}
-                    disabled={loading || savingPublic}
-                    className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
-                    data-testid="account-community-handle-input"
-                    aria-invalid={handleAvailability === "taken" || handleAvailability === "invalid"}
-                    aria-describedby={`${handleId}-status`}
-                  />
-                </div>
-                <p
-                  id={`${handleId}-status`}
-                  className={cn(
-                    "text-xs",
-                    handleAvailability === "taken" || handleAvailability === "invalid"
-                      ? "text-destructive"
-                      : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
-                        ? "text-primary"
-                        : "text-muted-foreground",
-                  )}
-                  aria-live="polite"
-                  data-testid="account-community-handle-status"
-                >
-                  {handleAvailability === "checking"
-                    ? "Checking availability…"
-                    : handleAvailability === "taken"
-                      ? PUBLIC_HANDLE_TAKEN_MESSAGE
-                      : handleAvailability === "invalid"
-                        ? "Use 3–30 characters: letters, numbers, underscores only."
-                        : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
-                          ? "This handle is available."
-                          : "Handles are unique — you will need a different one if it is already in use."}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor={bioId} className="text-xs font-medium text-muted-foreground">
-                  Bio <span className="font-normal">(optional)</span>
-                </Label>
-                <Textarea
-                  ref={bioRef}
-                  id={bioId}
-                  rows={1}
-                  maxLength={500}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="A short intro for the feed (not medical advice)."
-                  disabled={loading || savingPublic}
-                  data-testid="account-community-bio-input"
-                  className="min-h-[2.75rem] max-h-[200px] resize-none overflow-y-auto rounded-lg border-border/60 bg-background/80 py-2"
-                />
-              </div>
-
-              {showOnsetDate ? (
-                <div className="space-y-2 border-t border-border/40 pt-3">
-                  <FieldLabelWithInfo
-                    htmlFor={onsetId}
-                    info="Optional. Shown on your community card when set. You can change or remove it anytime."
-                  >
-                    Living with diabetes since{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </FieldLabelWithInfo>
-                  <Input
-                    id={onsetId}
-                    type="date"
-                    min="1900-01-01"
-                    max={todayIso}
-                    value={onsetDateInput}
-                    onChange={(e) => setOnsetDateInput(e.target.value)}
-                    disabled={loading || saving || savingPublic}
-                    className="rounded-lg border-border/60 bg-background/80"
-                    data-testid="account-community-onset-input"
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    {livingLine ? (
-                      <span
-                        className="flex items-center gap-2 text-xs text-muted-foreground"
-                        data-testid="account-community-onset-line"
-                      >
-                        <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-                        <span>{livingLine}</span>
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground" data-testid="account-community-onset-empty">
-                        Not set
-                      </span>
-                    )}
-                    {onsetDateInput.trim() ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 rounded-full px-3 text-xs"
-                        onClick={() => void clearOnsetDate()}
-                        disabled={saving || loading || savingPublic}
-                        data-testid="account-community-onset-remove"
-                      >
-                        Remove
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              <Button
-                type="submit"
-                className="w-full min-h-11 rounded-xl font-medium"
-                disabled={saving || loading || savingPublic || handleSaveBlocked}
-                data-testid="account-community-save"
-              >
-                {saving ? "Saving…" : "Save profile"}
-              </Button>
-            </ProfileFormInset>
-          ) : (
-            <ProfileFormInset>
-              <ProfileFormStack>
-                {showOnsetDate ? (
-                  <ProfileReadOnlyRow label="Diabetes journey">
-                    {livingLine ? (
-                      <span className="inline-flex items-center gap-2" data-testid="account-community-onset-highlight">
-                        <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-                        {livingLine}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground" data-testid="account-community-onset-empty">
-                        Not set
-                      </span>
-                    )}
-                  </ProfileReadOnlyRow>
-                ) : null}
-                <ProfileReadOnlyRow label="Feed handle">
-                  {readOnlyHandleSlug ? (
+          <div className="space-y-2">
+            <FieldLabelWithInfo
+              htmlFor={handleId}
+              info={
+                <>
+                  Required and unique across Diabeaters. 3–30 characters: lowercase letters, numbers, underscores. Share:{" "}
+                  {handleInput.trim() ? (
                     <Link
-                      href={`/community/u/${encodeURIComponent(readOnlyHandleSlug)}`}
-                      className="font-medium text-primary underline-offset-4 hover:underline"
-                      data-testid="account-community-handle-readonly"
+                      href={`/community/u/${encodeURIComponent(handleSlug)}`}
+                      className="text-primary underline-offset-4 hover:underline"
                     >
-                      @{readOnlyHandleSlug}
+                      /community/u/{handleSlug}
                     </Link>
                   ) : (
-                    <span className="text-muted-foreground" data-testid="account-community-handle-empty">
-                      No handle yet
-                    </span>
+                    <span className="text-muted-foreground">set a handle for a link</span>
                   )}
-                </ProfileReadOnlyRow>
-                <ProfileReadOnlyRow label="Bio">
-                  {profile?.bio?.trim() ? (
-                    <span className="whitespace-pre-wrap text-foreground/90" data-testid="account-community-bio-readonly">
-                      {profile.bio}
-                    </span>
-                  ) : (
-                    <span className="italic text-muted-foreground" data-testid="account-community-bio-empty">
-                      No bio yet
-                    </span>
-                  )}
-                </ProfileReadOnlyRow>
-              </ProfileFormStack>
-            </ProfileFormInset>
-          )}
+                </>
+              }
+            >
+              Feed handle
+            </FieldLabelWithInfo>
+            <div className="flex h-10 items-center gap-2 rounded-xl border border-border/60 bg-background/80 px-3 focus-within:ring-2 focus-within:ring-ring">
+              <span className="text-sm font-medium text-muted-foreground select-none" aria-hidden>
+                @
+              </span>
+              <Input
+                id={handleId}
+                placeholder="your_handle"
+                value={handleInput}
+                onChange={(e) => setHandleInput(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={30}
+                disabled={loading || savingPublic}
+                className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                data-testid="account-community-handle-input"
+                aria-invalid={handleAvailability === "taken" || handleAvailability === "invalid"}
+                aria-describedby={`${handleId}-status`}
+              />
+            </div>
+            <p
+              id={`${handleId}-status`}
+              className={cn(
+                "text-xs",
+                handleAvailability === "taken" || handleAvailability === "invalid"
+                  ? "text-destructive"
+                  : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
+                    ? "text-primary"
+                    : "text-muted-foreground",
+              )}
+              aria-live="polite"
+              data-testid="account-community-handle-status"
+            >
+              {handleAvailability === "checking"
+                ? "Checking availability…"
+                : handleAvailability === "taken"
+                  ? PUBLIC_HANDLE_TAKEN_MESSAGE
+                  : handleAvailability === "invalid"
+                    ? "Use 3–30 characters: letters, numbers, underscores only."
+                    : handleAvailability === "available" && handleSlug && handleSlug !== savedHandleSlug
+                      ? "This handle is available."
+                      : "Handles are unique — you will need a different one if it is already in use."}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={bioId} className="text-xs font-medium text-muted-foreground">
+              Bio <span className="font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              ref={bioRef}
+              id={bioId}
+              rows={1}
+              maxLength={500}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="A short intro for the feed (not medical advice)."
+              disabled={loading || savingPublic}
+              data-testid="account-community-bio-input"
+              className="min-h-[2.75rem] max-h-[200px] resize-none overflow-y-auto rounded-xl border-border/60 bg-background/80 py-2"
+            />
+          </div>
+
+          {showOnsetDate ? (
+            <div className="space-y-2 border-t border-border/40 pt-3">
+              <FieldLabelWithInfo
+                htmlFor={onsetId}
+                info="Optional. Shown on your community card when set. You can change or remove it anytime."
+              >
+                Living with diabetes since{" "}
+                <span className="text-muted-foreground font-normal">(optional)</span>
+              </FieldLabelWithInfo>
+              <Input
+                id={onsetId}
+                type="date"
+                min="1900-01-01"
+                max={todayIso}
+                value={onsetDateInput}
+                onChange={(e) => setOnsetDateInput(e.target.value)}
+                disabled={loading || saving || savingPublic}
+                className="h-10 rounded-xl border-border/60 bg-background/80"
+                data-testid="account-community-onset-input"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {livingLine ? (
+                  <span
+                    className="flex items-center gap-2 text-xs text-muted-foreground"
+                    data-testid="account-community-onset-line"
+                  >
+                    <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                    <span>{livingLine}</span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground" data-testid="account-community-onset-empty">
+                    Not set
+                  </span>
+                )}
+                {onsetDateInput.trim() ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 rounded-full px-3 text-xs"
+                    onClick={() => void clearOnsetDate()}
+                    disabled={saving || loading || savingPublic}
+                    data-testid="account-community-onset-remove"
+                  >
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-xl font-medium"
+            disabled={saving || loading || savingPublic || handleSaveBlocked}
+            data-testid="account-community-save"
+          >
+            {saving ? "Saving…" : "Save profile"}
+          </Button>
         </>
       ) : (
-        <ProfileFormInset>
+        <>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Turn on <span className="font-medium text-foreground">Public profile</span> to use the Feed and choose your
             @handle. Bio and diagnosis date are optional.
           </p>
-          {editing ? (
+          {showNameInput ? (
             <Button
               type="submit"
-              className="mt-3 w-full min-h-11 rounded-xl"
+              className="h-11 w-full rounded-xl"
               disabled={saving || loading || savingPublic}
               data-testid="account-community-save"
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : "Save name"}
             </Button>
           ) : null}
-        </ProfileFormInset>
+        </>
       )}
+    </div>
+  );
+
+  const formBody = (
+    <>
+      {readOnlyPublicSummary ? (
+        <ProfileCommunityPreview
+          handleSlug={readOnlyHandleSlug || null}
+          bio={profile?.bio}
+          livingWithLine={livingLine}
+          showOnset={showOnsetDate}
+          onAddBio={() => setEditing(true)}
+        />
+      ) : editing ? (
+        editFields
+      ) : isPublic ? (
+        <ProfileFormInset>
+          <ProfileFormStack>
+            {showOnsetDate ? (
+              <ProfileReadOnlyRow label="Diabetes journey">
+                {livingLine ? (
+                  <span className="inline-flex items-center gap-2" data-testid="account-community-onset-highlight">
+                    <Clock3 className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+                    {livingLine}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground" data-testid="account-community-onset-empty">
+                    Not set
+                  </span>
+                )}
+              </ProfileReadOnlyRow>
+            ) : null}
+            <ProfileReadOnlyRow label="Feed handle">
+              {readOnlyHandleSlug ? (
+                <Link
+                  href={`/community/u/${encodeURIComponent(readOnlyHandleSlug)}`}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  data-testid="account-community-handle-readonly"
+                >
+                  @{readOnlyHandleSlug}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground" data-testid="account-community-handle-empty">
+                  No handle yet
+                </span>
+              )}
+            </ProfileReadOnlyRow>
+            <ProfileReadOnlyRow label="Bio">
+              {profile?.bio?.trim() ? (
+                <span className="whitespace-pre-wrap text-foreground/90" data-testid="account-community-bio-readonly">
+                  {profile.bio}
+                </span>
+              ) : (
+                <span className="italic text-muted-foreground" data-testid="account-community-bio-empty">
+                  No bio yet
+                </span>
+              )}
+            </ProfileReadOnlyRow>
+          </ProfileFormStack>
+        </ProfileFormInset>
+      ) : (
+        editFields
+      )}
+
+      <div className={cn(readOnlyPublicSummary || editing || isPublic ? "border-t border-border/40 pt-4" : "pt-1")}>
+        {publicToggle}
+      </div>
     </>
   );
 
@@ -713,53 +727,75 @@ export function AccountCommunityProfileFields({
     ) : null;
 
   const form = (
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-4">
       {embeddedEditRow}
       {formBody}
     </form>
   );
 
   if (variant === "standalone") {
+    const profileComplete = profile ? isPublicProfileComplete(profile) : false;
+    const statusLine = !isPublic
+      ? "Private — turn on to join the Feed"
+      : profileComplete && !editing
+        ? "Visible on the Feed"
+        : "Add your name and @handle to finish setup";
+
     return (
       <ProfileFormCard id={cardId} className={className} testId="account-profile-card">
-        <div className="flex items-start justify-between gap-3 border-b border-border/40 pb-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-0.5">
-              <h2 className="font-display text-base font-semibold tracking-tight text-foreground">Profile</h2>
-              <InlineInfoHint
-                ariaLabel="About Profile"
-                content={
-                  <>
-                    <p className="mb-2 last:mb-0">
-                      With Public profile on, your community card is complete when your name and @handle are saved. Bio
-                      and diagnosis date are optional.
-                    </p>
-                    <p className="mb-0">
-                      Turn Public profile on to use the Feed. Until name and handle are saved, you stay in the editor.
-                    </p>
-                  </>
-                }
-              />
+        <div className="space-y-4 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-display text-base font-semibold tracking-tight text-foreground">Community profile</h2>
+                <ProfileStatusPill isPublic={isPublic} complete={profileComplete} />
+                <InlineInfoHint
+                  ariaLabel="About community profile"
+                  content={
+                    <>
+                      <p className="mb-2 last:mb-0">
+                        With Public profile on, your community card is complete when your name and @handle are saved. Bio
+                        and diagnosis date are optional.
+                      </p>
+                      <p className="mb-0">Your photo and sign-in email are managed in the hero card above.</p>
+                    </>
+                  }
+                />
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{statusLine}</p>
             </div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Display name, Feed handle, and visibility
-            </p>
+            <div className="flex shrink-0 items-center gap-1">
+              {editing ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full text-xs"
+                  onClick={() => {
+                    resetFromProfile();
+                  }}
+                  disabled={saving || savingPublic}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+              {!editing ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-border/60 bg-background/70 text-xs shadow-sm"
+                  onClick={() => setEditing(true)}
+                  disabled={savingPublic}
+                  data-testid="account-community-edit"
+                >
+                  Edit
+                </Button>
+              ) : null}
+            </div>
           </div>
-          {!editing ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0 rounded-full border-border/60 bg-background/70 text-xs shadow-sm"
-              onClick={() => setEditing(true)}
-              disabled={savingPublic}
-              data-testid="account-community-edit"
-            >
-              Edit
-            </Button>
-          ) : null}
+          {form}
         </div>
-        <div className="pt-4">{form}</div>
       </ProfileFormCard>
     );
   }

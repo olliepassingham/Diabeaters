@@ -378,6 +378,15 @@ export default function Account() {
   }, [location]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#profile") return;
+    if (profileLoading) return;
+    window.setTimeout(() => {
+      document.getElementById("profile")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }, [location, profileLoading]);
+
+  useEffect(() => {
     if (!showPublicProfileTab) {
       setPublicCounts(null);
       return;
