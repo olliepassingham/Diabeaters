@@ -5,6 +5,7 @@ import {
   checkNativeLocalNotificationPermission,
   ensureNativeNotificationChannels,
 } from "@/lib/native-local-notifications";
+import { extraForPushNotificationDeepLink } from "@/lib/push-notification-deep-link";
 import { getNativePushPlatform } from "@/lib/native-platform";
 import { storage } from "@/lib/storage";
 
@@ -80,10 +81,7 @@ export async function presentAudiblePushNotificationFromRemote(
           body,
           sound: "default",
           schedule: { at: new Date(Date.now() + 300) },
-          extra: {
-            source: "remote_push_foreground",
-            push_id: notification.id ?? null,
-          },
+          extra: extraForPushNotificationDeepLink(notification),
         },
       ],
     });

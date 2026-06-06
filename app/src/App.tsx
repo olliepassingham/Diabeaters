@@ -35,6 +35,11 @@ import { isUserVerified, logout } from "@/lib/auth";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { pathFromOpenedAppUrl } from "@/lib/native-app-open-url";
+import {
+  setPushDeepLinkNavigationHandler,
+  setPushDeepLinkNavigationReady,
+} from "@/lib/push-notification-deep-link";
+import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
 
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
@@ -266,6 +271,26 @@ function useNativeLocalNotificationDeepLinks() {
       if (handle) void handle.remove();
     };
   }, [setLocation]);
+}
+
+function useNativePushDeepLinks(authLoading: boolean, userId: string | undefined) {
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform?.()) return;
+    ensurePushDeepLinkListenersAttached();
+  }, []);
+
+  useEffect(() => {
+    setPushDeepLinkNavigationHandler(setLocation);
+    return () => setPushDeepLinkNavigationHandler(null);
+  }, [setLocation]);
+
+  useEffect(() => {
+    const ready = !authLoading && Boolean(userId);
+    setPushDeepLinkNavigationReady(ready);
+    return () => setPushDeepLinkNavigationReady(false);
+  }, [authLoading, userId]);
 }
 
 /** Mirrors signed-in shell (backdrop, top bar, content, bottom nav) while auth/session resolves. */
@@ -1298,12 +1323,14 @@ function AuthenticatedShell() {
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
       {!isDmThreadView ? <OfflineBanner /> : null}
-      <AppTopBar
-        isCarer={isCarerMode}
-        pathOnly={location.split("?")[0] ?? location}
-        onBrandClick={goBrandHome}
-        onLogout={handleLogout}
-      />
+      {!isDmThreadView ? (
+        <AppTopBar
+          isCarer={isCarerMode}
+          pathOnly={location.split("?")[0] ?? location}
+          onBrandClick={goBrandHome}
+          onLogout={handleLogout}
+        />
+      ) : null}
       {isDmThreadView ? <DmThreadSubheader /> : null}
       {!suppressClinicalPollers && !isDmThreadView && iosNotifPrompt.show ? (
         <div className="relative z-40 -mt-1 mb-2 px-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:px-6">
@@ -1442,6 +1469,7 @@ function AppContent() {
   useNativeLocalNotificationDeepLinks();
   const [location, setLocation] = useLocation();
   const { user, loading: authLoading } = useAuth();
+  useNativePushDeepLinks(authLoading, user?.id);
   const queryClient = useQueryClient();
   const userId = user?.id;
   const linkQuery = useLinkedPatientQuery();

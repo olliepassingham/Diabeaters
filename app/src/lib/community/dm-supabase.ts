@@ -639,3 +639,9 @@ export async function sendFeedPostToDmThread(
   if (msgRes.error) return { data: null, error: msgRes.error };
   return { data: { threadId: threadRes.data }, error: null };
 }
+
+export { mapMessage as mapDmMessageRow };
+
+export async function enrichDmMessages(messages: DmMessageRow[]): Promise<DmMessageRow[]> {
+  return enrichDmMessagesWithLikesAndImages(messages);
+}

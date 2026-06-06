@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { BellOff, ChevronRight, EyeOff, MessageCircle, MoreHorizontal, Pin, Search, Users } from "lucide-react";
+import { BellOff, EyeOff, MessageCircle, MoreHorizontal, Pin, Search, Users } from "lucide-react";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { DmInboxSwipeRow } from "@/components/dm-inbox-swipe-row";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { EmptyState } from "@/components/empty-state";
@@ -626,7 +627,7 @@ export default function CommunityMessagesPage() {
   }
 
   return (
-    <PageShell variant="standard" className="mx-auto max-w-xl space-y-4 pb-8">
+    <PageShell variant="standard" className="mx-auto max-w-xl space-y-5 pb-8">
       <PageHeader
         leading={<PageBackButton />}
         title="Messages"
@@ -640,10 +641,10 @@ export default function CommunityMessagesPage() {
         }
       />
 
-      <form onSubmit={handleStartChat} className="space-y-2">
+      <form onSubmit={handleStartChat} className="space-y-2.5">
         <div className="relative">
           <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Input
@@ -653,7 +654,7 @@ export default function CommunityMessagesPage() {
             onChange={(e) => setHandleInput(e.target.value)}
             placeholder="Search or @handle…"
             title="Search your conversations and start new chats by @handle."
-            className="h-9 rounded-lg border-border/60 bg-background pl-8 text-sm shadow-sm"
+            className="h-11 rounded-2xl border-border/50 bg-muted/25 pl-10 text-[15px] shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
@@ -723,6 +724,10 @@ export default function CommunityMessagesPage() {
             ) : null}
           </div>
         ) : null}
+
+        {threads.length > 0 ? (
+          <p className="text-[11px] text-muted-foreground">Swipe left on a conversation to pin, mute, or hide.</p>
+        ) : null}
       </form>
 
       {loading ? (
@@ -756,7 +761,7 @@ export default function CommunityMessagesPage() {
               Updating…
             </p>
           ) : null}
-        <ul className="space-y-2">
+        <ul className="divide-y divide-border/40 overflow-hidden rounded-2xl border border-border/50 bg-card/60 shadow-sm">
           {filteredThreads.map((t) => {
             const other = user?.id ? otherMemberUserId(t.members, user.id) : null;
             const label = other ? labels[other] ?? shortId(other) : "Chat";
@@ -772,19 +777,26 @@ export default function CommunityMessagesPage() {
 
             return (
               <li key={t.id}>
-                <Link
-                  href={`/community/messages/${t.id}`}
-                  className="block"
-                  onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
-                  onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
+                <DmInboxSwipeRow
+                  isPinned={isPinned}
+                  isMuted={isMuted}
+                  onPin={() => togglePinned(t.id)}
+                  onMute={() => void toggleMutedServerFirst(t.id)}
+                  onHide={() => void hideThreadServerFirst(t.id)}
                 >
-                  <div
-                    className={cn(
-                      "pressable flex items-center gap-3 rounded-2xl border border-border/50 bg-card/80 px-3 py-3.5 transition-colors",
-                      "hover:border-primary/30 hover:bg-muted/30 active:bg-muted/40",
-                      isUnread && "border-primary/25 bg-primary/[0.04]",
-                    )}
+                  <Link
+                    href={`/community/messages/${t.id}`}
+                    className="block"
+                    onMouseEnter={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
+                    onFocus={() => userId && prefetchDmThreadRoute(queryClient, t.id, userId)}
                   >
+                    <div
+                      className={cn(
+                        "pressable flex items-center gap-3 px-3.5 py-3.5 transition-colors",
+                        "hover:bg-muted/35 active:bg-muted/50",
+                        isUnread && "bg-primary/[0.05]",
+                      )}
+                    >
                       {other ? (
                         <CommunityAuthorAvatar
                           displayName={label}
@@ -795,7 +807,7 @@ export default function CommunityMessagesPage() {
                         <div className="h-10 w-10 shrink-0 rounded-full bg-muted" aria-hidden />
                       )}
                       <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="text-sm font-medium text-foreground truncate">
+                        <p className="truncate text-[15px] font-semibold text-foreground">
                           {label}
                           {isPinned ? <Pin className="ml-2 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
                           {isMuted ? <BellOff className="ml-2 inline-block h-3.5 w-3.5 text-muted-foreground" aria-hidden /> : null}
@@ -804,7 +816,7 @@ export default function CommunityMessagesPage() {
                             <span className="ml-2 inline-flex h-2 w-2 rounded-full bg-primary align-middle" aria-label="Unread" />
                           ) : null}
                         </p>
-                        <p className={`text-sm truncate ${isUnread ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+                        <p className={`truncate text-sm ${isUnread ? "font-medium text-foreground/90" : "text-muted-foreground"}`}>
                           {preview}
                         </p>
                       </div>
@@ -868,14 +880,14 @@ export default function CommunityMessagesPage() {
                         <time
                           dateTime={last?.created_at ?? t.updated_at}
                           title={timeTitle}
-                          className="shrink-0 self-start pt-0.5 text-xs text-muted-foreground tabular-nums"
+                          className="shrink-0 self-start pt-0.5 text-[11px] text-muted-foreground tabular-nums"
                         >
                           {timeStr}
                         </time>
                       ) : null}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  </div>
-                </Link>
+                    </div>
+                  </Link>
+                </DmInboxSwipeRow>
               </li>
             );
           })}

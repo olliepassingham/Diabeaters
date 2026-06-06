@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, ImagePlus, Send } from "lucide-react";
+import { Heart, ImagePlus, Check, CheckCheck, Send } from "lucide-react";
 import { DmSharedPostPreview } from "@/components/community/dm-shared-post-preview";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -22,6 +22,14 @@ import {
 } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import {
+  formatReadReceiptTime,
+  latestReadOutgoingMessageId,
+  readReceiptStatusForMessage,
+  type DmReadReceiptStatus,
+} from "@/lib/dm-read-receipts";
+import { useDmThreadLive } from "@/lib/dm-thread-live";
+import { usePeerTypingActive } from "@/lib/dm-thread-typing";
 import { format, isToday, isYesterday } from "date-fns";
 
 function scrollToBottom(el: HTMLElement | null, behavior: ScrollBehavior) {
@@ -37,7 +45,19 @@ function dayDividerLabel(iso: string): string | null {
   return format(d, "d MMM yyyy");
 }
 
-function DmMessageImage({ src, className }: { src: string; className?: string }) {
+function DmMessageImage({
+  src,
+  className,
+  overlayTime,
+  mine,
+  readReceiptStatus,
+}: {
+  src: string;
+  className?: string;
+  overlayTime?: string;
+  mine?: boolean;
+  readReceiptStatus?: DmReadReceiptStatus | null;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -45,14 +65,25 @@ function DmMessageImage({ src, className }: { src: string; className?: string })
       <button
         type="button"
         className={cn(
-          "block w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "group relative block w-full overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           className,
         )}
         onClick={() => setOpen(true)}
         aria-label="View full size photo"
         data-testid="dm-message-image-open"
       >
-        <img src={src} alt="" className="max-h-64 w-full object-cover bg-muted/30" loading="lazy" />
+        <img src={src} alt="" className="max-h-72 w-full object-cover bg-muted/20" loading="lazy" />
+        {overlayTime ? (
+          <span
+            className={cn(
+              "absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums backdrop-blur-md",
+              mine ? "bg-black/35 text-white" : "bg-background/70 text-foreground/80",
+            )}
+          >
+            {overlayTime}
+            {mine && readReceiptStatus ? <ReadReceiptIcon status={readReceiptStatus} /> : null}
+          </span>
+        ) : null}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-[min(96vw,48rem)] overflow-hidden border-0 bg-transparent p-0 shadow-none">
@@ -68,13 +99,55 @@ function DmMessageImage({ src, className }: { src: string; className?: string })
   );
 }
 
+function DmTypingDots() {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground" aria-live="polite">
+      <span className="flex items-center gap-1" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/80"
+            style={{ animationDelay: `${i * 140}ms` }}
+          />
+        ))}
+      </span>
+      Typing…
+    </div>
+  );
+}
+
+function ReadReceiptIcon({ status }: { status: DmReadReceiptStatus }) {
+  if (status === "read") {
+    return <CheckCheck className="h-3 w-3 shrink-0 opacity-90" aria-label="Read" />;
+  }
+  return <Check className="h-3 w-3 shrink-0 opacity-70" aria-label="Sent" />;
+}
+
+function messagesGrouped(messages: DmMessageRow[]): boolean[] {
+  return messages.map((m, i) => {
+    if (i === 0) return false;
+    const prev = messages[i - 1]!;
+    if (prev.sender_id !== m.sender_id) return false;
+    const t1 = new Date(prev.created_at).getTime();
+    const t2 = new Date(m.created_at).getTime();
+    if (!Number.isFinite(t1) || !Number.isFinite(t2)) return false;
+    return t2 - t1 < 5 * 60 * 1000;
+  });
+}
+
 function DmMessageBubble({
   message: m,
   mine,
+  groupedWithPrevious,
+  readReceiptStatus,
+  showReadLabel,
   onToggleLike,
 }: {
   message: DmMessageRow;
   mine: boolean;
+  groupedWithPrevious: boolean;
+  readReceiptStatus: DmReadReceiptStatus | null;
+  showReadLabel: boolean;
   onToggleLike: (m: DmMessageRow) => void;
 }) {
   const shared = parseSharedFeedPostMessage(m.body);
@@ -82,17 +155,53 @@ function DmMessageBubble({
   const likedByMe = m.liked_by_me ?? false;
   const showImage = Boolean(m.image_signed_url);
   const hasText = !shared && Boolean(m.body.trim());
+  const isImageOnly = showImage && !hasText && !shared;
+  const timeLabel = format(new Date(m.created_at), "HH:mm");
+
+  const bubbleShell = cn(
+    "relative max-w-[min(88%,20rem)] text-[15px] leading-relaxed",
+    isImageOnly
+      ? "overflow-hidden rounded-2xl shadow-md ring-1 ring-black/5 dark:ring-white/10"
+      : cn(
+          "px-3.5 py-2 shadow-sm",
+          groupedWithPrevious ? "mt-0.5" : "",
+          mine
+            ? cn(
+                "rounded-[1.25rem] bg-primary text-primary-foreground",
+                groupedWithPrevious ? "rounded-tr-[0.45rem]" : "rounded-br-[0.45rem]",
+              )
+            : cn(
+                "rounded-[1.25rem] bg-card text-foreground ring-1 ring-border/40",
+                groupedWithPrevious ? "rounded-tl-[0.45rem]" : "rounded-bl-[0.45rem]",
+              ),
+          shared && "max-w-[min(92%,22rem)] p-2.5",
+        ),
+  );
 
   return (
-    <div className={cn("flex w-full", mine ? "justify-end" : "justify-start")}>
+    <div
+      className={cn(
+        "group/msg flex w-full items-end gap-1.5",
+        mine ? "justify-end" : "justify-start",
+        groupedWithPrevious ? "mt-0.5" : "mt-2",
+      )}
+    >
+      {!mine ? (
+        <button
+          type="button"
+          className={cn(
+            "mb-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-all",
+            likedByMe ? "text-rose-500 opacity-100" : "opacity-45 hover:bg-muted/80 hover:opacity-100 sm:opacity-0 sm:group-hover/msg:opacity-70",
+          )}
+          aria-label={likedByMe ? "Unlike" : "Like"}
+          onClick={() => onToggleLike(m)}
+        >
+          <Heart className={cn("h-4 w-4", likedByMe && "fill-current")} />
+        </button>
+      ) : null}
+
       <div
-        className={cn(
-          "max-w-[min(82%,17.5rem)] rounded-[1.15rem] px-3 py-2 text-[15px] leading-snug shadow-sm",
-          mine
-            ? "rounded-br-md bg-primary text-primary-foreground"
-            : "rounded-bl-md border border-border/50 bg-card text-foreground",
-          shared && "max-w-[min(92%,22rem)] p-2.5",
-        )}
+        className={cn("min-w-0", bubbleShell)}
         onDoubleClick={!mine ? () => onToggleLike(m) : undefined}
         title={!mine ? "Double-tap to like" : undefined}
       >
@@ -102,48 +211,52 @@ function DmMessageBubble({
             <DmSharedPostPreview postId={shared.postId} />
           </>
         ) : null}
+
         {showImage ? (
-          <div className={cn(shared && "mt-2")}>
-            <DmMessageImage src={m.image_signed_url!} />
+          <div className={cn(!isImageOnly && (shared || hasText) && "mt-2", isImageOnly && "p-0")}>
+            <DmMessageImage
+              src={m.image_signed_url!}
+              className={isImageOnly ? "rounded-none" : "rounded-xl"}
+              overlayTime={isImageOnly ? timeLabel : undefined}
+              mine={mine}
+              readReceiptStatus={isImageOnly ? readReceiptStatus : null}
+            />
           </div>
         ) : null}
+
         {hasText ? <div className={cn("whitespace-pre-wrap", showImage && "mt-2")}>{m.body}</div> : null}
+
         {!shared && !showImage && m.image_storage_path && !m.image_signed_url ? (
           <span className="text-xs opacity-70">Could not load image</span>
         ) : null}
-        <div
-          className={cn(
-            "mt-1.5 flex items-center gap-2 text-[10px]",
-            mine ? "text-primary-foreground/75 justify-end" : "text-muted-foreground",
-          )}
-        >
-          <time dateTime={m.created_at}>{format(new Date(m.created_at), "HH:mm")}</time>
-          {!mine ? (
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-                likedByMe ? "text-rose-500" : "hover:bg-muted/80",
-              )}
-              aria-label={likedByMe ? "Unlike" : "Like"}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleLike(m);
-              }}
-            >
-              <Heart className={cn("h-3.5 w-3.5", likedByMe && "fill-current")} />
-            </button>
-          ) : null}
-        </div>
+
+        {!isImageOnly ? (
+          <div
+            className={cn(
+              "mt-1 flex items-center gap-1.5 text-[10px] tabular-nums",
+              mine ? "justify-end text-primary-foreground/70" : "text-muted-foreground",
+            )}
+          >
+            <time dateTime={m.created_at}>{timeLabel}</time>
+            {mine && readReceiptStatus ? <ReadReceiptIcon status={readReceiptStatus} /> : null}
+          </div>
+        ) : null}
+
+        {mine && showReadLabel && m.read_at ? (
+          <p className="mt-0.5 text-right text-[10px] text-primary-foreground/60">
+            Read {formatReadReceiptTime(m.read_at) ?? ""}
+          </p>
+        ) : null}
+
         {likeCount > 0 ? (
           <div
             className={cn(
-              "mt-0.5 flex items-center gap-1 text-[10px]",
-              mine ? "justify-end text-primary-foreground/75" : "text-muted-foreground",
+              "absolute -bottom-2 flex items-center gap-0.5 rounded-full border border-border/60 bg-background px-1.5 py-0.5 text-[10px] shadow-sm",
+              mine ? "-left-1" : "-right-1",
             )}
           >
-            <Heart className="h-3 w-3 fill-current text-rose-500" aria-hidden />
-            <span>{likeCount}</span>
+            <Heart className="h-3 w-3 fill-rose-500 text-rose-500" aria-hidden />
+            <span className="font-medium tabular-nums text-foreground">{likeCount}</span>
           </div>
         ) : null}
       </div>
@@ -182,6 +295,10 @@ export default function CommunityThreadPage() {
   const messages = threadQuery.data?.messages ?? [];
   const messagingBlocked = threadQuery.data?.messagingBlocked ?? false;
   const loading = threadQuery.isPending && threadQuery.data === undefined;
+
+  const { notifyComposerTyping } = useDmThreadLive(threadId, userId, queryClient);
+  const peerTyping = usePeerTypingActive(threadId);
+  const latestReadOutgoingId = latestReadOutgoingMessageId(messages, userId);
 
   const setMessagesInCache = useCallback(
     (updater: (prev: DmMessageRow[]) => DmMessageRow[]) => {
@@ -234,12 +351,6 @@ export default function CommunityThreadPage() {
   }, [loading, messages, userId]);
 
   useEffect(() => {
-    if (loading || messagingBlocked) return;
-    const t = window.setTimeout(() => composerRef.current?.focus(), 80);
-    return () => window.clearTimeout(t);
-  }, [loading, messagingBlocked, threadId]);
-
-  useEffect(() => {
     if (!pendingImage) {
       setPreviewUrl(null);
       return;
@@ -286,6 +397,7 @@ export default function CommunityThreadPage() {
     }
     setBody("");
     setPendingImage(null);
+    notifyComposerTyping(false);
     if (res.data) {
       setMessagesInCache((prev) => [...prev, res.data!]);
       requestAnimationFrame(() => scrollToBottom(scrollRef.current, "smooth"));
@@ -295,7 +407,7 @@ export default function CommunityThreadPage() {
   if (!match || !threadId) return null;
 
   const shellClass =
-    "mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground";
+    "mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col bg-background text-foreground";
 
   if (!isSupabaseConfigured()) {
     return (
@@ -321,27 +433,31 @@ export default function CommunityThreadPage() {
   }
 
   let lastDivider: string | null = null;
+  const groupedFlags = messagesGrouped(messages);
 
   return (
     <div className={shellClass} data-testid="dm-thread-shell">
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-3"
+        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain bg-gradient-to-b from-muted/25 via-background to-background px-3 py-4 sm:px-4"
         aria-label="Message history"
       >
         {loading ? (
-          <div className="space-y-3" aria-busy="true">
+          <div className="space-y-3 px-1" aria-busy="true">
             {Array.from({ length: 5 }, (_, i) => (
-              <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start" : "justify-end")}>
-                <Skeleton className={cn("h-14 rounded-2xl", i % 2 === 0 ? "w-[70%]" : "w-[55%]")} />
+              <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start pl-9" : "justify-end")}>
+                <Skeleton className={cn("h-12 rounded-2xl", i % 2 === 0 ? "w-[68%]" : "w-[52%]")} />
               </div>
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">No messages yet. Say hello.</p>
+          <div className="flex h-full min-h-[12rem] flex-col items-center justify-center px-6 text-center">
+            <p className="text-sm font-medium text-foreground">No messages yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">Say hello to start the conversation.</p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {messages.map((m) => {
+          <div className="flex flex-col pb-2">
+            {messages.map((m, index) => {
               const divider = dayDividerLabel(m.created_at);
               const showDivider = divider && divider !== lastDivider;
               if (showDivider) lastDivider = divider;
@@ -349,24 +465,33 @@ export default function CommunityThreadPage() {
               return (
                 <div key={m.id}>
                   {showDivider ? (
-                    <div className="my-3 flex justify-center">
-                      <span className="rounded-full bg-muted/80 px-3 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    <div className="my-4 flex justify-center">
+                      <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 text-[11px] font-medium tracking-wide text-muted-foreground shadow-sm backdrop-blur-sm">
                         {divider}
                       </span>
                     </div>
                   ) : null}
-                  <DmMessageBubble message={m} mine={mine} onToggleLike={(msg) => void toggleLike(msg)} />
+                  <DmMessageBubble
+                    message={m}
+                    mine={mine}
+                    groupedWithPrevious={groupedFlags[index] ?? false}
+                    readReceiptStatus={readReceiptStatusForMessage(m, userId)}
+                    showReadLabel={mine && m.id === latestReadOutgoingId}
+                    onToggleLike={(msg) => void toggleLike(msg)}
+                  />
                 </div>
               );
             })}
           </div>
         )}
-        <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
+        <div ref={bottomRef} className="h-2 shrink-0" aria-hidden />
       </div>
+
+      {peerTyping ? <DmTypingDots /> : null}
 
       <form
         onSubmit={handleSend}
-        className="z-10 shrink-0 border-t border-border/60 bg-background px-2 py-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.35)] pb-[calc(max(0.35rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]"
+        className="z-10 shrink-0 border-t border-border/50 bg-background/90 px-3 py-2.5 backdrop-blur-xl pb-[calc(max(0.5rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]"
       >
         {messagingBlocked ? (
           <p className="mb-2 px-1 text-center text-sm text-muted-foreground" data-testid="dm-thread-blocked-notice">
@@ -387,34 +512,37 @@ export default function CommunityThreadPage() {
           }}
         />
         {previewUrl ? (
-          <div className="mb-2 flex items-start gap-2">
-            <img src={previewUrl} alt="" className="max-h-24 rounded-xl border border-border object-contain" />
-            <Button type="button" variant="ghost" size="sm" onClick={() => setPendingImage(null)}>
+          <div className="mb-2.5 flex items-start gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2">
+            <img src={previewUrl} alt="" className="max-h-28 rounded-xl object-cover shadow-sm" />
+            <Button type="button" variant="ghost" size="sm" className="shrink-0 rounded-xl" onClick={() => setPendingImage(null)}>
               Remove
             </Button>
           </div>
         ) : null}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-2 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground"
+            className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             disabled={sending || !user || messagingBlocked}
             aria-label="Attach photo"
             onClick={() => fileInputRef.current?.click()}
           >
-            <ImagePlus className="h-5 w-5" />
+            <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
           </Button>
           <Textarea
             ref={composerRef}
             rows={1}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              setBody(e.target.value);
+              notifyComposerTyping(Boolean(e.target.value.trim()));
+            }}
             placeholder={messagingBlocked ? "Messaging unavailable" : "Message…"}
             maxLength={8000}
             disabled={sending || !user || messagingBlocked}
-            className="min-h-10 max-h-28 flex-1 resize-none rounded-2xl border-border/60 bg-muted/40 px-3 py-2 text-[16px] leading-snug"
+            className="min-h-10 max-h-28 flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -427,7 +555,10 @@ export default function CommunityThreadPage() {
           <Button
             type="submit"
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-full"
+            className={cn(
+              "h-10 w-10 shrink-0 rounded-full transition-all",
+              body.trim() || pendingImage ? "shadow-md" : "opacity-50",
+            )}
             disabled={sending || messagingBlocked || (!body.trim() && !pendingImage) || !user}
             aria-label="Send message"
           >

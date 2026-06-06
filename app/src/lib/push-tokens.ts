@@ -1,10 +1,11 @@
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
 import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
+import { handlePushDeepLinkFromNotification } from "@/lib/push-notification-deep-link";
 import {
   getNativePushPlatform,
   isNativePushPlatform,
@@ -13,8 +14,11 @@ import {
 import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
 
-/** True while `registration` / `registrationError` listeners are attached. */
-let pushListenersBound = false;
+/** True while registration listeners are attached. Deep-link listeners are separate. */
+let registrationListenersBound = false;
+let deepLinkListenersBound = false;
+let registrationHandles: PluginListenerHandle[] = [];
+let deepLinkHandles: PluginListenerHandle[] = [];
 
 const PUSH_DIAG_KEY = "diabeaters:push_diag:v1";
 const PUSH_TOKEN_LAST_KEY = "diabeaters:push_token:last:v1";
@@ -213,7 +217,7 @@ export async function getPushRegistrationDebugSnapshot(): Promise<Record<string,
     isIosDeviceForCapacitorPush: isIosDeviceForCapacitorPush(),
     notificationEnabled: s.enabled,
     pushNotifications: s.pushNotifications,
-    pushListenersBound,
+    pushListenersBound: registrationListenersBound,
     cachedTokenChars: token?.length ?? 0,
     cachedTokenPrefix: token && token.length >= 8 ? `${token.slice(0, 8)}…` : null,
     pushPermissionCheck,
@@ -221,36 +225,64 @@ export async function getPushRegistrationDebugSnapshot(): Promise<Record<string,
   };
 }
 
-function detachPushListeners(): void {
-  pushListenersBound = false;
-  if (!isNativePushPlatform()) return;
-  try {
-    void PushNotifications.removeAllListeners();
-  } catch {
-    // ignore
-  }
+async function detachRegistrationListeners(): Promise<void> {
+  registrationListenersBound = false;
+  const handles = registrationHandles;
+  registrationHandles = [];
+  await Promise.all(handles.map((h) => h.remove().catch(() => {})));
 }
 
+async function detachAllPushListeners(): Promise<void> {
+  registrationListenersBound = false;
+  deepLinkListenersBound = false;
+  const handles = [...registrationHandles, ...deepLinkHandles];
+  registrationHandles = [];
+  deepLinkHandles = [];
+  await Promise.all(handles.map((h) => h.remove().catch(() => {})));
+}
+
+/** Reset registration state so {@link ensureNativePushRegistered} can attach listeners again. */
 export function resetNativePushRegistrationState(): void {
-  detachPushListeners();
-  writePushDiag({ state: "reset" });
+  void detachRegistrationListeners();
 }
 
-/** @deprecated Use {@link resetNativePushRegistrationState} */
-export const resetIosPushRegistrationState = resetNativePushRegistrationState;
+/** Attach tap/receive handlers early so cold-start notification opens route correctly. */
+export function ensurePushDeepLinkListenersAttached(): void {
+  bindPushDeepLinkListeners();
+}
 
-function attachPushListeners(
+function bindPushDeepLinkListeners(): void {
+  if (!isNativePushPlatform()) return;
+  if (deepLinkListenersBound) return;
+  deepLinkListenersBound = true;
+
+  void PushNotifications.addListener("pushNotificationReceived", (notification) => {
+    writePushDiag({ state: "push_received_foreground", platform: currentPushPlatform() ?? "ios" });
+    scheduleNativeAppBadgeSync();
+    if (currentPushPlatform() === "ios") {
+      void presentAudiblePushNotificationFromRemote(notification);
+    }
+  }).then((h) => {
+    deepLinkHandles.push(h);
+  });
+
+  void PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+    writePushDiag({ state: "push_action_performed", platform: currentPushPlatform() ?? "ios" });
+    scheduleNativeAppBadgeSync();
+    handlePushDeepLinkFromNotification(action.notification);
+  }).then((h) => {
+    deepLinkHandles.push(h);
+  });
+}
+
+function attachRegistrationListeners(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   platform: NativePushPlatform,
 ): void {
-  try {
-    void PushNotifications.removeAllListeners();
-  } catch {
-    // ignore
-  }
-  pushListenersBound = false;
+  if (registrationListenersBound) return;
+  registrationListenersBound = true;
 
-  PushNotifications.addListener("registration", async (token: { value: string }) => {
+  void PushNotifications.addListener("registration", async (token: { value: string }) => {
     const t = token.value?.trim();
     writePushDiag({
       state: "registered",
@@ -264,32 +296,21 @@ function attachPushListeners(
 
     rememberPushToken(t, platform);
     await persistPushTokenToCloud(supabase, t, platform);
+  }).then((h) => {
+    registrationHandles.push(h);
   });
 
-  PushNotifications.addListener("registrationError", (err: unknown) => {
-    detachPushListeners();
+  void PushNotifications.addListener("registrationError", (err: unknown) => {
+    void detachRegistrationListeners();
     writePushDiag({
       state: "registration_error",
       error: typeof err === "string" ? err : JSON.stringify(err),
       platform,
     });
     console.warn("[push_tokens] registration error:", err);
+  }).then((h) => {
+    registrationHandles.push(h);
   });
-
-  PushNotifications.addListener("pushNotificationReceived", (notification) => {
-    writePushDiag({ state: "push_received_foreground", platform });
-    scheduleNativeAppBadgeSync();
-    if (platform === "ios") {
-      void presentAudiblePushNotificationFromRemote(notification);
-    }
-  });
-
-  PushNotifications.addListener("pushNotificationActionPerformed", () => {
-    writePushDiag({ state: "push_action_performed", platform });
-    scheduleNativeAppBadgeSync();
-  });
-
-  pushListenersBound = true;
 }
 
 function scheduleMissingTokenRegisterRetries(
@@ -344,11 +365,12 @@ export async function ensureNativePushRegistered(): Promise<void> {
 
   writePushDiag({ state: "starting", platform });
 
-  attachPushListeners(supabase, platform);
+  ensurePushDeepLinkListenersAttached();
+  attachRegistrationListeners(supabase, platform);
 
   const perm = await PushNotifications.requestPermissions();
   if (perm.receive !== "granted") {
-    detachPushListeners();
+    await detachRegistrationListeners();
     writePushDiag({ state: "permission_denied", platform });
     return;
   }
@@ -396,7 +418,7 @@ export async function refreshNativePushRegistration(): Promise<void> {
     return;
   }
 
-  if (!pushListenersBound) {
+  if (!registrationListenersBound) {
     await ensureNativePushRegistered();
     return;
   }
@@ -446,6 +468,6 @@ export async function cleanupPushRegistration(): Promise<void> {
   }
 
   forgetPushToken();
-  detachPushListeners();
+  await detachAllPushListeners();
   writePushDiag({ state: "cleaned_up" });
 }
