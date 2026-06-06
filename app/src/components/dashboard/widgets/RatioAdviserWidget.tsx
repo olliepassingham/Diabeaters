@@ -142,7 +142,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
   return (
     <WidgetCard className="overflow-visible" data-testid="widget-ratio-adviser">
       <CardHeader className="space-y-0 p-3 pb-1.5 md:p-4 md:pb-2">
-        <Link href="/ratios">
+        <Link href="/settings/ratios">
           <div className="flex flex-wrap items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer">
             <Syringe className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0" />
             <CardTitle className="text-base font-semibold leading-tight text-foreground">Your ratios</CardTitle>
@@ -245,7 +245,7 @@ export function RatioAdviserWidget(props: DashboardWidgetLayoutProps) {
 
         {!hasRatios && (
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-stretch">
-            <Link href="/ratios" className="sm:flex-1">
+            <Link href="/settings/ratios" className="sm:flex-1">
               <Button
                 variant="secondary"
                 size="sm"

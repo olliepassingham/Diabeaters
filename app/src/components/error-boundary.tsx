@@ -12,16 +12,18 @@ interface State {
   componentStack: string | null;
 }
 
+const CACHE_RECOVERY_KEY = "diabeaters-cache-recovery-attempted";
+
 async function clearAllCachesAndReload() {
   try {
-    if ('caches' in window) {
+    if ("caches" in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.map(key => caches.delete(key)));
+      await Promise.all(keys.map((key) => caches.delete(key)));
     }
 
-    if ('serviceWorker' in navigator) {
+    if ("serviceWorker" in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(r => r.unregister()));
+      await Promise.all(registrations.map((r) => r.unregister()));
     }
   } catch (e) {
     console.error("Cache clearing failed:", e);
@@ -30,12 +32,28 @@ async function clearAllCachesAndReload() {
   window.location.reload();
 }
 
+function shouldAttemptCacheRecovery(error: Error | null): boolean {
+  if (!error || import.meta.env.DEV) return false;
+  if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(CACHE_RECOVERY_KEY) === "1") {
+    return false;
+  }
+  return isCacheRelatedError(error);
+}
+
 function isCacheRelatedError(error: Error | null): boolean {
   if (!error) return false;
-  const msg = error.message || '';
-  const stack = error.stack || '';
-  return (msg.includes("useRef") || msg.includes("useState") || msg.includes("useEffect") || msg.includes("useContext")) &&
-    (stack.includes('.vite/deps') || stack.includes('chunk-'));
+  const msg = error.message || "";
+  const stack = error.stack || "";
+  const looksLikeHookMismatch =
+    msg.includes("Invalid hook call") ||
+    (msg.includes("Cannot read properties of null") && msg.includes("use"));
+  const mentionsHookName =
+    msg.includes("useRef") ||
+    msg.includes("useState") ||
+    msg.includes("useEffect") ||
+    msg.includes("useContext");
+  const fromBundledChunk = stack.includes(".vite/deps") || stack.includes("chunk-");
+  return (looksLikeHookMismatch || mentionsHookName) && fromBundledChunk;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -57,9 +75,14 @@ export class ErrorBoundary extends Component<Props, State> {
       this.setState({ componentStack: errorInfo.componentStack });
     }
 
-    if (isCacheRelatedError(error)) {
+    if (shouldAttemptCacheRecovery(error)) {
+      try {
+        sessionStorage.setItem(CACHE_RECOVERY_KEY, "1");
+      } catch {
+        // ignore quota / private mode
+      }
       this.setState({ isClearing: true });
-      clearAllCachesAndReload();
+      void clearAllCachesAndReload();
     }
   }
 

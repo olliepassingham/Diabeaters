@@ -622,7 +622,7 @@ export default function Adviser() {
           ) : (
             <>
           {cameFromRatios && (
-            <Link href="/ratios">
+            <Link href="/settings/ratios">
               <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-back-to-ratios-meal">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Ratios
@@ -1084,7 +1084,7 @@ export default function Adviser() {
 
         <TabsContent value="ratios" className="space-y-4 mt-4 animate-fade-in-up">
           {cameFromRatios && (
-            <Link href="/ratios">
+            <Link href="/settings/ratios">
               <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" data-testid="button-back-to-ratios">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Ratios

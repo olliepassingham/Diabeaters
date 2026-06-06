@@ -26,7 +26,7 @@ export default function CommunitySettingsPage() {
             <span>Your name and photo are managed on Account.</span>
             <InlineInfoHint
               ariaLabel="Where to edit profile"
-              content="The same options are on Account (Profile section)."
+              content="The same options are on Account under Community profile."
             />
           </span>
         }

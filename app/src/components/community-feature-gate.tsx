@@ -1,5 +1,6 @@
 import { Redirect } from "wouter";
 import { FeedLoadingSkeleton } from "@/components/empty-state";
+import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import { isCommunityEnabled } from "@/lib/flags";
 import { useProfile } from "@/lib/profile";
 
@@ -22,7 +23,9 @@ export function CommunityFeatureGate({
     return <FeedLoadingSkeleton rows={4} />;
   }
 
-  if (requirePublicProfile && !profile?.is_public) return <Redirect to="/account#profile" replace />;
+  if (requirePublicProfile && !profile?.is_public) {
+    return <CommunityProfileSetupPrompt />;
+  }
 
   return <>{children}</>;
 }

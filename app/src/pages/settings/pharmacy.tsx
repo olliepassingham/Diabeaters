@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,10 +18,8 @@ import { pharmacyDayLabel } from "@/lib/pharmacy";
 import { syncPharmacyToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
-import { FaceLogoWatermark } from "@/components/face-logo";
-import { PageHeader, PageShell } from "@/components/layout";
-import { SettingsBackLink } from "./shared";
-import { Save, Building2, Trash2, Pencil, Copy } from "lucide-react";
+import { SettingsPanel, SettingsPanelBody, SettingsSectionHeader, SettingsSubPageShell } from "./shared";
+import { Save, Trash2, Pencil, Copy } from "lucide-react";
 
 const DEFAULT_OPEN = "09:00";
 const DEFAULT_CLOSE = "17:30";
@@ -269,25 +266,18 @@ export default function SettingsPharmacyPage() {
   );
 
   return (
-    <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
-      <FaceLogoWatermark />
-      <SettingsBackLink />
-      <PageHeader
-        title="Your pharmacy"
-        description="Save your usual pharmacy and weekly opening hours so the app can suggest realistic collect-by dates."
-      />
-
+    <SettingsSubPageShell
+      title="Your pharmacy"
+      description="Save your usual pharmacy and weekly opening hours for collect-by hints."
+    >
       {showSupporterRedirecting ? (
-        <Card className="rounded-2xl border-border/60 shadow-sm">
-          <CardContent className="p-6 text-sm text-muted-foreground">Loading…</CardContent>
-        </Card>
+        <SettingsPanel>
+          <SettingsPanelBody className="text-sm text-muted-foreground">Loading…</SettingsPanelBody>
+        </SettingsPanel>
       ) : (
-        <Card className="rounded-2xl border-border/60 shadow-sm">
-          <CardContent className="space-y-6 p-6 pb-32 md:pb-6">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" aria-hidden />
-              <h2 className="text-base font-semibold tracking-tight">Pharmacy details</h2>
-            </div>
+        <SettingsPanel>
+          <SettingsPanelBody className="space-y-6 pb-32 md:pb-2">
+            <SettingsSectionHeader title="Pharmacy details" />
 
             {mode === "view" && hadExisting ? (
               savedCard
@@ -485,9 +475,9 @@ export default function SettingsPharmacyPage() {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+          </SettingsPanelBody>
+        </SettingsPanel>
       )}
-    </PageShell>
+    </SettingsSubPageShell>
   );
 }

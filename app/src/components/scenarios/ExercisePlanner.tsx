@@ -933,7 +933,7 @@ export function ExercisePlanner() {
                       entered.
                     </p>
                     <Button variant="outline" size="sm" className="mt-2 min-h-9" asChild>
-                      <Link href="/ratios">Open ratio settings</Link>
+                      <Link href="/settings/ratios">Open ratio settings</Link>
                     </Button>
                   </div>
                 )}

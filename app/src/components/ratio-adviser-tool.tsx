@@ -1167,7 +1167,7 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
                           Another meal
                         </Button>
                         <Button variant="outline" size="sm" asChild data-testid="link-assessment-to-ratios">
-                          <Link href="/ratios">Ratios</Link>
+                          <Link href="/settings/ratios">Ratios</Link>
                         </Button>
                         {onNavigateToMeal && (
                           <Button

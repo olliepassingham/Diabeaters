@@ -1,8 +1,7 @@
 import type { ChangeEvent, ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -29,96 +28,39 @@ import {
   type ImportBackupMode,
 } from "@/lib/storage";
 import { Link } from "wouter";
-import { Phone, ChevronRight, Upload, Download, Database, ChevronDown } from "lucide-react";
+import { Phone, Upload, Download, Database, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { EmergencyProfileFields } from "@/components/emergency-profile-fields";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
+import {
+  SettingsBackLink,
+  SettingsGroup,
+  SettingsGroupLabel,
+  SettingsHubNavLink,
+  SettingsNavRow,
+} from "@/components/settings/settings-ui";
 
-export function SettingsNavRow({ href, label }: { href: string; label: string }) {
-  const className =
-    "flex items-center justify-between py-3 border-b border-border last:border-b-0 text-foreground hover:text-primary transition-colors group";
-  const chevron = <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary shrink-0" aria-hidden />;
-  if (href.startsWith("#")) {
-    return (
-      <a href={href} className={className}>
-        <span className="text-body font-medium">{label}</span>
-        {chevron}
-      </a>
-    );
-  }
-  return (
-    <Link href={href} className={className}>
-      <span className="text-body font-medium">{label}</span>
-      {chevron}
-    </Link>
-  );
-}
+export {
+  SettingsBackLink,
+  SettingsFormBlock,
+  SettingsGroup,
+  SettingsGroupLabel,
+  SettingsHubNavLink,
+  SettingsNavRow,
+  SettingsPanel,
+  SettingsPanelBody,
+  SettingsSectionHeader,
+  SettingsSetupBanner,
+  SettingsSubPageShell,
+  SettingsToggleRow,
+} from "@/components/settings/settings-ui";
 
 export function SettingsHubGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <Card className="border-border/80 p-4 space-y-2 shadow-sm">
-      <h2 className="text-h3 font-semibold text-foreground mb-2">{title}</h2>
-      <div className="divide-y divide-border">{children}</div>
-    </Card>
-  );
-}
-
-export function SettingsHubNavLink({
-  href,
-  label,
-  description,
-  icon: Icon,
-  dataTestId,
-}: {
-  href: string;
-  label: string;
-  description?: string;
-  icon?: LucideIcon;
-  dataTestId?: string;
-}) {
-  const className =
-    "group flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/50";
-  const body = (
-    <>
-      <div className="flex min-w-0 items-start gap-3">
-        {Icon ? (
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-            <Icon className="h-4 w-4" aria-hidden />
-          </span>
-        ) : null}
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground group-hover:text-primary">{label}</p>
-          {description ? <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p> : null}
-        </div>
-      </div>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/80 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
-    </>
-  );
-  if (href.startsWith("#")) {
-    return (
-      <a href={href} className={className} data-testid={dataTestId}>
-        {body}
-      </a>
-    );
-  }
-  return (
-    <Link href={href} className={className} data-testid={dataTestId}>
-      {body}
-    </Link>
-  );
-}
-
-export function SettingsBackLink() {
-  return (
-    <div className="mb-4">
-      <Link
-        href="/settings"
-        className="inline-flex items-center gap-1 text-small text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronRight className="h-4 w-4 rotate-180 shrink-0" aria-hidden />
-        All settings
-      </Link>
+    <div className="space-y-1">
+      <SettingsGroupLabel>{title}</SettingsGroupLabel>
+      <SettingsGroup>{children}</SettingsGroup>
     </div>
   );
 }

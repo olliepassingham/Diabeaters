@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
@@ -31,11 +29,10 @@ import {
   Sparkles,
   Cookie,
 } from "lucide-react";
-import { FaceLogoWatermark } from "@/components/face-logo";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
-import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { DIABETES_TERMS } from "@/components/info-tooltip";
 import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -43,7 +40,6 @@ import { parseRatioToGramsPerUnit, gramsPerUnitToInputValue, parseInputToGramsPe
 import type { RatioFormat } from "@/lib/storage";
 import { validateTDD, validateCorrectionFactor, validateTargetBgLow, validateTargetBgHigh, validateTargetRange, validateCarbRatio } from "@/lib/clinical-validation";
 import { ClinicalWarningHint } from "@/components/clinical-warning";
-import appPackage from "../../../package.json";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
 import { profileQueryKey, useProfile } from "@/lib/profile";
@@ -72,9 +68,7 @@ import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsRatiosRoute } from "./ratios";
-import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink } from "./shared";
-import { Progress } from "@/components/ui/progress";
-import { CheckCircle2 } from "lucide-react";
+import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink, SettingsSectionHeader, SettingsSetupBanner } from "./shared";
 
 /** Mobile save bars must sit above `BottomNav` (z-[100]); `bottom-0` + lower z-index left them untappable behind the tabs. */
 const SETTINGS_MOBILE_STICKY_FOOTER =
@@ -304,15 +298,6 @@ function ProfileTab({
           </div>
         </div>
       </div>
-      <div className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">
-          Name your gels, drinks, and tablets for hypo and exercise advice in{" "}
-          <Link href="/settings/carb-sources" className="text-primary underline-offset-4 hover:underline">
-            Carb sources
-          </Link>
-          . Grams stay the main number — favourites translate them into what you carry.
-        </p>
-      </div>
       <div className="hidden justify-end pt-1 md:flex">
         <Button onClick={onSave} data-testid="button-save-profile">
           <Save className="h-4 w-4 mr-2" />
@@ -372,22 +357,7 @@ function InsulinTab({
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Syringe className="h-5 w-5 text-primary" aria-hidden />
-            <StaticLabelWithInfo
-              labelClassName="text-h3 font-semibold"
-              ariaLabel="About insulin settings"
-              info={
-                <p>Configure your insulin ratios and targets for calculations across tools and advisers.</p>
-              }
-            >
-              Insulin Settings
-            </StaticLabelWithInfo>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pb-28 md:pb-6">
+      <div className="space-y-4 pb-28 md:pb-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <FieldLabelWithInfo
@@ -556,18 +526,17 @@ function InsulinTab({
         </div>
 
           <div className="hidden md:flex justify-end">
-            <Button onClick={onSave} data-testid="button-save-insulin">
+            <Button onClick={onSave} className="rounded-xl" data-testid="button-save-insulin">
               <Save className="h-4 w-4 mr-2" />
               Save Insulin Settings
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
       {/* Mobile-only sticky action bar for long forms */}
       <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
-        <div className="mx-auto w-full max-w-screen-md px-4 pt-3 pb-3">
-          <Button onClick={onSave} className="w-full" data-testid="button-save-insulin-sticky">
+        <div className="mx-auto w-full max-w-lg px-4 pt-3 pb-3">
+          <Button onClick={onSave} className="h-11 w-full rounded-xl" data-testid="button-save-insulin-sticky">
             <Save className="h-4 w-4 mr-2" />
             Save Insulin Settings
           </Button>
@@ -1411,8 +1380,8 @@ export default function Settings() {
     toast({
       title: "Saved",
       description: partial
-        ? `Profile and usage settings are updated on this device. ${partial}`
-        : "Profile and usage settings are updated on this device.",
+        ? `Personal & usage settings are updated on this device. ${partial}`
+        : "Personal & usage settings are updated on this device.",
     });
   };
 
@@ -1464,18 +1433,12 @@ export default function Settings() {
   );
 
   const usageToolsInner = (
-    <CardContent className="space-y-4 px-4 py-3 sm:px-5 sm:py-4 md:space-y-5 md:px-6 md:py-5 pb-36 md:pb-6">
-      <section id="settings-personal" className="scroll-mt-24 space-y-2">
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Profile</p>
-          <InlineInfoHint
-            ariaLabel="About profile settings"
-            content={
-              <p>Units, delivery method, body weight for hypo help, and optional date of birth.</p>
-            }
-            className="h-7 w-7"
-          />
-        </div>
+    <div className="space-y-5 px-4 py-4 sm:px-5 sm:py-5 md:space-y-6 pb-36 md:pb-6">
+      <section id="settings-personal" className="scroll-mt-24 space-y-2.5">
+        <SettingsSectionHeader
+          title="Personal & units"
+          description="Region, units, delivery method, body weight for hypo help, and optional date of birth."
+        />
         <ProfileTab
           appRegion={appRegion}
           setAppRegion={setAppRegion}
@@ -1516,15 +1479,11 @@ export default function Settings() {
         />
       </section>
 
-      <section id="settings-usage" className="scroll-mt-24 space-y-2 border-t border-border/50 pt-4">
-        <div className="flex items-center gap-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Usage &amp; supplies</p>
-          <InlineInfoHint
-            ariaLabel="About usage and supplies"
-            content={<p>Daily habits, sensor timing, and pack sizes for the tracker.</p>}
-            className="h-7 w-7"
-          />
-        </div>
+      <section id="settings-usage" className="scroll-mt-24 space-y-2.5 border-t border-border/40 pt-5">
+        <SettingsSectionHeader
+          title="Usage & supplies"
+          description="Daily habits, sensor timing, and pack sizes for the tracker."
+        />
         <UsageTab
           isPumpUser={isPumpUser}
           tdd={tdd}
@@ -1566,15 +1525,15 @@ export default function Settings() {
         />
       </section>
 
-      <div id="settings-backup" className="scroll-mt-24 border-t border-border/50 pt-4" data-testid="card-account-backup">
+      <div id="settings-backup" className="scroll-mt-24 border-t border-border/40 pt-5" data-testid="card-account-backup">
         <SettingsDataBackupSection embedded />
       </div>
 
       <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
-        <div className="mx-auto w-full max-w-screen-md px-4 pt-2.5 pb-2.5">
+        <div className="mx-auto w-full max-w-lg px-4 pt-2.5 pb-2.5">
           <Button
             type="button"
-            className="w-full"
+            className="h-11 w-full rounded-xl"
             data-testid="button-save-usage-page-sticky"
             onClick={() => void handleSaveUsagePage()}
           >
@@ -1583,20 +1542,16 @@ export default function Settings() {
           </Button>
         </div>
       </div>
-    </CardContent>
+    </div>
   );
 
   const ratiosToolsInner = (
-    <CardContent className="pt-6 pb-6 space-y-8">
+    <div className="space-y-4 px-4 py-4 sm:p-5">
       <div id="settings-ratios" className="scroll-mt-28 space-y-3 pb-28 md:pb-0">
-        <div className="flex items-center gap-1">
-          <h3 className="text-h3 font-semibold text-foreground">Ratios</h3>
-          <InlineInfoHint
-            ariaLabel="About ratios settings"
-            content={<p>TDD, correction factor, targets, and meal ratios used across tools and advisers.</p>}
-            className="h-7 w-7"
-          />
-        </div>
+        <SettingsSectionHeader
+          title="Insulin ratios"
+          description="TDD, correction factor, targets, and meal ratios used across tools and advisers."
+        />
         <InsulinTab
           bgUnits={bgUnits}
           tdd={tdd}
@@ -1622,64 +1577,42 @@ export default function Settings() {
           onSave={handleSaveInsulin}
         />
       </div>
-    </CardContent>
+    </div>
   );
 
   if (pathOnly === "/settings") {
     const completion = storage.getSettingsCompletion();
     const showSoftSetupCard = completion.completed < completion.total;
     return (
-      <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
-        <FaceLogoWatermark />
+      <PageShell variant="narrow" density="compact" className="space-y-4 pb-6">
         <PageHeader
-          className="mb-1"
           title="Settings"
           description={
             isCarer
               ? "Your supporter account, alerts, and appearance."
               : isCommunityAccount
                 ? "Community profile, alerts, and appearance."
-                : "Personal profile, clinical defaults, alerts, and appearance."
+                : "Personal details, clinical defaults, alerts, and appearance."
           }
           actions={settingsInfoDialog}
         />
 
         {!isCarer && !isCommunityAccount && showSoftSetupCard ? (
-          <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <CardTitle className="text-base">2‑minute setup</CardTitle>
-                  <CardDescription>
-                    Helps the dashboard, supplies, meal planner, and situation guides give better suggestions.
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {completion.percentage}%
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <Progress value={completion.percentage} className="h-2" />
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button asChild variant="outline" className="justify-start">
-                  <Link href="/settings/ratios">
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
-                    Ratios & TDD
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="justify-start">
-                  <Link href="/settings/usage#settings-usage">
-                    <CheckCircle2 className="h-4 w-4 mr-2 text-primary" />
-                    Usage & supplies
-                  </Link>
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                You can still use the app without this — it just makes forecasts and advice more accurate.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="space-y-2">
+            <SettingsSetupBanner
+              percentage={completion.percentage}
+              completed={completion.completed}
+              total={completion.total}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl text-xs">
+                <Link href="/settings/ratios">Ratios &amp; TDD</Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="h-9 rounded-xl text-xs">
+                <Link href="/settings/usage#settings-usage">Usage &amp; supplies</Link>
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         {!hidePatientClinicalHub && (
@@ -1715,7 +1648,7 @@ export default function Settings() {
           <SettingsHubGroup title="Community">
             <SettingsHubNavLink
               href="/account#profile"
-              label="Profile"
+              label="Community profile"
               description="Name, handle, bio, and feed visibility"
               icon={AtSign}
             />
@@ -1809,10 +1742,9 @@ export default function Settings() {
   }
 
   return (
-    <PageShell variant="standard" className="relative space-y-6 bg-background text-foreground">
-      <FaceLogoWatermark />
+    <PageShell variant="narrow" density="compact" className="space-y-4 pb-6">
       <PageHeader title="Settings" description="This section was moved." />
-      <Button variant="outline" asChild>
+      <Button variant="outline" asChild className="rounded-xl">
         <Link href="/settings">Back to settings</Link>
       </Button>
     </PageShell>

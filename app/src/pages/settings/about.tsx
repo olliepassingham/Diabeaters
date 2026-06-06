@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
 import { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Disclaimer } from "@/components/disclaimer";
 import appPackage from "../../../package.json";
 import { BookOpen, ExternalLink, Info } from "lucide-react";
 import { Link } from "wouter";
-import { FaceLogoWatermark } from "@/components/face-logo";
-import { PageHeader, PageShell } from "@/components/layout";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
-import { SettingsBackLink, SettingsNavRow } from "./shared";
+import {
+  SettingsGroup,
+  SettingsGroupLabel,
+  SettingsNavRow,
+  SettingsPanel,
+  SettingsPanelBody,
+  SettingsSubPageShell,
+} from "./shared";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeShellForPushTestUi } from "@/lib/native-platform";
 import { unlockPushTestUi } from "@/lib/push-test-ui-unlock";
@@ -162,22 +166,18 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
   }, [toast]);
 
   return (
-    <PageShell variant="standard" className="relative space-y-6 bg-muted/20 text-foreground">
-      <FaceLogoWatermark />
-      <SettingsBackLink />
-      <PageHeader
-        className="mb-2"
-        title="About"
-        description="Version, legal, support, and third-party references."
-        actions={settingsInfoDialog}
-      />
-      <Card className="overflow-hidden rounded-2xl border-border/60 bg-card/80 shadow-sm ring-1 ring-border/40">
-        <CardContent className="pt-6 pb-6 space-y-6">
-          <div className="flex items-center justify-between py-3 border-b border-border">
-            <span className="text-body font-medium text-foreground">Version</span>
+    <SettingsSubPageShell
+      title="About"
+      description="Version, legal, support, and third-party references."
+      actions={settingsInfoDialog}
+    >
+      <SettingsPanel>
+        <SettingsPanelBody className="space-y-5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-muted/10 px-3.5 py-3">
+            <span className="text-sm font-medium text-foreground">Version</span>
             <button
               type="button"
-              className="text-small text-muted-foreground tabular-nums rounded-md px-2 py-1 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-end touch-manipulation hover:bg-muted/60 active:bg-muted"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-end rounded-lg px-2 py-1 text-xs tabular-nums text-muted-foreground touch-manipulation hover:bg-muted/60 active:bg-muted"
               data-testid="text-app-version"
               aria-label={`App version ${appPackage.version}`}
               onClick={onVersionTap}
@@ -186,48 +186,49 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
             </button>
           </div>
           <PushTestUnlockCallout className="-mt-1" />
-          <nav aria-label="Legal and support" className="flex flex-col">
-            <SettingsNavRow href="/privacy" label="Privacy" />
-            <SettingsNavRow href="/privacy#terms" label="Terms" />
-            <SettingsNavRow href="/support" label="Support" />
-          </nav>
-          <div className="text-xs text-muted-foreground border-t border-border pt-4">
-            <p data-testid="text-copyright">
-              © PassingTime Ltd {year} ·{" "}
-              <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
-                Privacy
-              </Link>{" "}
-              ·{" "}
-              <Link href="/privacy#terms" className="underline underline-offset-2 hover:text-foreground">
-                Terms
-              </Link>{" "}
-              ·{" "}
-              <Link href="/support" className="underline underline-offset-2 hover:text-foreground">
-                Support
-              </Link>{" "}
-              ·{" "}
-              <Link href="/medical-sources" className="underline underline-offset-2 hover:text-foreground">
-                Sources
-              </Link>
-            </p>
+          <div>
+            <SettingsGroupLabel>Legal & support</SettingsGroupLabel>
+            <SettingsGroup>
+              <SettingsNavRow href="/privacy" label="Privacy" />
+              <SettingsNavRow href="/privacy#terms" label="Terms" />
+              <SettingsNavRow href="/support" label="Support" />
+            </SettingsGroup>
           </div>
-          <div id="settings-sources" className="scroll-mt-28 border-t border-border pt-6 space-y-3">
-            <h3 className="text-h3 font-semibold text-foreground flex items-center gap-2">
+          <p className="text-xs text-muted-foreground" data-testid="text-copyright">
+            © PassingTime Ltd {year} ·{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+              Privacy
+            </Link>{" "}
+            ·{" "}
+            <Link href="/privacy#terms" className="underline underline-offset-2 hover:text-foreground">
+              Terms
+            </Link>{" "}
+            ·{" "}
+            <Link href="/support" className="underline underline-offset-2 hover:text-foreground">
+              Support
+            </Link>{" "}
+            ·{" "}
+            <Link href="/medical-sources" className="underline underline-offset-2 hover:text-foreground">
+              Sources
+            </Link>
+          </p>
+          <div id="settings-sources" className="scroll-mt-28 space-y-3 border-t border-border/40 pt-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <BookOpen className="h-4 w-4 text-primary" aria-hidden />
               Sources &amp; references
             </h3>
             <SourcesReferencesContent />
           </div>
-          <div className="border-t border-border pt-6">
-            <h3 className="text-h3 font-semibold text-foreground mb-2 flex items-center gap-2">
+          <div className="border-t border-border/40 pt-5">
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
               <Info className="h-4 w-4 text-primary" aria-hidden />
               Safety &amp; data
             </h3>
             <Disclaimer />
           </div>
-          <div className="pt-2 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center">
             <Link href="/account" data-testid="settings-link-account">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="rounded-xl">
                 Open full account settings
               </Button>
             </Link>
@@ -235,11 +236,11 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
               <Link href="/settings/usage#settings-backup" className="text-primary underline-offset-2 hover:underline">
                 Export or import app data
               </Link>{" "}
-              (at the bottom of Personal information and usage).
+              (at the bottom of Personal &amp; usage).
             </p>
           </div>
-        </CardContent>
-      </Card>
-    </PageShell>
+        </SettingsPanelBody>
+      </SettingsPanel>
+    </SettingsSubPageShell>
   );
 }

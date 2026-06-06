@@ -52,7 +52,7 @@ import {
   setActiveAppMode,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { getCommunityMemberOnboardingCompletePath } from "@/lib/community-landing";
 import { markCommunityPushPromptPending } from "@/lib/community-push-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
@@ -526,7 +526,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       description: "Explore Tools for education and tips, or open the feed when your profile is public.",
     });
     if (onComplete) {
-      onComplete(pathOverride ?? getCommunityMemberLandingPath());
+      onComplete(pathOverride ?? getCommunityMemberOnboardingCompletePath());
     }
   };
 
@@ -728,8 +728,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 }
 
 function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) => void | Promise<void> }) {
-  const land = getCommunityMemberLandingPath();
-  const openLabel = land === "/community" ? "Open feed" : "Open Tools";
+  const profilePath = getCommunityMemberOnboardingCompletePath();
   return (
     <div className="space-y-8 pb-4 sm:pb-0">
       <div className="text-center space-y-4">
@@ -741,8 +740,8 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
         <div className="space-y-2">
           <h2 className="text-2xl font-bold">You&apos;re ready to explore</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Education, tips, optional feed, and {AI_ASSISTANT_NAME} — all in one place. You can switch to full Type&nbsp;1
-            tools anytime in Settings.
+            Set up your community profile to join the feed, or browse education and {AI_ASSISTANT_NAME} in Tools. You
+            can unlock full Type&nbsp;1 features anytime in Settings.
           </p>
         </div>
       </div>
@@ -751,16 +750,25 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
         data-testid="onboarding-community-first-win-actions"
       >
         <Button
-          className="w-full"
+          className="w-full rounded-xl"
           size="lg"
-          onClick={() => void onFinish(land)}
+          onClick={() => void onFinish(profilePath)}
           data-testid="button-onboarding-community-complete"
         >
-          {openLabel}
+          Set up community profile
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>
+        <Button
+          className="w-full rounded-xl"
+          size="lg"
+          variant="outline"
+          onClick={() => void onFinish("/tools")}
+          data-testid="button-onboarding-community-tools"
+        >
+          Browse tools
+        </Button>
         <p className="text-center text-xs text-muted-foreground">
-          Finishing saves your profile. You can add more detail anytime in Settings.
+          Finishing saves your basics. Add a public profile when you&apos;re ready to post or message.
         </p>
       </div>
     </div>

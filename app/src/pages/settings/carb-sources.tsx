@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,9 +27,8 @@ import {
   storage,
   type UserProfile,
 } from "@/lib/storage";
-import { PageHeader, PageShell } from "@/components/layout";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { SettingsBackLink } from "./shared";
+import { SettingsPanel, SettingsPanelBody, SettingsSubPageShell } from "./shared";
 
 type DraftFavorite = {
   id: string;
@@ -197,25 +195,23 @@ export default function SettingsCarbSourcesPage() {
   };
 
   return (
-    <PageShell variant="standard" className="relative mx-auto max-w-lg space-y-5">
-      <SettingsBackLink href="/settings" />
-      <PageHeader
-        title="Carb sources"
-        actions={
-          <InlineInfoHint
-            ariaLabel="About carb sources"
-            content={
-              <p>
-                Name the gels, drinks, and tablets you actually use. Grams stay the main number — these favourites
-                translate them into what to carry.
-              </p>
-            }
-          />
-        }
-      />
-
-      <Card variant="glass-muted">
-        <CardContent className="space-y-4 p-4 sm:p-5">
+    <SettingsSubPageShell
+      title="Carb sources"
+      description="Name the gels, drinks, and tablets you use — grams stay the main number."
+      actions={
+        <InlineInfoHint
+          ariaLabel="About carb sources"
+          content={
+            <p>
+              Name the gels, drinks, and tablets you actually use. Grams stay the main number — these favourites
+              translate them into what to carry.
+            </p>
+          }
+        />
+      }
+    >
+      <SettingsPanel>
+        <SettingsPanelBody className="space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Your favourites</h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -302,15 +298,15 @@ export default function SettingsCarbSourcesPage() {
             </ul>
           )}
 
-          <Button type="button" variant="outline" size="sm" onClick={() => addDraft()}>
+          <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => addDraft()}>
             <Plus className="mr-1.5 h-4 w-4" aria-hidden />
             Add custom favourite
           </Button>
-        </CardContent>
-      </Card>
+        </SettingsPanelBody>
+      </SettingsPanel>
 
-      <Card variant="glass-muted">
-        <CardContent className="space-y-4 p-4 sm:p-5">
+      <SettingsPanel>
+        <SettingsPanelBody className="space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">Use these for…</h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -353,15 +349,15 @@ export default function SettingsCarbSourcesPage() {
               </div>
             );
           })}
-        </CardContent>
-      </Card>
+        </SettingsPanelBody>
+      </SettingsPanel>
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Button type="button" className="flex-1" disabled={saving} onClick={() => void handleSave()}>
+        <Button type="button" className="h-11 flex-1 rounded-xl" disabled={saving} onClick={() => void handleSave()}>
           <Save className="mr-2 h-4 w-4" aria-hidden />
           Save carb sources
         </Button>
-        <Button type="button" variant="outline" onClick={handleClear}>
+        <Button type="button" variant="outline" className="rounded-xl" onClick={handleClear}>
           Clear all
         </Button>
       </div>
@@ -377,6 +373,6 @@ export default function SettingsCarbSourcesPage() {
         </Link>{" "}
         still holds weight and units used in hypo estimates.
       </p>
-    </PageShell>
+    </SettingsSubPageShell>
   );
 }

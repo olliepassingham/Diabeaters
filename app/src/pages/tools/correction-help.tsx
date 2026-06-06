@@ -201,7 +201,7 @@ export default function CorrectionHelpPage() {
               <AlertDescription className="text-sm space-y-3">
                 <p>Add a correction factor (ISF) in Ratios to see a dose estimate.</p>
                 <Button asChild size="sm" data-testid="button-correction-open-ratios">
-                  <Link href="/ratios">Open Ratios</Link>
+                  <Link href="/settings/ratios">Open Ratios</Link>
                 </Button>
               </AlertDescription>
             </Alert>

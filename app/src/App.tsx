@@ -120,7 +120,6 @@ const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
 const Supplies = lazy(() => import("@/pages/supplies"));
 const Adviser = lazy(() => import("@/pages/adviser"));
-const Ratios = lazy(() => import("@/pages/ratios"));
 const Routines = lazy(() => import("@/pages/routines"));
 const HelpNow = lazy(() => import("@/pages/help-now"));
 const Appointments = lazy(() => import("@/pages/appointments"));
@@ -951,11 +950,7 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/ratios">
-        <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Ratios />
-          </Suspense>
-        </PatientRouteGuard>
+        <Redirect to="/settings/ratios" replace />
       </Route>
       <Route path="/routines">
         <PatientRouteGuard>

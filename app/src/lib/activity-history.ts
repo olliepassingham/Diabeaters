@@ -271,7 +271,7 @@ export function collectAllActivityEvents(): ActivityEvent[] {
         at,
         title: "Ratios updated",
         subtitle: ratio.note?.trim() || undefined,
-        href: "/ratios",
+        href: "/settings/ratios",
       }),
     );
   }

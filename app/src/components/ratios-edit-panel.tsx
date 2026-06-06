@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { Sun, Sunset, Moon, Cookie, Target, TrendingDown, Save, X, Settings } from "lucide-react";
+import { Sun, Sunset, Moon, Cookie, Target, TrendingDown, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -259,13 +259,8 @@ export function RatiosEditPanel({
 
       <p className="text-center text-xs text-muted-foreground">
         TDD, history, and scenario-adjusted ratios —{" "}
-        <Link href="/ratios" className="font-medium text-primary underline underline-offset-2">
-          open full Ratios page
-        </Link>
-        {" · "}
         <Link href="/settings/ratios" className="font-medium text-primary underline underline-offset-2">
-          <Settings className="mr-0.5 inline h-3 w-3" aria-hidden />
-          settings
+          open Ratios in Settings
         </Link>
       </p>
     </div>
