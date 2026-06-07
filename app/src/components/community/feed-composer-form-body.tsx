@@ -122,9 +122,11 @@ export function FeedComposerFormBody({
         </Select>
       </div>
       {composerPostKind === "poll" ? (
-        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 text-foreground">
-          <div className="space-y-1">
-            <Label htmlFor="feed-poll-q">Poll question</Label>
+        <div className="min-w-0 space-y-3 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/[0.05] to-muted/15 p-3.5 text-foreground dark:from-primary/[0.08]">
+          <p className="font-display text-sm font-semibold tracking-tight">Create a poll</p>
+
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="feed-poll-q">Question</Label>
             <Input
               id="feed-poll-q"
               value={pollQuestion}
@@ -132,12 +134,20 @@ export function FeedComposerFormBody({
               placeholder="What do you want to ask?"
               disabled={submitting || !user || !canComposeToFeed}
               maxLength={500}
+              className="h-11"
             />
           </div>
-          <p className="text-xs text-muted-foreground">2–6 options, each up to 500 characters.</p>
+
           <div className="space-y-2">
+            <Label className="text-xs font-medium text-muted-foreground">Options</Label>
             {pollOptions.map((opt, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="flex items-center gap-2">
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold tabular-nums text-primary"
+                  aria-hidden
+                >
+                  {i + 1}
+                </span>
                 <Input
                   value={opt}
                   onChange={(e) =>
@@ -151,13 +161,14 @@ export function FeedComposerFormBody({
                   disabled={submitting || !user || !canComposeToFeed}
                   maxLength={500}
                   aria-label={`Poll option ${i + 1}`}
+                  className="h-10"
                 />
                 {pollOptions.length > 2 ? (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="shrink-0"
+                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
                     disabled={submitting || !user || !canComposeToFeed}
                     onClick={() => setPollOptions((prev) => prev.filter((_, j) => j !== i))}
                     aria-label={`Remove option ${i + 1}`}
@@ -172,13 +183,28 @@ export function FeedComposerFormBody({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="h-8 rounded-full text-xs"
                 disabled={submitting || !user || !canComposeToFeed}
                 onClick={() => setPollOptions((prev) => [...prev, ""])}
               >
-                <Plus className="h-4 w-4 mr-1.5" />
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
                 Add option
               </Button>
             ) : null}
+          </div>
+
+          <div className="min-w-0 space-y-1 border-t border-border/40 pt-2">
+            <Label htmlFor="feed-poll-intro">Short intro (optional)</Label>
+            <MentionTextarea
+              value={composer}
+              onChange={setComposer}
+              currentUserId={user?.id}
+              hideHint
+              placeholder="A quick note that appears above the poll…"
+              rows={2}
+              maxLength={8000}
+              disabled={submitting || !user || !canComposeToFeed}
+            />
           </div>
         </div>
       ) : null}
@@ -301,7 +327,7 @@ export function FeedComposerFormBody({
           </div>
         </div>
       ) : null}
-      {composerPostKind !== "event" ? (
+      {composerPostKind === "standard" ? (
       <div className="min-w-0 space-y-1.5">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-sm font-medium text-foreground">Post</Label>
@@ -312,18 +338,14 @@ export function FeedComposerFormBody({
           onChange={setComposer}
           currentUserId={user?.id}
           hideHint={false}
-          placeholder={
-            composerPostKind === "poll"
-              ? "Optional intro before the poll…"
-              : "Share something on the feed…"
-          }
+          placeholder="Share something on the feed…"
           rows={3}
           maxLength={8000}
           disabled={submitting || !user || !canComposeToFeed}
         />
       </div>
       ) : null}
-      {composerPostKind !== "event" ? (
+      {composerPostKind === "standard" ? (
       <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
       ) : null}
       {composerPreviews.length > 0 && composerPostKind !== "event" ? (
@@ -435,7 +457,7 @@ export function FeedComposerFormBody({
         <InlineInfoHint ariaLabel="Photo limits for posts" content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`} />
         <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit || !canComposeToFeed}>
           <Send className="h-4 w-4 mr-1.5" />
-          {composerPostKind === "event" ? "Share event" : "Post"}
+          {composerPostKind === "event" ? "Share event" : composerPostKind === "poll" ? "Share poll" : "Post"}
         </Button>
       </div>
     </>

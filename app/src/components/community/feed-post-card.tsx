@@ -18,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
 import { FeedEventCard } from "@/components/community/feed-event-card";
+import { FeedPollCard } from "@/components/community/feed-poll-card";
 import { FeedCommentItem } from "@/components/community/feed-comment-item";
 import { FeedLinkPreview } from "@/components/community/feed-link-preview";
 import { Badge } from "@/components/ui/badge";
@@ -58,14 +59,11 @@ import { getProfileIdByPublicHandle, getProfilesByIds, normalizePublicHandleInpu
 import { cn } from "@/lib/utils";
 import { type FeedAuthorMeta } from "@/lib/community/feed-author-meta";
 import {
-  castPollVote,
   communityTopicLabel,
   fetchDmThreadsForCurrentUser,
-  fetchPollVoteState,
   getFirstWhitelistedFeedLink,
   fetchPostLikersWithProfiles,
   fetchPostInterestedWithProfiles,
-  fetchPollVotersWithProfiles,
   otherMemberUserId,
   parseEventExtra,
   parsePollExtra,
@@ -79,151 +77,6 @@ const RECENT_DM_PEERS_LIMIT = 20;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
-
-function FeedPollBlock({
-  postId,
-  question,
-  options,
-  viewerId,
-}: {
-  postId: string;
-  question: string;
-  options: string[];
-  viewerId: string | undefined;
-}) {
-  const { toast } = useToast();
-  const [counts, setCounts] = useState<number[]>(() => Array.from({ length: options.length }, () => 0));
-  const [myIdx, setMyIdx] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [votersOpen, setVotersOpen] = useState(false);
-  const [votersLoading, setVotersLoading] = useState(false);
-  const [voters, setVoters] = useState<Array<{ user_id: string; name: string; avatar_url: string | null; option_index: number }>>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const r = await fetchPollVoteState(postId, options.length);
-      if (cancelled) return;
-      setLoading(false);
-      if (!r.error) {
-        setCounts(r.counts);
-        setMyIdx(r.myOptionIndex);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [postId, options.length]);
-
-  const total = useMemo(() => counts.reduce((a, b) => a + b, 0), [counts]);
-  const revealTallies = myIdx !== null;
-
-  async function onPick(i: number) {
-    if (!viewerId) {
-      toast({ title: "Sign in to vote", description: "Log in to cast your vote on this poll.", variant: "destructive" });
-      return;
-    }
-    const errRes = await castPollVote(postId, i);
-    if (errRes.error) {
-      toast({ title: "Could not vote", description: errRes.error.message, variant: "destructive" });
-      return;
-    }
-    const r = await fetchPollVoteState(postId, options.length);
-    if (!r.error) {
-      setCounts(r.counts);
-      setMyIdx(r.myOptionIndex);
-    }
-  }
-
-  async function openVoters() {
-    setVotersOpen(true);
-    if (votersLoading || voters.length > 0) return;
-    setVotersLoading(true);
-    const res = await fetchPollVotersWithProfiles(postId);
-    setVotersLoading(false);
-    if (res.error) {
-      toast({ title: "Could not load voters", description: res.error.message, variant: "destructive" });
-      return;
-    }
-    setVoters(res.data.map((r) => ({ user_id: r.user_id, name: r.name, avatar_url: r.avatar_url, option_index: r.option_index })));
-  }
-
-  return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-muted/15 p-3">
-      <p className="text-sm font-semibold leading-snug">{question}</p>
-      {loading ? (
-        <p className="text-xs text-muted-foreground">Loading poll…</p>
-      ) : (
-        <ul className="space-y-2">
-          {options.map((label, i) => {
-            const pct = total > 0 && revealTallies ? Math.round((counts[i]! / total) * 100) : null;
-            return (
-              <li key={i}>
-                <Button
-                  type="button"
-                  variant={myIdx === i ? "default" : "outline"}
-                  size="sm"
-                  className="h-auto min-h-9 w-full justify-start whitespace-normal px-3 py-2 text-left font-normal"
-                  disabled={!viewerId}
-                  onClick={() => void onPick(i)}
-                >
-                  <span className="flex w-full items-start justify-between gap-2">
-                    <span>{label}</span>
-                    {revealTallies && pct !== null ? (
-                      <span className="shrink-0 tabular-nums text-xs opacity-80">
-                        {pct}% · {counts[i]}
-                      </span>
-                    ) : null}
-                  </span>
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {!loading && total > 0 ? (
-        <div className="pt-1">
-          <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => void openVoters()}>
-            View who voted
-          </Button>
-        </div>
-      ) : null}
-
-      <Dialog open={votersOpen} onOpenChange={setVotersOpen}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Poll voters</DialogTitle>
-            <DialogDescription>Who has voted so far (hidden for blocked users).</DialogDescription>
-          </DialogHeader>
-          {votersLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : voters.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No votes yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {voters.map((v) => (
-                <li key={v.user_id} className="flex items-center gap-3 rounded-lg border border-border/60 bg-card/60 p-2">
-                  <CommunityAuthorAvatar
-                    displayName={v.name}
-                    avatarPath={v.avatar_url}
-                    size="sm"
-                    profileHref={`/community/profile/${encodeURIComponent(v.user_id)}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{v.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      Voted: {options[v.option_index] ?? "—"}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
 }
 
 /** date-fns throws RangeError on invalid dates; DB/RPC should always send ISO strings but guard anyway. */
@@ -700,7 +553,7 @@ export function FeedPostCard({
             />
           ) : null}
           {pollExtra ? (
-            <FeedPollBlock
+            <FeedPollCard
               postId={post.id}
               question={pollExtra.question}
               options={pollExtra.options}
