@@ -692,11 +692,6 @@ export function FeedPostCard({
               event={eventExtra}
               imagePaths={post.image_urls}
               imageAltTexts={post.image_alt_texts}
-              postUrl={
-                typeof window !== "undefined"
-                  ? `${window.location.origin}/community/post/${encodeURIComponent(post.id)}`
-                  : undefined
-              }
               interestedCount={post.interested_count}
               interestedByMe={post.interested_by_me}
               viewerCanReact={Boolean(viewerId)}

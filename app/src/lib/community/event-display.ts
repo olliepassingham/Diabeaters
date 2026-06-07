@@ -1,7 +1,5 @@
 import { format, formatDistanceStrict, isToday, isTomorrow, startOfDay } from "date-fns";
 
-import type { CommunityEventExtra } from "./post-kinds";
-
 export type EventTiming = "past" | "today" | "tomorrow" | "soon" | "upcoming";
 
 export function parseEventDate(iso: string): Date | null {
@@ -84,64 +82,6 @@ export function eventQuickStartPresets(now: Date = new Date()): { id: string; la
   ];
 }
 
-function toGoogleCalendarUtc(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-}
-
-export function buildGoogleCalendarUrl(event: CommunityEventExtra, postUrl?: string): string | null {
-  const start = parseEventDate(event.starts_at);
-  if (!start) return null;
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  const params = new URLSearchParams({
-    action: "TEMPLATE",
-    text: event.title,
-    dates: `${toGoogleCalendarUtc(start)}/${toGoogleCalendarUtc(end)}`,
-  });
-  const details = [event.details?.trim(), postUrl ? `View on Diabeaters: ${postUrl}` : ""].filter(Boolean).join("\n\n");
-  if (details) params.set("details", details);
-  if (event.location?.trim()) params.set("location", event.location.trim());
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
-}
-
 export function buildMapsSearchUrl(location: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.trim())}`;
-}
-
-function escapeIcsText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
-}
-
-export function buildEventIcsContent(event: CommunityEventExtra, postUrl?: string): string | null {
-  const start = parseEventDate(event.starts_at);
-  if (!start) return null;
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  const uid = `${start.getTime()}-${event.title.replace(/\s+/g, "-").slice(0, 40)}@diabeaters.app`;
-  const description = [event.details?.trim(), postUrl ? `View on Diabeaters: ${postUrl}` : ""].filter(Boolean).join("\\n\\n");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Diabeaters//Community Events//EN",
-    "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${toGoogleCalendarUtc(new Date())}`,
-    `DTSTART:${toGoogleCalendarUtc(start)}`,
-    `DTEND:${toGoogleCalendarUtc(end)}`,
-    `SUMMARY:${escapeIcsText(event.title)}`,
-  ];
-  if (description) lines.push(`DESCRIPTION:${escapeIcsText(description)}`);
-  if (event.location?.trim()) lines.push(`LOCATION:${escapeIcsText(event.location.trim())}`);
-  lines.push("END:VEVENT", "END:VCALENDAR");
-  return lines.join("\r\n");
-}
-
-export function downloadEventIcs(event: CommunityEventExtra, postUrl?: string): void {
-  const content = buildEventIcsContent(event, postUrl);
-  if (!content || typeof document === "undefined") return;
-  const blob = new Blob([content], { type: "text/calendar;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${event.title.replace(/[^\w\s-]/g, "").trim().slice(0, 40) || "event"}.ics`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

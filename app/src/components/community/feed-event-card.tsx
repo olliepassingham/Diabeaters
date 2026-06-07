@@ -1,11 +1,9 @@
-import { Calendar, CalendarPlus, ExternalLink, Heart, MapPin } from "lucide-react";
+import { Calendar, ExternalLink, Heart, MapPin } from "lucide-react";
 
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
 import { Button } from "@/components/ui/button";
 import {
-  buildGoogleCalendarUrl,
   buildMapsSearchUrl,
-  downloadEventIcs,
   eventTimingLabel,
   formatEventWhen,
   getEventTiming,
@@ -17,7 +15,6 @@ export function FeedEventCard({
   event,
   imagePaths,
   imageAltTexts,
-  postUrl,
   interestedCount = 0,
   interestedByMe = false,
   viewerCanReact = false,
@@ -28,7 +25,6 @@ export function FeedEventCard({
   event: CommunityEventExtra;
   imagePaths: string[];
   imageAltTexts?: string[];
-  postUrl?: string;
   interestedCount?: number;
   interestedByMe?: boolean;
   viewerCanReact?: boolean;
@@ -38,7 +34,6 @@ export function FeedEventCard({
 }) {
   const timing = getEventTiming(event.starts_at);
   const isPast = timing === "past";
-  const calendarUrl = buildGoogleCalendarUrl(event, postUrl);
   const mapsUrl = event.location?.trim() ? buildMapsSearchUrl(event.location) : null;
   const canMarkInterest = viewerCanReact && !isPast;
 
@@ -141,28 +136,6 @@ export function FeedEventCard({
             </button>
           ) : null}
         </div>
-
-        {!isPast ? (
-          <div className="flex flex-wrap gap-2 pt-0.5">
-            {calendarUrl ? (
-              <Button type="button" variant="outline" size="sm" className="h-8 rounded-full text-xs" asChild>
-                <a href={calendarUrl} target="_blank" rel="noopener noreferrer">
-                  <CalendarPlus className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                  Add to calendar
-                </a>
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 rounded-full text-xs text-muted-foreground"
-              onClick={() => downloadEventIcs(event, postUrl)}
-            >
-              Download .ics
-            </Button>
-          </div>
-        ) : null}
       </div>
     </div>
   );

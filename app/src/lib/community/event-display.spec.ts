@@ -5,7 +5,6 @@ import {
   eventTimingLabel,
   formatEventWhen,
   getEventTiming,
-  buildGoogleCalendarUrl,
 } from "./event-display";
 
 describe("event-display", () => {
@@ -25,15 +24,5 @@ describe("event-display", () => {
     const label = formatEventWhen("2026-05-23T15:49:00.000Z");
     expect(label).not.toContain("T");
     expect(label).toMatch(/May/);
-  });
-
-  it("buildGoogleCalendarUrl includes title and location", () => {
-    const url = buildGoogleCalendarUrl({
-      title: "Meetup",
-      starts_at: "2026-06-10T10:00:00.000Z",
-      location: "London",
-    });
-    expect(url).toContain("text=Meetup");
-    expect(url).toContain("location=London");
   });
 });
