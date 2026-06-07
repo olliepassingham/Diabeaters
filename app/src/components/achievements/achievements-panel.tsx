@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { format, parseISO } from "date-fns";
+import { Pin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { ProfileMutedCard, ProfileSectionHeading } from "@/components/profile/profile-ui";
 import {
   ACHIEVEMENT_DEFINITIONS,
+  computeProfileStreakDays,
   getAchievementDefinition,
+  profileStreakKindIcon,
+  profileStreakTooltip,
   type AchievementId,
+  type ProfileStreakKind,
 } from "@/lib/achievements";
 import {
   loadEarnedAchievements,
-  loadPinnedAchievementIds,
+  loadPinnedStreakKinds,
+  localPublicProfileStreaks,
   MAX_PINNED_ACHIEVEMENTS,
-  syncPinnedAchievementsToProfile,
-  togglePinnedAchievement,
+  syncPinnedStreaksToProfile,
+  togglePinnedStreakKind,
   USER_ACHIEVEMENTS_CHANGED_EVENT,
   type EarnedAchievement,
+  type PublicProfileStreak,
 } from "@/lib/user-achievements";
 import { cn } from "@/lib/utils";
 
@@ -37,39 +42,48 @@ function useEarnedAchievementsState(): EarnedAchievement[] {
   return earned;
 }
 
-/** Account → Public profile: earned badges only, with a link to the full Tools page. */
-export function AccountPublicAchievementsSummary({ className }: { className?: string }) {
-  const earned = useEarnedAchievementsState();
+function usePinnedStreakKindsState(): ProfileStreakKind[] {
+  const [pinned, setPinned] = useState<ProfileStreakKind[]>(() => loadPinnedStreakKinds());
 
-  const earnedBadges = useMemo(
-    () =>
-      earned.map(({ id }) => ({
-        id,
-        title: getAchievementDefinition(id).title,
-      })),
-    [earned],
-  );
+  useEffect(() => {
+    const refresh = () => setPinned(loadPinnedStreakKinds());
+    window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+  }, []);
+
+  return pinned;
+}
+
+/** Account → Public profile: pinned live streak badges with a link to the full Tools page. */
+export function AccountPublicAchievementsSummary({ className }: { className?: string }) {
+  const [streaks, setStreaks] = useState<PublicProfileStreak[]>(() => localPublicProfileStreaks());
+
+  useEffect(() => {
+    const refresh = () => setStreaks(localPublicProfileStreaks());
+    window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
+  }, []);
 
   return (
     <ProfileMutedCard testId="account-public-achievements" className={className}>
       <div className="space-y-3">
         <ProfileSectionHeading
-          title="Your achievements"
+          title="Your streaks"
           subtitle={
-            earned.length > 0
-              ? `${earned.length} earned — manage badges and profile pins in Tools.`
-              : "Earn badges from bedtime checks, exercise, showing up, and guides in Tools."
+            streaks.length > 0
+              ? "Pinned streaks appear on your public profile when your Feed visibility is on."
+              : "Earn milestones in Tools, then pin streaks you want on your public profile."
           }
         />
 
-        {earnedBadges.length > 0 ? (
-          <ProfileAchievementBadges achievements={earnedBadges} />
+        {streaks.length > 0 ? (
+          <ProfileStreakBadges streaks={streaks} />
         ) : (
-          <p className="text-sm text-muted-foreground">No badges earned yet.</p>
+          <p className="text-sm text-muted-foreground">No streaks pinned yet.</p>
         )}
 
         <Button asChild variant="outline" size="sm" className="w-full sm:w-auto" data-testid="account-achievements-tools-link">
-          <Link href="/tools/achievements">Achievements in Tools</Link>
+          <Link href="/tools/achievements">Manage in Tools</Link>
         </Button>
       </div>
     </ProfileMutedCard>
@@ -86,34 +100,27 @@ export function AchievementsPanel({
   userId?: string;
 }) {
   const earned = useEarnedAchievementsState();
-  const [pinned, setPinned] = useState<AchievementId[]>(() => loadPinnedAchievementIds());
-
-  useEffect(() => {
-    const refresh = () => setPinned(loadPinnedAchievementIds());
-    window.addEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(USER_ACHIEVEMENTS_CHANGED_EVENT, refresh);
-  }, []);
+  const pinned = usePinnedStreakKindsState();
 
   const earnedIds = useMemo(() => new Set(earned.map((a) => a.id)), [earned]);
-  const earnedAtById = useMemo(() => new Map(earned.map((a) => [a.id, a.earnedAt])), [earned]);
 
   const rows = ACHIEVEMENT_DEFINITIONS.map((def) => ({
     def,
     earned: earnedIds.has(def.id),
-    earnedAt: earnedAtById.get(def.id),
-    pinned: pinned.includes(def.id),
+    streakDays: computeProfileStreakDays(def.streakKind),
+    pinned: pinned.includes(def.streakKind),
   }));
 
   const unlockedCount = earned.length;
 
   const subtitle =
     unlockedCount > 0
-      ? `${unlockedCount} earned — keep going at your own pace.`
-      : "Complete bedtime checks, exercise sessions, or show up on consecutive days to earn your first badge.";
+      ? `${unlockedCount} milestone${unlockedCount === 1 ? "" : "s"} earned — streaks update daily from your activity.`
+      : "Complete bedtime checks, exercise sessions, or show up on consecutive days to earn your first milestone.";
 
   const profileToggleNote = showProfileToggles ? (
-    <p className="text-[11px] text-muted-foreground">
-      Choose up to {MAX_PINNED_ACHIEVEMENTS} badges for your public profile. Clinical counts are never shown.
+    <p className="text-[11px] leading-relaxed text-muted-foreground">
+      Tap the pin on an earned milestone to show that streak on your public profile (up to {MAX_PINNED_ACHIEVEMENTS}).
     </p>
   ) : null;
 
@@ -127,52 +134,77 @@ export function AchievementsPanel({
           </Button>
         </div>
 
+        {pinned.length > 0 ? (
+          <div className="rounded-2xl border border-border/45 bg-muted/10 px-3 py-3">
+            <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">On your profile</p>
+            <ProfileStreakBadges
+              streaks={pinned
+                .map((kind) => ({ kind, days: computeProfileStreakDays(kind) }))
+                .filter((row) => row.days > 0)}
+            />
+          </div>
+        ) : null}
+
         <ul className="list-none space-y-2.5" aria-label="Achievements">
-          {rows.map(({ def, earned: isEarned, earnedAt, pinned: isPinned }) => {
+          {rows.map(({ def, earned: isEarned, streakDays, pinned: isPinned }) => {
             const Icon = def.icon;
+            const canPin = showProfileToggles && isEarned;
+            const pinDisabled = !isPinned && pinned.length >= MAX_PINNED_ACHIEVEMENTS;
+
             return (
               <li
                 key={def.id}
                 className={cn(
-                  "flex items-start gap-3 rounded-2xl border px-3 py-3 sm:px-4",
+                  "relative flex items-start gap-3 rounded-2xl border px-3 py-3 sm:px-4",
                   isEarned
-                    ? "border-emerald-500/25 bg-emerald-500/5"
-                    : "border-border/45 bg-muted/10 opacity-80",
+                    ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+                    : "border-border/45 bg-muted/10 opacity-75",
                 )}
                 data-testid={`achievement-row-${def.id}`}
               >
                 <div
                   className={cn(
                     "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                    isEarned ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-muted/40 text-muted-foreground",
+                    isEarned ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" : "bg-muted/40 text-muted-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" aria-hidden />
                 </div>
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 flex-1 space-y-0.5 pr-8">
                   <p className="text-sm font-semibold text-foreground">{def.title}</p>
                   <p className="text-xs leading-relaxed text-muted-foreground">{def.description}</p>
-                  {isEarned && earnedAt ? (
-                    <p className="text-[11px] text-muted-foreground">
-                      Earned {format(parseISO(earnedAt), "d MMM yyyy")}
+                  {isEarned && streakDays > 0 ? (
+                    <p className="text-[11px] font-medium text-emerald-800/80 dark:text-emerald-200/80">
+                      Current streak: {streakDays} {streakDays === 1 ? "day" : "days"}
                     </p>
                   ) : null}
-                  {showProfileToggles && isEarned ? (
-                    <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-                      <Switch
-                        checked={isPinned}
-                        onCheckedChange={() => {
-                          const next = togglePinnedAchievement(def.id);
-                          setPinned(next);
-                          if (userId) void syncPinnedAchievementsToProfile(userId, next);
-                        }}
-                        disabled={!isPinned && pinned.length >= MAX_PINNED_ACHIEVEMENTS}
-                        aria-label={`Show ${def.title} on public profile`}
-                      />
-                      Show on public profile
-                    </label>
-                  ) : null}
                 </div>
+                {canPin ? (
+                  <button
+                    type="button"
+                    className={cn(
+                      "absolute right-3 top-3 rounded-full p-1.5 transition-colors",
+                      isPinned
+                        ? "text-primary hover:bg-primary/10"
+                        : "text-muted-foreground/70 hover:bg-muted/40 hover:text-foreground",
+                      pinDisabled && !isPinned && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground/70",
+                    )}
+                    aria-label={
+                      isPinned
+                        ? `Remove ${profileStreakTooltip(def.streakKind, streakDays)} from public profile`
+                        : `Show ${profileStreakTooltip(def.streakKind, streakDays)} on public profile`
+                    }
+                    aria-pressed={isPinned}
+                    disabled={pinDisabled && !isPinned}
+                    onClick={() => {
+                      const next = togglePinnedStreakKind(def.streakKind);
+                      if (userId) void syncPinnedStreaksToProfile(userId, next);
+                    }}
+                    data-testid={`achievement-pin-${def.id}`}
+                  >
+                    <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current")} aria-hidden />
+                  </button>
+                ) : null}
               </li>
             );
           })}
@@ -184,31 +216,75 @@ export function AchievementsPanel({
   );
 }
 
-export function ProfileAchievementBadges({
-  achievements,
+export function ProfileStreakBadges({
+  streaks,
   className,
+  size = "md",
 }: {
-  achievements: Array<{ id: AchievementId; title: string }>;
+  streaks: PublicProfileStreak[];
   className?: string;
+  size?: "sm" | "md";
 }) {
-  if (achievements.length === 0) return null;
+  if (streaks.length === 0) return null;
+
+  const compact = size === "sm";
 
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)} data-testid="profile-achievement-badges">
-      {achievements.map((badge) => {
-        const def = getAchievementDefinition(badge.id);
-        const Icon = def.icon;
+    <div className={cn("flex flex-wrap gap-2", className)} data-testid="profile-streak-badges">
+      {streaks.map((streak) => {
+        const Icon = profileStreakKindIcon(streak.kind);
         return (
           <span
-            key={badge.id}
-            className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-2 py-0.5 text-[11px] font-medium text-emerald-900 dark:text-emerald-100"
-            title={badge.title}
+            key={streak.kind}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-xl border border-border/50 bg-background/50 shadow-sm",
+              compact ? "px-1 py-0.5" : "px-1.5 py-1",
+            )}
+            title={profileStreakTooltip(streak.kind, streak.days)}
           >
-            <Icon className="h-3 w-3 shrink-0" aria-hidden />
-            <span className="truncate">{badge.title}</span>
+            <span
+              className={cn(
+                "flex items-center justify-center rounded-lg bg-primary/10 text-primary",
+                compact ? "h-5 w-5" : "h-6 w-6",
+              )}
+            >
+              <Icon className={cn(compact ? "h-3 w-3" : "h-3.5 w-3.5")} aria-hidden />
+            </span>
+            <span
+              className={cn(
+                "pr-1 font-semibold tabular-nums text-foreground",
+                compact ? "text-xs" : "text-sm",
+              )}
+            >
+              {streak.days}
+            </span>
           </span>
         );
       })}
     </div>
   );
+}
+
+/** @deprecated Use ProfileStreakBadges */
+export function ProfileAchievementBadges({
+  achievements,
+  className,
+}: {
+  achievements: Array<{ id: AchievementId; title: string; days?: number; kind?: ProfileStreakKind }>;
+  className?: string;
+}) {
+  const streaks: PublicProfileStreak[] = achievements
+    .map((row) => {
+      if (row.kind && typeof row.days === "number") {
+        return { kind: row.kind, days: row.days };
+      }
+      const def = getAchievementDefinition(row.id);
+      return {
+        kind: def.streakKind,
+        days: row.days ?? def.requiredDays,
+      };
+    })
+    .filter((row) => row.days > 0);
+
+  return <ProfileStreakBadges streaks={streaks} className={className} size="sm" />;
 }

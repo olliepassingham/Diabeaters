@@ -34,7 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { FeedPostList } from "@/components/community/feed-post-list";
-import { ProfileAchievementBadges } from "@/components/achievements/achievements-panel";
+import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -379,7 +379,7 @@ export default function CommunityProfilePage() {
               <ProfileDisplayName compact name={displayName} />
               <ProfileMetaRow>
                 {profile.public_handle ? <ProfileHandle handle={profile.public_handle} /> : null}
-                <ProfileAchievementBadges achievements={profile.achievements ?? []} />
+                <ProfileStreakBadges streaks={profile.streaks ?? profile.achievements ?? []} size="sm" />
                 {isSelf && !profile.is_public ? (
                   <span className="inline-flex rounded-full border border-amber-500/35 bg-amber-500/[0.08] px-2 py-0.5 text-[11px] font-medium text-amber-950 dark:text-amber-100">
                     Hidden from others

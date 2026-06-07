@@ -4,9 +4,73 @@ import {
   computeStreakStats,
   computeStreakStatsFromDayKeys,
   qualifyingBalancedDayKeys,
+  streakKindLabel,
   type StreakTrackKind,
 } from "@/lib/activity-streaks";
 import { collectAllActivityEvents, type ActivityEvent } from "@/lib/activity-history";
+
+export type ProfileStreakKind = StreakTrackKind | "balanced";
+
+const PROFILE_STREAK_KINDS: ProfileStreakKind[] = [
+  "bedtime_check",
+  "exercise_session",
+  "scenario_started",
+  "adviser_session",
+  "app_check_in",
+  "balanced",
+];
+
+export function isProfileStreakKind(value: string): value is ProfileStreakKind {
+  return (PROFILE_STREAK_KINDS as readonly string[]).includes(value);
+}
+
+const STREAK_KIND_ICONS: Record<ProfileStreakKind, LucideIcon> = {
+  bedtime_check: Moon,
+  exercise_session: Dumbbell,
+  supply_event: Sparkles,
+  appointment: Calendar,
+  scenario_started: MapIcon,
+  adviser_session: UtensilsCrossed,
+  app_check_in: Calendar,
+  balanced: Sparkles,
+};
+
+export function profileStreakKindIcon(kind: ProfileStreakKind): LucideIcon {
+  return STREAK_KIND_ICONS[kind];
+}
+
+export function profileStreakKindLabel(kind: ProfileStreakKind): string {
+  if (kind === "balanced") return "Balanced";
+  return streakKindLabel(kind);
+}
+
+export function profileStreakTooltip(kind: ProfileStreakKind, days: number): string {
+  const label = profileStreakKindLabel(kind);
+  return days === 1 ? `1-day ${label.toLowerCase()} streak` : `${days}-day ${label.toLowerCase()} streak`;
+}
+
+export function computeProfileStreakDays(
+  kind: ProfileStreakKind,
+  events: ActivityEvent[] = collectAllActivityEvents(),
+  today: Date = new Date(),
+): number {
+  if (kind === "balanced") {
+    return computeStreakStatsFromDayKeys(qualifyingBalancedDayKeys(events), "bedtime_check", today).current;
+  }
+  return computeStreakStats(events, kind, today).current;
+}
+
+export function computeAllProfileStreakDays(
+  events: ActivityEvent[] = collectAllActivityEvents(),
+  today: Date = new Date(),
+): Record<ProfileStreakKind, number> {
+  const out = {} as Record<ProfileStreakKind, number>;
+  for (const kind of PROFILE_STREAK_KINDS) {
+    const days = computeProfileStreakDays(kind, events, today);
+    if (days > 0) out[kind] = days;
+  }
+  return out;
+}
 
 export type AchievementId =
   | "bedtime_streak_3"
@@ -25,7 +89,7 @@ export type AchievementDefinition = {
   id: AchievementId;
   title: string;
   description: string;
-  streakKind: StreakTrackKind | "balanced";
+  streakKind: ProfileStreakKind;
   requiredDays: number;
   icon: LucideIcon;
 };

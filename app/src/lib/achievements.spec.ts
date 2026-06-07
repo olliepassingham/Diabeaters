@@ -4,8 +4,8 @@ import { evaluateNewlyUnlockedAchievements } from "./achievements";
 import { collectAllActivityEvents } from "./activity-history";
 import {
   loadEarnedAchievements,
-  loadPinnedAchievementIds,
-  savePinnedAchievementIds,
+  loadPinnedStreakKinds,
+  savePinnedStreakKinds,
   syncAchievementsFromActivity,
 } from "./user-achievements";
 import { setActiveUserIdForLocalStorage, storage } from "./storage";
@@ -53,14 +53,14 @@ describe("achievements", () => {
     expect(loadEarnedAchievements().map((a) => a.id)).toContain("bedtime_streak_3");
   });
 
-  it("savePinnedAchievementIds only keeps earned ids up to max", () => {
+  it("savePinnedStreakKinds only keeps earned streak kinds up to max", () => {
     saveThreeBedtimeDays();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-06-10T12:00:00"));
     syncAchievementsFromActivity();
     vi.useRealTimers();
 
-    savePinnedAchievementIds(["bedtime_streak_3", "bedtime_streak_7"]);
-    expect(loadPinnedAchievementIds()).toEqual(["bedtime_streak_3"]);
+    savePinnedStreakKinds(["bedtime_check", "exercise_session"]);
+    expect(loadPinnedStreakKinds()).toEqual(["bedtime_check"]);
   });
 });

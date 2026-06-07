@@ -9,7 +9,7 @@ export default function AchievementsPage() {
     <PageShell variant="narrow" className="space-y-4">
       <PageHeader
         title="Achievements"
-        description="Private milestones for habits you build with Diabeaters tools. Choose which earned badges appear on your public profile."
+        description="Private milestones from your Diabeaters habits. Pin streaks to show on your public profile."
       />
       <AchievementsPanel showProfileToggles userId={user?.id} />
     </PageShell>

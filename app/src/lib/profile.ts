@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-context";
 import { getSupabase } from "./supabase";
 import { normalizeDateOfBirthInput } from "./user-age";
-import type { PublicProfileAchievement } from "./user-achievements";
+import type { PublicProfileStreak } from "./user-achievements";
 import { carbSourcePreferencesFromCloud } from "./carb-source-preferences";
 
 export type ProfileRow = {
@@ -39,8 +39,10 @@ export type ProfileRow = {
   account_type?: "patient" | "community" | null;
   app_region?: "UK" | "US" | "OTHER" | null;
   emergency_number?: string | null;
-  /** Achievement ids pinned to public profile (max 5). */
+  /** Streak track kinds pinned to public profile (max 5). */
   pinned_achievement_ids?: string[] | null;
+  /** Current streak day counts for pinned tracks shown on public profile. */
+  public_streak_counts?: Record<string, number> | null;
   /** Named carb favourites + scenario defaults for hypo/exercise/driving hints. */
   carb_source_prefs?: import("@/lib/carb-source-preferences").CarbSourcePreferences | null;
 };
@@ -60,7 +62,9 @@ export type PublicCommunityProfile = Pick<
   ProfileRow,
   "id" | "full_name" | "avatar_url" | "bio" | "public_handle" | "is_public" | "diabetes_onset_date"
 > & {
-  achievements?: PublicProfileAchievement[];
+  streaks?: PublicProfileStreak[];
+  /** @deprecated Use streaks */
+  achievements?: PublicProfileStreak[];
 };
 
 export const profileQueryKey = (userId: string | undefined) => ["profile", userId] as const;
@@ -127,6 +131,18 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     pinned_achievement_ids = rawPinned.filter((id): id is string => typeof id === "string");
   } else pinned_achievement_ids = [];
 
+  const rawStreakCounts = data.public_streak_counts;
+  let public_streak_counts: Record<string, number> | null | undefined;
+  if (rawStreakCounts === null) public_streak_counts = null;
+  else if (rawStreakCounts === undefined) public_streak_counts = undefined;
+  else if (typeof rawStreakCounts === "object" && !Array.isArray(rawStreakCounts)) {
+    public_streak_counts = {};
+    for (const [key, value] of Object.entries(rawStreakCounts as Record<string, unknown>)) {
+      const days = typeof value === "number" ? value : Number(value);
+      if (Number.isFinite(days) && days > 0) public_streak_counts[key] = Math.floor(days);
+    }
+  } else public_streak_counts = {};
+
   const rawCarbPrefs = data.carb_source_prefs;
   let carb_source_prefs: ProfileRow["carb_source_prefs"];
   if (rawCarbPrefs === null) carb_source_prefs = null;
@@ -156,6 +172,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     app_region,
     emergency_number,
     pinned_achievement_ids,
+    public_streak_counts,
     carb_source_prefs,
   };
 }
@@ -252,7 +269,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
   try {
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids")
+      .select("id, full_name, avatar_url, bio, public_handle, is_public, diabetes_onset_date, pinned_achievement_ids, public_streak_counts")
       .eq("id", userId)
       .maybeSingle();
 
@@ -263,9 +280,13 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
     const pinnedIds = Array.isArray(pinnedRaw)
       ? pinnedRaw.filter((id): id is string => typeof id === "string")
       : [];
+    const streakCounts =
+      r.public_streak_counts && typeof r.public_streak_counts === "object" && !Array.isArray(r.public_streak_counts)
+        ? (r.public_streak_counts as Record<string, number>)
+        : null;
 
-    const { fetchPublicProfileAchievements } = await import("./user-achievements");
-    const achievements = await fetchPublicProfileAchievements(userId, pinnedIds);
+    const { fetchPublicProfileStreaks } = await import("./user-achievements");
+    const streaks = await fetchPublicProfileStreaks(userId, pinnedIds, streakCounts);
 
     const profile: PublicCommunityProfile = {
       id: String(r.id),
@@ -275,7 +296,8 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       public_handle: (r.public_handle as string | null) ?? null,
       is_public: typeof r.is_public === "boolean" ? r.is_public : true,
       diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
-      achievements,
+      streaks,
+      achievements: streaks,
     };
     if (!profile.is_public) return { profile: null, error: null };
     return { profile, error: null };
@@ -458,6 +480,7 @@ export type ProfileUpdatePayload = {
     | "app_region"
     | "emergency_number"
     | "pinned_achievement_ids"
+    | "public_streak_counts"
     | "carb_source_prefs"
   >
 >;
@@ -486,6 +509,7 @@ export async function updateProfile(
     app_region,
     emergency_number,
     pinned_achievement_ids,
+    public_streak_counts,
     carb_source_prefs,
   } = payload;
   const update: Record<string, unknown> = { id };
@@ -582,6 +606,9 @@ export async function updateProfile(
     } else {
       update.pinned_achievement_ids = pinned_achievement_ids.filter((id) => typeof id === "string").slice(0, 5);
     }
+  }
+  if (public_streak_counts !== undefined) {
+    update.public_streak_counts = public_streak_counts ?? {};
   }
   if (carb_source_prefs !== undefined) {
     update.carb_source_prefs = carb_source_prefs ?? null;

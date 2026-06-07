@@ -8,11 +8,14 @@ import {
   DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
   storage,
 } from "@/lib/storage";
-import { mergeCloudAchievements, syncAchievementsFromActivity } from "@/lib/user-achievements";
+import { mergeCloudAchievements, syncAchievementsFromActivity, syncPublicStreakCountsToProfile } from "@/lib/user-achievements";
 
 function runAchievementSync(userId: string | null, showToasts: boolean): void {
   syncAchievementsFromActivity({ showToasts, userId });
-  if (userId) void mergeCloudAchievements(userId);
+  if (userId) {
+    void mergeCloudAchievements(userId);
+    void syncPublicStreakCountsToProfile(userId);
+  }
 }
 
 function recordCheckInAndSync(userId: string | null, showToasts: boolean): void {
