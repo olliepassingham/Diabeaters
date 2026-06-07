@@ -2,12 +2,10 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
-  Calendar,
   Flag,
   Heart,
   Link2,
   Loader2,
-  MapPin,
   MessageSquare,
   MoreHorizontal,
   Pencil,
@@ -19,6 +17,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { FeedEventCard } from "@/components/community/feed-event-card";
 import { FeedCommentItem } from "@/components/community/feed-comment-item";
 import { FeedLinkPreview } from "@/components/community/feed-link-preview";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +64,7 @@ import {
   fetchPollVoteState,
   getFirstWhitelistedFeedLink,
   fetchPostLikersWithProfiles,
+  fetchPostInterestedWithProfiles,
   fetchPollVotersWithProfiles,
   otherMemberUserId,
   parseEventExtra,
@@ -79,16 +79,6 @@ const RECENT_DM_PEERS_LIMIT = 20;
 
 function shortPeerId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
-}
-
-function formatEventWhen(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  try {
-    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  } catch {
-    return iso;
-  }
 }
 
 function FeedPollBlock({
@@ -266,6 +256,8 @@ type FeedPostCardProps = {
   onToggleComments: () => void;
   onReplyFocus: () => void;
   onLike: () => void;
+  /** Event posts: toggle interest (separate from like). */
+  onEventInterest?: () => void;
   onSavePost: () => void;
   onSubmitComment: () => void;
   onReportPost: () => void;
@@ -304,6 +296,7 @@ export function FeedPostCard({
   onToggleComments,
   onReplyFocus,
   onLike,
+  onEventInterest,
   onSavePost,
   onSubmitComment,
   onReportPost,
@@ -354,6 +347,14 @@ export function FeedPostCard({
   const [likersError, setLikersError] = useState<string | null>(null);
   const [likersTruncated, setLikersTruncated] = useState(false);
 
+  const [interestedOpen, setInterestedOpen] = useState(false);
+  const [interestedLoading, setInterestedLoading] = useState(false);
+  const [interestedRows, setInterestedRows] = useState<
+    { user_id: string; name: string; avatar_url: string | null }[]
+  >([]);
+  const [interestedError, setInterestedError] = useState<string | null>(null);
+  const [interestedTruncated, setInterestedTruncated] = useState(false);
+
   const previewLink = useMemo(() => getFirstWhitelistedFeedLink(post.body), [post.body]);
 
   const pollExtra = useMemo(
@@ -388,6 +389,29 @@ export function FeedPostCard({
       cancelled = true;
     };
   }, [likersOpen, post.id]);
+
+  useEffect(() => {
+    if (!interestedOpen) return;
+    let cancelled = false;
+    setInterestedLoading(true);
+    setInterestedError(null);
+    void (async () => {
+      const res = await fetchPostInterestedWithProfiles(post.id);
+      if (cancelled) return;
+      setInterestedLoading(false);
+      if (res.error) {
+        setInterestedError(res.error.message);
+        setInterestedRows([]);
+        setInterestedTruncated(false);
+        return;
+      }
+      setInterestedRows(res.data);
+      setInterestedTruncated(res.truncated);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [interestedOpen, post.id]);
 
   useEffect(() => {
     if (!shareOpen || !viewerId) return;
@@ -664,42 +688,21 @@ export function FeedPostCard({
             );
           })()}
           {eventExtra ? (
-            <div className="overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-b from-primary/[0.07] to-muted/20 shadow-sm ring-1 ring-border/50 dark:from-primary/10 dark:to-muted/10">
-              {post.image_urls.length > 0 ? (
-                <CommunityPostImageGrid
-                  paths={post.image_urls}
-                  altTexts={post.image_alt_texts}
-                  variant="event-banner"
-                />
-              ) : null}
-              <div
-                className={cn(
-                  "space-y-2 p-3 text-sm",
-                  post.image_urls.length > 0 && "border-t border-border/50 bg-background/50 backdrop-blur-sm dark:bg-background/30",
-                )}
-              >
-                <div className="flex items-start gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary dark:bg-primary/20">
-                    <Calendar className="h-4 w-4" aria-hidden />
-                  </span>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="font-semibold leading-snug text-foreground">{eventExtra.title}</p>
-                    <p className="text-sm text-muted-foreground">{formatEventWhen(eventExtra.starts_at)}</p>
-                    {eventExtra.location ? (
-                      <p className="flex items-start gap-1.5 text-sm text-foreground/90">
-                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                        <span>{eventExtra.location}</span>
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                {eventExtra.details ? (
-                  <p className="whitespace-pre-wrap border-t border-border/40 pt-2 text-sm text-muted-foreground pl-[2.75rem] sm:pl-12">
-                    {eventExtra.details}
-                  </p>
-                ) : null}
-              </div>
-            </div>
+            <FeedEventCard
+              event={eventExtra}
+              imagePaths={post.image_urls}
+              imageAltTexts={post.image_alt_texts}
+              postUrl={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/community/post/${encodeURIComponent(post.id)}`
+                  : undefined
+              }
+              interestedCount={post.interested_count}
+              interestedByMe={post.interested_by_me}
+              viewerCanReact={Boolean(viewerId)}
+              onInterested={onEventInterest}
+              onShowInterested={() => setInterestedOpen(true)}
+            />
           ) : null}
           {pollExtra ? (
             <FeedPollBlock
@@ -710,7 +713,7 @@ export function FeedPostCard({
             />
           ) : null}
           {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
-          {!(eventExtra && post.image_urls.length > 0) ? (
+          {!eventExtra ? (
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
           <div
@@ -963,6 +966,60 @@ export function FeedPostCard({
           {likersTruncated ? (
             <p className="text-tiny text-muted-foreground pt-1 border-t border-border/60">
               Pull down on the feed (or use the refresh icon) to sync the like count on the post card.
+            </p>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={interestedOpen} onOpenChange={setInterestedOpen}>
+        <DialogContent className="sm:max-w-md flex flex-col max-h-[min(70vh,28rem)]">
+          <DialogHeader>
+            <DialogTitle>Interested</DialogTitle>
+            <DialogDescription>
+              {interestedLoading
+                ? "Fetching who is interested…"
+                : interestedError
+                  ? "Could not load the list of interested people."
+                  : interestedRows.length === 0
+                    ? "No one has marked interest yet."
+                    : interestedTruncated
+                      ? `Showing the first ${POST_LIKERS_QUERY_LIMIT} people interested (there may be more).`
+                      : `People interested in this event (${interestedRows.length}).`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 -mr-1">
+            {interestedLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+              </div>
+            ) : interestedError ? (
+              <p className="text-sm text-destructive">{interestedError}</p>
+            ) : interestedRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No one interested yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {interestedRows.map((row) => (
+                  <li key={row.user_id}>
+                    <Link
+                      href={`/community/profile/${row.user_id}`}
+                      className="flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/60 min-h-11"
+                      onClick={() => setInterestedOpen(false)}
+                    >
+                      <CommunityAuthorAvatar
+                        size="sm"
+                        displayName={row.name}
+                        avatarPath={row.avatar_url}
+                      />
+                      <span className="text-sm font-medium text-foreground truncate">{row.name}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {interestedTruncated ? (
+            <p className="text-tiny text-muted-foreground pt-1 border-t border-border/60">
+              Pull down on the feed (or use the refresh icon) to sync the interest count on the event card.
             </p>
           ) : null}
         </DialogContent>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getPostImageSignedUrls } from "@/lib/community/posts-supabase";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   className?: string;
   /** `event-banner`: wide hero image for the first photo (feed event cards). */
   variant?: "default" | "event-banner";
+  /** Shown in placeholder when cover photo is missing or failed. */
+  eventTitle?: string;
 };
 
 function indexWithUrl(urls: (string | null)[], start: number, dir: -1 | 1): number | null {
@@ -26,19 +28,24 @@ function indexWithUrl(urls: (string | null)[], start: number, dir: -1 | 1): numb
 /**
  * Resolves private storage paths to signed URLs and renders a small grid.
  */
-export function CommunityPostImageGrid({ paths, altTexts, className, variant = "default" }: Props) {
+export function CommunityPostImageGrid({ paths, altTexts, className, variant = "default", eventTitle }: Props) {
   const [urls, setUrls] = useState<(string | null)[]>([]);
+  const [failedIndices, setFailedIndices] = useState<Set<number>>(() => new Set());
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (paths.length === 0) {
       setUrls([]);
+      setFailedIndices(new Set());
       return;
     }
     let cancelled = false;
     void (async () => {
       const next = await getPostImageSignedUrls(paths);
-      if (!cancelled) setUrls(next);
+      if (!cancelled) {
+        setUrls(next);
+        setFailedIndices(new Set());
+      }
     })();
     return () => {
       cancelled = true;
@@ -46,8 +53,8 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
   }, [paths]);
 
   const loadedIndices = useMemo(
-    () => paths.map((_, i) => i).filter((i) => Boolean(urls[i]?.trim())),
-    [paths, urls],
+    () => paths.map((_, i) => i).filter((i) => Boolean(urls[i]?.trim()) && !failedIndices.has(i)),
+    [paths, urls, failedIndices],
   );
 
   const safeIdx = openIdx != null && openIdx >= 0 && openIdx < urls.length && urls[openIdx] ? openIdx : null;
@@ -67,6 +74,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
   if (variant === "event-banner") {
     const heroIdx = loadedIndices[0];
     const moreIdx = loadedIndices.slice(1);
+    const waitingForUrls = urls.length !== paths.length || (paths.length > 0 && loadedIndices.length === 0 && !loadFailed);
     return (
       <>
         <div className={cn("overflow-hidden", className)}>
@@ -79,18 +87,24 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
             >
               <img
                 src={urls[heroIdx]!}
-                alt={altTexts?.[heroIdx]?.trim() || "Event photo"}
+                alt={altTexts?.[heroIdx]?.trim() || eventTitle?.trim() || "Event cover photo"}
                 className="h-44 w-full object-cover sm:h-52"
                 loading="lazy"
+                onError={() => setFailedIndices((prev) => new Set(prev).add(heroIdx))}
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
             </button>
-          ) : loadFailed ? (
-            <div className="flex h-28 items-center justify-center bg-muted/40 px-4 text-center text-xs text-muted-foreground">
-              Photo could not be loaded. Try refreshing the feed.
+          ) : waitingForUrls ? (
+            <div className="flex h-32 animate-pulse items-end bg-gradient-to-br from-primary/10 to-muted/30 p-4 sm:h-40" aria-hidden>
+              <div className="h-3 w-24 rounded-full bg-muted/60" />
             </div>
           ) : (
-            <div className="h-8 animate-pulse bg-muted/50" aria-hidden />
+            <div className="flex h-28 flex-col items-center justify-center gap-1 bg-gradient-to-br from-primary/12 via-primary/5 to-muted/25 px-4 text-center sm:h-32">
+              <Calendar className="h-8 w-8 text-primary/35" aria-hidden />
+              {eventTitle?.trim() ? (
+                <p className="max-w-full truncate text-xs font-medium text-muted-foreground">{eventTitle.trim()}</p>
+              ) : null}
+            </div>
           )}
           {moreIdx.length > 0 ? (
             <div className="flex gap-1.5 border-t border-border/50 bg-muted/20 p-2 dark:bg-muted/10">

@@ -111,6 +111,7 @@ function normalizeAltsForCount(raw: string[] | undefined, n: number): string[] {
 function mapPost(r: Record<string, unknown>): CommunityPostRow {
   const cc = Number(r.comment_count ?? 0);
   const lc = Number(r.like_count ?? 0);
+  const ic = Number(r.interested_count ?? 0);
   const imgs = parseImageUrls(r.image_urls);
   const post_kind = mapPostKind(r.post_kind);
   const post_extra = parsePostExtra(post_kind, r.post_extra);
@@ -130,6 +131,8 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
     comment_count: Number.isFinite(cc) ? Math.max(0, Math.floor(cc)) : 0,
     like_count: Number.isFinite(lc) ? Math.max(0, Math.floor(lc)) : 0,
     liked_by_me: Boolean(r.liked_by_me),
+    interested_count: Number.isFinite(ic) ? Math.max(0, Math.floor(ic)) : 0,
+    interested_by_me: Boolean(r.interested_by_me),
     saved_by_me: Boolean(r.saved_by_me),
     created_at: String(r.created_at ?? ""),
   };
@@ -174,6 +177,51 @@ async function fetchLikeCountsForPostIds(postIds: string[]): Promise<Map<string,
     out.set(pid, (out.get(pid) ?? 0) + 1);
   }
   return out;
+}
+
+async function fetchInterestCountsForPostIds(postIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const id of postIds) out.set(id, 0);
+  if (postIds.length === 0) return out;
+  const supabase = getSupabase();
+  if (!supabase) return out;
+
+  const { data, error } = await supabase
+    .from("community_post_event_interest")
+    .select("post_id")
+    .in("post_id", postIds);
+
+  if (error) return out;
+  for (const row of (data ?? []) as Array<{ post_id: string }>) {
+    const pid = String(row.post_id);
+    out.set(pid, (out.get(pid) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** Which event post IDs the current user marked interested in. */
+export async function fetchMyInterestForPostIds(postIds: string[]): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const supabase = getSupabase();
+  if (!supabase) return new Set();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return new Set();
+
+  const { data, error } = await supabase
+    .from("community_post_event_interest")
+    .select("post_id")
+    .eq("user_id", uid)
+    .in("post_id", postIds);
+
+  if (error) return new Set();
+  return new Set((data ?? []).map((row: { post_id: string }) => String(row.post_id)));
+}
+
+function mergeInterestedIntoPosts(posts: CommunityPostRow[], interestedIds: Set<string>): CommunityPostRow[] {
+  return posts.map((p) =>
+    p.post_kind === "event" ? { ...p, interested_by_me: interestedIds.has(p.id) } : p,
+  );
 }
 
 /** Which of these post IDs the current user has liked (for merging into feed rows). */
@@ -241,10 +289,13 @@ async function attachAuthorPreviews(posts: CommunityPostRow[]): Promise<Communit
 async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<CommunityPostRow[]> {
   if (withCounts.length === 0) return withCounts;
   const postIds = withCounts.map((p) => p.id);
-  const [commentCounts, likeCounts, liked, saved, withAuthors] = await Promise.all([
+  const eventPostIds = withCounts.filter((p) => p.post_kind === "event").map((p) => p.id);
+  const [commentCounts, likeCounts, interestCounts, liked, interested, saved, withAuthors] = await Promise.all([
     fetchCommentCountsForPostIds(postIds),
     fetchLikeCountsForPostIds(postIds),
+    fetchInterestCountsForPostIds(eventPostIds),
     fetchMyLikesForPostIds(postIds),
+    fetchMyInterestForPostIds(eventPostIds),
     fetchMySavesForPostIds(postIds),
     attachAuthorPreviews(withCounts),
   ]);
@@ -252,8 +303,10 @@ async function finalizePostRowsForFeed(withCounts: CommunityPostRow[]): Promise<
     ...p,
     comment_count: Math.max(p.comment_count, commentCounts.get(p.id) ?? 0),
     like_count: Math.max(p.like_count, likeCounts.get(p.id) ?? 0),
+    interested_count:
+      p.post_kind === "event" ? Math.max(p.interested_count, interestCounts.get(p.id) ?? 0) : 0,
   }));
-  return mergeSavedIntoPosts(mergeLikedIntoPosts(merged, liked), saved);
+  return mergeSavedIntoPosts(mergeInterestedIntoPosts(mergeLikedIntoPosts(merged, liked), interested), saved);
 }
 
 async function finalizeSinglePostRow(row: CommunityPostRow): Promise<CommunityPostRow> {
@@ -295,6 +348,35 @@ export async function togglePostLike(
       if (fnErr) logEdgeInvokeFailure("notify_feed_push like", fnErr.message);
     });
 
+  return { error: null };
+}
+
+export async function toggleEventInterest(
+  postId: string,
+  currentlyInterested: boolean,
+): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: new Error("Not signed in") };
+
+  if (currentlyInterested) {
+    const { error } = await supabase
+      .from("community_post_event_interest")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", uid);
+    if (error) return { error: new Error(error.message) };
+    return { error: null };
+  }
+
+  const { error } = await supabase.from("community_post_event_interest").insert({
+    post_id: postId,
+    user_id: uid,
+  });
+  if (error) return { error: new Error(error.message) };
   return { error: null };
 }
 
@@ -1211,6 +1293,51 @@ export async function fetchPostLikersWithProfiles(postId: string): Promise<{
   truncated: boolean;
 }> {
   const { data: ids, error, truncated } = await fetchLikerUserIdsForPost(postId);
+  if (error) return { data: [], error, truncated: false };
+  if (ids.length === 0) return { data: [], error: null, truncated };
+
+  const profiles = await getProfilesByIds(ids);
+  const data: PostLikerDisplay[] = ids.map((uid) => {
+    const p = profiles.get(uid);
+    return {
+      user_id: uid,
+      name: p?.full_name?.trim() || shortLikerId(uid),
+      avatar_url: p?.avatar_url ?? null,
+    };
+  });
+  return { data, error: null, truncated };
+}
+
+/** User IDs interested in an event post, oldest first (RLS applies). */
+export async function fetchInterestedUserIdsForPost(postId: string): Promise<{
+  data: string[];
+  error: Error | null;
+  truncated: boolean;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: [], error: new Error("Supabase not configured"), truncated: false };
+
+  const { data, error } = await supabase
+    .from("community_post_event_interest")
+    .select("user_id")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true })
+    .limit(POST_LIKERS_QUERY_LIMIT);
+
+  if (error) return { data: [], error: new Error(error.message), truncated: false };
+  const rows = data ?? [];
+  const truncated = rows.length >= POST_LIKERS_QUERY_LIMIT;
+  const ids = rows.map((r: { user_id: string }) => String(r.user_id));
+  return { data: ids, error: null, truncated };
+}
+
+/** Interested users with display names (event posts). */
+export async function fetchPostInterestedWithProfiles(postId: string): Promise<{
+  data: PostLikerDisplay[];
+  error: Error | null;
+  truncated: boolean;
+}> {
+  const { data: ids, error, truncated } = await fetchInterestedUserIdsForPost(postId);
   if (error) return { data: [], error, truncated: false };
   if (ids.length === 0) return { data: [], error: null, truncated };
 

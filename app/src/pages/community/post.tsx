@@ -43,6 +43,7 @@ import {
   insertCommunityComment,
   submitContentReport,
   togglePostLike,
+  toggleEventInterest,
   togglePostSave,
   updateCommunityPost,
   type CommunityPostCommentRow,
@@ -193,6 +194,24 @@ export default function CommunityPostPage() {
         like_count: Math.max(0, post.like_count + (currentlyLiked ? 1 : -1)),
       });
       toast({ title: "Could not update like", description: res.error.message, variant: "destructive" });
+    }
+  }
+
+  async function handleToggleInterest(pid: string, currentlyInterested: boolean) {
+    if (!user || !post || pid !== post.id || post.post_kind !== "event") return;
+    setPost({
+      ...post,
+      interested_by_me: !currentlyInterested,
+      interested_count: Math.max(0, post.interested_count + (currentlyInterested ? -1 : 1)),
+    });
+    const res = await toggleEventInterest(pid, currentlyInterested);
+    if (res.error) {
+      setPost({
+        ...post,
+        interested_by_me: currentlyInterested,
+        interested_count: Math.max(0, post.interested_count + (currentlyInterested ? 1 : -1)),
+      });
+      toast({ title: "Could not update interest", description: res.error.message, variant: "destructive" });
     }
   }
 
@@ -399,6 +418,11 @@ export default function CommunityPostPage() {
         onToggleComments={() => setExpanded((e) => !e)}
         onReplyFocus={replyFocus}
         onLike={() => void handleToggleLike(post.id, post.liked_by_me)}
+        onEventInterest={
+          post.post_kind === "event"
+            ? () => void handleToggleInterest(post.id, post.interested_by_me)
+            : undefined
+        }
         onSavePost={() => void handleToggleSave(post.id, post.saved_by_me)}
         onSubmitComment={() => void submitComment()}
         onReportPost={() => openReport("post", post.id)}

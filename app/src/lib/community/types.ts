@@ -31,6 +31,10 @@ export type CommunityPostRow = {
   like_count: number;
   /** Whether the current user has liked this post (client merges from reactions). */
   liked_by_me: boolean;
+  /** Event posts: denormalized interest count (community_post_event_interest). */
+  interested_count: number;
+  /** Event posts: whether the current user marked interest. */
+  interested_by_me: boolean;
   /** Whether the current user saved/bookmarked this post (community_post_saves). */
   saved_by_me: boolean;
   created_at: string;

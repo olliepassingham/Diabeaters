@@ -46,6 +46,7 @@ import {
   searchCommunityPostsPage,
   submitContentReport,
   togglePostLike,
+  toggleEventInterest,
   togglePostSave,
   updateCommunityPost,
   shouldUseFeedServerSearch,
@@ -520,6 +521,23 @@ export function FeedPostList(props: {
     });
   }
 
+  async function onEventInterest(postId: string) {
+    if (!props.viewerId) return;
+    const cur = postsRef.current.find((p) => p.id === postId);
+    if (!cur || cur.post_kind !== "event") return;
+    const res = await toggleEventInterest(postId, cur.interested_by_me);
+    if (res.error) {
+      toast({ title: "Could not update interest", description: res.error.message, variant: "destructive" });
+      return;
+    }
+    patchPostsInCache((p) => {
+      if (p.id !== postId) return p;
+      const nextInterested = !p.interested_by_me;
+      const nextCount = Math.max(0, p.interested_count + (nextInterested ? 1 : -1));
+      return { ...p, interested_by_me: nextInterested, interested_count: nextCount };
+    });
+  }
+
   async function onSavePost(postId: string) {
     if (!props.viewerId) {
       toast({ title: "Sign in", description: "Log in to save posts.", variant: "destructive" });
@@ -786,6 +804,9 @@ export function FeedPostList(props: {
                   window.setTimeout(() => commentInputRefs.current[post.id]?.focus(), 0);
                 }}
                 onLike={() => void onLike(post.id)}
+                onEventInterest={
+                  post.post_kind === "event" ? () => void onEventInterest(post.id) : undefined
+                }
                 onSavePost={() => void onSavePost(post.id)}
                 onSubmitComment={() => void onSubmitComment(post.id)}
                 onReportPost={() => openReport("post", post.id)}

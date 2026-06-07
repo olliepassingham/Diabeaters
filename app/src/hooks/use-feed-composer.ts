@@ -15,6 +15,7 @@ import {
   type CommunityPostRow,
   type CommunityTopicId,
 } from "@/lib/community";
+import { defaultEventStartsAtLocal } from "@/lib/community/event-display";
 import { useProfile } from "@/lib/profile";
 
 export type UseFeedComposerOptions = {
@@ -197,6 +198,9 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
     setPollQuestion("");
     setPollOptions(["", ""]);
+    if (!eventStartsAt.trim()) {
+      setEventStartsAt(defaultEventStartsAtLocal());
+    }
     setComposerPostKind("event");
   }
 
@@ -266,6 +270,15 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         toast({ title: "Invalid date", description: "Choose a valid start date and time.", variant: "destructive" });
         return;
       }
+      if (startDate.getTime() < Date.now() - 60_000) {
+        setSubmitting(false);
+        toast({
+          title: "Date is in the past",
+          description: "Choose a start time in the future so people know when to show up.",
+          variant: "destructive",
+        });
+        return;
+      }
       res = await insertFeedPost({
         kind: "event",
         topic: composerTopic,
@@ -285,12 +298,15 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
       toast({ title: "Post failed", description: res.error.message, variant: "destructive" });
       return;
     }
+    const postedKind = composerPostKind;
     resetComposerAfterPost();
     if (options.closeSheetOnPost !== false) setSheetOpen(false);
     options.onPosted?.(res.data);
     if (!options.suppressPostedToast) {
       toast({
-        title: options.postedToastTitle ?? "Posted",
+        title:
+          options.postedToastTitle ??
+          (postedKind === "event" ? "Event shared" : "Posted"),
         description: options.postedToastDescription,
       });
     }
