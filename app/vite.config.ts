@@ -38,7 +38,17 @@ export default defineConfig(({ mode }) => {
     },
 
     optimizeDeps: {
-      include: ["react", "react-dom", "date-fns"],
+      // Pre-bundle deps used by lazy routes (e.g. Travel) so HMR does not 504 "Outdated Optimize Dep".
+      include: [
+        "react",
+        "react-dom",
+        "date-fns",
+        "@radix-ui/react-accordion",
+        "@radix-ui/react-collapsible",
+        "@radix-ui/react-tabs",
+        "@radix-ui/react-select",
+        "@radix-ui/react-popover",
+      ],
     },
 
     root: appDir,
@@ -73,6 +83,9 @@ export default defineConfig(({ mode }) => {
       host: true,
       fs: { strict: true, deny: ["**/.*"] },
       proxy: { "/api": "http://localhost:3000" },
+      warmup: {
+        clientFiles: ["./src/pages/travel.tsx"],
+      },
     },
   };
 });

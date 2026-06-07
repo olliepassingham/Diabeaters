@@ -13,6 +13,17 @@ interface State {
 }
 
 const CACHE_RECOVERY_KEY = "diabeaters-cache-recovery-attempted";
+const CHUNK_RECOVERY_KEY = "diabeaters-chunk-recovery-attempted";
+
+function isLazyChunkLoadError(error: Error | null): boolean {
+  if (!error) return false;
+  const msg = error.message || "";
+  return (
+    msg.includes("Failed to fetch dynamically imported module") ||
+    msg.includes("Importing a module script failed") ||
+    msg.includes("error loading dynamically imported module")
+  );
+}
 
 async function clearAllCachesAndReload() {
   try {
@@ -30,6 +41,14 @@ async function clearAllCachesAndReload() {
   }
 
   window.location.reload();
+}
+
+function shouldAttemptChunkRecovery(error: Error | null): boolean {
+  if (!error || !isLazyChunkLoadError(error)) return false;
+  if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(CHUNK_RECOVERY_KEY) === "1") {
+    return false;
+  }
+  return true;
 }
 
 function shouldAttemptCacheRecovery(error: Error | null): boolean {
@@ -75,6 +94,17 @@ export class ErrorBoundary extends Component<Props, State> {
       this.setState({ componentStack: errorInfo.componentStack });
     }
 
+    if (shouldAttemptChunkRecovery(error)) {
+      try {
+        sessionStorage.setItem(CHUNK_RECOVERY_KEY, "1");
+      } catch {
+        // ignore quota / private mode
+      }
+      this.setState({ isClearing: true });
+      window.location.reload();
+      return;
+    }
+
     if (shouldAttemptCacheRecovery(error)) {
       try {
         sessionStorage.setItem(CACHE_RECOVERY_KEY, "1");
@@ -109,7 +139,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-md text-center space-y-4">
             <h1 className="text-lg font-semibold">Something went wrong. Please try again.</h1>
             <p className="text-sm text-muted-foreground">
-              If the problem keeps happening, try closing and reopening the app.
+              {isLazyChunkLoadError(this.state.error)
+                ? import.meta.env.DEV
+                  ? "This page failed to load after a dev-server update. Retrying once — if it keeps happening, hard-refresh or restart npm run dev."
+                  : "This page failed to load. Retrying once — if it keeps happening, close and reopen the app."
+                : "If the problem keeps happening, try closing and reopening the app."}
             </p>
             {import.meta.env.DEV && this.state.error ? (
               <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-left text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
