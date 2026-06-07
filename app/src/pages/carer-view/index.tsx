@@ -25,8 +25,6 @@ import { Link, useLocation } from "wouter";
 import {
   normaliseScopes,
   fetchSuppliesForLinkedPatient,
-  fetchSupplyEventsForLinkedPatient,
-  resolveSupplyEventItemName,
   fetchPatientProfileForCarer,
   fetchAppointmentsForLinkedPatient,
   fetchScenariosForLinkedPatient,
@@ -39,10 +37,8 @@ import {
   carerLogSickDayMedicationTaken,
   carerDeactivateSickDayScenarioForPatient,
 } from "@/lib/carers";
-import type { CloudSupplyEventRow } from "@/lib/carers";
 import type { CloudHypoLogRow, CloudSupplyRow, LinkedPatientWithProfile } from "@/lib/carers.types";
 import {
-  formatCarerSupplyEventDelta,
   formatCarerSupplyQuantity,
   type PatientSupplyPackPrefs,
 } from "@/lib/supply-display-for-carer";
@@ -1282,7 +1278,6 @@ export default function CarerViewPage() {
   const [profile, setProfile] = useState<Awaited<ReturnType<typeof fetchPatientProfileForCarer>>["data"]>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [supplies, setSupplies] = useState<CloudSupplyRow[]>([]);
-  const [supplyEvents, setSupplyEvents] = useState<CloudSupplyEventRow[]>([]);
   const [appointmentRows, setAppointmentRows] = useState<Record<string, unknown>[]>([]);
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
@@ -1382,13 +1377,10 @@ export default function CarerViewPage() {
     setHypoLogs([]);
     void (async () => {
       try {
-        const [prof, sup, se, ap, sc, hl] = await Promise.all([
+        const [prof, sup, ap, sc, hl] = await Promise.all([
           fetchPatientProfileForCarer(patientId),
           rawScopes.supplies
             ? fetchSuppliesForLinkedPatient(patientId)
-            : Promise.resolve({ data: [], error: null }),
-          rawScopes.supplies
-            ? fetchSupplyEventsForLinkedPatient(patientId)
             : Promise.resolve({ data: [], error: null }),
           rawScopes.appointments
             ? fetchAppointmentsForLinkedPatient(patientId)
@@ -1406,8 +1398,6 @@ export default function CarerViewPage() {
         setProfile(prof.data);
         if (sup.error) setLoadError(sup.error.message);
         setSupplies(sup.data ?? []);
-        if (se.error) setLoadError(se.error.message);
-        setSupplyEvents(se.data ?? []);
         if (ap.error) setLoadError(ap.error.message);
         setAppointmentRows(ap.data ?? []);
         if (sc.error) setLoadError(sc.error.message);
@@ -1839,64 +1829,6 @@ export default function CarerViewPage() {
                     })}
                   </ul>
                 )}
-
-                  {supplyEvents.length > 0 && (
-                    <details className="mt-4">
-                      <summary className="text-sm text-muted-foreground cursor-pointer select-none">
-                        Recent changes
-                      </summary>
-                      <div className="mt-3 space-y-2">
-                        {supplyEvents.slice(0, 8).map((e) => {
-                          const when = new Date(e.created_at);
-                          const whenText = Number.isNaN(when.getTime())
-                            ? "Unknown time"
-                            : formatDistanceToNowStrict(when, { addSuffix: true });
-                          const delta =
-                            e.delta == null || Number.isNaN(e.delta) ? null : Math.round(e.delta * 10) / 10;
-                          const itemName = resolveSupplyEventItemName(e, supplies);
-                          const linkedSupply =
-                            supplies.find((s) => s.id === e.supply_id) ??
-                            (itemName
-                              ? supplies.find((s) => s.name.trim().toLowerCase() === itemName.trim().toLowerCase())
-                              : undefined);
-                          const eventRowForFormat: CloudSupplyRow =
-                            linkedSupply ?? {
-                              id: e.supply_id,
-                              user_id: e.user_id,
-                              name: itemName ?? "Supply",
-                              quantity: 0,
-                              updated_at: e.created_at,
-                              category: null,
-                            };
-                          return (
-                            <div key={e.id} className="rounded-lg border border-border/60 px-3 py-2 text-sm space-y-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">
-                                  {e.kind}
-                                  {delta != null && delta !== 0 ? (
-                                    <span
-                                      className={
-                                        delta < 0
-                                          ? "text-amber-700 dark:text-amber-400"
-                                          : "text-emerald-700 dark:text-emerald-400"
-                                      }
-                                    >
-                                      {" "}
-                                      {formatCarerSupplyEventDelta(delta, eventRowForFormat, patientSupplyPackPrefs)}
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span className="text-xs text-muted-foreground shrink-0">{whenText}</span>
-                              </div>
-                              {itemName ? (
-                                <p className="text-xs text-muted-foreground">Item: {itemName}</p>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </details>
-                  )}
               </CardContent>
             </CarerUrgentCard>
           )}

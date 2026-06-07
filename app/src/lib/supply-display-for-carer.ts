@@ -104,36 +104,3 @@ export function formatCarerSupplyQuantity(
 
   return String(qty);
 }
-
-/** Format event delta for supporter recent changes (e.g. +1 pen, +100 units stays as units if unknown type). */
-export function formatCarerSupplyEventDelta(
-  delta: number,
-  row: CloudSupplyRow,
-  packPrefs?: PatientSupplyPackPrefs | null,
-): string {
-  const rounded = Math.round(delta * 10) / 10;
-  if (rounded === 0) return "0";
-  const sign = rounded > 0 ? "+" : "";
-  const settings = settingsFromPackPrefs(packPrefs);
-  const type = inferSupplyTypeFromCloudRow(row);
-
-  if (INSULIN_TYPES.includes(type)) {
-    const perPen = getUnitsPerPen(settings);
-    const pens = Math.round((rounded / perPen) * 10) / 10;
-    if (Math.abs(pens) >= 0.05 && Math.abs(pens - Math.round(pens)) < 0.05) {
-      const whole = Math.round(pens);
-      return `${sign}${whole} ${pluralize("pen", Math.abs(whole))}`;
-    }
-  }
-
-  if (type === "needle") {
-    const perBox = Math.max(1, settings.needlesPerBox || UK_DEFAULT_NEEDLES_PER_BOX);
-    const boxes = Math.round((rounded / perBox) * 10) / 10;
-    if (Math.abs(boxes) >= 0.05 && Math.abs(boxes - Math.round(boxes)) < 0.05) {
-      const whole = Math.round(boxes);
-      return `${sign}${whole} ${pluralize("box", Math.abs(whole))}`;
-    }
-  }
-
-  return `${sign}${rounded}`;
-}
