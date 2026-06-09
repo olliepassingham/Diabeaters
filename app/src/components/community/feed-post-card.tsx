@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "
 import { Link, useLocation } from "wouter";
 import {
   Bookmark,
+  ChevronRight,
   Flag,
   Heart,
   Link2,
@@ -820,37 +821,65 @@ export function FeedPostCard({
       </Dialog>
 
       <Dialog open={interestedOpen} onOpenChange={setInterestedOpen}>
-        <DialogContent className="sm:max-w-md flex flex-col max-h-[min(70vh,28rem)]">
-          <DialogHeader>
-            <DialogTitle>Interested</DialogTitle>
-            <DialogDescription>
-              {interestedLoading
-                ? "Fetching who is interested…"
-                : interestedError
-                  ? "Could not load the list of interested people."
-                  : interestedRows.length === 0
-                    ? "No one has marked interest yet."
-                    : interestedTruncated
-                      ? `Showing the first ${POST_LIKERS_QUERY_LIMIT} people interested (there may be more).`
-                      : `People interested in this event (${interestedRows.length}).`}
-            </DialogDescription>
+        <DialogContent className="flex max-h-[min(72vh,32rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="space-y-0 border-b border-border/50 px-4 py-3.5 text-left sm:px-5 sm:py-4">
+            <div className="flex items-start gap-3 pr-8">
+              <div
+                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10"
+                aria-hidden
+              >
+                <Heart className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-base font-semibold leading-tight">Interested</DialogTitle>
+                  {!interestedLoading && !interestedError && interestedRows.length > 0 ? (
+                    <Badge variant="secondary" className="h-5 shrink-0 px-1.5 text-[10px] tabular-nums">
+                      {interestedRows.length}
+                    </Badge>
+                  ) : null}
+                </div>
+                {eventExtra?.title?.trim() ? (
+                  <p className="truncate text-xs text-muted-foreground">{eventExtra.title.trim()}</p>
+                ) : null}
+                <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+                  {interestedLoading
+                    ? "Loading…"
+                    : interestedError
+                      ? "Could not load this list."
+                      : interestedRows.length === 0
+                        ? "No one has marked interest yet."
+                        : interestedTruncated
+                          ? `First ${POST_LIKERS_QUERY_LIMIT} shown — there may be more.`
+                          : `${interestedRows.length === 1 ? "1 person" : `${interestedRows.length} people`} interested in this event`}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 -mr-1">
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 sm:px-3">
             {interestedLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden />
+              <div className="space-y-2 px-1 py-1">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-xl px-2.5 py-2">
+                    <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+                    <Skeleton className="h-4 flex-1 max-w-[8rem]" />
+                  </div>
+                ))}
               </div>
             ) : interestedError ? (
-              <p className="text-sm text-destructive">{interestedError}</p>
+              <p className="px-2 py-6 text-center text-sm text-destructive">{interestedError}</p>
             ) : interestedRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No one interested yet.</p>
+              <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+                <Heart className="h-8 w-8 text-muted-foreground/35" aria-hidden />
+                <p className="text-sm text-muted-foreground">Be the first to mark interested.</p>
+              </div>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-0.5">
                 {interestedRows.map((row) => (
                   <li key={row.user_id}>
                     <Link
                       href={`/community/profile/${row.user_id}`}
-                      className="flex items-center gap-2 rounded-md px-1 py-1.5 hover:bg-muted/60 min-h-11"
+                      className="flex min-h-11 items-center gap-3 rounded-xl px-2.5 py-2 transition-colors hover:bg-muted/50 active:bg-muted/70"
                       onClick={() => setInterestedOpen(false)}
                     >
                       <CommunityAuthorAvatar
@@ -858,7 +887,10 @@ export function FeedPostCard({
                         displayName={row.name}
                         avatarPath={row.avatar_url}
                       />
-                      <span className="text-sm font-medium text-foreground truncate">{row.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                        {row.name}
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
                     </Link>
                   </li>
                 ))}
@@ -866,8 +898,8 @@ export function FeedPostCard({
             )}
           </div>
           {interestedTruncated ? (
-            <p className="text-tiny text-muted-foreground pt-1 border-t border-border/60">
-              Pull down on the feed (or use the refresh icon) to sync the interest count on the event card.
+            <p className="border-t border-border/50 px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground sm:px-5">
+              Pull down on the feed to refresh the interest count on the event card.
             </p>
           ) : null}
         </DialogContent>

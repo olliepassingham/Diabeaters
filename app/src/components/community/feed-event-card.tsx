@@ -127,13 +127,26 @@ export function FeedEventCard({
             Interested
           </Button>
           {interestedCount > 0 && onShowInterested ? (
-            <button
-              type="button"
-              className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              onClick={onShowInterested}
-            >
-              {interestedCount} {interestedCount === 1 ? "person" : "people"} interested
-            </button>
+            <>
+              <span className="text-muted-foreground/50" aria-hidden>
+                ·
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-2.5 text-xs font-medium text-muted-foreground no-underline hover:bg-muted/40 hover:text-foreground"
+                onClick={onShowInterested}
+                aria-label={`See who is interested (${interestedCount})`}
+              >
+                <span className="tabular-nums">{interestedCount}</span>
+                <span className="ml-1">interested</span>
+              </Button>
+            </>
+          ) : interestedCount > 0 ? (
+            <span className="text-xs text-muted-foreground">
+              <span className="tabular-nums font-medium text-foreground/80">{interestedCount}</span> interested
+            </span>
           ) : null}
         </div>
       </div>
