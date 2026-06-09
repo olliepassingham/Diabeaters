@@ -54,7 +54,14 @@ import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activi
 import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
 import { resolveSupporterPushPromptAfterLink } from "@/lib/supporter-push-prompt";
+import { SupporterProfileSetupCard } from "@/components/supporter-profile-setup-card";
 import { useAuth } from "@/lib/auth-context";
+import { needsCommunityProfileSetup, useProfile } from "@/lib/profile";
+import {
+  clearSupporterProfilePromptState,
+  dismissSupporterProfilePrompt,
+  shouldShowSupporterProfilePrompt,
+} from "@/lib/supporter-profile-prompt";
 import { useLinkedPatientQuery, useLinkedPatientsForCarerQuery } from "@/lib/carer-link-query";
 import { CarerClinicalPrefsCard } from "@/pages/carer-view/carer-clinical-prefs-card";
 import { scrollToCarerViewHashTarget } from "@/pages/carer-view/carer-view-nav";
@@ -1252,6 +1259,7 @@ type CarerViewPhase = "loading_link" | "unlinked" | "ready";
 
 export default function CarerViewPage() {
   const { user } = useAuth();
+  const { profile: supporterProfile, loading: supporterProfileLoading } = useProfile();
   const [location, setLocation] = useLocation();
   const cachedLinkQuery = useLinkedPatientQuery();
   const linkedPatientsQuery = useLinkedPatientsForCarerQuery();
@@ -1284,6 +1292,7 @@ export default function CarerViewPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
   const [supporterPushPromptOpen, setSupporterPushPromptOpen] = useState(false);
+  const [showProfileSetupCard, setShowProfileSetupCard] = useState(false);
   const linkQueriesLoading =
     (cachedLinkQuery.isLoading || linkedPatientsQuery.isLoading) && linkedPatients.length === 0;
   const linkResolvedEmpty =
@@ -1466,6 +1475,16 @@ export default function CarerViewPage() {
       cancelled = true;
     };
   }, [phase, user?.id]);
+
+  useEffect(() => {
+    if (phase !== "ready" || !user?.id || supporterProfileLoading) return;
+    if (needsCommunityProfileSetup(supporterProfile)) {
+      setShowProfileSetupCard(shouldShowSupporterProfilePrompt(user.id));
+      return;
+    }
+    clearSupporterProfilePromptState(user.id);
+    setShowProfileSetupCard(false);
+  }, [phase, user?.id, supporterProfile, supporterProfileLoading]);
   const upcomingAppointments = useMemo(() => {
     const now = Date.now();
     return (appointmentRows ?? [])
@@ -1698,6 +1717,15 @@ export default function CarerViewPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {showProfileSetupCard && user?.id ? (
+        <SupporterProfileSetupCard
+          onDismiss={() => {
+            dismissSupporterProfilePrompt(user.id);
+            setShowProfileSetupCard(false);
+          }}
+        />
+      ) : null}
 
       {loadError && (
         <Alert variant="destructive">

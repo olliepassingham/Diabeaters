@@ -55,6 +55,10 @@ import {
 } from "@/lib/carer-session";
 import { getCommunityMemberOnboardingCompletePath } from "@/lib/community-landing";
 import { markCommunityPushPromptPending } from "@/lib/community-push-prompt";
+import {
+  clearCommunitySkippedProfileSetup,
+  markCommunitySkippedProfileSetup,
+} from "@/lib/community-profile-prompt";
 import { markBedtimeReminderPromptPending } from "@/lib/bedtime-reminder-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
@@ -495,6 +499,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     markCommunityPushPromptPending();
+    if (pathOverride === "/tools") {
+      markCommunitySkippedProfileSetup();
+    } else {
+      clearCommunitySkippedProfileSetup();
+    }
     setActiveAppMode("community");
     setPrimaryAppRole("community");
     if (user?.id) {
@@ -743,11 +752,32 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
         <div className="space-y-2">
           <h2 className="text-2xl font-bold">You&apos;re ready to explore</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Set up your community profile to join the feed, or browse education and {AI_ASSISTANT_NAME} in Tools. You
-            can unlock full Type&nbsp;1 features anytime in Settings.
+            Browse education and {AI_ASSISTANT_NAME} in Tools now, or set up your public profile first to join the Feed.
+            You can unlock full Type&nbsp;1 features anytime in Settings.
           </p>
         </div>
       </div>
+      <ul className="mx-auto max-w-md space-y-2.5 text-sm text-muted-foreground" data-testid="onboarding-community-feed-requirements">
+        <li className="flex items-start gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <span>
+            <span className="font-medium text-foreground">Display name</span> — how others see you on posts and messages
+          </span>
+        </li>
+        <li className="flex items-start gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <span>
+            <span className="font-medium text-foreground">Public @handle</span> — your unique community username
+          </span>
+        </li>
+        <li className="flex items-start gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+          <span>
+            <span className="font-medium text-foreground">Profile public</span> — turns on Feed access when the rest is
+            complete
+          </span>
+        </li>
+      </ul>
       <div
         className="space-y-3 fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
         data-testid="onboarding-community-first-win-actions"
@@ -771,7 +801,7 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
           Browse tools
         </Button>
         <p className="text-center text-xs text-muted-foreground">
-          Finishing saves your basics. Add a public profile when you&apos;re ready to post or message.
+          Finishing saves your basics. You can add your public profile anytime in Account.
         </p>
       </div>
     </div>

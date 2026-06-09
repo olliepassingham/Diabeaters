@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import {
   formatLivingWithDiabetesLine,
   isPublicHandleAvailable,
+  isPublicCommunityProfileComplete,
   normalizePublicHandleInput,
   PUBLIC_HANDLE_TAKEN_MESSAGE,
   updateProfile,
@@ -41,26 +42,6 @@ type AccountCommunityProfileFieldsProps = {
   cardId?: string;
   className?: string;
 };
-
-/**
- * Public profile is "complete" (read-only / published layout) when name and valid handle are set.
- * Bio and living-with-diabetes date are optional.
- */
-function isPublicProfileComplete(profile: {
-  full_name?: string | null;
-  public_handle?: string | null;
-} | null): boolean {
-  if (!profile) return false;
-  if (!profile.full_name?.trim()) return false;
-  try {
-    const raw = (profile.public_handle ?? "").replace(/^@/, "").trim();
-    const h = normalizePublicHandleInput(raw);
-    if (!h) return false;
-  } catch {
-    return false;
-  }
-  return true;
-}
 
 /**
  * Public profile switch + handle/bio when on. Shared by Account and Community settings.
@@ -125,14 +106,14 @@ export function AccountCommunityProfileFields({
       if (!profile.is_public) {
         setEditing(false);
       } else {
-        setEditing(!isPublicProfileComplete(profile));
+        setEditing(!isPublicCommunityProfileComplete(profile));
       }
     }
   }, [profile, showOnsetDate]);
 
   useEffect(() => {
     if (!profile?.is_public) return;
-    if (!isPublicProfileComplete(profile)) {
+    if (!isPublicCommunityProfileComplete(profile)) {
       setEditing(true);
     }
   }, [profile?.is_public, profile?.full_name, profile?.public_handle]);
@@ -218,7 +199,7 @@ export function AccountCommunityProfileFields({
     setHandleInput(profile.public_handle ?? "");
     setOnsetDateInput(showOnsetDate ? (profile.diabetes_onset_date ?? "") : "");
     setIsPublic(profile.is_public);
-    setEditing(!profile.is_public ? false : !isPublicProfileComplete(profile));
+    setEditing(!profile.is_public ? false : !isPublicCommunityProfileComplete(profile));
   }, [profile, showOnsetDate]);
 
   async function persistPublicChange(next: boolean) {
@@ -228,7 +209,7 @@ export function AccountCommunityProfileFields({
 
     setIsPublic(next);
     if (next) {
-      setEditing(!isPublicProfileComplete(profile));
+      setEditing(!isPublicCommunityProfileComplete(profile));
     } else {
       setEditing(false);
     }
@@ -242,7 +223,7 @@ export function AccountCommunityProfileFields({
       if (!previous) {
         setEditing(false);
       } else {
-        setEditing(!isPublicProfileComplete(profile));
+        setEditing(!isPublicCommunityProfileComplete(profile));
       }
       toast({
         title: "Could not update visibility",
@@ -376,9 +357,10 @@ export function AccountCommunityProfileFields({
     }
     if (nameVal) applyDisplayNameToLocalProfile(nameVal);
     void refresh();
-    const completeAfterSave = isPublicProfileComplete({
+    const completeAfterSave = isPublicCommunityProfileComplete({
       full_name: nameVal,
       public_handle: normalizedHandle,
+      is_public: isPublic,
     });
     setEditing(!completeAfterSave);
     toast({ title: "Saved", description: "Your profile was updated." });
@@ -396,7 +378,7 @@ export function AccountCommunityProfileFields({
       handleAvailability === "checking" ||
       handleAvailability === "invalid");
 
-  const readOnlyPublicSummary = Boolean(isPublic && profile && isPublicProfileComplete(profile) && !editing);
+  const readOnlyPublicSummary = Boolean(profile && isPublicCommunityProfileComplete(profile) && !editing);
   const showNameInput = editing && (!readOnlyPublicSummary || !isPublic);
 
   const publicToggle = (
@@ -737,7 +719,7 @@ export function AccountCommunityProfileFields({
   );
 
   if (variant === "standalone") {
-    const profileComplete = profile ? isPublicProfileComplete(profile) : false;
+    const profileComplete = profile ? isPublicCommunityProfileComplete(profile) : false;
     const statusLine = !isPublic
       ? "Private — turn on to join the Feed"
       : profileComplete && !editing

@@ -258,6 +258,27 @@ export function normalizePublicHandleInput(raw: string): string | null {
   return t;
 }
 
+/** Public profile is ready for the community feed when visibility is on plus name and valid @handle. */
+export function isPublicCommunityProfileComplete(
+  profile: Pick<ProfileRow, "full_name" | "public_handle" | "is_public"> | null | undefined,
+): boolean {
+  if (!profile?.is_public) return false;
+  if (!profile.full_name?.trim()) return false;
+  try {
+    const h = normalizePublicHandleInput((profile.public_handle ?? "").replace(/^@/, "").trim());
+    if (!h) return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+export function needsCommunityProfileSetup(
+  profile: Pick<ProfileRow, "full_name" | "public_handle" | "is_public"> | null | undefined,
+): boolean {
+  return !isPublicCommunityProfileComplete(profile);
+}
+
 /** Load only community-safe columns for another user's profile card. */
 export async function getPublicCommunityProfile(userId: string): Promise<{
   profile: PublicCommunityProfile | null;
