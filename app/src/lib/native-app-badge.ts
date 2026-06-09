@@ -10,19 +10,39 @@ let inFlight: Promise<void> | null = null;
 
 async function applyNativeAppBadgeCount(count: number): Promise<void> {
   const platform = Capacitor.getPlatform();
+  const safeCount = Math.max(0, Math.floor(count));
   if (platform === "ios") {
-    // Never use @capawesome/capacitor-badge on iOS: Badge.set() re-requests .badge-only permission
+    // Never use @capawesome/capacitor-badge on iOS: Badge.set() re-requests badge-only permission
     // and regressed remote notification delivery. Use our minimal AppIconBadge plugin instead.
-    await AppIconBadge.setCount({ count });
+    await AppIconBadge.setCount({ count: safeCount });
     return;
   }
   if (platform === "android") {
-    await Badge.set({ count });
+    await Badge.set({ count: safeCount });
   }
+}
+
+/** Clears the OS app-icon badge (e.g. on sign-out). */
+export async function clearNativeAppBadge(): Promise<void> {
+  if (!isNativePushPlatform()) return;
+  try {
+    await applyNativeAppBadgeCount(0);
+  } catch (e) {
+    console.warn("[native_app_badge] clear failed:", e);
+  }
+}
+
+async function resolveBadgeCountWithRetry(): Promise<{ count: number; error: Error | null }> {
+  let last = await fetchNativeAppBadgeCount();
+  if (!last.error) return last;
+  await new Promise((r) => setTimeout(r, 350));
+  last = await fetchNativeAppBadgeCount();
+  return last;
 }
 
 /**
  * Sets the OS app-icon badge to match unread bell items + unread DM threads.
+ * Always attempts to write the resolved count so a stale "1" from APNs does not linger.
  */
 export async function syncNativeAppBadgeNow(): Promise<void> {
   if (!isNativePushPlatform()) return;
@@ -34,15 +54,20 @@ export async function syncNativeAppBadgeNow(): Promise<void> {
 
   inFlight = (async () => {
     try {
-      const { count, error } = await fetchNativeAppBadgeCount();
+      const { count, error } = await resolveBadgeCountWithRetry();
       if (error) {
-        console.warn("[native_app_badge] count failed:", error.message);
+        console.warn("[native_app_badge] count failed; clearing stale badge:", error.message);
+        await applyNativeAppBadgeCount(0);
         return;
       }
       await applyNativeAppBadgeCount(count);
     } catch (e) {
-      // AppIconBadge is only in native builds that include AppIconBadgePlugin.swift (1.0.4+).
-      console.warn("[native_app_badge] sync failed:", e);
+      console.warn("[native_app_badge] sync failed; clearing stale badge:", e);
+      try {
+        await applyNativeAppBadgeCount(0);
+      } catch {
+        // ignore secondary failure
+      }
     } finally {
       inFlight = null;
     }

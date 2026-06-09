@@ -79,6 +79,27 @@ export async function deleteInAppNotification(id: string): Promise<{ error: Erro
   return { error: null };
 }
 
+/** Marks unread DM inbox rows for a thread read (keeps badge count aligned with message read state). */
+export async function markDmInAppNotificationsReadForThread(threadId: string): Promise<{ error: Error | null }> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { error: null };
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read: true })
+    .eq("user_id", uid)
+    .eq("read", false)
+    .filter("data->>kind", "eq", "dm_message")
+    .filter("data->>thread_id", "eq", threadId);
+
+  if (error) return { error: new Error(error.message) };
+  return { error: null };
+}
+
 /**
  * Removes all in-app notification rows for the current user.
  * Tries client DELETE first (RLS: notifications_delete_own); falls back to clear_my_notifications RPC

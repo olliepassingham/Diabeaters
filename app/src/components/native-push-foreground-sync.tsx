@@ -3,6 +3,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 
 import { useAuth } from "@/lib/auth-context";
 import { isNativePushPlatform } from "@/lib/native-platform";
+import { syncNativeAppBadgeNow } from "@/lib/native-app-badge";
 import { refreshNativePushRegistration } from "@/lib/push-tokens";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { storage } from "@/lib/storage";
@@ -27,6 +28,7 @@ export function NativePushForegroundSync() {
         debounceTimer = undefined;
         const s = storage.getNotificationSettings();
         void (async () => {
+          await syncNativeAppBadgeNow();
           await syncNotificationPreferences(s);
           if (s.enabled && s.pushNotifications) {
             await refreshNativePushRegistration();

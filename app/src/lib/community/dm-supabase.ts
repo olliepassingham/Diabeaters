@@ -3,6 +3,8 @@
  * Optional images use bucket `community_post_images` (paths `{uid}/dm/{thread_id}/…`).
  */
 import { logEdgeInvokeFailure } from "@/lib/dev-log";
+import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
+import { markDmInAppNotificationsReadForThread } from "@/lib/in-app-notifications-supabase";
 import { getSupabase } from "@/lib/supabase";
 import { getBlockStatus } from "./blocks-supabase";
 import { COMMUNITY_POST_IMAGES_BUCKET } from "./posts-supabase";
@@ -312,6 +314,16 @@ export async function markIncomingDmMessagesAsReadInThread(threadId: string): Pr
     .is("read_at", null);
 
   if (error) return { readAt: null, error: new Error(error.message) };
+
+  void markDmInAppNotificationsReadForThread(threadId)
+    .then((res) => {
+      if (res.error) return;
+      notifyInAppNotificationsChanged({ skipPageRefresh: true });
+    })
+    .catch(() => {
+      // Non-fatal; badge sync will still use dm_messages read_at.
+    });
+
   return { readAt, error: null };
 }
 

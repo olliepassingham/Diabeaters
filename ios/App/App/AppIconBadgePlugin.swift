@@ -17,7 +17,10 @@ public class AppIconBadgePlugin: CAPPlugin, CAPBridgedPlugin {
             if #available(iOS 16.0, *) {
                 UNUserNotificationCenter.current().setBadgeCount(count) { error in
                     if let error = error {
-                        call.reject(error.localizedDescription)
+                        // Fallback for devices/entitlements where setBadgeCount fails.
+                        UIApplication.shared.applicationIconBadgeNumber = count
+                        CAPLog.print("[AppIconBadge] setBadgeCount failed, used legacy API:", error.localizedDescription)
+                        call.resolve()
                     } else {
                         call.resolve()
                     }

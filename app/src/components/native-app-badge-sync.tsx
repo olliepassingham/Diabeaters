@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { DM_INBOX_CHANGED } from "@/lib/community/dm-inbox-events";
 import { INAPP_NOTIFICATIONS_CHANGED } from "@/lib/in-app-notifications-events";
 import { isNativePushPlatform } from "@/lib/native-platform";
-import { scheduleNativeAppBadgeSync, syncNativeAppBadgeNow } from "@/lib/native-app-badge";
+import { clearNativeAppBadge, scheduleNativeAppBadgeSync, syncNativeAppBadgeNow } from "@/lib/native-app-badge";
 
 /**
  * Keeps the iOS/Android home-screen icon badge aligned with unread bell + DM inbox counts.
@@ -14,8 +14,13 @@ export function NativeAppBadgeSync() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (loading || !user?.id) return;
+    if (loading) return;
     if (!isNativePushPlatform()) return;
+
+    if (!user?.id) {
+      void clearNativeAppBadge();
+      return;
+    }
 
     void syncNativeAppBadgeNow();
 
@@ -27,7 +32,11 @@ export function NativeAppBadgeSync() {
 
     let listener: { remove: () => Promise<void> } | undefined;
     void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      scheduleNativeAppBadgeSync(isActive ? 200 : 0);
+      if (isActive) {
+        void syncNativeAppBadgeNow();
+      } else {
+        scheduleNativeAppBadgeSync(0);
+      }
     }).then((h) => {
       listener = h;
     });
