@@ -9,6 +9,7 @@ import {
   Droplet,
   Heart,
   MessageCircle,
+  Moon,
   MoreHorizontal,
   Trash2,
 } from "lucide-react";
@@ -38,6 +39,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
   if (kind === "scenario_started") return Activity;
   if (kind === "appointment_reminder_support") return Calendar;
+  if (kind === "bedtime_reminder") return Moon;
   return Bell;
 }
 

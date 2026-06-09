@@ -6,6 +6,7 @@ import type { NotificationSettings } from "@/lib/storage";
 import { IosNotificationDisplayCard } from "@/components/ios-notification-display-card";
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
+import { BEDTIME_REMINDER_TIME_OPTIONS } from "@/lib/bedtime-reminder-schedule";
 import {
   SettingsGroup,
   SettingsGroupLabel,
@@ -32,12 +33,14 @@ export function NotificationsTab({
   notifSettings,
   onToggle,
   onThreshold,
+  onBedtimeReminderTimeChange,
   embedded = false,
   supporterMode = false,
 }: {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
+  onBedtimeReminderTimeChange?: (time: string) => void;
   embedded?: boolean;
   supporterMode?: boolean;
 }) {
@@ -165,6 +168,44 @@ export function NotificationsTab({
                 testId="switch-scenario-alerts"
               />
               <SettingsToggleRow
+                label="Bedtime check"
+                description="A gentle evening nudge to open your bedtime readiness check"
+                checked={notifSettings.bedtimeCheckReminders === true}
+                onCheckedChange={(checked) => onToggle("bedtimeCheckReminders", checked)}
+                disabled={masterOff}
+                testId="switch-bedtime-check-reminders"
+              />
+              {notifSettings.bedtimeCheckReminders ? (
+                <div className="space-y-2 px-3.5 py-3 sm:px-4">
+                  <Label htmlFor="bedtime-reminder-time" className="text-xs font-medium text-muted-foreground">
+                    Reminder time
+                  </Label>
+                  <Select
+                    value={notifSettings.bedtimeReminderTime || "20:30"}
+                    onValueChange={(v) => onBedtimeReminderTimeChange?.(v)}
+                    disabled={masterOff}
+                  >
+                    <SelectTrigger
+                      id="bedtime-reminder-time"
+                      className="h-10 rounded-xl"
+                      data-testid="select-bedtime-reminder-time"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BEDTIME_REMINDER_TIME_OPTIONS.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Skips the reminder if you already completed a bedtime check that day.
+                  </p>
+                </div>
+              ) : null}
+              <SettingsToggleRow
                 label="Notify supporters about appointments"
                 description="Evening before and about 2 hours before each appointment — for linked supporters who can see appointments"
                 checked={supporterApptOn}
@@ -273,6 +314,7 @@ type SettingsNotificationsRouteProps = {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
+  onBedtimeReminderTimeChange?: (time: string) => void;
   supporterMode?: boolean;
 };
 
@@ -281,6 +323,7 @@ export function SettingsNotificationsRoute({
   notifSettings,
   onToggle,
   onThreshold,
+  onBedtimeReminderTimeChange,
   supporterMode = false,
 }: SettingsNotificationsRouteProps) {
   useEffect(() => {
@@ -313,6 +356,7 @@ export function SettingsNotificationsRoute({
             notifSettings={notifSettings}
             onToggle={onToggle}
             onThreshold={onThreshold}
+            onBedtimeReminderTimeChange={onBedtimeReminderTimeChange}
             embedded
             supporterMode={supporterMode}
           />

@@ -33,6 +33,12 @@ describe("getPathForInAppNotification", () => {
     ).toBe("/supplies");
   });
 
+  it("maps bedtime_reminder to bedtime tool", () => {
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "bedtime_reminder" } })),
+    ).toBe("/scenarios/bedtime");
+  });
+
   it("maps supplies_low without deep_link", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "supplies_low" } }))).toBe(
       "/supplies",

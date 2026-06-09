@@ -13,6 +13,8 @@ export type GradientMarkerBarProps = {
   header?: ReactNode;
   /** Small print under end labels */
   footer?: ReactNode;
+  /** When false, only the gradient track and marker are shown */
+  showEndLabels?: boolean;
   className?: string;
   "data-testid"?: string;
 };
@@ -28,6 +30,7 @@ export function GradientMarkerBar({
   trackGradientClassName = "from-sky-950 via-sky-600 to-sky-300 dark:from-sky-950 dark:via-sky-600 dark:to-sky-200",
   header,
   footer,
+  showEndLabels = true,
   className,
   "data-testid": testId,
 }: GradientMarkerBarProps) {
@@ -47,10 +50,12 @@ export function GradientMarkerBar({
           aria-hidden
         />
       </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{endLeftLabel}</span>
-        <span>{endRightLabel}</span>
-      </div>
+      {showEndLabels ? (
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>{endLeftLabel}</span>
+          <span>{endRightLabel}</span>
+        </div>
+      ) : null}
       {footer ? <div className="text-[10px] leading-snug text-muted-foreground/90">{footer}</div> : null}
     </div>
   );

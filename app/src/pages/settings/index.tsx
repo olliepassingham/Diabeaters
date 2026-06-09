@@ -30,6 +30,7 @@ import {
   Cookie,
 } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -1460,6 +1461,17 @@ export default function Settings() {
         void ensureNativePushRegistered();
       }
     }
+    if (key === "bedtimeCheckReminders" || key === "enabled") {
+      void rescheduleBedtimeReminders();
+    }
+  };
+
+  const handleBedtimeReminderTime = (time: string) => {
+    const updated = { ...notifSettings, bedtimeReminderTime: time };
+    setNotifSettings(updated);
+    storage.saveNotificationSettings(updated);
+    void syncNotificationPreferences(updated);
+    void rescheduleBedtimeReminders();
   };
 
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
@@ -1794,6 +1806,7 @@ export default function Settings() {
         notifSettings={notifSettings}
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
+        onBedtimeReminderTimeChange={handleBedtimeReminderTime}
         supporterMode={isCarer}
       />
     );

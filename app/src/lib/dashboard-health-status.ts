@@ -102,9 +102,6 @@ export function buildStableGlanceMessage(supplies: Supply[], scenarioState: Scen
   if (guidesQuiet && minDays !== null) {
     return `Stock looks good · ~${minDays}d shortest runway`;
   }
-  if (guidesQuiet) {
-    return "Supplies OK · no active guides";
-  }
   return "Supplies OK";
 }
 

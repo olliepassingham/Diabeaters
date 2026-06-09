@@ -16,6 +16,7 @@ import {
   Utensils,
   Dumbbell,
   LayoutDashboard,
+  Moon,
   Heart,
   Shield,
   Sparkles,
@@ -54,6 +55,7 @@ import {
 } from "@/lib/carer-session";
 import { getCommunityMemberOnboardingCompletePath } from "@/lib/community-landing";
 import { markCommunityPushPromptPending } from "@/lib/community-push-prompt";
+import { markBedtimeReminderPromptPending } from "@/lib/bedtime-reminder-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import {
   APP_REGION_OPTIONS,
@@ -539,6 +541,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     handleSaveProfile();
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
+    markBedtimeReminderPromptPending();
     if (upgradeFlow) {
       setActiveAppMode("patient");
       setPrimaryAppRole("patient");
@@ -1927,6 +1930,7 @@ function FirstWinStep({
         { icon: Package, text: "Supply tracking with depletion forecasts", highlight: true },
         { icon: Utensils, text: "Meal and exercise planning with dose suggestions" },
         { icon: Dumbbell, text: "Exercise planning with carb and insulin guidance" },
+        { icon: Moon, text: "Evening bedtime readiness check when you're winding down" },
       ],
       ctaText: "Go to Dashboard",
       ctaPath: "/",

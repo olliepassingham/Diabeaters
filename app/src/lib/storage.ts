@@ -732,6 +732,27 @@ export interface UsualPrescription {
   savedAt: string;
 }
 
+/** Best estimate of how much you receive per repeat prescription for this supply. */
+export function getRepeatPrescriptionQuantity(supply: Supply): number {
+  if (supply.typicalRefillQuantity != null && supply.typicalRefillQuantity > 0) {
+    return supply.typicalRefillQuantity;
+  }
+  if (supply.quantityAtPickup != null && supply.quantityAtPickup > 0) {
+    return supply.quantityAtPickup;
+  }
+  return Math.max(0, supply.currentQuantity);
+}
+
+export function supplyToUsualPrescriptionItem(supply: Supply): UsualPrescriptionItem {
+  return {
+    name: supply.name,
+    type: supply.type,
+    quantity: getRepeatPrescriptionQuantity(supply),
+    dailyUsage: supply.dailyUsage,
+    notes: supply.notes,
+  };
+}
+
 export interface PickupRecord {
   id: string;
   supplyId: string;
@@ -1074,6 +1095,10 @@ export interface NotificationSettings {
   lowThresholdDays: number;
   /** Appointment reminder notifications (in-app + push where available). */
   appointmentReminders: boolean;
+  /** Optional daily nudge to open the bedtime readiness check (off by default). */
+  bedtimeCheckReminders?: boolean;
+  /** Local reminder time for bedtime check (HH:mm, device local). */
+  bedtimeReminderTime?: string;
   /** When true, linked supporters can receive appointment reminders (evening before + ~2h before). */
   supporterAppointmentReminders?: boolean;
   /** Supporter account: alerts when a linked person has an upcoming appointment. */
@@ -1972,17 +1997,30 @@ export const storage = {
   saveUsualPrescription(items: UsualPrescriptionItem[]): void {
     const record: UsualPrescription = { items, savedAt: new Date().toISOString() };
     localStorage.setItem(STORAGE_KEYS.USUAL_PRESCRIPTION, JSON.stringify(record));
+    this.syncTypicalRefillFromUsualPrescription(items);
+  },
+
+  syncTypicalRefillFromUsualPrescription(items: UsualPrescriptionItem[]): void {
+    if (items.length === 0) return;
+    const supplies = this.getSupplies();
+    let changed = false;
+    for (const item of items) {
+      const index = supplies.findIndex(
+        (s) => s.name.toLowerCase() === item.name.toLowerCase() && s.type === item.type,
+      );
+      if (index === -1 || item.quantity <= 0) continue;
+      if (supplies[index].typicalRefillQuantity === item.quantity) continue;
+      supplies[index] = { ...supplies[index], typicalRefillQuantity: item.quantity };
+      changed = true;
+    }
+    if (changed) {
+      localStorage.setItem(STORAGE_KEYS.SUPPLIES, JSON.stringify(supplies));
+    }
   },
 
   saveCurrentSuppliesAsUsualPrescription(): void {
     const supplies = this.getSupplies();
-    const items: UsualPrescriptionItem[] = supplies.map(s => ({
-      name: s.name,
-      type: s.type,
-      quantity: s.currentQuantity,
-      dailyUsage: s.dailyUsage,
-      notes: s.notes,
-    }));
+    const items: UsualPrescriptionItem[] = supplies.map((s) => supplyToUsualPrescriptionItem(s));
     this.saveUsualPrescription(items);
   },
 
@@ -3599,6 +3637,8 @@ export const storage = {
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
       appointmentReminders: true,
+      bedtimeCheckReminders: false,
+      bedtimeReminderTime: "20:30",
       supporterAppointmentReminders: true,
       appointmentAlerts: true,
       hypoAlerts: true,
@@ -3620,6 +3660,11 @@ export const storage = {
       communityDmAlerts: parsed.communityDmAlerts !== false,
       supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,
       appointmentAlerts: parsed.appointmentAlerts !== false,
+      bedtimeCheckReminders: parsed.bedtimeCheckReminders === true,
+      bedtimeReminderTime:
+        typeof parsed.bedtimeReminderTime === "string" && /^\d{1,2}:\d{2}$/.test(parsed.bedtimeReminderTime)
+          ? parsed.bedtimeReminderTime
+          : defaults.bedtimeReminderTime,
     };
   },
 

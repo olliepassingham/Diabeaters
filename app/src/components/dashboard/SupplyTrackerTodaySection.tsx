@@ -293,10 +293,12 @@ export function SupplyTrackerEntryCard() {
       ? "dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden border-2 border-dashed border-muted-foreground/30 rounded-xl"
       : `dashboard-card-hover border-border/70 shadow-sm hover:shadow-md dark:border-border/50 overflow-hidden rounded-xl border ${supplyBorderTone}`;
 
-  const scenarioLine =
-    scenarioState.travelModeActive || scenarioState.sickDayActive
-      ? "Scenario active"
-      : "No active guides";
+  const scenarioLine = (() => {
+    if (scenarioState.travelModeActive && scenarioState.sickDayActive) return "Travel and sick day guides active";
+    if (scenarioState.travelModeActive) return "Travel guide active";
+    if (scenarioState.sickDayActive) return "Sick day guide active";
+    return null;
+  })();
 
   return (
     <Card className={outerCardClass} data-testid="dashboard-supply-entry-card">
@@ -309,7 +311,7 @@ export function SupplyTrackerEntryCard() {
             <div className="min-w-0 space-y-0.5">
               <p className="font-semibold text-foreground">{statusLabel}</p>
               <p className="text-sm text-muted-foreground">{daysLine}</p>
-              {supplies.length > 0 ? (
+              {scenarioLine ? (
                 <p className="text-xs text-muted-foreground">{scenarioLine}</p>
               ) : null}
             </div>

@@ -9,6 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
+import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { useAuth } from "@/lib/auth-context";
+import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-prompt";
+import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
@@ -159,6 +163,8 @@ export default function Bedtime() {
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [secondChancePromptOpen, setSecondChancePromptOpen] = useState(false);
 
   useEffect(() => {
     const settings = storage.getSettings();
@@ -748,6 +754,7 @@ export default function Bedtime() {
 
   const handleSaveCheck = () => {
     if (!result || saved) return;
+    const isFirstBedtimeCheck = bedtimeLogs.length === 0;
     const log: BedtimeLog = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
@@ -770,10 +777,14 @@ export default function Bedtime() {
     storage.saveBedtimeLog(log);
     setBedtimeLogs(storage.getBedtimeLogs());
     setSaved(true);
+    void rescheduleBedtimeReminders();
     toast({
       title: "Bedtime check saved",
       description: "Logged for your streak and activity history.",
     });
+    if (isFirstBedtimeCheck && user?.id && shouldOfferBedtimeReminderSecondChance(user.id)) {
+      setSecondChancePromptOpen(true);
+    }
   };
 
   const getRecentLogs = () => {
@@ -1527,6 +1538,11 @@ export default function Bedtime() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+      <BedtimeReminderPromptDialog
+        open={secondChancePromptOpen}
+        onOpenChange={setSecondChancePromptOpen}
+        variant="second_chance"
+      />
     </PageShell>
   );
 }

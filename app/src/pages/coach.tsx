@@ -19,6 +19,7 @@ import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt }
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
+import { buildCoachStarterContext, pickCoachStarterPrompts } from "@/lib/ai-coach/coach-starter-prompts";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
 import {
   AI_ASSISTANT_NAME,
@@ -200,6 +201,11 @@ export default function CoachPage() {
   const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
   const effectiveTopic = topicSlug ?? (isSupporter ? "supporter" : "general");
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
+  const starterContext = useMemo(() => buildCoachStarterContext(), []);
+  const displayedStarters = useMemo(
+    () => pickCoachStarterPrompts(effectiveTopic, starterContext, { userId: user?.id }),
+    [effectiveTopic, starterContext, user?.id],
+  );
   const pageTitle = coachPageTitle(isSupporter ? "supporter" : "patient");
 
   const { linked, isCarer } = useLinkedCarer();
@@ -556,7 +562,11 @@ export default function CoachPage() {
       className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground"
       data-testid="coach-chat-shell"
     >
-      <div className="shrink-0 border-b border-border/40 px-4 pb-3 pt-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+      <div
+        className={chatThreadScrollClasses(
+          "shrink-0 border-b border-border/40 px-4 pb-3 pt-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+        )}
+      >
         <PageHeader title={pageTitle} description={headerDescription} leading={<PageBackButton />} />
       </div>
 
@@ -589,12 +599,12 @@ export default function CoachPage() {
         aria-live="polite"
         aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
       >
-        {messages.length === 0 && topicCfg.starters.length > 0 ? (
+        {messages.length === 0 && displayedStarters.length > 0 ? (
           <div className="mb-4 flex w-full min-w-0 flex-col gap-2.5" role="group" aria-label="Suggested prompts">
             <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Suggested questions
             </p>
-            {topicCfg.starters.map((q) => (
+            {displayedStarters.map((q) => (
               <button
                 key={q}
                 type="button"

@@ -10,6 +10,8 @@ export function toCloudPrefs(settings: NotificationSettings): Record<string, unk
     critical_threshold_days: Number(settings.criticalThresholdDays || 0),
     low_threshold_days: Number(settings.lowThresholdDays || 0),
     appointment_reminders: Boolean(settings.appointmentReminders),
+    bedtime_check_reminders: settings.bedtimeCheckReminders === true,
+    bedtime_reminder_time: settings.bedtimeReminderTime || "20:30",
     supporter_appointment_reminders: settings.supporterAppointmentReminders !== false,
     appointment_alerts: settings.appointmentAlerts !== false,
     hypo_alerts: settings.hypoAlerts !== false,

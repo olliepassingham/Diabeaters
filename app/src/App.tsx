@@ -81,6 +81,9 @@ import { ClinicalPrefsCloudSync } from "@/components/clinical-prefs-cloud-sync";
 import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync";
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
+import { BedtimeReminderPoller } from "@/components/bedtime-reminder-poller";
+import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
 import { AchievementSync } from "@/components/achievement-sync";
@@ -1123,6 +1126,8 @@ function AuthenticatedShell() {
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
   const suppressClinicalPollers = isCarerMode || isCommunityMode;
   const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
+  const { bedtimeReminderPromptOpen, setBedtimeReminderPromptOpen } =
+    useBedtimeReminderPromptAfterOnboarding(!suppressClinicalPollers);
 
   const [activeExerciseSession, setActiveExerciseSession] = useState<ActiveExerciseSession | null>(() =>
     storage.getActiveExercise(),
@@ -1312,6 +1317,7 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? (
           <>
             <AppointmentReminderPoller />
+            <BedtimeReminderPoller />
             <SupplyLowNotifyPoller />
           </>
         ) : null}
@@ -1365,6 +1371,13 @@ function AuthenticatedShell() {
         </AnimatedRouteOutlet>
       </main>
       {!isDmThreadView ? <BottomNav /> : null}
+      {!suppressClinicalPollers ? (
+        <BedtimeReminderPromptDialog
+          open={bedtimeReminderPromptOpen}
+          onOpenChange={setBedtimeReminderPromptOpen}
+          variant="onboarding"
+        />
+      ) : null}
     </div>
       )}
     </AskAnythingProvider>
