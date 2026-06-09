@@ -7,7 +7,7 @@ import {
   login,
 } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
-import { navigateAfterLoginSuccess } from "@/lib/auth-post-login";
+import { navigateAfterLoginSuccess, completeAuthAndNavigate } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { PageShell } from "@/components/layout";
+import {
+  authFieldActionClass,
+  authInlineLinkClass,
+  authMutedNavLinkClass,
+} from "@/components/auth/auth-link-styles";
 import { Eye, EyeOff } from "lucide-react";
 
 const LAST_LOGIN_EMAIL_KEY = "diabeater_last_login_email";
@@ -47,7 +52,7 @@ function clearLastLoginEmail(): void {
 
 export default function Login() {
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, syncAuthSession } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -132,7 +137,7 @@ export default function Login() {
     }
 
     writeLastLoginEmail(email);
-    await navigateAfterLoginSuccess(setLocation);
+    await completeAuthAndNavigate(setLocation, syncAuthSession, data?.session);
   }
 
   return (
@@ -156,7 +161,7 @@ export default function Login() {
                 <Label htmlFor="email">Email</Label>
                 <button
                   type="button"
-                  className="min-h-11 px-2 -mx-2 text-xs underline text-muted-foreground hover:text-foreground"
+                  className={authFieldActionClass}
                   onClick={() => {
                     clearLastLoginEmail();
                     setEmail("");
@@ -178,13 +183,8 @@ export default function Login() {
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link href="/reset-request">
-                  <button
-                    type="button"
-                    className="min-h-11 px-2 -mx-2 text-xs underline text-muted-foreground hover:text-foreground"
-                  >
-                    Forgot your password?
-                  </button>
+                <Link href="/reset-request" className={authFieldActionClass}>
+                  Forgot your password?
                 </Link>
               </div>
               <div className="relative">
@@ -219,19 +219,15 @@ export default function Login() {
               {submitting ? "Logging in..." : "Log in"}
             </Button>
           </form>
-          <p className="text-xs text-center text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/signup">
-              <span className="underline underline-offset-2 cursor-pointer">
-                Create account
-              </span>
+            <Link href="/signup" className={authInlineLinkClass}>
+              Create account
             </Link>
           </p>
-          <p className="text-xs text-center pt-2">
-            <Link href="/welcome">
-              <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
-                Back to welcome
-              </span>
+          <p className="pt-1 text-center">
+            <Link href="/welcome" className={authMutedNavLinkClass}>
+              Back to welcome
             </Link>
           </p>
         </CardContent>

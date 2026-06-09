@@ -1,3 +1,5 @@
+import { flushSync } from "react-dom";
+import type { Session } from "@supabase/supabase-js";
 import { getLinkedPatientForCarer } from "@/lib/carers";
 import {
   getPrimaryAppRole,
@@ -6,6 +8,17 @@ import {
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+
+/** Commit Supabase session to React auth state before entering protected routes. */
+export function prepareAuthSessionBeforeNavigation(
+  syncAuthSession: (session: Session | null) => void,
+  session: Session | null | undefined,
+): void {
+  if (!session) return;
+  flushSync(() => {
+    syncAuthSession(session);
+  });
+}
 
 /**
  * Shared navigation after a successful password or OAuth session (login or signup when confirmations are off).
@@ -47,4 +60,13 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
     return;
   }
   setLocation("/");
+}
+
+export async function completeAuthAndNavigate(
+  setLocation: (path: string) => void,
+  syncAuthSession: (session: Session | null) => void,
+  session: Session | null | undefined,
+): Promise<void> {
+  prepareAuthSessionBeforeNavigation(syncAuthSession, session);
+  await navigateAfterLoginSuccess(setLocation);
 }

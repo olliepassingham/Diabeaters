@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { authInlineLinkClass, authMutedNavLinkClass } from "@/components/auth/auth-link-styles";
 
 export default function ResetRequest() {
   const [email, setEmail] = useState("");
@@ -46,10 +47,8 @@ export default function ResetRequest() {
             </p>
             <p className="text-xs text-muted-foreground">
               Didn&apos;t receive it? Check your spam folder or{" "}
-              <Link href="/reset-request">
-                <span className="underline cursor-pointer hover:text-foreground">
-                  try again
-                </span>
+              <Link href="/reset-request" className={authInlineLinkClass}>
+                try again
               </Link>
               .
             </p>
@@ -109,11 +108,9 @@ export default function ResetRequest() {
               {submitting ? "Sending…" : "Send reset link"}
             </Button>
           </form>
-          <p className="text-xs text-center text-muted-foreground">
-            <Link href="/login">
-              <span className="underline cursor-pointer hover:text-foreground">
-                Back to log in
-              </span>
+          <p className="text-center">
+            <Link href="/login" className={authMutedNavLinkClass}>
+              Back to log in
             </Link>
           </p>
         </CardContent>

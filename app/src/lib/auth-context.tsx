@@ -1,5 +1,5 @@
 import type { Session, User } from "@supabase/supabase-js";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
@@ -12,6 +12,8 @@ type AuthContextValue = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /** Apply a Supabase session immediately (e.g. right after password sign-in). */
+  syncAuthSession: (session: Session | null) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -42,6 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(initialE2EUser);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!initialE2EUser);
+
+  const syncAuthSession = useCallback((nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
+    const uid = nextSession?.user?.id ?? null;
+    setActiveUserIdForLocalStorage(uid);
+    setSentryUserId(uid);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -94,15 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (initialE2EUser) return;
 
-    const { data } = onAuthStateChange((event, session) => {
+    const { data } = onAuthStateChange((event, nextSession) => {
       if (!isMounted) return;
-      setSession(session ?? null);
-      setUser(session?.user ?? null);
-      setActiveUserIdForLocalStorage(session?.user?.id ?? null);
-      setSentryUserId(session?.user?.id ?? null);
+      syncAuthSession(nextSession ?? null);
       // Avoid hammering GoTrue's storage lock on TOKEN_REFRESHED; only sync when session identity is established.
       if (
-        session?.user?.id &&
+        nextSession?.user?.id &&
         (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED")
       ) {
         void syncRememberedPushTokenToSupabase();
@@ -113,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       data?.unsubscribe();
     };
-  }, [initialE2EUser]);
+  }, [initialE2EUser, syncAuthSession]);
 
   useEffect(() => {
     if (loading || !user?.id) return;
@@ -172,7 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loading, user?.id]);
 
-  const value: AuthContextValue = { user, session, loading };
+  const value: AuthContextValue = { user, session, loading, syncAuthSession };
   return (
     <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );

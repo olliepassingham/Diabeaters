@@ -46,7 +46,12 @@ import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { PageShell } from "@/components/layout/page-shell";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getOnboardingSecondaryCta, getPostOnboardingPath } from "@/lib/onboarding-routes";
+import {
+  buildOnboardingSteps,
+  getOnboardingSecondaryCta,
+  getPostOnboardingPath,
+  type OnboardingWizardStep,
+} from "@/lib/onboarding-routes";
 import {
   clearOnboardingAccountPath,
   getOnboardingAccountPath,
@@ -85,14 +90,7 @@ function diabetesTermInfo(term: { explanation: string; example?: string }, extra
 
 type CareContext = "mostly_me" | "mostly_them" | "both_equally" | null;
 
-type Step =
-  | "welcome"
-  | "care_context"
-  | "struggle"
-  | "region"
-  | "details"
-  | "disclaimer"
-  | "first_win";
+type Step = OnboardingWizardStep;
 
 type StruggleOptionDef = {
   id: Exclude<Struggle, null>;
@@ -274,6 +272,7 @@ interface OnboardingProps {
 const ONBOARDING_STEP_LABELS: Partial<Record<Step, string>> = {
   care_context: "Care",
   struggle: "Focus",
+  struggle_preview: "Preview",
   region: "Region",
   details: "Details",
   disclaimer: "Terms",
@@ -321,12 +320,17 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const accountPath = useMemo(() => getOnboardingAccountPath(), []);
   const showBothPath = accountPath === "both";
   const showCommunityPath = accountPath === "community";
-  const steps: Step[] = useMemo(() => {
-    if (upgradeFlow) return ["details", "disclaimer", "first_win"];
-    if (showCommunityPath) return ["welcome", "region", "disclaimer", "first_win"];
-    if (showBothPath) return ["welcome", "care_context", "struggle", "region", "details", "disclaimer", "first_win"];
-    return ["welcome", "struggle", "region", "details", "disclaimer", "first_win"];
-  }, [upgradeFlow, showCommunityPath, showBothPath]);
+  const [minimalSetup, setMinimalSetup] = useState(false);
+  const steps: Step[] = useMemo(
+    () =>
+      buildOnboardingSteps({
+        upgradeFlow,
+        showCommunityPath,
+        showBothPath,
+        minimalSetup,
+      }),
+    [upgradeFlow, showCommunityPath, showBothPath, minimalSetup],
+  );
   const [currentStep, setCurrentStep] = useState<Step>(() =>
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1"
       ? "details"
@@ -444,7 +448,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
     if (data.struggle) {
       localStorage.setItem("diabeater_onboarding_struggle", data.struggle);
-      localStorage.setItem("diabeater_profile_incomplete", "true");
     }
     if (data.careContext) {
       try {
@@ -456,10 +459,18 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleNext = () => {
+    if (currentStep === "struggle_preview") {
+      setMinimalSetup(false);
+    }
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex < steps.length - 1) {
       setCurrentStep(steps[stepIndex + 1]);
     }
+  };
+
+  const handleMinimalSetup = () => {
+    setMinimalSetup(true);
+    setCurrentStep("region");
   };
 
   const handleBack = () => {
@@ -492,7 +503,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     });
     try {
       localStorage.removeItem("diabeater_onboarding_struggle");
-      localStorage.removeItem("diabeater_profile_incomplete");
     } catch {
       /* ignore */
     }
@@ -616,6 +626,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
+      case "struggle_preview": return data.struggle !== null;
       case "region": return data.region === "UK" || data.region === "US" || data.region === "OTHER";
       case "details":
         return upgradeFlow || data.struggle !== null;
@@ -640,6 +651,8 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
         return <StruggleStep data={data} updateData={updateData} />;
+      case "struggle_preview":
+        return <StrugglePreviewStep data={data} onMinimalSetup={handleMinimalSetup} />;
       case "region":
         return <RegionStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />;
       case "details":

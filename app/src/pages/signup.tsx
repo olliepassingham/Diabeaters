@@ -6,7 +6,8 @@ import {
   isUserVerified,
   signup,
 } from "@/lib/auth";
-import { navigateAfterLoginSuccess } from "@/lib/auth-post-login";
+import { useAuth } from "@/lib/auth-context";
+import { completeAuthAndNavigate } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,11 +16,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
 import { PageShell } from "@/components/layout";
+import {
+  authInlineLinkClass,
+  authMutedNavLinkClass,
+} from "@/components/auth/auth-link-styles";
 import { TurnstileCaptcha } from "@/components/auth/Turnstile";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const { toast } = useToast();
+  const { syncAuthSession } = useAuth();
   const [, setLocation] = useLocation();
 
   const [email, setEmail] = useState("");
@@ -73,7 +79,7 @@ export default function Signup() {
         setLocation(`/check-email?email=${encodeURIComponent(email)}${nextQ}`);
         return;
       }
-      await navigateAfterLoginSuccess(setLocation);
+      await completeAuthAndNavigate(setLocation, syncAuthSession, data.session);
       return;
     }
 
@@ -157,19 +163,15 @@ export default function Signup() {
               {submitting ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          <p className="text-xs text-center text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login">
-              <span className="underline underline-offset-2 cursor-pointer">
-                Log in
-              </span>
+            <Link href="/login" className={authInlineLinkClass}>
+              Log in
             </Link>
           </p>
-          <p className="text-xs text-center pt-2">
-            <Link href="/welcome">
-              <span className="underline underline-offset-2 cursor-pointer text-muted-foreground hover:text-foreground">
-                Back to welcome
-              </span>
+          <p className="pt-1 text-center">
+            <Link href="/welcome" className={authMutedNavLinkClass}>
+              Back to welcome
             </Link>
           </p>
         </CardContent>

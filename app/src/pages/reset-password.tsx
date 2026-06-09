@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { authMutedNavLinkClass } from "@/components/auth/auth-link-styles";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function ResetPassword() {
@@ -90,11 +91,9 @@ export default function ResetPassword() {
                 Request new reset link
               </Button>
             </Link>
-            <p className="text-xs text-center text-muted-foreground">
-              <Link href="/login">
-                <span className="underline cursor-pointer hover:text-foreground">
-                  Back to log in
-                </span>
+            <p className="text-center">
+              <Link href="/login" className={authMutedNavLinkClass}>
+                Back to log in
               </Link>
             </p>
           </CardContent>
@@ -186,11 +185,9 @@ export default function ResetPassword() {
               {submitting ? "Updating…" : "Update password"}
             </Button>
           </form>
-          <p className="text-xs text-center text-muted-foreground">
-            <Link href="/login">
-              <span className="underline cursor-pointer hover:text-foreground">
-                Back to log in
-              </span>
+          <p className="text-center">
+            <Link href="/login" className={authMutedNavLinkClass}>
+              Back to log in
             </Link>
           </p>
         </CardContent>
