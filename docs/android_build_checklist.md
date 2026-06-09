@@ -107,4 +107,11 @@ Reuse branding from [`branding/appstore-icon-1024.png`](../branding/appstore-ico
 - **Feature graphic** — 1024×500 PNG for Play listing
 - **Phone screenshots** — capture from physical device or emulator at required sizes
 
-The default Capacitor launcher icons are placeholders until you replace them with branded adaptive icons.
+Generate branded launcher icons before each Play upload:
+
+```bash
+npm run icons:android
+npm run icons:validate
+```
+
+Source: [`branding/appstore-icon-1024.png`](../branding/appstore-icon-1024.png). The installed icon must match the Play Store listing (Google rejects placeholder Capacitor icons).

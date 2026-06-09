@@ -383,7 +383,8 @@ export default function FamilyCarersPage() {
             {
               key: "appointments" as const,
               label: "Appointments",
-              description: "Shared diary-style visits when cloud appointment sharing is enabled on your project.",
+              description:
+                "Shared clinic visits in Supporter mode. Supporters can also get reminders the evening before and about 2 hours before (if you allow it in Settings → Notifications).",
               testId: "privacy-toggle-appointments",
             },
             {

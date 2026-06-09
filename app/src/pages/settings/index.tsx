@@ -42,7 +42,8 @@ import { validateTDD, validateCorrectionFactor, validateTargetBgLow, validateTar
 import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useAuth } from "@/lib/auth-context";
-import { profileQueryKey, useProfile } from "@/lib/profile";
+import { profileQueryKey, updateProfile, useProfile } from "@/lib/profile";
+import { isEmailLike, resolveUserDisplayName } from "@/lib/user-display-name";
 import {
   formatWeightInputFromKg,
   getBodyWeightKgFromProfile,
@@ -75,6 +76,8 @@ const SETTINGS_MOBILE_STICKY_FOOTER =
   "md:hidden fixed left-0 right-0 z-[110] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
 
 function ProfileTab({
+  userDisplayName,
+  setUserDisplayName,
   appRegion,
   setAppRegion,
   emergencyNumber,
@@ -94,6 +97,8 @@ function ProfileTab({
   weightRequiredForHypo,
   onSave,
 }: {
+  userDisplayName: string;
+  setUserDisplayName: (v: string) => void;
   appRegion: AppRegion;
   setAppRegion: (v: AppRegion) => void;
   emergencyNumber: string;
@@ -131,6 +136,22 @@ function ProfileTab({
 
   return (
     <div className="space-y-3 rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
+      <div className="space-y-1.5">
+        <FieldLabelWithInfo
+          htmlFor="user-display-name"
+          info={<p>Shown on Help now and your emergency card so bystanders know who needs help.</p>}
+        >
+          Your name
+        </FieldLabelWithInfo>
+        <Input
+          id="user-display-name"
+          autoComplete="name"
+          value={userDisplayName}
+          onChange={(e) => setUserDisplayName(e.target.value)}
+          placeholder="e.g. Ollie Passingham"
+          data-testid="input-user-display-name"
+        />
+      </div>
       <div className="space-y-1.5">
         <FieldLabelWithInfo
           htmlFor="app-region"
@@ -918,7 +939,8 @@ export default function Settings() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
-  
+  const [userDisplayName, setUserDisplayName] = useState("");
+
   const [bgUnits, setBgUnits] = useState("mmol/L");
   const [carbUnits, setCarbUnits] = useState("grams");
   const [deliveryMethod, setDeliveryMethod] = useState<"pen" | "pump">("pen");
@@ -967,6 +989,8 @@ export default function Settings() {
     criticalThresholdDays: 3,
     lowThresholdDays: 7,
     appointmentReminders: true,
+    supporterAppointmentReminders: true,
+    appointmentAlerts: true,
     hypoAlerts: true,
     scenarioAlerts: true,
     hypoDashboardQuickNotify: true,
@@ -986,6 +1010,15 @@ export default function Settings() {
   }, [cloudProfile?.date_of_birth]);
 
   useEffect(() => {
+    const local = storage.getProfile();
+    const resolved = resolveUserDisplayName({
+      cloudFullName: cloudProfile?.full_name,
+      localName: local?.name,
+    });
+    if (resolved) setUserDisplayName(resolved);
+  }, [cloudProfile?.full_name]);
+
+  useEffect(() => {
     const storedProfile = storage.getProfile();
     const storedSettings = storage.getSettings();
     
@@ -1003,6 +1036,11 @@ export default function Settings() {
     
     if (storedProfile) {
       setProfile(storedProfile);
+      const resolvedName = resolveUserDisplayName({
+        cloudFullName: cloudProfile?.full_name,
+        localName: storedProfile.name,
+      });
+      if (resolvedName) setUserDisplayName(resolvedName);
       setBgUnits(storedProfile.bgUnits || "mmol/L");
       setCarbUnits(storedProfile.carbUnits || "grams");
       setDeliveryMethod((storedProfile.insulinDeliveryMethod as "pen" | "pump") || "pen");
@@ -1182,6 +1220,15 @@ export default function Settings() {
   }> => {
     const base = profile ?? storage.getProfile();
     if (!base) return { ok: false };
+    const nameTrim = userDisplayName.trim();
+    if (nameTrim && isEmailLike(nameTrim)) {
+      toast({
+        title: "Use your real name",
+        description: "Your name cannot be an email address. Help now shows this to bystanders.",
+        variant: "destructive",
+      });
+      return { ok: false };
+    }
     const normalizedDob = normalizeDateOfBirthInput(base.dateOfBirth?.trim() || null);
     const parsedKg = parseWeightInputToKg(bodyWeightInput, weightDisplayUnit);
     if (profileWeightRequiredForHypo(normalizedDob) && parsedKg == null) {
@@ -1194,6 +1241,7 @@ export default function Settings() {
     }
     const updatedProfile = {
       ...base,
+      name: nameTrim,
       bgUnits,
       carbUnits,
       insulinDeliveryMethod: deliveryMethod,
@@ -1208,6 +1256,18 @@ export default function Settings() {
 
     let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
+      if (nameTrim) {
+        const nameCloud = await updateProfile({ id: user.id, full_name: nameTrim });
+        if (nameCloud.error) {
+          toast({
+            title: "Saved on this device",
+            description: `Could not sync your name: ${nameCloud.error.message}`,
+            variant: "destructive",
+          });
+          return { ok: false };
+        }
+        void queryClient.invalidateQueries({ queryKey: profileQueryKey(user.id) });
+      }
       cloud = await syncClinicalPrefsToCloud(user.id);
       const regionCloud = await syncRegionToCloud(user.id);
       if (cloud.error) {
@@ -1437,9 +1497,11 @@ export default function Settings() {
       <section id="settings-personal" className="scroll-mt-24 space-y-2.5">
         <SettingsSectionHeader
           title="Personal & units"
-          description="Region, units, delivery method, body weight for hypo help, and optional date of birth."
+          description="Your name (for Help now), region, units, delivery method, body weight, and optional date of birth."
         />
         <ProfileTab
+          userDisplayName={userDisplayName}
+          setUserDisplayName={setUserDisplayName}
           appRegion={appRegion}
           setAppRegion={setAppRegion}
           emergencyNumber={emergencyNumber}

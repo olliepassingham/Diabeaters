@@ -4,14 +4,19 @@ import { Capacitor } from "@capacitor/core";
 
 import { ensureAppointmentInAppRemindersForUser } from "@/lib/appointment-inapp-reminders";
 import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
+import { invokeNotifySupporterAppointmentReminders } from "@/lib/invoke-notify-supporter-appointment-reminders";
 import { useAuth } from "@/lib/auth-context";
 import { storage } from "@/lib/storage";
 
 const POLL_MS = 5 * 60 * 1000;
 
 async function runAppointmentReminderScan(userId: string): Promise<void> {
+  const settings = storage.getNotificationSettings();
   await ensureAppointmentInAppRemindersForUser(userId);
   await rescheduleAppointmentReminders(storage.getAppointmentsForUser(userId));
+  if (settings.enabled && settings.supporterAppointmentReminders !== false) {
+    void invokeNotifySupporterAppointmentReminders();
+  }
 }
 
 /**

@@ -78,6 +78,18 @@ Invoked when sick day / travel mode starts (`invoke-notify-scenario-started.ts`)
 
 ---
 
+## Path F — Supporter appointment reminders (`notify_supporter_appointment_reminders`)
+
+| Step | Where |
+|------|--------|
+| 1 | Patient keeps **Notify supporters about appointments** on (**Settings → Notifications**). Supporter needs **Appointments** scope (**Family & supporters**) and **Appointment reminders** on their account. |
+| 2 | While the patient app is open, **`AppointmentReminderPoller`** invokes the function with the patient JWT (same windows as personal reminders: evening before 18:00 UK, ~2h before). |
+| 3 | **Optional cron backup:** schedule POST to `…/functions/v1/notify_supporter_appointment_reminders` with service role (or **`NOTIFY_SUPPORTER_APPT_CRON_SECRET`** + `x-notify-supporter-appt-cron-secret`) every 15–30 minutes so supporters are alerted even if the patient does not open the app. |
+
+Prefs: patient `supporter_appointment_reminders`; supporter `appointment_alerts` + `push` in `notification_preferences`.
+
+---
+
 ## Supabase CLI (`verify_jwt`)
 
 `supabase/config.toml` sets `verify_jwt = false` for several notify functions; each handler validates `Authorization` with `auth.getUser(jwt)` instead. Deploy with:

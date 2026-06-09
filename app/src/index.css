@@ -263,6 +263,34 @@
     color: rgb(var(--color-text-muted) / 0.95);
   }
 
+  /* DM / Beatie chat scroll — dot grid + soft primary glow (uses rgb theme tokens). */
+  .chat-thread-wallpaper {
+    background-color: rgb(var(--app-background));
+    background-image:
+      radial-gradient(circle at 1px 1px, rgb(var(--app-foreground) / 0.07) 1px, transparent 0),
+      radial-gradient(ellipse 110% 55% at 50% -12%, rgb(var(--color-primary) / 0.16), transparent 58%),
+      linear-gradient(
+        180deg,
+        rgb(var(--color-bg-muted) / 0.5) 0%,
+        rgb(var(--app-background) / 0.97) 42%,
+        rgb(var(--app-background)) 100%
+      );
+    background-size: 18px 18px, 100% 100%, 100% 100%;
+    background-attachment: local, local, local;
+  }
+
+  .dark .chat-thread-wallpaper {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgb(var(--app-foreground) / 0.11) 1px, transparent 0),
+      radial-gradient(ellipse 110% 52% at 50% -10%, rgb(var(--color-primary) / 0.28), transparent 60%),
+      linear-gradient(
+        180deg,
+        rgb(var(--color-bg-muted) / 0.72) 0%,
+        rgb(var(--app-background) / 0.92) 36%,
+        rgb(var(--app-background)) 100%
+      );
+  }
+
   /* Primary wash helps glass panels sit on the canvas (light/dark). */
   .surface-glass {
     background:

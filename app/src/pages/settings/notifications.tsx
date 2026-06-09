@@ -3,9 +3,7 @@ import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { NotificationSettings } from "@/lib/storage";
-import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import { IosNotificationDisplayCard } from "@/components/ios-notification-display-card";
-import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
 import {
@@ -48,6 +46,8 @@ export function NotificationsTab({
   const scenarioOn = notifSettings.scenarioAlerts !== false;
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
+  const supporterApptOn = notifSettings.supporterAppointmentReminders !== false;
+  const appointmentAlertsOn = notifSettings.appointmentAlerts !== false;
   const masterOff = !notifSettings.enabled;
 
   const inner = (
@@ -68,7 +68,7 @@ export function NotificationsTab({
             label="Push notifications"
             description={
               supporterMode
-                ? "Lock-screen alerts for hypos, supplies, and travel/sick-day updates from the person you support, plus your community and messages."
+                ? "Lock-screen alerts for hypos, supplies, appointments, and travel/sick-day updates from the person you support, plus your community and messages."
                 : "Receive alerts when the app is in the background"
             }
             checked={notifSettings.pushNotifications}
@@ -117,6 +117,14 @@ export function NotificationsTab({
               disabled={masterOff}
               testId="switch-scenario-alerts"
             />
+            <SettingsToggleRow
+              label="Appointment reminders"
+              description="The evening before and about 2 hours before their shared appointments"
+              checked={appointmentAlertsOn}
+              onCheckedChange={(checked) => onToggle("appointmentAlerts", checked)}
+              disabled={masterOff}
+              testId="switch-supporter-appointment-alerts"
+            />
           </SettingsGroup>
         </div>
       ) : (
@@ -155,6 +163,14 @@ export function NotificationsTab({
                 onCheckedChange={(checked) => onToggle("scenarioAlerts", checked)}
                 disabled={masterOff}
                 testId="switch-scenario-alerts"
+              />
+              <SettingsToggleRow
+                label="Notify supporters about appointments"
+                description="Evening before and about 2 hours before each appointment — for linked supporters who can see appointments"
+                checked={supporterApptOn}
+                onCheckedChange={(checked) => onToggle("supporterAppointmentReminders", checked)}
+                disabled={masterOff}
+                testId="switch-supporter-appointment-reminders"
               />
             </SettingsGroup>
           </div>
@@ -300,8 +316,6 @@ export function SettingsNotificationsRoute({
             embedded
             supporterMode={supporterMode}
           />
-          <PushTestUnlockCallout className="pt-1" />
-          <DevPushNotificationTestPanel />
         </SettingsPanelBody>
       </SettingsPanel>
     </SettingsSubPageShell>

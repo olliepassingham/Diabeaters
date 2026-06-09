@@ -24,6 +24,7 @@ import {
 } from "@/lib/storage";
 import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { isEmailLike } from "@/lib/user-display-name";
 import { normalizeAppRegion } from "@/lib/region";
 import { UK_DEFAULT_NEEDLES_PER_BOX, UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "@/lib/storage";
 
@@ -176,6 +177,14 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
 
   const localProfile = storage.getProfile();
   const localSettings = storage.getSettings();
+
+  const cloudName = row.full_name?.trim();
+  if (cloudName && !isEmailLike(cloudName)) {
+    const lp = storage.getProfile();
+    if (lp && (!lp.name?.trim() || isEmailLike(lp.name))) {
+      storage.saveProfile({ ...lp, name: cloudName });
+    }
+  }
 
   if (cloudDob && (!localProfile?.dateOfBirth || !String(localProfile.dateOfBirth).trim())) {
     if (!localProfile) {

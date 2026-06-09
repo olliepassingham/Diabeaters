@@ -20,6 +20,7 @@ import {
   toggleDmMessageLike,
   type DmMessageRow,
 } from "@/lib/community";
+import { chatThreadScrollClasses } from "@/components/chat-thread-scenery";
 import { cn } from "@/lib/utils";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import {
@@ -439,7 +440,9 @@ export default function CommunityThreadPage() {
     <div className={shellClass} data-testid="dm-thread-shell">
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain bg-gradient-to-b from-muted/25 via-background to-background px-3 py-4 sm:px-4"
+        className={chatThreadScrollClasses(
+          "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 py-4 sm:px-4",
+        )}
         aria-label="Message history"
       >
         {loading ? (

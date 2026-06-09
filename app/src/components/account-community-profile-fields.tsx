@@ -28,6 +28,7 @@ import {
 } from "@/lib/profile";
 import { getPrimaryAppRole } from "@/lib/carer-session";
 import { useAuth } from "@/lib/auth-context";
+import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
 
 type AccountCommunityProfileFieldsProps = {
   /** Prefix for form control ids (avoid duplicates if multiple instances ever mount). */
@@ -301,6 +302,7 @@ export function AccountCommunityProfileFields({
         toast({ title: "Could not save", description: error.message, variant: "destructive" });
         return;
       }
+      if (nameVal) applyDisplayNameToLocalProfile(nameVal);
       void refresh();
       setEditing(false);
       toast({ title: "Saved", description: "Your name has been updated." });
@@ -372,6 +374,7 @@ export function AccountCommunityProfileFields({
       toast({ title: "Could not save", description: error.message, variant: "destructive" });
       return;
     }
+    if (nameVal) applyDisplayNameToLocalProfile(nameVal);
     void refresh();
     const completeAfterSave = isPublicProfileComplete({
       full_name: nameVal,

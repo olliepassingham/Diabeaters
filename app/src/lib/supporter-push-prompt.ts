@@ -47,7 +47,7 @@ export function dismissSupporterPushPrompt(userId: string): void {
 
 /**
  * Turn on local + cloud prefs for all supporter-facing alerts and register for remote push (native only).
- * Matches edge checks: hypo_alerts, supply_alerts, scenario_alerts, and push === true.
+ * Matches edge checks: hypo_alerts, supply_alerts, scenario_alerts, appointment_alerts, and push === true.
  */
 export async function enableSupporterPushNotifications(): Promise<void> {
   const current = storage.getNotificationSettings();
@@ -58,6 +58,7 @@ export async function enableSupporterPushNotifications(): Promise<void> {
     hypoAlerts: true,
     supplyAlerts: true,
     scenarioAlerts: true,
+    appointmentAlerts: true,
     communityFeedAlerts: current.communityFeedAlerts !== false,
     communityDmAlerts: current.communityDmAlerts !== false,
   };

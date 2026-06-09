@@ -5,6 +5,7 @@ import { Disclaimer } from "@/components/disclaimer";
 import appPackage from "../../../package.json";
 import { BookOpen, ExternalLink, Info } from "lucide-react";
 import { Link } from "wouter";
+import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import {
   SettingsGroup,
@@ -186,6 +187,7 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
             </button>
           </div>
           <PushTestUnlockCallout className="-mt-1" />
+          <DevPushNotificationTestPanel />
           <div>
             <SettingsGroupLabel>Legal & support</SettingsGroupLabel>
             <SettingsGroup>

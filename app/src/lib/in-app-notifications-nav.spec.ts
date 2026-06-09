@@ -59,6 +59,12 @@ describe("getPathForInAppNotification", () => {
     );
   });
 
+  it("maps appointment_reminder_support to carer view", () => {
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "appointment_reminder_support" } })),
+    ).toBe("/carer-view");
+  });
+
   it("maps feed kinds to post or community hub", () => {
     expect(
       getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "feed_post_like", post_id: "p1" } })),

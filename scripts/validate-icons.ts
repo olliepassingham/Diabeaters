@@ -66,12 +66,26 @@ function main() {
     }
   }
 
-  // 3. Android launcher placeholders (Capacitor default mipmaps)
+  // 3. Android launcher must match branding (not Capacitor placeholder)
   const androidMipmap = join(ROOT, "android", "app", "src", "main", "res", "mipmap-xxxhdpi", "ic_launcher.png");
   if (!existsSync(androidMipmap)) {
-    console.warn(`Android launcher not found: ${androidMipmap} — run npx cap add android or replace mipmaps before Play upload.`);
+    console.error(`Android launcher not found: ${androidMipmap}`);
+    console.error("  Run: npm run icons:android");
+    failed = true;
   } else {
-    console.log(`✓ Android mipmap present: ${androidMipmap}`);
+    const launcherBuf = readFileSync(androidMipmap);
+    const launcherDims = getDimensions(launcherBuf);
+    if (launcherDims.width !== 192 || launcherDims.height !== 192) {
+      console.error(`${androidMipmap}: expected 192×192, got ${launcherDims.width}×${launcherDims.height}`);
+      failed = true;
+    } else if (launcherBuf.length < 8_000) {
+      console.error(
+        `${androidMipmap}: looks like the Capacitor placeholder (${launcherBuf.length} bytes). Run: npm run icons:android`,
+      );
+      failed = true;
+    } else {
+      console.log(`✓ Android mipmap present: ${androidMipmap}`);
+    }
   }
 
   if (failed) process.exit(1);

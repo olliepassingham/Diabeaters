@@ -3,6 +3,7 @@ import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Info, Loader2, Send } from "lucide-react";
 
+import { chatThreadScrollClasses } from "@/components/chat-thread-scenery";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -551,95 +552,87 @@ export default function CoachPage() {
   }
 
   return (
-    <PageShell
-      density="compact"
-      variant="narrow"
-      className="flex min-h-0 min-w-0 flex-col space-y-0 gap-0 pb-1"
+    <div
+      className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col bg-background text-foreground"
+      data-testid="coach-chat-shell"
     >
-      <div className="shrink-0 pb-2">
+      <div className="shrink-0 border-b border-border/40 px-4 pb-3 pt-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
         <PageHeader title={pageTitle} description={headerDescription} leading={<PageBackButton />} />
       </div>
 
+      {sendError ? (
+        <Alert variant="destructive" className="mx-4 mt-2 shrink-0 py-2">
+          <AlertTitle className="text-sm">Could not send</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 flex-1">{sendError}</span>
+            {retryableMessage?.trim() ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 shrink-0 self-start sm:self-center"
+                disabled={sendMutation.isPending}
+                onClick={() => void onRetrySend()}
+              >
+                Retry
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <div
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
-        style={{ minHeight: "min(100%, calc(100dvh - 11.5rem))" }}
+        className={chatThreadScrollClasses(
+          "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-3 sm:px-5",
+        )}
+        role="log"
+        aria-live="polite"
+        aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
       >
-        {sendError ? (
-          <Alert variant="destructive" className="shrink-0 py-2">
-            <AlertTitle className="text-sm">Could not send</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
-              <span className="min-w-0 flex-1">{sendError}</span>
-              {retryableMessage?.trim() ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-8 shrink-0 self-start sm:self-center"
-                  disabled={sendMutation.isPending}
-                  onClick={() => void onRetrySend()}
-                >
-                  Retry
-                </Button>
-              ) : null}
-            </AlertDescription>
-          </Alert>
+        {messages.length === 0 && topicCfg.starters.length > 0 ? (
+          <div className="mb-4 flex w-full min-w-0 flex-col gap-2.5" role="group" aria-label="Suggested prompts">
+            <p className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Suggested questions
+            </p>
+            {topicCfg.starters.map((q) => (
+              <button
+                key={q}
+                type="button"
+                className="w-full rounded-2xl border border-border/50 bg-card/80 px-4 py-3.5 text-left text-sm leading-snug text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-card active:scale-[0.99]"
+                onClick={() => void sendCoachTurn(q)}
+                disabled={sendMutation.isPending}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         ) : null}
 
-        <div
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-muted/20 via-background to-background shadow-sm dark:from-muted/10"
-          role="region"
-          aria-label={`Chat with ${AI_ASSISTANT_NAME}`}
-        >
-          <div
-            className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3 sm:p-4"
-            role="log"
-            aria-live="polite"
-          >
-            {messages.length === 0 && topicCfg.starters.length > 0 ? (
-              <div className="flex w-full min-w-0 flex-col gap-2 px-1 pt-1 pb-2" role="group" aria-label="Suggested prompts">
-                {topicCfg.starters.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    className="w-full rounded-xl border border-border/50 bg-card/70 px-3 py-2.5 text-left text-xs leading-snug text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-card active:scale-[0.99]"
-                    onClick={() => void sendCoachTurn(q)}
-                    disabled={sendMutation.isPending}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+        <div className="flex flex-col gap-3">
+          {messages.map((m, i) => (
+            <div
+              key={`${i}-${m.role}`}
+              className={cn(
+                "max-w-[90%] text-[15px] leading-relaxed shadow-sm",
+                m.role === "user"
+                  ? "ml-auto self-end rounded-[1.25rem] rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground"
+                  : "mr-auto self-start rounded-[1.25rem] rounded-bl-md border border-border/40 bg-card px-3.5 py-2.5 text-card-foreground",
+              )}
+            >
+              <p className="whitespace-pre-wrap">{m.content}</p>
+            </div>
+          ))}
 
-            {messages.map((m, i) => (
-              <div
-                key={`${i}-${m.role}`}
-                className={cn(
-                  "max-w-[88%] text-sm leading-relaxed shadow-sm",
-                  m.role === "user"
-                    ? "ml-auto self-end rounded-2xl rounded-br-md bg-primary px-3.5 py-2.5 text-primary-foreground"
-                    : "mr-auto self-start rounded-2xl rounded-bl-md border border-border/45 bg-card/95 px-3.5 py-2.5 text-card-foreground backdrop-blur-sm",
-                )}
-              >
-                <p className="whitespace-pre-wrap">{m.content}</p>
-              </div>
-            ))}
-
-            {sendMutation.isPending ? (
-              <div className="mr-auto flex max-w-[88%] items-center gap-2 rounded-2xl rounded-bl-md border border-border/40 bg-card/70 px-3 py-2 text-xs text-muted-foreground">
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                <span>{AI_ASSISTANT_NAME} is thinking…</span>
-              </div>
-            ) : null}
-            <div ref={bottomRef} />
-          </div>
+          {sendMutation.isPending ? (
+            <div className="mr-auto flex max-w-[90%] items-center gap-2 rounded-[1.25rem] rounded-bl-md border border-border/40 bg-card/80 px-3.5 py-2.5 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              <span>{AI_ASSISTANT_NAME} is thinking…</span>
+            </div>
+          ) : null}
         </div>
 
         {lastReply && lastReply.suggestedNextActions.length > 0 ? (
-          <div
-            className="shrink-0 rounded-xl border border-border/50 bg-muted/15 p-2.5 dark:bg-muted/10"
-            data-testid="coach-suggested-actions"
-          >
+          <div className="mt-4 rounded-2xl border border-border/50 bg-muted/15 p-3 dark:bg-muted/10" data-testid="coach-suggested-actions">
             <p className="mb-2 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Open in the app
             </p>
@@ -662,8 +655,12 @@ export default function CoachPage() {
           </div>
         ) : null}
 
+        <div ref={bottomRef} className="h-2 shrink-0" aria-hidden />
+      </div>
+
+      <div className="z-10 shrink-0 border-t border-border/50 bg-background/95 backdrop-blur-xl">
         {lastReply && lastReply.suggestedQuestions.length > 0 ? (
-          <div className="shrink-0 space-y-2">
+          <div className="space-y-2 border-b border-border/40 px-4 pb-2.5 pt-2.5">
             <p className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Try asking next
             </p>
@@ -672,7 +669,7 @@ export default function CoachPage() {
                 <button
                   key={q}
                   type="button"
-                  className="shrink-0 max-w-[85%] rounded-full border border-border/50 bg-card/80 px-3 py-2 text-left text-xs leading-snug text-foreground shadow-sm transition-colors hover:border-primary/30"
+                  className="shrink-0 max-w-[85%] rounded-full border border-border/50 bg-card px-3 py-2 text-left text-xs leading-snug text-foreground shadow-sm transition-colors hover:border-primary/30"
                   onClick={() => setDraft(q)}
                 >
                   {q}
@@ -682,45 +679,52 @@ export default function CoachPage() {
           </div>
         ) : null}
 
-        <div className="flex shrink-0 items-end gap-2 rounded-2xl border border-border/60 bg-card/90 p-2 shadow-md backdrop-blur-sm dark:bg-card/70">
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type your question…"
-            rows={1}
-            className="max-h-28 min-h-[2.75rem] flex-1 resize-none border-0 bg-transparent px-2 py-2 text-sm shadow-none focus-visible:ring-0"
-            disabled={sendMutation.isPending}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void onSend();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-full shadow-sm"
-            onClick={() => void onSend()}
-            disabled={sendMutation.isPending || !draft.trim()}
-            aria-label="Send message"
-          >
-            {sendMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            ) : (
-              <Send className="h-4 w-4" aria-hidden />
-            )}
-          </Button>
-        </div>
+        <div className="px-3 py-2.5 pb-[calc(max(0.5rem,env(safe-area-inset-bottom,0px))+var(--keyboard-inset-bottom,0px))]">
+          <div className="flex items-end gap-2 rounded-[1.75rem] border border-border/50 bg-muted/35 p-1.5 pl-3 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04]">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Type your question…"
+              rows={1}
+              className="min-h-10 max-h-32 flex-1 resize-none border-0 bg-transparent px-0 py-2.5 text-[16px] leading-snug shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              disabled={sendMutation.isPending}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void onSend();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              size="icon"
+              className={cn(
+                "h-10 w-10 shrink-0 rounded-full transition-all",
+                draft.trim() ? "shadow-md" : "opacity-50",
+              )}
+              onClick={() => void onSend()}
+              disabled={sendMutation.isPending || !draft.trim()}
+              aria-label="Send message"
+            >
+              {sendMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Send className="h-4 w-4" aria-hidden />
+              )}
+            </Button>
+          </div>
 
-        <CoachDisclaimerFooter
-          isSupporter={isSupporter}
-          effectiveTopic={effectiveTopic}
-          topicLabel={topicCfg.label}
-          topicHint={topicHint}
-          onClearChat={clearChat}
-        />
+          <div className="mt-2">
+            <CoachDisclaimerFooter
+              isSupporter={isSupporter}
+              effectiveTopic={effectiveTopic}
+              topicLabel={topicCfg.label}
+              topicHint={topicHint}
+              onClearChat={clearChat}
+            />
+          </div>
+        </div>
       </div>
-    </PageShell>
+    </div>
   );
 }

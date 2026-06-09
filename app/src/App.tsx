@@ -1116,6 +1116,8 @@ function AuthenticatedShell() {
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const pathOnly = location.split("?")[0] ?? location;
   const isDmThreadView = /^\/community\/messages\/[^/]+$/.test(pathOnly);
+  const isCoachChatView = pathOnly === "/coach";
+  const isFillHeightChatView = isDmThreadView || isCoachChatView;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
@@ -1296,7 +1298,7 @@ function AuthenticatedShell() {
     <div
       className={cn(
         "relative flex w-full min-w-0 flex-col bg-background text-foreground",
-        lockShellHeightForExercise || isDmThreadView ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen",
+        lockShellHeightForExercise || isFillHeightChatView ? "h-dvh min-h-0 overflow-hidden" : "min-h-screen",
       )}
     >
       <NativePushForegroundSync />
@@ -1349,16 +1351,16 @@ function AuthenticatedShell() {
         id="app-scroll-main"
         className={cn(
           "relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
-          isDmThreadView
+          isFillHeightChatView
             ? "flex flex-col overflow-hidden p-0 md:p-0"
             : "overflow-y-auto p-4 md:p-6",
         )}
         style={{
-          paddingBottom: isDmThreadView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
-          scrollPaddingBottom: isDmThreadView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
+          paddingBottom: isFillHeightChatView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
+          scrollPaddingBottom: isFillHeightChatView ? 0 : MAIN_BOTTOM_SCROLL_PADDING,
         }}
       >
-        <AnimatedRouteOutlet fillHeight={isDmThreadView}>
+        <AnimatedRouteOutlet fillHeight={isFillHeightChatView}>
           <InnerRouter />
         </AnimatedRouteOutlet>
       </main>

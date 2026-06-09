@@ -1074,6 +1074,10 @@ export interface NotificationSettings {
   lowThresholdDays: number;
   /** Appointment reminder notifications (in-app + push where available). */
   appointmentReminders: boolean;
+  /** When true, linked supporters can receive appointment reminders (evening before + ~2h before). */
+  supporterAppointmentReminders?: boolean;
+  /** Supporter account: alerts when a linked person has an upcoming appointment. */
+  appointmentAlerts?: boolean;
   hypoAlerts?: boolean;
   scenarioAlerts?: boolean;
   /** When true, dashboard "Treated a Hypo" logs and notifies without opening the detail dialog first. */
@@ -3595,6 +3599,8 @@ export const storage = {
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
       appointmentReminders: true,
+      supporterAppointmentReminders: true,
+      appointmentAlerts: true,
       hypoAlerts: true,
       scenarioAlerts: true,
       hypoDashboardQuickNotify: true,
@@ -3612,6 +3618,8 @@ export const storage = {
       hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify !== false,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
       communityDmAlerts: parsed.communityDmAlerts !== false,
+      supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,
+      appointmentAlerts: parsed.appointmentAlerts !== false,
     };
   },
 

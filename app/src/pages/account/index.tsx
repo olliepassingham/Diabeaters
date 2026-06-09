@@ -62,6 +62,7 @@ import {
   isAccountDeletionTableUnavailableMessage,
 } from "@/lib/support";
 import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
+import { resolveUserDisplayName } from "@/lib/user-display-name";
 import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 function shortId(id: string) {
@@ -356,8 +357,12 @@ export default function Account() {
   }
 
   const settingsName = storage.getProfile()?.name?.trim() ?? "";
-  const displayName = profile?.full_name?.trim() || settingsName || "Your account";
-  const nameForInitials = profile?.full_name?.trim() || settingsName;
+  const resolvedName = resolveUserDisplayName({
+    cloudFullName: profile?.full_name,
+    localName: settingsName,
+  });
+  const displayName = resolvedName || "Your account";
+  const nameForInitials = resolvedName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
   const showPublicProfileTab = isCommunityEnabled && !isCarer;
   const isPublicProfile = profile?.is_public === true;

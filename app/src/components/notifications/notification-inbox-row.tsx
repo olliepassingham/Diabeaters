@@ -3,6 +3,7 @@ import {
   Activity,
   AtSign,
   Bell,
+  Calendar,
   Check,
   ChevronRight,
   Droplet,
@@ -36,6 +37,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "feed_post_mention") return AtSign;
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
   if (kind === "scenario_started") return Activity;
+  if (kind === "appointment_reminder_support") return Calendar;
   return Bell;
 }
 

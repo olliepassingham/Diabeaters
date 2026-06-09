@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, BookOpen, HeartPulse, Phone, ShieldAlert, User } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  HeartPulse,
+  Phone,
+  ShieldAlert,
+  Syringe,
+  User,
+  UserRound,
+} from "lucide-react";
 import { Link } from "wouter";
 import { storage, UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
@@ -11,7 +20,46 @@ import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageShell } from "@/components/layout";
-import { getEffectiveEmergencyNumber, getProfileRegion, getRegionDefaultsForProfile } from "@/lib/region";
+import { getEffectiveEmergencyNumber } from "@/lib/region";
+import { resolveUserDisplayName } from "@/lib/user-display-name";
+import { cn } from "@/lib/utils";
+
+const AWAKE_STEPS = [
+  "Give fast sugar — juice, regular cola, glucose tablets, or sweets.",
+  "Stay with them for 10–15 minutes.",
+  "Repeat fast sugar if they are not improving.",
+  "Still unwell? Call emergency services using the button below.",
+] as const;
+
+const UNCONSCIOUS_STEPS = [
+  "Tell paramedics this person has Type 1 Diabetes and uses insulin.",
+  "Do not give food, drink, or put anything in their mouth.",
+  "Turn them on their side and stay with them until help arrives.",
+  "Call emergency services now using the button below.",
+] as const;
+
+function StepList({ steps, urgent }: { steps: readonly string[]; urgent?: boolean }) {
+  return (
+    <ol className="space-y-2.5">
+      {steps.map((step, index) => (
+        <li key={step} className="flex gap-3">
+          <span
+            className={cn(
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums",
+              urgent
+                ? "bg-red-600 text-white dark:bg-red-500"
+                : "bg-red-500/10 text-red-700 dark:bg-red-500/20 dark:text-red-300",
+            )}
+            aria-hidden
+          >
+            {index + 1}
+          </span>
+          <p className="min-w-0 pt-0.5 text-base leading-snug text-foreground">{step}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function HelpNow() {
   const { data: linkedPatient } = useLinkedPatient();
@@ -33,7 +81,10 @@ export default function HelpNow() {
   }, []);
 
   const primaryContact = toLegacyPrimaryContact(emergency);
-  const displayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
+  const displayName = resolveUserDisplayName({
+    cloudFullName: cloudProfile?.full_name,
+    localName: profile?.name,
+  });
 
   const handleCall = (phone: string) => {
     window.location.href = `tel:${phone}`;
@@ -43,8 +94,8 @@ export default function HelpNow() {
     handleCall(getEffectiveEmergencyNumber(profile));
   };
 
-  const regionDefaults = getRegionDefaultsForProfile(profile);
-  const emergencyLabel = `Call ${getEffectiveEmergencyNumber(profile)}`;
+  const emergencyNumber = getEffectiveEmergencyNumber(profile);
+  const emergencyLabel = `Call ${emergencyNumber}`;
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
 
@@ -53,205 +104,215 @@ export default function HelpNow() {
     [],
   );
 
-  /** Space for fixed emergency bar above bottom nav (nav height is measured at runtime). */
   const emergencyDockClearance =
-    "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 7.25rem)";
+    "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 7rem)";
 
   return (
     <PageShell
       variant="standard"
-      className="min-h-[calc(100vh-8rem)] space-y-4"
+      density="compact"
+      className="min-h-[calc(100vh-8rem)]"
       style={{ paddingBottom: emergencyDockClearance }}
     >
+      {/* Hero */}
       <div
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-red-600 via-rose-600 to-red-800 text-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.55)] ring-1 ring-white/10 dark:from-red-700 dark:via-rose-700 dark:to-red-950 dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.65)]"
+        className={cn(
+          "relative overflow-hidden rounded-3xl px-5 py-6 text-white shadow-lg shadow-red-600/20",
+          "bg-gradient-to-br from-red-600 via-red-600 to-red-700",
+          "ring-1 ring-red-500/30 dark:from-red-700 dark:via-red-700 dark:to-red-800",
+        )}
         role="alert"
         aria-live="polite"
+        data-testid="help-now-hero"
       >
         <div
-          className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl"
+          className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10 blur-2xl"
           aria-hidden
         />
+        {/* Medical ID — first thing a bystander should see */}
         <div
-          className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-black/15 blur-2xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(105deg,transparent_40%,rgba(255,255,255,0.06)_50%,transparent_60%)]"
-          aria-hidden
-        />
-        <div className="relative flex gap-0 sm:gap-1">
-          <div className="w-1 shrink-0 rounded-l-3xl bg-gradient-to-b from-white/50 via-white/25 to-white/10" aria-hidden />
-          <div className="min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-              <span className="mx-auto flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/12 shadow-inner shadow-black/10 ring-1 ring-white/20 backdrop-blur-sm sm:mx-0">
-                <ShieldAlert className="h-7 w-7 text-white drop-shadow-sm" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1 space-y-3 text-center sm:text-left">
-                <div>
-                  <p className="inline-flex items-center justify-center rounded-full bg-black/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-red-50 ring-1 ring-white/15 sm:justify-start">
-                    Type 1 diabetes · Emergency
-                  </p>
-                  <h1 className="mt-3 text-balance text-2xl font-bold leading-[1.15] tracking-tight sm:text-3xl sm:leading-tight">
-                    This person needs urgent help
-                  </h1>
-                </div>
-                {displayName ? (
-                  <p className="text-base font-semibold text-white sm:text-lg">
-                    <span className="text-red-100/90">Name · </span>
-                    <span className="whitespace-normal break-words">{displayName}</span>
-                  </p>
-                ) : null}
-                <p className="text-base font-medium leading-snug text-white sm:text-lg">
-                  <strong className="font-bold text-white">Type 1 diabetes</strong> — blood sugar can drop fast.
+          className="relative mb-4 rounded-2xl bg-white px-4 py-3.5 text-center shadow-md ring-2 ring-white/50"
+          data-testid="help-now-diabetes-type"
+        >
+          <p className="font-display text-[1.65rem] font-black uppercase leading-none tracking-tight text-red-700 sm:text-3xl">
+            Type 1 Diabetes
+          </p>
+          {profile?.usingInsulin || isPumpUser ? (
+            <p className="mt-1.5 flex items-center justify-center gap-1.5 text-sm font-bold uppercase tracking-wider text-red-600">
+              <Syringe className="h-4 w-4 shrink-0" aria-hidden />
+              Insulin dependent
+            </p>
+          ) : null}
+        </div>
+
+        <div className="relative flex items-start gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+            <ShieldAlert className="h-6 w-6" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-sm font-bold uppercase tracking-wide text-red-50">
+              Low blood sugar emergency
+            </p>
+            {displayName ? (
+              <div className="space-y-0.5">
+                <p
+                  className="font-display text-3xl font-bold leading-none tracking-tight"
+                  data-testid="help-now-display-name"
+                >
+                  {displayName}
+                </p>
+                <p className="text-base font-medium text-red-50">may be having a severe hypo</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <p className="text-xl font-bold leading-tight">Someone needs help</p>
+                <p className="text-sm text-red-50">
+                  <Link
+                    href="/settings/usage#settings-personal"
+                    className="font-medium underline underline-offset-2 hover:text-white"
+                  >
+                    Add your name in Settings
+                  </Link>{" "}
+                  so helpers know who this is for.
                 </p>
               </div>
-            </div>
+            )}
+            <p className="text-sm leading-relaxed text-red-100/90">
+              For anyone helping — this is a <strong className="font-semibold text-white">Type 1</strong> low blood
+              sugar emergency. Follow the steps below.
+            </p>
           </div>
         </div>
       </div>
 
-      <Card className="rounded-2xl border-amber-500/35 bg-gradient-to-b from-amber-500/[0.08] to-card shadow-sm ring-1 ring-amber-500/15 dark:from-amber-500/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base text-foreground">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-sm dark:bg-amber-600">
-              <AlertCircle className="h-5 w-5" aria-hidden />
-            </span>
-            <span>Low blood sugar — common signs</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {quickSymptoms.map((s) => (
-              <div
-                key={s}
-                className="rounded-xl border border-amber-500/20 bg-background/80 px-2 py-2.5 text-center text-sm font-semibold text-foreground shadow-sm"
+      {/* Situation + steps */}
+      <Card className="overflow-hidden rounded-3xl border-border/60 shadow-sm">
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div className="space-y-2">
+            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <HeartPulse className="h-4 w-4 text-red-600 dark:text-red-400" aria-hidden />
+              What is their situation?
+            </p>
+            <div
+              className="grid grid-cols-1 gap-2 rounded-2xl bg-muted/50 p-1.5 sm:grid-cols-2"
+              role="group"
+              aria-label="Person's situation"
+            >
+              <button
+                type="button"
+                className={cn(
+                  "flex min-h-12 items-center gap-2.5 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-all",
+                  mode === "awake"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/80"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setMode("awake")}
+                data-testid="button-toggle-awake"
               >
-                {s}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl border-border/70 bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <HeartPulse className="h-4 w-4 text-primary" aria-hidden />
-            What should you do?
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button
-              type="button"
-              variant={mode === "awake" ? "default" : "outline"}
-              className="min-h-12 justify-start rounded-xl px-4 text-left"
-              onClick={() => setMode("awake")}
-              data-testid="button-toggle-awake"
-            >
-              Awake &amp; can swallow
-            </Button>
-            <Button
-              type="button"
-              variant={mode === "unconscious" ? "destructive" : "outline"}
-              className="min-h-12 justify-start rounded-xl px-4 text-left"
-              onClick={() => setMode("unconscious")}
-              data-testid="button-toggle-unconscious"
-            >
-              Unconscious / seizure / can’t swallow
-            </Button>
-          </div>
-
-          {mode === "awake" ? (
-            <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.05] p-4">
-              <p className="text-base font-semibold text-foreground">Awake &amp; can swallow — do this</p>
-              <ol className="mt-3 space-y-2.5 text-base text-foreground">
-                <li>
-                  <strong>Fast sugar:</strong> juice, regular (not diet) cola, glucose tablets, or sweets.
-                </li>
-                <li>
-                  <strong>Stay</strong> — wait <strong>10–15 minutes</strong>.
-                </li>
-                <li>
-                  <strong>Repeat</strong> fast sugar if no better.
-                </li>
-                <li>
-                  <strong>Worse or unsure</strong> — red button below.
-                </li>
-              </ol>
+                <UserRound className="h-4 w-4 shrink-0" aria-hidden />
+                Awake &amp; can swallow
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex min-h-12 items-center gap-2.5 rounded-xl px-3.5 py-3 text-left text-sm font-semibold transition-all",
+                  mode === "unconscious"
+                    ? "bg-red-600 text-white shadow-sm ring-1 ring-red-500/40 dark:bg-red-700"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setMode("unconscious")}
+                data-testid="button-toggle-unconscious"
+              >
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                Unconscious / can&apos;t swallow
+              </button>
             </div>
-          ) : null}
+          </div>
 
-          {mode === "unconscious" ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.06] p-4">
-              <p className="text-base font-semibold text-foreground">Severe emergency — red button below</p>
-              <div className="mt-3 space-y-2 text-base text-foreground">
-                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
-                  <p>
-                    <strong className="text-foreground">Do not</strong> give food or drink.
-                  </p>
-                  <p className="mt-1">
-                    <strong className="text-foreground">Do not</strong> put anything in their mouth.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border/70 bg-background/60 p-3">
-                  <p>
-                    <strong className="text-foreground">Turn them on their side</strong> and stay with them until help arrives.
-                  </p>
-                </div>
-              </div>
+          <div
+            className={cn(
+              "rounded-2xl border p-4",
+              mode === "unconscious"
+                ? "border-red-500/30 bg-red-500/[0.07] dark:bg-red-950/30"
+                : "border-border/60 bg-muted/20",
+            )}
+          >
+            <p className="text-base font-semibold text-foreground">
+              {mode === "awake" ? "Give fast sugar, then wait" : `Call ${emergencyNumber} now`}
+            </p>
+            <div className="mt-3">
+              <StepList
+                steps={mode === "awake" ? AWAKE_STEPS : UNCONSCIOUS_STEPS}
+                urgent={mode === "unconscious"}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Common signs
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickSymptoms.map((symptom) => (
+                <span
+                  key={symptom}
+                  className="rounded-full border border-border/70 bg-muted/30 px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                >
+                  {symptom}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {isPumpUser ? (
+            <div
+              className="flex gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] px-3.5 py-3 dark:bg-amber-950/25"
+              data-testid="card-pump-emergency"
+            >
+              <Syringe className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden />
+              <p className="text-sm leading-relaxed text-foreground">
+                <strong>Pump user:</strong> treat the hypo first — do not disconnect the pump. If unconscious,
+                tell paramedics they use an insulin pump.
+              </p>
             </div>
           ) : null}
         </CardContent>
       </Card>
 
-      {isPumpUser ? (
-        <Card className="rounded-2xl border border-indigo-500/25 bg-indigo-500/[0.05]" data-testid="card-pump-emergency">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base text-indigo-900 dark:text-indigo-100">
-              <AlertCircle className="h-4 w-4 text-indigo-700 dark:text-indigo-300" aria-hidden />
-              Pump user note
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0 text-base font-medium text-foreground">
-            <p>
-              Low sugar: <strong>do not disconnect the pump</strong> — treat the hypo first.
-            </p>
-            <p>
-              Unconscious: <strong>do not remove the pump</strong> — say they use a pump to paramedics.
-            </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Card key={syncGeneration} className="rounded-2xl border-border/70 bg-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BookOpen className="h-4 w-4 text-muted-foreground" aria-hidden />
-            Emergency contacts
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 space-y-2">
+      {/* Emergency contact */}
+      <Card key={syncGeneration} className="rounded-3xl border-border/60 shadow-sm">
+        <CardContent className="space-y-3 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-foreground">Emergency contact</p>
           {primaryContact ? (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-background/60 p-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{primaryContact.name}</p>
-                <p className="text-sm text-muted-foreground">{primaryContact.phone}</p>
+            <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/20 p-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-500/10 dark:bg-red-500/15">
+                <User className="h-5 w-5 text-red-600 dark:text-red-400" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base font-semibold text-foreground">{primaryContact.name}</p>
+                <p className="text-sm tabular-nums text-muted-foreground">{primaryContact.phone}</p>
+                {primaryContact.relationship ? (
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {primaryContact.relationship}
+                  </p>
+                ) : null}
               </div>
-              <Button size="sm" onClick={() => handleCall(primaryContact.phone)} data-testid="button-call-primary-synced">
-                <Phone className="h-4 w-4 mr-1.5" />
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-xl"
+                onClick={() => handleCall(primaryContact.phone)}
+                data-testid="button-call-primary-synced"
+              >
+                <Phone className="mr-1.5 h-4 w-4" />
                 Call
               </Button>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border/70 bg-background/40 p-3">
-              <p className="text-sm font-semibold text-foreground">No contact saved</p>
-              <Button size="sm" variant="outline" className="mt-3" asChild data-testid="button-call-contact">
-                <Link href={emergencyEditHref}>
-                  <User className="h-4 w-4 mr-1.5" />
-                  Add contact
-                </Link>
+            <div className="rounded-2xl border border-dashed border-border/70 bg-muted/10 px-4 py-5 text-center">
+              <p className="text-sm text-muted-foreground">No emergency contact saved yet.</p>
+              <Button size="sm" variant="link" className="mt-1 h-auto px-0" asChild data-testid="button-call-contact">
+                <Link href={emergencyEditHref}>Add emergency contact</Link>
               </Button>
             </div>
           )}
@@ -259,49 +320,73 @@ export default function HelpNow() {
           {emergency?.phoneSecondary?.trim() ? (
             <Button
               size="sm"
-              variant="outline"
-              className="w-full"
+              variant="ghost"
+              className="h-auto w-full justify-between px-1 text-muted-foreground"
               onClick={() => handleCall(emergency.phoneSecondary.trim())}
               data-testid="button-call-secondary-synced"
             >
               Call secondary contact
+              <ChevronRight className="h-4 w-4" aria-hidden />
             </Button>
           ) : null}
 
-          <Button variant="secondary" size="sm" className="w-full" asChild>
-            <Link href={emergencyEditHref}>Edit emergency details</Link>
+          <Button variant="ghost" size="sm" className="h-auto w-full justify-between px-1 text-muted-foreground" asChild>
+            <Link href={emergencyEditHref}>
+              Edit emergency details
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </Link>
           </Button>
         </CardContent>
       </Card>
 
+      {/* Fixed call dock */}
       <div
-        className="fixed left-0 right-0 z-[95] px-4 pb-2 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]"
+        className="pointer-events-none fixed inset-x-0 z-[95]"
         style={{
-          bottom: "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px) + 0.5rem)",
+          bottom: "calc(var(--bottom-nav-height, 7.5rem) + var(--keyboard-inset-bottom, 0px))",
         }}
       >
-        <div className="mx-auto max-w-md rounded-2xl border border-border/70 bg-background/95 p-3 shadow-xl backdrop-blur-md supports-[backdrop-filter]:bg-background/80">
-          <div className="flex items-stretch gap-2">
-            <Button size="lg" className="flex-1 rounded-xl bg-red-600 dark:bg-red-700" onClick={callEmergencyServices} data-testid="button-call-emergency">
-              <Phone className="h-5 w-5 mr-2" />
+        <div
+          className="pointer-events-auto bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-2 pt-6 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]"
+        >
+          <div className="mx-auto max-w-md space-y-2">
+            <Button
+              size="lg"
+              className={cn(
+                "h-14 w-full rounded-2xl text-base font-semibold text-white shadow-lg shadow-red-600/25",
+                "bg-gradient-to-r from-red-600 to-red-500 dark:from-red-700 dark:to-red-600",
+                "ring-1 ring-red-500/30 hover:shadow-xl active:translate-y-px",
+              )}
+              onClick={callEmergencyServices}
+              data-testid="button-call-emergency"
+            >
+              <span className="mr-2 flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/15">
+                <Phone className="h-5 w-5" />
+              </span>
               {emergencyLabel}
             </Button>
             {primaryContact ? (
               <Button
-                size="lg"
+                size="sm"
                 variant="outline"
-                className="flex-1 rounded-xl"
+                className="h-11 w-full rounded-2xl border-border/80 bg-background/80 backdrop-blur-sm"
                 onClick={() => handleCall(primaryContact.phone)}
-                data-testid="button-call-contact"
+                data-testid="button-call-contact-dock"
               >
-                <User className="h-5 w-5 mr-2" />
+                <User className="mr-2 h-4 w-4" />
                 Call {primaryContact.name}
               </Button>
             ) : (
-              <Button size="lg" variant="outline" className="flex-1 rounded-xl" asChild data-testid="button-call-contact">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 w-full rounded-2xl border-border/80 bg-background/80 backdrop-blur-sm"
+                asChild
+                data-testid="button-call-contact"
+              >
                 <Link href={emergencyEditHref}>
-                  <User className="h-5 w-5 mr-2" />
-                  Add contact
+                  <User className="mr-2 h-4 w-4" />
+                  Add emergency contact
                 </Link>
               </Button>
             )}

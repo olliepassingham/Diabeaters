@@ -10,6 +10,7 @@ import { useProfile } from "@/lib/profile";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { PageHeader, PageShell } from "@/components/layout";
+import { resolveUserDisplayName } from "@/lib/user-display-name";
 
 const LANGUAGES = [
   { code: "en", name: "English", flag: "GB" },
@@ -213,7 +214,10 @@ export default function EmergencyCard() {
 
   const t = TRANSLATIONS[selectedLang] || TRANSLATIONS.en;
   const primaryContact = toLegacyPrimaryContact(emergency);
-  const displayName = cloudProfile?.full_name?.trim() || profile?.name?.trim() || "";
+  const displayName = resolveUserDisplayName({
+    cloudFullName: cloudProfile?.full_name,
+    localName: profile?.name,
+  });
   const selectedLangInfo = LANGUAGES.find(l => l.code === selectedLang);
 
   const handleShare = async () => {

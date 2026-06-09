@@ -20,6 +20,7 @@
    supabase functions deploy notify_scenario_started --no-verify-jwt
    supabase functions deploy notify_supply_low --no-verify-jwt
    supabase functions deploy notify_supply_low_cron --no-verify-jwt
+   supabase functions deploy notify_supporter_appointment_reminders --no-verify-jwt
    supabase functions deploy notify_dm_push --no-verify-jwt
    ```
 
@@ -29,4 +30,6 @@
 
 4. **Low supply (scheduled)** — apply migration `20260506120000_supplies_forecast_cache.sql` (columns `days_remaining_cached`, `supply_forecast_at` on `public.supplies`). Schedule **`notify_supply_low_cron`** via **Dashboard → Integrations → Cron** (or `pg_cron` + `pg_net` SQL; [docs](https://supabase.com/docs/guides/functions/schedule-functions)): POST to `…/functions/v1/notify_supply_low_cron` with **`Authorization: Bearer <service role>`** and matching **`apikey`**, or set Edge secret **`NOTIFY_SUPPLY_LOW_CRON_SECRET`** and send **`x-notify-supply-low-cron-secret`** ( **`apikey`** can be **anon** for the gateway). Prefer [Vault](https://supabase.com/docs/guides/database/vault) for values in SQL. See `notify_supply_low_cron/index.ts` header.
 
-5. **App** — ensure `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set; the client POSTs to `functions/v1/notify_carers_on_hypo` (with anon `apikey` + user `Authorization`) after inserting `hypo_logs`.
+5. **Supporter appointment reminders (optional cron)** — deploy **`notify_supporter_appointment_reminders`**. The patient app invokes it while open (`AppointmentReminderPoller`). For background delivery when the patient does not open the app, schedule POST to `…/functions/v1/notify_supporter_appointment_reminders` every 15–30 minutes with service role or **`NOTIFY_SUPPORTER_APPT_CRON_SECRET`**. See `notify_supporter_appointment_reminders/index.ts` header and `docs/ios-push-notification-paths.md` (Path F).
+
+6. **App** — ensure `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are set; the client POSTs to `functions/v1/notify_carers_on_hypo` (with anon `apikey` + user `Authorization`) after inserting `hypo_logs`.

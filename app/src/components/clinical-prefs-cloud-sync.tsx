@@ -26,6 +26,7 @@ export function ClinicalPrefsCloudSync() {
     profile?.insulin_delivery_method,
     profile?.tdd,
     profile?.date_of_birth,
+    profile?.full_name,
     profile?.pharmacy?.updatedAt,
   ]);
 

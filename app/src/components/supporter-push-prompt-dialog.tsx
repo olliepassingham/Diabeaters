@@ -53,7 +53,7 @@ export function SupporterPushPromptDialog({ open, onOpenChange, patientName }: P
         onOpenChange(false);
         toast({
           title: "Supporter alerts enabled",
-          description: `You'll be notified when ${patientName} shares hypos, supplies, or travel/sick-day updates with you.`,
+          description: `You'll be notified when ${patientName} shares hypos, supplies, appointments, or travel/sick-day updates with you.`,
         });
         return;
       }
