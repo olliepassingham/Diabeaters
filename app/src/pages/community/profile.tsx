@@ -500,7 +500,7 @@ export default function CommunityProfilePage() {
             <AlertDialogTitle>Block this person?</AlertDialogTitle>
             <AlertDialogDescription>
               You will not see each other’s posts or comments, and you cannot message each other.
-              You can unblock later from their profile.
+              You can unblock them anytime from Feed → ⋯ → Blocked users.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

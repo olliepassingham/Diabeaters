@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { FeedComposerFormBody } from "@/components/community/feed-composer-form-body";
 import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
 import { FindPeoplePanel } from "@/components/community/find-people-panel";
+import { FeedMoreMenu } from "@/components/community/feed-more-menu";
 import { useFeedComposer } from "@/hooks/use-feed-composer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -389,12 +390,13 @@ export default function CommunityHomePage() {
                 <MessageCircle className="h-4 w-4" aria-hidden />
               </Link>
             </Button>
-            <Button variant="outline" size="sm" className="hidden h-9 rounded-xl sm:inline-flex" asChild>
+            <Button variant="outline" size="sm" className="hidden h-9 shrink-0 rounded-xl sm:inline-flex" asChild>
               <Link href="/community/messages" aria-label="Messages" title="Open messages">
                 <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
                 <span>Messages</span>
               </Link>
             </Button>
+            {user ? <FeedMoreMenu /> : null}
           </div>
         }
       />

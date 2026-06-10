@@ -65,6 +65,32 @@ export async function blockUser(blockedId: string): Promise<{ error: Error | nul
   return { error: null };
 }
 
+export async function listUsersBlockedByCurrentUser(): Promise<{
+  ids: string[];
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { ids: [], error: new Error("Supabase not configured") };
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user?.id;
+  if (!uid) return { ids: [], error: null };
+
+  const { data, error } = await supabase
+    .from("user_blocks")
+    .select("blocked_id, created_at")
+    .eq("blocker_id", uid)
+    .order("created_at", { ascending: false });
+
+  if (error) return { ids: [], error: new Error(error.message) };
+
+  const ids = (data ?? [])
+    .map((row) => String((row as { blocked_id: string }).blocked_id))
+    .filter(Boolean);
+
+  return { ids, error: null };
+}
+
 export async function listBlockRelatedUserIdsForCurrentUser(): Promise<{
   ids: Set<string>;
   error: Error | null;

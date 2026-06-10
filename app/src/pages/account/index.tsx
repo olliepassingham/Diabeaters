@@ -364,7 +364,7 @@ export default function Account() {
   const displayName = resolvedName || "Your account";
   const nameForInitials = resolvedName;
   const showAvatarImage = Boolean(avatarDisplayUrl && !avatarImgFailed);
-  const showPublicProfileTab = isCommunityEnabled && !isCarer;
+  const showPublicProfileTab = isCommunityEnabled;
   const isPublicProfile = profile?.is_public === true;
   const publicHandle = (profile?.public_handle ?? "").replace(/^@/, "").trim();
   const bioPreview = profile?.bio?.trim() || "";
