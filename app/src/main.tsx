@@ -14,13 +14,13 @@ import {
 import { applyNativeDocumentClass } from "@/lib/native-chrome";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
 import { clearNativeAppBadge } from "@/lib/native-app-badge";
-import { isNativePushPlatform } from "@/lib/native-platform";
+import { isCapacitorNativeShell } from "@/lib/native-platform";
 
 migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));
 applyNativeDocumentClass();
 void ensureNativeNotificationChannels();
-if (isNativePushPlatform()) {
+if (isCapacitorNativeShell()) {
   void clearNativeAppBadge();
 }
 

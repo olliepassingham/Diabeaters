@@ -2,15 +2,30 @@ import { Badge } from "@capawesome/capacitor-badge";
 
 import { AppIconBadge } from "@/lib/app-icon-badge";
 import { fetchNativeAppBadgeCount } from "@/lib/native-app-badge-count";
-import { getNativePushPlatform, isNativePushPlatform } from "@/lib/native-platform";
+import {
+  getNativePushPlatform,
+  isCapacitorNativeShell,
+} from "@/lib/native-platform";
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
 let needsFollowUpSync = false;
 
+/** Where to write the OS icon badge (handles remote server.url shells). */
+function resolveNativeBadgeWritePlatform(): "ios" | "android" | null {
+  const pushPlatform = getNativePushPlatform();
+  if (pushPlatform) return pushPlatform;
+  if (isCapacitorNativeShell()) return "ios";
+  return null;
+}
+
+function canWriteNativeAppBadge(): boolean {
+  return resolveNativeBadgeWritePlatform() != null;
+}
+
 async function applyNativeAppBadgeCount(count: number): Promise<void> {
   const safeCount = Math.max(0, Math.floor(count));
-  const platform = getNativePushPlatform();
+  const platform = resolveNativeBadgeWritePlatform();
   if (platform === "ios") {
     // Never use @capawesome/capacitor-badge on iOS: Badge.set() re-requests badge-only permission
     // and regressed remote notification delivery. Use our minimal AppIconBadge plugin instead.
@@ -24,7 +39,7 @@ async function applyNativeAppBadgeCount(count: number): Promise<void> {
 
 /** Clears the OS app-icon badge (e.g. on sign-out). */
 export async function clearNativeAppBadge(): Promise<void> {
-  if (!isNativePushPlatform()) return;
+  if (!canWriteNativeAppBadge()) return;
   try {
     await applyNativeAppBadgeCount(0);
   } catch (e) {
@@ -55,7 +70,7 @@ async function performBadgeSync(): Promise<void> {
  * Always attempts to write the resolved count so a stale "1" from APNs does not linger.
  */
 export async function syncNativeAppBadgeNow(): Promise<void> {
-  if (!isNativePushPlatform()) return;
+  if (!canWriteNativeAppBadge()) return;
 
   if (inFlight) {
     needsFollowUpSync = true;
@@ -92,7 +107,7 @@ export async function syncNativeAppBadgeNow(): Promise<void> {
 
 /** Debounced badge sync after notification or inbox changes. */
 export function scheduleNativeAppBadgeSync(delayMs = 400): void {
-  if (!isNativePushPlatform()) return;
+  if (!canWriteNativeAppBadge()) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = undefined;

@@ -12,18 +12,14 @@ public class AppIconBadgePlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private func applyBadgeCount(_ count: Int) {
+        // Legacy API updates SpringBoard immediately; setBadgeCount keeps Notification Center in sync.
+        UIApplication.shared.applicationIconBadgeNumber = count
         if #available(iOS 16.0, *) {
             UNUserNotificationCenter.current().setBadgeCount(count) { error in
                 if let error = error {
                     CAPLog.print("[AppIconBadge] setBadgeCount failed:", error.localizedDescription)
                 }
-                // Always mirror the legacy property — keeps SpringBoard in sync when only one API succeeds.
-                DispatchQueue.main.async {
-                    UIApplication.shared.applicationIconBadgeNumber = count
-                }
             }
-        } else {
-            UIApplication.shared.applicationIconBadgeNumber = count
         }
     }
 

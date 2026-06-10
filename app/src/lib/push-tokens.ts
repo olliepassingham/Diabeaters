@@ -3,7 +3,7 @@ import { PushNotifications } from "@capacitor/push-notifications";
 
 import { isIosDeviceForCapacitorPush } from "@/lib/ios-user-agent";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
-import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
+import { clearNativeAppBadge, scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
 import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notification-present";
 import { handlePushDeepLinkFromNotification } from "@/lib/push-notification-deep-link";
 import {
@@ -258,7 +258,9 @@ function bindPushDeepLinkListeners(): void {
 
   void PushNotifications.addListener("pushNotificationReceived", (notification) => {
     writePushDiag({ state: "push_received_foreground", platform: currentPushPlatform() ?? "ios" });
-    scheduleNativeAppBadgeSync();
+    // APNs/Capacitor may apply a stale aps.badge before JS runs — reset then reconcile.
+    void clearNativeAppBadge();
+    scheduleNativeAppBadgeSync(0);
     if (currentPushPlatform() === "ios") {
       void presentAudiblePushNotificationFromRemote(notification);
     }
@@ -268,7 +270,8 @@ function bindPushDeepLinkListeners(): void {
 
   void PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
     writePushDiag({ state: "push_action_performed", platform: currentPushPlatform() ?? "ios" });
-    scheduleNativeAppBadgeSync();
+    void clearNativeAppBadge();
+    scheduleNativeAppBadgeSync(0);
     handlePushDeepLinkFromNotification(action.notification);
   }).then((h) => {
     deepLinkHandles.push(h);

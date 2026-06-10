@@ -4,7 +4,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { useAuth } from "@/lib/auth-context";
 import { DM_INBOX_CHANGED } from "@/lib/community/dm-inbox-events";
 import { INAPP_NOTIFICATIONS_CHANGED } from "@/lib/in-app-notifications-events";
-import { isNativePushPlatform } from "@/lib/native-platform";
+import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { clearNativeAppBadge, scheduleNativeAppBadgeSync, syncNativeAppBadgeNow } from "@/lib/native-app-badge";
 
 /**
@@ -16,7 +16,7 @@ export function NativeAppBadgeSync() {
   const signedIn = Boolean(user?.id) && !loading;
 
   useEffect(() => {
-    if (!isNativePushPlatform()) return;
+    if (!isCapacitorNativeShell()) return;
 
     if (!signedIn) {
       void clearNativeAppBadge();

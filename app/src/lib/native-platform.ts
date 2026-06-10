@@ -21,11 +21,16 @@ export function getNativePushPlatform(): NativePushPlatform | null {
   const p = Capacitor.getPlatform();
   if (p === "android") return "android";
   if (p === "ios") return "ios";
-  if (p === "web") {
-    if (isIosLikeUserAgent()) return "ios";
-    // Remote `server.url` builds report `"web"` on Android native shells too.
-    if (Capacitor.isNativePlatform?.()) return "android";
-  }
+  if (p !== "web") return null;
+
+  if (isIosLikeUserAgent()) return "ios";
+
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (/Android/i.test(ua) && Capacitor.isNativePlatform?.()) return "android";
+
+  // Remote `server.url` iOS App Store shell: platform "web", trimmed UA — still APNs/iOS.
+  if (Capacitor.isNativePlatform?.()) return "ios";
+
   return null;
 }
 

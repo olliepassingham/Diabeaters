@@ -89,6 +89,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
+        clearApplicationIconBadge()
         scheduleInspectableWebViewRetries()
         application.registerForRemoteNotifications()
     }
