@@ -20,6 +20,8 @@ import {
   Pill,
   ArrowRight,
   History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -86,6 +88,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+const RECENT_HYPOS_COLLAPSED_COUNT = 2;
+const RECENT_HYPOS_MAX_COUNT = 4;
 
 function parseLocalDateTime(date: unknown, time: unknown): Date | null {
   if (typeof date !== "string") return null;
@@ -1289,6 +1294,7 @@ export default function CarerViewPage() {
   const [appointmentRows, setAppointmentRows] = useState<Record<string, unknown>[]>([]);
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
+  const [recentHyposExpanded, setRecentHyposExpanded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
   const [supporterPushPromptOpen, setSupporterPushPromptOpen] = useState(false);
@@ -1373,6 +1379,10 @@ export default function CarerViewPage() {
     setActiveCarerPatientId(picked);
     setActivePatientIdState(picked);
   }, [linkedPatients, activePatientId]);
+
+  useEffect(() => {
+    setRecentHyposExpanded(false);
+  }, [activePatientId]);
 
   useEffect(() => {
     if (phase !== "ready" || !activeLink) return;
@@ -1759,27 +1769,56 @@ export default function CarerViewPage() {
                     description="When they log a hypo and share alerts with you, it will appear here."
                   />
                 ) : (
-                  <ul className="space-y-3 m-0 list-none p-0">
-                    {hypoLogs.slice(0, 4).map((h) => {
-                      const when = new Date(h.created_at);
-                      const whenText = Number.isNaN(when.getTime())
-                        ? "Unknown time"
-                        : `${formatDistanceToNowStrict(when, { addSuffix: true })}`;
-                      const bg =
-                        h.blood_glucose == null || Number.isNaN(h.blood_glucose)
-                          ? null
-                          : Math.round(h.blood_glucose * 10) / 10;
-                      return (
-                        <CarerHypoTimelineItem
-                          key={h.id}
-                          bgLabel={bg == null ? "Hypo logged" : `BG ${bg}`}
-                          whenText={whenText}
-                          treatment={h.treatment}
-                          notes={h.notes}
-                        />
-                      );
-                    })}
-                  </ul>
+                  <div className="space-y-2">
+                    <ul className="space-y-3 m-0 list-none p-0">
+                      {(recentHyposExpanded
+                        ? hypoLogs.slice(0, RECENT_HYPOS_MAX_COUNT)
+                        : hypoLogs.slice(0, RECENT_HYPOS_COLLAPSED_COUNT)
+                      ).map((h) => {
+                        const when = new Date(h.created_at);
+                        const whenText = Number.isNaN(when.getTime())
+                          ? "Unknown time"
+                          : `${formatDistanceToNowStrict(when, { addSuffix: true })}`;
+                        const bg =
+                          h.blood_glucose == null || Number.isNaN(h.blood_glucose)
+                            ? null
+                            : Math.round(h.blood_glucose * 10) / 10;
+                        return (
+                          <CarerHypoTimelineItem
+                            key={h.id}
+                            bgLabel={bg == null ? "Hypo logged" : `BG ${bg}`}
+                            whenText={whenText}
+                            treatment={h.treatment}
+                            notes={h.notes}
+                          />
+                        );
+                      })}
+                    </ul>
+                    {hypoLogs.length > RECENT_HYPOS_COLLAPSED_COUNT ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 w-full text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setRecentHyposExpanded((open) => !open)}
+                        data-testid="button-recent-hypos-expand"
+                        aria-expanded={recentHyposExpanded}
+                      >
+                        {recentHyposExpanded ? (
+                          <>
+                            Show fewer
+                            <ChevronUp className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+                          </>
+                        ) : (
+                          <>
+                            Show {Math.min(hypoLogs.length, RECENT_HYPOS_MAX_COUNT) - RECENT_HYPOS_COLLAPSED_COUNT}{" "}
+                            more recent {hypoLogs.length - RECENT_HYPOS_COLLAPSED_COUNT === 1 ? "hypo" : "hypos"}
+                            <ChevronDown className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                  </div>
                 )}
               </CardContent>
             </CarerUrgentCard>
