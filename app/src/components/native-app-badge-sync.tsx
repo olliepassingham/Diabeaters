@@ -9,34 +9,41 @@ import { clearNativeAppBadge, scheduleNativeAppBadgeSync, syncNativeAppBadgeNow 
 
 /**
  * Keeps the iOS/Android home-screen icon badge aligned with unread bell + DM inbox counts.
+ * Mounted at the app root so login/welcome routes clear stale APNs badges before sign-in.
  */
 export function NativeAppBadgeSync() {
   const { user, loading } = useAuth();
+  const signedIn = Boolean(user?.id) && !loading;
 
   useEffect(() => {
-    if (loading) return;
     if (!isNativePushPlatform()) return;
 
-    if (!user?.id) {
+    if (!signedIn) {
       void clearNativeAppBadge();
-      return;
+    } else {
+      void syncNativeAppBadgeNow();
     }
 
-    void syncNativeAppBadgeNow();
-
-    const onNotifs = () => scheduleNativeAppBadgeSync(0);
-    const onInbox = () => scheduleNativeAppBadgeSync(0);
+    const onNotifs = () => {
+      if (signedIn) scheduleNativeAppBadgeSync(0);
+      else void clearNativeAppBadge();
+    };
+    const onInbox = () => {
+      if (signedIn) scheduleNativeAppBadgeSync(0);
+      else void clearNativeAppBadge();
+    };
 
     window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, onNotifs);
     window.addEventListener(DM_INBOX_CHANGED, onInbox);
 
     let listener: { remove: () => Promise<void> } | undefined;
     void CapacitorApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) {
-        void syncNativeAppBadgeNow();
-      } else {
-        scheduleNativeAppBadgeSync(0);
+      if (!isActive) {
+        if (signedIn) scheduleNativeAppBadgeSync(0);
+        return;
       }
+      if (signedIn) void syncNativeAppBadgeNow();
+      else void clearNativeAppBadge();
     }).then((h) => {
       listener = h;
     });
@@ -46,7 +53,7 @@ export function NativeAppBadgeSync() {
       window.removeEventListener(DM_INBOX_CHANGED, onInbox);
       void listener?.remove();
     };
-  }, [loading, user?.id]);
+  }, [signedIn]);
 
   return null;
 }

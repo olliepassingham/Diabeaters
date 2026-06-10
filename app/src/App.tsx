@@ -1335,7 +1335,6 @@ function AuthenticatedShell() {
       )}
     >
       <NativePushForegroundSync />
-      <NativeAppBadgeSync />
       <AchievementSync />
       <DmInboxQuerySync />
       <ClinicalPrefsCloudSync />
@@ -1690,6 +1689,7 @@ export default function App() {
         <TooltipProvider>
           <ThemeProvider>
             <AuthProvider>
+              <NativeAppBadgeSync />
               <EmergencyProfileProvider>
                 {/*
                  * Mount once at the very top so the iOS keyboard helper covers

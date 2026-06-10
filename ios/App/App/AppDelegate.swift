@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import WebKit
+import UserNotifications
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -44,7 +45,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return nil
     }
 
+    /// Reset stale SpringBoard badge before JS loads (APNs can leave a phantom count after reinstall).
+    private func clearApplicationIconBadge() {
+        if #available(iOS 16.0, *) {
+            UNUserNotificationCenter.current().setBadgeCount(0) { _ in
+                DispatchQueue.main.async {
+                    UIApplication.shared.applicationIconBadgeNumber = 0
+                }
+            }
+        } else {
+            UIApplication.shared.applicationIconBadgeNumber = 0
+        }
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        clearApplicationIconBadge()
         DispatchQueue.main.async {
             application.registerForRemoteNotifications()
         }

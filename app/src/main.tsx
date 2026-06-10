@@ -13,11 +13,16 @@ import {
 } from "@/hooks/useThemeMode";
 import { applyNativeDocumentClass } from "@/lib/native-chrome";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
+import { clearNativeAppBadge } from "@/lib/native-app-badge";
+import { isNativePushPlatform } from "@/lib/native-platform";
 
 migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));
 applyNativeDocumentClass();
 void ensureNativeNotificationChannels();
+if (isNativePushPlatform()) {
+  void clearNativeAppBadge();
+}
 
 if (import.meta.env.DEV) {
   console.info(
