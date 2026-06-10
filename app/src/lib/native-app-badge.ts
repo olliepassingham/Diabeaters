@@ -1,17 +1,16 @@
-import { Capacitor } from "@capacitor/core";
 import { Badge } from "@capawesome/capacitor-badge";
 
 import { AppIconBadge } from "@/lib/app-icon-badge";
 import { fetchNativeAppBadgeCount } from "@/lib/native-app-badge-count";
-import { isNativePushPlatform } from "@/lib/native-platform";
+import { getNativePushPlatform, isNativePushPlatform } from "@/lib/native-platform";
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
 let needsFollowUpSync = false;
 
 async function applyNativeAppBadgeCount(count: number): Promise<void> {
-  const platform = Capacitor.getPlatform();
   const safeCount = Math.max(0, Math.floor(count));
+  const platform = getNativePushPlatform();
   if (platform === "ios") {
     // Never use @capawesome/capacitor-badge on iOS: Badge.set() re-requests badge-only permission
     // and regressed remote notification delivery. Use our minimal AppIconBadge plugin instead.

@@ -7,12 +7,15 @@ vi.mock("@/lib/native-app-badge-count", () => ({
   fetchNativeAppBadgeCount: (...args: unknown[]) => fetchNativeAppBadgeCount(...args),
 }));
 
+const getNativePushPlatform = vi.fn(() => "ios" as const);
+
 vi.mock("@/lib/native-platform", () => ({
   isNativePushPlatform: () => true,
+  getNativePushPlatform: () => getNativePushPlatform(),
 }));
 
 vi.mock("@capacitor/core", () => ({
-  Capacitor: { getPlatform: () => "ios" },
+  Capacitor: { getPlatform: () => "web" },
 }));
 
 vi.mock("@/lib/app-icon-badge", () => ({
@@ -32,6 +35,7 @@ describe("syncNativeAppBadgeNow", () => {
     vi.resetModules();
     applyCounts.length = 0;
     fetchNativeAppBadgeCount.mockReset();
+    getNativePushPlatform.mockReturnValue("ios");
   });
 
   it("runs a follow-up sync when another sync is requested while in flight", async () => {
@@ -64,5 +68,15 @@ describe("syncNativeAppBadgeNow", () => {
     await syncNativeAppBadgeNow();
 
     expect(applyCounts).toEqual([0]);
+  });
+
+  it("writes the icon badge on remote server.url shells where Capacitor reports web", async () => {
+    fetchNativeAppBadgeCount.mockResolvedValue({ count: 2, error: null });
+
+    const { syncNativeAppBadgeNow } = await import("@/lib/native-app-badge");
+    await syncNativeAppBadgeNow();
+
+    expect(getNativePushPlatform).toHaveBeenCalled();
+    expect(applyCounts).toEqual([2]);
   });
 });

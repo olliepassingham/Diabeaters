@@ -23,10 +23,11 @@ const config: CapacitorConfig = {
      * iOS: show banners and play sound while the app is open (same as lock-screen alerts).
      */
     PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
+      // Badge is managed by AppIconBadge + syncNativeAppBadgeNow — not push presentation (stale aps.badge).
+      presentationOptions: ["sound", "alert"],
     },
     LocalNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
+      presentationOptions: ["sound", "alert"],
     },
     /** Android only — excluded from iOS via `ios.includePlugins` (badge-only permission broke alerts). */
     Badge: {

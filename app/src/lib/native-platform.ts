@@ -21,7 +21,11 @@ export function getNativePushPlatform(): NativePushPlatform | null {
   const p = Capacitor.getPlatform();
   if (p === "android") return "android";
   if (p === "ios") return "ios";
-  if (p === "web" && isIosLikeUserAgent()) return "ios";
+  if (p === "web") {
+    if (isIosLikeUserAgent()) return "ios";
+    // Remote `server.url` builds report `"web"` on Android native shells too.
+    if (Capacitor.isNativePlatform?.()) return "android";
+  }
   return null;
 }
 
