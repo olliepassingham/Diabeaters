@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  applySupporterAccountRoleAfterLink,
   canSwitchAppMode,
   clearCarerClientSessionKeys,
   getPrimaryAppRole,
   isCarerSessionMode,
+  isCommunityMemberAccount,
   isCommunityOnlyAccount,
   isCommunitySessionMode,
   isSupporterOnlyAccount,
@@ -70,5 +72,30 @@ describe("carer-session community-only accounts", () => {
     expect(getPrimaryAppRole()).toBe("community");
     expect(isCommunityOnlyAccount()).toBe(true);
     expect(isCommunitySessionMode(false, null)).toBe(true);
+  });
+
+  it("converts community members to supporter-only after linking", () => {
+    setOnboardingAccountPath("community");
+    setPrimaryAppRole("community");
+    expect(isCommunityMemberAccount()).toBe(true);
+
+    applySupporterAccountRoleAfterLink();
+
+    expect(isCommunityOnlyAccount()).toBe(false);
+    expect(isCommunityMemberAccount()).toBe(false);
+    expect(isSupporterOnlyAccount()).toBe(true);
+    expect(canSwitchAppMode()).toBe(false);
+    expect(isCarerSessionMode(true, "patient")).toBe(true);
+  });
+
+  it("does not overwrite patient dual-role accounts when linking", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+
+    applySupporterAccountRoleAfterLink();
+
+    expect(getPrimaryAppRole()).toBe("patient");
+    expect(isSupporterOnlyAccount()).toBe(false);
+    expect(canSwitchAppMode()).toBe(true);
   });
 });

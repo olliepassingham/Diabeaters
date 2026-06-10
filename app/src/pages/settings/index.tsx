@@ -28,6 +28,7 @@ import {
   Building2,
   Sparkles,
   Cookie,
+  Eye,
 } from "lucide-react";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
@@ -1731,6 +1732,12 @@ export default function Settings() {
 
         {isCommunityAccount && (
           <SettingsHubGroup title="Account type">
+            <SettingsHubNavLink
+              href="/carer-setup"
+              label="Support someone with Type 1"
+              description="Enter their invite code to switch to Supporter Mode"
+              icon={Eye}
+            />
             <SettingsHubNavLink
               href="/onboarding?upgrade=1"
               label="I have Type 1 diabetes / use insulin"

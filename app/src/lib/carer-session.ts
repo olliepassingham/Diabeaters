@@ -147,6 +147,32 @@ export function isCommunityOnlyAccount(): boolean {
   return getPrimaryAppRole() === "community";
 }
 
+/** Community Member path before linking as a supporter (local onboarding role/path). */
+export function isCommunityMemberAccount(): boolean {
+  return isCommunityOnlyAccount() || getPrimaryAppRole() === "community";
+}
+
+/** After a successful invite redeem, turn a community-only account into supporter-only. */
+export function promoteCommunityMemberToSupporterAccount(): void {
+  setPrimaryAppRole("carer");
+  setOnboardingAccountPath("supporter");
+}
+
+/**
+ * Set supporter-only onboarding markers after linking.
+ * Community members become supporter-only; fresh accounts with no role get the same defaults.
+ */
+export function applySupporterAccountRoleAfterLink(): void {
+  if (isCommunityMemberAccount()) {
+    promoteCommunityMemberToSupporterAccount();
+    return;
+  }
+  if (getPrimaryAppRole() == null) {
+    setPrimaryAppRole("carer");
+    if (getOnboardingAccountPath() == null) setOnboardingAccountPath("supporter");
+  }
+}
+
 export type CommunitySessionModeOptions = {
   localCommunityProfile?: boolean;
   cloudCommunityProfile?: boolean;

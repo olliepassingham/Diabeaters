@@ -14,17 +14,17 @@ import {
 } from "@/lib/carers";
 import { getSupabase } from "@/lib/supabase";
 import {
+  applySupporterAccountRoleAfterLink,
   clearCarerIntent,
   clearPendingCarer,
   hasPendingCarer,
-  getPrimaryAppRole,
-  getOnboardingAccountPath,
+  isCommunityMemberAccount,
   setActiveAppMode,
   setCarerLinkedBannerMessage,
   markCarerLinkJustCompleted,
-  setOnboardingAccountPath,
-  setPrimaryAppRole,
 } from "@/lib/carer-session";
+import { clearCommunityProfileAfterSupporterLink } from "@/lib/community-to-supporter";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { markSupporterPushPromptPending } from "@/lib/supporter-push-prompt";
 import { markSupporterCarerOnboarded } from "@/lib/supporter-profile-prompt";
 import { cn } from "@/lib/utils";
@@ -86,6 +86,15 @@ function emitCarerLinkUpdated(): void {
   }
 }
 
+async function finalizeSupporterLink(userId: string | undefined): Promise<void> {
+  const shouldClearCommunityProfile =
+    isCommunityMemberAccount() || isCommunityAccountProfile(storage.getProfile());
+  applySupporterAccountRoleAfterLink();
+  if (shouldClearCommunityProfile && userId) {
+    await clearCommunityProfileAfterSupporterLink(userId);
+  }
+}
+
 export default function CarerSetupPage() {
   const { user, loading: authLoading } = useAuth();
   const configured = Boolean(getSupabase());
@@ -132,6 +141,10 @@ export default function CarerSetupPage() {
     }
     clearCarerIntent();
     setCode("");
+    if (isCommunityMemberAccount() || isCommunityAccountProfile(storage.getProfile())) {
+      setLocation("/settings");
+      return;
+    }
     setLocation("/family-carers");
   };
 
@@ -162,10 +175,7 @@ export default function CarerSetupPage() {
         if (link.data?.patientId) {
           clearPendingCarer();
           clearCarerIntent();
-          if (getPrimaryAppRole() == null) {
-            setPrimaryAppRole("carer");
-            if (getOnboardingAccountPath() == null) setOnboardingAccountPath("supporter");
-          }
+          await finalizeSupporterLink(user?.id);
           setActiveAppMode("carer");
           markCarerLinkJustCompleted();
           emitCarerLinkUpdated();
@@ -193,10 +203,7 @@ export default function CarerSetupPage() {
     markSupporterCarerOnboarded();
     clearPendingCarer();
     clearCarerIntent();
-    if (getPrimaryAppRole() == null) {
-      setPrimaryAppRole("carer");
-      if (getOnboardingAccountPath() == null) setOnboardingAccountPath("supporter");
-    }
+    await finalizeSupporterLink(user?.id);
     setActiveAppMode("carer");
     markCarerLinkJustCompleted();
     markSupporterPushPromptPending();
