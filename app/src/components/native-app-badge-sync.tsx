@@ -24,8 +24,8 @@ export function NativeAppBadgeSync() {
 
     void syncNativeAppBadgeNow();
 
-    const onNotifs = () => scheduleNativeAppBadgeSync();
-    const onInbox = () => scheduleNativeAppBadgeSync();
+    const onNotifs = () => scheduleNativeAppBadgeSync(0);
+    const onInbox = () => scheduleNativeAppBadgeSync(0);
 
     window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, onNotifs);
     window.addEventListener(DM_INBOX_CHANGED, onInbox);

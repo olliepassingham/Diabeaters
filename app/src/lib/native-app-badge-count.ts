@@ -27,23 +27,24 @@ export async function countUnreadInAppNotificationsExcludingDm(): Promise<{
   const uid = sessionData.session?.user?.id;
   if (!uid) return { count: 0, error: null };
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("data, read")
-    .eq("user_id", uid)
-    .eq("read", false);
+  const unreadQuery = () =>
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", uid)
+      .eq("read", false);
 
-  if (error) return { count: 0, error: new Error(error.message) };
+  const [allRes, dmRes] = await Promise.all([
+    unreadQuery(),
+    unreadQuery().filter("data->>kind", "eq", "dm_message"),
+  ]);
 
-  const rows = (data ?? []).map(
-    (r) =>
-      ({
-        read: Boolean((r as { read?: boolean }).read),
-        data: (r as { data?: unknown }).data,
-      }) as Pick<InAppNotificationRow, "read" | "data">,
-  ) as InAppNotificationRow[];
+  if (allRes.error) return { count: 0, error: new Error(allRes.error.message) };
+  if (dmRes.error) return { count: 0, error: new Error(dmRes.error.message) };
 
-  return { count: countUnreadInAppExcludingDmFromRows(rows), error: null };
+  const totalUnread = allRes.count ?? 0;
+  const dmUnread = dmRes.count ?? 0;
+  return { count: Math.max(0, totalUnread - dmUnread), error: null };
 }
 
 export async function fetchNativeAppBadgeCount(): Promise<{ count: number; error: Error | null }> {

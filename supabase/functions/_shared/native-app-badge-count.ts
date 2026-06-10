@@ -30,15 +30,24 @@ export async function countUnreadInAppNotificationsExcludingDm(
   admin: SupabaseAdmin,
   userId: string,
 ): Promise<{ count: number; error: string | null }> {
-  const { data, error } = await admin
-    .from("notifications")
-    .select("read, data")
-    .eq("user_id", userId)
-    .eq("read", false);
+  const unreadQuery = () =>
+    admin
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("read", false);
 
-  if (error) return { count: 0, error: error.message };
+  const [allRes, dmRes] = await Promise.all([
+    unreadQuery(),
+    unreadQuery().filter("data->>kind", "eq", "dm_message"),
+  ]);
 
-  return { count: countUnreadInAppExcludingDmFromRows(data ?? []), error: null };
+  if (allRes.error) return { count: 0, error: allRes.error.message };
+  if (dmRes.error) return { count: 0, error: dmRes.error.message };
+
+  const totalUnread = allRes.count ?? 0;
+  const dmUnread = dmRes.count ?? 0;
+  return { count: Math.max(0, totalUnread - dmUnread), error: null };
 }
 
 /**

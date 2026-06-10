@@ -7,6 +7,7 @@ import { isNativePushPlatform } from "@/lib/native-platform";
 
 let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
+let needsFollowUpSync = false;
 
 async function applyNativeAppBadgeCount(count: number): Promise<void> {
   const platform = Capacitor.getPlatform();
@@ -40,6 +41,16 @@ async function resolveBadgeCountWithRetry(): Promise<{ count: number; error: Err
   return last;
 }
 
+async function performBadgeSync(): Promise<void> {
+  const { count, error } = await resolveBadgeCountWithRetry();
+  if (error) {
+    console.warn("[native_app_badge] count failed; clearing stale badge:", error.message);
+    await applyNativeAppBadgeCount(0);
+    return;
+  }
+  await applyNativeAppBadgeCount(count);
+}
+
 /**
  * Sets the OS app-icon badge to match unread bell items + unread DM threads.
  * Always attempts to write the resolved count so a stale "1" from APNs does not linger.
@@ -48,19 +59,18 @@ export async function syncNativeAppBadgeNow(): Promise<void> {
   if (!isNativePushPlatform()) return;
 
   if (inFlight) {
+    needsFollowUpSync = true;
     await inFlight;
+    if (needsFollowUpSync) {
+      needsFollowUpSync = false;
+      return syncNativeAppBadgeNow();
+    }
     return;
   }
 
   inFlight = (async () => {
     try {
-      const { count, error } = await resolveBadgeCountWithRetry();
-      if (error) {
-        console.warn("[native_app_badge] count failed; clearing stale badge:", error.message);
-        await applyNativeAppBadgeCount(0);
-        return;
-      }
-      await applyNativeAppBadgeCount(count);
+      await performBadgeSync();
     } catch (e) {
       console.warn("[native_app_badge] sync failed; clearing stale badge:", e);
       try {
@@ -74,6 +84,11 @@ export async function syncNativeAppBadgeNow(): Promise<void> {
   })();
 
   await inFlight;
+
+  if (needsFollowUpSync) {
+    needsFollowUpSync = false;
+    return syncNativeAppBadgeNow();
+  }
 }
 
 /** Debounced badge sync after notification or inbox changes. */
