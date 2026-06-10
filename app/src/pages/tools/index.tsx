@@ -20,7 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { getActiveAppMode, hasCarerIntent, hasPendingCarer, isCarerSessionMode } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
@@ -523,7 +523,7 @@ export default function ToolsPage() {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode =
     !hasCarerLink &&
     activeMode !== "patient" &&

@@ -18,9 +18,11 @@ import {
   clearPendingCarer,
   hasPendingCarer,
   getPrimaryAppRole,
+  getOnboardingAccountPath,
   setActiveAppMode,
   setCarerLinkedBannerMessage,
   markCarerLinkJustCompleted,
+  setOnboardingAccountPath,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { markSupporterPushPromptPending } from "@/lib/supporter-push-prompt";
@@ -160,7 +162,10 @@ export default function CarerSetupPage() {
         if (link.data?.patientId) {
           clearPendingCarer();
           clearCarerIntent();
-          if (getPrimaryAppRole() == null) setPrimaryAppRole("carer");
+          if (getPrimaryAppRole() == null) {
+            setPrimaryAppRole("carer");
+            if (getOnboardingAccountPath() == null) setOnboardingAccountPath("supporter");
+          }
           setActiveAppMode("carer");
           markCarerLinkJustCompleted();
           emitCarerLinkUpdated();
@@ -190,6 +195,7 @@ export default function CarerSetupPage() {
     clearCarerIntent();
     if (getPrimaryAppRole() == null) {
       setPrimaryAppRole("carer");
+      if (getOnboardingAccountPath() == null) setOnboardingAccountPath("supporter");
     }
     setActiveAppMode("carer");
     markCarerLinkJustCompleted();

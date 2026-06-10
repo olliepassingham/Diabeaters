@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
-import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode } from "@/lib/carer-session";
+import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode, canSwitchAppMode } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
@@ -376,7 +376,7 @@ export default function Account() {
     (activeMode == null || activeMode === "patient")
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
-  const canOpenModeChooser = hasCarerLink;
+  const canOpenModeChooser = hasCarerLink && canSwitchAppMode();
 
   useEffect(() => {
     setAccountTab(accountTabFromHash(typeof window !== "undefined" ? window.location.hash : ""));

@@ -5,8 +5,26 @@ const CARER_LINK_JUST_COMPLETED_AT_KEY = "diabeater_carer_link_just_completed_at
 const ACTIVE_CARER_PATIENT_ID_KEY = "diabeater_active_carer_patient_id";
 const ACTIVE_APP_MODE_KEY = "diabeater_active_app_mode";
 const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
+const PRIMARY_APP_ROLE_PERSIST_KEY = "diabeater_primary_app_role_v1";
 /** Chosen on /welcome: patient-only, supporter-only, or both (patient tools + supporter linking). */
 const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
+
+function readPersistedPrimaryAppRole(): PrimaryAppRole | null {
+  try {
+    const raw = localStorage.getItem(PRIMARY_APP_ROLE_PERSIST_KEY);
+    if (raw === "patient" || raw === "carer" || raw === "community") return raw;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function primaryRoleFromOnboardingPath(path: OnboardingAccountPath): PrimaryAppRole | null {
+  if (path === "supporter") return "carer";
+  if (path === "community") return "community";
+  if (path === "patient" || path === "both") return "patient";
+  return null;
+}
 
 export type ActiveAppMode = "patient" | "carer" | "community";
 
@@ -31,11 +49,6 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
   sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
-  try {
-    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
-  } catch {
-    // ignore
-  }
   // Legacy location (older builds); safe to clear if present.
   try {
     sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
@@ -84,12 +97,53 @@ export function clearOnboardingAccountPath(): void {
 
 export function setPrimaryAppRole(role: PrimaryAppRole): void {
   sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, role);
+  try {
+    localStorage.setItem(PRIMARY_APP_ROLE_PERSIST_KEY, role);
+  } catch {
+    // ignore
+  }
 }
 
 export function getPrimaryAppRole(): PrimaryAppRole | null {
   const raw = sessionStorage.getItem(PRIMARY_APP_ROLE_KEY);
   if (raw === "patient" || raw === "carer" || raw === "community") return raw;
+
+  const persisted = readPersistedPrimaryAppRole();
+  if (persisted) {
+    sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, persisted);
+    return persisted;
+  }
+
+  const path = getOnboardingAccountPath();
+  if (path) {
+    const derived = primaryRoleFromOnboardingPath(path);
+    if (derived) {
+      sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, derived);
+      return derived;
+    }
+  }
+
   return null;
+}
+
+/** Account created as supporter-only on /welcome — no User Mode or mode switcher. */
+export function isSupporterOnlyAccount(): boolean {
+  const path = getOnboardingAccountPath();
+  if (path === "supporter") return true;
+  if (path === "patient" || path === "both" || path === "community") return false;
+  return getPrimaryAppRole() === "carer";
+}
+
+/** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */
+export function canSwitchAppMode(): boolean {
+  return !isSupporterOnlyAccount();
+}
+
+/** Whether the UI should treat this session as Supporter Mode. */
+export function isCarerSessionMode(hasCarerLink: boolean, activeMode: ActiveAppMode | null): boolean {
+  if (!hasCarerLink) return false;
+  if (isSupporterOnlyAccount()) return true;
+  return activeMode === "carer";
 }
 
 export function setCarerIntent(): void {

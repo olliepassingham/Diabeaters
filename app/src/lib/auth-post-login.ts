@@ -5,6 +5,7 @@ import {
   getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
+  isSupporterOnlyAccount,
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -27,7 +28,7 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
   const link = await getLinkedPatientForCarer();
   if (link.data) {
     const next = new URLSearchParams(window.location.search).get("next");
-    if (getPrimaryAppRole() === "carer") {
+    if (isSupporterOnlyAccount() || getPrimaryAppRole() === "carer") {
       setActiveAppMode("carer");
       setLocation("/carer-view");
       return;

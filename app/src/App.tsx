@@ -72,6 +72,8 @@ import {
   getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
+  isCarerSessionMode,
+  isSupporterOnlyAccount,
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { AnimatedRouteOutlet } from "@/components/animated-route-outlet";
@@ -475,7 +477,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
 
   useEffect(() => {
@@ -575,7 +577,7 @@ function FamilyCarersGate() {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
 
   useEffect(() => {
@@ -1122,7 +1124,7 @@ function AuthenticatedShell() {
   const isCoachChatView = pathOnly === "/coach";
   const isFillHeightChatView = isDmThreadView || isCoachChatView;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
   const suppressClinicalPollers = isCarerMode || isCommunityMode;
   const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
@@ -1183,9 +1185,16 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (!hasCarerLink) return;
+    if (isSupporterOnlyAccount() && getActiveAppMode() !== "carer") {
+      setActiveAppMode("carer");
+    }
+  }, [hasCarerLink]);
+
+  useEffect(() => {
+    if (!hasCarerLink) return;
     if (activeMode != null) return;
     if (pathOnly === "/mode") return;
-    if (getPrimaryAppRole() === "carer") {
+    if (isSupporterOnlyAccount() || getPrimaryAppRole() === "carer") {
       setActiveAppMode("carer");
     } else {
       setActiveAppMode("patient");
@@ -1203,15 +1212,19 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (!hasCarerLink) return;
-    if (!activeMode) return;
-    if (activeMode === "carer") {
+    if (pathOnly === "/mode" && isSupporterOnlyAccount()) {
+      setLocation("/carer-view");
+      return;
+    }
+    if (isCarerMode) {
       if (!isCarerAllowedPath(pathOnly) && pathOnly !== "/mode") setLocation("/carer-view");
       return;
     }
+    if (!activeMode) return;
     if (pathOnly === "/carer-view" || pathOnly.startsWith("/carer-view/")) {
       setLocation("/");
     }
-  }, [hasCarerLink, activeMode, pathOnly, setLocation]);
+  }, [hasCarerLink, activeMode, isCarerMode, pathOnly, setLocation]);
 
   useEffect(() => {
     if (!isCommunityMode) return;

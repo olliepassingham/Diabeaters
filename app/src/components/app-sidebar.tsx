@@ -18,7 +18,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { FaceLogo } from "@/components/face-logo";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -69,7 +69,7 @@ export function AppSidebar() {
   const { isCarer } = useLinkedCarer();
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(isCarer && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(isCarer, activeMode);
   const isCommunityMode =
     !isCarer &&
     activeMode !== "patient" &&

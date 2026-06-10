@@ -6,7 +6,7 @@ import {
   invalidateLinkedPatientQuery,
   useLinkedPatientQuery,
 } from "@/lib/carer-link-query";
-import { getActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
 
 /**
  * Source-of-truth link detection from backend (`public.carer_links`).
@@ -44,8 +44,11 @@ export function useLinkedPatient(): {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
+  const hasLink = Boolean(linkQuery.data);
+  const inCarerMode = isCarerSessionMode(hasLink, activeMode);
+
   return {
-    data: activeMode === "carer" ? (linkQuery.data ?? null) : null,
+    data: inCarerMode ? (linkQuery.data ?? null) : null,
     loading: authLoading || linkQuery.isLoading,
     isFetched: linkQuery.isFetched,
     refetch,

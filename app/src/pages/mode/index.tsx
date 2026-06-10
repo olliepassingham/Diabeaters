@@ -5,13 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode, isSupporterOnlyAccount, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { ArrowRight, Eye, User as UserIcon } from "lucide-react";
 
 export default function ModeChooserPage() {
   const [location, setLocation] = useLocation();
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
+
+  useEffect(() => {
+    if (isSupporterOnlyAccount()) {
+      setLocation("/carer-view");
+    }
+  }, [setLocation]);
 
   useEffect(() => {
     if (isCommunityAccountProfile(storage.getProfile())) {

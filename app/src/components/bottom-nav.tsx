@@ -11,7 +11,7 @@ import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCritica
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { prefetchLinkedPatientsQuery } from "@/lib/carer-link-query";
-import { getActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
@@ -230,7 +230,7 @@ export function BottomNav() {
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
-  const isCarerMode = Boolean(hasCarerLink && activeMode === "carer");
+  const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
   const isCommunityMode =
     !hasCarerLink &&
     activeMode !== "patient" &&
