@@ -8,6 +8,7 @@ import { presentAudiblePushNotificationFromRemote } from "@/lib/push-notificatio
 import { handlePushDeepLinkFromNotification } from "@/lib/push-notification-deep-link";
 import {
   getNativePushPlatform,
+  isCapacitorNativeShell,
   isNativePushPlatform,
   type NativePushPlatform,
 } from "@/lib/native-platform";
@@ -252,7 +253,7 @@ export function ensurePushDeepLinkListenersAttached(): void {
 }
 
 function bindPushDeepLinkListeners(): void {
-  if (!isNativePushPlatform()) return;
+  if (!isCapacitorNativeShell()) return;
   if (deepLinkListenersBound) return;
   deepLinkListenersBound = true;
 
@@ -262,7 +263,9 @@ function bindPushDeepLinkListeners(): void {
     void clearNativeAppBadge();
     scheduleNativeAppBadgeSync(0);
     if (currentPushPlatform() === "ios") {
-      void presentAudiblePushNotificationFromRemote(notification);
+      void presentAudiblePushNotificationFromRemote(notification).finally(() => {
+        scheduleNativeAppBadgeSync(800);
+      });
     }
   }).then((h) => {
     deepLinkHandles.push(h);

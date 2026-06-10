@@ -114,3 +114,11 @@ export function scheduleNativeAppBadgeSync(delayMs = 400): void {
     void syncNativeAppBadgeNow();
   }, delayMs);
 }
+
+/** Clears stale SpringBoard badges repeatedly after cold start (APNs can race JS). */
+export function scheduleNativeAppBadgeBootClear(): void {
+  if (!canWriteNativeAppBadge()) return;
+  for (const ms of [400, 1200, 3500]) {
+    window.setTimeout(() => void clearNativeAppBadge(), ms);
+  }
+}

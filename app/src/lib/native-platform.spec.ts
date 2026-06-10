@@ -45,4 +45,37 @@ describe("getNativePushPlatform", () => {
     const { getNativePushPlatform } = await import("@/lib/native-platform");
     expect(getNativePushPlatform()).toBe("android");
   });
+
+  it("returns ios when Capacitor web shell has a WKWebView bridge but trimmed UA", async () => {
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 AppleWebKit/605.1.15 Mobile/15E148",
+      maxTouchPoints: 5,
+    });
+    capacitorState.isNativePlatform = false;
+    vi.stubGlobal("window", {
+      webkit: { messageHandlers: { bridge: {} } },
+    });
+    const { getNativePushPlatform } = await import("@/lib/native-platform");
+    expect(getNativePushPlatform()).toBe("ios");
+  });
+});
+
+describe("isCapacitorNativeShell", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    capacitorState.platform = "web";
+    capacitorState.isNativePlatform = false;
+    vi.stubGlobal("navigator", {
+      userAgent: "Mozilla/5.0 AppleWebKit/605.1.15 Mobile/15E148",
+      maxTouchPoints: 5,
+    });
+  });
+
+  it("returns true for Capacitor WKWebView bridge even when isNativePlatform is false", async () => {
+    vi.stubGlobal("window", {
+      webkit: { messageHandlers: { capacitor: {} } },
+    });
+    const { isCapacitorNativeShell } = await import("@/lib/native-platform");
+    expect(isCapacitorNativeShell()).toBe(true);
+  });
 });

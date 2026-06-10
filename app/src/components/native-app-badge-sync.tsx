@@ -5,7 +5,12 @@ import { useAuth } from "@/lib/auth-context";
 import { DM_INBOX_CHANGED } from "@/lib/community/dm-inbox-events";
 import { INAPP_NOTIFICATIONS_CHANGED } from "@/lib/in-app-notifications-events";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
-import { clearNativeAppBadge, scheduleNativeAppBadgeSync, syncNativeAppBadgeNow } from "@/lib/native-app-badge";
+import {
+  clearNativeAppBadge,
+  scheduleNativeAppBadgeBootClear,
+  scheduleNativeAppBadgeSync,
+  syncNativeAppBadgeNow,
+} from "@/lib/native-app-badge";
 
 /**
  * Keeps the iOS/Android home-screen icon badge aligned with unread bell + DM inbox counts.
@@ -17,6 +22,8 @@ export function NativeAppBadgeSync() {
 
   useEffect(() => {
     if (!isCapacitorNativeShell()) return;
+
+    scheduleNativeAppBadgeBootClear();
 
     if (!signedIn) {
       void clearNativeAppBadge();

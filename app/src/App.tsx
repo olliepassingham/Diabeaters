@@ -94,7 +94,7 @@ import { AchievementSync } from "@/components/achievement-sync";
 import { DmInboxQuerySync } from "@/components/dm-inbox-query-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications } from "@/lib/native-platform";
+import { supportsNativeLocalNotifications, isCapacitorNativeShell } from "@/lib/native-platform";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -283,7 +283,7 @@ function useNativePushDeepLinks(authLoading: boolean, userId: string | undefined
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform?.()) return;
+    if (!isCapacitorNativeShell()) return;
     ensurePushDeepLinkListenersAttached();
   }, []);
 

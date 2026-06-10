@@ -47,6 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     /// Reset stale SpringBoard badge before JS loads (APNs can leave a phantom count after reinstall).
     private func clearApplicationIconBadge() {
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         if #available(iOS 16.0, *) {
             UNUserNotificationCenter.current().setBadgeCount(0) { _ in
                 DispatchQueue.main.async {

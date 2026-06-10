@@ -101,10 +101,8 @@ async function sendViaApns(
   const aps: Record<string, unknown> = {
     alert: { title: opts.title, body: opts.body },
     sound: "default",
+    badge: opts.badge !== undefined ? Math.max(0, Math.floor(opts.badge)) : 0,
   };
-  if (opts.badge !== undefined) {
-    aps.badge = Math.max(0, Math.floor(opts.badge));
-  }
 
   const payload: Record<string, unknown> = {
     aps,

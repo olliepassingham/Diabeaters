@@ -4,12 +4,24 @@ import { isIosLikeUserAgent } from "@/lib/ios-user-agent";
 
 export type NativePushPlatform = "ios" | "android";
 
+/** True when the page runs inside a Capacitor WKWebView (not Mobile Safari). */
+export function hasCapacitorNativeWebViewBridge(): boolean {
+  if (typeof window === "undefined") return false;
+  const handlers = (
+    window as Window & { webkit?: { messageHandlers?: Record<string, unknown> } }
+  ).webkit?.messageHandlers;
+  if (!handlers) return false;
+  return "bridge" in handlers || "capacitor" in handlers;
+}
+
 /** True when running in a Capacitor native shell (iOS or Android). */
 export function isCapacitorNativeShell(): boolean {
   const p = Capacitor.getPlatform();
   if (p === "ios" || p === "android") return true;
-  // Remote `server.url` builds can report `"web"` on real devices.
-  return p === "web" && Capacitor.isNativePlatform?.() === true;
+  if (p !== "web") return false;
+  // Remote `server.url` builds can report `"web"` and `isNativePlatform()` false on real devices.
+  if (Capacitor.isNativePlatform?.()) return true;
+  return hasCapacitorNativeWebViewBridge();
 }
 
 /** True when remote push registration (APNs or FCM) should run. */
@@ -30,6 +42,11 @@ export function getNativePushPlatform(): NativePushPlatform | null {
 
   // Remote `server.url` iOS App Store shell: platform "web", trimmed UA — still APNs/iOS.
   if (Capacitor.isNativePlatform?.()) return "ios";
+
+  if (hasCapacitorNativeWebViewBridge()) {
+    if (/Android/i.test(ua)) return "android";
+    return "ios";
+  }
 
   return null;
 }

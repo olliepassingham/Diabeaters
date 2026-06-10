@@ -53,13 +53,13 @@ export function getMobilePushEdgeContext(): {
   };
 }
 
-async function resolveBadgeCount(options?: DeliverPushOptions): Promise<number | undefined> {
+async function resolveBadgeCount(options?: DeliverPushOptions): Promise<number> {
   if (options?.badgeCount !== undefined) {
     return Math.max(0, Math.floor(options.badgeCount));
   }
   const userId = options?.recipientUserId?.trim();
   const admin = options?.admin;
-  if (!userId || !admin) return undefined;
+  if (!userId || !admin) return 0;
 
   const res = await fetchNativeAppBadgeCountForUser(admin, userId);
   if (res.error) {
