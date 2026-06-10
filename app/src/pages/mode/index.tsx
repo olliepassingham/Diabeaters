@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, PageShell } from "@/components/layout";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode, isCarerSessionMode, isSupporterOnlyAccount, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode, isCommunityOnlyAccount, isSupporterOnlyAccount, setActiveAppMode, type ActiveAppMode } from "@/lib/carer-session";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { ArrowRight, Eye, User as UserIcon } from "lucide-react";
 
@@ -16,12 +17,16 @@ export default function ModeChooserPage() {
   useEffect(() => {
     if (isSupporterOnlyAccount()) {
       setLocation("/carer-view");
+      return;
+    }
+    if (isCommunityOnlyAccount()) {
+      setLocation(getCommunityMemberLandingPath());
     }
   }, [setLocation]);
 
   useEffect(() => {
     if (isCommunityAccountProfile(storage.getProfile())) {
-      setLocation("/settings");
+      setLocation(getCommunityMemberLandingPath());
     }
   }, [setLocation]);
   const [mode, setMode] = useState<ActiveAppMode | null>(() => {

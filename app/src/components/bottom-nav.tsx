@@ -11,7 +11,7 @@ import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCritica
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { prefetchLinkedPatientsQuery } from "@/lib/carer-link-query";
-import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
 import { useProfile } from "@/lib/profile";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 
@@ -231,11 +231,10 @@ export function BottomNav() {
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
-  const isCommunityMode =
-    !hasCarerLink &&
-    activeMode !== "patient" &&
-    activeMode !== "carer" &&
-    (activeMode === "community" || (activeMode == null && isCommunityAccountProfile(storage.getProfile())));
+  const isCommunityMode = isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
   const showCommunityTab =
     isCommunityEnabled && !profileLoading && profile?.is_public === true;
 

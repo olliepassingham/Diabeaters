@@ -139,6 +139,32 @@ export function canSwitchAppMode(): boolean {
   return !isSupporterOnlyAccount();
 }
 
+/** Account created as community-only on /welcome — learn/feed session, not full patient tools. */
+export function isCommunityOnlyAccount(): boolean {
+  const path = getOnboardingAccountPath();
+  if (path === "community") return true;
+  if (path === "patient" || path === "both" || path === "supporter") return false;
+  return getPrimaryAppRole() === "community";
+}
+
+export type CommunitySessionModeOptions = {
+  localCommunityProfile?: boolean;
+  cloudCommunityProfile?: boolean;
+};
+
+/** Whether the UI should treat this session as Community Member mode. */
+export function isCommunitySessionMode(
+  hasCarerLink: boolean,
+  activeMode: ActiveAppMode | null,
+  options: CommunitySessionModeOptions = {},
+): boolean {
+  if (hasCarerLink) return false;
+  if (isCommunityOnlyAccount()) return true;
+  if (activeMode === "patient" || activeMode === "carer") return false;
+  if (activeMode === "community") return true;
+  return Boolean(options.localCommunityProfile || options.cloudCommunityProfile);
+}
+
 /** Whether the UI should treat this session as Supporter Mode. */
 export function isCarerSessionMode(hasCarerLink: boolean, activeMode: ActiveAppMode | null): boolean {
   if (!hasCarerLink) return false;

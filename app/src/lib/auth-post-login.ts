@@ -5,6 +5,7 @@ import {
   getPrimaryAppRole,
   hasCarerIntent,
   hasPendingCarer,
+  isCommunityOnlyAccount,
   isSupporterOnlyAccount,
   setActiveAppMode,
 } from "@/lib/carer-session";
@@ -55,7 +56,7 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
     setLocation("/welcome");
     return;
   }
-  if (role === "community") {
+  if (isCommunityOnlyAccount() || role === "community") {
     setActiveAppMode("community");
     setLocation(getCommunityMemberLandingPath());
     return;

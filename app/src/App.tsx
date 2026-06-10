@@ -73,6 +73,8 @@ import {
   hasCarerIntent,
   hasPendingCarer,
   isCarerSessionMode,
+  isCommunityOnlyAccount,
+  isCommunitySessionMode,
   isSupporterOnlyAccount,
   setActiveAppMode,
 } from "@/lib/carer-session";
@@ -461,15 +463,13 @@ function isCommunityMemberAllowedPath(pathOnly: string): boolean {
   return false;
 }
 
-function computeCommunityMemberMode(
+function resolveCommunityMode(
   hasCarerLink: boolean,
   activeMode: ReturnType<typeof getActiveAppMode>,
 ): boolean {
-  if (hasCarerLink) return false;
-  if (activeMode === "patient" || activeMode === "carer") return false;
-  if (activeMode === "community") return true;
-  if (activeMode == null && isCommunityAccountProfile(storage.getProfile())) return true;
-  return false;
+  return isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+  });
 }
 
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
@@ -478,7 +478,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
   const pathOnly = location.split("?")[0] ?? location;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
-  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+  const isCommunityMode = resolveCommunityMode(hasCarerLink, activeMode);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
@@ -546,7 +546,7 @@ function CarerSetupIntentGuard({ children }: { children: React.ReactNode }) {
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const isCarerMode = Boolean(linkedPatient);
-  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+  const isCommunityMode = resolveCommunityMode(hasCarerLink, activeMode);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
@@ -578,7 +578,7 @@ function FamilyCarersGate() {
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
-  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+  const isCommunityMode = resolveCommunityMode(hasCarerLink, activeMode);
 
   useEffect(() => {
     const onMode = (ev: Event) => {
@@ -1125,7 +1125,7 @@ function AuthenticatedShell() {
   const isFillHeightChatView = isDmThreadView || isCoachChatView;
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
-  const isCommunityMode = computeCommunityMemberMode(hasCarerLink, activeMode);
+  const isCommunityMode = resolveCommunityMode(hasCarerLink, activeMode);
   const suppressClinicalPollers = isCarerMode || isCommunityMode;
   const iosNotifPrompt = useNativeLocalNotificationPermissionPrompt(!suppressClinicalPollers);
   const { bedtimeReminderPromptOpen, setBedtimeReminderPromptOpen } =
@@ -1191,6 +1191,13 @@ function AuthenticatedShell() {
   }, [hasCarerLink]);
 
   useEffect(() => {
+    if (hasCarerLink) return;
+    if (isCommunityOnlyAccount() && getActiveAppMode() !== "community") {
+      setActiveAppMode("community");
+    }
+  }, [hasCarerLink]);
+
+  useEffect(() => {
     if (!hasCarerLink) return;
     if (activeMode != null) return;
     if (pathOnly === "/mode") return;
@@ -1205,7 +1212,11 @@ function AuthenticatedShell() {
     if (hasCarerLink) return;
     if (activeMode != null) return;
     if (pathOnly === "/mode") return;
-    if (isCommunityAccountProfile(storage.getProfile()) || getPrimaryAppRole() === "community") {
+    if (
+      isCommunityOnlyAccount() ||
+      getPrimaryAppRole() === "community" ||
+      isCommunityAccountProfile(storage.getProfile())
+    ) {
       setActiveAppMode("community");
     }
   }, [hasCarerLink, activeMode, pathOnly]);
@@ -1228,6 +1239,10 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     if (!isCommunityMode) return;
+    if (pathOnly === "/mode" && isCommunityOnlyAccount()) {
+      setLocation(getCommunityMemberLandingPath());
+      return;
+    }
     if (!isCommunityMemberAllowedPath(pathOnly) && pathOnly !== "/mode") {
       setLocation(getCommunityMemberLandingPath());
     }

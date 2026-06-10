@@ -4,6 +4,8 @@ import {
   clearCarerClientSessionKeys,
   getPrimaryAppRole,
   isCarerSessionMode,
+  isCommunityOnlyAccount,
+  isCommunitySessionMode,
   isSupporterOnlyAccount,
   setOnboardingAccountPath,
   setPrimaryAppRole,
@@ -37,5 +39,36 @@ describe("carer-session supporter-only accounts", () => {
     clearCarerClientSessionKeys();
     expect(getPrimaryAppRole()).toBe("carer");
     expect(isSupporterOnlyAccount()).toBe(true);
+  });
+});
+
+describe("carer-session community-only accounts", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  it("treats onboarding community path as community-only", () => {
+    setOnboardingAccountPath("community");
+    expect(isCommunityOnlyAccount()).toBe(true);
+    expect(isCommunitySessionMode(false, "patient")).toBe(true);
+    expect(isCommunitySessionMode(true, "community")).toBe(false);
+  });
+
+  it("does not treat patient onboarding as community-only", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    expect(isCommunityOnlyAccount()).toBe(false);
+    expect(isCommunitySessionMode(false, null)).toBe(false);
+    expect(isCommunitySessionMode(false, "community")).toBe(true);
+  });
+
+  it("restores community role from localStorage after session clears", () => {
+    setPrimaryAppRole("community");
+    setOnboardingAccountPath("community");
+    clearCarerClientSessionKeys();
+    expect(getPrimaryAppRole()).toBe("community");
+    expect(isCommunityOnlyAccount()).toBe(true);
+    expect(isCommunitySessionMode(false, null)).toBe(true);
   });
 });

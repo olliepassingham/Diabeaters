@@ -20,8 +20,9 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode, hasCarerIntent, hasPendingCarer, isCarerSessionMode } from "@/lib/carer-session";
+import { getActiveAppMode, hasCarerIntent, hasPendingCarer, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { needsCommunityProfileSetup, useProfile } from "@/lib/profile";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
@@ -33,7 +34,6 @@ import {
   dismissCommunityToolsProfileReminder,
   shouldShowCommunityToolsProfileReminder,
 } from "@/lib/community-profile-prompt";
-import { needsCommunityProfileSetup, useProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
@@ -521,14 +521,14 @@ export function CarerToolsPlaceholder() {
 /** Patients see the hub; Supporter Mode sessions see read-only messaging; carer-signup flows redirect away. */
 export default function ToolsPage() {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
+  const { profile } = useProfile();
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
-  const isCommunityMode =
-    !hasCarerLink &&
-    activeMode !== "patient" &&
-    activeMode !== "carer" &&
-    (activeMode === "community" || (activeMode == null && isCommunityAccountProfile(storage.getProfile())));
+  const isCommunityMode = isCommunitySessionMode(hasCarerLink, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
   const tileCount = isCarerMode
     ? carerToolsForHub().length
     : isCommunityMode

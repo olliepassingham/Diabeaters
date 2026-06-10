@@ -56,6 +56,7 @@ import {
   clearOnboardingAccountPath,
   getOnboardingAccountPath,
   setActiveAppMode,
+  setOnboardingAccountPath,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { getCommunityMemberOnboardingCompletePath } from "@/lib/community-landing";
@@ -516,6 +517,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
     setActiveAppMode("community");
     setPrimaryAppRole("community");
+    if (getOnboardingAccountPath() == null) setOnboardingAccountPath("community");
     if (user?.id) {
       const fullName = data.name.trim() ? data.name.trim() : null;
       const { error } = await upsertProfile({

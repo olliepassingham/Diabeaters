@@ -6,7 +6,7 @@ import {
   type CommunityTopicId,
   type FeedCursor,
 } from "@/lib/community";
-import { getActiveAppMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
 import type { ProfileRow } from "@/lib/profile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
@@ -103,12 +103,10 @@ export function isCommunityMemberSession(opts: {
   hasCarerLink: boolean;
   cloudProfile?: ProfileRow | null;
 }): boolean {
-  if (opts.hasCarerLink) return false;
-  const mode = getActiveAppMode();
-  if (mode === "patient" || mode === "carer") return false;
-  if (mode === "community") return true;
-  if (opts.cloudProfile?.account_type === "community") return true;
-  return isCommunityAccountProfile(storage.getProfile());
+  return isCommunitySessionMode(opts.hasCarerLink, getActiveAppMode(), {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: opts.cloudProfile?.account_type === "community",
+  });
 }
 
 async function fetchMainFeedPage(

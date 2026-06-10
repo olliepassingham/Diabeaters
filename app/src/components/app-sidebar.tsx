@@ -18,7 +18,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { FaceLogo } from "@/components/face-logo";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
-import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
@@ -70,11 +70,10 @@ export function AppSidebar() {
   const { profile, loading: profileLoading } = useProfile();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(isCarer, activeMode);
-  const isCommunityMode =
-    !isCarer &&
-    activeMode !== "patient" &&
-    activeMode !== "carer" &&
-    (activeMode === "community" || (activeMode == null && isCommunityAccountProfile(storage.getProfile())));
+  const isCommunityMode = isCommunitySessionMode(isCarer, activeMode, {
+    localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+    cloudCommunityProfile: profile?.account_type === "community",
+  });
   const showCommunity =
     isCommunityEnabled && !profileLoading && profile?.is_public === true;
 
