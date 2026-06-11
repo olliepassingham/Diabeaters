@@ -7,10 +7,7 @@ import { getOnboardingAccountPath, getPrimaryAppRole, hasCarerIntent, hasPending
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
-import {
-  reconcileCommunityWelcomeWithExistingPatient,
-  stashExistingPatientOnCommunityPathToast,
-} from "@/lib/community-path-patient-reconcile";
+import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 
 const ONBOARDING_LS = "diabeater_onboarding_completed";
 
@@ -45,6 +42,12 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/welcome");
         return;
       }
+      const wrongPath = await reconcileWrongWelcomePathForSignedInUser(user.id);
+      if (cancelled) return;
+      if (wrongPath.reconciled && wrongPath.destination) {
+        setLocation(wrongPath.destination);
+        return;
+      }
       const upgradeWizard = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1";
       if (upgradeWizard) {
         setShowWizard(true);
@@ -60,12 +63,6 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
       if (done) {
         if (profile?.account_type === "community") {
           setLocation(getCommunityMemberLandingPath());
-          return;
-        }
-        const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(user.id);
-        if (reconciled) {
-          stashExistingPatientOnCommunityPathToast();
-          setLocation("/");
           return;
         }
         setLocation("/");

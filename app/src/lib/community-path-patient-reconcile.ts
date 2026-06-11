@@ -6,17 +6,16 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { getProfile, type ProfileRow } from "@/lib/profile";
+import type { PostLoginToastMessage } from "@/lib/post-login-toast-stash";
+import { stashPostLoginToast } from "@/lib/post-login-toast-stash";
 
-const POST_LOGIN_TOAST_KEY = "diabeater:post_login_toast:v1";
 const ONBOARDING_LS = "diabeater_onboarding_completed";
 
-export const POST_LOGIN_TOAST_STASHED_EVENT = "diabeater:post-login-toast-stashed";
-
-export const EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST = {
+export const EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST: PostLoginToastMessage = {
   title: "Already have a full account",
   description:
     "Community Member is for new sign-ups. You're signed in to User mode — you can open the community feed from the app anytime.",
-} as const;
+};
 
 /** True when /welcome sent the user down the Community Member path on this device. */
 export function isCommunityWelcomePathChosen(): boolean {
@@ -41,26 +40,9 @@ export function restorePatientSessionMarkersAfterCommunityMismatch(): void {
   setActiveAppMode("patient");
 }
 
+/** @deprecated Use {@link stashPostLoginToast} */
 export function stashExistingPatientOnCommunityPathToast(): void {
-  try {
-    sessionStorage.setItem(POST_LOGIN_TOAST_KEY, JSON.stringify(EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST));
-    window.dispatchEvent(new CustomEvent(POST_LOGIN_TOAST_STASHED_EVENT));
-  } catch {
-    // ignore
-  }
-}
-
-export function consumePostLoginToast(): { title: string; description: string } | null {
-  try {
-    const raw = sessionStorage.getItem(POST_LOGIN_TOAST_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(POST_LOGIN_TOAST_KEY);
-    const parsed = JSON.parse(raw) as { title?: string; description?: string };
-    if (!parsed.title || !parsed.description) return null;
-    return { title: parsed.title, description: parsed.description };
-  } catch {
-    return null;
-  }
+  stashPostLoginToast(EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST);
 }
 
 /**

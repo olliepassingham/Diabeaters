@@ -8,6 +8,7 @@ import {
   isCommunityMemberAccount,
   isCommunityOnlyAccount,
   isCommunitySessionMode,
+  isPersistedSupporterAccount,
   isSupporterOnlyAccount,
   setOnboardingAccountPath,
   setPrimaryAppRole,
@@ -24,6 +25,11 @@ describe("carer-session supporter-only accounts", () => {
     expect(isSupporterOnlyAccount()).toBe(true);
     expect(canSwitchAppMode()).toBe(false);
     expect(isCarerSessionMode(true, "patient")).toBe(true);
+  });
+
+  it("persists supporter account marker when onboarding path is supporter", () => {
+    setOnboardingAccountPath("supporter");
+    expect(isPersistedSupporterAccount()).toBe(true);
   });
 
   it("allows mode switching for patient onboarding with a carer link", () => {

@@ -3,10 +3,7 @@ import { useLocation } from "wouter";
 
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
-import {
-  consumePostLoginToast,
-  POST_LOGIN_TOAST_STASHED_EVENT,
-} from "@/lib/community-path-patient-reconcile";
+import { consumePostLoginToast, POST_LOGIN_TOAST_STASHED_EVENT } from "@/lib/post-login-toast-stash";
 import { useToast } from "@/hooks/use-toast";
 
 function showStashedPostLoginToast(toast: ReturnType<typeof useToast>["toast"]): void {

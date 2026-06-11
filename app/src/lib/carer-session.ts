@@ -8,6 +8,8 @@ const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
 const PRIMARY_APP_ROLE_PERSIST_KEY = "diabeater_primary_app_role_v1";
 /** Chosen on /welcome: patient-only, supporter-only, or both (patient tools + supporter linking). */
 const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
+/** Survives mistaken User/Community welcome taps — marks a supporter-only account. */
+const SUPPORTER_ACCOUNT_PERSIST_KEY = "diabeater_supporter_account_v1";
 
 function readPersistedPrimaryAppRole(): PrimaryAppRole | null {
   try {
@@ -58,9 +60,27 @@ export function clearCarerClientSessionKeys(): void {
   emitModeChanged(null);
 }
 
+export function markPersistedSupporterAccount(): void {
+  try {
+    localStorage.setItem(SUPPORTER_ACCOUNT_PERSIST_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function isPersistedSupporterAccount(): boolean {
+  try {
+    if (localStorage.getItem(SUPPORTER_ACCOUNT_PERSIST_KEY) === "1") return true;
+    return localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY) === "supporter";
+  } catch {
+    return false;
+  }
+}
+
 export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
   try {
     localStorage.setItem(ONBOARDING_ACCOUNT_PATH_KEY, path);
+    if (path === "supporter") markPersistedSupporterAccount();
   } catch {
     // ignore
   }
@@ -156,6 +176,7 @@ export function isCommunityMemberAccount(): boolean {
 export function promoteCommunityMemberToSupporterAccount(): void {
   setPrimaryAppRole("carer");
   setOnboardingAccountPath("supporter");
+  markPersistedSupporterAccount();
 }
 
 /**

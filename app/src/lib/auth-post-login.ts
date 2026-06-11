@@ -10,10 +10,7 @@ import {
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
-import {
-  reconcileCommunityWelcomeWithExistingPatient,
-  stashExistingPatientOnCommunityPathToast,
-} from "@/lib/community-path-patient-reconcile";
+import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 
 /** Commit Supabase session to React auth state before entering protected routes. */
 export function prepareAuthSessionBeforeNavigation(
@@ -26,13 +23,39 @@ export function prepareAuthSessionBeforeNavigation(
   });
 }
 
+function applyWelcomeReconcileDestination(
+  setLocation: (path: string) => void,
+  destination: string,
+): void {
+  if (destination === "/carer-view" || destination === "/carer-setup") {
+    setActiveAppMode("carer");
+  } else if (destination === "/") {
+    setActiveAppMode("patient");
+  }
+  setLocation(destination);
+}
+
 /**
  * Shared navigation after a successful password or OAuth session (login or signup when confirmations are off).
  */
 export async function navigateAfterLoginSuccess(
   setLocation: (path: string) => void,
   userId?: string | null,
+  welcomeReconcileDestination?: string,
 ): Promise<void> {
+  if (welcomeReconcileDestination) {
+    applyWelcomeReconcileDestination(setLocation, welcomeReconcileDestination);
+    return;
+  }
+
+  if (userId) {
+    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
+    if (wrongPath.reconciled && wrongPath.destination) {
+      applyWelcomeReconcileDestination(setLocation, wrongPath.destination);
+      return;
+    }
+  }
+
   const link = await getLinkedPatientForCarer();
   if (link.data) {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -64,15 +87,6 @@ export async function navigateAfterLoginSuccess(
     return;
   }
   if (isCommunityOnlyAccount() || role === "community") {
-    if (userId) {
-      const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(userId);
-      if (reconciled) {
-        stashExistingPatientOnCommunityPathToast();
-        setActiveAppMode("patient");
-        setLocation("/");
-        return;
-      }
-    }
     setActiveAppMode("community");
     setLocation(getCommunityMemberLandingPath());
     return;
@@ -86,13 +100,12 @@ export async function completeAuthAndNavigate(
   session: Session | null | undefined,
 ): Promise<void> {
   const userId = session?.user?.id ?? null;
-  // Stash before auth sync so PostLoginToast does not miss the message on first paint.
+  let welcomeReconcileDestination: string | undefined;
+  // Reconcile before auth sync so PostLoginToast does not miss the message on first paint.
   if (userId) {
-    const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(userId);
-    if (reconciled) {
-      stashExistingPatientOnCommunityPathToast();
-    }
+    const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
+    if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
   }
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
-  await navigateAfterLoginSuccess(setLocation, userId);
+  await navigateAfterLoginSuccess(setLocation, userId, welcomeReconcileDestination);
 }

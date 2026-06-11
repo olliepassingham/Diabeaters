@@ -12,10 +12,7 @@ import {
 } from "@/lib/carer-session";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
-import {
-  reconcileCommunityWelcomeWithExistingPatient,
-  stashExistingPatientOnCommunityPathToast,
-} from "@/lib/community-path-patient-reconcile";
+import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 import { ArrowRight, Eye, HeartHandshake, Users } from "lucide-react";
 
 export default function Welcome() {
@@ -23,12 +20,29 @@ export default function Welcome() {
   const { user } = useAuth();
   const alreadySignedIn = Boolean(user?.id && isUserVerified(user));
 
+  async function reconcileSignedInWrongPath(): Promise<boolean> {
+    if (!user?.id) return false;
+    const result = await reconcileWrongWelcomePathForSignedInUser(user.id);
+    if (result.reconciled && result.destination) {
+      setLocation(result.destination);
+      return true;
+    }
+    return false;
+  }
+
   const onPatient = () => {
     clearOnboardingAccountPath();
     setOnboardingAccountPath("patient");
     setPrimaryAppRole("patient");
     setPendingPatient();
-    setLocation(alreadySignedIn ? "/onboarding" : "/login");
+    if (alreadySignedIn && user?.id) {
+      void (async () => {
+        if (await reconcileSignedInWrongPath()) return;
+        setLocation("/onboarding");
+      })();
+      return;
+    }
+    setLocation("/login");
   };
 
   const onSupporter = () => {
@@ -46,12 +60,7 @@ export default function Welcome() {
     setPendingCommunity();
     if (alreadySignedIn && user?.id) {
       void (async () => {
-        const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(user.id);
-        if (reconciled) {
-          stashExistingPatientOnCommunityPathToast();
-          setLocation("/");
-          return;
-        }
+        if (await reconcileSignedInWrongPath()) return;
         setLocation("/onboarding");
       })();
       return;

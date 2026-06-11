@@ -74,11 +74,11 @@ describe("community-path-patient-reconcile", () => {
       },
     });
 
-    const {
-      reconcileCommunityWelcomeWithExistingPatient,
-      stashExistingPatientOnCommunityPathToast,
-      consumePostLoginToast,
-    } = await import("@/lib/community-path-patient-reconcile");
+    const { reconcileCommunityWelcomeWithExistingPatient, stashExistingPatientOnCommunityPathToast } =
+      await import("@/lib/community-path-patient-reconcile");
+    const { consumePostLoginToast, POST_LOGIN_TOAST_STASHED_EVENT } = await import(
+      "@/lib/post-login-toast-stash"
+    );
     const { getPrimaryAppRole, getOnboardingAccountPath } = await import("@/lib/carer-session");
 
     const result = await reconcileCommunityWelcomeWithExistingPatient("u1");
@@ -87,10 +87,7 @@ describe("community-path-patient-reconcile", () => {
     expect(getOnboardingAccountPath()).toBe("patient");
 
     const onStashed = vi.fn();
-    window.addEventListener(
-      (await import("@/lib/community-path-patient-reconcile")).POST_LOGIN_TOAST_STASHED_EVENT,
-      onStashed,
-    );
+    window.addEventListener(POST_LOGIN_TOAST_STASHED_EVENT, onStashed);
     stashExistingPatientOnCommunityPathToast();
     expect(onStashed).toHaveBeenCalledTimes(1);
     expect(consumePostLoginToast()?.title).toContain("Already have a full account");
