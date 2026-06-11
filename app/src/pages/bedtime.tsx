@@ -17,7 +17,7 @@ import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHA
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
-import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
+import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
@@ -121,7 +121,7 @@ const BEDTIME_SECTION_INFO = {
   foodInsulin:
     "How long since you ate and took rapid insulin helps estimate food still digesting and insulin still working overnight.",
   sleep: "If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.",
-  extras: "Optional switches that shape your summary. They are only saved if you tap Save check.",
+  extras: "Optional switches that shape your summary and are included when you check bedtime.",
   exercise: "Workouts can raise hypo risk for many hours overnight.",
   alcohol: "Alcohol can delay lows — we weigh this more heavily than hypos alone.",
   recentHypos:
@@ -155,7 +155,6 @@ export default function Bedtime() {
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [saved, setSaved] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aboutCheckOpen, setAboutCheckOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
@@ -270,6 +269,39 @@ export default function Bedtime() {
       alcoholWarning,
       sickDayWarning,
     };
+  };
+
+  const persistBedtimeCheck = (level: ReadinessLevel, correctionDose: number | null) => {
+    const isFirstBedtimeCheck = storage.getBedtimeLogs().length === 0;
+    const log: BedtimeLog = {
+      id: crypto.randomUUID(),
+      date: new Date().toISOString(),
+      currentBg: parseFloat(currentBg),
+      bgUnits,
+      readinessLevel: level,
+      hoursSinceFood: hoursSinceFood ? parseFloat(hoursSinceFood) : null,
+      hoursSinceInsulin: hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : null,
+      hoursUntilSleep: hoursUntilSleep ? parseFloat(hoursUntilSleep) : null,
+      bgTrend: bgTrend === "not_sure" ? undefined : bgTrend,
+      mealCarbs: mealCarbs ? parseFloat(mealCarbs) : null,
+      recentHypos,
+      exercisedToday,
+      hadAlcohol,
+      sickDayActive: scenarioState.sickDayActive,
+      travelModeActive: scenarioState.travelModeActive,
+      correctionGiven: correctionDose,
+      notes: "",
+    };
+    storage.saveBedtimeLog(log);
+    setBedtimeLogs(storage.getBedtimeLogs());
+    void rescheduleBedtimeReminders();
+    toast({
+      title: "Bedtime check logged",
+      description: "Counted for your streak, activity history, and linked supporters.",
+    });
+    if (isFirstBedtimeCheck && user?.id && shouldOfferBedtimeReminderSecondChance(user.id)) {
+      setSecondChancePromptOpen(true);
+    }
   };
 
   const calculateReadiness = () => {
@@ -661,7 +693,7 @@ export default function Bedtime() {
       correction,
       snack: personalized.snack,
     });
-    setSaved(false);
+    persistBedtimeCheck(level, correction?.suggestedDose ?? null);
     setDetailsOpen(false);
     setQuickCheckOpen(false);
     setTipsOpen(false);
@@ -752,41 +784,6 @@ export default function Bedtime() {
 
   const verdictLabel = (level: ReadinessLevel) =>
     level === "steady" ? "Ready" : level === "monitor" ? "Caution" : "Needs attention";
-
-  const handleSaveCheck = () => {
-    if (!result || saved) return;
-    const isFirstBedtimeCheck = bedtimeLogs.length === 0;
-    const log: BedtimeLog = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString(),
-      currentBg: parseFloat(currentBg),
-      bgUnits,
-      readinessLevel: result.level,
-      hoursSinceFood: hoursSinceFood ? parseFloat(hoursSinceFood) : null,
-      hoursSinceInsulin: hoursSinceInsulin ? parseFloat(hoursSinceInsulin) : null,
-      hoursUntilSleep: hoursUntilSleep ? parseFloat(hoursUntilSleep) : null,
-      bgTrend: bgTrend === "not_sure" ? undefined : bgTrend,
-      mealCarbs: mealCarbs ? parseFloat(mealCarbs) : null,
-      recentHypos,
-      exercisedToday,
-      hadAlcohol,
-      sickDayActive: scenarioState.sickDayActive,
-      travelModeActive: scenarioState.travelModeActive,
-      correctionGiven: result.correction ? result.correction.suggestedDose : null,
-      notes: "",
-    };
-    storage.saveBedtimeLog(log);
-    setBedtimeLogs(storage.getBedtimeLogs());
-    setSaved(true);
-    void rescheduleBedtimeReminders();
-    toast({
-      title: "Bedtime check saved",
-      description: "Logged for your streak and activity history.",
-    });
-    if (isFirstBedtimeCheck && user?.id && shouldOfferBedtimeReminderSecondChance(user.id)) {
-      setSecondChancePromptOpen(true);
-    }
-  };
 
   const getRecentLogs = () => {
     const fourteenDaysAgo = new Date();
@@ -953,52 +950,19 @@ export default function Bedtime() {
 
       {result ? (
         <div
-          className={cn(
-            "overflow-hidden rounded-2xl border-2 shadow-md",
-            saved
-              ? "border-emerald-500/35 bg-emerald-500/[0.08]"
-              : "border-indigo-500/40 bg-gradient-to-br from-indigo-500/[0.12] via-card to-violet-500/[0.08] ring-1 ring-indigo-500/15",
-          )}
+          className="overflow-hidden rounded-2xl border-2 border-emerald-500/35 bg-emerald-500/[0.08] shadow-md"
           data-testid="card-bedtime-save-prompt"
         >
           <div className="px-4 py-4 sm:px-5">
-            {saved ? (
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground">Check saved</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    Logged for your bedtime streak and activity history.
-                  </p>
-                </div>
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground">Check logged</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Counted for your bedtime streak, activity history, and linked supporters.
+                </p>
               </div>
-            ) : (
-              <>
-                <StaticLabelWithInfo
-                  ariaLabel="Why save your bedtime check"
-                  labelClassName="text-base font-semibold tracking-tight text-foreground"
-                  info={
-                    <p className="text-sm leading-relaxed">
-                      Your result isn&apos;t logged until you save. This counts toward your bedtime streak and appears
-                      in your activity log — including for supporters linked to your account.
-                    </p>
-                  }
-                >
-                  Save tonight&apos;s check
-                </StaticLabelWithInfo>
-                <Button
-                  onClick={handleSaveCheck}
-                  className={cn(
-                    "mt-3 h-12 w-full rounded-xl text-base font-semibold shadow-sm",
-                    "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500",
-                  )}
-                  data-testid="button-save-bedtime-check"
-                >
-                  <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden />
-                  Save check
-                </Button>
-              </>
-            )}
+            </div>
             <div className="mt-3 flex justify-center">
               <Button variant="link" size="sm" className="h-auto px-0 text-muted-foreground" asChild>
                 <Link href="/tools/hypo-help">Hypo help</Link>
@@ -1500,7 +1464,7 @@ export default function Bedtime() {
 
               {recentLogs.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-bedtime-logs">
-                  No bedtime checks saved yet. Run a check and save it to start tracking patterns.
+                  No bedtime checks logged yet. Run a check to start tracking patterns.
                 </p>
               ) : (
                 <div className="space-y-2">
