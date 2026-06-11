@@ -17,6 +17,7 @@ import {
 import { format, startOfDay } from "date-fns";
 
 import { isPumpDeliveryMethod } from "./insulin-delivery-method";
+import { getEffectiveTdd, hasConfiguredTdd } from "./tdd";
 import appPkg from "../../package.json";
 
 const STORAGE_KEYS = {
@@ -2451,17 +2452,9 @@ export const storage = {
     const primingWaste = this.getPrimingWastePerDay(supply.type, s);
 
     if (supply.type === "insulin_vial") {
-      let base = 0;
-      if (s.tdd && s.tdd > 0) {
-        base = s.tdd;
-      } else {
-        const shortActing = s.shortActingUnitsPerDay || 0;
-        const longActing = s.longActingUnitsPerDay || 0;
-        if (shortActing + longActing > 0) {
-          base = shortActing + longActing;
-        } else if (supply.dailyUsage && supply.dailyUsage > 0) {
-          base = supply.dailyUsage;
-        }
+      let base = getEffectiveTdd(s) ?? 0;
+      if (base <= 0 && supply.dailyUsage && supply.dailyUsage > 0) {
+        base = supply.dailyUsage;
       }
       return base > 0 ? base + primingWaste : 0;
     }
@@ -2489,14 +2482,8 @@ export const storage = {
     }
 
     if (supply.type === "insulin") {
-      let base = 0;
-      const shortActing = s.shortActingUnitsPerDay || 0;
-      const longActing = s.longActingUnitsPerDay || 0;
-      if (shortActing + longActing > 0) {
-        base = shortActing + longActing;
-      } else if (s.tdd && s.tdd > 0) {
-        base = s.tdd;
-      } else if (supply.dailyUsage && supply.dailyUsage > 0) {
+      let base = getEffectiveTdd(s) ?? 0;
+      if (base <= 0 && supply.dailyUsage && supply.dailyUsage > 0) {
         base = supply.dailyUsage;
       }
       return base > 0 ? base + primingWaste : 0;
@@ -2582,21 +2569,18 @@ export const storage = {
     }
 
     if (type === "insulin_vial") {
-      if (s.tdd && s.tdd > 0) {
-        return { value: s.tdd, source: "from your Settings (TDD)" };
-      }
-      const shortActing = s.shortActingUnitsPerDay || 0;
-      const longActing = s.longActingUnitsPerDay || 0;
-      if (shortActing + longActing > 0) {
-        return { value: shortActing + longActing, source: "from your Settings (total daily insulin)" };
+      const tdd = getEffectiveTdd(s);
+      if (tdd) {
+        return { value: tdd, source: "from your Settings (TDD)" };
       }
       return null;
     }
 
     if (type === "insulin_short") {
       if (isPump) {
-        if (s.tdd && s.tdd > 0) {
-          return { value: s.tdd, source: "from your Settings (TDD)" };
+        const tdd = getEffectiveTdd(s);
+        if (tdd) {
+          return { value: tdd, source: "from your Settings (TDD)" };
         }
         return null;
       }
@@ -2617,18 +2601,15 @@ export const storage = {
 
     if (type === "insulin") {
       if (isPump) {
-        if (s.tdd && s.tdd > 0) {
-          return { value: s.tdd, source: "from your Settings (TDD)" };
+        const tdd = getEffectiveTdd(s);
+        if (tdd) {
+          return { value: tdd, source: "from your Settings (TDD)" };
         }
         return null;
       }
-      const shortActing = s.shortActingUnitsPerDay || 0;
-      const longActing = s.longActingUnitsPerDay || 0;
-      if (shortActing + longActing > 0) {
-        return { value: shortActing + longActing, source: "from your Settings (short + long acting units/day)" };
-      }
-      if (s.tdd && s.tdd > 0) {
-        return { value: s.tdd, source: "from your Settings (TDD)" };
+      const tdd = getEffectiveTdd(s);
+      if (tdd) {
+        return { value: tdd, source: "from your Settings (TDD)" };
       }
       return null;
     }
@@ -2813,7 +2794,7 @@ export const storage = {
     const settings = this.getSettings();
     
     const checks = [
-      !!settings.tdd,
+      hasConfiguredTdd(settings),
       !!(settings.breakfastRatio || settings.lunchRatio),
       !!settings.correctionFactor,
       !!(settings.targetBgLow && settings.targetBgHigh),
@@ -2829,7 +2810,7 @@ export const storage = {
     const settings = this.getSettings();
     
     const checks = [
-      !!settings.tdd,
+      hasConfiguredTdd(settings),
       !!(settings.breakfastRatio || settings.lunchRatio),
       !!settings.correctionFactor,
       !!(settings.targetBgLow && settings.targetBgHigh),

@@ -54,6 +54,17 @@ describe("calculateMealDose before exercise", () => {
     const r = calculateMealDose(40, "snack", {}, "mmol/L", "before", 1);
     expect(r.error).toBe("no_ratios");
   });
+
+  it("estimates dose from MDI short + long acting when explicit TDD is unset", () => {
+    const r = calculateMealDose(
+      50,
+      "snack",
+      { shortActingUnitsPerDay: 25, longActingUnitsPerDay: 15 },
+      "mmol/L",
+    );
+    expect(r.error).toBeUndefined();
+    expect(r.dose).toBe(4);
+  });
 });
 
 describe("calculateMealDose exercise meta modifiers", () => {

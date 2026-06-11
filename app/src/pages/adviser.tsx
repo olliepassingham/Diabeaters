@@ -30,6 +30,7 @@ import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { calculateMealDose, roundInsulinUnits, type MealDoseResult } from "@/lib/meal-dose";
+import { getEffectiveTdd } from "@/lib/tdd";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { FaceLogoWatermark } from "@/components/face-logo";
@@ -349,7 +350,12 @@ export default function Adviser() {
         totalUnits = Math.round((carbValue / gpu) * 10) / 10;
         ratioUsed = `Using your ${splitMealTime} ratio (${formatRatioForDisplay(gpu, ratioFmt, cpSize)})`;
       }
-    } else if (settings.tdd) {
+    } else {
+      const effectiveTdd = getEffectiveTdd(settings);
+      if (!effectiveTdd) {
+        setSplitResult(null);
+        return;
+      }
       const ageYears = ageInWholeYearsUtc(profile.dateOfBirth ?? storage.getProfile()?.dateOfBirth);
       if (ageYears !== null && ageYears < 18) {
         toast({
@@ -361,7 +367,7 @@ export default function Adviser() {
         setSplitResult(null);
         return;
       }
-      const estimatedRatio = Math.round(500 / settings.tdd);
+      const estimatedRatio = Math.round(500 / effectiveTdd);
       totalUnits = Math.round((carbValue / estimatedRatio) * 10) / 10;
       ratioUsed = `Estimated from TDD (${formatRatioForDisplay(estimatedRatio, ratioFmt, cpSize)})`;
     }

@@ -20,6 +20,7 @@ import {
   type MealExerciseMeta,
 } from "@/lib/meal-dose";
 import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserSettings } from "@/lib/storage";
+import { getEffectiveTdd } from "@/lib/tdd";
 
 export type { PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
 
@@ -147,7 +148,8 @@ function describeRatioUsed(mealType: string, settings: UserSettings): string | u
   };
   const ratio = ratioMap[mealType]?.trim();
   if (ratio) return `1 unit per ${ratio}g carbs (${mealTypeLabel(mealType)})`;
-  if (settings.tdd) return `estimated from TDD ${settings.tdd} (500÷TDD rule)`;
+  const tdd = getEffectiveTdd(settings);
+  if (tdd) return `estimated from TDD ${tdd} (500÷TDD rule)`;
   return undefined;
 }
 

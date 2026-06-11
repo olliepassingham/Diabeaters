@@ -1,5 +1,6 @@
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { storage, type Supply } from "@/lib/storage";
+import { getEffectiveTdd } from "@/lib/tdd";
 
 export const PUMP_SUPPLIES_SEEDED_KEY = "diabeaters_pump_supplies_seeded_v1";
 
@@ -55,7 +56,7 @@ export function seedPumpSuppliesIfNeeded(opts: PumpSupplySeedOptions = {}): { se
     return { seeded: false, count: 0 };
   }
 
-  const tdd = opts.tdd && opts.tdd > 0 ? opts.tdd : storage.getSettings().tdd || 40;
+  const tdd = opts.tdd && opts.tdd > 0 ? opts.tdd : getEffectiveTdd(storage.getSettings()) ?? 40;
   const started = todayNoonIso();
   const backupNote = "Backup for pump failure — confirm doses with your diabetes team.";
 

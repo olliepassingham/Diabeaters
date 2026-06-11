@@ -24,6 +24,7 @@ import {
   DIABEATER_PROFILE_CHANGED_EVENT,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { getEffectiveTdd, hasConfiguredTdd } from "@/lib/tdd";
 import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
@@ -501,8 +502,9 @@ export default function SickDay() {
   useEffect(() => {
     const storedSettings = storage.getSettings();
     setSettings(storedSettings);
-    if (storedSettings.tdd) {
-      setTdd(storedSettings.tdd.toString());
+    const effectiveTdd = getEffectiveTdd(storedSettings);
+    if (effectiveTdd) {
+      setTdd(effectiveTdd.toString());
     }
     
     const profile = storage.getProfile();
@@ -1085,10 +1087,10 @@ export default function SickDay() {
   };
 
   const handleCalculate = () => {
-    if (!settings.tdd) {
+    if (!hasConfiguredTdd(settings)) {
       toast({
         title: "TDD not configured",
-        description: "Please set your Total Daily Dose in Settings first.",
+        description: "Set your total daily dose under Settings → Ratios, or enter short- and long-acting units under Personal & usage.",
         variant: "destructive",
       });
       return;
@@ -1103,13 +1105,13 @@ export default function SickDay() {
       return;
     }
 
-    const tddNum = parseFloat(tdd);
+    const tddNum = getEffectiveTdd(settings);
     const bgNum = parseFloat(bgLevel);
 
-    if (isNaN(tddNum) || isNaN(bgNum) || tddNum <= 0 || bgNum <= 0) {
+    if (!tddNum || isNaN(bgNum) || bgNum <= 0) {
       toast({
         title: "Invalid values",
-        description: "Please enter valid positive numbers for TDD and blood glucose.",
+        description: "Please enter valid blood glucose and ensure TDD is set in Settings.",
         variant: "destructive",
       });
       return;
@@ -2547,7 +2549,7 @@ export default function SickDay() {
                     Total Daily Dose (TDD)
                     <InfoTooltip {...DIABETES_TERMS.tdd} />
                   </Label>
-                  {settings.tdd ? (
+                  {hasConfiguredTdd(settings) ? (
                     <>
                       <div className="flex items-center gap-2">
                         <Input

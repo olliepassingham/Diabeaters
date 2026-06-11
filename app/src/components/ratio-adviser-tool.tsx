@@ -29,6 +29,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { storage, UserSettings, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
+import { getEffectiveTdd } from "@/lib/tdd";
 import {
   formatRatioForStorage,
   formatRatioForDisplay,
@@ -216,7 +217,10 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
   const [frequency, setFrequency] = useState<FrequencyAnswer | null>(null);
   const [result, setResult] = useState<AdviserResult | null>(null);
 
-  const [tddInput, setTddInput] = useState(settings.tdd ? settings.tdd.toString() : "");
+  const [tddInput, setTddInput] = useState(() => {
+    const effective = getEffectiveTdd(settings);
+    return effective ? effective.toString() : "";
+  });
   const [estimatedRatios, setEstimatedRatios] = useState<{ breakfast: number; lunch: number; dinner: number; snack: number } | null>(null);
 
   const [ratioFormat, setRatioFormat] = useState<RatioFormat>("per10g");
@@ -275,8 +279,9 @@ export function RatioAdviserTool({ settings, bgUnit, onSettingsUpdate, onNavigat
     } else if (!ratiosExist && mode === "refine") {
       setMode("detect");
     }
-    if (settings.tdd && tddInput === "") {
-      setTddInput(settings.tdd.toString());
+    const effectiveTdd = getEffectiveTdd(settings);
+    if (effectiveTdd && tddInput === "") {
+      setTddInput(effectiveTdd.toString());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync TDD placeholder when settings load; avoid fighting user input
   }, [settings, mode]);

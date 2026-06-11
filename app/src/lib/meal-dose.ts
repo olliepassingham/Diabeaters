@@ -1,5 +1,6 @@
 import type { UserSettings } from "@/lib/storage";
 import { calculateDoseFromCarbs } from "@/lib/ratio-utils";
+import { getEffectiveTdd } from "@/lib/tdd";
 import type { ExerciseIntensity, ExerciseType } from "@/lib/storage";
 
 /** Round insulin units to whole numbers (pen-friendly). */
@@ -135,9 +136,12 @@ export function calculateMealDose(
 
   if (ratio) {
     exactBaseUnits = calculateDoseFromCarbs(carbs, ratio);
-  } else if (settings.tdd) {
-    const estimatedRatio = Math.round(500 / settings.tdd);
-    exactBaseUnits = carbs / estimatedRatio;
+  } else {
+    const tdd = getEffectiveTdd(settings);
+    if (tdd) {
+      const estimatedRatio = Math.round(500 / tdd);
+      exactBaseUnits = carbs / estimatedRatio;
+    }
   }
 
   if (exactBaseUnits <= 0) {

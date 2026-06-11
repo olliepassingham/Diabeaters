@@ -40,6 +40,7 @@ import {
   syncClinicalPrefsToCloud,
 } from "@/lib/clinical-prefs-cloud-sync";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
+import { withReconciledTdd } from "@/lib/tdd";
 import { PageShell } from "@/components/layout/page-shell";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -450,7 +451,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
 
     if (Object.keys(settings).length > 0) {
-      storage.saveSettings(settings);
+      storage.saveSettings(withReconciledTdd({ ...storage.getSettings(), ...settings }));
     }
 
     if (data.struggle) {

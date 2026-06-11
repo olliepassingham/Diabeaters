@@ -52,6 +52,7 @@ import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { storage, Supply, UserSettings, UserProfile, HolidayPrep, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { getEffectiveTdd } from "@/lib/tdd";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import {
   buildTravelWeatherRiskWarnings,
@@ -415,7 +416,7 @@ function calculatePackingList(plan: TravelPlan, supplies: Supply[], settings: Us
 
   if (isPumpUser) {
     // === PUMP USER PACKING LIST ===
-    const tdd = settings.tdd || 40;
+    const tdd = getEffectiveTdd(settings) ?? 40;
     const reservoirCapacity = settings.reservoirCapacity || 300;
     const siteChangeDays = settings.siteChangeDays || 3;
     const reservoirChangeDays = settings.reservoirChangeDays || 3;

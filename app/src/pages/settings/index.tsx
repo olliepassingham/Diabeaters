@@ -63,6 +63,7 @@ import {
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { scrollToSettingsHashTarget } from "@/lib/settings-nav";
 import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import { getEffectiveTdd, withReconciledTdd } from "@/lib/tdd";
 import {
   APP_REGION_OPTIONS,
   applyRegionUnitDefaults,
@@ -761,6 +762,9 @@ function UsageTab({
               </FieldLabelWithInfo>
               <Input id="long-acting-units" className={usageFieldInputClass} type="number" placeholder="e.g., 20" value={longActingUnitsPerDay} onChange={(e) => setLongActingUnitsPerDay(e.target.value)} data-testid="input-long-acting-units" />
             </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              When you save, total daily dose in Ratios is set to short + long acting units (used across the app).
+            </p>
             <div className="space-y-1.5">
               <FieldLabelWithInfo htmlFor="short-acting-injections" info={<p>Meals + corrections.</p>}>
                 Short-Acting Injections/Day
@@ -1095,7 +1099,8 @@ export default function Settings() {
     
     if (storedSettings) {
       setSettings(storedSettings);
-      setTdd(storedSettings.tdd?.toString() || "");
+      const effectiveTdd = getEffectiveTdd(storedSettings);
+      setTdd(effectiveTdd?.toString() || "");
       const cpSize = storedProfile?.carbPortionSize;
       const bGpu = parseRatioToGramsPerUnit(storedSettings.breakfastRatio);
       setBreakfastRatio(bGpu ? gramsPerUnitToInputValue(bGpu, format, cpSize) : "");
@@ -1430,9 +1435,9 @@ export default function Settings() {
     });
   };
 
-  const handleSaveUsage = (opts?: { quietSuccess?: boolean }) => {
+  const handleSaveUsage = (opts?: { quietSuccess?: boolean }): boolean => {
     const longInjParsed = longActingInjectionsPerDay ? parseInt(longActingInjectionsPerDay, 10) : 0;
-    const newSettings: UserSettings = {
+    const newSettings: UserSettings = withReconciledTdd({
       ...settings,
       shortActingUnitsPerDay: shortActingUnitsPerDay ? parseInt(shortActingUnitsPerDay) : undefined,
       longActingUnitsPerDay: longActingUnitsPerDay ? parseInt(longActingUnitsPerDay) : undefined,
@@ -1458,9 +1463,14 @@ export default function Settings() {
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
       suppliesSmarterForecastEnabled,
       usesClosedLoop: isPumpDeliveryMethod(deliveryMethod) ? usesClosedLoop : undefined,
-    };
+    });
+    const tddReconciled = newSettings.tdd != null && newSettings.tdd !== settings.tdd;
     storage.saveSettings(newSettings);
     setSettings(newSettings);
+    if (newSettings.tdd && newSettings.tdd > 0) {
+      storage.syncSettingsToSupplyUsage("tdd", newSettings.tdd);
+      setTdd(newSettings.tdd.toString());
+    }
     if (isPumpDeliveryMethod(deliveryMethod)) {
       void reschedulePumpChangeReminders();
     }
@@ -1472,19 +1482,36 @@ export default function Settings() {
       }
     }
     if (!opts?.quietSuccess) {
-      toast({ title: "Usage settings saved", description: "Your supply usage settings have been updated." });
+      const description = tddReconciled
+        ? "Your supply usage settings have been updated. Total daily dose in Ratios now matches short + long acting."
+        : "Your supply usage settings have been updated.";
+      toast({ title: "Usage settings saved", description });
     }
+    return tddReconciled;
   };
 
   const handleSaveUsagePage = async () => {
     const save = await handleSaveProfile({ quietSuccess: true });
     if (!save.ok) return;
-    handleSaveUsage({ quietSuccess: true });
+    const tddReconciled = handleSaveUsage({ quietSuccess: true });
+    let tddCloudSkipped = save.tddCloudSkipped;
+    if (tddReconciled && user?.id) {
+      const cloud = await syncClinicalPrefsToCloud(user.id);
+      if (cloud.error) {
+        toast({
+          title: "Saved on this device",
+          description: `Could not sync TDD to your account: ${cloud.error.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      tddCloudSkipped = cloud.tddCloudSkipped;
+    }
     const partial = describePartialClinicalPrefsCloudSync({
       error: null,
       dateOfBirthCloudSkipped: save.dateOfBirthCloudSkipped,
       insulinDeliveryMethodCloudSkipped: save.insulinDeliveryMethodCloudSkipped,
-      tddCloudSkipped: save.tddCloudSkipped,
+      tddCloudSkipped,
     });
     toast({
       title: "Saved",
