@@ -72,6 +72,47 @@ export function buildFeedbackMailtoHref(params: {
   return `mailto:${supportEmail}?${q.toString()}`;
 }
 
+export const FEEDBACK_MIN_MESSAGE_LENGTH = 8;
+
+export function isFeedbackMessageLongEnough(message: string): boolean {
+  return message.trim().length >= FEEDBACK_MIN_MESSAGE_LENGTH;
+}
+
+/** PostgREST / Supabase when the table was never migrated or API schema cache is stale. */
+export function isFeedbackSubmissionsTableUnavailableMessage(message: string | undefined): boolean {
+  const m = (message ?? "").toLowerCase();
+  if (!m) return false;
+  if (m.includes("schema cache") && m.includes("feedback_submissions")) return true;
+  if (m.includes("feedback_submissions") && (m.includes("does not exist") || m.includes("not find"))) return true;
+  if (m.includes("pgrst205") || m.includes("could not find the table")) return true;
+  return false;
+}
+
+export function feedbackSubmitUnavailableDescription(): string {
+  return "Use Copy message or the email options below. If you manage this app, apply the Supabase migration that creates public.feedback_submissions (see supabase/migrations).";
+}
+
+export function buildFeedbackSubmissionInsert(params: {
+  userId: string;
+  kind: FeedbackKind;
+  message: string;
+  appVersion: string;
+  region?: string | null;
+  userEmail?: string | null;
+  pagePath?: string | null;
+}) {
+  return {
+    user_id: params.userId,
+    kind: params.kind,
+    message: params.message.trim(),
+    app_version: params.appVersion,
+    platform: feedbackPlatformLabel(),
+    region: params.region?.trim() || null,
+    page_path: params.pagePath?.trim() || null,
+    email: params.userEmail?.trim() || null,
+  };
+}
+
 export function buildFeedbackGmailWebComposeUrl(params: {
   kind: FeedbackKind;
   message: string;

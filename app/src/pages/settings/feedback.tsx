@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { Bug, Lightbulb, Mail } from "lucide-react";
+import { Bug, Lightbulb, Mail, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,10 +13,16 @@ import {
   buildFeedbackGmailWebComposeUrl,
   buildFeedbackMailtoHref,
   buildFeedbackRequestText,
+  buildFeedbackSubmissionInsert,
+  feedbackSubmitUnavailableDescription,
+  FEEDBACK_MIN_MESSAGE_LENGTH,
+  isFeedbackMessageLongEnough,
+  isFeedbackSubmissionsTableUnavailableMessage,
   type FeedbackKind,
 } from "@/lib/feedback";
 import { getProfileRegion } from "@/lib/region";
 import { getSupportEmail } from "@/lib/support";
+import { getSupabase } from "@/lib/supabase";
 import { storage } from "@/lib/storage";
 import {
   SettingsGroup,
@@ -35,6 +41,7 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
   const { toast } = useToast();
   const [kind, setKind] = useState<FeedbackKind>("suggestion");
   const [message, setMessage] = useState("");
+  const [submitBusy, setSubmitBusy] = useState(false);
 
   const profile = storage.getProfile();
   const region = getProfileRegion(profile);
@@ -54,7 +61,69 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
     [kind, message, region, user?.email, user?.id, supportEmail],
   );
 
-  const canSend = message.trim().length >= 8;
+  const canSend = isFeedbackMessageLongEnough(message);
+
+  const tooShortHint =
+    message.trim().length > 0 && !canSend
+      ? `Write at least ${FEEDBACK_MIN_MESSAGE_LENGTH} characters to send (${FEEDBACK_MIN_MESSAGE_LENGTH - message.trim().length} more).`
+      : null;
+
+  const handleSubmitInApp = async () => {
+    if (!canSend) {
+      toast({
+        title: "Add a bit more detail",
+        description: "Please write at least a sentence so we know what to improve.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!user?.id) {
+      toast({
+        title: "Sign in to send",
+        description: "Use the email options below, or sign in and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const supabase = getSupabase();
+    if (!supabase) {
+      toast({
+        title: "Could not send",
+        description: "Auth is not configured on this build. Try the email options below.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmitBusy(true);
+    const { error } = await supabase
+      .from("feedback_submissions")
+      .insert(
+        buildFeedbackSubmissionInsert({
+          userId: user.id,
+          kind,
+          message,
+          appVersion: APP_VERSION,
+          region,
+          userEmail: user.email ?? null,
+          pagePath: payload.pagePath,
+        }),
+      );
+    setSubmitBusy(false);
+    if (error) {
+      const missingTable = isFeedbackSubmissionsTableUnavailableMessage(error.message);
+      toast({
+        title: missingTable ? "In-app send isn’t available here yet" : "Could not send feedback",
+        description: missingTable ? feedbackSubmitUnavailableDescription() : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({
+      title: "Thanks — we got it",
+      description: "Your feedback was sent to the Diabeaters team.",
+    });
+    setMessage("");
+  };
 
   const handleCopy = async () => {
     if (!canSend) {
@@ -160,6 +229,7 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
                 className="min-h-[140px] resize-y"
                 data-testid="textarea-feedback-message"
               />
+              {tooShortHint ? <p className="text-xs text-muted-foreground">{tooShortHint}</p> : null}
               <p className="text-xs text-muted-foreground">
                 We automatically attach app version, platform, and region to help us investigate. For urgent medical
                 issues, contact your diabetes team or emergency services — not this form.
@@ -174,6 +244,20 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
             <div className="space-y-3 p-3.5 sm:p-4">
               <Button
                 type="button"
+                className="w-full min-h-11"
+                disabled={!canSend || submitBusy}
+                onClick={() => void handleSubmitInApp()}
+                data-testid="button-feedback-send"
+              >
+                <Send className="mr-2 h-4 w-4" aria-hidden />
+                {submitBusy ? "Sending…" : "Send feedback"}
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                Sends in the app — no email client needed. You can also use email below.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
                 className="w-full min-h-11"
                 disabled={!canSend}
                 onClick={openMailto}
@@ -205,11 +289,11 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
                 </Button>
               </div>
               <p className="text-xs text-center text-muted-foreground">
-                Sent to{" "}
+                Email fallback:{" "}
                 <a className="text-primary underline-offset-2 hover:underline" href={`mailto:${supportEmail}`}>
                   {supportEmail}
                 </a>
-                . Need help signing in? See{" "}
+                . Need help? See{" "}
                 <Link href="/support" className="text-primary underline-offset-2 hover:underline">
                   Support
                 </Link>
