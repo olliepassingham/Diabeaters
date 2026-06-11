@@ -995,7 +995,7 @@ export default function Settings() {
     appointmentAlerts: true,
     hypoAlerts: true,
     scenarioAlerts: true,
-    hypoDashboardQuickNotify: true,
+    hypoDashboardQuickNotify: false,
     communityFeedAlerts: true,
     communityDmAlerts: true,
   });

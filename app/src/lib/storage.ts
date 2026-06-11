@@ -3643,7 +3643,7 @@ export const storage = {
       appointmentAlerts: true,
       hypoAlerts: true,
       scenarioAlerts: true,
-      hypoDashboardQuickNotify: true,
+      hypoDashboardQuickNotify: false,
       communityFeedAlerts: true,
       communityDmAlerts: true,
     };
@@ -3654,8 +3654,8 @@ export const storage = {
     return {
       ...defaults,
       ...parsed,
-      /** Default on (UK-style quick log); only explicit `false` in stored settings turns it off. */
-      hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify !== false,
+      /** Off by default — opens the hypo log form; only explicit `true` enables one-tap log + supporter notify. */
+      hypoDashboardQuickNotify: parsed.hypoDashboardQuickNotify === true,
       communityFeedAlerts: parsed.communityFeedAlerts !== false,
       communityDmAlerts: parsed.communityDmAlerts !== false,
       supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,

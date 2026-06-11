@@ -9,7 +9,6 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
-  Bell,
   X,
   History,
   ChevronDown,
@@ -38,6 +37,7 @@ import {
 import { getActiveAppMode } from "@/lib/carer-session";
 import { carbSourceLogLabel } from "@/lib/hypo-treatment-display";
 import { useToast } from "@/hooks/use-toast";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -528,9 +528,13 @@ function HeroCard({
       <Dialog open={hypoDialogOpen} onOpenChange={setHypoDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              Log Hypo Treatment
+            <DialogTitle className="flex items-center gap-1">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" />
+              <span className="min-w-0 flex-1">Log Hypo Treatment</span>
+              <InfoTooltip
+                term="Saving hypo treatments"
+                explanation="Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your account and notify any linked supporters (push / in-app)."
+              />
             </DialogTitle>
             <DialogDescription>
               Record details about your hypo treatment.
@@ -574,13 +578,6 @@ function HeroCard({
                 onChange={(e) => setHypoNotes(e.target.value)}
                 data-testid="input-dashboard-hypo-notes"
               />
-            </div>
-            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-              <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
-              <p className="text-sm text-muted-foreground">
-                Your hypo treatment is saved locally. When you are signed in with cloud enabled, we also save to your
-                account and notify any linked supporters (push / in-app).
-              </p>
             </div>
             <Button
               variant="ghost"
