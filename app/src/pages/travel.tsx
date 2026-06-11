@@ -74,6 +74,11 @@ import { fetchScenarioStateForUser, upsertScenario } from "@/lib/scenarios-supab
 import { invokeNotifyScenarioStarted } from "@/lib/invoke-notify-scenario-started";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
+import {
+  getDisplayLocale,
+  getRegionDefaultsForProfile,
+  travelEnglishEmergencyNumber,
+} from "@/lib/region";
 import { PharmacyCard } from "@/components/pharmacy-card";
 import {
   buildActiveTravelCoachPrompt,
@@ -818,13 +823,14 @@ function countExerciseOutcomesInTripWindow(planStart: string, planEnd: string): 
     .filter((o) => completedAtWithinInclusiveTripDates(o.completedAt, start, end)).length;
 }
 
-function formatGBDateOrEmpty(
+function formatTripDate(
   value: string | null | undefined,
+  profile: UserProfile | null,
   options: Intl.DateTimeFormatOptions,
 ): string {
   const d = parseISODateOrNull(value);
   if (!d) return "";
-  return d.toLocaleDateString("en-GB", options);
+  return d.toLocaleDateString(getDisplayLocale(profile), options);
 }
 
 function getDefaultISOTripDates(): { start: string; end: string } {
@@ -1001,6 +1007,14 @@ export default function Travel() {
   const [selectedLanguage, setSelectedLanguage] = useState("English");
 
   const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const regionDefaults = getRegionDefaultsForProfile(profile);
+  const emergencyPhrases = useMemo(() => {
+    const englishNumber = travelEnglishEmergencyNumber(profile);
+    return {
+      ...EMERGENCY_PHRASES,
+      English: { ...EMERGENCY_PHRASES.English, emergencyNumber: englishNumber },
+    };
+  }, [profile]);
   const showClimateTab =
     plan.weatherChange !== "similar" || plan.timezoneChange !== "none";
 
@@ -1275,7 +1289,7 @@ export default function Travel() {
     toast({
       title: "Travel Mode Activated",
       description: `You'll see travel reminders until ${
-        formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "your return date"
+        formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "your return date"
       }`,
     });
     void (async () => {
@@ -1439,7 +1453,7 @@ export default function Travel() {
         .filter((x): x is BasalAdjustmentRow & { doseLabel: string } => x != null);
     })();
 
-    const selectedPhrases = EMERGENCY_PHRASES[selectedLanguage];
+    const selectedPhrases = emergencyPhrases[selectedLanguage];
     const dayNumber = hasStarted ? daysElapsed + 1 : 0;
     const activeProgressInput = {
       plan,
@@ -1524,8 +1538,8 @@ export default function Travel() {
           body={
             <>
               <p className="text-xs text-muted-foreground">
-                {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start"} —{" "}
-                {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End"}
+                {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} —{" "}
+                {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End"}
               </p>
               <Progress value={progressPercent} className="h-1.5" data-testid="progress-trip" />
               <p className="text-xs leading-snug text-muted-foreground" data-testid="travel-progress-guidance">
@@ -1635,7 +1649,7 @@ export default function Travel() {
                   <div>
                     <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Return</p>
                     <p className="font-medium leading-snug">
-                      {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short" }) || "—"}
+                      {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short" }) || "—"}
                     </p>
                   </div>
                   <div>
@@ -1830,7 +1844,7 @@ export default function Travel() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.keys(EMERGENCY_PHRASES).map(lang => (
+                        {Object.keys(emergencyPhrases).map(lang => (
                           <SelectItem key={lang} value={lang}>{lang}</SelectItem>
                         ))}
                       </SelectContent>
@@ -2083,10 +2097,10 @@ export default function Travel() {
                     <div>
                       <h3 className="font-semibold text-base">{holidayPrep.destination}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {formatGBDateOrEmpty(holidayPrep.departureDate, { day: "numeric", month: "short" }) ||
+                        {formatTripDate(holidayPrep.departureDate, profile, { day: "numeric", month: "short" }) ||
                           "Departure"} 
                         {" — "}
-                        {formatGBDateOrEmpty(holidayPrep.returnDate, {
+                        {formatTripDate(holidayPrep.returnDate, profile, {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -2196,8 +2210,8 @@ export default function Travel() {
                           <AlertTitle>Prescription Timing</AlertTitle>
                           <AlertDescription>
                             {daysBeforeDeparture <= 0
-                              ? `Your next prescription is due around ${nextDue.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — that's ${Math.abs(daysBeforeDeparture)} days before departure. Ask your pharmacy about collecting early.`
-                              : `Your next prescription is due around ${nextDue.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — while you're away. Ask your pharmacy about collecting early before you go.`
+                              ? `Your next ${regionDefaults.repeatPrescriptionLabel} is due around ${formatTripDate(nextDue.toISOString().slice(0, 10), profile, { day: "numeric", month: "short" })} — that's ${Math.abs(daysBeforeDeparture)} days before departure. Ask your pharmacy about collecting early.`
+                              : `Your next ${regionDefaults.repeatPrescriptionLabel} is due around ${formatTripDate(nextDue.toISOString().slice(0, 10), profile, { day: "numeric", month: "short" })} — while you're away. Ask your pharmacy about collecting early before you go.`
                             }
                           </AlertDescription>
                         </Alert>
@@ -2707,8 +2721,8 @@ export default function Travel() {
           </h1>
           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
             <p className="text-xs text-muted-foreground min-w-0">
-              {formatGBDateOrEmpty(plan.startDate, { day: "numeric", month: "short" }) || "Start date"} –{" "}
-              {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
+              {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start date"} –{" "}
+              {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
             </p>
             <Badge variant="outline" className="shrink-0 text-xs">
               {plan.travelType === "international" ? "International" : "Domestic"}
@@ -2743,7 +2757,7 @@ export default function Travel() {
               <p className="text-xs text-muted-foreground leading-snug">
                 Turn on for reminders until{" "}
                 <span className="text-foreground font-medium">
-                  {formatGBDateOrEmpty(plan.endDate, { day: "numeric", month: "short", year: "numeric" }) ||
+                  {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) ||
                     "your return date"}
                 </span>
                 .

@@ -54,6 +54,15 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { recordLastInteraction } from "@/lib/last-interaction";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
+import {
+  formatAppDate,
+  formatAppDateTime,
+  formatAppTime,
+  getKetoneEmergencyCopy,
+  getProfileRegion,
+  getRegionDefaultsForProfile,
+  getRegionEmergencyFooter,
+} from "@/lib/region";
 
 // Conversion helpers for blood glucose units
 const mgdlToMmol = (mgdl: number) => Math.round(mgdl / 18 * 10) / 10;
@@ -236,6 +245,7 @@ function calculateSickDayRecommendations(
   // === RATIO AND OTHER ADJUSTMENTS ===
   
   const sickDayProfile = storage.getProfile();
+  const ketoneEmergency = getKetoneEmergencyCopy(getProfileRegion(sickDayProfile));
   const ratioFmt: RatioFormat = sickDayProfile?.ratioFormat || "per10g";
   const cpSize = sickDayProfile?.carbPortionSize;
 
@@ -347,16 +357,16 @@ function calculateSickDayRecommendations(
       ketoneWarningBrief = "Urgent: contact your diabetes team now.";
       if (isVeryHighBg || severity === "severe") {
         ketoneActionRequired = "emergency";
-        ketoneWarning = "EMERGENCY: Moderate ketones with high glucose or severe illness. Go to A&E or call 999 if you cannot reach your diabetes team.";
-        ketoneWarningBrief = "Emergency: go to A&E or call 999 if you cannot reach your team.";
+        ketoneWarning = ketoneEmergency.moderateWithHighBg;
+        ketoneWarningBrief = ketoneEmergency.moderateWithHighBgBrief;
       }
       break;
     case "large":
       ketoneGuidance = "Large ketones are a medical emergency. You are at high risk of DKA (diabetic ketoacidosis). Do NOT wait - seek emergency medical care immediately.";
       ketoneGuidanceBrief = "Medical emergency—seek care now.";
       ketoneActionRequired = "emergency";
-      ketoneWarning = "EMERGENCY: Large ketones detected. Go to A&E immediately or call 999. This is a medical emergency.";
-      ketoneWarningBrief = "Go to A&E or call 999 now.";
+      ketoneWarning = ketoneEmergency.large;
+      ketoneWarningBrief = ketoneEmergency.largeBrief;
       break;
   }
 
@@ -414,6 +424,8 @@ interface SickDaySession {
 
 export default function SickDay() {
   const { toast } = useToast();
+  const [localeProfile, setLocaleProfile] = useState(() => storage.getProfile());
+  const regionDefaults = getRegionDefaultsForProfile(localeProfile);
   const [settings, setSettings] = useState<UserSettings>({});
   const [tdd, setTdd] = useState("");
   const [bgLevel, setBgLevel] = useState("");
@@ -535,6 +547,7 @@ export default function SickDay() {
   useEffect(() => {
     const onProfile = () => {
       const p = storage.getProfile();
+      setLocaleProfile(p);
       setIsPumpUser(isPumpDeliveryMethod(p?.insulinDeliveryMethod));
     };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
@@ -783,7 +796,7 @@ export default function SickDay() {
       medPreset === "custom"
         ? medCustomName.trim()
         : medPreset === "paracetamol"
-          ? "Paracetamol"
+          ? regionDefaults.paracetamolLabel
           : medPreset === "ibuprofen"
             ? "Ibuprofen"
             : "Antibiotic";
@@ -1254,7 +1267,7 @@ export default function SickDay() {
     setJournalNotes("");
     toast({
       title: "Check logged",
-      description: `BG ${bgNum} ${bgUnits} recorded at ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}.`,
+      description: `BG ${bgNum} ${bgUnits} recorded at ${formatAppTime(new Date(), localeProfile, { hour: "2-digit", minute: "2-digit" })}.`,
     });
   };
 
@@ -1384,7 +1397,7 @@ export default function SickDay() {
           subtitle={
             `Started ${
               sickDayActivatedAt
-                ? new Date(sickDayActivatedAt).toLocaleDateString("en-GB", {
+                ? formatAppDateTime(sickDayActivatedAt, localeProfile, {
                     day: "numeric",
                     month: "short",
                     hour: "2-digit",
@@ -1467,7 +1480,7 @@ export default function SickDay() {
                     title="Current recommendations"
                     lastUpdatedLabel={
                       lastCheckAtIso
-                        ? `Latest check: ${new Date(lastCheckAtIso).toLocaleString("en-GB", {
+                        ? `Latest check: ${formatAppDateTime(lastCheckAtIso, localeProfile, {
                             day: "numeric",
                             month: "short",
                             hour: "2-digit",
@@ -1687,7 +1700,7 @@ export default function SickDay() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="paracetamol">Paracetamol</SelectItem>
+                            <SelectItem value="paracetamol">{regionDefaults.paracetamolLabel}</SelectItem>
                             <SelectItem value="ibuprofen">Ibuprofen</SelectItem>
                             <SelectItem value="antibiotic">Antibiotic</SelectItem>
                             <SelectItem value="custom">Custom…</SelectItem>
@@ -2424,7 +2437,7 @@ export default function SickDay() {
                 </Button>
               </Link>
               <p className="text-xs text-center text-muted-foreground">
-                UK Emergency: 999 | NHS 111 for non-emergency advice
+                {getRegionEmergencyFooter(localeProfile)}
               </p>
             </div>
                 </CardContent>

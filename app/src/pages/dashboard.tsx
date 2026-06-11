@@ -35,6 +35,7 @@ import {
   HypoTreatment,
 } from "@/lib/storage";
 import { getActiveAppMode } from "@/lib/carer-session";
+import { formatAppDate, formatAppTime } from "@/lib/region";
 import { carbSourceLogLabel } from "@/lib/hypo-treatment-display";
 import { useToast } from "@/hooks/use-toast";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -597,8 +598,8 @@ function HeroCard({
                 ) : (
                   hypoHistory.map((entry) => {
                     const date = new Date(entry.timestamp);
-                    const timeStr = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-                    const dateStr = date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                    const timeStr = formatAppTime(date, profile, { hour: "2-digit", minute: "2-digit" });
+                    const dateStr = formatAppDate(date, profile, { day: "numeric", month: "short" });
                     return (
                       <div key={entry.id} className="flex items-start gap-3 p-2 rounded-md bg-muted/30 text-sm" data-testid={`item-hypo-${entry.id}`}>
                         <div className="text-muted-foreground text-xs whitespace-nowrap pt-0.5">

@@ -88,6 +88,24 @@ export function getRegionDefaultsForProfile(profile: UserProfile | null | undefi
   return base;
 }
 
+/** Short emergency footer for sick day, travel, and similar safety callouts. */
+export function getRegionEmergencyFooter(profile: UserProfile | null | undefined): string {
+  return getKetoneEmergencyCopy(getProfileRegion(profile)).footer;
+}
+
+/** English travel card emergency number(s) for the user's region. */
+export function travelEnglishEmergencyNumber(profile: UserProfile | null | undefined): string {
+  const region = getProfileRegion(profile);
+  if (region === "US") return "911";
+  if (region === "UK") return "999 / 112";
+  const num = getEffectiveEmergencyNumber(profile);
+  return num === "112" ? "112" : `${num} / 112`;
+}
+
+export function getKetoneEmergencyCopyForProfile(profile: UserProfile | null | undefined) {
+  return getKetoneEmergencyCopy(getProfileRegion(profile));
+}
+
 export function getDisplayLocale(profile: UserProfile | null | undefined): string {
   return getRegionDefaultsForProfile(profile).displayLocale;
 }

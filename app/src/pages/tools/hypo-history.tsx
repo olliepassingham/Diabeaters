@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { formatAppDate, formatAppTime } from "@/lib/region";
 import { storage, type HypoTreatment, type UserProfile } from "@/lib/storage";
 
 function sortTreatmentsNewestFirst(rows: HypoTreatment[]): HypoTreatment[] {
@@ -78,8 +79,8 @@ export default function HypoHistoryPage() {
             <ul className="max-h-[min(70vh,28rem)] space-y-2 overflow-y-auto pr-1" data-testid="list-hypo-history-page">
               {entries.map((entry) => {
                 const date = new Date(entry.timestamp);
-                const timeStr = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-                const dateStr = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+                const timeStr = formatAppTime(date, profile, { hour: "2-digit", minute: "2-digit" });
+                const dateStr = formatAppDate(date, profile, { day: "numeric", month: "short", year: "numeric" });
                 return (
                   <li
                     key={entry.id}
@@ -117,7 +118,7 @@ export default function HypoHistoryPage() {
                       ) : null}
                       {entry.followUpGlucose !== undefined && entry.followUpTime ? (
                         <p className="text-xs text-muted-foreground">
-                          Recheck {new Date(entry.followUpTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}:{" "}
+                          Recheck {formatAppTime(entry.followUpTime, profile, { hour: "2-digit", minute: "2-digit" })}:{" "}
                           {entry.followUpGlucose} {bgUnitsLabel}
                         </p>
                       ) : null}
