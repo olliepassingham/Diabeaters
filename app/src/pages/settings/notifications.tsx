@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { NotificationSettings } from "@/lib/storage";
+import { storage } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { IosNotificationDisplayCard } from "@/components/ios-notification-display-card";
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
@@ -48,6 +50,7 @@ export function NotificationsTab({
   const hypoOn = notifSettings.hypoAlerts !== false;
   const supplyOn = notifSettings.supplyAlerts !== false;
   const scenarioOn = notifSettings.scenarioAlerts !== false;
+  const isPumpUser = isPumpDeliveryMethod(storage.getProfile()?.insulinDeliveryMethod);
   const communityFeedOn = notifSettings.communityFeedAlerts !== false;
   const communityDmOn = notifSettings.communityDmAlerts !== false;
   const supporterApptOn = notifSettings.supporterAppointmentReminders !== false;
@@ -205,6 +208,16 @@ export function NotificationsTab({
                     Skips the reminder if you already completed a bedtime check that day.
                   </p>
                 </div>
+              ) : null}
+              {isPumpUser ? (
+                <SettingsToggleRow
+                  label="Pump site & reservoir changes"
+                  description="Reminder when your infusion set or reservoir is due (based on Supply Tracker dates)"
+                  checked={notifSettings.pumpChangeReminders !== false}
+                  onCheckedChange={(checked) => onToggle("pumpChangeReminders", checked)}
+                  disabled={masterOff}
+                  testId="switch-pump-change-reminders"
+                />
               ) : null}
               <SettingsToggleRow
                 label="Notify supporters about appointments"

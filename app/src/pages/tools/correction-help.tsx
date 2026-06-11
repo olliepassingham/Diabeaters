@@ -24,6 +24,7 @@ import {
   type UserSettings,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { ageInWholeYearsUtc } from "@/lib/user-age";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -132,15 +133,7 @@ export default function CorrectionHelpPage() {
         </Alert>
       )}
 
-      {isPump && (
-        <Alert data-testid="alert-correction-pump-iob">
-          <AlertDescription className="text-sm">
-            <strong>Pump users:</strong> Before stacking a manual correction, check <strong>active insulin (IOB)</strong> on
-            your pump — the pump may already credit recent boluses. Temp basals and extended boluses also affect how much
-            extra insulin is safe.
-          </AlertDescription>
-        </Alert>
-      )}
+      {isPump ? <PumpDosingBanner /> : null}
 
       {recentHypoCount >= 2 && (
         <Alert

@@ -29,9 +29,15 @@ import {
   Sparkles,
   Cookie,
   Eye,
+  MessageSquarePlus,
+  ChevronRight,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
+import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
+import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { ensureNativePushRegistered, resetNativePushRegistrationState } from "@/lib/push-tokens";
 import { Link, useLocation } from "wouter";
@@ -70,6 +76,7 @@ import { SettingsAppearanceRoute } from "./appearance";
 import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
+import { SettingsFeedbackRoute } from "./feedback";
 import { SettingsRatiosRoute } from "./ratios";
 import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink, SettingsSectionHeader, SettingsSetupBanner } from "./shared";
 
@@ -588,6 +595,7 @@ function UsageTab({
   reservoirsPerBox, setReservoirsPerBox,
   insulinCartridgeUnits, setInsulinCartridgeUnits,
   suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled,
+  usesClosedLoop, setUsesClosedLoop,
   onSave
 }: {
   isPumpUser: boolean; tdd: string;
@@ -608,6 +616,7 @@ function UsageTab({
   reservoirsPerBox: string; setReservoirsPerBox: (v: string) => void;
   insulinCartridgeUnits: string; setInsulinCartridgeUnits: (v: string) => void;
   suppliesSmarterForecastEnabled: boolean; setSuppliesSmarterForecastEnabled: (v: boolean) => void;
+  usesClosedLoop: boolean; setUsesClosedLoop: (v: boolean) => void;
   onSave: () => void;
 }) {
   const usageFieldInputClass = "h-10 border-border/60 bg-background/85 shadow-none";
@@ -638,8 +647,29 @@ function UsageTab({
         </div>
 
         {isPumpUser ? (
-          <div className="rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Pump &amp; CGM</p>
+          <div className="rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4 space-y-3">
+            <div className="flex items-center gap-2.5 rounded-lg border border-border/40 bg-background/40 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <StaticLabelWithInfo
+                  ariaLabel="About closed loop"
+                  info={
+                    <p>
+                      Turn on if you use hybrid or full closed loop (e.g. Control-IQ, Loop, CamAPS). Exercise and
+                      temp-basal tips will be softened because your pump may adjust automatically.
+                    </p>
+                  }
+                >
+                  Hybrid / closed loop
+                </StaticLabelWithInfo>
+              </div>
+              <Switch
+                className="shrink-0"
+                checked={usesClosedLoop}
+                onCheckedChange={(v) => setUsesClosedLoop(v)}
+                data-testid="switch-closed-loop"
+              />
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">Pump &amp; CGM</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <StaticLabelWithInfo
@@ -980,6 +1010,7 @@ export default function Settings() {
   const [reservoirsPerBox, setReservoirsPerBox] = useState("");
   const [insulinCartridgeUnits, setInsulinCartridgeUnits] = useState("");
   const [suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled] = useState(false);
+  const [usesClosedLoop, setUsesClosedLoop] = useState(false);
   
   const isCommunityAccount = profile?.accountType === "community";
   const hidePatientClinicalHub = isCarer || isCommunityAccount;
@@ -1109,6 +1140,7 @@ export default function Settings() {
       setReservoirsPerBox(storedSettings.reservoirsPerBox?.toString() || "");
       setInsulinCartridgeUnits(storedSettings.insulinCartridgeUnits?.toString() || "");
       setSuppliesSmarterForecastEnabled(!!storedSettings.suppliesSmarterForecastEnabled);
+      setUsesClosedLoop(!!storedSettings.usesClosedLoop);
     } else {
       setSiteChangeDays("3");
       setReservoirChangeDays("3");
@@ -1253,8 +1285,19 @@ export default function Settings() {
       region: appRegion,
       emergencyNumber: emergencyNumber.trim() || undefined,
     };
+    const wasPump = isPumpDeliveryMethod(base.insulinDeliveryMethod);
     storage.saveProfile(updatedProfile);
     setProfile(updatedProfile);
+
+    if (isPumpDeliveryMethod(deliveryMethod)) {
+      seedPumpSuppliesIfNeeded({
+        tdd: settings.tdd,
+        siteChangeDays: siteChangeDays ? parseInt(siteChangeDays, 10) : undefined,
+        reservoirChangeDays: reservoirChangeDays ? parseInt(reservoirChangeDays, 10) : undefined,
+        reservoirCapacity: reservoirCapacity ? parseInt(reservoirCapacity, 10) : undefined,
+      });
+      if (!wasPump) void reschedulePumpChangeReminders();
+    }
 
     let cloud: Awaited<ReturnType<typeof syncClinicalPrefsToCloud>> = { error: null };
     if (user?.id) {
@@ -1414,9 +1457,13 @@ export default function Settings() {
       reservoirsPerBox: reservoirsPerBox ? Math.max(1, parseInt(reservoirsPerBox)) : undefined,
       insulinCartridgeUnits: insulinCartridgeUnits ? Math.max(1, parseInt(insulinCartridgeUnits)) : undefined,
       suppliesSmarterForecastEnabled,
+      usesClosedLoop: isPumpDeliveryMethod(deliveryMethod) ? usesClosedLoop : undefined,
     };
     storage.saveSettings(newSettings);
     setSettings(newSettings);
+    if (isPumpDeliveryMethod(deliveryMethod)) {
+      void reschedulePumpChangeReminders();
+    }
     const syncKeys = ["injectionsPerDay", "shortActingUnitsPerDay", "longActingUnitsPerDay"] as const;
     for (const key of syncKeys) {
       const val = newSettings[key] as number | undefined;
@@ -1464,6 +1511,9 @@ export default function Settings() {
     }
     if (key === "bedtimeCheckReminders" || key === "enabled") {
       void rescheduleBedtimeReminders();
+    }
+    if (key === "pumpChangeReminders" || key === "enabled") {
+      void reschedulePumpChangeReminders();
     }
   };
 
@@ -1596,6 +1646,8 @@ export default function Settings() {
           setInsulinCartridgeUnits={setInsulinCartridgeUnits}
           suppliesSmarterForecastEnabled={suppliesSmarterForecastEnabled}
           setSuppliesSmarterForecastEnabled={setSuppliesSmarterForecastEnabled}
+          usesClosedLoop={usesClosedLoop}
+          setUsesClosedLoop={setUsesClosedLoop}
           onSave={() => handleSaveUsage()}
         />
       </section>
@@ -1671,6 +1723,32 @@ export default function Settings() {
           }
           actions={settingsInfoDialog}
         />
+
+        <Link
+          href="/settings/feedback"
+          className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+          data-testid="link-settings-feedback"
+        >
+          <Card className="border-primary/25 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/[0.05]">
+            <CardContent className="flex items-center gap-3 p-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                <MessageSquarePlus className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">Send feedback</span>
+                  <Badge variant="secondary" className="h-5 rounded-full px-2 text-[10px] font-semibold uppercase tracking-wide">
+                    New
+                  </Badge>
+                </span>
+                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                  Suggestions and bug reports help us improve Diabeaters
+                </span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+            </CardContent>
+          </Card>
+        </Link>
 
         {!isCarer && !isCommunityAccount && showSoftSetupCard ? (
           <div className="space-y-2">
@@ -1784,6 +1862,13 @@ export default function Settings() {
 
         <SettingsHubGroup title="Help & legal">
           <SettingsHubNavLink
+            href="/settings/feedback"
+            label="Send feedback"
+            description="Suggestions and bug reports"
+            icon={MessageSquarePlus}
+            dataTestId="hub-link-settings-feedback"
+          />
+          <SettingsHubNavLink
             href="/settings/about"
             label="Version, legal & references"
             description="Privacy, terms, support, sources"
@@ -1821,6 +1906,10 @@ export default function Settings() {
 
   if (pathOnly === "/settings/about") {
     return <SettingsAboutRoute settingsInfoDialog={settingsInfoDialog} />;
+  }
+
+  if (pathOnly === "/settings/feedback") {
+    return <SettingsFeedbackRoute settingsInfoDialog={settingsInfoDialog} />;
   }
 
   return (

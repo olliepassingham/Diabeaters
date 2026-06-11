@@ -86,6 +86,7 @@ import { SickDayCloudRepairSync } from "@/components/sick-day-cloud-repair-sync"
 import { SickDayMedDuePoller } from "@/components/sick-day-med-due-poller";
 import { AppointmentReminderPoller } from "@/components/appointment-reminder-poller";
 import { BedtimeReminderPoller } from "@/components/bedtime-reminder-poller";
+import { PumpChangeReminderPoller } from "@/components/pump-change-reminder-poller";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
@@ -459,6 +460,7 @@ function isCommunityMemberAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/appearance") return true;
   if (p === "/settings/notifications") return true;
   if (p === "/settings/about") return true;
+  if (p === "/settings/feedback") return true;
   if (p === "/privacy" || p === "/support") return true;
   if (isCommunityPath(p)) return true;
   return false;
@@ -534,6 +536,7 @@ function isCarerAllowedPath(pathOnly: string): boolean {
   if (p === "/settings/appearance") return true;
   if (p === "/settings/notifications") return true;
   if (p === "/settings/about") return true;
+  if (p === "/settings/feedback") return true;
   if (p === "/settings/emergency") return true;
   if (p === "/privacy" || p === "/support") return true;
   if (isCommunityPath(p)) return true;
@@ -893,6 +896,11 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/settings/about">
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsPage />
+        </Suspense>
+      </Route>
+      <Route path="/settings/feedback">
         <Suspense fallback={<RouteFallback />}>
           <SettingsPage />
         </Suspense>
@@ -1346,6 +1354,7 @@ function AuthenticatedShell() {
           <>
             <AppointmentReminderPoller />
             <BedtimeReminderPoller />
+            <PumpChangeReminderPoller />
             <SupplyLowNotifyPoller />
           </>
         ) : null}

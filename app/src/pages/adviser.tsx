@@ -27,6 +27,7 @@ import { RatioAdviserTool } from "@/components/ratio-adviser-tool";
 import { Switch } from "@/components/ui/switch";
 import { storage, UserSettings, UserProfile, ScenarioState, RatioFormat, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { parseRatioToGramsPerUnit, calculateDoseFromCarbs, formatRatioForDisplay } from "@/lib/ratio-utils";
 import { calculateMealDose, roundInsulinUnits, type MealDoseResult } from "@/lib/meal-dose";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -483,6 +484,8 @@ export default function Adviser() {
           </PageInfoDialog>
         }
       />
+
+      {isPumpUser ? <PumpDosingBanner className="mb-3" compact /> : null}
 
       {/**
        * Keep safety context visible without pushing the tools below the fold on phones.

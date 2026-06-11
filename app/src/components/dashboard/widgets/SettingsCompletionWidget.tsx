@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
 import { storage, DIABEATER_SETTINGS_CHANGED_EVENT, UserSettings, UserProfile } from "@/lib/storage";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { pumpSetupCompletion } from "@/lib/pump-supplies";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
@@ -68,11 +70,21 @@ export function SettingsCompletionWidget(props: DashboardWidgetLayoutProps) {
     );
   }
 
+  const isPumpUser = isPumpDeliveryMethod(profile?.insulinDeliveryMethod);
+  const pumpSetup = pumpSetupCompletion(profile, storage.getSupplies());
+
   const settingsItems: SettingsItem[] = [
     { key: "tdd", label: "Total daily dose", complete: !!settings.tdd },
     { key: "carbRatio", label: "Carb ratios", complete: !!(settings.breakfastRatio || settings.lunchRatio) },
     { key: "correctionFactor", label: "Correction factor", complete: !!settings.correctionFactor },
     { key: "targetRange", label: "Target BG range", complete: !!(settings.targetBgLow && settings.targetBgHigh) },
+    ...(isPumpUser
+      ? [
+          { key: "pumpIntervals", label: "Site & reservoir intervals", complete: pumpSetup.siteInterval && pumpSetup.reservoirCapacity },
+          { key: "pumpSupplies", label: "Infusion sets & reservoirs tracked", complete: pumpSetup.tracksSets && pumpSetup.tracksReservoirs },
+          { key: "pumpBackup", label: "Backup pens for pump failure", complete: pumpSetup.tracksBackup },
+        ]
+      : []),
   ];
 
   const hasEmergencyContact = Boolean(emergency.contactName?.trim() && emergency.phone?.trim());

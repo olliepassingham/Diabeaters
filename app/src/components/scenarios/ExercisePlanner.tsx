@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { storage, type UserProfile, type ExerciseIntensity, type ExerciseBgTrend, type ExerciseType } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { filterPumpTipsForClosedLoop } from "@/lib/closed-loop";
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
@@ -1214,10 +1215,12 @@ function TipRow({ children }: { children: React.ReactNode }) {
 }
 
 function PumpTipBlock({ tips, "data-testid": testId }: { tips: string[]; "data-testid"?: string }) {
+  const filtered = filterPumpTipsForClosedLoop(tips, storage.getSettings());
+  if (filtered.length === 0) return null;
   return (
     <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800 mt-3" data-testid={testId}>
       <p className="text-tiny font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump users</p>
-      {tips.map((tip, i) => (
+      {filtered.map((tip, i) => (
         <div key={i} className="flex items-start gap-2">
           <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
           <p className="text-small text-indigo-800 dark:text-indigo-200">{tip}</p>

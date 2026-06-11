@@ -15,6 +15,7 @@ import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-p
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -835,6 +836,8 @@ export default function Bedtime() {
         title="Bedtime"
         actions={<ScenarioCoachLink topic="bedtime" />}
       />
+      {isPumpUser ? <PumpDosingBanner compact /> : null}
+
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (

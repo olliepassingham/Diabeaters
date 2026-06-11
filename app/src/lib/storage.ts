@@ -568,6 +568,8 @@ export interface UserSettings {
   basalInjectionTime2?: string;
   primingUnitsPerInjection?: number;
   suppliesSmarterForecastEnabled?: boolean;
+  /** Hybrid/full closed loop — temp-basal coaching is softened when true. */
+  usesClosedLoop?: boolean;
 }
 
 export interface Supply {
@@ -1099,6 +1101,8 @@ export interface NotificationSettings {
   bedtimeCheckReminders?: boolean;
   /** Local reminder time for bedtime check (HH:mm, device local). */
   bedtimeReminderTime?: string;
+  /** Infusion set / reservoir change reminders for pump users (on by default). */
+  pumpChangeReminders?: boolean;
   /** When true, linked supporters can receive appointment reminders (evening before + ~2h before). */
   supporterAppointmentReminders?: boolean;
   /** Supporter account: alerts when a linked person has an upcoming appointment. */
@@ -3639,6 +3643,7 @@ export const storage = {
       appointmentReminders: true,
       bedtimeCheckReminders: true,
       bedtimeReminderTime: "21:30",
+      pumpChangeReminders: true,
       supporterAppointmentReminders: true,
       appointmentAlerts: true,
       hypoAlerts: true,
@@ -3662,6 +3667,7 @@ export const storage = {
       appointmentAlerts: parsed.appointmentAlerts !== false,
       /** Default on for habit building; only explicit `false` in stored settings turns it off. */
       bedtimeCheckReminders: parsed.bedtimeCheckReminders !== false,
+      pumpChangeReminders: parsed.pumpChangeReminders !== false,
       bedtimeReminderTime:
         typeof parsed.bedtimeReminderTime === "string" && /^\d{1,2}:\d{2}$/.test(parsed.bedtimeReminderTime)
           ? parsed.bedtimeReminderTime

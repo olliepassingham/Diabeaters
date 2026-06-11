@@ -67,6 +67,15 @@ import {
 } from "@/lib/community-profile-prompt";
 import { markBedtimeReminderPromptPending } from "@/lib/bedtime-reminder-prompt";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
+import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   APP_REGION_OPTIONS,
   applyRegionUnitDefaults,
@@ -263,6 +272,9 @@ interface OnboardingData {
   longActingUnitsPerDay: string;
   injectionsPerDay: string;
   cgmDays: string;
+  siteChangeDays: string;
+  reservoirChangeDays: string;
+  reservoirCapacity: string;
 }
 
 interface OnboardingProps {
@@ -359,6 +371,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     longActingUnitsPerDay: "",
     injectionsPerDay: "",
     cgmDays: "",
+    siteChangeDays: "3",
+    reservoirChangeDays: "3",
+    reservoirCapacity: "300",
   });
 
   useEffect(() => {
@@ -442,6 +457,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     if (data.longActingUnitsPerDay) settings.longActingUnitsPerDay = parseInt(data.longActingUnitsPerDay);
     if (data.injectionsPerDay) settings.injectionsPerDay = parseInt(data.injectionsPerDay);
     if (data.cgmDays) settings.cgmDays = parseInt(data.cgmDays);
+
+    const isPump = isPumpDeliveryMethod(
+      data.insulinDeliveryMethod === "injections" ? "pen" : data.insulinDeliveryMethod,
+    );
+    if (isPump) {
+      if (data.siteChangeDays) settings.siteChangeDays = parseInt(data.siteChangeDays);
+      if (data.reservoirChangeDays) settings.reservoirChangeDays = parseInt(data.reservoirChangeDays);
+      if (data.reservoirCapacity) settings.reservoirCapacity = parseInt(data.reservoirCapacity);
+    }
 
     if (Object.keys(settings).length > 0) {
       storage.saveSettings(settings);
@@ -560,6 +584,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
 
     handleSaveProfile();
+    if (isPumpDeliveryMethod(data.insulinDeliveryMethod)) {
+      seedPumpSuppliesIfNeeded({
+        tdd: data.tdd ? parseFloat(data.tdd) : undefined,
+        siteChangeDays: data.siteChangeDays ? parseInt(data.siteChangeDays, 10) : undefined,
+        reservoirChangeDays: data.reservoirChangeDays ? parseInt(data.reservoirChangeDays, 10) : undefined,
+        reservoirCapacity: data.reservoirCapacity ? parseInt(data.reservoirCapacity, 10) : undefined,
+      });
+      void reschedulePumpChangeReminders();
+    }
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     markBedtimeReminderPromptPending();
@@ -1439,17 +1472,65 @@ function PathDataSuppliesStep({
             </TabsContent>
             <TabsContent value="usage" className="mt-4 space-y-4">
               {isPump ? (
-                <div className="flex justify-end">
-                  <InlineInfoHint
-                    ariaLabel="About pump usage"
-                    content={
-                      <p>
-                        {supporterHeavy
-                          ? "Pump therapy delivers basal and bolus together — total daily dose is the main number for supply forecasts. Refine usage later in the Supply Tracker."
-                          : "Your pump delivers basal and bolus together — total daily dose is the main number for supply forecasts. Refine usage later in the Supply Tracker."}
-                      </p>
-                    }
-                  />
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    {supporterHeavy
+                      ? "We’ll add starter rows for infusion sets, reservoirs, insulin, and backup pens — adjust stock after your next pickup."
+                      : "We’ll add starter rows for infusion sets, reservoirs, insulin, and backup pens — adjust stock after your next pickup."}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <FieldLabelWithInfo htmlFor="path-site-days" info={<p>How often they change infusion sets.</p>}>
+                        Site change (days)
+                      </FieldLabelWithInfo>
+                      <Select
+                        value={data.siteChangeDays}
+                        onValueChange={(v) => updateData("siteChangeDays", v)}
+                      >
+                        <SelectTrigger id="path-site-days" data-testid="select-onboarding-site-days">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">Every 2 days</SelectItem>
+                          <SelectItem value="3">Every 3 days</SelectItem>
+                          <SelectItem value="4">Every 4 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <FieldLabelWithInfo htmlFor="path-reservoir-days" info={<p>How often they change reservoirs.</p>}>
+                        Reservoir change (days)
+                      </FieldLabelWithInfo>
+                      <Select
+                        value={data.reservoirChangeDays}
+                        onValueChange={(v) => updateData("reservoirChangeDays", v)}
+                      >
+                        <SelectTrigger id="path-reservoir-days" data-testid="select-onboarding-reservoir-days">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">Every 2 days</SelectItem>
+                          <SelectItem value="3">Every 3 days</SelectItem>
+                          <SelectItem value="4">Every 4 days</SelectItem>
+                          <SelectItem value="5">Every 5 days</SelectItem>
+                          <SelectItem value="7">Every 7 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <FieldLabelWithInfo htmlFor="path-reservoir-cap" info={<p>Units per cartridge or reservoir fill.</p>}>
+                        Reservoir capacity (units)
+                      </FieldLabelWithInfo>
+                      <Input
+                        id="path-reservoir-cap"
+                        type="number"
+                        placeholder="e.g., 300"
+                        value={data.reservoirCapacity}
+                        onChange={(e) => updateData("reservoirCapacity", e.target.value)}
+                        data-testid="input-onboarding-reservoir-capacity"
+                      />
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
