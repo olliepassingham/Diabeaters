@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,12 +95,18 @@ export function CarerClinicalPrefsCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <Stethoscope className="h-5 w-5 text-primary shrink-0" aria-hidden />
-          Clinical basics
+          <span className="min-w-0 flex-1">Clinical basics</span>
+          <InlineInfoHint
+            ariaLabel="About clinical basics"
+            className="-mr-2 shrink-0"
+            content={
+              <p className="text-sm leading-relaxed">
+                They allowed you to update delivery method, total daily dose, and date of birth on their cloud profile.
+                This helps other devices stay in sync — it does not replace their diabetes team.
+              </p>
+            }
+          />
         </CardTitle>
-        <CardDescription>
-          They allowed you to update delivery method, total daily dose, and date of birth on their cloud profile. This
-          helps other devices stay in sync — it does not replace their diabetes team.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {loadErr ? (
