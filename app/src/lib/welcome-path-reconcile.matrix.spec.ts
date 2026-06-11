@@ -11,7 +11,7 @@ vi.mock("@/lib/carers", () => ({
   getLinkedPatientForCarer: () => getLinkedPatientForCarer(),
 }));
 
-type AccountKind = "patient" | "community" | "supporter-linked" | "supporter-unlinked";
+type AccountKind = "patient" | "patient-dual" | "community" | "supporter-linked" | "supporter-unlinked";
 type WelcomePath = "user" | "community" | "supporter";
 
 const patientProfile = {
@@ -38,10 +38,10 @@ const carerLink = {
 
 function mockAccount(kind: AccountKind): void {
   getLinkedPatientForCarer.mockResolvedValue(
-    kind === "supporter-linked" ? carerLink : { data: null, error: null },
+    kind === "supporter-linked" || kind === "patient-dual" ? carerLink : { data: null, error: null },
   );
 
-  if (kind === "patient") {
+  if (kind === "patient" || kind === "patient-dual") {
     getProfile.mockResolvedValue({ profile: patientProfile });
     localStorage.setItem("diabeater_onboarding_completed", "true");
     return;
@@ -95,12 +95,19 @@ async function setWelcomePath(path: WelcomePath): Promise<void> {
 }
 
 async function seedAccountKind(kind: AccountKind): Promise<void> {
-  const { markPersistedCommunityAccount, markPersistedSupporterAccount, setOnboardingAccountPath, setPrimaryAppRole } =
-    await import("@/lib/carer-session");
+  const {
+    markPersistedCommunityAccount,
+    markPersistedSupporterAccount,
+    setOnboardingAccountPath,
+    setPrimaryAppRole,
+  } = await import("@/lib/carer-session");
 
-  if (kind === "patient") {
+  if (kind === "patient" || kind === "patient-dual") {
     setOnboardingAccountPath("patient");
     setPrimaryAppRole("patient");
+    if (kind === "patient-dual") {
+      markPersistedSupporterAccount();
+    }
     return;
   }
   if (kind === "community") {
@@ -167,6 +174,30 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
       label: "Patient → Supporter",
       expectReconcile: false,
       expectedDestination: "/carer-setup",
+    },
+
+    // Dual-role: Type 1 user who also supports someone (linked)
+    {
+      account: "patient-dual",
+      welcome: "user",
+      label: "Dual role (patient + supporter) → User",
+      expectReconcile: true,
+      expectedDestination: "/",
+    },
+    {
+      account: "patient-dual",
+      welcome: "community",
+      label: "Dual role (patient + supporter) → Community",
+      expectReconcile: true,
+      expectedDestination: "/",
+      expectedToast: "Already have a full account",
+    },
+    {
+      account: "patient-dual",
+      welcome: "supporter",
+      label: "Dual role (patient + supporter) → Supporter",
+      expectReconcile: false,
+      expectedDestination: "/carer-view",
     },
 
     // Community Member account
@@ -246,7 +277,7 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
 
   it.each(cases)("$label", async (tc) => {
     await seedAccountKind(tc.account);
-    mockAccount(tc.account);
+    mockAccount(tc.account === "patient-dual" ? "patient-dual" : tc.account);
     await setWelcomePath(tc.welcome);
 
     const reconcile = await runReconcile();
@@ -254,9 +285,11 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
 
     if (tc.expectReconcile) {
       expect(reconcile.destination).toBe(tc.expectedDestination);
-      const { consumePostLoginToast } = await import("@/lib/post-login-toast-stash");
-      const toast = consumePostLoginToast();
-      expect(toast?.title).toContain(tc.expectedToast ?? "");
+      if (tc.expectedToast) {
+        const { consumePostLoginToast } = await import("@/lib/post-login-toast-stash");
+        const toast = consumePostLoginToast();
+        expect(toast?.title).toContain(tc.expectedToast);
+      }
     }
 
     vi.resetModules();

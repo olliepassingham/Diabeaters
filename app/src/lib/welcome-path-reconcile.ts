@@ -2,6 +2,10 @@ import {
   EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST,
   reconcileCommunityWelcomeWithExistingPatient,
 } from "@/lib/community-path-patient-reconcile";
+import {
+  healDualRolePatientSessionIfNeeded,
+  repairDualRoleMarkersIfCorrupted,
+} from "@/lib/welcome-path-dual-role-reconcile";
 import { stashPostLoginToast } from "@/lib/post-login-toast-stash";
 import { reconcileUserWelcomeWithExistingCommunityAccount } from "@/lib/welcome-path-community-reconcile";
 import { reconcileSupporterWelcomeWithExistingAccount } from "@/lib/welcome-path-supporter-reconcile";
@@ -21,6 +25,11 @@ export async function reconcileWrongWelcomePathForSignedInUser(
     return { reconciled: true, destination: "/" };
   }
 
+  const dualRole = await healDualRolePatientSessionIfNeeded(userId);
+  if (dualRole.healed) {
+    return { reconciled: true, destination: "/" };
+  }
+
   const community = await reconcileUserWelcomeWithExistingCommunityAccount(userId);
   if (community.reconciled) {
     stashPostLoginToast(community.toast);
@@ -32,6 +41,8 @@ export async function reconcileWrongWelcomePathForSignedInUser(
     stashPostLoginToast(supporter.toast);
     return { reconciled: true, destination: supporter.destination };
   }
+
+  await repairDualRoleMarkersIfCorrupted(userId);
 
   return { reconciled: false };
 }

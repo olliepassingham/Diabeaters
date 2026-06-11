@@ -377,6 +377,8 @@ export default function Account() {
       ? formatLivingWithDiabetesLine(profile?.diabetes_onset_date ?? null)
       : null;
   const canOpenModeChooser = hasCarerLink && canSwitchAppMode();
+  const modeSwitchLabel =
+    activeMode === "carer" ? "Switch to User Mode" : "Switch to Supporter Mode";
 
   useEffect(() => {
     setAccountTab(accountTabFromHash(typeof window !== "undefined" ? window.location.hash : ""));
@@ -515,7 +517,7 @@ export default function Account() {
             </Button>
           ) : canOpenModeChooser ? (
             <Button variant="outline" size="sm" className="col-span-2" asChild data-testid="link-change-view">
-              <Link href="/mode">Change mode</Link>
+              <Link href="/mode">{modeSwitchLabel}</Link>
             </Button>
           ) : null}
 

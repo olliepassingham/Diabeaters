@@ -70,6 +70,14 @@ export function markPersistedSupporterAccount(): void {
   }
 }
 
+export function clearPersistedSupporterAccount(): void {
+  try {
+    localStorage.removeItem(SUPPORTER_ACCOUNT_PERSIST_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function isPersistedSupporterAccount(): boolean {
   try {
     if (localStorage.getItem(SUPPORTER_ACCOUNT_PERSIST_KEY) === "1") return true;
@@ -184,6 +192,8 @@ export function isSupporterOnlyAccount(): boolean {
 
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */
 export function canSwitchAppMode(): boolean {
+  const path = getOnboardingAccountPath();
+  if (path === "patient" || path === "both") return true;
   return !isSupporterOnlyAccount();
 }
 

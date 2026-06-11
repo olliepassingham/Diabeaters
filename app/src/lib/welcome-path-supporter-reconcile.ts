@@ -45,19 +45,19 @@ export function restoreSupporterSessionMarkers(): void {
   markPersistedSupporterAccount();
 }
 
-async function indicatesExistingSupporterAccount(userId: string): Promise<boolean> {
+async function indicatesExistingSupporterOnlyAccount(userId: string): Promise<boolean> {
+  const { profile } = await getProfile(userId);
+  if (profileIndicatesExistingPatientAccount(profile)) {
+    return false;
+  }
+
   const link = await getLinkedPatientForCarer();
   if (link.data) {
     markPersistedSupporterAccount();
     return true;
   }
 
-  if (isPersistedSupporterAccount()) return true;
-
-  const { profile } = await getProfile(userId);
-  if (profileIndicatesExistingPatientAccount(profile)) return false;
-
-  return false;
+  return isPersistedSupporterAccount();
 }
 
 export type SupporterWelcomeReconcileResult =
@@ -79,7 +79,7 @@ export async function reconcileSupporterWelcomeWithExistingAccount(
     return { reconciled: false };
   }
 
-  if (!(await indicatesExistingSupporterAccount(userId))) {
+  if (!(await indicatesExistingSupporterOnlyAccount(userId))) {
     return { reconciled: false };
   }
 

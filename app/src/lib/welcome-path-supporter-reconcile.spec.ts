@@ -76,6 +76,34 @@ describe("welcome-path-supporter-reconcile", () => {
     expect(result.toast.title).toContain("supporter account");
   });
 
+  it("does not reconcile dual-role patients who also support someone", async () => {
+    const { setOnboardingAccountPath } = await import("@/lib/carer-session");
+    setOnboardingAccountPath("patient");
+    getLinkedPatientForCarer.mockResolvedValue({
+      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
+      error: null,
+    });
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: "Pat",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: "patient",
+      },
+    });
+
+    const { reconcileSupporterWelcomeWithExistingAccount } = await import(
+      "@/lib/welcome-path-supporter-reconcile"
+    );
+
+    const result = await reconcileSupporterWelcomeWithExistingAccount("u1");
+    expect(result.reconciled).toBe(false);
+  });
+
   it("does not reconcile patient accounts on the User welcome path", async () => {
     const { setOnboardingAccountPath } = await import("@/lib/carer-session");
     setOnboardingAccountPath("patient");
