@@ -7,6 +7,7 @@ import { Moon, Thermometer, Plane, Dumbbell, Syringe, Wine, Car } from "lucide-r
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { pumpSetupCompletion } from "@/lib/pump-supplies";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageShell } from "@/components/layout";
 import { DobUnknownNotice } from "@/components/dob-unknown-notice";
@@ -102,10 +103,19 @@ export default function Scenarios() {
   }, []);
 
   const [showPumpFailureCard, setShowPumpFailureCard] = useState(false);
+  const [pumpFailureCardDescription, setPumpFailureCardDescription] = useState(
+    "If delivery stops: timers, backup links, and clear steps.",
+  );
   useEffect(() => {
     const profile = storage.getProfile();
     setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
     setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
+    const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
+    setPumpFailureCardDescription(
+      pumpReady
+        ? "If delivery stops: timers, backup links, and clear steps."
+        : "Set up backup pens in Supplies before you need them — then use this guide if delivery stops.",
+    );
   }, [location]);
 
   useEffect(() => {
@@ -113,6 +123,12 @@ export default function Scenarios() {
       const profile = storage.getProfile();
       setShowPumpFailureCard(isPumpDeliveryMethod(profile?.insulinDeliveryMethod));
       setVisibleScenarioCards(scenarioCardsForProfile(profile?.dateOfBirth));
+      const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
+      setPumpFailureCardDescription(
+        pumpReady
+          ? "If delivery stops: timers, backup links, and clear steps."
+          : "Set up backup pens in Supplies before you need them — then use this guide if delivery stops.",
+      );
     };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
@@ -143,6 +159,12 @@ export default function Scenarios() {
       </InfoSection>
       <InfoSection title="Travel & pump backup">
         <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
+      </InfoSection>
+      <InfoSection title="Pump failure">
+        <p>
+          For pump users: triage what went wrong, surface your backup contacts and supplies, ketone-aware escalation banners,
+          timed recheck reminders, and a log while active mode is on.
+        </p>
       </InfoSection>
       <InfoSection title="Alcohol">
         <p>
@@ -182,7 +204,7 @@ export default function Scenarios() {
               href="/scenarios/pump-failure"
               icon={Syringe}
               title="Pump failure"
-              description="If delivery stops: clear steps and what to keep nearby."
+              description={pumpFailureCardDescription}
             />
           </div>
         ) : null}

@@ -881,14 +881,43 @@ export interface PumpFailureReminder {
   sentAtIso?: string;
 }
 
+export type PumpFailureKetoneLevel = "unknown" | "none" | "trace" | "small" | "moderate" | "large";
+
+export type PumpFailureTriageKind = "delivery_stopped" | "high_unsure" | "set_issue";
+
+export interface PumpFailureChecklist {
+  checkedKetones: boolean;
+  usedBackupInsulin: boolean;
+  changedSetOrSite: boolean;
+  contactedSupport: boolean;
+}
+
+export interface PumpFailureReadingLogEntry {
+  id: string;
+  atIso: string;
+  bgValue?: number | null;
+  bgUnits?: string | null;
+  ketonesLevel?: PumpFailureKetoneLevel;
+}
+
+export const EMPTY_PUMP_FAILURE_CHECKLIST: PumpFailureChecklist = {
+  checkedKetones: false,
+  usedBackupInsulin: false,
+  changedSetOrSite: false,
+  contactedSupport: false,
+};
+
 export interface PumpFailureSession {
   id: string;
   createdAtIso: string;
   /** User-entered, optional values (educational prompts only). */
   bgValue?: number | null;
   bgUnits?: string | null;
-  ketonesLevel?: "unknown" | "none" | "trace" | "small" | "moderate" | "large";
+  ketonesLevel?: PumpFailureKetoneLevel;
   symptoms?: { vomiting?: boolean; confusion?: boolean };
+  triageKind?: PumpFailureTriageKind;
+  checklist?: PumpFailureChecklist;
+  readingLog?: PumpFailureReadingLogEntry[];
   reminders: PumpFailureReminder[];
   endedAtIso?: string;
 }
@@ -3158,6 +3187,8 @@ export const storage = {
     bgUnits?: string | null;
     ketonesLevel?: PumpFailureSession["ketonesLevel"];
     symptoms?: PumpFailureSession["symptoms"];
+    triageKind?: PumpFailureTriageKind;
+    checklist?: PumpFailureChecklist;
   }): PumpFailureSession {
     const now = new Date();
     const nowIso = now.toISOString();
@@ -3175,13 +3206,32 @@ export const storage = {
       })(),
     ];
 
+    const initialBg = params?.bgValue ?? null;
+    const initialUnits = params?.bgUnits ?? null;
+    const initialKetones = params?.ketonesLevel ?? "unknown";
+    const readingLog: PumpFailureReadingLogEntry[] =
+      initialBg != null || initialKetones !== "unknown"
+        ? [
+            {
+              id: crypto.randomUUID(),
+              atIso: nowIso,
+              bgValue: initialBg,
+              bgUnits: initialUnits,
+              ketonesLevel: initialKetones,
+            },
+          ]
+        : [];
+
     const session: PumpFailureSession = {
       id: crypto.randomUUID(),
       createdAtIso: nowIso,
-      bgValue: params?.bgValue ?? null,
-      bgUnits: params?.bgUnits ?? null,
-      ketonesLevel: params?.ketonesLevel ?? "unknown",
+      bgValue: initialBg,
+      bgUnits: initialUnits,
+      ketonesLevel: initialKetones,
       symptoms: params?.symptoms ?? {},
+      triageKind: params?.triageKind,
+      checklist: params?.checklist ?? { ...EMPTY_PUMP_FAILURE_CHECKLIST },
+      readingLog,
       reminders,
     };
     this.savePumpFailureSession(session);
@@ -3200,6 +3250,53 @@ export const storage = {
     sc.pumpFailureActivatedAt = undefined;
     this.saveScenarioState(sc);
     localStorage.removeItem(STORAGE_KEYS.PUMP_FAILURE_SESSION);
+  },
+
+  updatePumpFailureSession(
+    patch: Partial<
+      Pick<
+        PumpFailureSession,
+        "bgValue" | "bgUnits" | "ketonesLevel" | "symptoms" | "checklist" | "triageKind"
+      >
+    >,
+  ): PumpFailureSession | null {
+    const session = this.getPumpFailureSession();
+    if (!session) return null;
+    const next: PumpFailureSession = {
+      ...session,
+      ...patch,
+      symptoms: patch.symptoms ? { ...session.symptoms, ...patch.symptoms } : session.symptoms,
+      checklist: patch.checklist ? { ...session.checklist, ...patch.checklist } : session.checklist,
+    };
+    this.savePumpFailureSession(next);
+    return next;
+  },
+
+  addPumpFailureReading(params: {
+    bgValue?: number | null;
+    bgUnits?: string | null;
+    ketonesLevel?: PumpFailureKetoneLevel;
+  }): PumpFailureSession | null {
+    const session = this.getPumpFailureSession();
+    if (!session) return null;
+    const atIso = new Date().toISOString();
+    const entry: PumpFailureReadingLogEntry = {
+      id: crypto.randomUUID(),
+      atIso,
+      bgValue: params.bgValue ?? null,
+      bgUnits: params.bgUnits ?? null,
+      ketonesLevel: params.ketonesLevel,
+    };
+    const readingLog = [entry, ...(session.readingLog ?? [])].slice(0, 12);
+    const next: PumpFailureSession = {
+      ...session,
+      bgValue: params.bgValue ?? session.bgValue ?? null,
+      bgUnits: params.bgUnits ?? session.bgUnits ?? null,
+      ketonesLevel: params.ketonesLevel ?? session.ketonesLevel,
+      readingLog,
+    };
+    this.savePumpFailureSession(next);
+    return next;
   },
 
   getBedtimeLogs(): BedtimeLog[] {
