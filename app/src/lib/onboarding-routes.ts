@@ -1,11 +1,34 @@
+import { buildExerciseScenarioPlannerHref } from "@/lib/exercise-planner-href";
+
 /** Struggle keys saved during onboarding (localStorage `diabeater_onboarding_struggle`). */
 export type OnboardingStruggleKey = "supplies" | "meals" | "exercise" | "overview";
+
+export type OnboardingMealRatioFields = {
+  breakfastRatio: string;
+  lunchRatio: string;
+  dinnerRatio: string;
+  mealRatiosUnknown?: boolean;
+};
+
+/** Deep link for onboarding first win — pre-fills a gentle example plan. */
+export const ONBOARDING_EXERCISE_DEMO_HREF = buildExerciseScenarioPlannerHref({
+  exerciseType: "walking",
+  durationMinutes: 30,
+  intensity: "moderate",
+});
+
+export function hasOnboardingMealRatios(data: OnboardingMealRatioFields): boolean {
+  return !!(data.breakfastRatio || data.lunchRatio || data.dinnerRatio);
+}
+
+export function shouldUseRatioAdviserFirstWin(data: OnboardingMealRatioFields): boolean {
+  return !!data.mealRatiosUnknown || !hasOnboardingMealRatios(data);
+}
 
 export type OnboardingWizardStep =
   | "welcome"
   | "care_context"
   | "struggle"
-  | "struggle_preview"
   | "region"
   | "details"
   | "disclaimer"
@@ -21,9 +44,9 @@ export function buildOnboardingSteps(opts: {
   if (opts.upgradeFlow) flow = ["details", "disclaimer", "first_win"];
   else if (opts.showCommunityPath) flow = ["welcome", "region", "disclaimer", "first_win"];
   else if (opts.showBothPath) {
-    flow = ["welcome", "care_context", "struggle", "struggle_preview", "region", "details", "disclaimer", "first_win"];
+    flow = ["welcome", "care_context", "struggle", "region", "details", "disclaimer", "first_win"];
   } else {
-    flow = ["welcome", "struggle", "struggle_preview", "region", "details", "disclaimer", "first_win"];
+    flow = ["welcome", "struggle", "region", "details", "disclaimer", "first_win"];
   }
   if (opts.minimalSetup && !opts.upgradeFlow && !opts.showCommunityPath) {
     return flow.filter((step) => step !== "details");
@@ -50,9 +73,10 @@ export type SecondaryCta = { label: string; path: string };
  */
 export function getOnboardingSecondaryCta(
   struggle: OnboardingStruggleKey | null,
-  hasMealRatios: boolean,
+  mealRatioState: OnboardingMealRatioFields,
   opts?: { wantsSupporterSetupNext?: boolean },
 ): SecondaryCta | null {
+  const hasMealRatios = hasOnboardingMealRatios(mealRatioState);
   if (opts?.wantsSupporterSetupNext) {
     return { label: "Set up Supporter linking", path: "/carer-setup" };
   }

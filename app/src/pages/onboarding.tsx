@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertTriangle,
   ArrowRight,
-  ArrowLeft,
   Check,
   Package,
   Utensils,
@@ -50,6 +47,8 @@ import {
   buildOnboardingSteps,
   getOnboardingSecondaryCta,
   getPostOnboardingPath,
+  ONBOARDING_EXERCISE_DEMO_HREF,
+  shouldUseRatioAdviserFirstWin,
   type OnboardingWizardStep,
 } from "@/lib/onboarding-routes";
 import {
@@ -83,6 +82,21 @@ import {
   regionDefaults,
 } from "@/lib/region";
 import { syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
+import {
+  OnboardingBackdrop,
+  OnboardingBrandMark,
+  OnboardingCard,
+  OnboardingFeatureList,
+  OnboardingHeroIcon,
+  OnboardingNavActions,
+  OnboardingOptionCard,
+  OnboardingProgress,
+  OnboardingStepHeader,
+  OnboardingStepPanel,
+  OnboardingStepRail,
+  OnboardingStickyActions,
+  OnboardingTrustRow,
+} from "@/components/onboarding/onboarding-ui";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
 
@@ -123,8 +137,8 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
   {
     id: "meals",
     icon: Utensils,
-    title: "I struggle with meal dosing",
-    description: "Working out carbs and insulin for meals is stressful",
+    title: "I want help around food and dosing",
+    description: "Less stress at mealtimes — we'll guide you if ratios aren't settled yet",
     color: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-500/10",
   },
@@ -132,7 +146,7 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
     id: "exercise",
     icon: Dumbbell,
     title: "Exercise throws my levels off",
-    description: "I worry about going low or high when I'm active",
+    description: "Plan activity with carb and timing tips — no perfect numbers needed",
     color: "text-green-600 dark:text-green-400",
     bg: "bg-green-500/10",
   },
@@ -147,10 +161,10 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
 ];
 
 function getStruggleOptionOrder(careContext: CareContext): Array<Exclude<Struggle, null>> {
-  if (careContext === "mostly_me") return ["meals", "supplies", "exercise", "overview"];
-  if (careContext === "mostly_them") return ["supplies", "meals", "exercise", "overview"];
-  if (careContext === "both_equally") return ["meals", "supplies", "exercise", "overview"];
-  return ["supplies", "meals", "exercise", "overview"];
+  if (careContext === "mostly_me") return ["supplies", "overview", "meals", "exercise"];
+  if (careContext === "mostly_them") return ["supplies", "overview", "meals", "exercise"];
+  if (careContext === "both_equally") return ["supplies", "overview", "meals", "exercise"];
+  return ["supplies", "overview", "meals", "exercise"];
 }
 
 function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext): { title: string; description: string } {
@@ -163,14 +177,14 @@ function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext):
     }
     if (id === "meals") {
       return {
-        title: "Mealtimes are stressful for me",
-        description: "Carbs, doses, and timing — I want calmer decisions for my own diabetes day-to-day.",
+        title: "I want help around food and dosing",
+        description: "Calmer mealtimes — we'll start with tools that work even if your ratios aren't settled.",
       };
     }
     if (id === "exercise") {
       return {
         title: "Exercise throws my levels off",
-        description: "I worry about going low or high when I’m active — especially on busy days.",
+        description: "Plan activity with carb and timing tips — you don't need perfect numbers to start.",
       };
     }
     return {
@@ -188,14 +202,14 @@ function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext):
     }
     if (id === "meals") {
       return {
-        title: "Mealtimes feel unpredictable for them",
-        description: "Carb counting, ratios, and corrections can be stressful to support in the moment.",
+        title: "We need calmer mealtimes for them",
+        description: "Food and dosing support — we'll guide you if their ratios aren't clear yet.",
       };
     }
     if (id === "exercise") {
       return {
         title: "Activity makes their levels swing",
-        description: "Sports, school runs, and busy days can make highs/lows harder to anticipate.",
+        description: "Plan sessions with carb and timing tips — no perfect numbers needed to start.",
       };
     }
     return {
@@ -214,13 +228,13 @@ function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext):
     if (id === "meals") {
       return {
         title: "We need better meal-time planning",
-        description: "Carbs, doses, and timing — we want less second-guessing at the table.",
+        description: "Less second-guessing at the table — we'll help find ratios if you're unsure.",
       };
     }
     if (id === "exercise") {
       return {
         title: "Exercise days are harder to manage",
-        description: "Activity changes quickly — we want steadier guidance before, during, and after.",
+        description: "Steadier guidance before, during, and after activity — rough estimates are fine.",
       };
     }
     return {
@@ -267,6 +281,8 @@ interface OnboardingData {
   breakfastRatio: string;
   lunchRatio: string;
   dinnerRatio: string;
+  /** User chose "I don't know my ratios" on the meals path. */
+  mealRatiosUnknown: boolean;
   correctionFactor: string;
   shortActingUnitsPerDay: string;
   longActingUnitsPerDay: string;
@@ -285,45 +301,10 @@ interface OnboardingProps {
 const ONBOARDING_STEP_LABELS: Partial<Record<Step, string>> = {
   care_context: "Care",
   struggle: "Focus",
-  struggle_preview: "Preview",
   region: "Region",
   details: "Details",
   disclaimer: "Terms",
 };
-
-function OnboardingStepPills({ steps, currentStep }: { steps: Step[]; currentStep: Step }) {
-  if (currentStep === "welcome" || currentStep === "first_win") return null;
-  const rail = steps.filter((s) => s !== "welcome" && s !== "first_win") as Exclude<Step, "welcome" | "first_win">[];
-  const activeIdx = rail.indexOf(currentStep as (typeof rail)[number]);
-  if (activeIdx < 0) return null;
-
-  return (
-    <nav
-      className="flex flex-wrap justify-center gap-1.5 px-1 pt-1 sm:gap-2"
-      aria-label="Onboarding steps"
-    >
-      {rail.map((step, i) => {
-        const done = i < activeIdx;
-        const current = i === activeIdx;
-        const label = ONBOARDING_STEP_LABELS[step] ?? step;
-        return (
-          <span
-            key={step}
-            aria-current={current ? "step" : undefined}
-            className={cn(
-              "inline-flex max-w-[6.5rem] items-center justify-center truncate rounded-full border px-2.5 py-1 text-center text-[10px] font-medium uppercase tracking-wide sm:max-w-none sm:text-xs",
-              done && "border-primary/30 bg-primary/10 text-foreground",
-              current && "border-primary bg-primary text-primary-foreground shadow-sm",
-              !done && !current && "border-border/50 bg-muted/40 text-muted-foreground",
-            )}
-          >
-            {label}
-          </span>
-        );
-      })}
-    </nav>
-  );
-}
 
 export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
@@ -366,6 +347,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     breakfastRatio: "",
     lunchRatio: "",
     dinnerRatio: "",
+    mealRatiosUnknown: false,
     correctionFactor: "",
     shortActingUnitsPerDay: "",
     longActingUnitsPerDay: "",
@@ -484,7 +466,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleNext = () => {
-    if (currentStep === "struggle_preview") {
+    if (currentStep === "struggle") {
       setMinimalSetup(false);
     }
     const stepIndex = steps.indexOf(currentStep);
@@ -494,6 +476,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   };
 
   const handleMinimalSetup = () => {
+    if (data.struggle === null) return;
     setMinimalSetup(true);
     setCurrentStep("region");
   };
@@ -661,7 +644,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "welcome": return true;
       case "care_context": return data.careContext !== null;
       case "struggle": return data.struggle !== null;
-      case "struggle_preview": return data.struggle !== null;
       case "region": return data.region === "UK" || data.region === "US" || data.region === "OTHER";
       case "details":
         return upgradeFlow || data.struggle !== null;
@@ -685,15 +667,14 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "care_context":
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
-        return <StruggleStep data={data} updateData={updateData} />;
-      case "struggle_preview":
-        return <StrugglePreviewStep data={data} onMinimalSetup={handleMinimalSetup} />;
+        return <StruggleStep data={data} updateData={updateData} onMinimalSetup={handleMinimalSetup} />;
       case "region":
         return <RegionStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />;
       case "details":
         return (
-          <div className="space-y-8">
+          <div className="space-y-10">
             <EssentialsStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />
+            <div className="h-px bg-gradient-to-r from-transparent via-border/80 to-transparent" aria-hidden />
             <PathDataStep data={data} updateData={updateData} />
           </div>
         );
@@ -713,77 +694,60 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const showProgress = currentStep !== "welcome" && currentStep !== "care_context" && currentStep !== "first_win";
   const showBackButton = currentStep !== "welcome" && currentStep !== "first_win";
   const showNextButton = currentStep !== "first_win";
+  const stepRail = useMemo(
+    () =>
+      steps
+        .filter((s) => s !== "welcome" && s !== "first_win")
+        .map((s) => ({ id: s, label: ONBOARDING_STEP_LABELS[s] ?? s })),
+    [steps],
+  );
   const stepLabel =
     currentStep !== "welcome" && currentStep !== "first_win"
       ? `Step ${currentStepIndex + 1} of ${steps.length}`
       : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <OnboardingBackdrop>
       <PageShell
         variant="narrow"
-        className={`px-4 pt-6 md:pt-8 pb-0 sm:pb-0 ${
+        className={`space-y-1 px-4 pt-6 md:pt-8 pb-0 sm:pb-0 ${
           currentStep === "first_win" || currentStep === "details" || currentStep === "disclaimer"
             ? "pb-44 sm:pb-10"
             : "pb-28"
         }`}
       >
-        {currentStep !== "welcome" && (
-          <div className="flex justify-center">
-            <FaceLogo size={40} />
-          </div>
-        )}
+        <OnboardingBrandMark show={currentStep !== "welcome"} />
 
         {stepLabel ? (
           <p className="sr-only" aria-live="polite">
             {stepLabel}
           </p>
         ) : null}
-        <OnboardingStepPills steps={steps} currentStep={currentStep} />
 
-        {showProgress && (
-          <Progress value={progress} className="h-1.5" data-testid="progress-onboarding" />
-        )}
+        {currentStep !== "welcome" && currentStep !== "first_win" ? (
+          <OnboardingStepRail steps={stepRail} currentStepId={currentStep} />
+        ) : null}
 
-        <div className="animate-fade-in-up">{renderStep()}</div>
+        {showProgress ? <OnboardingProgress value={progress} /> : null}
 
-        <p className="text-center text-xs text-muted-foreground pt-2 sm:pt-6">
+        <OnboardingStepPanel stepKey={currentStep}>{renderStep()}</OnboardingStepPanel>
+
+        <p className="pt-2 text-center text-xs text-muted-foreground sm:pt-6">
           Privacy, terms, and support are available in Settings → About once you’re signed in.
         </p>
       </PageShell>
 
-      {(showBackButton || showNextButton) && (
-        <div
-          className="fixed bottom-[var(--keyboard-inset-bottom,0px)] left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-4 sm:py-0 sm:backdrop-blur-none"
-          data-testid="onboarding-sticky-actions"
-        >
-          <div className="mx-auto w-full max-w-lg flex justify-between gap-3 items-center">
-            {showBackButton ? (
-              <Button variant="outline" size="sm" onClick={handleBack} data-testid="button-onboarding-back">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            ) : (
-              <div />
-            )}
-            <div className="flex-1 min-w-0 flex justify-end gap-2 flex-wrap sm:flex-nowrap">
-              {showNextButton && (
-                <Button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                  size="sm"
-                  className="min-w-[7rem] shrink-0"
-                  data-testid="button-onboarding-next"
-                >
-                  {currentStep === "disclaimer" ? "Let's go" : "Next"}
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <OnboardingNavActions
+        showBack={showBackButton}
+        onBack={handleBack}
+        showNext={showNextButton}
+        onNext={handleNext}
+        nextLabel={currentStep === "disclaimer" ? "Let's go" : "Next"}
+        nextDisabled={!canProceed()}
+        backTestId="button-onboarding-back"
+        nextTestId="button-onboarding-next"
+      />
+    </OnboardingBackdrop>
   );
 }
 
@@ -791,56 +755,49 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
   const profilePath = getCommunityMemberOnboardingCompletePath();
   return (
     <div className="space-y-8 pb-4 sm:pb-0">
-      <div className="text-center space-y-4">
-        <div className="flex justify-center">
-          <div className="rounded-full bg-primary/10 p-4">
-            <Sparkles className="h-8 w-8 text-primary" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold">You&apos;re ready to explore</h2>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Browse education and {AI_ASSISTANT_NAME} in Tools now, or set up your public profile first to join the Feed.
-            You can unlock full Type&nbsp;1 features anytime in Settings.
-          </p>
-        </div>
+      <div className="space-y-4 text-center">
+        <OnboardingHeroIcon icon={Sparkles} accent="primary" />
+        <OnboardingStepHeader
+          title="You're ready to explore"
+          subtitle={
+            <>
+              Browse education and {AI_ASSISTANT_NAME} in Tools now, or set up your public profile first to join the
+              Feed. You can unlock full Type&nbsp;1 features anytime in Settings.
+            </>
+          }
+        />
       </div>
-      <ul className="mx-auto max-w-md space-y-2.5 text-sm text-muted-foreground" data-testid="onboarding-community-feed-requirements">
-        <li className="flex items-start gap-2.5">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            <span className="font-medium text-foreground">Display name</span> — how others see you on posts and messages
-          </span>
-        </li>
-        <li className="flex items-start gap-2.5">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            <span className="font-medium text-foreground">Public @handle</span> — your unique community username
-          </span>
-        </li>
-        <li className="flex items-start gap-2.5">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            <span className="font-medium text-foreground">Profile public</span> — turns on Feed access when the rest is
-            complete
-          </span>
-        </li>
-      </ul>
-      <div
-        className="space-y-3 fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
-        data-testid="onboarding-community-first-win-actions"
+      <OnboardingCard accent="primary" contentClassName="pt-5 pb-5">
+        <ul className="space-y-3 text-sm text-muted-foreground" data-testid="onboarding-community-feed-requirements">
+          {[
+            ["Display name", "how others see you on posts and messages"],
+            ["Public @handle", "your unique community username"],
+            ["Profile public", "turns on Feed access when the rest is complete"],
+          ].map(([label, detail]) => (
+            <li key={label} className="flex items-start gap-2.5">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <span>
+                <span className="font-medium text-foreground">{label}</span> — {detail}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </OnboardingCard>
+      <OnboardingStickyActions
+        className="space-y-3"
+        testId="onboarding-community-first-win-actions"
       >
         <Button
-          className="w-full rounded-xl"
+          className="mx-auto w-full max-w-lg rounded-xl"
           size="lg"
           onClick={() => void onFinish(profilePath)}
           data-testid="button-onboarding-community-complete"
         >
           Set up community profile
-          <ArrowRight className="h-4 w-4 ml-2" />
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
         <Button
-          className="w-full rounded-xl"
+          className="mx-auto w-full max-w-lg rounded-xl"
           size="lg"
           variant="outline"
           onClick={() => void onFinish("/tools")}
@@ -851,7 +808,7 @@ function CommunityMemberFirstWinStep({ onFinish }: { onFinish: (path?: string) =
         <p className="text-center text-xs text-muted-foreground">
           Finishing saves your basics. You can add your public profile anytime in Account.
         </p>
-      </div>
+      </OnboardingStickyActions>
     </div>
   );
 }
@@ -868,19 +825,25 @@ function WelcomeStep({
   communityFlow?: boolean;
 }) {
   return (
-    <div className="text-center space-y-8">
-      <div className="space-y-4">
+    <div className="space-y-8 text-center">
+      <div className="space-y-5">
         <div className="flex justify-center">
           <div className="relative">
-            <FaceLogo size={80} />
-            <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-1">
-              <Heart className="h-4 w-4 text-primary-foreground" />
+            <div
+              aria-hidden
+              className="absolute inset-0 scale-125 rounded-full bg-primary/15 blur-2xl"
+            />
+            <div className="relative rounded-3xl bg-card/80 p-4 shadow-md ring-1 ring-border/60 backdrop-blur-sm">
+              <FaceLogo size={72} />
+              <div className="absolute -bottom-1 -right-1 rounded-full bg-primary p-1.5 shadow-sm ring-2 ring-background">
+                <Heart className="h-4 w-4 text-primary-foreground" />
+              </div>
             </div>
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Diabeaters</h1>
-          <p className="text-lg text-muted-foreground max-w-sm mx-auto leading-relaxed">
+          <h1 className="font-display text-3xl font-bold tracking-tight">Diabeaters</h1>
+          <p className="mx-auto max-w-sm text-pretty text-lg leading-relaxed text-muted-foreground">
             {communityFlow
               ? "Learn at your own pace, join the conversation when you want, and keep things simple — no supply or dose tracking required."
               : showBothPath
@@ -890,8 +853,7 @@ function WelcomeStep({
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 pb-6 space-y-6">
+      <OnboardingCard contentClassName="space-y-6 pt-6 pb-6">
           <div className="space-y-2">
             <Label htmlFor="welcome-name" className="text-base">What should we call you?</Label>
             <Input
@@ -920,11 +882,12 @@ function WelcomeStep({
             <button
               type="button"
               onClick={() => updateData("diabetesType", "type1")}
-              className={`flex w-full items-center justify-between rounded-md border p-3 text-left transition-colors ${
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl border p-3 text-left transition-all hover-elevate",
                 data.diabetesType === "type1"
-                  ? "border-primary bg-primary/5 ring-1 ring-primary"
-                  : "border-border hover-elevate"
-              }`}
+                  ? "border-primary/45 bg-primary/5 ring-2 ring-primary/15 shadow-sm"
+                  : "border-border/70",
+              )}
               data-testid="button-diabetes-type1"
             >
               <span className="font-medium text-sm">Type 1</span>
@@ -932,23 +895,18 @@ function WelcomeStep({
             </button>
           </div>
           ) : null}
-        </CardContent>
-      </Card>
+      </OnboardingCard>
 
-      <p className="text-sm text-muted-foreground/70 text-center max-w-xs mx-auto">
+      <p className="mx-auto max-w-xs text-center text-sm text-muted-foreground/80">
         No complicated setup. Just the bits that matter to you.
       </p>
 
-      <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <Shield className="h-3.5 w-3.5" />
-          <span>Your data stays on your device</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5" />
-          <span>Takes 2 minutes</span>
-        </div>
-      </div>
+      <OnboardingTrustRow
+        items={[
+          { icon: Shield, label: "Your data stays on your device" },
+          { icon: Clock, label: "Takes 2 minutes" },
+        ]}
+      />
     </div>
   );
 }
@@ -974,12 +932,10 @@ function CareContextStep({ data, updateData }: { data: OnboardingData; updateDat
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">Quick context</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          You chose that you have Type&nbsp;1 and you support someone too. Where should we focus this first setup?
-        </p>
-      </div>
+      <OnboardingStepHeader
+        title="Quick context"
+        subtitle="You chose that you have Type 1 and you support someone too. Where should we focus this first setup?"
+      />
 
       <RadioGroup
         value={data.careContext ?? ""}
@@ -990,14 +946,17 @@ function CareContextStep({ data, updateData }: { data: OnboardingData; updateDat
           <label
             key={opt.id}
             htmlFor={`care-${opt.id}`}
-            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-all hover-elevate ${
-              data.careContext === opt.id ? "border-primary bg-primary/5 ring-1 ring-primary/20" : ""
-            }`}
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-all hover-elevate",
+              data.careContext === opt.id
+                ? "border-primary/45 bg-gradient-to-br from-primary/[0.1] to-primary/[0.02] ring-2 ring-primary/20 shadow-sm"
+                : "border-border/70 bg-card/70 backdrop-blur-sm",
+            )}
           >
             <RadioGroupItem id={`care-${opt.id}`} value={opt.id} className="mt-1" data-testid={`care-context-${opt.id}`} />
             <div className="min-w-0">
-              <div className="font-medium">{opt.title}</div>
-              <div className="text-sm text-muted-foreground mt-1">{opt.description}</div>
+              <div className="font-medium leading-snug">{opt.title}</div>
+              <div className="mt-1 text-sm leading-relaxed text-muted-foreground">{opt.description}</div>
             </div>
           </label>
         ))}
@@ -1006,7 +965,15 @@ function CareContextStep({ data, updateData }: { data: OnboardingData; updateDat
   );
 }
 
-function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
+function StruggleStep({
+  data,
+  updateData,
+  onMinimalSetup,
+}: {
+  data: OnboardingData;
+  updateData: (field: keyof OnboardingData, value: any) => void;
+  onMinimalSetup: () => void;
+}) {
   const supporterAngle = data.careContext === "mostly_them" || data.careContext === "both_equally";
   const strugglePresentationContext: CareContext = useMemo(() => {
     return getOnboardingAccountPath() === "both" ? data.careContext : null;
@@ -1016,129 +983,43 @@ function StruggleStep({ data, updateData }: { data: OnboardingData; updateData: 
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">
-          {data.name ? `${data.name}, what` : "What"} do you want working better first?
-        </h2>
-        <p className="text-muted-foreground">
-          {supporterAngle
-            ? "Pick the pain point you want help with right now (for you, or for the person you support)."
-            : "We’ll tune the app around it so you see value quickly"}
-        </p>
-      </div>
+      <OnboardingStepHeader
+        title={<>{data.name ? `${data.name}, what` : "What"} do you want working better first?</>}
+        subtitle={
+          supporterAngle
+            ? "Pick what you want to open first — we’ll send you there when setup finishes."
+            : "Pick what you want to open first — you can add clinical details whenever you’re ready."
+        }
+      />
 
       <div className="space-y-3">
-        {struggleOptions.map((option) => {
-          const isSelected = data.struggle === option.id;
-          const Icon = option.icon;
-          return (
-            <div
-              key={option.id}
-              className={`flex items-center gap-3 p-3 sm:gap-4 sm:p-4 rounded-lg border cursor-pointer transition-all hover-elevate ${
-                isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : ""
-              }`}
-              onClick={() => updateData("struggle", option.id)}
-              data-testid={`struggle-${option.id}`}
-            >
-              <div className={`p-2.5 sm:p-3 rounded-lg ${option.bg}`}>
-                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${option.color}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">{option.title}</p>
-                <p className="text-sm text-muted-foreground">{option.description}</p>
-              </div>
-              {isSelected && (
-                <div className="flex-shrink-0">
-                  <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="h-3 w-3 text-primary-foreground" />
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {struggleOptions.map((option) => (
+          <OnboardingOptionCard
+            key={option.id}
+            selected={data.struggle === option.id}
+            onClick={() => updateData("struggle", option.id)}
+            icon={option.icon}
+            iconBg={option.bg}
+            iconColor={option.color}
+            title={option.title}
+            description={option.description}
+            testId={`struggle-${option.id}`}
+          />
+        ))}
       </div>
-    </div>
-  );
-}
 
-function StrugglePreviewStep({
-  data,
-  onMinimalSetup,
-}: {
-  data: OnboardingData;
-  onMinimalSetup: () => void;
-}) {
-  const s = data.struggle;
-  const panels: Record<
-    NonNullable<Struggle>,
-    { headline: string; bullets: [string, string] }
-  > = {
-    supplies: {
-      headline: "What you’ll get first",
-      bullets: [
-        "A supply tracker that shows when insulin, sensors, and essentials are likely to run low.",
-        "Space to log what you use so forecasts match how you treat day to day.",
-      ],
-    },
-    meals: {
-      headline: "What you’ll get first",
-      bullets: [
-        "Meal planning that can suggest doses from your carbs and ratios (rough numbers are fine).",
-        "A path to fine-tune ratios later if you’re not sure yet.",
-      ],
-    },
-    exercise: {
-      headline: "What you’ll get first",
-      bullets: [
-        "Exercise planning with carb and insulin adjustment suggestions.",
-        "Guidance you can revisit before, during, and after activity.",
-      ],
-    },
-    overview: {
-      headline: "What you’ll get first",
-      bullets: [
-        "One hub for supplies, meals, and exercise — tailored as you add detail.",
-        "Gentle prompts when something will work better with a bit more info.",
-      ],
-    },
-  };
-
-  if (!s) return null;
-  const { headline, bullets } = panels[s];
-
-  return (
-    <div className="space-y-6" data-testid="onboarding-struggle-preview">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">{headline}</h2>
-        <p className="text-muted-foreground text-sm">
-          A quick preview before we collect a few details — you can skip anything you’re unsure about.
-        </p>
-      </div>
-      <Card className="border-primary/15 bg-primary/[0.03]">
-        <CardContent className="pt-6 pb-6 space-y-4 text-left">
-          <ul className="space-y-3 text-sm text-muted-foreground">
-            <li className="flex gap-3">
-              <span className="text-primary font-semibold shrink-0">•</span>
-              <span>{bullets[0]}</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="text-primary font-semibold shrink-0">•</span>
-              <span>{bullets[1]}</span>
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
-      <div className="text-center pt-1">
-        <button
-          type="button"
-          className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground min-h-11 px-2"
-          onClick={onMinimalSetup}
-          data-testid="button-onboarding-minimal-setup"
-        >
-          Skip these questions — I’ll add details in Settings
-        </button>
-      </div>
+      {data.struggle ? (
+        <div className="pt-1 text-center" data-testid="onboarding-struggle-skip">
+          <button
+            type="button"
+            className="min-h-11 rounded-xl px-3 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:bg-muted/40 hover:text-foreground"
+            onClick={onMinimalSetup}
+            data-testid="button-onboarding-minimal-setup"
+          >
+            Skip optional details — I’ll add them in Settings later
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1157,17 +1038,16 @@ function EssentialsStep({
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">A few essentials</h2>
-        <p className="text-muted-foreground">
-          {supporterHeavy
+      <OnboardingStepHeader
+        title="A few essentials"
+        subtitle={
+          supporterHeavy
             ? "A few basics so dose planning and forecasts line up with real life — you can fine-tune everything later."
-            : "A few details so tips and safety checks can match how you live with diabetes. Nothing here is set in stone — you can change it all later."}
-        </p>
-      </div>
+            : "A few details so tips and safety checks can match how you live with diabetes. Nothing here is set in stone — you can change it all later."
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6 space-y-6">
+      <OnboardingCard contentClassName="space-y-6 pt-6">
           <div className="space-y-3">
             <StaticLabelWithInfo
               labelClassName="text-sm font-medium"
@@ -1189,7 +1069,12 @@ function EssentialsStep({
               className="space-y-2"
             >
               <div
-                className="flex items-center space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                className={cn(
+                  "flex cursor-pointer items-center space-x-3 rounded-xl border p-3 transition-all hover-elevate",
+                  data.insulinDeliveryMethod === "injections"
+                    ? "border-primary/45 bg-primary/5 ring-1 ring-primary/15"
+                    : "border-border/70",
+                )}
                 onClick={() => updateData("insulinDeliveryMethod", "injections")}
               >
                 <RadioGroupItem value="injections" id="ob-injections" data-testid="radio-injections" />
@@ -1198,7 +1083,12 @@ function EssentialsStep({
                 </div>
               </div>
               <div
-                className="flex items-center space-x-3 p-3 rounded-lg border hover-elevate cursor-pointer"
+                className={cn(
+                  "flex cursor-pointer items-center space-x-3 rounded-xl border p-3 transition-all hover-elevate",
+                  data.insulinDeliveryMethod === "pump"
+                    ? "border-primary/45 bg-primary/5 ring-1 ring-primary/15"
+                    : "border-border/70",
+                )}
                 onClick={() => updateData("insulinDeliveryMethod", "pump")}
               >
                 <RadioGroupItem value="pump" id="ob-pump" data-testid="radio-pump" />
@@ -1315,8 +1205,7 @@ function EssentialsStep({
               </div>
             </RadioGroup>
           </div>
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1334,35 +1223,33 @@ function RegionStep({
 
   return (
     <div className="space-y-6" data-testid="onboarding-region">
-      <div className="text-center space-y-2">
-        <div className="flex justify-center">
-          <div className="p-3 rounded-full bg-primary/10">
-            <Globe className="h-6 w-6 text-primary" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold">Where are you based?</h2>
-        <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          {supporterHeavy
+      <OnboardingStepHeader
+        icon={Globe}
+        accent="primary"
+        title="Where are you based?"
+        subtitle={
+          supporterHeavy
             ? "This sets default units and emergency numbers for the person you support. You can change units on the next step."
-            : "This sets your default blood glucose units, weight display, and local emergency number. You can override units on the next step."}
-        </p>
-      </div>
+            : "This sets your default blood glucose units, weight display, and local emergency number. You can override units on the next step."
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6 space-y-3">
+      <OnboardingCard contentClassName="space-y-3 pt-6">
           {APP_REGION_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
               data-testid={`onboarding-region-${opt.value}`}
               className={cn(
-                "w-full text-left p-4 rounded-lg border hover-elevate transition-colors",
-                data.region === opt.value ? "border-primary bg-primary/5" : "border-border",
+                "w-full rounded-2xl border p-4 text-left transition-all hover-elevate",
+                data.region === opt.value
+                  ? "border-primary/45 bg-gradient-to-br from-primary/[0.08] to-primary/[0.02] ring-2 ring-primary/15 shadow-sm"
+                  : "border-border/70 bg-background/50",
               )}
               onClick={() => updateData("region", opt.value)}
             >
               <p className="font-medium">{opt.label}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">{opt.description}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{opt.description}</p>
             </button>
           ))}
 
@@ -1381,8 +1268,7 @@ function RegionStep({
               />
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1406,26 +1292,20 @@ function PathDataSuppliesStep({
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-supplies">
-      <div className="text-center space-y-2">
-        <div className="flex justify-center">
-          <div className="p-3 rounded-full bg-blue-500/10">
-            <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold">
-          {pathCare === "mostly_them" ? "Let’s sort their supplies" : "Let’s sort your supplies"}
-        </h2>
-        <p className="text-muted-foreground">
-          {supporterHeavy
+      <OnboardingStepHeader
+        icon={Package}
+        accent="blue"
+        title={pathCare === "mostly_them" ? "Let’s sort their supplies" : "Let’s sort your supplies"}
+        subtitle={
+          supporterHeavy
             ? "A couple of numbers so forecasts match their real usage — you can refine later in Supplies."
-            : "A couple of numbers so we can predict when you'll run out"}
-        </p>
-      </div>
+            : "A couple of numbers so we can predict when you'll run out"
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <OnboardingCard accent="blue" contentClassName="pt-6">
           <Tabs value={suppliesTab} onValueChange={setSuppliesTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
+            <TabsList className="grid h-auto min-h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1">
               <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-basics">
                 {isPump ? "Pump basics" : "Basics"}
               </TabsTrigger>
@@ -1594,8 +1474,7 @@ function PathDataSuppliesStep({
               </div>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1616,26 +1495,20 @@ function PathDataMealsStep({
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-meals">
-      <div className="text-center space-y-2">
-        <div className="flex justify-center">
-          <div className="p-3 rounded-full bg-amber-500/10">
-            <Utensils className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold">
-          {pathCare === "mostly_them" ? "Let’s simplify their mealtimes" : "Let’s simplify mealtimes"}
-        </h2>
-        <p className="text-muted-foreground">
-          {supporterHeavy
-            ? "Ratios and corrections help dose suggestions — rough numbers are fine."
-            : "Your ratios let us suggest doses — even rough numbers help"}
-        </p>
-      </div>
+      <OnboardingStepHeader
+        icon={Utensils}
+        accent="amber"
+        title={pathCare === "mostly_them" ? "Let’s simplify their mealtimes" : "Let’s simplify mealtimes"}
+        subtitle={
+          supporterHeavy
+            ? "Know a ratio? Add it now. Not sure? We’ll open the Ratio Adviser when you finish."
+            : "Know a ratio? Add one now. Not sure? We’ll guide you through the Ratio Adviser next."
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <OnboardingCard accent="amber" contentClassName="pt-6">
           <Tabs value={mealsTab} onValueChange={setMealsTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-auto min-h-11 p-1 gap-1">
+            <TabsList className="grid h-auto min-h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1">
               <TabsTrigger value="ratios" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ratios">
                 Ratios
               </TabsTrigger>
@@ -1646,7 +1519,15 @@ function PathDataMealsStep({
                 Tips (optional)
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="ratios" className="mt-4 space-y-2">
+            <TabsContent value="ratios" className="mt-4 space-y-4">
+              {data.mealRatiosUnknown ? (
+                <div
+                  className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground"
+                  data-testid="onboarding-meals-ratios-unknown-banner"
+                >
+                  No problem — after setup we&apos;ll open the Ratio Adviser to help you find starting numbers.
+                </div>
+              ) : null}
               <StaticLabelWithInfo
                 labelClassName="text-sm font-medium"
                 ariaLabel="About carb ratios"
@@ -1654,7 +1535,8 @@ function PathDataMealsStep({
                   <div className="space-y-2">
                     {diabetesTermInfo(DIABETES_TERMS.carbRatio)}
                     <p>
-                      Enter values as <strong>{ONBOARDING_RATIO_FORMAT_LABEL}</strong> carbs.
+                      Enter values as <strong>{ONBOARDING_RATIO_FORMAT_LABEL}</strong> carbs. One meal is enough to
+                      start — add the rest in Settings later.
                     </p>
                   </div>
                 }
@@ -1665,7 +1547,7 @@ function PathDataMealsStep({
                 {(
                   [
                     { label: "Breakfast", key: "breakfastRatio" as const, placeholder: "e.g., 1.0", testId: "breakfast" },
-                    { label: "Lunch", key: "lunchRatio" as const, placeholder: "e.g., 0.8", testId: "lunch" },
+                    { label: "Lunch", key: "lunchRatio" as const, placeholder: "e.g., 0.8", testId: "lunch", hint: "A good one to start with" },
                     { label: "Dinner", key: "dinnerRatio" as const, placeholder: "e.g., 1.0", testId: "dinner" },
                   ] as const
                 ).map((meal) => (
@@ -1676,16 +1558,36 @@ function PathDataMealsStep({
                       step="0.1"
                       placeholder={meal.placeholder}
                       value={data[meal.key]}
-                      onChange={(e) => updateData(meal.key, e.target.value)}
+                      onChange={(e) => {
+                        updateData(meal.key, e.target.value);
+                        if (e.target.value.trim()) updateData("mealRatiosUnknown", false);
+                      }}
                       data-testid={`input-onboarding-${meal.testId}-ratio`}
                     />
                     <ClinicalWarningHint
                       warning={validateCarbRatio(parseInputToGramsPerUnit(data[meal.key], "per10g"))}
                     />
-                    <p className="text-xs text-muted-foreground">{ONBOARDING_RATIO_FORMAT_LABEL}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {ONBOARDING_RATIO_FORMAT_LABEL}
+                      {"hint" in meal && meal.hint ? ` · ${meal.hint}` : ""}
+                    </p>
                   </div>
                 ))}
               </div>
+              <Button
+                type="button"
+                variant={data.mealRatiosUnknown ? "default" : "outline"}
+                className="w-full rounded-xl"
+                onClick={() => {
+                  updateData("mealRatiosUnknown", true);
+                  updateData("breakfastRatio", "");
+                  updateData("lunchRatio", "");
+                  updateData("dinnerRatio", "");
+                }}
+                data-testid="button-onboarding-meals-ratios-unknown"
+              >
+                I don&apos;t know my ratios yet
+              </Button>
             </TabsContent>
             <TabsContent value="corrections" className="mt-4 space-y-1.5">
               <FieldLabelWithInfo
@@ -1722,8 +1624,7 @@ function PathDataMealsStep({
               />
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1738,87 +1639,48 @@ function PathDataExerciseStep({
   pathCare: CareContext;
 }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
-  const defaultExerciseTab = pathCare === "mostly_them" ? "corrections" : "basics";
-  const [exerciseTab, setExerciseTab] = useState(defaultExerciseTab);
-  const correctionsTone = cn("text-xs sm:text-sm", supporterHeavy && pathCare !== "mostly_them" && "opacity-90");
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-exercise">
-      <div className="text-center space-y-2">
-        <div className="flex justify-center">
-          <div className="p-3 rounded-full bg-green-500/10">
-            <Dumbbell className="h-6 w-6 text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold">
-          {pathCare === "mostly_them" ? "Let’s make activity easier for them" : "Let’s make exercise easier"}
-        </h2>
-        <p className="text-muted-foreground">
-          {supporterHeavy
-            ? "A couple of numbers help us suggest safer adjustments around activity."
-            : "We need a couple of numbers to give you adjustment suggestions"}
-        </p>
-      </div>
+      <OnboardingStepHeader
+        icon={Dumbbell}
+        accent="green"
+        title={pathCare === "mostly_them" ? "Ready to plan their activity" : "Ready to plan activity"}
+        subtitle={
+          supporterHeavy
+            ? "The exercise planner works from activity type and duration — no daily totals required."
+            : "The exercise planner works from what you’re doing — you don’t need perfect numbers to start."
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6">
-          <Tabs value={exerciseTab} onValueChange={setExerciseTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-auto min-h-11 p-1 gap-1">
-              <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ex-basics">
-                Basics
-              </TabsTrigger>
-              <TabsTrigger value="corrections" className={correctionsTone} data-testid="onboarding-path-tab-ex-corrections">
-                Corrections
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="basics" className="mt-4 space-y-1.5">
-              <FieldLabelWithInfo
-                htmlFor="path-tdd-ex"
-                info={diabetesTermInfo(
-                  DIABETES_TERMS.tdd,
-                  pathCare === "mostly_them"
-                    ? "All insulin they take in a day — used for exercise adjustment suggestions."
-                    : "All insulin you take in a day — used for exercise adjustment suggestions.",
-                )}
-              >
-                Total Daily Dose (units)
-              </FieldLabelWithInfo>
-              <Input
-                id="path-tdd-ex"
-                type="number"
-                placeholder="e.g., 40"
-                value={data.tdd}
-                onChange={(e) => updateData("tdd", e.target.value)}
-                data-testid="input-onboarding-tdd"
-              />
-              <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-            </TabsContent>
-            <TabsContent value="corrections" className="mt-4 space-y-1.5">
-              <FieldLabelWithInfo
-                htmlFor="path-correction-ex"
-                info={
-                  <div className="space-y-2">
-                    {diabetesTermInfo(DIABETES_TERMS.correctionFactor)}
-                    <p>You can update these anytime in Settings.</p>
-                  </div>
-                }
-              >
-                Correction Factor
-              </FieldLabelWithInfo>
-              <Input
-                id="path-correction-ex"
-                type="number"
-                step="0.1"
-                placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
-                value={data.correctionFactor}
-                onChange={(e) => updateData("correctionFactor", e.target.value)}
-                data-testid="input-onboarding-correction"
-              />
-              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      <OnboardingCard accent="green" contentClassName="space-y-4 pt-6">
+          <p className="text-sm text-muted-foreground">
+            After setup we&apos;ll open a sample 30-minute walk so you can see carb and timing guidance right away.
+          </p>
+          <div className="space-y-1.5">
+            <FieldLabelWithInfo
+              htmlFor="path-correction-ex"
+              info={
+                <div className="space-y-2">
+                  {diabetesTermInfo(DIABETES_TERMS.correctionFactor)}
+                  <p>Optional — add later in Settings if you prefer.</p>
+                </div>
+              }
+            >
+              Correction factor (optional)
+            </FieldLabelWithInfo>
+            <Input
+              id="path-correction-ex"
+              type="number"
+              step="0.1"
+              placeholder={data.bgUnits === "mmol/L" ? "e.g., 3 — skip if unsure" : "e.g., 50 — skip if unsure"}
+              value={data.correctionFactor}
+              onChange={(e) => updateData("correctionFactor", e.target.value)}
+              data-testid="input-onboarding-correction"
+            />
+            <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
+          </div>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1839,26 +1701,20 @@ function PathDataOverviewStep({
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-overview">
-      <div className="text-center space-y-2">
-        <div className="flex justify-center">
-          <div className="p-3 rounded-full bg-purple-500/10">
-            <LayoutDashboard className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold">
-          {pathCare === "mostly_them" ? "A calmer overview for their care" : "Your all-in-one hub"}
-        </h2>
-        <p className="text-muted-foreground">
-          {supporterHeavy
+      <OnboardingStepHeader
+        icon={LayoutDashboard}
+        accent="purple"
+        title={pathCare === "mostly_them" ? "A calmer overview for their care" : "Your all-in-one hub"}
+        subtitle={
+          supporterHeavy
             ? "Start with what you know now — you can layer in detail later."
-            : "A few details so we can make everything work together"}
-        </p>
-      </div>
+            : "A few details so we can make everything work together"
+        }
+      />
 
-      <Card>
-        <CardContent className="pt-6">
+      <OnboardingCard accent="purple" contentClassName="pt-6">
           <Tabs value={overviewTab} onValueChange={setOverviewTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-auto min-h-11 p-1 gap-1">
+            <TabsList className="grid h-auto min-h-11 w-full grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1">
               <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ov-basics">
                 Basics
               </TabsTrigger>
@@ -1904,8 +1760,7 @@ function PathDataOverviewStep({
               />
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1933,22 +1788,21 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
 function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData: (field: keyof OnboardingData, value: any) => void }) {
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">One important thing</h2>
-        <p className="text-muted-foreground">
-          Please read and accept before we continue
-        </p>
-      </div>
+      <OnboardingStepHeader
+        icon={AlertTriangle}
+        accent="yellow"
+        title="One important thing"
+        subtitle="Please read and accept before we continue"
+      />
 
-      <Card className="border-yellow-500/30">
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
+      <OnboardingCard accent="yellow" contentClassName="space-y-4 pt-6">
+          <div className="flex items-start gap-3 rounded-xl bg-yellow-50 p-4 dark:bg-yellow-950/30">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-600 dark:text-yellow-500" />
             <Disclaimer className="text-yellow-900 dark:text-yellow-100" />
           </div>
 
           <div
-            className="flex items-start space-x-3 p-4 border rounded-lg hover-elevate cursor-pointer"
+            className="flex cursor-pointer items-start space-x-3 rounded-xl border border-border/70 p-4 transition-all hover-elevate"
             onClick={() => updateData("hasAcceptedDisclaimer", !data.hasAcceptedDisclaimer)}
           >
             <Checkbox
@@ -1964,8 +1818,7 @@ function DisclaimerStep({ data, updateData }: { data: OnboardingData; updateData
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </OnboardingCard>
     </div>
   );
 }
@@ -1984,8 +1837,7 @@ function FirstWinStep({
     if (struggle === "supplies") {
       return {
         icon: Package,
-        iconColor: "text-blue-600 dark:text-blue-400",
-        iconBg: "bg-blue-500/10",
+        accent: "blue" as const,
         title: "Your Supply Tracker is ready",
         subtitle: "Here's what you can do right now",
         features: [
@@ -1998,18 +1850,16 @@ function FirstWinStep({
       };
     }
     if (struggle === "meals") {
-      const hasRatios = !!(data.breakfastRatio || data.lunchRatio || data.dinnerRatio);
-      if (hasRatios) {
+      if (!shouldUseRatioAdviserFirstWin(data)) {
         return {
           icon: Utensils,
-          iconColor: "text-amber-600 dark:text-amber-400",
-          iconBg: "bg-amber-500/10",
+          accent: "amber" as const,
           title: "Your Meal Planner is ready",
-          subtitle: "Let's take the stress out of mealtimes",
+          subtitle: "Try a dose calculation with the ratio you added",
           features: [
             { icon: Sparkles, text: "Get dose suggestions based on your carbs and ratios", highlight: true },
             { icon: Clock, text: "Automatic time-of-day ratio selection" },
-            { icon: TrendingDown, text: "Exercise adjustments built right in" },
+            { icon: TrendingDown, text: "Add more ratios anytime in Settings" },
           ],
           ctaText: "Try a Meal Calculation",
           ctaPath: "/adviser?tab=meal",
@@ -2017,39 +1867,36 @@ function FirstWinStep({
       }
       return {
         icon: Utensils,
-        iconColor: "text-amber-600 dark:text-amber-400",
-        iconBg: "bg-amber-500/10",
-        title: "Let's work out your ratios first",
-        subtitle: "The Meal Planner needs your carb ratios to calculate doses — let's find yours",
+        accent: "amber" as const,
+        title: "Let's find your starting ratios",
+        subtitle: "A short guided flow — then meal dose suggestions unlock",
         features: [
-          { icon: Sparkles, text: "Guided questionnaire to estimate your starting ratios", highlight: true },
-          { icon: Clock, text: "Works even if you don't know your ratios yet" },
-          { icon: TrendingDown, text: "Then you'll be ready to use the Meal Planner" },
+          { icon: Sparkles, text: "Guided questionnaire to estimate starting ratios", highlight: true },
+          { icon: Clock, text: "Works even if you're not sure of your numbers yet" },
+          { icon: TrendingDown, text: "Then jump straight into the Meal Planner" },
         ],
-        ctaText: "Go to Ratio Adviser",
+        ctaText: "Open Ratio Adviser",
         ctaPath: "/adviser?tab=ratio-adviser",
       };
     }
     if (struggle === "exercise") {
       return {
         icon: Dumbbell,
-        iconColor: "text-green-600 dark:text-green-400",
-        iconBg: "bg-green-500/10",
-        title: "Your Exercise Planner is ready",
-        subtitle: "Move with more confidence",
+        accent: "green" as const,
+        title: "Let's plan your first activity",
+        subtitle: "We've picked a gentle example — change it to match your day",
         features: [
-          { icon: Sparkles, text: "Get carb and insulin adjustments for any activity", highlight: true },
+          { icon: Sparkles, text: "Carb and timing tips from activity type and duration", highlight: true },
           { icon: Clock, text: "Before, during, and after exercise guidance" },
-          { icon: TrendingDown, text: "Recovery recommendations to avoid late lows" },
+          { icon: TrendingDown, text: "No daily insulin totals required to get started" },
         ],
-        ctaText: "Plan an Activity",
-        ctaPath: "/scenarios/exercise",
+        ctaText: "Try a 30-minute walk",
+        ctaPath: ONBOARDING_EXERCISE_DEMO_HREF,
       };
     }
     return {
       icon: LayoutDashboard,
-      iconColor: "text-purple-600 dark:text-purple-400",
-      iconBg: "bg-purple-500/10",
+      accent: "purple" as const,
       title: "Your Dashboard is ready",
       subtitle: "Everything in one place, customised for you",
       features: [
@@ -2065,73 +1912,55 @@ function FirstWinStep({
 
   const content = getContent();
   const Icon = content.icon;
-  const hasRatios = !!(data.breakfastRatio || data.lunchRatio || data.dinnerRatio);
-  const secondaryRaw = getOnboardingSecondaryCta(struggle, hasRatios, { wantsSupporterSetupNext });
+  const secondaryRaw = getOnboardingSecondaryCta(
+    struggle,
+    {
+      breakfastRatio: data.breakfastRatio,
+      lunchRatio: data.lunchRatio,
+      dinnerRatio: data.dinnerRatio,
+      mealRatiosUnknown: data.mealRatiosUnknown,
+    },
+    { wantsSupporterSetupNext },
+  );
   const secondary =
     secondaryRaw && secondaryRaw.path !== content.ctaPath ? secondaryRaw : null;
 
   return (
     <div className="space-y-8 pb-4 sm:pb-0">
-      <div className="text-center space-y-4">
-        <div className="flex justify-center">
-          <div className={`p-4 rounded-full ${content.iconBg}`}>
-            <Icon className={`h-8 w-8 ${content.iconColor}`} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold">{content.title}</h2>
-          <p className="text-muted-foreground">{content.subtitle}</p>
-        </div>
+      <div className="space-y-4 text-center">
+        <OnboardingHeroIcon icon={Icon} accent={content.accent} />
+        <OnboardingStepHeader title={content.title} subtitle={content.subtitle} />
       </div>
 
-      <Card>
-        <CardContent className="pt-6 pb-6">
-          <div className="space-y-4">
-            {content.features.map((feature, i) => {
-              const FeatureIcon = feature.icon;
-              return (
-                <div key={i} className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg flex-shrink-0 ${feature.highlight ? content.iconBg : "bg-muted"}`}>
-                    <FeatureIcon className={`h-4 w-4 ${feature.highlight ? content.iconColor : "text-muted-foreground"}`} />
-                  </div>
-                  <p className={`text-sm pt-1.5 ${feature.highlight ? "font-medium" : "text-muted-foreground"}`}>
-                    {feature.text}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <OnboardingCard accent={content.accent} contentClassName="pt-5 pb-5">
+        <OnboardingFeatureList features={content.features} accent={content.accent} />
+      </OnboardingCard>
 
-      <div
-        className="space-y-3 fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:z-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none"
-        data-testid="onboarding-first-win-actions"
-      >
+      <OnboardingStickyActions className="space-y-3" testId="onboarding-first-win-actions">
         <Button
-          className="w-full"
+          className="mx-auto w-full max-w-lg rounded-xl"
           size="lg"
           onClick={() => void onFinish(content.ctaPath)}
           data-testid="button-onboarding-complete"
         >
           {content.ctaText}
-          <ArrowRight className="h-4 w-4 ml-2" />
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
-        {secondary && (
+        {secondary ? (
           <Button
             variant="outline"
-            className="w-full"
+            className="mx-auto w-full max-w-lg rounded-xl"
             size="lg"
             onClick={() => void onFinish(secondary.path)}
             data-testid="button-onboarding-complete-secondary"
           >
             {secondary.label}
           </Button>
-        )}
+        ) : null}
         <p className="text-center text-xs text-muted-foreground">
           Finishing saves your setup and opens the app. You can add more detail anytime in Settings.
         </p>
-      </div>
+      </OnboardingStickyActions>
     </div>
   );
 }
