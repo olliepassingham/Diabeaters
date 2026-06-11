@@ -248,8 +248,7 @@ export function DevPushNotificationTestPanel() {
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
       {unlocked && !isPushTestUiEnabled ? (
         <p className="text-xs text-muted-foreground leading-snug">
-          Unlocked on this {nativePlatformLabel().toLowerCase()} from{" "}
-          <strong className="text-foreground/85">Settings → Notifications</strong> or seven quick taps on{" "}
+          Unlocked on this {nativePlatformLabel().toLowerCase()} via seven quick taps on{" "}
           <strong className="text-foreground/85">About → Version</strong>. Stored only on this device.
         </p>
       ) : null}
