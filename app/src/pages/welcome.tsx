@@ -12,6 +12,10 @@ import {
 } from "@/lib/carer-session";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
+import {
+  reconcileCommunityWelcomeWithExistingPatient,
+  stashExistingPatientOnCommunityPathToast,
+} from "@/lib/community-path-patient-reconcile";
 import { ArrowRight, Eye, HeartHandshake, Users } from "lucide-react";
 
 export default function Welcome() {
@@ -40,7 +44,19 @@ export default function Welcome() {
     setOnboardingAccountPath("community");
     setPrimaryAppRole("community");
     setPendingCommunity();
-    setLocation(alreadySignedIn ? "/onboarding" : "/login");
+    if (alreadySignedIn && user?.id) {
+      void (async () => {
+        const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(user.id);
+        if (reconciled) {
+          stashExistingPatientOnCommunityPathToast();
+          setLocation("/");
+          return;
+        }
+        setLocation("/onboarding");
+      })();
+      return;
+    }
+    setLocation("/login");
   };
 
   return (

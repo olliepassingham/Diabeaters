@@ -10,6 +10,10 @@ import {
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import {
+  reconcileCommunityWelcomeWithExistingPatient,
+  stashExistingPatientOnCommunityPathToast,
+} from "@/lib/community-path-patient-reconcile";
 
 /** Commit Supabase session to React auth state before entering protected routes. */
 export function prepareAuthSessionBeforeNavigation(
@@ -25,7 +29,10 @@ export function prepareAuthSessionBeforeNavigation(
 /**
  * Shared navigation after a successful password or OAuth session (login or signup when confirmations are off).
  */
-export async function navigateAfterLoginSuccess(setLocation: (path: string) => void): Promise<void> {
+export async function navigateAfterLoginSuccess(
+  setLocation: (path: string) => void,
+  userId?: string | null,
+): Promise<void> {
   const link = await getLinkedPatientForCarer();
   if (link.data) {
     const next = new URLSearchParams(window.location.search).get("next");
@@ -57,6 +64,15 @@ export async function navigateAfterLoginSuccess(setLocation: (path: string) => v
     return;
   }
   if (isCommunityOnlyAccount() || role === "community") {
+    if (userId) {
+      const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(userId);
+      if (reconciled) {
+        stashExistingPatientOnCommunityPathToast();
+        setActiveAppMode("patient");
+        setLocation("/");
+        return;
+      }
+    }
     setActiveAppMode("community");
     setLocation(getCommunityMemberLandingPath());
     return;
@@ -70,5 +86,5 @@ export async function completeAuthAndNavigate(
   session: Session | null | undefined,
 ): Promise<void> {
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
-  await navigateAfterLoginSuccess(setLocation);
+  await navigateAfterLoginSuccess(setLocation, session?.user?.id);
 }

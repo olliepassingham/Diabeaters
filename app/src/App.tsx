@@ -90,6 +90,7 @@ import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-promp
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
+import { PostLoginToast } from "@/components/post-login-toast";
 import { AchievementSync } from "@/components/achievement-sync";
 import { DmInboxQuerySync } from "@/components/dm-inbox-query-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
@@ -1689,6 +1690,7 @@ export default function App() {
         <TooltipProvider>
           <ThemeProvider>
             <AuthProvider>
+              <PostLoginToast />
               <NativeAppBadgeSync />
               <EmergencyProfileProvider>
                 {/*

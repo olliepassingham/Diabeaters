@@ -93,7 +93,7 @@ export default function Login() {
       }
       if (authLoading) return;
       if (user && isUserVerified(user)) {
-        void navigateAfterLoginSuccess(setLocation);
+        void navigateAfterLoginSuccess(setLocation, user.id);
         return;
       }
       window.history.replaceState({}, "", "/login");
