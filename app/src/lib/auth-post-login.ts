@@ -85,6 +85,14 @@ export async function completeAuthAndNavigate(
   syncAuthSession: (session: Session | null) => void,
   session: Session | null | undefined,
 ): Promise<void> {
+  const userId = session?.user?.id ?? null;
+  // Stash before auth sync so PostLoginToast does not miss the message on first paint.
+  if (userId) {
+    const { reconciled } = await reconcileCommunityWelcomeWithExistingPatient(userId);
+    if (reconciled) {
+      stashExistingPatientOnCommunityPathToast();
+    }
+  }
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
-  await navigateAfterLoginSuccess(setLocation, session?.user?.id);
+  await navigateAfterLoginSuccess(setLocation, userId);
 }

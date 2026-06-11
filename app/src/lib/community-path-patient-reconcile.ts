@@ -10,6 +10,8 @@ import { getProfile, type ProfileRow } from "@/lib/profile";
 const POST_LOGIN_TOAST_KEY = "diabeater:post_login_toast:v1";
 const ONBOARDING_LS = "diabeater_onboarding_completed";
 
+export const POST_LOGIN_TOAST_STASHED_EVENT = "diabeater:post-login-toast-stashed";
+
 export const EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST = {
   title: "Already have a full account",
   description:
@@ -42,6 +44,7 @@ export function restorePatientSessionMarkersAfterCommunityMismatch(): void {
 export function stashExistingPatientOnCommunityPathToast(): void {
   try {
     sessionStorage.setItem(POST_LOGIN_TOAST_KEY, JSON.stringify(EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST));
+    window.dispatchEvent(new CustomEvent(POST_LOGIN_TOAST_STASHED_EVENT));
   } catch {
     // ignore
   }

@@ -86,7 +86,13 @@ describe("community-path-patient-reconcile", () => {
     expect(getPrimaryAppRole()).toBe("patient");
     expect(getOnboardingAccountPath()).toBe("patient");
 
+    const onStashed = vi.fn();
+    window.addEventListener(
+      (await import("@/lib/community-path-patient-reconcile")).POST_LOGIN_TOAST_STASHED_EVENT,
+      onStashed,
+    );
     stashExistingPatientOnCommunityPathToast();
+    expect(onStashed).toHaveBeenCalledTimes(1);
     expect(consumePostLoginToast()?.title).toContain("Already have a full account");
   });
 
