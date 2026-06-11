@@ -79,6 +79,15 @@ describe("calculateExercisePlan", () => {
     expect(ahead.pre.timing).toBe("Planning ahead");
   });
 
+  it("scales intense pre carbs by duration", () => {
+    const short = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 25 });
+    const mid = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 45 });
+    const long = calculateExercisePlan({ ...baseCtx, intensity: "intense", durationMinutes: 120 });
+    expect(short.pre.carbsIfLow).toBe(15);
+    expect(mid.pre.carbsIfLow).toBe(25);
+    expect(long.pre.carbsIfLow).toBe(30);
+  });
+
   it("nudges carb targets by exercise type (same intensity and duration)", () => {
     const ctx = { ...baseCtx, durationMinutes: 60, intensity: "moderate" as const };
     const cardio = calculateExercisePlan({ ...ctx, exerciseType: "cardio" });

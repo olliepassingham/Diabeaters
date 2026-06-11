@@ -10,7 +10,28 @@ const settings: UserSettings = {
 };
 
 describe("computeExerciseFuelPlan", () => {
-  it("returns insulin units when meal carbs and ratios are provided", () => {
+  it("returns insulin units when meal carbs, ratios, and BG are provided", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 50,
+      mealType: "snack",
+      currentBg: 8.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulin!.adjustedUnits).toBeGreaterThan(0);
+    expect(r.breakdown.standardUnits).toBeGreaterThan(0);
+    expect(r.headline).toContain("50g");
+  });
+
+  it("does not show insulin without a BG reading even when meal carbs are entered", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "cardio",
       intensity: "moderate",
@@ -23,15 +44,11 @@ describe("computeExerciseFuelPlan", () => {
       settings,
       isPump: false,
     });
-    expect(r.insulin).not.toBeNull();
-    expect(r.insulin!.adjustedUnits).toBeGreaterThan(0);
-    expect(r.insulin!.reductionPercent).toBeGreaterThan(0);
-    expect(r.headline).toContain("50g");
-    expect(r.headline).not.toContain("→");
-    expect(r.headline).not.toContain("usual");
+    expect(r.insulin).toBeNull();
+    expect(r.insulinSuppressedReason).toBe("bg_missing");
   });
 
-  it("suggests meal carbs when none entered", () => {
+  it("suggests meal carbs when fasted and none entered", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "cardio",
       intensity: "moderate",
@@ -39,12 +56,64 @@ describe("computeExerciseFuelPlan", () => {
       minutesUntilStart: 30,
       fasted: true,
       mealType: "snack",
+      currentBg: 8,
+      bgTrend: "flat",
       bgUnits: "mmol/L",
       settings,
       isPump: false,
     });
     expect(r.mealCarbsIsSuggested).toBe(true);
     expect(r.mealCarbs).toBeGreaterThan(0);
+  });
+
+  it("does not suggest pre-meal carbs when BG is in range and not fasted", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealType: "snack",
+      currentBg: 8,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.mealCarbs).toBe(0);
+    expect(r.mealCarbsSkipReason).toBe("in_range_fed");
+    expect(r.onHandCarbs).toBeGreaterThan(0);
+    expect(r.insulin).toBeNull();
+  });
+
+  it("scales intense pre buffer with duration", () => {
+    const short = computeExerciseFuelPlan({
+      exerciseType: "court",
+      intensity: "intense",
+      durationMinutes: 25,
+      minutesUntilStart: 45,
+      fasted: true,
+      mealType: "snack",
+      currentBg: 6.5,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    const long = computeExerciseFuelPlan({
+      exerciseType: "court",
+      intensity: "intense",
+      durationMinutes: 120,
+      minutesUntilStart: 45,
+      fasted: true,
+      mealType: "snack",
+      currentBg: 6.5,
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(short.breakdown.preBufferGrams).toBe(15);
+    expect(long.breakdown.preBufferGrams).toBe(30);
+    expect(long.breakdown.duringGrams).toBe(90);
   });
 
   it("adds note when rapid insulin was recent", () => {
@@ -56,6 +125,8 @@ describe("computeExerciseFuelPlan", () => {
       fasted: false,
       mealCarbsGrams: 40,
       mealType: "lunch",
+      currentBg: 8.5,
+      bgTrend: "flat",
       rapidInsulinLast2h: true,
       bgUnits: "mmol/L",
       settings,
@@ -70,7 +141,7 @@ describe("computeExerciseFuelPlan", () => {
       intensity: "moderate",
       durationMinutes: 45,
       minutesUntilStart: 0,
-      fasted: false,
+      fasted: true,
       mealType: "snack",
       currentBg: 5.5,
       bgTrend: "flat",
@@ -79,32 +150,8 @@ describe("computeExerciseFuelPlan", () => {
       isPump: false,
     });
     expect(r.mealCarbs).toBeGreaterThan(0);
-    expect(r.mealCarbsIsSuggested).toBe(true);
     expect(r.insulin).toBeNull();
     expect(r.insulinSuppressedReason).toBe("low_bg");
-    expect(r.headline).toContain("no meal insulin");
-    expect(r.notes.some((n) => n.toLowerCase().includes("meal insulin") || n.toLowerCase().includes("exercise-start"))).toBe(
-      true,
-    );
-  });
-
-  it("still shows meal insulin at 8.0 mmol/L with suggested carbs", () => {
-    const r = computeExerciseFuelPlan({
-      exerciseType: "cardio",
-      intensity: "moderate",
-      durationMinutes: 45,
-      minutesUntilStart: 30,
-      fasted: false,
-      mealType: "snack",
-      currentBg: 8,
-      bgTrend: "flat",
-      bgUnits: "mmol/L",
-      settings,
-      isPump: false,
-    });
-    expect(r.mealCarbsIsSuggested).toBe(true);
-    expect(r.insulin).not.toBeNull();
-    expect(r.insulinSuppressedReason).toBeNull();
   });
 
   it("suppresses insulin at 6.5 mmol/L when carbs are suggested (below ideal 7)", () => {
@@ -113,15 +160,35 @@ describe("computeExerciseFuelPlan", () => {
       intensity: "moderate",
       durationMinutes: 45,
       minutesUntilStart: 30,
-      fasted: false,
+      fasted: true,
       mealType: "snack",
       currentBg: 6.5,
       bgUnits: "mmol/L",
       settings,
       isPump: false,
     });
+    expect(r.mealCarbs).toBeGreaterThan(0);
     expect(r.insulin).toBeNull();
     expect(r.insulinSuppressedReason).toBe("below_target");
+  });
+
+  it("suppresses insulin when BG trend is falling", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 40,
+      mealType: "snack",
+      currentBg: 8.5,
+      bgTrend: "falling",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.insulin).toBeNull();
+    expect(r.insulinSuppressedReason).toBe("falling");
   });
 
   it("suppresses insulin at 5.5 mmol/L even when user enters 50g carbs", () => {

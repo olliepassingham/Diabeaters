@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getExerciseGuidanceForReading } from "./exercise-reading-guidance";
+import {
+  getExerciseGuidanceForReading,
+  shouldSuggestPreExerciseMealCarbs,
+  shouldSuggestPreExerciseMealInsulin,
+} from "./exercise-reading-guidance";
 
 describe("getExerciseGuidanceForReading", () => {
   it("returns treat-low-first when BG low", () => {
@@ -35,6 +39,40 @@ describe("getExerciseGuidanceForReading", () => {
         phase: "pre",
       }),
     ).toEqual([]);
+  });
+
+  it("shouldSuggestPreExerciseMealCarbs skips when in range and fed", () => {
+    const r = shouldSuggestPreExerciseMealCarbs({
+      currentBg: 8,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      fasted: false,
+      bufferGrams: 20,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.skipReason).toBe("in_range_fed");
+  });
+
+  it("shouldSuggestPreExerciseMealInsulin requires BG", () => {
+    const r = shouldSuggestPreExerciseMealInsulin({
+      bgUnits: "mmol/L",
+      mealCarbsIsSuggested: true,
+      mealCarbsGrams: 25,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.suppressedReason).toBe("bg_missing");
+  });
+
+  it("shouldSuggestPreExerciseMealInsulin suppresses when falling", () => {
+    const r = shouldSuggestPreExerciseMealInsulin({
+      currentBg: 8.5,
+      bgTrend: "falling",
+      bgUnits: "mmol/L",
+      mealCarbsIsSuggested: false,
+      mealCarbsGrams: 50,
+    });
+    expect(r.suggest).toBe(false);
+    expect(r.suppressedReason).toBe("falling");
   });
 
   it("uses post-workout framing in recovery when BG in range", () => {

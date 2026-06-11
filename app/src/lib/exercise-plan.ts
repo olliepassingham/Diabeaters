@@ -342,7 +342,7 @@ function baseCarbsAndBolus(
       bolusReduction = "25-35%";
       break;
     case "intense":
-      preExerciseCarbs = 25;
+      preExerciseCarbs = duration < 30 ? 15 : duration <= 60 ? 25 : 30;
       duringCarbs = duration > 30 ? Math.round(duration / 30) * 20 : 0;
       postExerciseCarbs = 30;
       bolusReduction = "35-50%";

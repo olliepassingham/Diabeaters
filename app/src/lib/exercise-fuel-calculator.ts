@@ -9,8 +9,11 @@ import {
   getExerciseGuidanceForReading,
   isExerciseStartLow,
   preExerciseInsulinSuppressedMessage,
+  preExerciseMealCarbsSkipMessage,
+  shouldSuggestPreExerciseMealCarbs,
   shouldSuggestPreExerciseMealInsulin,
   type PreExerciseInsulinSuppressedReason,
+  type PreExerciseMealCarbsSkipReason,
 } from "@/lib/exercise-reading-guidance";
 import {
   getExerciseMealBolusPreview,
@@ -18,7 +21,22 @@ import {
 } from "@/lib/meal-dose";
 import type { ExerciseBgTrend, ExerciseIntensity, ExerciseType, UserSettings } from "@/lib/storage";
 
-export type { PreExerciseInsulinSuppressedReason };
+export type { PreExerciseInsulinSuppressedReason, PreExerciseMealCarbsSkipReason };
+
+export type ExerciseFuelCalculationBreakdown = {
+  intensityLabel: string;
+  activityLabel: string;
+  durationMinutes: number;
+  preBufferGrams: number;
+  duringGrams: number;
+  onHandGrams: number;
+  mealCarbsSource: "user" | "suggested" | "none";
+  mealCarbsSkipReason?: PreExerciseMealCarbsSkipReason;
+  ratioDescription?: string;
+  standardUnits?: number;
+  reductionPercent?: number;
+  adjustedUnitsExact?: number;
+};
 
 export type ExerciseFuelCalculatorInput = {
   exerciseType: ExerciseType;
@@ -66,6 +84,8 @@ export type ExerciseFuelCalculatorResult = {
   pumpTip: string | null;
   /** Up to 3 short, input-specific notes. */
   notes: string[];
+  mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null;
+  breakdown: ExerciseFuelCalculationBreakdown;
 };
 
 function buildPlanContext(input: ExerciseFuelCalculatorInput): ExercisePlanContext {
@@ -117,6 +137,20 @@ function mealTypeLabel(mealType: string): string {
   return EXERCISE_MEAL_TYPE_OPTIONS.find((o) => o.value === mealType)?.label.toLowerCase() ?? mealType;
 }
 
+function describeRatioUsed(mealType: string, settings: UserSettings): string | undefined {
+  const ratioMap: Record<string, string | undefined> = {
+    breakfast: settings.breakfastRatio,
+    lunch: settings.lunchRatio,
+    dinner: settings.dinnerRatio,
+    snack: settings.snackRatio,
+    meal: settings.lunchRatio || settings.breakfastRatio,
+  };
+  const ratio = ratioMap[mealType]?.trim();
+  if (ratio) return `1 unit per ${ratio}g carbs (${mealTypeLabel(mealType)})`;
+  if (settings.tdd) return `estimated from TDD ${settings.tdd} (500÷TDD rule)`;
+  return undefined;
+}
+
 function startLabel(minutesUntilStart: number): string {
   if (minutesUntilStart <= 0) return "starting now";
   if (minutesUntilStart === 60) return "starts in about an hour";
@@ -158,14 +192,23 @@ function pickNotes(
   plan: ReturnType<typeof calculateExercisePlan>,
   mealCarbs: number,
   insulinSuppressedReason: PreExerciseInsulinSuppressedReason | null,
+  mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null,
 ): string[] {
   const notes: string[] = [];
   const units = input.bgUnits;
   const bgUnits = units === "mg/dL" ? "mg/dL" : "mmol/L";
   const high = units === "mmol/L" ? 13.9 : 250;
 
+  if (mealCarbsSkipReason) {
+    notes.push(preExerciseMealCarbsSkipMessage(mealCarbsSkipReason, units));
+  }
+
   if (insulinSuppressedReason) {
     notes.push(preExerciseInsulinSuppressedMessage(insulinSuppressedReason, units, input.settings));
+  }
+
+  if (input.currentBg == null && mealCarbs <= 0) {
+    notes.push("Add current BG and trend — they change whether we suggest eating now or only keeping fast carbs on hand.");
   }
 
   if (input.currentBg != null && isBgBelowHypoThreshold(input.currentBg, input.settings, bgUnits)) {
@@ -229,10 +272,30 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
 
   const userMealCarbs = input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? input.mealCarbsGrams : 0;
   const mealCarbsIsSuggested = userMealCarbs <= 0;
-  const mealCarbs = mealCarbsIsSuggested ? plan.pre.carbsIfLow : userMealCarbs;
-
-  const onHandCarbs = Math.max(plan.pre.carbsIfLow, plan.during.carbsNeeded);
+  const preBufferGrams = plan.pre.carbsIfLow;
   const duringCarbs = plan.during.carbsNeeded;
+  const onHandCarbs = Math.max(preBufferGrams, duringCarbs);
+
+  let mealCarbs = 0;
+  let mealCarbsSkipReason: PreExerciseMealCarbsSkipReason | null = null;
+
+  if (mealCarbsIsSuggested) {
+    const carbsDecision = shouldSuggestPreExerciseMealCarbs({
+      currentBg: input.currentBg,
+      bgTrend: input.bgTrend,
+      bgUnits: input.bgUnits,
+      fasted: input.fasted,
+      bufferGrams: preBufferGrams,
+      settings: input.settings,
+    });
+    if (carbsDecision.suggest) {
+      mealCarbs = preBufferGrams;
+    } else if (carbsDecision.skipReason) {
+      mealCarbsSkipReason = carbsDecision.skipReason;
+    }
+  } else {
+    mealCarbs = userMealCarbs;
+  }
 
   let insulin: ExerciseFuelInsulinResult | null = null;
   let insulinNoRatios = false;
@@ -280,16 +343,32 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
   const headline = buildHeadline(
     input,
     mealCarbs,
-    mealCarbsIsSuggested,
+    mealCarbsIsSuggested && mealCarbs > 0,
     onHandCarbs,
     insulinSuppressedReason != null,
   );
+
+  const breakdown: ExerciseFuelCalculationBreakdown = {
+    intensityLabel: intensityLabel(input.intensity),
+    activityLabel: activityLabel(input.exerciseType),
+    durationMinutes: input.durationMinutes,
+    preBufferGrams,
+    duringGrams: duringCarbs,
+    onHandGrams: onHandCarbs,
+    mealCarbsSource: !mealCarbsIsSuggested ? "user" : mealCarbs > 0 ? "suggested" : "none",
+    mealCarbsSkipReason: mealCarbsSkipReason ?? undefined,
+    ratioDescription:
+      mealCarbs > 0 ? describeRatioUsed(input.mealType, input.settings) : undefined,
+    standardUnits: insulin?.standardUnits,
+    reductionPercent: insulin?.reductionPercent,
+    adjustedUnitsExact: insulin?.exactAdjusted,
+  };
 
   return {
     headline,
     targetBg: plan.pre.targetBg,
     mealCarbs,
-    mealCarbsIsSuggested,
+    mealCarbsIsSuggested: mealCarbsIsSuggested && mealCarbs > 0,
     onHandCarbs,
     duringCarbs,
     insulin,
@@ -297,6 +376,8 @@ export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): Exe
     insulinNoRatios,
     bolusReductionBand: plan.pre.bolusReduction,
     pumpTip: input.isPump && plan.pumpTips.pre[0] ? plan.pumpTips.pre[0]! : null,
-    notes: pickNotes(input, plan, mealCarbs, insulinSuppressedReason),
+    notes: pickNotes(input, plan, mealCarbs, insulinSuppressedReason, mealCarbsSkipReason),
+    mealCarbsSkipReason,
+    breakdown,
   };
 }

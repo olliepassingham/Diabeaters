@@ -11,7 +11,10 @@ import { Switch } from "@/components/ui/switch";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
-import { preExerciseInsulinSuppressedMessage } from "@/lib/exercise-reading-guidance";
+import {
+  preExerciseInsulinSuppressedMessage,
+  preExerciseMealCarbsSkipMessage,
+} from "@/lib/exercise-reading-guidance";
 import {
   EXERCISE_INTENSITY_OPTIONS,
   EXERCISE_MEAL_TYPE_OPTIONS,
@@ -154,6 +157,41 @@ function ExerciseFuelPlanDetails({
           </p>
         </PlanDetailSection>
       ) : null}
+
+      <PlanDetailSection title="How we calculated this">
+        <ul className="list-disc space-y-1 pl-4">
+          <li>
+            Session: {result.breakdown.intensityLabel} {result.breakdown.activityLabel} ·{" "}
+            {result.breakdown.durationMinutes} min
+          </li>
+          <li>Pre buffer (if you need fuel): ~{result.breakdown.preBufferGrams}g</li>
+          <li>During session (fast carbs ready): ~{result.breakdown.duringGrams}g</li>
+          <li>On hand (max of pre + during): ~{result.breakdown.onHandGrams}g</li>
+          {result.breakdown.mealCarbsSource === "user" ? (
+            <li>Pre-meal carbs: your entry ({result.mealCarbs}g)</li>
+          ) : result.breakdown.mealCarbsSource === "suggested" ? (
+            <li>Pre-meal carbs suggested from buffer: ~{result.mealCarbs}g (BG/trend/fasted)</li>
+          ) : result.breakdown.mealCarbsSkipReason ? (
+            <li>{preExerciseMealCarbsSkipMessage(result.breakdown.mealCarbsSkipReason, bgUnits)}</li>
+          ) : (
+            <li>No pre-meal carbs suggested — keep fast carbs on hand for the full session.</li>
+          )}
+          {result.insulin ? (
+            <>
+              <li>{result.breakdown.ratioDescription ?? "Ratio from Settings"}</li>
+              <li>
+                Standard dose ~{result.breakdown.standardUnits}u → {result.breakdown.reductionPercent}% exercise
+                reduction → {result.insulin.adjustedUnits}u shown
+                {result.breakdown.adjustedUnitsExact != null && result.breakdown.adjustedUnitsExact !== result.insulin.adjustedUnits
+                  ? ` (exact ${result.breakdown.adjustedUnitsExact}u before rounding)`
+                  : ""}
+              </li>
+            </>
+          ) : result.insulinSuppressedReason ? (
+            <li>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</li>
+          ) : null}
+        </ul>
+      </PlanDetailSection>
 
       {result.pumpTip ? (
         <PlanDetailSection title="Pump">
@@ -457,7 +495,7 @@ export function ExerciseFuelCalculator() {
 
           <div className="space-y-3 border-t border-border/50 pt-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Food before exercise</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 size="sm"
@@ -476,6 +514,18 @@ export function ExerciseFuelCalculator() {
               >
                 Suggest carbs for me
               </Button>
+              {foodMode === "suggest" ? (
+                <InlineInfoHint
+                  ariaLabel="How suggest mode uses BG and trend"
+                  className="h-9 w-9 shrink-0"
+                  content={
+                    <>
+                      Enter current BG and trend above — we use them to decide whether to suggest eating before you
+                      start or only keeping fast carbs on hand. Meal insulin is never shown without a BG reading.
+                    </>
+                  }
+                />
+              ) : null}
             </div>
 
             {foodMode === "known" ? (
@@ -507,12 +557,7 @@ export function ExerciseFuelCalculator() {
                   </Select>
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                We will suggest carbs from your activity, intensity, duration, and whether you are fasted — then
-                estimate insulin if ratios are set in Settings.
-              </p>
-            )}
+            ) : null}
           </div>
 
           <Button
@@ -602,7 +647,13 @@ export function ExerciseFuelCalculator() {
               </div>
             )}
 
-            {result.mealCarbs > 0 ? (
+            {result.mealCarbsSkipReason && result.mealCarbs <= 0 ? (
+              <p className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5 text-sm text-muted-foreground leading-relaxed">
+                {preExerciseMealCarbsSkipMessage(result.mealCarbsSkipReason, bgUnits)}
+              </p>
+            ) : null}
+
+            {result.mealCarbs > 0 || result.onHandCarbs > 0 ? (
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
                   <p className="text-[11px] text-muted-foreground">On hand</p>
@@ -638,7 +689,7 @@ export function ExerciseFuelCalculator() {
                   }
                 />
               </div>
-            ) : result.insulinSuppressedReason && result.mealCarbs > 0 ? (
+            ) : result.insulinSuppressedReason && (result.mealCarbs > 0 || foodMode === "known") ? (
               <div className="flex items-center gap-1 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
                 <p className="min-w-0 flex-1 text-sm font-medium text-foreground">No meal insulin at this reading</p>
                 <InlineInfoHint
