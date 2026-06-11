@@ -538,14 +538,6 @@ export default function Account() {
               </Link>
             </Button>
           )}
-
-          {isCarer && (
-            <Button variant="outline" size="sm" className="col-span-2" asChild>
-              <Link href="/carer-view" data-testid="link-back-to-carer-view">
-                Back to Supporter Mode
-              </Link>
-            </Button>
-          )}
         </ProfileActionGrid>
       </div>
     </ProfileHeroCard>
