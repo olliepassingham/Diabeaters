@@ -1,8 +1,10 @@
 import { getLinkedPatientForCarer } from "@/lib/carers";
 import {
+  cacheCloudPrimaryAppRole,
   getOnboardingAccountPath,
   getPrimaryAppRole,
   isPersistedSupporterAccount,
+  isSupporterOnlyAccount,
   markPersistedSupporterAccount,
   setActiveAppMode,
   setOnboardingAccountPath,
@@ -10,6 +12,12 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { isCommunityWelcomePathChosen, profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
+import {
+  backfillSupporterRoleToCloudIfNeeded,
+  profileIsSupporterOnlyRole,
+  resolveSupporterOnlyAccount,
+  syncPrimaryAppRoleToCloud,
+} from "@/lib/profile-primary-role";
 import { getProfile } from "@/lib/profile";
 import type { PostLoginToastMessage } from "@/lib/post-login-toast-stash";
 
@@ -43,17 +51,36 @@ export function restoreSupporterSessionMarkers(): void {
   setActiveAppMode("carer");
   setPendingCarer();
   markPersistedSupporterAccount();
+  cacheCloudPrimaryAppRole("carer");
 }
 
 async function indicatesExistingSupporterOnlyAccount(userId: string): Promise<boolean> {
-  const { profile } = await getProfile(userId);
+  const [{ profile }, link] = await Promise.all([getProfile(userId), getLinkedPatientForCarer()]);
+  const hasCarerLink = Boolean(link.data);
+
+  if (profileIsSupporterOnlyRole(profile)) return true;
+
+  if (
+    resolveSupporterOnlyAccount({
+      profile,
+      hasCarerLink,
+      localIsSupporterOnly: isSupporterOnlyAccount(),
+    })
+  ) {
+    if (hasCarerLink) {
+      markPersistedSupporterAccount();
+      await backfillSupporterRoleToCloudIfNeeded(userId, profile, true);
+    }
+    return true;
+  }
+
   if (profileIndicatesExistingPatientAccount(profile)) {
     return false;
   }
 
-  const link = await getLinkedPatientForCarer();
-  if (link.data) {
+  if (hasCarerLink) {
     markPersistedSupporterAccount();
+    await syncPrimaryAppRoleToCloud(userId, "carer");
     return true;
   }
 

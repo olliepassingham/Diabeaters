@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useDoubleTap } from "@/hooks/use-double-tap";
 import { useToast } from "@/hooks/use-toast";
+import { hapticLight } from "@/lib/haptics";
 import { useAuth } from "@/lib/auth-context";
 import {
   dmThreadQueryKey,
@@ -158,6 +160,7 @@ function DmMessageBubble({
   const hasText = !shared && Boolean(m.body.trim());
   const isImageOnly = showImage && !hasText && !shared;
   const timeLabel = format(new Date(m.created_at), "HH:mm");
+  const doubleTapLike = useDoubleTap(() => onToggleLike(m));
 
   const bubbleShell = cn(
     "relative max-w-[min(88%,20rem)] text-[15px] leading-relaxed",
@@ -203,8 +206,13 @@ function DmMessageBubble({
 
       <div
         className={cn("min-w-0", bubbleShell)}
-        onDoubleClick={!mine ? () => onToggleLike(m) : undefined}
-        title={!mine ? "Double-tap to like" : undefined}
+        {...(!mine
+          ? {
+              onTouchEnd: doubleTapLike.onTouchEnd,
+              onDoubleClick: doubleTapLike.onDoubleClick,
+              onClickCapture: doubleTapLike.onClickCapture,
+            }
+          : {})}
       >
         {shared ? (
           <>
@@ -368,6 +376,7 @@ export default function CommunityThreadPage() {
       const prevCount = m.like_count ?? 0;
       const optimisticLiked = !wasLiked;
       const optimisticCount = Math.max(0, wasLiked ? prevCount - 1 : prevCount + 1);
+      if (optimisticLiked) void hapticLight();
       setMessagesInCache((prev) =>
         prev.map((x) =>
           x.id === m.id ? { ...x, liked_by_me: optimisticLiked, like_count: optimisticCount } : x,

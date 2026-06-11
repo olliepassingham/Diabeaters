@@ -90,6 +90,10 @@ async function finalizeSupporterLink(userId: string | undefined): Promise<void> 
   const shouldClearCommunityProfile =
     isCommunityMemberAccount() || isCommunityAccountProfile(storage.getProfile());
   applySupporterAccountRoleAfterLink();
+  if (userId) {
+    const { syncPrimaryAppRoleToCloud } = await import("@/lib/profile-primary-role");
+    await syncPrimaryAppRoleToCloud(userId, "carer");
+  }
   if (shouldClearCommunityProfile && userId) {
     await clearCommunityProfileAfterSupporterLink(userId);
   }

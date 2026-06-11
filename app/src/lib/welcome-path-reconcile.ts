@@ -8,6 +8,7 @@ import {
 } from "@/lib/welcome-path-dual-role-reconcile";
 import { stashPostLoginToast } from "@/lib/post-login-toast-stash";
 import { reconcileUserWelcomeWithExistingCommunityAccount } from "@/lib/welcome-path-community-reconcile";
+import { reconcileSupporterSessionFromCloudProfile } from "@/lib/profile-primary-role";
 import { reconcileSupporterWelcomeWithExistingAccount } from "@/lib/welcome-path-supporter-reconcile";
 
 export type WelcomePathReconcileResult = {
@@ -40,6 +41,11 @@ export async function reconcileWrongWelcomePathForSignedInUser(
   if (supporter.reconciled) {
     stashPostLoginToast(supporter.toast);
     return { reconciled: true, destination: supporter.destination };
+  }
+
+  const cloudSupporter = await reconcileSupporterSessionFromCloudProfile(userId);
+  if (cloudSupporter.reconciled) {
+    return { reconciled: true, destination: cloudSupporter.destination };
   }
 
   await repairDualRoleMarkersIfCorrupted(userId);

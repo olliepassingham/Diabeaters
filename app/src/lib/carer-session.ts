@@ -12,6 +12,8 @@ const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
 const SUPPORTER_ACCOUNT_PERSIST_KEY = "diabeater_supporter_account_v1";
 /** Survives mistaken User/Supporter welcome taps — marks a community-only account. */
 const COMMUNITY_ACCOUNT_PERSIST_KEY = "diabeater_community_account_v1";
+/** Session cache of `profiles.primary_app_role` — survives navigation within a login session. */
+const CLOUD_PRIMARY_APP_ROLE_KEY = "diabeater_cloud_primary_app_role";
 
 function readPersistedPrimaryAppRole(): PrimaryAppRole | null {
   try {
@@ -45,6 +47,34 @@ function emitModeChanged(mode: ActiveAppMode | null) {
   }
 }
 
+export function cacheCloudPrimaryAppRole(role: PrimaryAppRole | null): void {
+  try {
+    if (role === null) sessionStorage.removeItem(CLOUD_PRIMARY_APP_ROLE_KEY);
+    else sessionStorage.setItem(CLOUD_PRIMARY_APP_ROLE_KEY, role);
+  } catch {
+    // ignore
+  }
+}
+
+export function cacheCloudPrimaryAppRoleFromProfile(
+  profile: { primary_app_role?: PrimaryAppRole | null } | null | undefined,
+): void {
+  const raw = profile?.primary_app_role;
+  if (raw === "patient" || raw === "carer" || raw === "community") {
+    cacheCloudPrimaryAppRole(raw);
+  }
+}
+
+export function getCachedCloudPrimaryAppRole(): PrimaryAppRole | null {
+  try {
+    const raw = sessionStorage.getItem(CLOUD_PRIMARY_APP_ROLE_KEY);
+    if (raw === "patient" || raw === "carer" || raw === "community") return raw;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(CARER_INTENT_KEY);
   sessionStorage.removeItem(CARER_LINKED_BANNER_KEY);
@@ -53,6 +83,7 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(ACTIVE_CARER_PATIENT_ID_KEY);
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
   sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
+  sessionStorage.removeItem(CLOUD_PRIMARY_APP_ROLE_KEY);
   // Legacy location (older builds); safe to clear if present.
   try {
     sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
@@ -184,10 +215,15 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 
 /** Account created as supporter-only on /welcome — no User Mode or mode switcher. */
 export function isSupporterOnlyAccount(): boolean {
+  const cloud = getCachedCloudPrimaryAppRole();
+  if (cloud === "carer") return true;
+  if (cloud === "patient" || cloud === "community") return false;
+
   const path = getOnboardingAccountPath();
   if (path === "supporter") return true;
   if (path === "patient" || path === "both" || path === "community") return false;
-  return getPrimaryAppRole() === "carer";
+  if (getPrimaryAppRole() === "carer") return true;
+  return isPersistedSupporterAccount();
 }
 
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */

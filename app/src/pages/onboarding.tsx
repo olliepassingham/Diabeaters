@@ -533,6 +533,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         onboarding_complete: true,
         full_name: fullName,
         account_type: "community",
+        primary_app_role: "community",
       });
       if (error) {
         toast({
@@ -592,6 +593,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         onboarding_complete: true,
         full_name: fullName,
         account_type: "patient",
+        primary_app_role: "patient",
       });
       if (error) {
         toast({

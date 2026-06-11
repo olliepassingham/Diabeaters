@@ -12,7 +12,9 @@ import {
   profileIndicatesExistingPatientAccount,
 } from "@/lib/community-path-patient-reconcile";
 import { getProfile } from "@/lib/profile";
+import { cloudPrimaryAppRoleFromProfile, profileIsSupporterOnlyRole } from "@/lib/profile-primary-role";
 import { isUserWelcomePathChosen } from "@/lib/welcome-path-supporter-reconcile";
+import { cacheCloudPrimaryAppRole } from "@/lib/carer-session";
 
 /** Patient + linked supporter: keep User markers and clear mistaken supporter-only flags. */
 export function restoreDualRolePatientSessionMarkers(): void {
@@ -21,12 +23,15 @@ export function restoreDualRolePatientSessionMarkers(): void {
   setPrimaryAppRole("patient");
   setActiveAppMode("patient");
   clearPersistedSupporterAccount();
+  cacheCloudPrimaryAppRole("patient");
 }
 
 async function isDualRolePatientSupporter(userId: string): Promise<boolean> {
   const link = await getLinkedPatientForCarer();
   if (!link.data) return false;
   const { profile } = await getProfile(userId);
+  if (profileIsSupporterOnlyRole(profile)) return false;
+  if (cloudPrimaryAppRoleFromProfile(profile) === "patient") return true;
   return profileIndicatesExistingPatientAccount(profile);
 }
 

@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getProfile = vi.fn();
 const getLinkedPatientForCarer = vi.fn();
+const updateProfile = vi.fn();
 
 vi.mock("@/lib/profile", () => ({
   getProfile: (...args: unknown[]) => getProfile(...args),
+  updateProfile: (...args: unknown[]) => updateProfile(...args),
 }));
 
 vi.mock("@/lib/carers", () => ({
@@ -42,13 +44,20 @@ function mockAccount(kind: AccountKind): void {
   );
 
   if (kind === "patient" || kind === "patient-dual") {
-    getProfile.mockResolvedValue({ profile: patientProfile });
+    getProfile.mockResolvedValue({
+      profile: {
+        ...patientProfile,
+        primary_app_role: "patient" as const,
+      },
+    });
     localStorage.setItem("diabeater_onboarding_completed", "true");
     return;
   }
 
   if (kind === "community") {
-    getProfile.mockResolvedValue({ profile: communityProfile });
+    getProfile.mockResolvedValue({
+      profile: { ...communityProfile, primary_app_role: "community" as const },
+    });
     return;
   }
 
@@ -62,6 +71,7 @@ function mockAccount(kind: AccountKind): void {
       is_public: false,
       onboarding_complete: false,
       account_type: null,
+      primary_app_role: "carer",
     },
   });
 }
@@ -126,12 +136,72 @@ async function runReconcile(): Promise<{ reconciled: boolean; destination?: stri
   return reconcileWrongWelcomePathForSignedInUser("u1");
 }
 
+/** Mirrors post-login navigation without pulling in `react-dom` (Vitest env). */
 async function runNavigateAfterReconcile(): Promise<string> {
   const destinations: string[] = [];
-  const { navigateAfterLoginSuccess } = await import("@/lib/auth-post-login");
-  await navigateAfterLoginSuccess((path) => {
+  const setLocation = (path: string) => {
     destinations.push(path);
-  }, "u1");
+  };
+  const userId = "u1";
+
+  const wrongPath = await runReconcile();
+  if (wrongPath.reconciled && wrongPath.destination) {
+    const { setActiveAppMode } = await import("@/lib/carer-session");
+    const dest = wrongPath.destination;
+    if (dest === "/carer-view" || dest === "/carer-setup") setActiveAppMode("carer");
+    else if (dest === "/") setActiveAppMode("patient");
+    else setActiveAppMode("community");
+    setLocation(dest);
+    return destinations[0] ?? "";
+  }
+
+  const { getLinkedPatientForCarer } = await import("@/lib/carers");
+  const {
+    getPrimaryAppRole,
+    hasCarerIntent,
+    hasPendingCarer,
+    isCommunityOnlyAccount,
+    isSupporterOnlyAccount,
+    setActiveAppMode,
+    cacheCloudPrimaryAppRoleFromProfile,
+  } = await import("@/lib/carer-session");
+  const { getCommunityMemberLandingPath } = await import("@/lib/community-landing");
+  const { getProfile } = await import("@/lib/profile");
+  const { resolveSupporterOnlyAccount } = await import("@/lib/profile-primary-role");
+
+  const link = await getLinkedPatientForCarer();
+  if (link.data) {
+    const { profile } = await getProfile(userId);
+    if (profile) cacheCloudPrimaryAppRoleFromProfile(profile);
+    const supporterOnly = resolveSupporterOnlyAccount({
+      profile,
+      hasCarerLink: true,
+      localIsSupporterOnly: isSupporterOnlyAccount(),
+    });
+    if (supporterOnly || getPrimaryAppRole() === "carer") {
+      setActiveAppMode("carer");
+      setLocation("/carer-view");
+      return destinations[0] ?? "";
+    }
+    setActiveAppMode("patient");
+    setLocation("/");
+    return destinations[0] ?? "";
+  }
+  if (hasCarerIntent() || hasPendingCarer()) {
+    setLocation("/carer-setup");
+    return destinations[0] ?? "";
+  }
+  const role = getPrimaryAppRole();
+  if (role === null) {
+    setLocation("/welcome");
+    return destinations[0] ?? "";
+  }
+  if (isCommunityOnlyAccount() || role === "community") {
+    setActiveAppMode("community");
+    setLocation(getCommunityMemberLandingPath());
+    return destinations[0] ?? "";
+  }
+  setLocation("/");
   return destinations[0] ?? "";
 }
 
@@ -142,6 +212,8 @@ describe("welcome path matrix — wrong-path login behaviour", () => {
     localStorage.clear();
     getProfile.mockReset();
     getLinkedPatientForCarer.mockReset();
+    updateProfile.mockReset();
+    updateProfile.mockResolvedValue({ data: null, error: null });
   });
 
   const cases: Array<{

@@ -10,6 +10,9 @@ import {
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { cacheCloudPrimaryAppRoleFromProfile } from "@/lib/carer-session";
+import { getProfile } from "@/lib/profile";
+import { resolveSupporterOnlyAccount, syncLocalPrimaryAppRoleToCloud } from "@/lib/profile-primary-role";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 
 /** Commit Supabase session to React auth state before entering protected routes. */
@@ -61,7 +64,14 @@ export async function navigateAfterLoginSuccess(
   const link = await getLinkedPatientForCarer();
   if (link.data) {
     const next = new URLSearchParams(window.location.search).get("next");
-    if (isSupporterOnlyAccount() || getPrimaryAppRole() === "carer") {
+    const profile = userId ? (await getProfile(userId)).profile : null;
+    if (profile) cacheCloudPrimaryAppRoleFromProfile(profile);
+    const supporterOnly = resolveSupporterOnlyAccount({
+      profile,
+      hasCarerLink: true,
+      localIsSupporterOnly: isSupporterOnlyAccount(),
+    });
+    if (supporterOnly || getPrimaryAppRole() === "carer") {
       setActiveAppMode("carer");
       setLocation("/carer-view");
       return;
@@ -107,6 +117,9 @@ export async function completeAuthAndNavigate(
   if (userId) {
     const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
     if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
+    const { profile } = await getProfile(userId);
+    cacheCloudPrimaryAppRoleFromProfile(profile);
+    void syncLocalPrimaryAppRoleToCloud(userId);
   }
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
   await navigateAfterLoginSuccess(setLocation, userId, welcomeReconcileDestination);

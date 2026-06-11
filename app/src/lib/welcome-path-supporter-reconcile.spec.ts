@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getProfile = vi.fn();
 const getLinkedPatientForCarer = vi.fn();
+const updateProfile = vi.fn();
 
 vi.mock("@/lib/profile", () => ({
   getProfile: (...args: unknown[]) => getProfile(...args),
+  updateProfile: (...args: unknown[]) => updateProfile(...args),
 }));
 
 vi.mock("@/lib/carers", () => ({
@@ -18,6 +20,8 @@ describe("welcome-path-supporter-reconcile", () => {
     localStorage.clear();
     getProfile.mockReset();
     getLinkedPatientForCarer.mockReset();
+    updateProfile.mockReset();
+    updateProfile.mockResolvedValue({ data: null, error: null });
     getLinkedPatientForCarer.mockResolvedValue({ data: null, error: null });
     getProfile.mockResolvedValue({
       profile: {
@@ -29,6 +33,7 @@ describe("welcome-path-supporter-reconcile", () => {
         is_public: false,
         onboarding_complete: false,
         account_type: null,
+        primary_app_role: null,
       },
     });
   });
@@ -93,6 +98,7 @@ describe("welcome-path-supporter-reconcile", () => {
         is_public: false,
         onboarding_complete: true,
         account_type: "patient",
+        primary_app_role: "patient",
       },
     });
 
@@ -117,6 +123,7 @@ describe("welcome-path-supporter-reconcile", () => {
         is_public: false,
         onboarding_complete: true,
         account_type: "patient",
+        primary_app_role: "patient",
       },
     });
 
@@ -126,5 +133,37 @@ describe("welcome-path-supporter-reconcile", () => {
 
     const result = await reconcileSupporterWelcomeWithExistingAccount("u1");
     expect(result.reconciled).toBe(false);
+  });
+
+  it("reconciles when cloud profile marks supporter-only even without local markers", async () => {
+    const { setOnboardingAccountPath } = await import("@/lib/carer-session");
+    setOnboardingAccountPath("patient");
+
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: "Sup",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: false,
+        account_type: null,
+        primary_app_role: "carer",
+      },
+    });
+    getLinkedPatientForCarer.mockResolvedValue({
+      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
+      error: null,
+    });
+
+    const { reconcileSupporterWelcomeWithExistingAccount } = await import(
+      "@/lib/welcome-path-supporter-reconcile"
+    );
+
+    const result = await reconcileSupporterWelcomeWithExistingAccount("u1");
+    expect(result.reconciled).toBe(true);
+    if (!result.reconciled) return;
+    expect(result.destination).toBe("/carer-view");
   });
 });

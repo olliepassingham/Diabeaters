@@ -1,7 +1,8 @@
 /**
  * Supabase `profiles` + React Query cache. Avatar files: `storage-profile.ts`.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { cacheCloudPrimaryAppRoleFromProfile } from "./carer-session";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./auth-context";
 import { getSupabase } from "./supabase";
@@ -37,6 +38,8 @@ export type ProfileRow = {
   pharmacy?: PharmacyJson | null;
   /** patient = full tools; community = learn + feed persona. */
   account_type?: "patient" | "community" | null;
+  /** Authoritative login persona: patient | carer (supporter) | community. */
+  primary_app_role?: "patient" | "carer" | "community" | null;
   app_region?: "UK" | "US" | "OTHER" | null;
   emergency_number?: string | null;
   /** Streak track kinds pinned to public profile (max 5). */
@@ -110,6 +113,14 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
   else if (rawAccountType === "patient" || rawAccountType === "community") account_type = rawAccountType;
   else account_type = "patient";
 
+  const rawPrimaryRole = data.primary_app_role;
+  let primary_app_role: ProfileRow["primary_app_role"];
+  if (rawPrimaryRole === null) primary_app_role = null;
+  else if (rawPrimaryRole === undefined) primary_app_role = undefined;
+  else if (rawPrimaryRole === "patient" || rawPrimaryRole === "carer" || rawPrimaryRole === "community") {
+    primary_app_role = rawPrimaryRole;
+  } else primary_app_role = null;
+
   const rawRegion = data.app_region;
   let app_region: "UK" | "US" | "OTHER" | null | undefined;
   if (rawRegion === null) app_region = null;
@@ -169,6 +180,7 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     date_of_birth,
     pharmacy,
     account_type,
+    primary_app_role,
     app_region,
     emergency_number,
     pinned_achievement_ids,
@@ -498,6 +510,7 @@ export type ProfileUpdatePayload = {
     | "date_of_birth"
     | "pharmacy"
     | "account_type"
+    | "primary_app_role"
     | "app_region"
     | "emergency_number"
     | "pinned_achievement_ids"
@@ -527,6 +540,7 @@ export async function updateProfile(
     date_of_birth,
     pharmacy,
     account_type,
+    primary_app_role,
     app_region,
     emergency_number,
     pinned_achievement_ids,
@@ -612,6 +626,12 @@ export async function updateProfile(
     if (account_type === null) update.account_type = "patient";
     else if (account_type === "patient" || account_type === "community") update.account_type = account_type;
   }
+  if (primary_app_role !== undefined) {
+    if (primary_app_role === null) update.primary_app_role = null;
+    else if (primary_app_role === "patient" || primary_app_role === "carer" || primary_app_role === "community") {
+      update.primary_app_role = primary_app_role;
+    }
+  }
   if (app_region !== undefined) {
     if (app_region === null) update.app_region = null;
     else if (app_region === "UK" || app_region === "US" || app_region === "OTHER") update.app_region = app_region;
@@ -675,6 +695,7 @@ export async function upsertProfile(payload: {
   emergency_contact_phone?: string | null;
   emergency_notes?: string | null;
   account_type?: "patient" | "community" | null;
+  primary_app_role?: "patient" | "carer" | "community" | null;
 }): Promise<{ data: ProfileRow | null; error: Error | null }> {
   const supabase = getSupabase();
   if (!supabase) return { data: null, error: new Error("Supabase not configured") };
@@ -690,6 +711,7 @@ export async function upsertProfile(payload: {
     emergency_contact_phone,
     emergency_notes,
     account_type,
+    primary_app_role,
   } = payload;
 
   const update: Record<string, unknown> = { id };
@@ -708,6 +730,12 @@ export async function upsertProfile(payload: {
   if (account_type !== undefined) {
     if (account_type === null) update.account_type = "patient";
     else if (account_type === "patient" || account_type === "community") update.account_type = account_type;
+  }
+  if (primary_app_role !== undefined) {
+    if (primary_app_role === null) update.primary_app_role = null;
+    else if (primary_app_role === "patient" || primary_app_role === "carer" || primary_app_role === "community") {
+      update.primary_app_role = primary_app_role;
+    }
   }
 
   try {
@@ -749,6 +777,10 @@ export function useProfile() {
   const refresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: profileQueryKey(userId) });
   }, [queryClient, userId]);
+
+  useEffect(() => {
+    if (q.data) cacheCloudPrimaryAppRoleFromProfile(q.data);
+  }, [q.data]);
 
   const err = q.error;
   const error =
