@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   clearCommunityProfileReminderState,
+  dismissCommunityFeedProfileReminder,
   dismissCommunityToolsProfileReminder,
   markCommunitySkippedProfileSetup,
+  shouldShowCommunityFeedProfileReminder,
   shouldShowCommunityToolsProfileReminder,
 } from "@/lib/community-profile-prompt";
 
@@ -32,5 +34,15 @@ describe("community-profile-prompt", () => {
     clearCommunityProfileReminderState(USER_ID);
     markCommunitySkippedProfileSetup();
     expect(shouldShowCommunityToolsProfileReminder(USER_ID)).toBe(true);
+  });
+
+  it("shows feed reminder when public profile is incomplete until dismissed", () => {
+    const incomplete = { full_name: null, public_handle: null, is_public: false };
+    expect(shouldShowCommunityFeedProfileReminder(USER_ID, incomplete)).toBe(true);
+    dismissCommunityFeedProfileReminder(USER_ID);
+    expect(shouldShowCommunityFeedProfileReminder(USER_ID, incomplete)).toBe(false);
+    expect(shouldShowCommunityFeedProfileReminder(USER_ID, { full_name: "A", public_handle: "ab_c", is_public: true })).toBe(
+      false,
+    );
   });
 });

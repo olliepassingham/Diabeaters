@@ -35,6 +35,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
+import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
+import {
+  dismissCommunityFeedProfileReminder,
+  shouldShowCommunityFeedProfileReminder,
+} from "@/lib/community-profile-prompt";
 import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
@@ -111,6 +116,15 @@ export default function CommunityHomePage() {
   const [followingAuthorIds, setFollowingAuthorIds] = useState<string[] | null>(null);
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
+  const [showProfileReminder, setShowProfileReminder] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id || profileLoading) {
+      setShowProfileReminder(false);
+      return;
+    }
+    setShowProfileReminder(shouldShowCommunityFeedProfileReminder(user.id, profile));
+  }, [user?.id, profile, profileLoading]);
 
   // Preserve scroll position across Everyone / Following toggles.
   useEffect(() => {
@@ -401,16 +415,13 @@ export default function CommunityHomePage() {
         }
       />
 
-      {user && !profileLoading && !hasFeedHandle ? (
-        <Alert className="rounded-2xl border-amber-500/40 bg-amber-500/5 dark:bg-amber-950/25">
-          <AlertDescription className="text-sm leading-relaxed text-foreground">
-            <span className="font-medium">Set a @handle to post on the Feed.</span> You can still read posts. Your handle
-            is used for @mentions and your public link.{" "}
-            <Link href="/account#profile" className="font-medium text-primary underline-offset-4 hover:underline">
-              Open Profile
-            </Link>
-          </AlertDescription>
-        </Alert>
+      {showProfileReminder && user?.id ? (
+        <CommunityProfileReminderCard
+          onDismiss={() => {
+            dismissCommunityFeedProfileReminder(user.id);
+            setShowProfileReminder(false);
+          }}
+        />
       ) : null}
 
       <FindPeoplePanel

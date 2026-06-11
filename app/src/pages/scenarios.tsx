@@ -9,6 +9,7 @@ import { storage, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageShell } from "@/components/layout";
+import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 type ScenarioCardDef = {
   href: string;
@@ -160,8 +161,10 @@ export default function Scenarios() {
   );
 
   return (
-    <PageShell variant="standard" density="compact" className="pt-0 space-y-0">
+    <PageShell variant="standard" density="compact" className="space-y-4 pt-0">
       <h1 className="sr-only">Guides</h1>
+
+      <DobUnknownNotice testId="guides-dob-unknown-notice" />
 
       <div className="grid w-full grid-cols-1 gap-y-3 gap-x-5 md:grid-cols-2 md:gap-x-6 md:gap-y-4">
         <div className="col-span-1 flex h-9 items-center justify-end md:col-span-2">{guidesAboutDialog}</div>

@@ -22,24 +22,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getActiveAppMode, hasCarerIntent, hasPendingCarer, isCarerSessionMode, isCommunitySessionMode } from "@/lib/carer-session";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
-import { needsCommunityProfileSetup, useProfile } from "@/lib/profile";
+import { useProfile } from "@/lib/profile";
 import { PageHeader, PageShell } from "@/components/layout";
 import { HubLoadingSkeleton } from "@/components/empty-state";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
-import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
-import { useAuth } from "@/lib/auth-context";
-import {
-  clearCommunityProfileReminderState,
-  dismissCommunityToolsProfileReminder,
-  shouldShowCommunityToolsProfileReminder,
-} from "@/lib/community-profile-prompt";
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
-import { DobUnknownNotice } from "@/components/dob-unknown-notice";
+import { RatiosSetupNotice } from "@/components/ratios-setup-notice";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -332,21 +325,7 @@ export function ToolsHubPage({
   hubVariant?: "patient" | "carer" | "community";
 }) {
   const byId = new Map(tools.map((t) => [t.id, t] as const));
-  const { user } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useProfile();
   const { communityPushPromptOpen, setCommunityPushPromptOpen } = useCommunityPushPromptAfterOnboarding();
-  const [showProfileReminder, setShowProfileReminder] = useState(false);
-
-  useEffect(() => {
-    if (hubVariant !== "community" || !user?.id || profileLoading) return;
-    if (needsCommunityProfileSetup(profile)) {
-      setShowProfileReminder(shouldShowCommunityToolsProfileReminder(user.id));
-      return;
-    }
-    clearCommunityProfileReminderState(user.id);
-    setShowProfileReminder(false);
-  }, [hubVariant, user?.id, profile, profileLoading]);
-
   useEffect(() => {
     const run = () => prefetchToolsHubLinkedChunks();
     if (typeof window.requestIdleCallback === "function") {
@@ -386,16 +365,7 @@ export function ToolsHubPage({
     <PageShell variant="standard" density="compact" className="max-w-5xl pt-0 space-y-6">
       <h1 className="sr-only">Tools</h1>
 
-      <DobUnknownNotice hidden={hubVariant === "carer" || hubVariant === "community"} testId="tools-dob-unknown-notice" />
-
-      {hubVariant === "community" && showProfileReminder && user?.id ? (
-        <CommunityProfileReminderCard
-          onDismiss={() => {
-            dismissCommunityToolsProfileReminder(user.id);
-            setShowProfileReminder(false);
-          }}
-        />
-      ) : null}
+      <RatiosSetupNotice hidden={hubVariant !== "patient"} testId="tools-ratios-setup-notice" />
 
       {(hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
         <section

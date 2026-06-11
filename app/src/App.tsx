@@ -719,7 +719,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityHome />
             </Suspense>

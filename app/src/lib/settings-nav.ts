@@ -1,6 +1,9 @@
 /** Deep link to date of birth on Personal info & usage settings. */
 export const SETTINGS_DATE_OF_BIRTH_HREF = "/settings/usage#settings-dob";
 
+/** Carb ratios and related insulin settings. */
+export const SETTINGS_RATIOS_HREF = "/settings/ratios";
+
 export function scrollToSettingsHashTarget(hashId: string, opts?: { focusInput?: boolean }): boolean {
   const el = document.getElementById(hashId);
   if (!el) return false;

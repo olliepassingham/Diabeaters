@@ -63,7 +63,6 @@ import {
 } from "@/lib/support";
 import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
 import { resolveUserDisplayName } from "@/lib/user-display-name";
-import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -554,7 +553,6 @@ export default function Account() {
 
   const accountTabPanel = (
     <>
-      <DobUnknownNotice hidden={isCarer || isCommunityAccount} testId="account-dob-unknown-notice" />
       {accountHero}
 
       {isCommunityEnabled && (

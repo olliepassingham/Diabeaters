@@ -303,7 +303,7 @@ export function notifyActiveExerciseChanged(): void {
 
 const ONBOARDING_FINISHED_AT_KEY = "diabeater_onboarding_finished_at";
 
-/** Persist when the onboarding wizard finishes so the dashboard can show a lighter first week. */
+/** Persist when the onboarding wizard finishes so the dashboard can soften post-onboarding setup prompts. */
 export function recordOnboardingFinishedAt(): void {
   if (typeof window === "undefined") return;
   try {
@@ -353,34 +353,6 @@ export function dismissSoftSetupNudge(): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(softSetupNudgeDismissedKey(), "true");
-  } catch {
-    /* ignore */
-  }
-}
-
-function firstWeekChecklistDismissedKey(): string {
-  if (typeof window === "undefined") return "diabeater_first_week_checklist_dismissed";
-  try {
-    const uid = localStorage.getItem(ACTIVE_USER_ID_KEY);
-    return uid ? `diabeater_first_week_checklist_dismissed_u_${uid}` : "diabeater_first_week_checklist_dismissed";
-  } catch {
-    return "diabeater_first_week_checklist_dismissed";
-  }
-}
-
-export function isFirstWeekChecklistDismissed(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return localStorage.getItem(firstWeekChecklistDismissedKey()) === "true";
-  } catch {
-    return false;
-  }
-}
-
-export function dismissFirstWeekChecklist(): void {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(firstWeekChecklistDismissedKey(), "true");
   } catch {
     /* ignore */
   }

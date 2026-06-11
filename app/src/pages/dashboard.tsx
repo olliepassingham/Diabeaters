@@ -24,9 +24,7 @@ import {
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   DIABEATER_OPEN_HYPO_DIALOG_EVENT,
   dismissSoftSetupNudge,
-  dismissFirstWeekChecklist,
   isCommunityAccountProfile,
-  isFirstWeekChecklistDismissed,
   isSoftSetupNudgeDismissed,
   isWithinOnboardingPostFinishGracePeriod,
   Supply as LocalSupply,
@@ -70,7 +68,6 @@ import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/n
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isCommunityEnabled } from "@/lib/flags";
-import { FirstWeekChecklistCard } from "@/components/dashboard/FirstWeekChecklistCard";
 import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
 import { HomePrimaryStatusPill } from "@/components/home/home-ui";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
@@ -716,7 +713,6 @@ function DashboardSkeleton() {
 }
 
 const ONBOARDING_SETUP_GRACE_DAYS = 5;
-const FIRST_WEEK_CHECKLIST_DAYS = 7;
 
 function SoftSettingsNudge({
   completion,
@@ -818,7 +814,6 @@ export default function Dashboard() {
   const [isSettingsComplete, setIsSettingsComplete] = useState(() => storage.isSettingsComplete());
   const [settingsCompletion, setSettingsCompletion] = useState(() => storage.getSettingsCompletion());
   const [softSetupNudgeDismissed, setSoftSetupNudgeDismissed] = useState(() => isSoftSetupNudgeDismissed());
-  const [firstWeekChecklistDismissed, setFirstWeekChecklistDismissed] = useState(() => isFirstWeekChecklistDismissed());
   const [isLoading, setIsLoading] = useState(true);
   const [showVerifiedWelcome, setShowVerifiedWelcome] = useState(false);
 
@@ -852,10 +847,7 @@ export default function Dashboard() {
 
     const onSettingsChanged = () => refreshData();
 
-    const onActiveUserChanged = () => {
-      setFirstWeekChecklistDismissed(isFirstWeekChecklistDismissed());
-      refreshData();
-    };
+    const onActiveUserChanged = () => refreshData();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleFocus);
@@ -931,13 +923,6 @@ export default function Dashboard() {
     !isCommunityDash && !isSettingsComplete && inOnboardingSetupGrace && !softSetupNudgeDismissed;
   const showFullSetupPrompt =
     !isCommunityDash && !isSettingsComplete && !inOnboardingSetupGrace;
-
-  const inFirstWeekSinceOnboarding = isWithinOnboardingPostFinishGracePeriod(FIRST_WEEK_CHECKLIST_DAYS);
-  const showFirstWeekChecklist =
-    !isCommunityDash &&
-    inFirstWeekSinceOnboarding &&
-    !firstWeekChecklistDismissed &&
-    !showFullSetupPrompt;
 
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
@@ -1017,19 +1002,6 @@ export default function Dashboard() {
             />
           </div>
         ) : null}
-
-        {!isCommunityDash && showFirstWeekChecklist && (
-          <div className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
-            <FirstWeekChecklistCard
-              suppliesCount={supplies.length}
-              isSettingsComplete={isSettingsComplete}
-              onDismiss={() => {
-                dismissFirstWeekChecklist();
-                setFirstWeekChecklistDismissed(true);
-              }}
-            />
-          </div>
-        )}
 
         {showWelcomeWidget ? (
           <section className="animate-fade-in-up" style={{ animationDelay: "50ms" }}>
