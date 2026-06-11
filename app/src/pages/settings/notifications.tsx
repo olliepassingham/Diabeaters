@@ -8,7 +8,6 @@ import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
 import { BEDTIME_REMINDER_TIME_OPTIONS, DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
-import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import {
   SettingsGroup,
   SettingsGroupLabel,
@@ -362,7 +361,6 @@ export function SettingsNotificationsRoute({
             embedded
             supporterMode={supporterMode}
           />
-          <PushTestUnlockCallout />
           <DevPushNotificationTestPanel />
         </SettingsPanelBody>
       </SettingsPanel>

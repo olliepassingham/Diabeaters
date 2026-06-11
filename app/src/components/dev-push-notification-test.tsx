@@ -72,7 +72,8 @@ export function DevPushNotificationTestPanel() {
   }, [location]);
 
   const nativeShell = isNativeShellForPushTestUi();
-  const showPanel = isPushTestUiEnabled || (unlocked && nativeShell);
+  /** Never show in the browser — push test is native-only. Production users need the About → Version unlock. */
+  const showPanel = nativeShell && (isPushTestUiEnabled || unlocked);
 
   useEffect(() => {
     if (!showPanel || !isNativePushPlatform()) return;
@@ -97,23 +98,6 @@ export function DevPushNotificationTestPanel() {
   }, [showPanel]);
 
   const iosHealth = notificationSettingsLookHealthy(iosNotifSettings);
-
-  if (!showPanel) return null;
-
-  if (!nativeShell) {
-    return (
-      <div className="rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
-        <p className="text-xs text-muted-foreground leading-snug">
-          <strong className="text-foreground/90">Test push only runs on the native app.</strong> In Safari or
-          Chrome (Vite dev), the app never registers with APNs/FCM, so Supabase has no{" "}
-          <code className="text-[11px]">push_tokens</code> row — you will always see{" "}
-          <code className="text-[11px]">no_push_token</code>. Open Diabeaters from the home screen on
-          an iPhone or Android device, enable Push in Notifications settings, then use Send test push there.
-        </p>
-      </div>
-    );
-  }
 
   const copyPushDebug = useCallback(async () => {
     const text = pushDebugJson || "{}";
@@ -256,6 +240,8 @@ export function DevPushNotificationTestPanel() {
       })();
     }, 1000);
   };
+
+  if (!showPanel) return null;
 
   return (
     <div className="rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
