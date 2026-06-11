@@ -20,7 +20,7 @@ export async function rescheduleBedtimeReminders(): Promise<void> {
   if (!supportsNativeLocalNotifications()) return;
 
   const settings = storage.getNotificationSettings();
-  if (!settings.enabled || settings.bedtimeCheckReminders !== true) {
+  if (!settings.enabled || settings.bedtimeCheckReminders === false) {
     await cancelAllBedtimeReminders(
       settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME,
     );

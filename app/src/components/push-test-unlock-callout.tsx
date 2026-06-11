@@ -53,7 +53,7 @@ export function PushTestUnlockCallout({ className }: { className?: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Enable push test tools?</AlertDialogTitle>
             <AlertDialogDescription>
-              Adds &quot;Send test push&quot; under Settings → Notifications on this device (saved locally). Use it to
+              Adds a developer &quot;Send test push&quot; section on this page (saved locally on this device). Use it to
               verify APNs/FCM and your Supabase <code className="text-[11px]">push_tokens</code> row.
             </AlertDialogDescription>
           </AlertDialogHeader>

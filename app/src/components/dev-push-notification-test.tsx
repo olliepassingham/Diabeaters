@@ -56,7 +56,7 @@ function deliveryFailureHint(r: {
   return null;
 }
 
-/** “Send test push” — build-time flag, staging, or per-device unlock (see About → Version taps on iOS). */
+/** “Send test push” — build-time flag, staging, per-device unlock, or seven taps on About → Version (native). */
 export function DevPushNotificationTestPanel() {
   const { toast } = useToast();
   const [location] = useLocation();
@@ -102,7 +102,7 @@ export function DevPushNotificationTestPanel() {
 
   if (!nativeShell) {
     return (
-      <div className="mt-6 rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
+      <div className="rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
         <p className="text-xs text-muted-foreground leading-snug">
           <strong className="text-foreground/90">Test push only runs on the native app.</strong> In Safari or
@@ -258,12 +258,13 @@ export function DevPushNotificationTestPanel() {
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
+    <div className="rounded-xl border border-dashed border-amber-600/40 bg-amber-950/15 p-4 space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">Developer</p>
       {unlocked && !isPushTestUiEnabled ? (
         <p className="text-xs text-muted-foreground leading-snug">
-          Unlocked on this {nativePlatformLabel().toLowerCase()} from <strong className="text-foreground/85">About</strong> (link “Enable push test
-          tools…” or seven quick taps on the version). Stored only on this device.
+          Unlocked on this {nativePlatformLabel().toLowerCase()} from{" "}
+          <strong className="text-foreground/85">Settings → Notifications</strong> or seven quick taps on{" "}
+          <strong className="text-foreground/85">About → Version</strong>. Stored only on this device.
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground leading-snug">

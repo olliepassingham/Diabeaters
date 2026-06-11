@@ -6,7 +6,9 @@ import type { NotificationSettings } from "@/lib/storage";
 import { IosNotificationDisplayCard } from "@/components/ios-notification-display-card";
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
-import { BEDTIME_REMINDER_TIME_OPTIONS } from "@/lib/bedtime-reminder-schedule";
+import { BEDTIME_REMINDER_TIME_OPTIONS, DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
+import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
+import { PushTestUnlockCallout } from "@/components/push-test-unlock-callout";
 import {
   SettingsGroup,
   SettingsGroupLabel,
@@ -170,18 +172,18 @@ export function NotificationsTab({
               <SettingsToggleRow
                 label="Bedtime check"
                 description="A gentle evening nudge to open your bedtime readiness check"
-                checked={notifSettings.bedtimeCheckReminders === true}
+                checked={notifSettings.bedtimeCheckReminders !== false}
                 onCheckedChange={(checked) => onToggle("bedtimeCheckReminders", checked)}
                 disabled={masterOff}
                 testId="switch-bedtime-check-reminders"
               />
-              {notifSettings.bedtimeCheckReminders ? (
+              {notifSettings.bedtimeCheckReminders !== false ? (
                 <div className="space-y-2 px-3.5 py-3 sm:px-4">
                   <Label htmlFor="bedtime-reminder-time" className="text-xs font-medium text-muted-foreground">
                     Reminder time
                   </Label>
                   <Select
-                    value={notifSettings.bedtimeReminderTime || "20:30"}
+                    value={notifSettings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME}
                     onValueChange={(v) => onBedtimeReminderTimeChange?.(v)}
                     disabled={masterOff}
                   >
@@ -360,6 +362,8 @@ export function SettingsNotificationsRoute({
             embedded
             supporterMode={supporterMode}
           />
+          <PushTestUnlockCallout />
+          <DevPushNotificationTestPanel />
         </SettingsPanelBody>
       </SettingsPanel>
     </SettingsSubPageShell>

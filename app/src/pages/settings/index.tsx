@@ -1144,7 +1144,7 @@ export default function Settings() {
       contacts: emergencyEdit,
       data: "/settings/usage#settings-backup",
       appearance: "/settings/appearance",
-      sources: "/settings/about#settings-sources",
+      sources: "/medical-sources",
       about: "/settings/about",
     };
     if (tab && tabRoutes[tab]) {
@@ -1169,7 +1169,7 @@ export default function Settings() {
       "emergency-contacts": emergencyEdit,
       "usual-habits": "/settings/usage#settings-usage",
       data: "/settings/usage#settings-backup",
-      sources: "/settings/about#settings-sources",
+      sources: "/medical-sources",
       insulin: "/settings/ratios",
     };
     const target = hashRoutes[raw];

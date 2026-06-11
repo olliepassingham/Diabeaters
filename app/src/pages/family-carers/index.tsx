@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { InfoTooltip } from "@/components/info-tooltip";
 import { Users, Copy, UserPlus, Shield, Info, Check, ChevronLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -24,6 +26,98 @@ import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { Link, useLocation } from "wouter";
 import { PageHeader, PageShell } from "@/components/layout";
+
+function InfoPopoverButton({
+  label,
+  title,
+  children,
+  testId,
+}: {
+  label: string;
+  title?: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          aria-label={label}
+          data-testid={testId}
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(20rem,calc(100vw-2rem))] space-y-2 p-3 text-sm" align="end" sideOffset={6}>
+        {title ? <p className="font-medium text-foreground">{title}</p> : null}
+        <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">{children}</div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SectionTitle({
+  icon: Icon,
+  title,
+  info,
+}: {
+  icon?: typeof Users;
+  title: string;
+  info?: ReactNode;
+}) {
+  return (
+    <CardTitle className="flex items-center gap-2 text-lg">
+      {Icon ? <Icon className="h-5 w-5 shrink-0 text-primary" /> : null}
+      <span className="min-w-0 flex-1">{title}</span>
+      {info}
+    </CardTitle>
+  );
+}
+
+const PRIVACY_TOGGLES = [
+  {
+    key: "supplies" as const,
+    label: "Supplies",
+    description: "Stock levels from your cloud supply list.",
+    testId: "privacy-toggle-supplies",
+  },
+  {
+    key: "hypo_alerts" as const,
+    label: "Hypo logs",
+    description: "Recent low blood sugar logs.",
+    testId: "privacy-toggle-hypo-alerts",
+  },
+  {
+    key: "appointments" as const,
+    label: "Appointments",
+    description:
+      "Shared clinic visits in Supporter mode. Supporters can also get reminders the evening before and about 2 hours before (if you allow it in Settings → Notifications).",
+    testId: "privacy-toggle-appointments",
+  },
+  {
+    key: "scenarios" as const,
+    label: "Travel and sick-day flags",
+    description: "High-level status when your project exposes these to linked supporters.",
+    testId: "privacy-toggle-scenarios",
+  },
+  {
+    key: "emergency_info" as const,
+    label: "Emergency details",
+    description: "The contact and notes you save under Account or Settings — only if you want them visible.",
+    testId: "privacy-toggle-emergency",
+  },
+  {
+    key: "clinical_settings" as const,
+    label: "Clinical basics on their profile",
+    descriptionChild:
+      "Lets a linked supporter update insulin delivery, total daily dose, and date of birth on the cloud profile. For under-13 accounts this starts on for new links so parents can help — turn it off if you prefer.",
+    descriptionDefault:
+      "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default for new links.",
+    testId: "privacy-toggle-clinical-settings",
+  },
+] as const;
 
 function AvatarBubble({
   label,
@@ -199,7 +293,13 @@ export default function FamilyCarersPage() {
             Family &amp; supporters
           </span>
         }
-        description="Invite someone you trust to follow along. They only see what you allow — nothing here replaces professional care."
+        description="Invite people you trust to a read-only view you control."
+        actions={
+          <InfoTooltip
+            term="Family & supporters"
+            explanation="Linked supporters sign in with their own account and only see what you allow. This does not replace advice from your diabetes team."
+          />
+        }
       />
 
       {!configured && (
@@ -213,28 +313,33 @@ export default function FamilyCarersPage() {
       )}
 
       {configured && patientAgeBand === "child" && (
-        <Alert className="border-primary/25 bg-primary/[0.04]">
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            <span className="font-medium text-foreground">Supporter defaults for under-13 accounts.</span>{" "}
-            {scopePresetHint} Everyone stays on the toggles you set here after they link.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 py-2.5 text-sm">
+          <p className="min-w-0 flex-1 text-foreground">Under-13 accounts use tailored supporter defaults.</p>
+          <InfoTooltip
+            term="Under-13 supporter defaults"
+            explanation={`${scopePresetHint} You can change any toggle below after they link.`}
+          />
+        </div>
       )}
 
-      {/* A) Linked accounts (invite flow) */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">People you have linked</CardTitle>
-          <CardDescription>They can open a read-only view when they sign in with their own account.</CardDescription>
+        <CardHeader className="pb-3">
+          <SectionTitle
+            title="Linked supporters"
+            info={
+              <InfoPopoverButton label="About linked supporters" title="Linked supporters">
+                <p>Each person signs in with their own Diabeaters account and opens a read-only view of your data.</p>
+                <p>Remove someone anytime — they lose access immediately.</p>
+              </InfoPopoverButton>
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 pt-0">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : links.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="carers-list-empty">
-              No one is linked yet. Generate an invite code below and ask them to enter it in Supporter setup (Account →
-              Supporter setup) on their device.
+              No one linked yet — generate an invite below.
             </p>
           ) : (
             <ul className="space-y-3" data-testid="supporters-list">
@@ -285,21 +390,36 @@ export default function FamilyCarersPage() {
         </CardContent>
       </Card>
 
-      {/* B) Invite */}
       <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5 text-primary shrink-0" />
-            Invite someone
-          </CardTitle>
-          <CardDescription>
-            Codes expire after 7 days. A new link starts with every view option on; clinical basics on their profile also
-            turn on automatically for under-13 accounts (you can switch that off below after they link).
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <SectionTitle
+            icon={UserPlus}
+            title="Invite someone"
+            info={
+              <InfoPopoverButton label="How invites work" title="How invites work" testId="invite-how-it-works">
+                <ol className="list-decimal space-y-1.5 pl-4">
+                  <li>Generate a code and share it privately with one person.</li>
+                  <li>
+                    They sign in (or create an account) and enter it in{" "}
+                    <span className="font-medium text-foreground">Account → Supporter setup</span>.
+                  </li>
+                  <li>Use the privacy toggles below to limit what they can see.</li>
+                </ol>
+                <p>Codes expire after 7 days. New links start with all view options on.</p>
+                {patientAgeBand === "child" ? (
+                  <p>Under-13 accounts also turn on clinical basics by default — you can switch that off after they link.</p>
+                ) : null}
+                {invites.length > 1 ? (
+                  <p>Older unused codes still work until they expire or are used.</p>
+                ) : null}
+              </InfoPopoverButton>
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-0">
           <Button
             type="button"
+            className="w-full sm:w-auto"
             onClick={handleGenerateInvite}
             disabled={generating || !configured}
             data-testid="invite-generate"
@@ -309,13 +429,15 @@ export default function FamilyCarersPage() {
           </Button>
 
           {activeInvite && (
-            <div className="rounded-xl border-0 bg-gray-50 p-5 space-y-3 shadow-sm dark:bg-muted/30">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Active code</p>
+            <div className="rounded-xl bg-muted/40 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active code</p>
+                <p className="text-xs text-muted-foreground">
+                  Expires {format(new Date(activeInvite.expiresAt), "d MMM yyyy")}
+                </p>
+              </div>
               <p className="font-mono text-2xl font-semibold tracking-widest" data-testid="invite-code">
                 {activeInvite.code}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Expires {format(new Date(activeInvite.expiresAt), "EEEE d MMMM yyyy, HH:mm")}
               </p>
               <Button
                 type="button"
@@ -331,130 +453,85 @@ export default function FamilyCarersPage() {
               </Button>
             </div>
           )}
-
-          <div className="text-sm text-muted-foreground space-y-2 border-t pt-4">
-            <p className="font-medium text-foreground">How it works</p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>You generate a code and share it privately with one person.</li>
-              <li>They sign in to Diabeaters (or create an account) and enter the code in Supporter setup (Account → Supporter setup).</li>
-              <li>You stay in control: use the toggles below to limit what they can see.</li>
-            </ol>
-          </div>
-
-          {invites.length > 1 && (
-            <div className="text-xs text-muted-foreground">
-              You have multiple active codes. Older ones still work until used or expired; you can revoke unused codes
-              from the database if needed (see project docs).
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* C) Privacy */}
       <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary shrink-0" />
-            What supporters can see
-          </CardTitle>
-          <CardDescription>
-            For this MVP, changes apply to <strong className="font-medium">everyone you have linked</strong>. Per-person
-            controls can follow in a later update.
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <SectionTitle
+            icon={Shield}
+            title="What supporters can see"
+            info={
+              <InfoPopoverButton label="About privacy controls" title="Privacy controls">
+                <p>Changes apply to everyone you have linked. Per-person controls may follow in a later update.</p>
+              </InfoPopoverButton>
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-0 divide-y divide-border/60 pt-0">
           {links.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Link someone first — then you can fine-tune what they see.</p>
+            <p className="pb-4 text-sm text-muted-foreground">Link someone first to adjust what they can see.</p>
           ) : null}
 
-          {[
-            {
-              key: "supplies" as const,
-              label: "Supplies",
-              description: "Stock levels from your cloud supply list.",
-              testId: "privacy-toggle-supplies",
-            },
-            {
-              key: "hypo_alerts" as const,
-              label: "Hypo logs",
-              description: "Recent low blood sugar logs.",
-              testId: "privacy-toggle-hypo-alerts",
-            },
-            {
-              key: "appointments" as const,
-              label: "Appointments",
-              description:
-                "Shared clinic visits in Supporter mode. Supporters can also get reminders the evening before and about 2 hours before (if you allow it in Settings → Notifications).",
-              testId: "privacy-toggle-appointments",
-            },
-            {
-              key: "scenarios" as const,
-              label: "Travel and sick-day flags",
-              description: "High-level status when your project exposes these to linked supporters.",
-              testId: "privacy-toggle-scenarios",
-            },
-            {
-              key: "emergency_info" as const,
-              label: "Emergency details",
-              description: "The contact and notes you save under Account or Settings — only if you want them visible.",
-              testId: "privacy-toggle-emergency",
-            },
-            {
-              key: "clinical_settings" as const,
-              label: "Clinical basics on their profile",
-              description:
-                patientAgeBand === "child"
-                  ? "Lets a linked supporter update insulin delivery, total daily dose, and date of birth on the cloud profile. For under-13 accounts this starts on for new links so parents can help — turn it off if you prefer."
-                  : "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default for new links.",
-              testId: "privacy-toggle-clinical-settings",
-            },
-          ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between gap-4">
-              <div className="space-y-1 flex-1">
-                <Label htmlFor={item.testId} className="text-base font-medium">
-                  {item.label}
-                </Label>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
+          {PRIVACY_TOGGLES.map((item) => {
+            const description =
+              item.key === "clinical_settings"
+                ? patientAgeBand === "child"
+                  ? item.descriptionChild
+                  : item.descriptionDefault
+                : item.description;
+            return (
+              <div key={item.key} className="flex items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
+                <div className="flex min-w-0 flex-1 items-center gap-0.5">
+                  <Label htmlFor={item.testId} className="cursor-pointer text-base font-medium leading-tight">
+                    {item.label}
+                  </Label>
+                  <InfoTooltip term={item.label} explanation={description} />
+                </div>
+                <Switch
+                  id={item.testId}
+                  checked={displayScopes[item.key]}
+                  disabled={links.length === 0 || privacyBusy !== null}
+                  onCheckedChange={(on) => applyPrivacyToAll({ [item.key]: on }, item.key)}
+                  data-testid={item.testId}
+                  aria-label={`Allow supporters to see ${item.label.toLowerCase()}`}
+                />
               </div>
-              <Switch
-                id={item.testId}
-                checked={displayScopes[item.key]}
-                disabled={links.length === 0 || privacyBusy !== null}
-                onCheckedChange={(on) => applyPrivacyToAll({ [item.key]: on }, item.key)}
-                data-testid={item.testId}
-                aria-label={`Allow supporters to see ${item.label.toLowerCase()}`}
-              />
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 
       <Card className="rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Support someone else?</CardTitle>
-          <CardDescription>
-            If you have an invite code from someone you support (their own Diabeaters account), open Supporter setup to
-            enter it.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+          <CardTitle className="min-w-0 flex-1 text-base">Support someone else?</CardTitle>
+          <InfoTooltip
+            term="Supporter setup"
+            explanation="If someone shared an invite code with you, open Supporter setup to enter it and link to their account."
+          />
         </CardHeader>
         <CardContent className="pt-0">
           <Button variant="outline" className="w-full min-h-11 sm:w-auto" asChild>
             <Link href="/carer-setup" data-testid="link-carer-setup">
-              Supporter setup
+              Open Supporter setup
             </Link>
           </Button>
         </CardContent>
       </Card>
 
-      {/* Read-only snapshot of the same emergency record edited under Account / Settings (no duplicate form). */}
       <Card className="surface-card transition-shadow duration-500" key={syncGeneration}>
-        <CardHeader>
-          <CardTitle className="text-lg">Your emergency details</CardTitle>
-          <CardDescription>
-            Supporters only see this when &quot;Emergency details&quot; is on above. Edits are shared everywhere in the app.
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <SectionTitle
+            title="Your emergency details"
+            info={
+              <InfoPopoverButton label="About emergency details" title="Emergency details">
+                <p>Supporters only see this when the Emergency details toggle is on above.</p>
+                <p>Edits here are the same record shown under Account and Settings.</p>
+              </InfoPopoverButton>
+            }
+          />
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+        <CardContent className="space-y-3 pt-0 text-sm">
           {emergency.contactName || emergency.phone ? (
             <dl className="space-y-2">
               {emergency.contactName ? (

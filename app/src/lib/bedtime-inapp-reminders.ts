@@ -44,7 +44,7 @@ export async function ensureBedtimeInAppRemindersForUser(userId: string): Promis
   if (!sessionUid || sessionUid !== userId) return;
 
   const settings = storage.getNotificationSettings();
-  if (!settings.enabled || settings.bedtimeCheckReminders !== true) return;
+  if (!settings.enabled || settings.bedtimeCheckReminders === false) return;
 
   const time = settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME;
   const now = new Date();

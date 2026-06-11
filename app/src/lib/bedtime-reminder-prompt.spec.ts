@@ -38,6 +38,12 @@ describe("bedtime-reminder-prompt", () => {
     localStorage.clear();
   });
 
+  it("defaults bedtime check reminders on at 21:30", () => {
+    const settings = storage.getNotificationSettings();
+    expect(settings.bedtimeCheckReminders).toBe(true);
+    expect(settings.bedtimeReminderTime).toBe("21:30");
+  });
+
   it("marks and consumes pending flag once", () => {
     markBedtimeReminderPromptPending();
     expect(sessionStorage.getItem(PENDING_KEY)).toBe("1");
@@ -61,6 +67,10 @@ describe("bedtime-reminder-prompt", () => {
   });
 
   it("resolveBedtimeReminderPromptAfterOnboarding shows when pending and not dismissed", () => {
+    storage.saveNotificationSettings({
+      ...storage.getNotificationSettings(),
+      bedtimeCheckReminders: false,
+    });
     markBedtimeReminderPromptPending();
     expect(resolveBedtimeReminderPromptAfterOnboarding(USER_ID)).toBe("show");
   });
@@ -85,6 +95,10 @@ describe("bedtime-reminder-prompt", () => {
   });
 
   it("shouldOfferBedtimeReminderSecondChance requires onboarding dismiss and reminders off", () => {
+    storage.saveNotificationSettings({
+      ...storage.getNotificationSettings(),
+      bedtimeCheckReminders: false,
+    });
     expect(shouldOfferBedtimeReminderSecondChance(USER_ID)).toBe(false);
 
     dismissBedtimeReminderOnboardingPrompt(USER_ID);

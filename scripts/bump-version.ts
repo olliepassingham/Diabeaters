@@ -7,6 +7,7 @@ import { join } from "path";
 
 const ROOT = process.cwd();
 const PKG_PATH = join(ROOT, "package.json");
+const APP_PKG_PATH = join(ROOT, "app", "package.json");
 const PBXPROJ_PATH = join(ROOT, "ios", "App", "App.xcodeproj", "project.pbxproj");
 
 type Bump = "patch" | "minor" | "major";
@@ -37,6 +38,11 @@ function main() {
   pkg.version = newVer;
   writeFileSync(PKG_PATH, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
   console.log(`package.json: ${oldVer} → ${newVer}`);
+
+  const appPkg = JSON.parse(readFileSync(APP_PKG_PATH, "utf-8"));
+  appPkg.version = newVer;
+  writeFileSync(APP_PKG_PATH, JSON.stringify(appPkg, null, 2) + "\n", "utf-8");
+  console.log(`app/package.json: → ${newVer}`);
 
   const pbx = readFileSync(PBXPROJ_PATH, "utf-8");
   const buildMatch = pbx.match(/CURRENT_PROJECT_VERSION = (\d+);/);

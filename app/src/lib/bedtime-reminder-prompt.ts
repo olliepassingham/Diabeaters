@@ -60,7 +60,7 @@ export function dismissBedtimeReminderSecondChancePrompt(userId: string): void {
 
 export function shouldOfferBedtimeReminderSecondChance(userId: string): boolean {
   const settings = storage.getNotificationSettings();
-  if (settings.bedtimeCheckReminders === true) return false;
+  if (settings.bedtimeCheckReminders !== false) return false;
   if (!isBedtimeReminderOnboardingPromptDismissed(userId)) return false;
   if (isBedtimeReminderSecondChancePromptDismissed(userId)) return false;
   return true;
@@ -91,7 +91,7 @@ export function resolveBedtimeReminderPromptAfterOnboarding(userId: string): Bed
   if (isBedtimeReminderOnboardingPromptDismissed(userId)) return "skip";
 
   const settings = storage.getNotificationSettings();
-  if (settings.bedtimeCheckReminders === true) return "skip";
+  if (settings.bedtimeCheckReminders !== false) return "skip";
 
   return "show";
 }

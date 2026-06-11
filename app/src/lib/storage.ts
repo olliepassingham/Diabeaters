@@ -1095,7 +1095,7 @@ export interface NotificationSettings {
   lowThresholdDays: number;
   /** Appointment reminder notifications (in-app + push where available). */
   appointmentReminders: boolean;
-  /** Optional daily nudge to open the bedtime readiness check (off by default). */
+  /** Daily nudge to open the bedtime readiness check (on by default; user can turn off in Settings). */
   bedtimeCheckReminders?: boolean;
   /** Local reminder time for bedtime check (HH:mm, device local). */
   bedtimeReminderTime?: string;
@@ -3637,8 +3637,8 @@ export const storage = {
       criticalThresholdDays: 3,
       lowThresholdDays: 7,
       appointmentReminders: true,
-      bedtimeCheckReminders: false,
-      bedtimeReminderTime: "20:30",
+      bedtimeCheckReminders: true,
+      bedtimeReminderTime: "21:30",
       supporterAppointmentReminders: true,
       appointmentAlerts: true,
       hypoAlerts: true,
@@ -3660,7 +3660,8 @@ export const storage = {
       communityDmAlerts: parsed.communityDmAlerts !== false,
       supporterAppointmentReminders: parsed.supporterAppointmentReminders !== false,
       appointmentAlerts: parsed.appointmentAlerts !== false,
-      bedtimeCheckReminders: parsed.bedtimeCheckReminders === true,
+      /** Default on for habit building; only explicit `false` in stored settings turns it off. */
+      bedtimeCheckReminders: parsed.bedtimeCheckReminders !== false,
       bedtimeReminderTime:
         typeof parsed.bedtimeReminderTime === "string" && /^\d{1,2}:\d{2}$/.test(parsed.bedtimeReminderTime)
           ? parsed.bedtimeReminderTime

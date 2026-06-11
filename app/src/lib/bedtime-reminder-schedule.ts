@@ -3,7 +3,7 @@ import { addDays, format, startOfDay } from "date-fns";
 import { toActivityDayKey } from "@/lib/activity-history";
 import { storage } from "@/lib/storage";
 
-export const DEFAULT_BEDTIME_REMINDER_TIME = "20:30";
+export const DEFAULT_BEDTIME_REMINDER_TIME = "21:30";
 export const BEDTIME_REMINDER_LOOKAHEAD_DAYS = 14;
 
 export const BEDTIME_REMINDER_TIME_OPTIONS = [
