@@ -8,6 +8,7 @@ import {
   isCommunityMemberAccount,
   isCommunityOnlyAccount,
   isCommunitySessionMode,
+  isPersistedCommunityAccount,
   isPersistedSupporterAccount,
   isSupporterOnlyAccount,
   setOnboardingAccountPath,
@@ -30,6 +31,11 @@ describe("carer-session supporter-only accounts", () => {
   it("persists supporter account marker when onboarding path is supporter", () => {
     setOnboardingAccountPath("supporter");
     expect(isPersistedSupporterAccount()).toBe(true);
+  });
+
+  it("persists community account marker when onboarding path is community", () => {
+    setOnboardingAccountPath("community");
+    expect(isPersistedCommunityAccount()).toBe(true);
   });
 
   it("allows mode switching for patient onboarding with a carer link", () => {
@@ -84,9 +90,11 @@ describe("carer-session community-only accounts", () => {
     setOnboardingAccountPath("community");
     setPrimaryAppRole("community");
     expect(isCommunityMemberAccount()).toBe(true);
+    expect(isPersistedCommunityAccount()).toBe(true);
 
     applySupporterAccountRoleAfterLink();
 
+    expect(isPersistedCommunityAccount()).toBe(false);
     expect(isCommunityOnlyAccount()).toBe(false);
     expect(isCommunityMemberAccount()).toBe(false);
     expect(isSupporterOnlyAccount()).toBe(true);

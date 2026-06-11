@@ -3,6 +3,7 @@ import {
   reconcileCommunityWelcomeWithExistingPatient,
 } from "@/lib/community-path-patient-reconcile";
 import { stashPostLoginToast } from "@/lib/post-login-toast-stash";
+import { reconcileUserWelcomeWithExistingCommunityAccount } from "@/lib/welcome-path-community-reconcile";
 import { reconcileSupporterWelcomeWithExistingAccount } from "@/lib/welcome-path-supporter-reconcile";
 
 export type WelcomePathReconcileResult = {
@@ -10,7 +11,7 @@ export type WelcomePathReconcileResult = {
   destination?: string;
 };
 
-/** Correct mistaken /welcome path choices for returning patient or supporter accounts. */
+/** Correct mistaken /welcome path choices for returning patient, community, or supporter accounts. */
 export async function reconcileWrongWelcomePathForSignedInUser(
   userId: string,
 ): Promise<WelcomePathReconcileResult> {
@@ -18,6 +19,12 @@ export async function reconcileWrongWelcomePathForSignedInUser(
   if (patient.reconciled) {
     stashPostLoginToast(EXISTING_PATIENT_ON_COMMUNITY_PATH_TOAST);
     return { reconciled: true, destination: "/" };
+  }
+
+  const community = await reconcileUserWelcomeWithExistingCommunityAccount(userId);
+  if (community.reconciled) {
+    stashPostLoginToast(community.toast);
+    return { reconciled: true, destination: community.destination };
   }
 
   const supporter = await reconcileSupporterWelcomeWithExistingAccount(userId);

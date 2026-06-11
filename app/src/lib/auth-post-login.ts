@@ -31,6 +31,8 @@ function applyWelcomeReconcileDestination(
     setActiveAppMode("carer");
   } else if (destination === "/") {
     setActiveAppMode("patient");
+  } else {
+    setActiveAppMode("community");
   }
   setLocation(destination);
 }

@@ -10,6 +10,8 @@ const PRIMARY_APP_ROLE_PERSIST_KEY = "diabeater_primary_app_role_v1";
 const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
 /** Survives mistaken User/Community welcome taps — marks a supporter-only account. */
 const SUPPORTER_ACCOUNT_PERSIST_KEY = "diabeater_supporter_account_v1";
+/** Survives mistaken User/Supporter welcome taps — marks a community-only account. */
+const COMMUNITY_ACCOUNT_PERSIST_KEY = "diabeater_community_account_v1";
 
 function readPersistedPrimaryAppRole(): PrimaryAppRole | null {
   try {
@@ -77,10 +79,36 @@ export function isPersistedSupporterAccount(): boolean {
   }
 }
 
+export function markPersistedCommunityAccount(): void {
+  try {
+    localStorage.setItem(COMMUNITY_ACCOUNT_PERSIST_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function clearPersistedCommunityAccount(): void {
+  try {
+    localStorage.removeItem(COMMUNITY_ACCOUNT_PERSIST_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function isPersistedCommunityAccount(): boolean {
+  try {
+    if (localStorage.getItem(COMMUNITY_ACCOUNT_PERSIST_KEY) === "1") return true;
+    return localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY) === "community";
+  } catch {
+    return false;
+  }
+}
+
 export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
   try {
     localStorage.setItem(ONBOARDING_ACCOUNT_PATH_KEY, path);
     if (path === "supporter") markPersistedSupporterAccount();
+    if (path === "community") markPersistedCommunityAccount();
   } catch {
     // ignore
   }
@@ -174,6 +202,7 @@ export function isCommunityMemberAccount(): boolean {
 
 /** After a successful invite redeem, turn a community-only account into supporter-only. */
 export function promoteCommunityMemberToSupporterAccount(): void {
+  clearPersistedCommunityAccount();
   setPrimaryAppRole("carer");
   setOnboardingAccountPath("supporter");
   markPersistedSupporterAccount();
