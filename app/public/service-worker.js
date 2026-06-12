@@ -1,6 +1,6 @@
-const CACHE_NAME = 'diabeaters-v11';
-const STATIC_CACHE = 'diabeaters-static-v11';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v11';
+const CACHE_NAME = 'diabeaters-v12';
+const STATIC_CACHE = 'diabeaters-static-v12';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v12';
 
 /** Replaced at build time by scripts/sw-precache.ts — do not edit the marker by hand. */
 const PRECACHE_URLS = __PRECACHE_MANIFEST__;
@@ -81,20 +81,27 @@ self.addEventListener('fetch', (event) => {
 
   if (isNavigationRequest(event.request)) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => {
-              cache.put('/index.html', clone);
-              cache.put('/', clone);
-            });
+      (async () => {
+        const cache = await caches.open(STATIC_CACHE);
+        const cached =
+          (await cache.match(event.request)) ||
+          (await cache.match('/index.html')) ||
+          (await cache.match('/'));
+        try {
+          const fetched = await fetch(event.request);
+          if (fetched.ok) {
+            const clone = fetched.clone();
+            void cache.put('/index.html', clone);
+            void cache.put('/', clone);
           }
-          return response;
-        })
-        .catch(() =>
-          caches.match('/index.html').then((doc) => doc || caches.match('/') || caches.match(event.request)),
-        ),
+          if (fetched.ok) return fetched;
+          if (cached) return cached;
+          return fetched;
+        } catch {
+          if (cached) return cached;
+          return new Response('Offline', { status: 503, statusText: 'Offline' });
+        }
+      })(),
     );
     return;
   }

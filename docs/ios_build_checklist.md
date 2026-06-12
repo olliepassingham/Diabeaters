@@ -50,7 +50,7 @@ Use `npm run version:patch`, `version:minor`, or `version:major` to bump `packag
 
 - [ ] **NSAppTransportSecurity** (ATS): Enforces HTTPS only
   - `NSAllowsArbitraryLoads` = `false`
-  - `NSAllowsLocalNetworking` = `false`
+  - `NSAllowsLocalNetworking` = `true` (required for bundled Capacitor web assets served from localhost)
   - Configured in `ios/App/App/Info.plist`:
 
 ```xml
@@ -59,7 +59,7 @@ Use `npm run version:patch`, `version:minor`, or `version:major` to bump `packag
     <key>NSAllowsArbitraryLoads</key>
     <false/>
     <key>NSAllowsLocalNetworking</key>
-    <false/>
+    <true/>
 </dict>
 ```
 

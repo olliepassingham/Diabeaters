@@ -47,7 +47,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
-		<false/>
+		<true/>
 	</dict>
     <key>NSCameraUsageDescription</key>
     <string>Allow Diabeaters to use your camera to take photos for community posts, direct messages, and your profile.</string>
