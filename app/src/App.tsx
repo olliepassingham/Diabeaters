@@ -403,7 +403,9 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, pathname, search, setLocation, pathOnly]);
 
-  if (loading || (linkedPatientLoading && !linkedPatientFetched)) {
+  const waitingOnCarerLink = isOnline() && linkedPatientLoading && !linkedPatientFetched;
+
+  if (loading || waitingOnCarerLink) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <div className="animate-pulse text-muted-foreground">
@@ -1528,6 +1530,7 @@ function AppContent() {
     // Start as soon as we have a user id (parallel with carer link lookup — gate still waits when needed).
     enabled: Boolean(userId) && !authLoading && !skipProfileForGate,
     staleTime: 30_000,
+    retry: false,
   });
 
   const linkedCarer = Boolean(linkQuery.data);

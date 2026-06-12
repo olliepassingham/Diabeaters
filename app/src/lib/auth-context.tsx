@@ -80,24 +80,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const [{ data }, sessionRes] = await Promise.all([
+        const [{ data: userResult }, sessionRes] = await Promise.all([
           getCurrentUser(),
           supabase.auth.getSession(),
         ]);
 
         if (!isMounted) return;
-        const uid = data?.user?.id ?? null;
-        setUser(data?.user ?? null);
-        setSession(sessionRes.data.session ?? null);
+        const session = sessionRes.data.session ?? null;
+        // `getUser()` needs network; `getSession()` reads the cached JWT offline.
+        const user = userResult?.user ?? session?.user ?? null;
+        const uid = user?.id ?? null;
+        setUser(user);
+        setSession(session);
         setActiveUserIdForLocalStorage(uid);
         setSentryUserId(uid);
         setLoading(false);
       } catch {
         if (!isMounted) return;
-        setUser(null);
-        setSession(null);
-        setActiveUserIdForLocalStorage(null);
-        setSentryUserId(null);
+        try {
+          const { data: sessionRes } = await supabase.auth.getSession();
+          const session = sessionRes.session ?? null;
+          const user = session?.user ?? null;
+          const uid = user?.id ?? null;
+          setUser(user);
+          setSession(session);
+          setActiveUserIdForLocalStorage(uid);
+          setSentryUserId(uid);
+        } catch {
+          setUser(null);
+          setSession(null);
+          setActiveUserIdForLocalStorage(null);
+          setSentryUserId(null);
+        }
         setLoading(false);
       }
     })();

@@ -1,5 +1,11 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { captureException } from "@/observability/sentry";
+import { isOnline } from "@/lib/offline";
+import {
+  isLazyChunkLoadError,
+  markChunkRecoveryAttempted,
+  shouldReloadAfterChunkError,
+} from "@/lib/chunk-error-recovery";
 
 interface Props {
   children: ReactNode;
@@ -13,18 +19,6 @@ interface State {
 }
 
 const CACHE_RECOVERY_KEY = "diabeaters-cache-recovery-attempted";
-const CHUNK_RECOVERY_KEY = "diabeaters-chunk-recovery-attempted";
-
-function isLazyChunkLoadError(error: Error | null): boolean {
-  if (!error) return false;
-  const msg = error.message || "";
-  return (
-    msg.includes("Failed to fetch dynamically imported module") ||
-    msg.includes("Importing a module script failed") ||
-    msg.includes("error loading dynamically imported module")
-  );
-}
-
 async function clearAllCachesAndReload() {
   try {
     if ("caches" in window) {
@@ -41,14 +35,6 @@ async function clearAllCachesAndReload() {
   }
 
   window.location.reload();
-}
-
-function shouldAttemptChunkRecovery(error: Error | null): boolean {
-  if (!error || !isLazyChunkLoadError(error)) return false;
-  if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(CHUNK_RECOVERY_KEY) === "1") {
-    return false;
-  }
-  return true;
 }
 
 function shouldAttemptCacheRecovery(error: Error | null): boolean {
@@ -94,18 +80,14 @@ export class ErrorBoundary extends Component<Props, State> {
       this.setState({ componentStack: errorInfo.componentStack });
     }
 
-    if (shouldAttemptChunkRecovery(error)) {
-      try {
-        sessionStorage.setItem(CHUNK_RECOVERY_KEY, "1");
-      } catch {
-        // ignore quota / private mode
-      }
+    if (shouldReloadAfterChunkError(error)) {
+      markChunkRecoveryAttempted();
       this.setState({ isClearing: true });
       window.location.reload();
       return;
     }
 
-    if (shouldAttemptCacheRecovery(error)) {
+    if (shouldAttemptCacheRecovery(error) && isOnline()) {
       try {
         sessionStorage.setItem(CACHE_RECOVERY_KEY, "1");
       } catch {
@@ -140,9 +122,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <h1 className="text-lg font-semibold">Something went wrong. Please try again.</h1>
             <p className="text-sm text-muted-foreground">
               {isLazyChunkLoadError(this.state.error)
-                ? import.meta.env.DEV
-                  ? "This page failed to load after a dev-server update. Retrying once — if it keeps happening, hard-refresh or restart npm run dev."
-                  : "This page failed to load. Retrying once — if it keeps happening, close and reopen the app."
+                ? !isOnline()
+                  ? "This page is not available offline yet. Connect briefly, open Home or Guides once while online, then try again."
+                  : import.meta.env.DEV
+                    ? "This page failed to load after a dev-server update. Retrying once — if it keeps happening, hard-refresh or restart npm run dev."
+                    : "This page failed to load. Retrying once — if it keeps happening, close and reopen the app."
                 : "If the problem keeps happening, try closing and reopening the app."}
             </p>
             {import.meta.env.DEV && this.state.error ? (

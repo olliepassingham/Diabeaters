@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { width: 1080px; height: 1350px; }
+
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    background: #060d1d;
+    color: #fff;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 95% 55% at 68% 50%, rgba(43, 84, 165, 0.40) 0%, rgba(43, 84, 165, 0) 70%),
+      radial-gradient(ellipse 60% 35% at 30% 40%, rgba(245, 183, 61, 0.08) 0%, rgba(245, 183, 61, 0) 70%),
+      radial-gradient(ellipse 120% 60% at 50% 110%, rgba(16, 33, 66, 0.9) 0%, rgba(6, 13, 29, 0) 60%),
+      linear-gradient(180deg, #08101f 0%, #0a1428 35%, #0a1428 65%, #060c1a 100%);
+  }
+  .vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 130% 115% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);
+  }
+  .grain {
+    position: absolute; inset: 0; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  }
+
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 70px 70px 60px;
+  }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .header img { width: 64px; height: 64px; object-fit: contain; filter: invert(1); }
+  .wordmark { font-size: 42px; font-weight: 650; letter-spacing: 0.5px; }
+
+  .title { text-align: center; margin-top: 36px; }
+  .title .line1 { font-size: 56px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; white-space: nowrap; }
+  .title .gold {
+    color: #f5b73d;
+    text-shadow: 0 0 50px rgba(245,183,61,0.40), 0 0 20px rgba(245,183,61,0.22);
+  }
+
+  /* Main two-column area */
+  .main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 44px;
+    margin-top: 36px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Phone */
+  .phone-col { flex: none; display: flex; justify-content: center; }
+  .phone {
+    width: 392px;
+    border-radius: 56px;
+    padding: 14px;
+    background: linear-gradient(160deg, #2a3a58 0%, #101a2e 60%);
+    box-shadow:
+      0 40px 90px rgba(0,0,0,0.65),
+      0 0 80px rgba(43,84,165,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .phone img {
+    display: block;
+    width: 100%;
+    border-radius: 44px;
+  }
+
+  /* Callouts */
+  .callouts { flex: 1; display: flex; flex-direction: column; gap: 22px; justify-content: center; }
+  .callout {
+    display: flex; gap: 20px; align-items: flex-start;
+    background: rgba(255,255,255,0.045);
+    border: 2px solid rgba(255,255,255,0.12);
+    border-radius: 24px;
+    padding: 22px 26px;
+  }
+  .icon {
+    flex: none;
+    width: 56px; height: 56px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+  }
+  .icon.red    { background: rgba(239,68,68,0.18); }
+  .icon.gold   { background: rgba(245,183,61,0.16); }
+  .icon.blue   { background: rgba(88,140,233,0.18); }
+  .icon.green  { background: rgba(34,197,94,0.16); }
+  .callout h3 { font-size: 30px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.2px; }
+  .callout p  { font-size: 24px; line-height: 1.38; color: rgba(214, 223, 240, 0.82); }
+  .callout .hl { color: #f5b73d; font-weight: 600; }
+
+  /* Footer */
+  .footer {
+    margin-top: 36px;
+    display: flex; align-items: center; justify-content: center; gap: 26px;
+  }
+  .footer .cta-mini {
+    background: linear-gradient(180deg, #f9cb5a 0%, #e8a52a 100%);
+    color: #0a1428; font-weight: 750; font-size: 30px;
+    padding: 18px 44px; border-radius: 999px;
+    box-shadow: 0 10px 36px rgba(240,178,50,0.35);
+  }
+  .footer .note { font-size: 26px; color: rgba(176,188,210,0.65); letter-spacing: 2px; text-transform: uppercase; font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <div class="content">
+    <div class="header">
+      <img src="../../attached_assets/image_1771412400865.png" alt="" />
+      <div class="wordmark">Diabeaters</div>
+    </div>
+
+    <div class="title">
+      <div class="line1">Guides for life's <span class="gold">tricky moments</span></div>
+    </div>
+
+    <div class="main">
+      <div class="phone-col">
+        <div class="phone">
+          <img src="guides-screenshot.png" alt="Diabeaters home screen" />
+        </div>
+      </div>
+
+      <div class="callouts">
+        <div class="callout">
+          <div class="icon blue">&#127939;</div>
+          <div>
+            <h3>Exercise</h3>
+            <p>Plan your session with <span class="hl">glucose-friendly fueling</span> — carbs and timing matched to how hard you're going.</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="icon red">&#127777;&#65039;</div>
+          <div>
+            <h3>Sick day</h3>
+            <p>Track symptoms and ketones, with clear steps on <span class="hl">when to escalate</span>.</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="icon gold">&#9992;&#65039;</div>
+          <div>
+            <h3>Travel</h3>
+            <p>Packing lists and <span class="hl">backup planning</span> so trips don't catch you out.</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="icon green">&#127769;</div>
+          <div>
+            <h3>Bedtime &amp; alcohol</h3>
+            <p>A quick evening check to wind down safely, plus prep for <span class="hl">nights out</span>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="cta-mini">Download free</div>
+      <div class="note">Link in bio</div>
+    </div>
+  </div>
+</body>
+</html>

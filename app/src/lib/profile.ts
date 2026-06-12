@@ -772,6 +772,7 @@ export function useProfile() {
     },
     enabled: Boolean(userId),
     staleTime: 30_000,
+    retry: false,
   });
 
   const refresh = useCallback(async () => {

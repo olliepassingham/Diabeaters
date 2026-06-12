@@ -60,17 +60,11 @@ export function scheduleCommunityRoutePrefetch(): void {
   });
 }
 
-/** Schedule demo warm-up after first paint so it does not compete with startup gates. */
+/** Warm remaining demo/community chunks soon after login (offline-critical routes start in main.tsx). */
 export function scheduleDemoRoutePrefetch(): void {
   if (typeof window === "undefined") return;
-
-  const run = () => prefetchDemoCriticalRoutes();
-
+  prefetchDemoCriticalRoutes();
   window.requestAnimationFrame(() => {
-    if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(run, { timeout: 3500 });
-    } else {
-      window.setTimeout(run, 1200);
-    }
+    prefetchDemoCriticalRoutes();
   });
 }

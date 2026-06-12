@@ -16,6 +16,7 @@ import { ensureNativeNotificationChannels } from "@/lib/native-local-notificatio
 import { clearNativeAppBadge, scheduleNativeAppBadgeBootClear } from "@/lib/native-app-badge";
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
+import { prefetchOfflineCriticalRoutes } from "@/lib/offline-critical-prefetch";
 
 migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));
@@ -25,6 +26,10 @@ if (isCapacitorNativeShell()) {
   void clearNativeAppBadge();
   scheduleNativeAppBadgeBootClear();
   ensurePushDeepLinkListenersAttached();
+}
+
+if (import.meta.env.PROD) {
+  prefetchOfflineCriticalRoutes();
 }
 
 if (import.meta.env.DEV) {

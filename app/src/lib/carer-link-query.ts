@@ -67,6 +67,7 @@ export function useLinkedPatientQuery() {
     queryFn: fetchLinkedPatientForUser,
     enabled: !authLoading && Boolean(userId),
     staleTime: 60_000,
+    retry: false,
   });
 }
 
