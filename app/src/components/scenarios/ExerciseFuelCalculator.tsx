@@ -25,6 +25,7 @@ import {
   computeExerciseFuelPlan,
   type ExerciseFuelCalculatorResult,
 } from "@/lib/exercise-fuel-calculator";
+import { isCardioLikeExerciseType } from "@/lib/exercise-readiness";
 import {
   formatCarbsForScenario,
   type CarbSourceScenario,
@@ -94,6 +95,172 @@ function TreatmentHint({
   );
 }
 
+function SessionFuelSection({
+  result,
+  profile,
+  exerciseType,
+  durationMinutes,
+  compact,
+}: {
+  result: ExerciseFuelCalculatorResult;
+  profile: Partial<UserProfile> | undefined;
+  exerciseType: string;
+  durationMinutes: number;
+  compact?: boolean;
+}) {
+  const { sessionFuel } = result;
+  const showInterval =
+    sessionFuel.doseGrams != null &&
+    sessionFuel.intervalMinutes != null &&
+    isCardioLikeExerciseType(exerciseType) &&
+    durationMinutes > 30;
+
+  if (sessionFuel.carryGrams <= 0 && sessionFuel.duringTotalGrams <= 0) return null;
+
+  const carryHint = formatCarbsForScenario(sessionFuel.carryGrams, profile, "exercise_on_hand");
+
+  return (
+    <div className="space-y-2">
+      {!compact ? (
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Session fuel</p>
+      ) : null}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3">
+          <p className="text-xs font-medium text-muted-foreground">Carry with you</p>
+          <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
+            ~{sessionFuel.carryGrams}g
+          </p>
+          {carryHint ? <p className="mt-0.5 text-xs text-muted-foreground">{carryHint}</p> : null}
+        </div>
+        <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-3">
+          <p className="text-xs font-medium text-muted-foreground">During session</p>
+          {showInterval ? (
+            <>
+              <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
+                ~{sessionFuel.doseGrams}g
+              </p>
+              <p className="text-xs text-muted-foreground">every {sessionFuel.intervalMinutes} min</p>
+            </>
+          ) : sessionFuel.duringTotalGrams > 0 ? (
+            <>
+              <p className={cn("font-bold tabular-nums text-foreground", compact ? "text-xl" : "text-2xl")}>
+                ~{sessionFuel.duringTotalGrams}g
+              </p>
+              <p className="text-xs text-muted-foreground">if BG drops</p>
+            </>
+          ) : (
+            <p className="text-sm font-medium text-muted-foreground">Unlikely needed</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KnownCarbsPlanHero({
+  result,
+  bgUnits,
+  profile,
+  exerciseType,
+  durationMinutes,
+}: {
+  result: ExerciseFuelCalculatorResult;
+  bgUnits: string;
+  profile: Partial<UserProfile> | undefined;
+  exerciseType: string;
+  durationMinutes: number;
+}) {
+  const insulin = result.insulin;
+  const projection = result.projection;
+
+  if (result.insulinNoRatios) {
+    return (
+      <div className="rounded-2xl border border-border/50 bg-background/90 px-4 py-5 text-center">
+        <p className="text-base text-muted-foreground">Add meal ratios in Settings for an insulin estimate</p>
+        <p className="mt-2 text-4xl font-bold tabular-nums text-foreground">{result.mealCarbs}g</p>
+        <p className="text-sm font-medium text-muted-foreground">pre-exercise meal</p>
+      </div>
+    );
+  }
+
+  if (result.insulinSuppressedReason === "hypo" || (!insulin && result.insulinSuppressedReason)) {
+    return (
+      <div className="rounded-2xl border border-amber-500/35 bg-amber-500/10 px-4 py-5 text-center">
+        <p className="text-4xl font-bold tabular-nums text-foreground">0 units</p>
+        <p className="mt-2 text-base font-medium text-foreground">No meal insulin at this reading</p>
+        {result.insulinSuppressedReason ? (
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, storage.getSettings())}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!insulin) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-violet-500/35 bg-violet-500/10 px-4 py-5 text-center shadow-sm">
+        <p className="text-5xl font-bold tabular-nums tracking-tight text-foreground">{insulin.totalUnits}</p>
+        <p className="mt-1 text-lg font-semibold text-foreground">units before exercise</p>
+        {insulin.correctionUnits > 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {insulin.adjustedUnits}u meal + {insulin.correctionUnits}u correction
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-xl border border-border/50 bg-background/80 px-2 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Now</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
+            {projection?.currentBg ?? "—"}
+          </p>
+          <p className="text-[10px] text-muted-foreground">{bgUnits}</p>
+        </div>
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-2 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Meal</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">{result.mealCarbs}g</p>
+          <p className="text-[10px] text-muted-foreground truncate">{insulin.mealType}</p>
+        </div>
+        <div className="rounded-xl border border-border/50 bg-background/80 px-2 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">At start</p>
+          <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
+            {projection?.projectedBgAtStart != null ? `~${projection.projectedBgAtStart}` : "—"}
+          </p>
+          <p className="text-[10px] text-muted-foreground">{bgUnits}</p>
+        </div>
+      </div>
+
+      {projection ? (
+        <p className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5 text-sm leading-relaxed text-foreground">
+          Target at exercise start: <span className="font-semibold">{projection.targetBand}</span>
+          {projection.inTargetAtStart ? " — your meal + dose should land you in range." : "."}
+        </p>
+      ) : null}
+
+      {result.exerciseEffectNote ? (
+        <p className="text-sm leading-relaxed text-muted-foreground">{result.exerciseEffectNote}</p>
+      ) : null}
+
+      {result.insulinSuppressedReason === "falling" ? (
+        <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+          BG is falling — dose reduced. Recheck before hard effort.
+        </p>
+      ) : null}
+
+      <SessionFuelSection
+        result={result}
+        profile={profile}
+        exerciseType={exerciseType}
+        durationMinutes={durationMinutes}
+        compact
+      />
+    </div>
+  );
+}
+
 function ExerciseFuelPlanDetails({
   result,
   bgUnits,
@@ -106,11 +273,12 @@ function ExerciseFuelPlanDetails({
   profile: Partial<UserProfile> | undefined;
 }) {
   const settings = storage.getSettings();
-  const mealTreatment = formatCarbsForScenario(result.mealCarbs, profile, "hypo");
-  const onHandTreatment = formatCarbsForScenario(result.onHandCarbs, profile, "exercise_on_hand");
+  const onHandTreatment = formatCarbsForScenario(result.sessionFuel.carryGrams, profile, "exercise_on_hand");
   const duringTreatment =
-    result.duringCarbs > 0 ? formatCarbsForScenario(result.duringCarbs, profile, "exercise_during") : null;
-  const showMealTreatmentInDetails = mealTreatment && !result.insulinSuppressedReason;
+    result.sessionFuel.duringTotalGrams > 0
+      ? formatCarbsForScenario(result.sessionFuel.duringTotalGrams, profile, "exercise_during")
+      : null;
+  const showMealInDetails = result.mealCarbs > 0 && !result.userEnteredMealCarbs;
 
   return (
     <div className="space-y-3">
@@ -120,16 +288,19 @@ function ExerciseFuelPlanDetails({
         <p className="mt-1 text-muted-foreground">Target BG {result.targetBg} · educational only</p>
       </PlanDetailSection>
 
-      {showMealTreatmentInDetails || onHandTreatment || duringTreatment ? (
+      {showMealInDetails || onHandTreatment || duringTreatment ? (
         <PlanDetailSection title="In your usual treatment">
-          {showMealTreatmentInDetails ? <p>Before exercise: {mealTreatment}</p> : null}
+          {showMealInDetails ? (
+            <p>
+              Before exercise: {result.mealCarbs}g
+              {result.mealCarbsIsSuggested ? " (suggested)" : ""}
+            </p>
+          ) : null}
           {onHandTreatment ? (
-            <p className={showMealTreatmentInDetails ? "mt-1" : undefined}>On hand: {onHandTreatment}</p>
+            <p className={showMealInDetails ? "mt-1" : undefined}>Carry with you: {onHandTreatment}</p>
           ) : null}
           {duringTreatment ? (
-            <p className={showMealTreatmentInDetails || onHandTreatment ? "mt-1" : undefined}>
-              During: {duringTreatment}
-            </p>
+            <p className={showMealInDetails || onHandTreatment ? "mt-1" : undefined}>During: {duringTreatment}</p>
           ) : null}
         </PlanDetailSection>
       ) : null}
@@ -138,12 +309,28 @@ function ExerciseFuelPlanDetails({
         <PlanDetailSection title="Meal insulin estimate">
           <p>
             Usually ~{result.insulin.standardUnits}u for {result.insulin.carbsGrams}g {result.insulin.mealType},
-            reduced by {result.insulin.reductionPercent}% for this session → {result.insulin.adjustedUnits} units shown.
+            reduced by {result.insulin.reductionPercent}% for this session → {result.insulin.adjustedUnits}u meal bolus
+            {result.insulin.correctionUnits > 0
+              ? ` + ${result.insulin.correctionUnits}u correction → ${result.insulin.totalUnits}u total`
+              : ` → ${result.insulin.totalUnits}u total`}
+            .
           </p>
+          {result.projection?.projectedBgAtStart != null ? (
+            <p className="mt-1">
+              Projected BG at exercise start: ~{result.projection.projectedBgAtStart} {bgUnits} (target{" "}
+              {result.projection.targetBand}).
+            </p>
+          ) : null}
         </PlanDetailSection>
       ) : null}
 
-      {result.insulinSuppressedReason ? (
+      {result.exerciseEffectNote ? (
+        <PlanDetailSection title="Exercise effect">
+          <p>{result.exerciseEffectNote}</p>
+        </PlanDetailSection>
+      ) : null}
+
+      {result.insulinSuppressedReason && !result.insulin ? (
         <PlanDetailSection title="Why no meal insulin">
           <p>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</p>
         </PlanDetailSection>
@@ -166,7 +353,12 @@ function ExerciseFuelPlanDetails({
           </li>
           <li>Pre buffer (if you need fuel): ~{result.breakdown.preBufferGrams}g</li>
           <li>During session (fast carbs ready): ~{result.breakdown.duringGrams}g</li>
-          <li>On hand (max of pre + during): ~{result.breakdown.onHandGrams}g</li>
+          <li>Carry with you: ~{result.sessionFuel.carryGrams}g</li>
+          {result.sessionFuel.doseGrams != null && result.sessionFuel.intervalMinutes != null ? (
+            <li>
+              During interval: ~{result.sessionFuel.doseGrams}g every {result.sessionFuel.intervalMinutes} min
+            </li>
+          ) : null}
           {result.breakdown.mealCarbsSource === "user" ? (
             <li>Pre-meal carbs: your entry ({result.mealCarbs}g)</li>
           ) : result.breakdown.mealCarbsSource === "suggested" ? (
@@ -181,12 +373,25 @@ function ExerciseFuelPlanDetails({
               <li>{result.breakdown.ratioDescription ?? "Ratio from Settings"}</li>
               <li>
                 Standard dose ~{result.breakdown.standardUnits}u → {result.breakdown.reductionPercent}% exercise
-                reduction → {result.insulin.adjustedUnits}u shown
-                {result.breakdown.adjustedUnitsExact != null && result.breakdown.adjustedUnitsExact !== result.insulin.adjustedUnits
-                  ? ` (exact ${result.breakdown.adjustedUnitsExact}u before rounding)`
+                reduction → {result.insulin.adjustedUnits}u meal bolus
+                {result.insulin.correctionUnits > 0
+                  ? ` + ${result.insulin.correctionUnits}u correction → ${result.insulin.totalUnits}u total`
+                  : ""}
+                {result.breakdown.adjustedUnitsExact != null &&
+                result.breakdown.adjustedUnitsExact !== result.insulin.adjustedUnits
+                  ? ` (exact meal ${result.breakdown.adjustedUnitsExact}u before rounding)`
                   : ""}
               </li>
             </>
+          ) : result.projectedInsulinAtTarget ? (
+            <li>
+              Projected at target band: ~{result.projectedInsulinAtTarget.totalUnits}u for {result.mealCarbs}g once BG
+              is in range ({result.projectedInsulinAtTarget.adjustedUnits}u meal
+              {result.projectedInsulinAtTarget.correctionUnits > 0
+                ? ` + ${result.projectedInsulinAtTarget.correctionUnits}u correction`
+                : ""}
+              )
+            </li>
           ) : result.insulinSuppressedReason ? (
             <li>{preExerciseInsulinSuppressedMessage(result.insulinSuppressedReason, bgUnits, settings)}</li>
           ) : null}
@@ -255,10 +460,11 @@ export function ExerciseFuelCalculator() {
     if (!Number.isFinite(d) || d < 1) return false;
     if (foodMode === "known") {
       const c = parseInt(mealCarbs, 10);
-      return Number.isFinite(c) && c > 0;
+      const bg = parseFloat(currentBg.replace(",", "."));
+      return Number.isFinite(c) && c > 0 && Number.isFinite(bg) && bg > 0;
     }
     return true;
-  }, [duration, foodMode, mealCarbs]);
+  }, [duration, foodMode, mealCarbs, currentBg]);
 
   const handleCalculate = () => {
     const durationMinutes = parseInt(duration, 10);
@@ -556,6 +762,10 @@ export function ExerciseFuelCalculator() {
                     </SelectContent>
                   </Select>
                 </div>
+                <p className="sm:col-span-2 text-xs text-muted-foreground leading-relaxed">
+                  Enter current BG above — we estimate insulin for your carbs, exercise type, and target range (with
+                  exercise reduction applied).
+                </p>
               </div>
             ) : null}
           </div>
@@ -615,8 +825,16 @@ export function ExerciseFuelCalculator() {
               />
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {result.mealCarbs > 0 ? (
+          <CardContent className="space-y-4">
+            {result.userEnteredMealCarbs && result.mealCarbs > 0 ? (
+              <KnownCarbsPlanHero
+                result={result}
+                bgUnits={bgUnits}
+                profile={profile}
+                exerciseType={exerciseType}
+                durationMinutes={parseInt(duration, 10) || result.breakdown.durationMinutes}
+              />
+            ) : result.mealCarbs > 0 ? (
               <div className="rounded-2xl border border-primary/25 bg-background/90 px-4 py-4 text-center shadow-sm">
                 <p className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
                   {result.mealCarbsIsSuggested ? "~" : ""}
@@ -653,30 +871,20 @@ export function ExerciseFuelCalculator() {
               </p>
             ) : null}
 
-            {result.mealCarbs > 0 || result.onHandCarbs > 0 ? (
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">On hand</p>
-                  <p className="font-semibold tabular-nums">~{result.onHandCarbs}g</p>
-                  <TreatmentHint carbsGrams={result.onHandCarbs} profile={profile} scenario="exercise_on_hand" className="mt-0.5" />
-                </div>
-                <div className="rounded-xl border border-border/50 bg-muted/15 px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">During</p>
-                  <p className="font-semibold tabular-nums">
-                    {result.duringCarbs > 0 ? `~${result.duringCarbs}g` : "—"}
-                  </p>
-                  {result.duringCarbs > 0 ? (
-                    <TreatmentHint carbsGrams={result.duringCarbs} profile={profile} scenario="exercise_during" className="mt-0.5" />
-                  ) : null}
-                </div>
-              </div>
+            {!result.userEnteredMealCarbs && (result.mealCarbs > 0 || result.sessionFuel.carryGrams > 0) ? (
+              <SessionFuelSection
+                result={result}
+                profile={profile}
+                exerciseType={exerciseType}
+                durationMinutes={parseInt(duration, 10) || result.breakdown.durationMinutes}
+              />
             ) : null}
 
-            {result.insulin ? (
+            {result.insulin && !result.userEnteredMealCarbs ? (
               <div className="flex items-center gap-1 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] text-muted-foreground">Meal insulin</p>
-                  <p className="text-2xl font-bold tabular-nums leading-none">{result.insulin.adjustedUnits} units</p>
+                  <p className="text-2xl font-bold tabular-nums leading-none">{result.insulin.totalUnits} units</p>
                 </div>
                 <InlineInfoHint
                   ariaLabel="Meal insulin estimate details"
@@ -684,12 +892,37 @@ export function ExerciseFuelCalculator() {
                   content={
                     <p className="text-sm leading-relaxed">
                       Usually ~{result.insulin.standardUnits}u for {result.insulin.carbsGrams}g{" "}
-                      {result.insulin.mealType}, reduced by {result.insulin.reductionPercent}% for this session.
+                      {result.insulin.mealType}, reduced by {result.insulin.reductionPercent}% for this session
+                      {result.insulin.correctionUnits > 0
+                        ? `, plus ${result.insulin.correctionUnits}u correction toward target`
+                        : ""}
+                      .
                     </p>
                   }
                 />
               </div>
-            ) : result.insulinSuppressedReason && (result.mealCarbs > 0 || foodMode === "known") ? (
+            ) : result.projectedInsulinAtTarget && !result.userEnteredMealCarbs ? (
+              <div className="flex items-center gap-1 rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-muted-foreground">Once in target range</p>
+                  <p className="text-2xl font-bold tabular-nums leading-none">
+                    ~{result.projectedInsulinAtTarget.totalUnits} units
+                  </p>
+                </div>
+                <InlineInfoHint
+                  ariaLabel="Projected insulin at target BG"
+                  className="h-9 w-9 shrink-0"
+                  content={
+                    <p className="text-sm leading-relaxed">
+                      Estimate for {result.projectedInsulinAtTarget.carbsGrams}g {result.projectedInsulinAtTarget.mealType}{" "}
+                      once BG is in your pre-exercise band ({result.targetBg}). Usually ~
+                      {result.projectedInsulinAtTarget.standardUnits}u before {result.projectedInsulinAtTarget.reductionPercent}%
+                      exercise reduction.
+                    </p>
+                  }
+                />
+              </div>
+            ) : result.insulinSuppressedReason && (result.mealCarbs > 0 || foodMode === "known") && !result.userEnteredMealCarbs ? (
               <div className="flex items-center gap-1 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
                 <p className="min-w-0 flex-1 text-sm font-medium text-foreground">No meal insulin at this reading</p>
                 <InlineInfoHint

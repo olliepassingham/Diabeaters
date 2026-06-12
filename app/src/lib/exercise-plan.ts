@@ -337,7 +337,7 @@ function baseCarbsAndBolus(
       break;
     case "moderate":
       preExerciseCarbs = duration < 20 ? 10 : 20;
-      duringCarbs = duration > 45 ? Math.round(duration / 30) * 15 : 0;
+      duringCarbs = duration >= 45 ? Math.round(duration / 30) * 15 : 0;
       postExerciseCarbs = 20;
       bolusReduction = "25-35%";
       break;

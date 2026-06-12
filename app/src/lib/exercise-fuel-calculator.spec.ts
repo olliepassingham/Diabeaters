@@ -7,6 +7,7 @@ const settings: UserSettings = {
   snackRatio: "15",
   lunchRatio: "10",
   tdd: 50,
+  correctionFactor: 2,
 };
 
 describe("computeExerciseFuelPlan", () => {
@@ -27,8 +28,10 @@ describe("computeExerciseFuelPlan", () => {
     });
     expect(r.insulin).not.toBeNull();
     expect(r.insulin!.adjustedUnits).toBeGreaterThan(0);
+    expect(r.insulin!.totalUnits).toBeGreaterThan(0);
+    expect(r.userEnteredMealCarbs).toBe(true);
     expect(r.breakdown.standardUnits).toBeGreaterThan(0);
-    expect(r.headline).toContain("50g");
+    expect(r.headline).toContain("units");
   });
 
   it("does not show insulin without a BG reading even when meal carbs are entered", () => {
@@ -172,7 +175,7 @@ describe("computeExerciseFuelPlan", () => {
     expect(r.insulinSuppressedReason).toBe("below_target");
   });
 
-  it("suppresses insulin when BG trend is falling", () => {
+  it("suppresses insulin when BG trend is falling in suggest mode", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "cardio",
       intensity: "moderate",
@@ -187,18 +190,20 @@ describe("computeExerciseFuelPlan", () => {
       settings,
       isPump: false,
     });
-    expect(r.insulin).toBeNull();
+    expect(r.userEnteredMealCarbs).toBe(true);
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulin!.totalUnits).toBeGreaterThan(0);
     expect(r.insulinSuppressedReason).toBe("falling");
   });
 
-  it("suppresses insulin at 5.5 mmol/L even when user enters 50g carbs", () => {
+  it("calculates insulin at low BG when user entered pre-exercise carbs", () => {
     const r = computeExerciseFuelPlan({
       exerciseType: "strength",
       intensity: "moderate",
       durationMinutes: 45,
-      minutesUntilStart: 0,
+      minutesUntilStart: 30,
       fasted: false,
-      mealCarbsGrams: 50,
+      mealCarbsGrams: 48,
       mealType: "snack",
       currentBg: 5.5,
       bgTrend: "flat",
@@ -206,7 +211,76 @@ describe("computeExerciseFuelPlan", () => {
       settings,
       isPump: false,
     });
-    expect(r.insulin).toBeNull();
-    expect(r.insulinSuppressedReason).toBe("low_bg");
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulin!.totalUnits).toBeGreaterThan(0);
+    expect(r.projection).not.toBeNull();
+    expect(r.projection!.projectedBgAtStart).not.toBeNull();
+    expect(r.projection!.projectedBgAtStart!).toBeGreaterThanOrEqual(7);
+    expect(r.projection!.projectedBgAtStart!).toBeLessThanOrEqual(10);
+    expect(r.exerciseEffectNote).toContain("Strength");
+    expect(r.userEnteredMealCarbs).toBe(true);
+    expect(r.projectedInsulinAtTarget).toBeNull();
+  });
+
+  it("adds correction units when BG is above pre-exercise target band", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 50,
+      mealType: "snack",
+      currentBg: 12,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.insulin).not.toBeNull();
+    expect(r.insulin!.correctionUnits).toBeGreaterThan(0);
+    expect(r.insulin!.totalUnits).toBeGreaterThan(r.insulin!.adjustedUnits);
+  });
+
+  it("computes session fuel from exercise type, intensity, and duration for known carbs", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "strength",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 70,
+      mealType: "lunch",
+      currentBg: 5.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.userEnteredMealCarbs).toBe(true);
+    expect(r.sessionFuel.duringTotalGrams).toBeGreaterThan(0);
+    expect(r.sessionFuel.carryGrams).toBeGreaterThan(0);
+    expect(r.onHandCarbs).toBe(r.sessionFuel.carryGrams);
+    expect(r.duringCarbs).toBe(r.sessionFuel.duringTotalGrams);
+  });
+
+  it("includes interval dosing for cardio sessions over 30 min", () => {
+    const r = computeExerciseFuelPlan({
+      exerciseType: "cardio",
+      intensity: "moderate",
+      durationMinutes: 45,
+      minutesUntilStart: 30,
+      fasted: false,
+      mealCarbsGrams: 40,
+      mealType: "snack",
+      currentBg: 8.5,
+      bgTrend: "flat",
+      bgUnits: "mmol/L",
+      settings,
+      isPump: false,
+    });
+    expect(r.sessionFuel.doseGrams).toBe(20);
+    expect(r.sessionFuel.intervalMinutes).toBe(30);
+    expect(r.sessionFuel.carryGrams).toBeGreaterThanOrEqual(40);
   });
 });
