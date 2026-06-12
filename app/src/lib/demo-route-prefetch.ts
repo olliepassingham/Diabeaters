@@ -1,4 +1,5 @@
 import { prefetchCommunityNavigationBundle } from "@/components/bottom-nav";
+import { prefetchScenariosHubAndRoutes } from "@/lib/scenarios-route-prefetch";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 
 let prefetchedDashboard = false;
@@ -40,6 +41,7 @@ export function prefetchDemoCriticalRoutes(): void {
   prefetchCommunityNavigationBundle();
   prefetchCommunityFeedChunk();
   prefetchToolsHubLinkedChunks();
+  prefetchScenariosHubAndRoutes();
 }
 
 /** Warm community route chunks soon after gate (feed is often the slowest sub-chunk). */

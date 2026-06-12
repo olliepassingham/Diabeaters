@@ -65,6 +65,19 @@ import {
 } from "@/lib/carer-link-query";
 import { getProfile, profileQueryKey } from "@/lib/profile";
 import { scheduleDemoRoutePrefetch } from "@/lib/demo-route-prefetch";
+import {
+  isPatientOnboardingSatisfied,
+  readOnboardingCompleteFromLocalStorage,
+  resolveAppGateReady,
+} from "@/lib/offline-app-gate";
+import { isOnline } from "@/lib/offline";
+import { useOffline } from "@/hooks/use-offline";
+import {
+  OFFLINE_SUPPLY_QUEUED_TOAST,
+  OFFLINE_SUPPLY_RETRY_TOAST,
+  offlineReconcileToasts,
+} from "@/lib/offline-messaging";
+import { reconcileAfterBackOnline } from "@/lib/offline-reconcile";
 import { isCommunityMemberSession, scheduleCommunityWarmup } from "@/lib/community-feed-cache";
 import {
   clearCarerClientSessionKeys,
@@ -1262,18 +1275,11 @@ function AuthenticatedShell() {
       const ce = ev as CustomEvent<{ kind?: string }>;
       const kind = ce.detail?.kind;
       if (kind === "queued") {
-        toast({
-          title: "Change queued",
-          description: "Change queued; will sync when you're back online.",
-        });
+        toast(OFFLINE_SUPPLY_QUEUED_TOAST);
         return;
       }
       if (kind === "retry") {
-        toast({
-          title: "Couldn't sync",
-          description: "Couldn't sync now; will retry automatically.",
-          variant: "destructive",
-        });
+        toast(OFFLINE_SUPPLY_RETRY_TOAST);
       }
     };
     window.addEventListener("diabeater:supply-sync-toast", onSupplySyncToast);
@@ -1282,26 +1288,9 @@ function AuthenticatedShell() {
 
   useEffect(() => {
     const flush = async () => {
-      const { flushSuppliesOfflineQueue } = await import("@/lib/supplies");
-      const { flushed, skippedNewer, failed } = await flushSuppliesOfflineQueue();
-      if (flushed > 0) {
-        toast({
-          title: "Queued changes synced",
-          description: `${flushed} change${flushed === 1 ? "" : "s"} sent to the server.`,
-        });
-      }
-      if (skippedNewer > 0) {
-        toast({
-          title: "Skipped newer server version",
-          description: `${skippedNewer} change${skippedNewer === 1 ? "" : "s"} were skipped because a newer server version exists.`,
-        });
-      }
-      if (failed > 0) {
-        toast({
-          title: "Sync incomplete",
-          description: "Some queued changes could not be synced yet. We'll retry when you're online.",
-          variant: "destructive",
-        });
+      const { supplies } = await reconcileAfterBackOnline();
+      for (const item of offlineReconcileToasts(supplies)) {
+        toast(item);
       }
     };
 
@@ -1518,6 +1507,8 @@ function AppContent() {
   const queryClient = useQueryClient();
   const userId = user?.id;
   const linkQuery = useLinkedPatientQuery();
+  const isOffline = useOffline();
+  const online = !isOffline;
   const pathOnly = location.split("?")[0] ?? location;
 
   const carerPendingBlocksOnboarding =
@@ -1541,28 +1532,39 @@ function AppContent() {
 
   const linkedCarer = Boolean(linkQuery.data);
 
-  const patientOnboardingSatisfied = useMemo(() => {
-    if (!userId) return true;
-    if (linkedCarer) return true;
-    if (carerPendingBlocksOnboarding) return true;
-    if (!profileQuery.isFetched) return true;
-    const fromDb = profileQuery.data?.onboarding_complete === true;
-    let fromLs = false;
-    try {
-      fromLs = localStorage.getItem("diabeater_onboarding_completed") === "true";
-    } catch {
-      fromLs = false;
-    }
-    return fromDb || fromLs;
-  }, [userId, linkedCarer, carerPendingBlocksOnboarding, profileQuery.data, profileQuery.isFetched]);
+  const patientOnboardingSatisfied = useMemo(
+    () =>
+      isPatientOnboardingSatisfied({
+        userId,
+        linkedCarer,
+        carerPendingBlocksOnboarding,
+        profileQueryFetched: profileQuery.isFetched,
+        onboardingCompleteFromDb: profileQuery.data?.onboarding_complete === true,
+        onboardingCompleteFromLocalStorage: readOnboardingCompleteFromLocalStorage(),
+        online,
+      }),
+    [
+      userId,
+      linkedCarer,
+      carerPendingBlocksOnboarding,
+      profileQuery.data,
+      profileQuery.isFetched,
+      online,
+    ],
+  );
 
-  const appGateReady = useMemo(() => {
-    if (authLoading) return false;
-    if (!userId) return true;
-    if (!linkQuery.isFetched) return false;
-    if (skipProfileForGate) return true;
-    return profileQuery.isFetched;
-  }, [authLoading, userId, linkQuery.isFetched, skipProfileForGate, profileQuery.isFetched]);
+  const appGateReady = useMemo(
+    () =>
+      resolveAppGateReady({
+        authLoading,
+        userId,
+        online,
+        linkQueryFetched: linkQuery.isFetched,
+        profileQueryFetched: profileQuery.isFetched,
+        skipProfileForGate,
+      }),
+    [authLoading, userId, online, linkQuery.isFetched, profileQuery.isFetched, skipProfileForGate],
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -1577,7 +1579,7 @@ function AppContent() {
   }, [userId]);
 
   useEffect(() => {
-    if (!appGateReady || !userId) return;
+    if (!appGateReady || !userId || !isOnline()) return;
     const onCommunityPath = pathOnly === "/community" || pathOnly.startsWith("/community/");
     const isCommunityMember = isCommunityMemberSession({
       hasCarerLink: Boolean(linkQuery.data),
@@ -1685,6 +1687,8 @@ function AppContent() {
 export default function App() {
   useEffect(() => {
     if (!(import.meta.env.PROD && "serviceWorker" in navigator)) return;
+    // Bundled Capacitor shells ship `dist/` in the binary — no service worker needed.
+    if (isCapacitorNativeShell()) return;
     navigator.serviceWorker
       .register("/service-worker.js", { updateViaCache: "none" })
       .then((registration) => {

@@ -1,23 +1,31 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * iOS wrapper MUST always load production URL for App Store builds.
- * Android Play Store builds use the same remote URL pattern.
- * Do not point server.url at staging. For local staging tests, temporarily
- * override and run npx cap sync ios|android — revert before archiving.
+ * Native release builds bundle the production web app from `dist/` (offline cold start).
  *
- * When `server.url` is set, the WebView loads that host’s JS (e.g. Vercel). Vite
- * flags like `VITE_SHOW_PUSH_TEST` apply only if set on **that** deployment’s build,
- * unless you use the per-device unlock (About → Version, seven taps on iOS).
+ * To load a remote host instead (legacy OTA-style updates without an App Store release),
+ * set `CAPACITOR_SERVER_URL` before `cap sync`, e.g.:
+ *   CAPACITOR_SERVER_URL=https://diabeaters.vercel.app npm run ios:release:sync:remote
+ *
+ * Do not point `CAPACITOR_SERVER_URL` at staging for store archives.
+ *
+ * When a remote URL is set, Vite flags on **that** deployment apply unless unlocked per device
+ * (About → Version, seven taps on iOS).
  */
+const remoteServerUrl = process.env.CAPACITOR_SERVER_URL?.trim();
+
 const config: CapacitorConfig = {
   appId: "com.passingtime.diabeaters",
   appName: "Diabeaters",
   webDir: "dist",
-  server: {
-    url: "https://diabeaters.vercel.app",
-    cleartext: false,
-  },
+  ...(remoteServerUrl
+    ? {
+        server: {
+          url: remoteServerUrl,
+          cleartext: false,
+        },
+      }
+    : {}),
   plugins: {
     /**
      * iOS: show banners and play sound while the app is open (same as lock-screen alerts).

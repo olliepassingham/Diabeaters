@@ -167,6 +167,8 @@ The email link opens in the system browser (SFSafariViewController). The WebView
 
 Cloud features are designed to be usable when connectivity is unreliable.
 
+- **Native apps (iOS/Android)**: Release builds bundle the production web app from `dist/` (see `npm run ios:release:sync`). The shell opens **without network**; home, guides, and tools use on-device storage. To ship the legacy remote-WebView mode instead, use `npm run ios:release:sync:remote` (`CAPACITOR_SERVER_URL`).
+- **Web/PWA**: The service worker precaches the built JS/CSS shell after `npm run web:build` for faster offline reloads.
 - **Cloud supplies**: Uses a small *read-through cache* of the last successful server list.
 - **When offline**:
   - Reads show the last cached cloud supplies.

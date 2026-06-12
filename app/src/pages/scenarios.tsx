@@ -10,6 +10,7 @@ import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { pumpSetupCompletion } from "@/lib/pump-supplies";
 import { canShowAlcoholScenarios, canShowDrivingReadiness } from "@/lib/user-age";
 import { PageShell } from "@/components/layout";
+import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { DobUnknownNotice } from "@/components/dob-unknown-notice";
 
 type ScenarioCardDef = {
@@ -187,6 +188,7 @@ export default function Scenarios() {
       <h1 className="sr-only">Guides</h1>
 
       <DobUnknownNotice testId="guides-dob-unknown-notice" />
+      <OfflineDeviceNotice />
 
       <div className="grid w-full grid-cols-1 gap-y-3 gap-x-5 md:grid-cols-2 md:gap-x-6 md:gap-y-4">
         <div className="col-span-1 flex h-9 items-center justify-end md:col-span-2">{guidesAboutDialog}</div>

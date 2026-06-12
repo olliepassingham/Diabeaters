@@ -1,6 +1,6 @@
 # Google Play / Android release checklist
 
-Operational steps to ship the Capacitor Android shell. Like iOS, the native app loads the web UI from [`capacitor.config.ts`](../capacitor.config.ts) (`server.url`); production web + Supabase must match that URL.
+Operational steps to ship the Capacitor Android shell. Default release sync (`npm run android:release:sync`) bundles `dist/` for offline cold start. Optional remote mode: `npm run android:release:sync:remote` sets `CAPACITOR_SERVER_URL` in [`capacitor.config.ts`](../capacitor.config.ts).
 
 **Start here for a phased launch plan:** [play_store_launch_runbook.md](./play_store_launch_runbook.md) (tickable Week 1–3 runbook + owner one-pager).
 

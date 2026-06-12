@@ -63,7 +63,8 @@ Use `npm run version:patch`, `version:minor`, or `version:major` to bump `packag
 </dict>
 ```
 
-- [ ] **External links**: Capacitor loads the app from a remote URL. By default, links open in the WebView. To open external links in `SFSafariViewController`, add `@capacitor/browser` and call `Browser.open()` from the web app for outbound URLs.
+- [ ] **Bundled web UI**: Default release sync (`npm run ios:release:sync`) bundles `dist/` in the app for offline cold start. Use `npm run ios:release:sync:remote` only if you intentionally want the WebView to load `https://diabeaters.vercel.app` instead.
+- [ ] **External links**: By default, links open in the WebView. To open external links in `SFSafariViewController`, add `@capacitor/browser` and call `Browser.open()` from the web app for outbound URLs.
 
 - [ ] **Email verification deep link**: `Info.plist` registers the `diabeaters` URL scheme so “confirm email” can reopen the app. In **Supabase → Authentication → URL Configuration → Redirect URLs**, allow `diabeaters://auth/email-verify` (and your production `https://…/auth/email-verify`) alongside `/auth/callback`.
 

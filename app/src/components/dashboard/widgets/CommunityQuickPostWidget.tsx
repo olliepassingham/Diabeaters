@@ -4,6 +4,7 @@ import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 import { useFeedComposer } from "@/hooks/use-feed-composer";
+import { useOffline } from "@/hooks/use-offline";
 import { useAuth } from "@/lib/auth-context";
 import { isCommunityEnabled } from "@/lib/flags";
 import { useProfile } from "@/lib/profile";
@@ -13,6 +14,7 @@ import type { DashboardWidgetLayoutProps } from "./types";
 export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
   const { user } = useAuth();
   const { profile, loading } = useProfile();
+  const isOffline = useOffline();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -32,7 +34,7 @@ export function CommunityQuickPostWidget(_props: DashboardWidgetLayoutProps) {
     },
   });
 
-  if (!isCommunityEnabled || loading || !profile?.is_public) return null;
+  if (isOffline || !isCommunityEnabled || loading || !profile?.is_public) return null;
 
   return (
     <WidgetCard

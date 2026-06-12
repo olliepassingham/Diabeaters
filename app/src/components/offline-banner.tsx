@@ -1,14 +1,18 @@
 import { WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOffline } from "@/hooks/use-offline";
-import { getQueueLength } from "@/lib/offline";
+import {
+  OFFLINE_BANNER_BASE,
+  offlineBannerQueuedSuffix,
+  readOfflineQueuedCount,
+} from "@/lib/offline-messaging";
 
 export function OfflineBanner() {
   const isOffline = useOffline();
-  const [queuedCount, setQueuedCount] = useState(() => getQueueLength());
+  const [queuedCount, setQueuedCount] = useState(() => readOfflineQueuedCount());
 
   useEffect(() => {
-    const update = () => setQueuedCount(getQueueLength());
+    const update = () => setQueuedCount(readOfflineQueuedCount());
     update();
     window.addEventListener("diabeater:offline-queue-changed", update as EventListener);
     window.addEventListener("storage", update);
@@ -26,14 +30,14 @@ export function OfflineBanner() {
       role="status"
       aria-live="polite"
     >
-      <WifiOff className="h-4 w-4" />
-      <span>You&apos;re offline. Some features may be limited.</span>
+      <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
+      <span data-testid="offline-banner-message">{OFFLINE_BANNER_BASE}</span>
       {queuedCount > 0 && (
         <span
           className="ml-1 rounded-full bg-amber-950/10 px-2 py-0.5 text-xs font-medium"
           data-testid="offline-queued-count"
         >
-          {queuedCount} change{queuedCount === 1 ? "" : "s"} queued
+          {offlineBannerQueuedSuffix(queuedCount)}
         </span>
       )}
     </div>

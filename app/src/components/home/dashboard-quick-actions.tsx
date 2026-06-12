@@ -8,13 +8,16 @@ import { HomeQuickActions, type HomeQuickAction } from "@/components/home/home-u
 export function DashboardQuickActions({
   showScenariosLink,
   scenariosHref,
+  showCoachLink = isAiCoachEnabled,
 }: {
   showScenariosLink: boolean;
   scenariosHref: string;
+  /** When false, hides Beatie (e.g. offline). Defaults to the AI coach feature flag. */
+  showCoachLink?: boolean;
 }) {
   const actions: HomeQuickAction[] = [];
 
-  if (isAiCoachEnabled) {
+  if (showCoachLink) {
     actions.push({
       id: "coach",
       label: openAssistantCtaLabel(),

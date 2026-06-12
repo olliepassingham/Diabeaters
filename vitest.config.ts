@@ -24,6 +24,8 @@ export default defineConfig({
     setupFiles: [path.resolve(rootDir, "app", "src", "test", "setup.ts")],
     include: [
       "app/src/**/*.spec.{ts,tsx}",
+      "app/tests/**/*.spec.ts",
+      "scripts/**/*.spec.ts",
       "supabase/functions/_shared/**/*.spec.ts",
     ],
     clearMocks: true,

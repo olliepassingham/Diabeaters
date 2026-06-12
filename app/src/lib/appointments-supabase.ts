@@ -1,3 +1,4 @@
+import { isOnline } from "@/lib/offline";
 import { getSupabase } from "@/lib/supabase";
 import {
   getAppointmentsStorageKeyForUserId,
@@ -109,6 +110,7 @@ async function getAuthedUserId(): Promise<string | null> {
 }
 
 export async function pushLocalAppointmentsToCloud(): Promise<void> {
+  if (!isOnline()) return;
   const supabase = getSupabase();
   if (!supabase) return;
   const userId = await getAuthedUserId();
@@ -140,6 +142,7 @@ export async function pushLocalAppointmentsToCloud(): Promise<void> {
 }
 
 export async function pullCloudAppointmentsToLocal(): Promise<void> {
+  if (!isOnline()) return;
   const supabase = getSupabase();
   if (!supabase) return;
   const userId = await getAuthedUserId();

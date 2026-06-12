@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Calculator,
@@ -33,6 +33,9 @@ import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { RatiosSetupNotice } from "@/components/ratios-setup-notice";
+import { useOffline } from "@/hooks/use-offline";
+import { filterOfflineCloudTools } from "@/lib/offline-app-gate";
+import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 
 function tileEnterDelay(index: number, stepMs = 12, capMs = 72): string {
   return `${Math.min(index * stepMs, capMs)}ms`;
@@ -366,6 +369,7 @@ export function ToolsHubPage({
       <h1 className="sr-only">Tools</h1>
 
       <RatiosSetupNotice hidden={hubVariant !== "patient"} testId="tools-ratios-setup-notice" />
+      <OfflineDeviceNotice />
 
       {(hubVariant === "carer" || hubVariant === "community") && supporterTools.length > 0 ? (
         <section
@@ -492,6 +496,7 @@ export function CarerToolsPlaceholder() {
 export default function ToolsPage() {
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const { profile } = useProfile();
+  const isOffline = useOffline();
   const [, setLocation] = useLocation();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
   const isCarerMode = isCarerSessionMode(hasCarerLink, activeMode);
@@ -499,11 +504,15 @@ export default function ToolsPage() {
     localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
     cloudCommunityProfile: profile?.account_type === "community",
   });
-  const tileCount = isCarerMode
-    ? carerToolsForHub().length
-    : isCommunityMode
-      ? communityToolsForHub().length
-      : patientToolsForHub().length;
+  const hubTools = useMemo(() => {
+    const raw = isCarerMode
+      ? carerToolsForHub()
+      : isCommunityMode
+        ? communityToolsForHub()
+        : patientToolsForHub();
+    return filterOfflineCloudTools(raw, isOffline);
+  }, [isCarerMode, isCommunityMode, isOffline]);
+  const tileCount = hubTools.length;
 
   useEffect(() => {
     prefetchToolsHubLinkedChunks();
@@ -537,7 +546,6 @@ export default function ToolsPage() {
     );
   }
   if (!isCarerMode && !isCommunityMode && (hasCarerIntent() || hasPendingCarer())) return null;
-  if (isCarerMode) return <ToolsHubPage tools={carerToolsForHub()} hubVariant="carer" />;
-  if (isCommunityMode) return <ToolsHubPage tools={communityToolsForHub()} hubVariant="community" />;
-  return <ToolsHubPage tools={patientToolsForHub()} hubVariant="patient" />;
+  const hubVariant = isCarerMode ? "carer" : isCommunityMode ? "community" : "patient";
+  return <ToolsHubPage tools={hubTools} hubVariant={hubVariant} />;
 }

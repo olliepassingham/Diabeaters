@@ -8,6 +8,9 @@ import { motion } from "framer-motion";
 import { navigateWithViewTransition } from "@/lib/nav-view-transition";
 import { prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { prefetchCarerViewRoute, prefetchCommunityFeedChunk, prefetchDemoCriticalRoutes } from "@/lib/demo-route-prefetch";
+import { filterOfflineCloudNavTabs } from "@/lib/offline-app-gate";
+import { prefetchScenariosHubAndRoutes } from "@/lib/scenarios-route-prefetch";
+import { useOffline } from "@/hooks/use-offline";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { prefetchLinkedPatientsQuery } from "@/lib/carer-link-query";
@@ -75,7 +78,7 @@ function prefetchTools(): void {
 function prefetchScenarios(): void {
   if (prefetchedScenarios) return;
   prefetchedScenarios = true;
-  void import("@/pages/scenarios");
+  prefetchScenariosHubAndRoutes();
 }
 
 type TabDef = {
@@ -235,8 +238,9 @@ export function BottomNav() {
     localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
     cloudCommunityProfile: profile?.account_type === "community",
   });
+  const isOffline = useOffline();
   const showCommunityTab =
-    isCommunityEnabled && !profileLoading && profile?.is_public === true;
+    !isOffline && isCommunityEnabled && !profileLoading && profile?.is_public === true;
 
   useEffect(() => {
     const onHash = () => setHash(window.location.hash.slice(1));
@@ -318,11 +322,14 @@ export function BottomNav() {
     };
   }, [isCarerMode, isCommunityMode, showCommunityTab, profileLoading]);
 
-  const tabs = isCarerMode
-    ? carerTabs(showCommunityTab)
-    : isCommunityMode
-      ? communityMemberTabs(showCommunityTab)
-      : patientTabs(showCommunityTab);
+  const tabs = filterOfflineCloudNavTabs(
+    isCarerMode
+      ? carerTabs(showCommunityTab)
+      : isCommunityMode
+        ? communityMemberTabs(showCommunityTab)
+        : patientTabs(showCommunityTab),
+    isOffline,
+  );
 
   const cols = tabs.length;
   const navRef = useRef<HTMLElement | null>(null);

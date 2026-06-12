@@ -20,6 +20,7 @@ import { formatDistanceToNow, format, differenceInDays, addDays, startOfDay } fr
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { runSupplyLowInAppNotifyScan } from "@/lib/supply-inapp-notify-scan";
 import { PharmacyCard } from "@/components/pharmacy-card";
@@ -1926,6 +1927,7 @@ export default function Supplies() {
           </PageInfoDialog>
         }
       />
+      <OfflineDeviceNotice variant="supplies" />
 
       {scenarioState.travelModeActive && (criticalSupplies.length > 0 || lowSupplies.length > 0) && (
         <Alert

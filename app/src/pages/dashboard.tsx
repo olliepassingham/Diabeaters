@@ -67,7 +67,9 @@ import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
-import { isCommunityEnabled } from "@/lib/flags";
+import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
+import { useOffline } from "@/hooks/use-offline";
+import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
 import { HomePrimaryStatusPill } from "@/components/home/home-ui";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
@@ -798,6 +800,7 @@ export default function Dashboard() {
   const search = useSearch();
   const [, setLocation] = useLocation();
   const { profile: cloudProfile, loading: cloudProfileLoading } = useProfile();
+  const isOffline = useOffline();
   const isMobile = useIsMobile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [supplies, setSupplies] = useState<LocalSupply[]>([]);
@@ -926,7 +929,7 @@ export default function Dashboard() {
 
   // SetupPromptCard covers incomplete setup; never show the settings-completion widget in the grid (avoids empty slot when complete).
   const showCommunityQuickPostWidget =
-    isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
+    !isOffline && isCommunityEnabled && !cloudProfileLoading && cloudProfile?.is_public === true;
   const communityDashWidgetAllow = new Set(["community-quick-post", "tip-of-day", "pharmacy"]);
   const widgetsToRender = activeWidgets
     .filter((w) => w.type !== "settings-completion")
@@ -948,6 +951,7 @@ export default function Dashboard() {
           </span>
         }
       />
+      <OfflineDeviceNotice className="mb-1" />
       {/* Today: high-signal cluster (reads as one section) */}
       <section className="space-y-4 sm:space-y-5" data-testid="dashboard-today">
         {showVerifiedWelcome && (
@@ -999,6 +1003,7 @@ export default function Dashboard() {
             <DashboardQuickActions
               showScenariosLink={showScenariosQuickLink}
               scenariosHref={scenariosQuickHref}
+              showCoachLink={isAiCoachEnabled && !isOffline}
             />
           </div>
         ) : null}

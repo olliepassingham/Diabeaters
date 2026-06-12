@@ -140,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const runSuppliesReconcile = () => {
       if (cancelled) return;
-      void import("@/lib/supplies").then((m) => m.reconcileSupplies());
+      void import("@/lib/offline-reconcile").then((m) => m.reconcileAfterBackOnline());
     };
 
     const scheduleSupplies = () => {

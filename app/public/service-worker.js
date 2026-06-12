@@ -1,12 +1,9 @@
-const CACHE_NAME = 'diabeaters-v8';
-const STATIC_CACHE = 'diabeaters-static-v8';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v8';
+const CACHE_NAME = 'diabeaters-v9';
+const STATIC_CACHE = 'diabeaters-static-v9';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v9';
 
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
+/** Replaced at build time by scripts/sw-precache.ts — do not edit the marker by hand. */
+const PRECACHE_URLS = __PRECACHE_MANIFEST__;
 
 function isViteDevResource(url) {
   return url.pathname.includes('.vite/') ||
@@ -17,11 +14,19 @@ function isViteDevResource(url) {
     url.pathname.startsWith('/src/');
 }
 
+async function precacheUrls(cache, urls) {
+  await Promise.all(
+    urls.map((url) =>
+      cache.add(url).catch(() => {
+        // Individual failures must not block install (e.g. optional icons).
+      }),
+    ),
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(STATIC_CACHE).then((cache) => precacheUrls(cache, PRECACHE_URLS)),
   );
   self.skipWaiting();
 });
@@ -32,9 +37,9 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys
           .filter((key) => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
-          .map((key) => caches.delete(key))
+          .map((key) => caches.delete(key)),
       );
-    })
+    }),
   );
   self.clients.claim();
 });
@@ -62,9 +67,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          return caches.match(event.request);
-        })
+        .catch(() => caches.match(event.request)),
     );
     return;
   }
@@ -91,29 +94,31 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         });
-      })
+      }),
     );
     return;
   }
 
   event.respondWith(
-    fetch(event.request).then((response) => {
-      if (response.ok && event.request.method === 'GET') {
-        const clone = response.clone();
-        caches.open(DYNAMIC_CACHE).then((cache) => {
-          cache.put(event.request, clone);
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request)
+        .then((response) => {
+          if (response.ok && event.request.method === 'GET') {
+            const clone = response.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => {
+              cache.put(event.request, clone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          if (event.request.destination === 'document') {
+            return caches.match('/index.html').then((doc) => doc || caches.match('/'));
+          }
+          return new Response('Offline', { status: 503 });
         });
-      }
-      return response;
-    }).catch(() => {
-      return caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        if (event.request.destination === 'document') {
-          return caches.match('/');
-        }
-        return new Response('Offline', { status: 503 });
-      });
-    })
+    }),
   );
 });
 
@@ -136,9 +141,7 @@ self.addEventListener('push', (event) => {
     ],
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -158,6 +161,6 @@ self.addEventListener('notificationclick', (event) => {
       if (clients.openWindow) {
         return clients.openWindow(url);
       }
-    })
+    }),
   );
 });
