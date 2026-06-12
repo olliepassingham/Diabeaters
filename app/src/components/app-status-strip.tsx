@@ -76,6 +76,11 @@ import {
   insulinDeliveryForPostExerciseTips,
 } from "@/lib/post-exercise-nudge";
 import { tripStyleLabel } from "@/lib/travel-active-guidance";
+import {
+  OFFLINE_BANNER_BASE,
+  offlineBannerQueuedSuffix,
+  readOfflineQueuedCount,
+} from "@/lib/offline-messaging";
 
 function exercisePhaseLabel(phase: ExercisePhase): string {
   if (phase === "active") return "during";
@@ -257,11 +262,23 @@ export function AppStatusStrip() {
   const exerciseAutoFinishKey = useRef<string | null>(null);
 
   const [stripProfile, setStripProfile] = useState<UserProfile | null>(() => storage.getProfile());
+  const [offlineQueuedCount, setOfflineQueuedCount] = useState(() => readOfflineQueuedCount());
 
   useEffect(() => {
     const onProfile = () => setStripProfile(storage.getProfile());
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
     return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+  }, []);
+
+  useEffect(() => {
+    const updateQueued = () => setOfflineQueuedCount(readOfflineQueuedCount());
+    updateQueued();
+    window.addEventListener("diabeater:offline-queue-changed", updateQueued as EventListener);
+    window.addEventListener("storage", updateQueued);
+    return () => {
+      window.removeEventListener("diabeater:offline-queue-changed", updateQueued as EventListener);
+      window.removeEventListener("storage", updateQueued);
+    };
   }, []);
 
   useEffect(() => {
@@ -665,11 +682,21 @@ export function AppStatusStrip() {
   return (
     <div className="relative z-40 -mt-2 mb-2 space-y-1.5 sm:space-y-2" data-testid="app-status-strip">
       {!online ? (
-        <div className={rowClass}>
-          <Badge className={cn("chip border border-border/60 bg-muted/50 text-muted-foreground", "max-w-full")} variant="secondary">
+        <div className={rowClass} role="status" aria-live="polite">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
             <WifiOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            Offline
-          </Badge>
+            <span className="min-w-0 text-xs leading-snug sm:text-sm" data-testid="offline-banner-message">
+              {OFFLINE_BANNER_BASE}
+            </span>
+          </div>
+          {offlineQueuedCount > 0 ? (
+            <span
+              className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              data-testid="offline-queued-count"
+            >
+              {offlineBannerQueuedSuffix(offlineQueuedCount)}
+            </span>
+          ) : null}
         </div>
       ) : null}
 

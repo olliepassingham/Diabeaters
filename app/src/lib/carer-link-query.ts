@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
+import { isOnline } from "@/lib/offline";
 import { getLinkedPatientForCarer, listLinkedPatientsForCarer } from "@/lib/carers";
 import { getCarerLinkJustCompletedAt } from "@/lib/carer-session";
 import type { LinkedPatientInfo, LinkedPatientWithProfile } from "@/lib/carers.types";
@@ -65,7 +66,7 @@ export function useLinkedPatientQuery() {
   return useQuery({
     queryKey: linkedPatientQueryKey(userId),
     queryFn: fetchLinkedPatientForUser,
-    enabled: !authLoading && Boolean(userId),
+    enabled: !authLoading && Boolean(userId) && isOnline(),
     staleTime: 60_000,
     retry: false,
   });

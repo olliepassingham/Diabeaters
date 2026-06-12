@@ -16,7 +16,6 @@ import { BottomNav } from "@/components/bottom-nav";
 import { Link } from "wouter";
 import { AppTopBar } from "@/components/app-top-bar";
 import { DmThreadSubheader } from "@/components/dm-thread-subheader";
-import { OfflineBanner } from "@/components/offline-banner";
 import { AppStatusStrip } from "@/components/app-status-strip";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -493,6 +492,7 @@ function resolveCommunityMode(
 }
 
 function PatientRouteGuard({ children }: { children: React.ReactNode }) {
+  const isOffline = useOffline();
   const { isCarer: hasCarerLink, loading } = useLinkedCarer();
   const [location, setLocation] = useLocation();
   const pathOnly = location.split("?")[0] ?? location;
@@ -530,7 +530,7 @@ function PatientRouteGuard({ children }: { children: React.ReactNode }) {
     }
   }, [loading, isCarerMode, isCommunityMode, pathOnly, setLocation]);
 
-  if (loading) {
+  if (loading && !isOffline) {
     return (
       <div className="flex justify-center py-16 text-muted-foreground text-sm">Loading…</div>
     );
@@ -750,72 +750,52 @@ function InnerRouter() {
       </Route>
       <Route path="/">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Dashboard />
-          </Suspense>
+          <Dashboard />
         </PatientRouteGuard>
       </Route>
       <Route path="/supplies">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Supplies />
-          </Suspense>
+          <Supplies />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/exercise">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <ScenarioExercisePage />
-          </Suspense>
+          <ScenarioExercisePage />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/bedtime">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Bedtime />
-          </Suspense>
+          <Bedtime />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/sick-day">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <SickDay />
-          </Suspense>
+          <SickDay />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/travel">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Travel />
-          </Suspense>
+          <Travel />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/alcohol">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <AlcoholScenarioPage />
-          </Suspense>
+          <AlcoholScenarioPage />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/driving">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <DrivingScenarioPage />
-          </Suspense>
+          <DrivingScenarioPage />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios/pump-failure">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <PumpFailurePage />
-          </Suspense>
+          <PumpFailurePage />
         </PatientRouteGuard>
       </Route>
       <Route path="/scenarios">
         <PatientRouteGuard>
-          <Suspense fallback={<RouteFallback />}>
-            <Scenarios />
-          </Suspense>
+          <Scenarios />
         </PatientRouteGuard>
       </Route>
       <Route path="/tools/hypo-help">
@@ -882,9 +862,7 @@ function InnerRouter() {
         </Suspense>
       </Route>
       <Route path="/tools">
-        <Suspense fallback={<RouteFallback />}>
-          <ToolsPage />
-        </Suspense>
+        <ToolsPage />
       </Route>
       <Route path="/adviser">
         <PatientRouteGuard>
@@ -1355,7 +1333,6 @@ function AuthenticatedShell() {
         {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       </DeferredAfterFirstPaint>
       <AppShellBackdrop tone="rich" />
-      {!isDmThreadView ? <OfflineBanner /> : null}
       <AppTopBar
         isCarer={isCarerMode}
         pathOnly={location.split("?")[0] ?? location}

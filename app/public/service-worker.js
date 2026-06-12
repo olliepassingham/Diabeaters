@@ -1,6 +1,6 @@
-const CACHE_NAME = 'diabeaters-v9';
-const STATIC_CACHE = 'diabeaters-static-v9';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v9';
+const CACHE_NAME = 'diabeaters-v10';
+const STATIC_CACHE = 'diabeaters-static-v10';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v10';
 
 /** Replaced at build time by scripts/sw-precache.ts — do not edit the marker by hand. */
 const PRECACHE_URLS = __PRECACHE_MANIFEST__;

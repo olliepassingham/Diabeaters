@@ -69,7 +69,6 @@ import { PageHeader, PageShell } from "@/components/layout";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
-import { OfflineDeviceNotice } from "@/components/offline-device-notice";
 import { DashboardQuickActions } from "@/components/home/dashboard-quick-actions";
 import { HomePrimaryStatusPill } from "@/components/home/home-ui";
 import { useAskAnything } from "@/components/ai-coach/ask-anything-context";
@@ -951,7 +950,6 @@ export default function Dashboard() {
           </span>
         }
       />
-      <OfflineDeviceNotice className="mb-1" />
       {/* Today: high-signal cluster (reads as one section) */}
       <section className="space-y-4 sm:space-y-5" data-testid="dashboard-today">
         {showVerifiedWelcome && (

@@ -61,7 +61,6 @@ test.describe("Offline experience", () => {
     await page.goto("/");
     await expect(page.getByTestId("dashboard-page")).toBeVisible({ timeout: 8000 });
     await expect(page.getByTestId("offline-banner-message")).toContainText("saved on this device");
-    await expect(page.getByTestId("offline-device-notice")).toBeVisible();
   });
 
   test("mid-session offline: hides feed tab and community widget", async ({ page, context }) => {
