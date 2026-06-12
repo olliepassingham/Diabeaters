@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const PRECACHE_MANIFEST_MARKER = "__PRECACHE_MANIFEST__";
@@ -11,6 +11,16 @@ const OPTIONAL_ROOT_FILES = [
   "favicon.ico",
   "robots.txt",
 ] as const;
+
+const PRECACHE_URLS_LINE = /const PRECACHE_URLS = \[[\s\S]*?\];/;
+
+export function serviceWorkerTemplatePath(repoRoot = process.cwd()): string {
+  return join(repoRoot, "app", "public", "service-worker.js");
+}
+
+export function serviceWorkerIsPatchable(swSource: string): boolean {
+  return swSource.includes(PRECACHE_MANIFEST_MARKER) || PRECACHE_URLS_LINE.test(swSource);
+}
 
 /** Collect same-origin URLs to precache after a Vite production build. */
 export function collectPrecacheUrls(distDir: string): string[] {
@@ -39,28 +49,50 @@ export function collectPrecacheUrls(distDir: string): string[] {
   return [...urls].sort((a, b) => a.localeCompare(b));
 }
 
-const PRECACHE_URLS_LINE = /const PRECACHE_URLS = \[[\s\S]*?\];/;
-
 export function patchServiceWorkerPrecacheManifest(swSource: string, urls: string[]): string {
   const manifest = JSON.stringify(urls);
   if (swSource.includes(PRECACHE_MANIFEST_MARKER)) {
     return swSource.replace(PRECACHE_MANIFEST_MARKER, manifest);
   }
-  // `web:build` and `postbuild` both run on Vercel — refresh an already-patched manifest.
   if (PRECACHE_URLS_LINE.test(swSource)) {
     return swSource.replace(PRECACHE_URLS_LINE, `const PRECACHE_URLS = ${manifest};`);
   }
   throw new Error(`service-worker.js is missing ${PRECACHE_MANIFEST_MARKER}`);
 }
 
-export function generateServiceWorkerPrecache(distDir: string): { urlCount: number; outputPath: string } {
+function ensureDistServiceWorker(distDir: string, repoRoot = process.cwd()): string {
   const swPath = join(distDir, "service-worker.js");
-  if (!existsSync(swPath)) {
-    throw new Error(`Missing built service worker at ${swPath}`);
+  const templatePath = serviceWorkerTemplatePath(repoRoot);
+
+  if (!existsSync(templatePath)) {
+    throw new Error(`Missing service worker template at ${templatePath}`);
   }
 
+  if (!existsSync(swPath)) {
+    copyFileSync(templatePath, swPath);
+  }
+
+  let swSource = readFileSync(swPath, "utf8");
+  if (!serviceWorkerIsPatchable(swSource)) {
+    copyFileSync(templatePath, swPath);
+    swSource = readFileSync(swPath, "utf8");
+  }
+
+  if (!serviceWorkerIsPatchable(swSource)) {
+    throw new Error(`service-worker.js is missing ${PRECACHE_MANIFEST_MARKER}`);
+  }
+
+  return swSource;
+}
+
+export function generateServiceWorkerPrecache(
+  distDir: string,
+  repoRoot = process.cwd(),
+): { urlCount: number; outputPath: string } {
+  const swPath = join(distDir, "service-worker.js");
   const urls = collectPrecacheUrls(distDir);
-  const patched = patchServiceWorkerPrecacheManifest(readFileSync(swPath, "utf8"), urls);
+  const swSource = ensureDistServiceWorker(distDir, repoRoot);
+  const patched = patchServiceWorkerPrecacheManifest(swSource, urls);
   writeFileSync(swPath, patched, "utf8");
 
   return { urlCount: urls.length, outputPath: swPath };

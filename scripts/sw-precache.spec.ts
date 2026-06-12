@@ -1,8 +1,13 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { collectPrecacheUrls, patchServiceWorkerPrecacheManifest, PRECACHE_MANIFEST_MARKER } from "./sw-precache";
+import {
+  collectPrecacheUrls,
+  generateServiceWorkerPrecache,
+  patchServiceWorkerPrecacheManifest,
+  PRECACHE_MANIFEST_MARKER,
+} from "./sw-precache";
 
 describe("sw precache", () => {
   it("collects shell, index assets, and all built chunks", () => {
@@ -35,5 +40,29 @@ describe("sw precache", () => {
     const source = 'const PRECACHE_URLS = ["/","/index.html"];';
     const patched = patchServiceWorkerPrecacheManifest(source, ["/", "/assets/a.js"]);
     expect(patched).toBe('const PRECACHE_URLS = ["/","/assets/a.js"];');
+  });
+
+  it("restores the public template when dist service worker is stale", () => {
+    const dir = mkdtempSync(join(tmpdir(), "sw-precache-restore-"));
+    const repoRoot = mkdtempSync(join(tmpdir(), "sw-precache-repo-"));
+    const publicDir = join(repoRoot, "app", "public");
+    mkdirSync(publicDir, { recursive: true });
+    writeFileSync(
+      join(publicDir, "service-worker.js"),
+      `const PRECACHE_URLS = ${PRECACHE_MANIFEST_MARKER};`,
+    );
+    writeFileSync(join(dir, "service-worker.js"), "const PRECACHE_URLS = legacy-without-marker;");
+    writeFileSync(
+      join(dir, "index.html"),
+      '<script src="/assets/chunk.js"></script>',
+    );
+    mkdirSync(join(dir, "assets"));
+    writeFileSync(join(dir, "assets", "chunk.js"), "export {}");
+
+    const { urlCount } = generateServiceWorkerPrecache(dir, repoRoot);
+    expect(urlCount).toBeGreaterThan(2);
+    const patched = readFileSync(join(dir, "service-worker.js"), "utf8");
+    expect(patched).toContain('"/assets/chunk.js"');
+    expect(patched).not.toContain(PRECACHE_MANIFEST_MARKER);
   });
 });
