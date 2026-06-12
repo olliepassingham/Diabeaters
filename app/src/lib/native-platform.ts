@@ -70,3 +70,20 @@ export function nativePlatformLabel(): string {
   if (p === "ios") return "iPhone";
   return "device";
 }
+
+/**
+ * Capacitor serves bundled `webDir` assets from localhost.
+ * Remote `server.url` shells load the production host (e.g. Vercel) instead.
+ */
+export function isBundledCapacitorOrigin(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+/** Service worker helps remote native shells cache JS for offline; bundled shells already ship assets. */
+export function shouldRegisterServiceWorker(): boolean {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
+  if (isCapacitorNativeShell() && isBundledCapacitorOrigin()) return false;
+  return true;
+}

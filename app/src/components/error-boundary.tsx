@@ -80,14 +80,14 @@ export class ErrorBoundary extends Component<Props, State> {
       this.setState({ componentStack: errorInfo.componentStack });
     }
 
-    if (shouldReloadAfterChunkError(error)) {
+    if (isOnline() && shouldReloadAfterChunkError(error)) {
       markChunkRecoveryAttempted();
       this.setState({ isClearing: true });
       window.location.reload();
       return;
     }
 
-    if (shouldAttemptCacheRecovery(error) && isOnline()) {
+    if (isOnline() && shouldAttemptCacheRecovery(error)) {
       try {
         sessionStorage.setItem(CACHE_RECOVERY_KEY, "1");
       } catch {

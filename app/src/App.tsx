@@ -40,6 +40,17 @@ import {
   setPushDeepLinkNavigationReady,
 } from "@/lib/push-notification-deep-link";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
+import Dashboard from "@/pages/dashboard";
+import ToolsPage from "@/pages/tools/index";
+import Bedtime from "@/pages/bedtime";
+import SickDay from "@/pages/sick-day";
+import Travel from "@/pages/travel";
+import Scenarios from "@/pages/scenarios";
+import ScenarioExercisePage from "@/pages/scenarios/exercise";
+import AlcoholScenarioPage from "@/pages/scenarios/alcohol";
+import DrivingScenarioPage from "@/pages/scenarios/driving";
+import PumpFailurePage from "@/pages/scenarios/pump-failure";
+import Supplies from "@/pages/supplies";
 
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
@@ -47,7 +58,6 @@ const AuthCallback = lazy(() => import("@/pages/auth-callback"));
 const ResetRequest = lazy(() => import("@/pages/reset-request"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const CheckEmail = lazy(() => import("@/pages/check-email"));
-const Dashboard = lazy(() => import("@/pages/dashboard"));
 const VerifiedSuccess = lazy(() => import("@/pages/verified-success"));
 const Welcome = lazy(() => import("@/pages/welcome"));
 const VerifiedReturn = lazy(() => import("@/pages/verified-return"));
@@ -109,7 +119,11 @@ import { AchievementSync } from "@/components/achievement-sync";
 import { DmInboxQuerySync } from "@/components/dm-inbox-query-sync";
 import { NativePushForegroundSync } from "@/components/native-push-foreground-sync";
 import { ensureNativeNotificationChannels } from "@/lib/native-local-notifications";
-import { supportsNativeLocalNotifications, isCapacitorNativeShell } from "@/lib/native-platform";
+import {
+  supportsNativeLocalNotifications,
+  isCapacitorNativeShell,
+  shouldRegisterServiceWorker,
+} from "@/lib/native-platform";
 import { AskAnythingProvider } from "@/components/ai-coach/ask-anything-context";
 import { isCommunityAccountProfile, storage, DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -129,7 +143,6 @@ const CommunityProfile = lazy(() => import("@/pages/community/profile"));
 const CommunitySettings = lazy(() => import("@/pages/community/settings"));
 const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
-const ToolsPage = lazy(() => import("@/pages/tools/index"));
 const CoachPage = lazy(() => import("@/pages/coach"));
 const HypoHelpPage = lazy(() => import("@/pages/tools/hypo-help"));
 const HypoHistoryPage = lazy(() => import("@/pages/tools/hypo-history"));
@@ -140,27 +153,16 @@ const TipsPage = lazy(() => import("@/pages/tools/tips"));
 const GlossaryIndex = lazy(() => import("@/pages/education/index"));
 const GlossaryDetail = lazy(() => import("@/pages/education/[slug]"));
 
-const Supplies = lazy(() => import("@/pages/supplies"));
 const Adviser = lazy(() => import("@/pages/adviser"));
 const Routines = lazy(() => import("@/pages/routines"));
 const HelpNow = lazy(() => import("@/pages/help-now"));
 const Appointments = lazy(() => import("@/pages/appointments"));
 const EmergencyCard = lazy(() => import("@/pages/emergency-card"));
 
-const Bedtime = lazy(() => import("@/pages/bedtime"));
-const SickDay = lazy(() => import("@/pages/sick-day"));
-const Travel = lazy(() => import("@/pages/travel"));
-
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const SettingsEmergencyPage = lazy(() => import("@/pages/settings/emergency"));
 const SettingsPharmacyPage = lazy(() => import("@/pages/settings/pharmacy"));
 const SettingsCarbSourcesPage = lazy(() => import("@/pages/settings/carb-sources"));
-
-const Scenarios = lazy(() => import("@/pages/scenarios"));
-const ScenarioExercisePage = lazy(() => import("@/pages/scenarios/exercise"));
-const AlcoholScenarioPage = lazy(() => import("@/pages/scenarios/alcohol"));
-const DrivingScenarioPage = lazy(() => import("@/pages/scenarios/driving"));
-const PumpFailurePage = lazy(() => import("@/pages/scenarios/pump-failure"));
 
 /** Single bottom inset above fixed BottomNav + home-indicator safe area. PageShell adds content rhythm only — no second nav-height pad. */
 const MAIN_BOTTOM_SCROLL_PADDING =
@@ -1689,9 +1691,7 @@ function AppContent() {
 
 export default function App() {
   useEffect(() => {
-    if (!(import.meta.env.PROD && "serviceWorker" in navigator)) return;
-    // Bundled Capacitor shells ship `dist/` in the binary — no service worker needed.
-    if (isCapacitorNativeShell()) return;
+    if (!import.meta.env.PROD || !shouldRegisterServiceWorker()) return;
     navigator.serviceWorker
       .register("/service-worker.js", { updateViaCache: "none" })
       .then((registration) => {

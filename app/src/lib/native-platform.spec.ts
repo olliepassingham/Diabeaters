@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const capacitorState = {
   platform: "web" as string,
@@ -77,5 +77,52 @@ describe("isCapacitorNativeShell", () => {
     });
     const { isCapacitorNativeShell } = await import("@/lib/native-platform");
     expect(isCapacitorNativeShell()).toBe(true);
+  });
+});
+
+describe("native platform offline helpers", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    capacitorState.platform = "web";
+    capacitorState.isNativePlatform = true;
+  });
+
+  it("detects bundled capacitor localhost origin", async () => {
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      hostname: "localhost",
+    } as Location);
+    const { isBundledCapacitorOrigin } = await import("@/lib/native-platform");
+    expect(isBundledCapacitorOrigin()).toBe(true);
+  });
+
+  it("registers service worker on remote native host", async () => {
+    capacitorState.platform = "ios";
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      hostname: "diabeaters.vercel.app",
+    } as Location);
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {},
+    });
+    const { shouldRegisterServiceWorker } = await import("@/lib/native-platform");
+    expect(shouldRegisterServiceWorker()).toBe(true);
+  });
+
+  it("skips service worker on bundled capacitor origin", async () => {
+    capacitorState.platform = "ios";
+    vi.spyOn(window, "location", "get").mockReturnValue({
+      hostname: "localhost",
+    } as Location);
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {},
+    });
+    const { shouldRegisterServiceWorker } = await import("@/lib/native-platform");
+    expect(shouldRegisterServiceWorker()).toBe(false);
   });
 });

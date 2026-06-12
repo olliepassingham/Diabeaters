@@ -28,7 +28,7 @@ if (isCapacitorNativeShell()) {
   ensurePushDeepLinkListenersAttached();
 }
 
-if (import.meta.env.PROD) {
+if (import.meta.env.PROD || isCapacitorNativeShell()) {
   prefetchOfflineCriticalRoutes();
 }
 

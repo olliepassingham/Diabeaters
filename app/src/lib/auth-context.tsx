@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getCurrentUser, onAuthStateChange } from "@/lib/auth";
+import { isOnline } from "@/lib/offline";
 import { setActiveUserIdForLocalStorage } from "@/lib/storage";
 import { setSentryUserId } from "@/observability/sentry";
 import { getSupabase } from "@/lib/supabase";
@@ -80,15 +81,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const [{ data: userResult }, sessionRes] = await Promise.all([
-          getCurrentUser(),
-          supabase.auth.getSession(),
-        ]);
+        const sessionRes = await supabase.auth.getSession();
+        const session = sessionRes.data.session ?? null;
+        let user = session?.user ?? null;
+
+        // `getUser()` validates with the server; skip when offline and use the cached session.
+        if (isOnline()) {
+          const { data: userResult } = await getCurrentUser();
+          if (userResult?.user) user = userResult.user;
+        }
 
         if (!isMounted) return;
-        const session = sessionRes.data.session ?? null;
-        // `getUser()` needs network; `getSession()` reads the cached JWT offline.
-        const user = userResult?.user ?? session?.user ?? null;
         const uid = user?.id ?? null;
         setUser(user);
         setSession(session);
@@ -98,8 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         if (!isMounted) return;
         try {
-          const { data: sessionRes } = await supabase.auth.getSession();
-          const session = sessionRes.session ?? null;
+          const { data: fallbackSession } = await supabase.auth.getSession();
+          const session = fallbackSession.session ?? null;
           const user = session?.user ?? null;
           const uid = user?.id ?? null;
           setUser(user);
