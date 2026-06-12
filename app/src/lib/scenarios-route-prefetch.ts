@@ -1,18 +1,9 @@
 let prefetchedScenariosBundle = false;
 
 /**
- * Warm the guides hub and every scenario detail chunk so offline navigation works
- * after at least one online session post-login.
+ * Guides ship in the main entry chunk (`offline-guides-entry.ts`).
+ * Kept as a no-op hook for callers that warm routes after login.
  */
 export function prefetchScenariosHubAndRoutes(): void {
-  if (prefetchedScenariosBundle) return;
   prefetchedScenariosBundle = true;
-  void import("@/pages/scenarios");
-  void import("@/pages/scenarios/exercise");
-  void import("@/pages/bedtime");
-  void import("@/pages/sick-day");
-  void import("@/pages/travel");
-  void import("@/pages/scenarios/alcohol");
-  void import("@/pages/scenarios/driving");
-  void import("@/pages/scenarios/pump-failure");
 }

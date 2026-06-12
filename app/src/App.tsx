@@ -1669,12 +1669,21 @@ function AppContent() {
 export default function App() {
   useEffect(() => {
     if (!import.meta.env.PROD || !shouldRegisterServiceWorker()) return;
-    navigator.serviceWorker
+
+    let reloadedForUpdate = false;
+    const onControllerChange = () => {
+      if (reloadedForUpdate || !isOnline()) return;
+      reloadedForUpdate = true;
+      window.location.reload();
+    };
+
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    void navigator.serviceWorker
       .register("/service-worker.js", { updateViaCache: "none" })
-      .then((registration) => {
-        registration.update();
-      })
+      .then((registration) => registration.update())
       .catch(() => {});
+
+    return () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
   }, []);
 
   return (

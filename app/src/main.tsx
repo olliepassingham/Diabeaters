@@ -17,6 +17,7 @@ import { clearNativeAppBadge, scheduleNativeAppBadgeBootClear } from "@/lib/nati
 import { isCapacitorNativeShell } from "@/lib/native-platform";
 import { ensurePushDeepLinkListenersAttached } from "@/lib/push-tokens";
 import { prefetchOfflineCriticalRoutes } from "@/lib/offline-critical-prefetch";
+import "@/lib/offline-guides-entry";
 
 migrateLegacyThemeModeKey();
 applyRootAppearanceClass(getEffectiveAppearance(getStoredThemeMode()));

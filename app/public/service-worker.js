@@ -1,6 +1,6 @@
-const CACHE_NAME = 'diabeaters-v10';
-const STATIC_CACHE = 'diabeaters-static-v10';
-const DYNAMIC_CACHE = 'diabeaters-dynamic-v10';
+const CACHE_NAME = 'diabeaters-v11';
+const STATIC_CACHE = 'diabeaters-static-v11';
+const DYNAMIC_CACHE = 'diabeaters-dynamic-v11';
 
 /** Replaced at build time by scripts/sw-precache.ts — do not edit the marker by hand. */
 const PRECACHE_URLS = __PRECACHE_MANIFEST__;
@@ -12,6 +12,10 @@ function isViteDevResource(url) {
     url.pathname.includes('/@fs/') ||
     url.pathname.includes('/node_modules/') ||
     url.pathname.startsWith('/src/');
+}
+
+function isNavigationRequest(request) {
+  return request.mode === 'navigate' || request.destination === 'document';
 }
 
 async function precacheUrls(cache, urls) {
@@ -26,22 +30,25 @@ async function precacheUrls(cache, urls) {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => precacheUrls(cache, PRECACHE_URLS)),
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      const existing = await cache.keys();
+      await Promise.all(existing.map((key) => cache.delete(key)));
+      await precacheUrls(cache, PRECACHE_URLS);
+    }),
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys
           .filter((key) => key !== STATIC_CACHE && key !== DYNAMIC_CACHE)
           .map((key) => caches.delete(key)),
-      );
-    }),
+      ),
+    ).then(() => self.clients.claim()),
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -68,6 +75,26 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match(event.request)),
+    );
+    return;
+  }
+
+  if (isNavigationRequest(event.request)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(STATIC_CACHE).then((cache) => {
+              cache.put('/index.html', clone);
+              cache.put('/', clone);
+            });
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match('/index.html').then((doc) => doc || caches.match('/') || caches.match(event.request)),
+        ),
     );
     return;
   }
@@ -99,6 +126,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request)
+          .then((response) => {
+            if (response.ok && event.request.method === 'GET') {
+              const clone = response.clone();
+              caches.open(STATIC_CACHE).then((cache) => {
+                cache.put(event.request, clone);
+              });
+            }
+            return response;
+          })
+          .catch(() => caches.match(event.request));
+      }),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -113,7 +160,7 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          if (event.request.destination === 'document') {
+          if (isNavigationRequest(event.request)) {
             return caches.match('/index.html').then((doc) => doc || caches.match('/'));
           }
           return new Response('Offline', { status: 503 });

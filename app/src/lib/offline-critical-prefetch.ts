@@ -10,8 +10,6 @@ let started = false;
 export function prefetchOfflineCriticalRoutes(): void {
   if (started || typeof window === "undefined") return;
   started = true;
-  void import("@/pages/dashboard");
-  void import("@/pages/tools/index");
   prefetchScenariosHubAndRoutes();
   prefetchToolsHubLinkedChunks();
 }
