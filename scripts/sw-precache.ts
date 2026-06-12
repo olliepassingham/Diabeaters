@@ -39,12 +39,18 @@ export function collectPrecacheUrls(distDir: string): string[] {
   return [...urls].sort((a, b) => a.localeCompare(b));
 }
 
+const PRECACHE_URLS_LINE = /const PRECACHE_URLS = \[[\s\S]*?\];/;
+
 export function patchServiceWorkerPrecacheManifest(swSource: string, urls: string[]): string {
   const manifest = JSON.stringify(urls);
-  if (!swSource.includes(PRECACHE_MANIFEST_MARKER)) {
-    throw new Error(`service-worker.js is missing ${PRECACHE_MANIFEST_MARKER}`);
+  if (swSource.includes(PRECACHE_MANIFEST_MARKER)) {
+    return swSource.replace(PRECACHE_MANIFEST_MARKER, manifest);
   }
-  return swSource.replace(PRECACHE_MANIFEST_MARKER, manifest);
+  // `web:build` and `postbuild` both run on Vercel — refresh an already-patched manifest.
+  if (PRECACHE_URLS_LINE.test(swSource)) {
+    return swSource.replace(PRECACHE_URLS_LINE, `const PRECACHE_URLS = ${manifest};`);
+  }
+  throw new Error(`service-worker.js is missing ${PRECACHE_MANIFEST_MARKER}`);
 }
 
 export function generateServiceWorkerPrecache(distDir: string): { urlCount: number; outputPath: string } {

@@ -30,4 +30,10 @@ describe("sw precache", () => {
     const patched = patchServiceWorkerPrecacheManifest(source, ["/", "/index.html"]);
     expect(patched).toBe('const PRECACHE_URLS = ["/","/index.html"];');
   });
+
+  it("refreshes an already-patched precache list (postbuild after web:build)", () => {
+    const source = 'const PRECACHE_URLS = ["/","/index.html"];';
+    const patched = patchServiceWorkerPrecacheManifest(source, ["/", "/assets/a.js"]);
+    expect(patched).toBe('const PRECACHE_URLS = ["/","/assets/a.js"];');
+  });
 });

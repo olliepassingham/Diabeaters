@@ -13,7 +13,7 @@
     "web:build": "npm --prefix app run build && node scripts/copy-robots.mjs && tsx scripts/sw-precache.ts",
     "web:build:internal": "npm --prefix app run build:internal && node scripts/copy-robots.mjs && tsx scripts/sw-precache.ts",
     "web:preview": "npm --prefix app run preview",
-    "postbuild": "node scripts/copy-robots.mjs && tsx scripts/sw-precache.ts",
+    "postbuild": "node scripts/copy-robots.mjs",
     "dev:server": "NODE_ENV=development tsx server/index.ts",
     "build:server": "npm --prefix app run build && tsx scripts/copy-robots.ts && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
