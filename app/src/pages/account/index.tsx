@@ -63,6 +63,7 @@ import {
 } from "@/lib/support";
 import { formatLivingWithDiabetesLine, getProfilesByIds } from "@/lib/profile";
 import { resolveUserDisplayName } from "@/lib/user-display-name";
+import { isOnline } from "@/lib/offline";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -165,7 +166,7 @@ export default function Account() {
     if (avatarUrlPending || avatarDisplayUrl) {
       return;
     }
-    if (avatarResolveError && !avatarLoadErrorToastShown.current) {
+    if (avatarResolveError && isOnline() && !avatarLoadErrorToastShown.current) {
       avatarLoadErrorToastShown.current = true;
       showAvatarLoadErrorToast(
         `${avatarResolveError} Check Storage policies for bucket "profile_pictures" (authenticated SELECT).`,

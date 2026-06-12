@@ -1,6 +1,7 @@
 /**
  * Profile pictures: Supabase Storage bucket `profile_pictures`, paths `avatar/{userId}-{timestamp}{ext}`.
  */
+import { isOnline } from "./offline";
 import { getSupabase } from "./supabase";
 
 export const PROFILE_PICTURES_BUCKET = "profile_pictures";
@@ -122,9 +123,15 @@ export async function resolveProfileImageUrlResult(
   if (/^https?:\/\//i.test(t)) {
     const extracted = extractProfilePicturesObjectKeyFromUrl(t);
     if (extracted) {
+      if (!isOnline()) return { url: null };
       return signedUrlForProfilePicturesKey(extracted);
     }
     return { url: t };
+  }
+
+  if (!isOnline()) {
+    // Private bucket keys need a signed URL from the network — fall back to initials offline.
+    return { url: null };
   }
 
   const p = normalizeKey(t);
