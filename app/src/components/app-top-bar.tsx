@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { useProfile } from "@/lib/profile";
 
@@ -145,7 +146,12 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
   const modeLabel = isCarer ? "Supporter" : isCommunityMode ? "Community" : null;
 
   return (
-    <header className="surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
+    <header
+      className={cn(
+        "surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
+        modeLabel && "pb-2",
+      )}
+    >
       <div className="relative flex w-full min-w-0 items-center">
         <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
           <HeaderProfileDropdown onLogout={onLogout} />
@@ -156,7 +162,7 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
           </Button>
         </div>
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(14rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center text-center">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
           <button
             type="button"
             onClick={onBrandClick}
@@ -168,17 +174,18 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
             data-testid="button-home-brand"
           >
             <FaceLogo size={32} />
-            <span className="truncate text-h2 font-semibold text-foreground">Diabeaters</span>
+            <span className="truncate">Diabeaters</span>
           </button>
-          {modeLabel ? (
-            <span
-              className="pointer-events-none mt-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-              data-testid="header-mode-chip"
-            >
-              {modeLabel}
-            </span>
-          ) : null}
         </div>
+
+        {modeLabel ? (
+          <span
+            className="pointer-events-none absolute left-1/2 top-[calc(50%+1.375rem)] -translate-x-1/2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+            data-testid="header-mode-chip"
+          >
+            {modeLabel}
+          </span>
+        ) : null}
 
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
           {isCommunityEnabled && <MessagesInboxNavButton />}
