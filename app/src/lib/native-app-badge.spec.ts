@@ -49,31 +49,56 @@ describe("syncNativeAppBadgeNow", () => {
       )
       .mockResolvedValueOnce({ count: 0, error: null });
 
-    const { syncNativeAppBadgeNow } = await import("@/lib/native-app-badge");
+    const { syncNativeAppBadgeNow, isNativeHomeScreenBadgeEnabled } = await import("@/lib/native-app-badge");
 
     const first = syncNativeAppBadgeNow();
     const second = syncNativeAppBadgeNow();
 
-    resolveFirst({ count: 3, error: null });
+    if (isNativeHomeScreenBadgeEnabled()) {
+      resolveFirst({ count: 3, error: null });
+    }
     await Promise.all([first, second]);
 
-    expect(fetchNativeAppBadgeCount).toHaveBeenCalledTimes(2);
-    expect(applyCounts).toEqual([3, 0]);
+    if (isNativeHomeScreenBadgeEnabled()) {
+      expect(fetchNativeAppBadgeCount).toHaveBeenCalledTimes(2);
+      expect(applyCounts).toEqual([3, 0]);
+    } else {
+      expect(fetchNativeAppBadgeCount).not.toHaveBeenCalled();
+      expect(applyCounts).toEqual([0, 0]);
+    }
   });
 
-  it("clears the badge when count resolution fails", async () => {
-    fetchNativeAppBadgeCount.mockResolvedValue({ count: 0, error: new Error("network") });
+  it("always clears the badge while home-screen badge sync is disabled", async () => {
+    fetchNativeAppBadgeCount.mockResolvedValue({ count: 3, error: null });
 
     const { syncNativeAppBadgeNow } = await import("@/lib/native-app-badge");
     await syncNativeAppBadgeNow();
 
+    expect(fetchNativeAppBadgeCount).not.toHaveBeenCalled();
+    expect(applyCounts).toEqual([0]);
+  });
+
+  it("clears the badge when count resolution fails", async () => {
+    const { syncNativeAppBadgeNow, isNativeHomeScreenBadgeEnabled } = await import("@/lib/native-app-badge");
+    if (isNativeHomeScreenBadgeEnabled()) {
+      fetchNativeAppBadgeCount.mockResolvedValue({ count: 0, error: new Error("network") });
+      await syncNativeAppBadgeNow();
+      expect(applyCounts).toEqual([0]);
+      return;
+    }
+    await syncNativeAppBadgeNow();
     expect(applyCounts).toEqual([0]);
   });
 
   it("writes the icon badge on remote server.url shells where Capacitor reports web", async () => {
-    fetchNativeAppBadgeCount.mockResolvedValue({ count: 2, error: null });
+    const { syncNativeAppBadgeNow, isNativeHomeScreenBadgeEnabled } = await import("@/lib/native-app-badge");
+    if (!isNativeHomeScreenBadgeEnabled()) {
+      await syncNativeAppBadgeNow();
+      expect(applyCounts).toEqual([0]);
+      return;
+    }
 
-    const { syncNativeAppBadgeNow } = await import("@/lib/native-app-badge");
+    fetchNativeAppBadgeCount.mockResolvedValue({ count: 2, error: null });
     await syncNativeAppBadgeNow();
 
     expect(getNativePushPlatform).toHaveBeenCalled();

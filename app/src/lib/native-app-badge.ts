@@ -11,6 +11,17 @@ let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 let inFlight: Promise<void> | null = null;
 let needsFollowUpSync = false;
 
+/**
+ * Home-screen icon badge is disabled until unread-count sync is reliable (phantom "1" reports).
+ * When false, the OS badge is always cleared to 0 — pushes and in-app sync never increment it.
+ */
+export const NATIVE_HOME_SCREEN_BADGE_ENABLED = false;
+
+/** Whether the app should reflect unread counts on the OS home-screen icon. */
+export function isNativeHomeScreenBadgeEnabled(): boolean {
+  return NATIVE_HOME_SCREEN_BADGE_ENABLED;
+}
+
 /** Where to write the OS icon badge (handles remote server.url shells). */
 function resolveNativeBadgeWritePlatform(): "ios" | "android" | null {
   const pushPlatform = getNativePushPlatform();
@@ -56,6 +67,11 @@ async function resolveBadgeCountWithRetry(): Promise<{ count: number; error: Err
 }
 
 async function performBadgeSync(): Promise<void> {
+  if (!NATIVE_HOME_SCREEN_BADGE_ENABLED) {
+    await applyNativeAppBadgeCount(0);
+    return;
+  }
+
   const { count, error } = await resolveBadgeCountWithRetry();
   if (error) {
     console.warn("[native_app_badge] count failed; clearing stale badge:", error.message);
@@ -108,6 +124,10 @@ export async function syncNativeAppBadgeNow(): Promise<void> {
 /** Debounced badge sync after notification or inbox changes. */
 export function scheduleNativeAppBadgeSync(delayMs = 400): void {
   if (!canWriteNativeAppBadge()) return;
+  if (!NATIVE_HOME_SCREEN_BADGE_ENABLED) {
+    void clearNativeAppBadge();
+    return;
+  }
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = undefined;

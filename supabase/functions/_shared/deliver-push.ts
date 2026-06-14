@@ -20,6 +20,9 @@ import { fetchNativeAppBadgeCountForUser } from "./native-app-badge-count.ts";
 
 type SupabaseAdmin = ReturnType<typeof createClient>;
 
+/** Home-screen badge disabled until unread sync is reliable (phantom "1" reports). */
+export const HOME_SCREEN_BADGE_ENABLED = false;
+
 export type PushPlatform = "ios" | "android";
 
 export type DeliverPushResult =
@@ -54,6 +57,8 @@ export function getMobilePushEdgeContext(): {
 }
 
 async function resolveBadgeCount(options?: DeliverPushOptions): Promise<number> {
+  if (!HOME_SCREEN_BADGE_ENABLED) return 0;
+
   if (options?.badgeCount !== undefined) {
     return Math.max(0, Math.floor(options.badgeCount));
   }

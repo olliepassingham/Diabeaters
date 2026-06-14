@@ -182,10 +182,14 @@ export async function deliverIosPushToDevice(
     ? (data as Record<string, unknown>)
     : undefined;
 
+  // Keep in sync with HOME_SCREEN_BADGE_ENABLED in deliver-push.ts
+  const HOME_SCREEN_BADGE_ENABLED = false;
+  const effectiveBadge = HOME_SCREEN_BADGE_ENABLED ? badgeCount : 0;
+
   let apnsFailure: Extract<DeliverIosPushResult, { success: false }> | undefined;
 
   if (apnsDirectConfigured()) {
-    const r = await sendViaApns(deviceToken, { title, body, data: custom, badge: badgeCount });
+    const r = await sendViaApns(deviceToken, { title, body, data: custom, badge: effectiveBadge });
     if (r.success) return r;
     apnsFailure = r;
   }
