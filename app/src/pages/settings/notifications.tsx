@@ -9,6 +9,7 @@ import { IosNotificationDisplayCard } from "@/components/ios-notification-displa
 import { ensureNativePushRegistered, syncRememberedPushTokenToSupabase } from "@/lib/push-tokens";
 import { isNativePushPlatform, nativePlatformLabel } from "@/lib/native-platform";
 import { BEDTIME_REMINDER_TIME_OPTIONS, DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
+import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { DevPushNotificationTestPanel } from "@/components/dev-push-notification-test";
 import {
   SettingsGroup,
@@ -39,6 +40,7 @@ export function NotificationsTab({
   onBedtimeReminderTimeChange,
   embedded = false,
   supporterMode = false,
+  showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders(),
 }: {
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
@@ -46,6 +48,7 @@ export function NotificationsTab({
   onBedtimeReminderTimeChange?: (time: string) => void;
   embedded?: boolean;
   supporterMode?: boolean;
+  showBedtimeCheckReminders?: boolean;
 }) {
   const hypoOn = notifSettings.hypoAlerts !== false;
   const supplyOn = notifSettings.supplyAlerts !== false;
@@ -171,43 +174,47 @@ export function NotificationsTab({
                 disabled={masterOff}
                 testId="switch-scenario-alerts"
               />
-              <SettingsToggleRow
-                label="Bedtime check"
-                description="A gentle evening nudge to open your bedtime readiness check"
-                checked={notifSettings.bedtimeCheckReminders !== false}
-                onCheckedChange={(checked) => onToggle("bedtimeCheckReminders", checked)}
-                disabled={masterOff}
-                testId="switch-bedtime-check-reminders"
-              />
-              {notifSettings.bedtimeCheckReminders !== false ? (
-                <div className="space-y-2 px-3.5 py-3 sm:px-4">
-                  <Label htmlFor="bedtime-reminder-time" className="text-xs font-medium text-muted-foreground">
-                    Reminder time
-                  </Label>
-                  <Select
-                    value={notifSettings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME}
-                    onValueChange={(v) => onBedtimeReminderTimeChange?.(v)}
+              {showBedtimeCheckReminders ? (
+                <>
+                  <SettingsToggleRow
+                    label="Bedtime check"
+                    description="A gentle evening nudge to open your bedtime readiness check"
+                    checked={notifSettings.bedtimeCheckReminders !== false}
+                    onCheckedChange={(checked) => onToggle("bedtimeCheckReminders", checked)}
                     disabled={masterOff}
-                  >
-                    <SelectTrigger
-                      id="bedtime-reminder-time"
-                      className="h-10 rounded-xl"
-                      data-testid="select-bedtime-reminder-time"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BEDTIME_REMINDER_TIME_OPTIONS.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground">
-                    Skips the reminder if you already completed a bedtime check that day.
-                  </p>
-                </div>
+                    testId="switch-bedtime-check-reminders"
+                  />
+                  {notifSettings.bedtimeCheckReminders !== false ? (
+                    <div className="space-y-2 px-3.5 py-3 sm:px-4">
+                      <Label htmlFor="bedtime-reminder-time" className="text-xs font-medium text-muted-foreground">
+                        Reminder time
+                      </Label>
+                      <Select
+                        value={notifSettings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME}
+                        onValueChange={(v) => onBedtimeReminderTimeChange?.(v)}
+                        disabled={masterOff}
+                      >
+                        <SelectTrigger
+                          id="bedtime-reminder-time"
+                          className="h-10 rounded-xl"
+                          data-testid="select-bedtime-reminder-time"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BEDTIME_REMINDER_TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Skips the reminder if you already completed a bedtime check that day.
+                      </p>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
               {isPumpUser ? (
                 <SettingsToggleRow
@@ -330,6 +337,7 @@ type SettingsNotificationsRouteProps = {
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
   onBedtimeReminderTimeChange?: (time: string) => void;
   supporterMode?: boolean;
+  showBedtimeCheckReminders?: boolean;
 };
 
 export function SettingsNotificationsRoute({
@@ -339,6 +347,7 @@ export function SettingsNotificationsRoute({
   onThreshold,
   onBedtimeReminderTimeChange,
   supporterMode = false,
+  showBedtimeCheckReminders,
 }: SettingsNotificationsRouteProps) {
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -373,6 +382,7 @@ export function SettingsNotificationsRoute({
             onBedtimeReminderTimeChange={onBedtimeReminderTimeChange}
             embedded
             supporterMode={supporterMode}
+            showBedtimeCheckReminders={showBedtimeCheckReminders}
           />
           <DevPushNotificationTestPanel />
         </SettingsPanelBody>

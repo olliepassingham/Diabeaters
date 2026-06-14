@@ -110,6 +110,7 @@ import { AppointmentReminderPoller } from "@/components/appointment-reminder-pol
 import { BedtimeReminderPoller } from "@/components/bedtime-reminder-poller";
 import { PumpChangeReminderPoller } from "@/components/pump-change-reminder-poller";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
+import { cancelAllBedtimeReminders, rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
@@ -1178,6 +1179,14 @@ function AuthenticatedShell() {
     window.addEventListener("diabeater:app-mode", onMode);
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
+
+  useEffect(() => {
+    if (suppressClinicalPollers) {
+      void cancelAllBedtimeReminders();
+      return;
+    }
+    void rescheduleBedtimeReminders({ hasCarerLink });
+  }, [suppressClinicalPollers, hasCarerLink]);
 
   useEffect(() => {
     if (suppressClinicalPollers) return;

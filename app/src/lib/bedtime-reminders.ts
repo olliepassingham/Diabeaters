@@ -8,6 +8,7 @@ import {
   notificationIdForBedtimeDay,
   upcomingBedtimeReminderSlots,
 } from "@/lib/bedtime-reminder-schedule";
+import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { ensureNativeLocalNotificationPermission } from "@/lib/native-local-notifications";
 import { supportsNativeLocalNotifications } from "@/lib/native-platform";
 import { storage } from "@/lib/storage";
@@ -16,21 +17,26 @@ function androidChannel(): { channelId?: string } {
   return Capacitor.getPlatform() === "android" ? { channelId: "diabeaters_general" } : {};
 }
 
-export async function rescheduleBedtimeReminders(): Promise<void> {
+export async function rescheduleBedtimeReminders(
+  options?: { hasCarerLink?: boolean },
+): Promise<void> {
   if (!supportsNativeLocalNotifications()) return;
 
   const settings = storage.getNotificationSettings();
-  if (!settings.enabled || settings.bedtimeCheckReminders === false) {
-    await cancelAllBedtimeReminders(
-      settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME,
-    );
+  const time = settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME;
+
+  if (
+    !shouldReceiveBedtimeCheckReminders({ hasCarerLink: options?.hasCarerLink }) ||
+    !settings.enabled ||
+    settings.bedtimeCheckReminders === false
+  ) {
+    await cancelAllBedtimeReminders(time);
     return;
   }
 
   const ok = await ensureNativeLocalNotificationPermission();
   if (!ok) return;
 
-  const time = settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME;
   const now = new Date();
 
   try {

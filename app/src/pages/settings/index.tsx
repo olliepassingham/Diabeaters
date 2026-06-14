@@ -36,6 +36,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
+import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
@@ -971,6 +972,7 @@ export default function Settings() {
   const [location, setLocation] = useLocation();
   const { data: linkedPatient } = useLinkedPatient();
   const isCarer = !!linkedPatient;
+  const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({ hasCarerLink: isCarer });
   const pathOnly = (location.split("?")[0] ?? "/settings").replace(/\/$/, "") || "/settings";
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -1927,6 +1929,7 @@ export default function Settings() {
         onThreshold={handleNotifThreshold}
         onBedtimeReminderTimeChange={handleBedtimeReminderTime}
         supporterMode={isCarer}
+        showBedtimeCheckReminders={showBedtimeCheckReminders}
       />
     );
   }

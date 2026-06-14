@@ -6,6 +6,7 @@ import {
   DEFAULT_BEDTIME_REMINDER_TIME,
   isBedtimeReminderDueNow,
 } from "@/lib/bedtime-reminder-schedule";
+import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
 import { showIosSystemNotificationNow } from "@/lib/ios-system-notifications";
 import { getSupabase } from "@/lib/supabase";
@@ -35,13 +36,18 @@ function saveSentKeys(keys: Set<string>) {
 }
 
 /** In-app (+ optional iOS banner) reminder once per evening after the chosen time. */
-export async function ensureBedtimeInAppRemindersForUser(userId: string): Promise<void> {
+export async function ensureBedtimeInAppRemindersForUser(
+  userId: string,
+  options?: { hasCarerLink?: boolean },
+): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
   const { data: sessionData } = await supabase.auth.getSession();
   const sessionUid = sessionData.session?.user?.id;
   if (!sessionUid || sessionUid !== userId) return;
+
+  if (!shouldReceiveBedtimeCheckReminders({ hasCarerLink: options?.hasCarerLink })) return;
 
   const settings = storage.getNotificationSettings();
   if (!settings.enabled || settings.bedtimeCheckReminders === false) return;

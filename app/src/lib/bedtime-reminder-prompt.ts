@@ -1,4 +1,5 @@
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
+import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { DEFAULT_BEDTIME_REMINDER_TIME } from "@/lib/bedtime-reminder-schedule";
 import { syncNotificationPreferences } from "@/lib/notification-preferences";
 import { storage } from "@/lib/storage";
@@ -68,6 +69,10 @@ export function shouldOfferBedtimeReminderSecondChance(userId: string): boolean 
 
 /** Turn on bedtime check reminders and schedule native / in-app nudges. */
 export async function enableBedtimeCheckReminders(time?: string): Promise<void> {
+  if (!shouldReceiveBedtimeCheckReminders()) {
+    await rescheduleBedtimeReminders();
+    return;
+  }
   const current = storage.getNotificationSettings();
   const reminderTime = time?.trim() || current.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME;
   const updated = {
@@ -87,6 +92,7 @@ export type BedtimeReminderPromptAction = "show" | "skip";
  * After patient onboarding, decide whether to show the bedtime reminder opt-in dialog.
  */
 export function resolveBedtimeReminderPromptAfterOnboarding(userId: string): BedtimeReminderPromptAction {
+  if (!shouldReceiveBedtimeCheckReminders()) return "skip";
   if (!consumeBedtimeReminderPromptPending()) return "skip";
   if (isBedtimeReminderOnboardingPromptDismissed(userId)) return "skip";
 
