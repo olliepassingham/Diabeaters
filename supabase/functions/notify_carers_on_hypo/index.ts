@@ -191,7 +191,7 @@ Deno.serve(async (req: Request) => {
 
       const payload = {
         kind: "hypo_logged",
-        deep_link: "/carer-view",
+        deep_link: "/notifications?bell=1",
         ...hypoPayload,
       };
 

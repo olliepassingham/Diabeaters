@@ -3,6 +3,8 @@ import { scheduleNativeAppBadgeSync } from "@/lib/native-app-badge";
 /** Dispatched when in-app notification rows change so global UI (e.g. header bell) can refetch. */
 export const INAPP_NOTIFICATIONS_CHANGED = "diabeaters:inapp-notifications-changed";
 
+export { OPEN_NOTIFICATION_BELL_EVENT, requestOpenNotificationBell } from "@/lib/notification-inbox-deep-link";
+
 export type InAppNotificationsChangedDetail = {
   /** When true, the full /notifications page should not refetch (it already updated local state). */
   skipPageRefresh?: boolean;

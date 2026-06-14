@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
         kind: "scenario_started",
         scenario_key: scenarioKey,
         patient_user_id: callerId,
-        deep_link: "/carer-view",
+        deep_link: "/notifications?bell=1",
       };
 
       if (inappOn) {

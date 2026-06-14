@@ -2,12 +2,16 @@ import type { PushNotificationSchema } from "@capacitor/push-notifications";
 import { describe, expect, it, beforeEach } from "vitest";
 
 import {
+  applyPushDeepLinkPath,
   consumePendingPushDeepLink,
   getPathForPushNotificationData,
   getPathFromPushNotification,
   isSafeInAppPath,
   storePendingPushDeepLink,
 } from "./push-notification-deep-link";
+import { NOTIFICATION_BELL_DEEP_LINK } from "./notification-inbox-deep-link";
+
+const OPEN_NOTIFICATION_BELL_EVENT = "diabeaters:open-notification-bell";
 
 describe("push-notification-deep-link", () => {
   beforeEach(() => {
@@ -54,5 +58,27 @@ describe("push-notification-deep-link", () => {
     storePendingPushDeepLink("/community/messages/x");
     expect(consumePendingPushDeepLink()).toBe("/community/messages/x");
     expect(consumePendingPushDeepLink()).toBeNull();
+  });
+
+  it("resolves notification bell deep link from push data", () => {
+    expect(
+      getPathForPushNotificationData({
+        kind: "hypo_logged",
+        deep_link: NOTIFICATION_BELL_DEEP_LINK,
+      }),
+    ).toBe(NOTIFICATION_BELL_DEEP_LINK);
+  });
+
+  it("opens notification bell instead of navigating", () => {
+    let navigated: string | null = null;
+    let bellOpened = false;
+    window.addEventListener(OPEN_NOTIFICATION_BELL_EVENT, () => {
+      bellOpened = true;
+    });
+    applyPushDeepLinkPath(NOTIFICATION_BELL_DEEP_LINK, (path) => {
+      navigated = path;
+    });
+    expect(navigated).toBeNull();
+    expect(bellOpened).toBe(true);
   });
 });

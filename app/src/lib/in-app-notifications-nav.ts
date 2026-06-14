@@ -1,4 +1,5 @@
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
+import { isNotificationBellDeepLink } from "@/lib/notification-inbox-deep-link";
 
 /**
  * Resolves the in-app route for a notification row (explicit deep_link or known `data.kind`).
@@ -8,7 +9,7 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   const data = row.data && typeof row.data === "object" ? (row.data as Record<string, unknown>) : {};
   const kind = typeof data.kind === "string" ? data.kind : "";
   const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
-  if (target) {
+  if (target && !isNotificationBellDeepLink(target)) {
     if (kind === "hypo_logged_self" && (target === "/" || target === "/dashboard")) {
       return "/tools/hypo-history";
     }

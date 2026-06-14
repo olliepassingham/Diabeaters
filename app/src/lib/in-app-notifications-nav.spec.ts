@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getPathForInAppNotification } from "./in-app-notifications-nav";
 import type { InAppNotificationRow } from "./carer-notify-types";
+import { NOTIFICATION_BELL_DEEP_LINK } from "./notification-inbox-deep-link";
 
 function row(partial: Partial<InAppNotificationRow> & Pick<InAppNotificationRow, "id" | "user_id">): InAppNotificationRow {
   return {
@@ -57,6 +58,15 @@ describe("getPathForInAppNotification", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_logged" } }))).toBe(
       "/carer-view",
     );
+    expect(
+      getPathForInAppNotification(
+        row({
+          id: "1",
+          user_id: "u",
+          data: { kind: "hypo_logged", deep_link: NOTIFICATION_BELL_DEEP_LINK },
+        }),
+      ),
+    ).toBe("/carer-view");
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_acknowledged" } }))).toBe(
       "/tools/hypo-history",
     );

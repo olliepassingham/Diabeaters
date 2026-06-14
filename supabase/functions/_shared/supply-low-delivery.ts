@@ -87,7 +87,7 @@ export async function deliverSupplyLowAlerts(
       supply_name: supplyName,
       days_remaining: daysRemaining,
       patient_user_id: patientId,
-      deep_link: isPatient ? "/supplies" : "/carer-view",
+      deep_link: isPatient ? "/supplies" : "/notifications?bell=1",
     };
 
     let inappInsertedFresh = false;

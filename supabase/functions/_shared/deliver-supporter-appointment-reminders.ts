@@ -118,7 +118,7 @@ export async function deliverSupporterAppointmentRemindersForPatient(
           patient_user_id: patientId,
           appointment_id: appointmentKey,
           dedupe_key: dedupeKey,
-          deep_link: "/carer-view",
+          deep_link: "/notifications?bell=1",
         };
 
         const { error: insErr } = await admin.from("notifications").insert({

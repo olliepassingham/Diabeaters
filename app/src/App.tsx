@@ -35,6 +35,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { pathFromOpenedAppUrl } from "@/lib/native-app-open-url";
 import {
+  applyPushDeepLinkPath,
   setPushDeepLinkNavigationHandler,
   setPushDeepLinkNavigationReady,
 } from "@/lib/push-notification-deep-link";
@@ -283,7 +284,7 @@ function useNativeLocalNotificationDeepLinks() {
         const next = raw.trim();
         if (!next) return;
         if (!next.startsWith("/") || next.startsWith("//")) return;
-        setLocation(next);
+        applyPushDeepLinkPath(next, setLocation);
       },
     ).then((h: { remove: () => Promise<void> }) => {
       if (removed) void h.remove();
@@ -306,7 +307,7 @@ function useNativePushDeepLinks(authLoading: boolean, userId: string | undefined
   }, []);
 
   useEffect(() => {
-    setPushDeepLinkNavigationHandler(setLocation);
+    setPushDeepLinkNavigationHandler((path) => applyPushDeepLinkPath(path, setLocation));
     return () => setPushDeepLinkNavigationHandler(null);
   }, [setLocation]);
 

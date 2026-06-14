@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, CheckCheck, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged } from "@/lib/in-app-notifications-events";
+import { INAPP_NOTIFICATIONS_CHANGED, notifyInAppNotificationsChanged, OPEN_NOTIFICATION_BELL_EVENT } from "@/lib/in-app-notifications-events";
 import { notifyDmInboxChanged } from "@/lib/community/dm-inbox-events";
 import {
   deleteAllInAppNotificationsForUser,
@@ -30,6 +30,7 @@ import {
   markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { consumePendingOpenNotificationBell } from "@/lib/notification-inbox-deep-link";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
@@ -130,6 +131,12 @@ export function NotificationBell() {
     }, [load]);
 
     useEffect(() => {
+      if (!consumePendingOpenNotificationBell()) return;
+      void load();
+      setOpen(true);
+    }, [load]);
+
+    useEffect(() => {
       prefetchNotificationsPage();
     }, []);
 
@@ -169,6 +176,15 @@ export function NotificationBell() {
       const handler = (_e: Event) => load();
       window.addEventListener(INAPP_NOTIFICATIONS_CHANGED, handler);
       return () => window.removeEventListener(INAPP_NOTIFICATIONS_CHANGED, handler);
+    }, [load]);
+
+    useEffect(() => {
+      const openBell = () => {
+        void load();
+        setOpen(true);
+      };
+      window.addEventListener(OPEN_NOTIFICATION_BELL_EVENT, openBell);
+      return () => window.removeEventListener(OPEN_NOTIFICATION_BELL_EVENT, openBell);
     }, [load]);
 
     /** Brief top toast + bell/list refresh when a new notification row arrives while the app is open. */

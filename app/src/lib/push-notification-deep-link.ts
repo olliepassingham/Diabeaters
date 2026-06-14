@@ -1,6 +1,11 @@
 import type { PushNotificationSchema } from "@capacitor/push-notifications";
 
 import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import {
+  isNotificationBellDeepLink,
+  requestOpenNotificationBell,
+  storePendingOpenNotificationBell,
+} from "@/lib/notification-inbox-deep-link";
 
 const PENDING_PUSH_DEEP_LINK_KEY = "diabeaters:pending_push_deep_link";
 export const PUSH_DEEP_LINK_PENDING_EVENT = "diabeater:push-deep-link-pending";
@@ -19,6 +24,9 @@ function notificationDataRecord(notification: PushNotificationSchema): Record<st
 
 /** Resolve in-app route from push custom data (APNs root keys / FCM data map). */
 export function getPathForPushNotificationData(data: Record<string, unknown>): string | null {
+  const target = typeof data.deep_link === "string" ? data.deep_link.trim() : "";
+  if (target && isNotificationBellDeepLink(target)) return target;
+
   return getPathForInAppNotification({
     id: "",
     user_id: "",
@@ -64,11 +72,20 @@ export function setPushDeepLinkNavigationHandler(handler: ((path: string) => voi
   navigate = handler;
 }
 
+export function applyPushDeepLinkPath(path: string, navigateTo: (path: string) => void): void {
+  if (!isSafeInAppPath(path)) return;
+  if (isNotificationBellDeepLink(path)) {
+    requestOpenNotificationBell();
+    return;
+  }
+  navigateTo(path.trim());
+}
+
 export function setPushDeepLinkNavigationReady(ready: boolean): void {
   navigationReady = ready;
   if (ready && navigate) {
     const pending = consumePendingPushDeepLink();
-    if (pending) navigate(pending);
+    if (pending) applyPushDeepLinkPath(pending, navigate);
   }
 }
 
@@ -78,7 +95,7 @@ export function handlePushDeepLinkFromNotification(notification: PushNotificatio
   storePendingPushDeepLink(path);
   if (navigationReady && navigate) {
     const pending = consumePendingPushDeepLink();
-    if (pending) navigate(pending);
+    if (pending) applyPushDeepLinkPath(pending, navigate);
   }
 }
 
