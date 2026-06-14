@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import { useLayoutEffect } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ChevronRight, Save } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { PageBackLink, PageHeader, PageShell } from "@/components/layout";
 import { hapticLight } from "@/lib/haptics";
+import { scrollAppMainToTop } from "@/lib/settings-nav";
 import { cn } from "@/lib/utils";
 
 /** Uppercase section label above a settings group (iOS-style). */
@@ -308,6 +310,12 @@ export function SettingsSubPageShell({
   backHref?: string;
   backLabel?: string;
 }) {
+  const [pathname] = useLocation();
+
+  useLayoutEffect(() => {
+    scrollAppMainToTop("auto");
+  }, [pathname]);
+
   return (
     <PageShell variant="narrow" density="compact" className={cn("space-y-4 pb-6", className)}>
       <PageBackLink fallbackHref={backHref} label={backLabel} />

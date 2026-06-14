@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -62,7 +62,7 @@ import {
   type WeightDisplayUnit,
 } from "@/lib/body-weight";
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
-import { scrollToSettingsHashTarget } from "@/lib/settings-nav";
+import { scrollToSettingsHashTarget, scrollAppMainToTop } from "@/lib/settings-nav";
 import { describePartialClinicalPrefsCloudSync, syncClinicalPrefsToCloud, syncRegionToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getEffectiveTdd, withReconciledTdd } from "@/lib/tdd";
 import {
@@ -972,6 +972,7 @@ export default function Settings() {
   const isCarer = !!linkedPatient;
   const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({ hasCarerLink: isCarer });
   const pathOnly = (location.split("?")[0] ?? "/settings").replace(/\/$/, "") || "/settings";
+  const skipSettingsHashScrollRef = useRef(false);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings>({});
@@ -1213,11 +1214,20 @@ export default function Settings() {
     if (target) setLocation(target);
   }, [location, pathOnly, setLocation, isCarer]);
 
+  useLayoutEffect(() => {
+    scrollAppMainToTop("auto");
+    skipSettingsHashScrollRef.current = true;
+  }, [pathOnly]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (pathOnly === "/settings") return;
     const raw = window.location.hash.replace(/^#/, "");
     if (!raw) return;
+    if (skipSettingsHashScrollRef.current) {
+      skipSettingsHashScrollRef.current = false;
+      return;
+    }
 
     let cancelled = false;
     const isDobHash = raw === "settings-dob" || raw === "settings-dob-section";

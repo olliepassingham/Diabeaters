@@ -1,14 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { PageHeader, PageShell } from "@/components/layout";
+import { scrollAppMainToTop } from "@/lib/settings-nav";
 import { SettingsBackLink, SettingsEmergencySection } from "./shared";
 import { useLinkedPatient } from "@/hooks/use-linked-patient";
 
 export default function SettingsEmergencyPage() {
-  const [, setLocation] = useLocation();
+  const [pathname, setLocation] = useLocation();
   const { data: supporterSession, loading } = useLinkedPatient();
+
+  useLayoutEffect(() => {
+    scrollAppMainToTop("auto");
+  }, [pathname]);
 
   useEffect(() => {
     if (loading) return;
