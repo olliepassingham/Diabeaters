@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { InfoTooltip } from "@/components/info-tooltip";
-import { Users, Copy, UserPlus, Shield, Info, Check, ChevronLeft } from "lucide-react";
+import { Users, Copy, UserPlus, Shield, Info, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import {
@@ -24,8 +23,15 @@ import { getSupabase } from "@/lib/supabase";
 import { useProfile } from "@/lib/profile";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
-import { Link, useLocation } from "wouter";
-import { PageHeader, PageShell } from "@/components/layout";
+import { Link } from "wouter";
+import { PageBackLink, PageHeader, PageShell } from "@/components/layout";
+import {
+  SettingsGroup,
+  SettingsGroupLabel,
+  SettingsPanel,
+  SettingsPanelBody,
+  SettingsSectionHeader,
+} from "@/components/settings/settings-ui";
 
 function InfoPopoverButton({
   label,
@@ -58,7 +64,7 @@ function InfoPopoverButton({
   );
 }
 
-function SectionTitle({
+function PanelHeading({
   icon: Icon,
   title,
   info,
@@ -68,11 +74,17 @@ function SectionTitle({
   info?: ReactNode;
 }) {
   return (
-    <CardTitle className="flex items-center gap-2 text-lg">
-      {Icon ? <Icon className="h-5 w-5 shrink-0 text-primary" /> : null}
-      <span className="min-w-0 flex-1">{title}</span>
+    <div className="flex items-start gap-2">
+      {Icon ? (
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Icon className="h-4 w-4" aria-hidden />
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <SettingsSectionHeader title={title} />
+      </div>
       {info}
-    </CardTitle>
+    </div>
   );
 }
 
@@ -131,7 +143,7 @@ function AvatarBubble({
   const { displayUrl } = useResolvedProfileImageUrl(avatarUrl);
   return (
     <div
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary overflow-hidden"
+      className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-medium text-primary"
       aria-label={`${label} avatar`}
     >
       {displayUrl ? <img src={displayUrl} alt="" className="h-full w-full object-cover" /> : initials}
@@ -165,7 +177,6 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
 export default function FamilyCarersPage() {
   const configured = Boolean(getSupabase());
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const { profile: cloudProfile } = useProfile();
   const patientAgeBand = getAgeBand(cloudProfile?.date_of_birth ?? null);
   const scopePresetHint = carerScopePresetSummary(patientAgeBand);
@@ -242,7 +253,7 @@ export default function FamilyCarersPage() {
       toast({ title: "Could not remove", description: error.message, variant: "destructive" });
       return;
     }
-      toast({ title: "Supporter removed", description: "They can no longer open your shared view." });
+    toast({ title: "Supporter removed", description: "They can no longer open your shared view." });
     await refresh();
   };
 
@@ -273,23 +284,13 @@ export default function FamilyCarersPage() {
   const activeInvite = latestCode ?? invites[0] ?? null;
 
   return (
-    <PageShell variant="standard" className="max-w-2xl space-y-6">
-      <div className="flex items-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="mr-2"
-          aria-label="Back to account"
-          onClick={() => setLocation("/account")}
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-      </div>
+    <PageShell variant="narrow" className="space-y-5 pb-6">
+      <PageBackLink fallbackHref="/account" label="Account" />
+
       <PageHeader
         title={
           <span className="inline-flex items-center gap-2" data-testid="heading-family-carers">
-            <Users className="h-7 w-7 text-primary shrink-0" />
+            <Users className="h-7 w-7 shrink-0 text-primary" />
             Family &amp; supporters
           </span>
         }
@@ -313,7 +314,7 @@ export default function FamilyCarersPage() {
       )}
 
       {configured && patientAgeBand === "child" && (
-        <div className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/[0.04] px-3 py-2.5 text-sm">
+        <div className="flex items-center gap-2 rounded-2xl border border-primary/25 bg-primary/[0.04] px-3 py-2.5 text-sm">
           <p className="min-w-0 flex-1 text-foreground">Under-13 accounts use tailored supporter defaults.</p>
           <InfoTooltip
             term="Under-13 supporter defaults"
@@ -322,206 +323,209 @@ export default function FamilyCarersPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <SectionTitle
-            title="Linked supporters"
-            info={
-              <InfoPopoverButton label="About linked supporters" title="Linked supporters">
-                <p>Each person signs in with their own Diabeaters account and opens a read-only view of your data.</p>
-                <p>Remove someone anytime — they lose access immediately.</p>
-              </InfoPopoverButton>
-            }
-          />
-        </CardHeader>
-        <CardContent className="space-y-3 pt-0">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : links.length === 0 ? (
-            <p className="text-sm text-muted-foreground" data-testid="carers-list-empty">
-              No one linked yet — generate an invite below.
-            </p>
-          ) : (
-            <ul className="space-y-3" data-testid="supporters-list">
-              {links.map((link) => {
-                const label =
-                  link.carer_full_name?.trim() ||
-                  `Linked supporter (${link.carerId.slice(0, 8)}…)`;
-                const initials = label
-                  .split(/\s+/)
-                  .map((w) => w[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase();
-                return (
-                  <li
-                    key={link.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-gray-50/80 p-4 shadow-sm dark:bg-muted/40"
-                    data-testid={`supporter-row-${link.id}`}
-                  >
-                    <Link
-                      href={`/community/profile/${encodeURIComponent(link.carerId)}`}
-                      className="flex min-w-0 flex-1 items-center gap-3 rounded-lg -m-1 p-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-                      aria-label={`View ${label}'s public profile`}
-                    >
-                      <AvatarBubble label={label} initials={initials} avatarUrl={link.carer_avatar_url ?? null} />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{label}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Linked {format(new Date(link.linkedAt), "d MMM yyyy")}
-                        </p>
-                      </div>
-                    </Link>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0 text-gray-600"
-                      onClick={() => handleRemove(link.id)}
-                      aria-label={`Remove ${label} from linked supporters`}
-                    >
-                      Remove
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-md">
-        <CardHeader className="pb-3">
-          <SectionTitle
-            icon={UserPlus}
-            title="Invite someone"
-            info={
-              <InfoPopoverButton label="How invites work" title="How invites work" testId="invite-how-it-works">
-                <ol className="list-decimal space-y-1.5 pl-4">
-                  <li>Generate a code and share it privately with one person.</li>
-                  <li>
-                    They sign in (or create an account) and enter it in{" "}
-                    <span className="font-medium text-foreground">Account → Supporter setup</span>.
-                  </li>
-                  <li>Use the privacy toggles below to limit what they can see.</li>
-                </ol>
-                <p>Codes expire after 7 days. New links start with all view options on.</p>
-                {patientAgeBand === "child" ? (
-                  <p>Under-13 accounts also turn on clinical basics by default — you can switch that off after they link.</p>
-                ) : null}
-                {invites.length > 1 ? (
-                  <p>Older unused codes still work until they expire or are used.</p>
-                ) : null}
-              </InfoPopoverButton>
-            }
-          />
-        </CardHeader>
-        <CardContent className="space-y-4 pt-0">
-          <Button
-            type="button"
-            className="w-full sm:w-auto"
-            onClick={handleGenerateInvite}
-            disabled={generating || !configured}
-            data-testid="invite-generate"
-            aria-label="Generate invite code"
-          >
-            {generating ? "Generating…" : "Generate invite"}
-          </Button>
-
-          {activeInvite && (
-            <div className="rounded-xl bg-muted/40 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active code</p>
-                <p className="text-xs text-muted-foreground">
-                  Expires {format(new Date(activeInvite.expiresAt), "d MMM yyyy")}
-                </p>
-              </div>
-              <p className="font-mono text-2xl font-semibold tracking-widest" data-testid="invite-code">
-                {activeInvite.code}
+      <section className="space-y-2">
+        <SettingsGroupLabel>Linked supporters</SettingsGroupLabel>
+        <SettingsPanel testId="supporters-panel">
+          <SettingsPanelBody className="space-y-3">
+            <PanelHeading
+              title="Who has access"
+              info={
+                <InfoPopoverButton label="About linked supporters" title="Linked supporters">
+                  <p>Each person signs in with their own Diabeaters account and opens a read-only view of your data.</p>
+                  <p>Remove someone anytime — they lose access immediately.</p>
+                </InfoPopoverButton>
+              }
+            />
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : links.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="carers-list-empty">
+                No one linked yet — generate an invite below.
               </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                data-testid="invite-copy"
-                onClick={() => handleCopyCode(activeInvite.code)}
-                aria-label="Copy invite code"
-              >
-                {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {codeCopied ? "Copied" : "Copy code"}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <SettingsGroup className="border-0 bg-muted/20 shadow-none">
+                <ul className="m-0 list-none p-0" data-testid="supporters-list">
+                  {links.map((link) => {
+                    const label =
+                      link.carer_full_name?.trim() || `Linked supporter (${link.carerId.slice(0, 8)}…)`;
+                    const initials = label
+                      .split(/\s+/)
+                      .map((w) => w[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase();
+                    return (
+                      <li
+                        key={link.id}
+                        className="flex items-center justify-between gap-3 px-3.5 py-3.5 sm:px-4"
+                        data-testid={`supporter-row-${link.id}`}
+                      >
+                        <Link
+                          href={`/community/profile/${encodeURIComponent(link.carerId)}`}
+                          className="-m-1 flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                          aria-label={`View ${label}'s public profile`}
+                        >
+                          <AvatarBubble label={label} initials={initials} avatarUrl={link.carer_avatar_url ?? null} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{label}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Linked {format(new Date(link.linkedAt), "d MMM yyyy")}
+                            </p>
+                          </div>
+                        </Link>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 text-muted-foreground"
+                          onClick={() => handleRemove(link.id)}
+                          aria-label={`Remove ${label} from linked supporters`}
+                        >
+                          Remove
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </SettingsGroup>
+            )}
+          </SettingsPanelBody>
+        </SettingsPanel>
+      </section>
 
-      <Card className="shadow-md">
-        <CardHeader className="pb-3">
-          <SectionTitle
-            icon={Shield}
-            title="What supporters can see"
-            info={
-              <InfoPopoverButton label="About privacy controls" title="Privacy controls">
-                <p>Changes apply to everyone you have linked. Per-person controls may follow in a later update.</p>
-              </InfoPopoverButton>
-            }
-          />
-        </CardHeader>
-        <CardContent className="space-y-0 divide-y divide-border/60 pt-0">
-          {links.length === 0 ? (
-            <p className="pb-4 text-sm text-muted-foreground">Link someone first to adjust what they can see.</p>
-          ) : null}
+      <section className="space-y-2">
+        <SettingsGroupLabel>Invites</SettingsGroupLabel>
+        <SettingsPanel testId="invite-panel">
+          <SettingsPanelBody className="space-y-4">
+            <PanelHeading
+              icon={UserPlus}
+              title="Invite someone"
+              info={
+                <InfoPopoverButton label="How invites work" title="How invites work" testId="invite-how-it-works">
+                  <ol className="list-decimal space-y-1.5 pl-4">
+                    <li>Generate a code and share it privately with one person.</li>
+                    <li>
+                      They sign in (or create an account) and enter it in{" "}
+                      <span className="font-medium text-foreground">Account → Supporter setup</span>.
+                    </li>
+                    <li>Use the privacy toggles below to limit what they can see.</li>
+                  </ol>
+                  <p>Codes expire after 7 days. New links start with all view options on.</p>
+                  {patientAgeBand === "child" ? (
+                    <p>Under-13 accounts also turn on clinical basics by default — you can switch that off after they link.</p>
+                  ) : null}
+                  {invites.length > 1 ? (
+                    <p>Older unused codes still work until they expire or are used.</p>
+                  ) : null}
+                </InfoPopoverButton>
+              }
+            />
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={handleGenerateInvite}
+              disabled={generating || !configured}
+              data-testid="invite-generate"
+              aria-label="Generate invite code"
+            >
+              {generating ? "Generating…" : "Generate invite"}
+            </Button>
 
-          {PRIVACY_TOGGLES.map((item) => {
-            const description =
-              item.key === "clinical_settings"
-                ? patientAgeBand === "child"
-                  ? item.descriptionChild
-                  : item.descriptionDefault
-                : item.description;
-            return (
-              <div key={item.key} className="flex items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
-                <div className="flex min-w-0 flex-1 items-center gap-0.5">
-                  <Label htmlFor={item.testId} className="cursor-pointer text-base font-medium leading-tight">
-                    {item.label}
-                  </Label>
-                  <InfoTooltip term={item.label} explanation={description} />
+            {activeInvite && (
+              <div className="space-y-3 rounded-xl border border-border/50 bg-muted/30 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active code</p>
+                  <p className="text-xs text-muted-foreground">
+                    Expires {format(new Date(activeInvite.expiresAt), "d MMM yyyy")}
+                  </p>
                 </div>
-                <Switch
-                  id={item.testId}
-                  checked={displayScopes[item.key]}
-                  disabled={links.length === 0 || privacyBusy !== null}
-                  onCheckedChange={(on) => applyPrivacyToAll({ [item.key]: on }, item.key)}
-                  data-testid={item.testId}
-                  aria-label={`Allow supporters to see ${item.label.toLowerCase()}`}
-                />
+                <p className="font-mono text-2xl font-semibold tracking-widest" data-testid="invite-code">
+                  {activeInvite.code}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  data-testid="invite-copy"
+                  onClick={() => handleCopyCode(activeInvite.code)}
+                  aria-label="Copy invite code"
+                >
+                  {codeCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {codeCopied ? "Copied" : "Copy code"}
+                </Button>
               </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+            )}
+          </SettingsPanelBody>
+        </SettingsPanel>
+      </section>
 
-      <Card className="rounded-2xl border-border/60 shadow-sm">
-        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-          <CardTitle className="min-w-0 flex-1 text-base">Support someone else?</CardTitle>
-          <InfoTooltip
-            term="Supporter setup"
-            explanation="If someone shared an invite code with you, open Supporter setup to enter it and link to their account."
-          />
-        </CardHeader>
-        <CardContent className="pt-0">
-          <Button variant="outline" className="w-full min-h-11 sm:w-auto" asChild>
+      <section className="space-y-2">
+        <SettingsGroupLabel>Privacy</SettingsGroupLabel>
+        <SettingsPanel testId="privacy-panel">
+          <SettingsPanelBody className="space-y-3">
+            <PanelHeading
+              icon={Shield}
+              title="What supporters can see"
+              info={
+                <InfoPopoverButton label="About privacy controls" title="Privacy controls">
+                  <p>Changes apply to everyone you have linked. Per-person controls may follow in a later update.</p>
+                </InfoPopoverButton>
+              }
+            />
+            {links.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Link someone first to adjust what they can see.</p>
+            ) : (
+              <SettingsGroup className="border-0 bg-muted/20 shadow-none">
+                {PRIVACY_TOGGLES.map((item) => {
+                  const description =
+                    item.key === "clinical_settings"
+                      ? patientAgeBand === "child"
+                        ? item.descriptionChild
+                        : item.descriptionDefault
+                      : item.description;
+                  return (
+                    <div key={item.key} className="flex items-center justify-between gap-3 px-3.5 py-3.5 sm:px-4">
+                      <div className="flex min-w-0 flex-1 items-center gap-0.5">
+                        <Label htmlFor={item.testId} className="cursor-pointer text-sm font-medium leading-tight">
+                          {item.label}
+                        </Label>
+                        <InfoTooltip term={item.label} explanation={description} />
+                      </div>
+                      <Switch
+                        id={item.testId}
+                        checked={displayScopes[item.key]}
+                        disabled={links.length === 0 || privacyBusy !== null}
+                        onCheckedChange={(on) => applyPrivacyToAll({ [item.key]: on }, item.key)}
+                        data-testid={item.testId}
+                        aria-label={`Allow supporters to see ${item.label.toLowerCase()}`}
+                      />
+                    </div>
+                  );
+                })}
+              </SettingsGroup>
+            )}
+          </SettingsPanelBody>
+        </SettingsPanel>
+      </section>
+
+      <SettingsPanel>
+        <SettingsPanelBody className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-sm font-semibold text-foreground">Support someone else?</p>
+            <p className="text-xs text-muted-foreground">Enter an invite code to link as a supporter.</p>
+          </div>
+          <Button variant="outline" className="min-h-11 w-full shrink-0 sm:w-auto" asChild>
             <Link href="/carer-setup" data-testid="link-carer-setup">
               Open Supporter setup
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </SettingsPanelBody>
+      </SettingsPanel>
 
-      <Card className="surface-card transition-shadow duration-500" key={syncGeneration}>
-        <CardHeader className="pb-3">
-          <SectionTitle
+      <SettingsPanel key={syncGeneration}>
+        <SettingsPanelBody className="space-y-3">
+          <PanelHeading
             title="Your emergency details"
             info={
               <InfoPopoverButton label="About emergency details" title="Emergency details">
@@ -530,63 +534,63 @@ export default function FamilyCarersPage() {
               </InfoPopoverButton>
             }
           />
-        </CardHeader>
-        <CardContent className="space-y-3 pt-0 text-sm">
-          {emergency.contactName || emergency.phone ? (
-            <dl className="space-y-2">
-              {emergency.contactName ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</dt>
-                  <dd className="font-medium text-foreground">{emergency.contactName}</dd>
-                </div>
-              ) : null}
-              {emergency.relation ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relationship</dt>
-                  <dd>{emergency.relation}</dd>
-                </div>
-              ) : null}
-              {emergency.phone ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary phone</dt>
-                  <dd>
-                    <a className="text-primary font-medium" href={`tel:${emergency.phone.replace(/\s+/g, "")}`}>
-                      {emergency.phone}
-                    </a>
-                  </dd>
-                </div>
-              ) : null}
-              {emergency.phoneSecondary ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Secondary phone</dt>
-                  <dd>
-                    <a className="text-primary font-medium" href={`tel:${emergency.phoneSecondary.replace(/\s+/g, "")}`}>
-                      {emergency.phoneSecondary}
-                    </a>
-                  </dd>
-                </div>
-              ) : null}
-              {emergency.medicalInstructions ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Medical instructions</dt>
-                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.medicalInstructions}</dd>
-                </div>
-              ) : null}
-              {emergency.notes ? (
-                <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</dt>
-                  <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.notes}</dd>
-                </div>
-              ) : null}
-            </dl>
-          ) : (
-            <p className="text-muted-foreground">You have not added emergency contact details yet.</p>
-          )}
+          <div className="text-sm">
+            {emergency.contactName || emergency.phone ? (
+              <dl className="space-y-2">
+                {emergency.contactName ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Contact</dt>
+                    <dd className="font-medium text-foreground">{emergency.contactName}</dd>
+                  </div>
+                ) : null}
+                {emergency.relation ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Relationship</dt>
+                    <dd>{emergency.relation}</dd>
+                  </div>
+                ) : null}
+                {emergency.phone ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary phone</dt>
+                    <dd>
+                      <a className="font-medium text-primary" href={`tel:${emergency.phone.replace(/\s+/g, "")}`}>
+                        {emergency.phone}
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+                {emergency.phoneSecondary ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Secondary phone</dt>
+                    <dd>
+                      <a className="font-medium text-primary" href={`tel:${emergency.phoneSecondary.replace(/\s+/g, "")}`}>
+                        {emergency.phoneSecondary}
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+                {emergency.medicalInstructions ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Medical instructions</dt>
+                    <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.medicalInstructions}</dd>
+                  </div>
+                ) : null}
+                {emergency.notes ? (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</dt>
+                    <dd className="whitespace-pre-wrap text-muted-foreground">{emergency.notes}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : (
+              <p className="text-muted-foreground">You have not added emergency contact details yet.</p>
+            )}
+          </div>
           <Button variant="outline" size="sm" asChild>
             <Link href="/account#account-emergency">Edit in Account</Link>
           </Button>
-        </CardContent>
-      </Card>
+        </SettingsPanelBody>
+      </SettingsPanel>
     </PageShell>
   );
 }

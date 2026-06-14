@@ -27,6 +27,7 @@ import { useProfile } from "@/lib/profile";
 
 type AppTopBarProps = {
   isCarer: boolean;
+  isCommunityMode?: boolean;
   pathOnly: string;
   onBrandClick: () => void;
   onLogout: () => void | Promise<void>;
@@ -134,8 +135,14 @@ function HeaderProfileDropdown({ onLogout }: { onLogout: () => void | Promise<vo
   );
 }
 
-export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopBarProps) {
-  const homeActive = isCarer ? pathOnly === "/carer-view" : pathOnly === "/";
+export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandClick, onLogout }: AppTopBarProps) {
+  const homeActive = isCarer
+    ? pathOnly === "/carer-view"
+    : isCommunityMode
+      ? pathOnly === "/community"
+      : pathOnly === "/";
+
+  const modeLabel = isCarer ? "Supporter" : isCommunityMode ? "Community" : null;
 
   return (
     <header className="surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]">
@@ -149,7 +156,7 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
           </Button>
         </div>
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(12rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-h2 font-semibold text-foreground">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 flex max-w-[min(14rem,calc(100vw-8rem))] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center text-center">
           <button
             type="button"
             onClick={onBrandClick}
@@ -161,8 +168,16 @@ export function AppTopBar({ isCarer, pathOnly, onBrandClick, onLogout }: AppTopB
             data-testid="button-home-brand"
           >
             <FaceLogo size={32} />
-            <span className="truncate">Diabeaters</span>
+            <span className="truncate text-h2 font-semibold text-foreground">Diabeaters</span>
           </button>
+          {modeLabel ? (
+            <span
+              className="pointer-events-none mt-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+              data-testid="header-mode-chip"
+            >
+              {modeLabel}
+            </span>
+          ) : null}
         </div>
 
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">

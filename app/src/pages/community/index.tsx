@@ -36,6 +36,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
+import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import {
   dismissCommunityFeedProfileReminder,
   shouldShowCommunityFeedProfileReminder,
@@ -380,12 +381,15 @@ export default function CommunityHomePage() {
     );
   }
 
+  const needsPublicSetup = !profileLoading && profile && !profile.is_public;
+
   return (
     <PageShell variant="narrow" density="compact" className="pb-2">
       <PageHeader
         title="Feed"
         stackActionsMaxSm
         actions={
+          !needsPublicSetup ? (
           <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
@@ -412,9 +416,14 @@ export default function CommunityHomePage() {
             </Button>
             {user ? <FeedMoreMenu /> : null}
           </div>
+          ) : undefined
         }
       />
 
+      {needsPublicSetup ? (
+        <CommunityProfileSetupPrompt compact />
+      ) : (
+        <>
       {showProfileReminder && user?.id ? (
         <CommunityProfileReminderCard
           onDismiss={() => {
@@ -930,6 +939,8 @@ export default function CommunityHomePage() {
         open={communityPushPromptOpen}
         onOpenChange={setCommunityPushPromptOpen}
       />
+        </>
+      )}
     </PageShell>
   );
 }

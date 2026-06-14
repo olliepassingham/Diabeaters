@@ -30,7 +30,9 @@ import {
   getProfilesByIds,
   normalizePublicHandleInput,
   searchProfilesByHandlePrefix,
+  useProfile,
 } from "@/lib/profile";
+import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
 import { dmThreadQueryKey, fetchDmThreadBundle } from "@/lib/dm-thread-query";
 import { DM_INBOX_QK, type DmInboxPayload } from "@/lib/dm-inbox-query";
 import { isSupabaseConfigured } from "@/lib/supabase";
@@ -215,6 +217,7 @@ function prefetchDmThreadRoute(queryClient: QueryClient, threadId: string, viewe
 
 export default function CommunityMessagesPage() {
   const { user } = useAuth();
+  const { profile, loading: profileLoading } = useProfile();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -621,6 +624,19 @@ export default function CommunityMessagesPage() {
       <PageShell variant="standard" className="mx-auto max-w-xl space-y-4">
         <PageHeader leading={<PageBackButton />} title="Messages" />
         <p className="text-sm text-muted-foreground">Connect Supabase to use messages.</p>
+      </PageShell>
+    );
+  }
+
+  if (!profileLoading && profile && !profile.is_public) {
+    return (
+      <PageShell variant="standard" className="mx-auto max-w-xl space-y-4 pb-8">
+        <PageHeader leading={<PageBackButton />} title="Messages" />
+        <CommunityProfileSetupPrompt
+          compact
+          title="Set up your profile to message"
+          description="Choose a display name and make your profile public before you can start conversations."
+        />
       </PageShell>
     );
   }

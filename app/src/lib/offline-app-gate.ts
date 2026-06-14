@@ -63,7 +63,7 @@ export function isPatientOnboardingSatisfied(params: {
 
 export const OFFLINE_CLOUD_TOOL_IDS = new Set(["ai-coach"]);
 
-export const OFFLINE_CLOUD_NAV_HREFS = new Set(["/community", "/coach"]);
+export const OFFLINE_CLOUD_NAV_HREFS = new Set(["/community", "/community/messages", "/coach"]);
 
 /** Hide Beatie / coach tiles from the tools hub when offline. */
 export function filterOfflineCloudTools<T extends { id: string }>(tools: T[], offline: boolean): T[] {

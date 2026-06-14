@@ -89,7 +89,24 @@ type TabDef = {
   isActive: (pathname: string, hash: string) => boolean;
 };
 
-function patientTabs(showCommunityTab: boolean): TabDef[] {
+function isCommunityFeedPath(pathname: string): boolean {
+  if (pathname === "/community") return true;
+  if (!pathname.startsWith("/community/")) return false;
+  return !pathname.startsWith("/community/messages");
+}
+
+function messagesTab(): TabDef {
+  return {
+    title: "Messages",
+    href: "/community/messages",
+    icon: MessageCircle,
+    testId: "bottomnav-messages",
+    isActive: (pathname) =>
+      pathname === "/community/messages" || pathname.startsWith("/community/messages/"),
+  };
+}
+
+function patientTabs(showFeedTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
       title: "Home",
@@ -106,13 +123,13 @@ function patientTabs(showCommunityTab: boolean): TabDef[] {
       isActive: (pathname) => pathname === "/scenarios" || pathname.startsWith("/scenarios/"),
     },
   ];
-  if (isCommunityEnabled && showCommunityTab) {
+  if (showFeedTab) {
     tabs.push({
       title: "Feed",
       href: "/community",
       icon: Users,
       testId: "bottomnav-community",
-      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+      isActive: (pathname) => isCommunityFeedPath(pathname),
     });
   }
   tabs.push(
@@ -138,7 +155,7 @@ function patientTabs(showCommunityTab: boolean): TabDef[] {
   return tabs;
 }
 
-function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
+function communityMemberTabs(showFeedTab: boolean, showMessagesTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
       title: "Tools",
@@ -152,14 +169,17 @@ function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
         pathname.startsWith("/education/"),
     },
   ];
-  if (isCommunityEnabled && showCommunityTab) {
+  if (showFeedTab) {
     tabs.push({
       title: "Feed",
       href: "/community",
       icon: Users,
       testId: "bottomnav-community",
-      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+      isActive: (pathname) => isCommunityFeedPath(pathname),
     });
+  }
+  if (showMessagesTab) {
+    tabs.push(messagesTab());
   }
   if (isAiCoachEnabled) {
     tabs.push({
@@ -180,7 +200,7 @@ function communityMemberTabs(showCommunityTab: boolean): TabDef[] {
   return tabs;
 }
 
-function carerTabs(showCommunityTab: boolean): TabDef[] {
+function carerTabs(showFeedTab: boolean, showMessagesTab: boolean): TabDef[] {
   const tabs: TabDef[] = [
     {
       title: "Supporter",
@@ -190,14 +210,17 @@ function carerTabs(showCommunityTab: boolean): TabDef[] {
       isActive: (pathname) => pathname === "/carer-view" || pathname.startsWith("/carer-view/"),
     },
   ];
-  if (isCommunityEnabled && showCommunityTab) {
+  if (showFeedTab) {
     tabs.push({
       title: "Feed",
       href: "/community",
       icon: Users,
       testId: "bottomnav-community",
-      isActive: (pathname) => pathname === "/community" || pathname.startsWith("/community/"),
+      isActive: (pathname) => isCommunityFeedPath(pathname),
     });
+  }
+  if (showMessagesTab) {
+    tabs.push(messagesTab());
   }
   tabs.push(
     {
@@ -239,8 +262,10 @@ export function BottomNav() {
     cloudCommunityProfile: profile?.account_type === "community",
   });
   const isOffline = useOffline();
-  const showCommunityTab =
-    !isOffline && isCommunityEnabled && !profileLoading && profile?.is_public === true;
+  const showCommunityNav = !isOffline && isCommunityEnabled;
+  const showPatientFeedTab = showCommunityNav && !profileLoading && profile?.is_public === true;
+  const showFeedTab = isCarerMode || isCommunityMode ? showCommunityNav : showPatientFeedTab;
+  const showMessagesTab = showCommunityNav && (isCarerMode || isCommunityMode);
 
   useEffect(() => {
     const onHash = () => setHash(window.location.hash.slice(1));
@@ -284,12 +309,13 @@ export function BottomNav() {
     let rafOuter = 0;
     let rafInner = 0;
 
-    // While `useProfile()` is still loading, `showCommunityTab` is false — warm chunks anyway so the
-    // first Feed / Messages tap after login is not blocked on JS download + parse.
     const communityWarm =
-      (isCommunityEnabled &&
-        (showCommunityTab || isCommunityMode || (!isCarerMode && !isCommunityMode && profileLoading))) ||
-      (isCarerMode && isCommunityEnabled);
+      showCommunityNav &&
+      (showFeedTab ||
+        showMessagesTab ||
+        isCommunityMode ||
+        isCarerMode ||
+        (!isCarerMode && !isCommunityMode && profileLoading));
 
     if (isCarerMode || isCommunityMode) {
       warmCommonTabs();
@@ -320,14 +346,14 @@ export function BottomNav() {
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [isCarerMode, isCommunityMode, showCommunityTab, profileLoading]);
+  }, [isCarerMode, isCommunityMode, showCommunityNav, showFeedTab, showMessagesTab, profileLoading]);
 
   const tabs = filterOfflineCloudNavTabs(
     isCarerMode
-      ? carerTabs(showCommunityTab)
+      ? carerTabs(showFeedTab, showMessagesTab)
       : isCommunityMode
-        ? communityMemberTabs(showCommunityTab)
-        : patientTabs(showCommunityTab),
+        ? communityMemberTabs(showFeedTab, showMessagesTab)
+        : patientTabs(showPatientFeedTab),
     isOffline,
   );
 
@@ -366,7 +392,7 @@ export function BottomNav() {
       {tabs.map((tab) => {
         const active = tab.isActive(pathname, hash);
         const warmPrefetch = () => {
-          if (tab.href === "/community") {
+          if (tab.href === "/community" || tab.href === "/community/messages") {
             prefetchCommunityNavigationBundle();
           }
           if (tab.href === "/account") prefetchAccount();

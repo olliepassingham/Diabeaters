@@ -772,7 +772,7 @@ function SickDaySupporterCareCard(props: {
   };
 
   return (
-    <Card className="border-orange-200/60 dark:border-orange-900/40" data-testid="carer-sick-day-care">
+    <CarerUrgentCard accent="amber" testId="carer-sick-day-care" id="carer-sick-day-care">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Thermometer className="h-5 w-5 text-orange-600" />
@@ -1154,7 +1154,7 @@ function SickDaySupporterCareCard(props: {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </CarerUrgentCard>
   );
 }
 
@@ -1680,43 +1680,6 @@ export default function CarerViewPage() {
             <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />
           ) : null}
 
-          {linkedPatients.length > 1 ? (
-            <Card variant="glass-muted" className="border-0 shadow-sm" data-testid="carer-linked-people">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Users className="h-5 w-5 text-primary shrink-0" aria-hidden />
-                  People you support
-                </CardTitle>
-                <CardDescription>
-                  Tap a name above to switch, or use the list below.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 pt-0">
-                <ul className="m-0 list-none space-y-2 p-0">
-                  {linkedPatients.map((p) => {
-                    const label = p.patient_full_name?.trim() || "Linked person";
-                    const active = p.patientId === activePatientId;
-                    return (
-                      <li key={p.patientId}>
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 px-3 py-2.5 text-sm bg-background/40">
-                          <span className="min-w-0 font-medium text-foreground">{label}</span>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {active ? (
-                              <Badge variant="secondary">Viewing</Badge>
-                            ) : (
-                              <Button type="button" size="sm" variant="outline" onClick={() => onPatientChange(p.patientId)}>
-                                Switch to
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </CardContent>
-            </Card>
-          ) : null}
         </div>
 
       {linkedBanner && (
@@ -1836,13 +1799,11 @@ export default function CarerViewPage() {
           )}
 
           {(scopes.scenarios ?? false) && isSickDayScenarioActive(sickDayState) && activeLink?.patientId ? (
-            <div id="carer-sick-day-care" className="scroll-mt-24">
-              <SickDaySupporterCareCard
-                patientId={activeLink.patientId}
-                sickState={sickDayState}
-                onUpdated={refreshScenarios}
-              />
-            </div>
+            <SickDaySupporterCareCard
+              patientId={activeLink.patientId}
+              sickState={sickDayState}
+              onUpdated={refreshScenarios}
+            />
           ) : null}
 
           {(scopes.supplies ?? false) && (

@@ -142,7 +142,6 @@ const CommunityPost = lazy(() => import("@/pages/community/post"));
 const CommunityMessages = lazy(() => import("@/pages/community/messages"));
 const CommunityThread = lazy(() => import("@/pages/community/thread"));
 const CommunityProfile = lazy(() => import("@/pages/community/profile"));
-const CommunitySettings = lazy(() => import("@/pages/community/settings"));
 const CommunityHandleResolve = lazy(() => import("@/pages/community/handle-resolve"));
 
 const CoachPage = lazy(() => import("@/pages/coach"));
@@ -685,7 +684,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/messages/:threadId">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityThread />
             </Suspense>
@@ -694,7 +693,7 @@ function InnerRouter() {
       </Route>
       <Route path="/community/messages">
         <PatientRouteGuard>
-          <CommunityFeatureGate>
+          <CommunityFeatureGate requirePublicProfile={false}>
             <Suspense fallback={<RouteFallback />}>
               <CommunityMessages />
             </Suspense>
@@ -702,13 +701,7 @@ function InnerRouter() {
         </PatientRouteGuard>
       </Route>
       <Route path="/community/settings">
-        <PatientRouteGuard>
-          <CommunityFeatureGate requirePublicProfile={false}>
-            <Suspense fallback={<RouteFallback />}>
-              <CommunitySettings />
-            </Suspense>
-          </CommunityFeatureGate>
-        </PatientRouteGuard>
+        <Redirect to="/account#profile" replace />
       </Route>
       <Route path="/community/u/:handle">
         <PatientRouteGuard>
@@ -1087,11 +1080,13 @@ function DeferredAfterFirstPaint({ children }: { children: ReactNode }) {
  */
 function UnverifiedAccountShell({
   isCarerMode,
+  isCommunityMode,
   suppressClinicalPollers,
   onBrandClick,
   onLogout,
 }: {
   isCarerMode: boolean;
+  isCommunityMode: boolean;
   suppressClinicalPollers: boolean;
   onBrandClick: () => void;
   onLogout: () => void | Promise<void>;
@@ -1104,7 +1099,13 @@ function UnverifiedAccountShell({
       {!suppressClinicalPollers ? <AlcoholReminderPoller /> : null}
       {!suppressClinicalPollers ? <PumpFailureReminderPoller /> : null}
       <AppShellBackdrop tone="rich" />
-      <AppTopBar isCarer={isCarerMode} pathOnly="/account" onBrandClick={onBrandClick} onLogout={onLogout} />
+      <AppTopBar
+        isCarer={isCarerMode}
+        isCommunityMode={isCommunityMode}
+        pathOnly="/account"
+        onBrandClick={onBrandClick}
+        onLogout={onLogout}
+      />
       <main
         id="app-scroll-main"
         className="relative z-[1] min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))] md:p-6"
@@ -1314,6 +1315,7 @@ function AuthenticatedShell() {
       {slimUnverifiedAccount ? (
         <UnverifiedAccountShell
           isCarerMode={isCarerMode}
+          isCommunityMode={isCommunityMode}
           suppressClinicalPollers={suppressClinicalPollers}
           onBrandClick={goBrandHome}
           onLogout={handleLogout}
@@ -1347,6 +1349,7 @@ function AuthenticatedShell() {
       <AppShellBackdrop tone="rich" />
       <AppTopBar
         isCarer={isCarerMode}
+        isCommunityMode={isCommunityMode}
         pathOnly={location.split("?")[0] ?? location}
         onBrandClick={goBrandHome}
         onLogout={handleLogout}
