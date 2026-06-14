@@ -1,8 +1,18 @@
 import { ChevronLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { navigateBack, normalizeNavPath } from "@/lib/nav-back";
 
-/** History back (same effect as react-router `navigate(-1)`). App uses wouter — no `useNavigate` hook. */
-export function PageBackButton() {
+export type PageBackButtonProps = {
+  /** Parent route when browser history is empty (e.g. deep link). */
+  fallbackHref?: string;
+};
+
+/** History back with safe parent-route fallback. App uses wouter — no `useNavigate` hook. */
+export function PageBackButton({ fallbackHref }: PageBackButtonProps = {}) {
+  const [location, setLocation] = useLocation();
+  const pathOnly = normalizeNavPath(location);
+
   return (
     <Button
       type="button"
@@ -10,7 +20,7 @@ export function PageBackButton() {
       size="icon"
       className="mr-2"
       aria-label="Go back"
-      onClick={() => window.history.back()}
+      onClick={() => navigateBack(pathOnly, setLocation, fallbackHref)}
     >
       <ChevronLeft className="h-5 w-5" />
     </Button>

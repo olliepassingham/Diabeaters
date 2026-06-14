@@ -2,4 +2,5 @@ export { PageShell, type PageShellProps, type PageShellVariant } from "./page-sh
 export { PageSectionLabel } from "./page-section-label";
 export { PageHeader, type PageHeaderProps } from "./page-header";
 export { PageBackButton } from "./page-back-button";
+export { PageBackLink } from "./page-back-link";
 export { HubBackRow } from "./hub-back-row";

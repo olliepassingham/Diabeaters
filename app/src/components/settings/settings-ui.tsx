@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { PageHeader, PageShell } from "@/components/layout";
+import { PageBackLink, PageHeader, PageShell } from "@/components/layout";
 import { cn } from "@/lib/utils";
 
 /** Uppercase section label above a settings group (iOS-style). */
@@ -142,15 +142,7 @@ export function SettingsNavRow({
 }
 
 export function SettingsBackLink({ href = "/settings" }: { href?: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded-lg py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <ChevronRight className="h-4 w-4 rotate-180 shrink-0" aria-hidden />
-      All settings
-    </Link>
-  );
+  return <PageBackLink fallbackHref={href} label="Settings" />;
 }
 
 export function SettingsToggleRow({
@@ -259,16 +251,20 @@ export function SettingsSubPageShell({
   actions,
   children,
   className,
+  backHref = "/settings",
+  backLabel = "Settings",
 }: {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  backHref?: string;
+  backLabel?: string;
 }) {
   return (
     <PageShell variant="narrow" density="compact" className={cn("space-y-4 pb-6", className)}>
-      <SettingsBackLink />
+      <PageBackLink fallbackHref={backHref} label={backLabel} />
       <PageHeader title={title} description={description} actions={actions} stackActionsMaxSm />
       {children}
     </PageShell>

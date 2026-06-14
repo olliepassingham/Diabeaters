@@ -114,6 +114,7 @@ import { cancelAllBedtimeReminders, rescheduleBedtimeReminders } from "@/lib/bed
 import { useBedtimeReminderPromptAfterOnboarding } from "@/hooks/use-bedtime-reminder-prompt-after-onboarding";
 import { SupplyLowNotifyPoller } from "@/components/supply-low-notify-poller";
 import { NativeAppBadgeSync } from "@/components/native-app-badge-sync";
+import { NativeNavBackHandler } from "@/components/native-nav-back-handler";
 import { PostLoginToast } from "@/components/post-login-toast";
 import { AchievementSync } from "@/components/achievement-sync";
 import { DmInboxQuerySync } from "@/components/dm-inbox-query-sync";
@@ -1324,6 +1325,7 @@ function AuthenticatedShell() {
       )}
     >
       <NativePushForegroundSync />
+      <NativeNavBackHandler pathname={pathOnly} setLocation={setLocation} />
       <AchievementSync />
       <DmInboxQuerySync />
       <ClinicalPrefsCloudSync />
