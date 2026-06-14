@@ -25,37 +25,37 @@ const SCENARIO_CARDS: ScenarioCardDef[] = [
     href: "/scenarios/exercise",
     icon: Dumbbell,
     title: "Exercise",
-    description: "Plan your session and glucose-friendly fueling.",
+    description: "Pre-workout fuel and insulin, plus active session tracking.",
   },
   {
     href: "/scenarios/bedtime",
     icon: Moon,
     title: "Bedtime",
-    description: "A quick evening check so you can wind down.",
+    description: "Evening readiness with correction, snack, and reminder options.",
   },
   {
     href: "/scenarios/sick-day",
     icon: Thermometer,
     title: "Sick day",
-    description: "Track symptoms, ketones, and when to escalate.",
+    description: "Illness mode with dose guidance, logs, ketones, and med reminders.",
   },
   {
     href: "/scenarios/travel",
     icon: Plane,
     title: "Travel",
-    description: "Packing lists and backup planning for trips.",
+    description: "Trip checklist, timezone tips, and guidance while you're away.",
   },
   {
     href: "/scenarios/alcohol",
     icon: Wine,
     title: "Alcohol",
-    description: "Prep, carb estimates, and when to get help.",
+    description: "Situation prep, meal carb estimates, and delayed-low awareness.",
   },
   {
     href: "/scenarios/driving",
     icon: Car,
     title: "Driving",
-    description: "A short readiness check before you head out.",
+    description: "Quick readiness check from glucose, trend, and recent hypos.",
   },
 ];
 
@@ -105,7 +105,7 @@ export default function Scenarios() {
 
   const [showPumpFailureCard, setShowPumpFailureCard] = useState(false);
   const [pumpFailureCardDescription, setPumpFailureCardDescription] = useState(
-    "If delivery stops: timers, backup links, and clear steps.",
+    "Triage, recheck timers, backup pens, and ketone-aware steps.",
   );
   useEffect(() => {
     const profile = storage.getProfile();
@@ -114,8 +114,8 @@ export default function Scenarios() {
     const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
     setPumpFailureCardDescription(
       pumpReady
-        ? "If delivery stops: timers, backup links, and clear steps."
-        : "Set up backup pens in Supplies before you need them — then use this guide if delivery stops.",
+        ? "Triage, recheck timers, backup pens, and ketone-aware steps."
+        : "Set up backup pens in Supplies first — then use this if delivery stops.",
     );
   }, [location]);
 
@@ -127,8 +127,8 @@ export default function Scenarios() {
       const pumpReady = pumpSetupCompletion(profile, storage.getSupplies()).tracksBackup;
       setPumpFailureCardDescription(
         pumpReady
-          ? "If delivery stops: timers, backup links, and clear steps."
-          : "Set up backup pens in Supplies before you need them — then use this guide if delivery stops.",
+          ? "Triage, recheck timers, backup pens, and ketone-aware steps."
+          : "Set up backup pens in Supplies first — then use this if delivery stops.",
       );
     };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
@@ -145,53 +145,70 @@ export default function Scenarios() {
 
   const guidesAboutDialog = (
     <PageInfoDialog
-      compact
       title="About situation guides"
       description="Step-by-step help for specific moments — not a substitute for your clinic."
+      triggerVariant="link"
+      linkLabel="About situation guides"
     >
       <InfoSection title="Exercise">
-        <p>Open structured exercise planning with carbs, checks, and bolus tips — moved here from Tools.</p>
+        <p>
+          Plan pre-workout fuel and insulin using your ratios and targets, with session carry carbs and an optional active
+          workout timer. Guided steps and links to exercise routines and the coach are on the guide page.
+        </p>
       </InfoSection>
-      <InfoSection title="Bedtime Check">
-        <p>A calm evening check to help you feel confident going to sleep.</p>
+      <InfoSection title="Bedtime">
+        <p>
+          Enter glucose, trend, food, insulin, and sleep timing for a steady, monitor, or alert result. You may see a
+          suggested correction or bedtime snack, with warnings for IOB, exercise, alcohol, or sick day. Saves to your log
+          and can set up evening reminders.
+        </p>
       </InfoSection>
-      <InfoSection title="Sick day mode">
-        <p>When you&apos;re unwell, diabetes management changes. Activate sick day mode for adjusted guidance. Past sick day sessions are listed at the bottom of the Sick day page.</p>
+      <InfoSection title="Sick day">
+        <p>
+          Turn on sick day mode for illness-adjusted correction guidance. Log readings, ketones, symptoms, temperature,
+          and medications; get ketone escalation alerts and optional med reminders. Linked supporters can be notified
+          when a session starts. Past sessions are listed at the bottom of the Sick day page.
+        </p>
       </InfoSection>
-      <InfoSection title="Travel & pump backup">
-        <p>Travel mode includes backup insulin planning if a pump fails or you are away from home. Past trips are listed at the bottom of the Travel page.</p>
+      <InfoSection title="Travel">
+        <p>
+          Plan destination and dates, then work through a packing checklist built from your supplies. Get timezone and
+          basal tips for longer trips. While travel mode is active, the app surfaces guidance and reminders until you
+          mark the trip complete. Past trips stay in your history.
+        </p>
       </InfoSection>
       <InfoSection title="Pump failure">
         <p>
-          For pump users: triage what went wrong, surface your backup contacts and supplies, ketone-aware escalation banners,
-          timed recheck reminders, and a log while active mode is on.
+          For pump users when delivery stops. Start active mode for timed glucose and ketone recheck reminders, a triage
+          checklist, ketone-aware escalation banners, and links to backup pens and emergency contacts from Supplies and
+          settings.
         </p>
       </InfoSection>
       <InfoSection title="Alcohol">
         <p>
-          Pick a situation for meal carb estimates using your saved ratios (same math as Meal Adviser), short prep
-          checklists, and red-flag routing to help. This is not medical advice — alcohol changes overnight risk;
-          always follow your clinic&apos;s plan.
+          Choose a situation, estimate meal carbs from your saved ratios, and see tips on delayed overnight lows,
+          including pump IOB cautions. For adults only — educational guidance, not medical advice. Always follow your
+          clinic&apos;s plan for drinking.
         </p>
       </InfoSection>
       <InfoSection title="Driving">
         <p>
-          Answer a few quick questions for a readiness recommendation. This is not legal or medical advice and
-          does not replace local licensing rules or your clinic&apos;s plan.
+          A short wizard on current glucose, trend, time since your last check, and recent hypos gives a ready, wait, or
+          check-again suggestion. For adults only — does not confirm you are legally fit to drive. Follow licensing rules
+          and your care team.
         </p>
       </InfoSection>
     </PageInfoDialog>
   );
 
   return (
-    <PageShell variant="standard" density="compact" className="space-y-4 pt-0">
+    <PageShell variant="standard" density="compact" className="space-y-3 pt-0">
       <h1 className="sr-only">Guides</h1>
 
       <DobUnknownNotice testId="guides-dob-unknown-notice" />
       <OfflineDeviceNotice />
 
       <div className="grid w-full grid-cols-1 gap-y-3 gap-x-5 md:grid-cols-2 md:gap-x-6 md:gap-y-4">
-        <div className="col-span-1 flex h-9 items-center justify-end md:col-span-2">{guidesAboutDialog}</div>
         {visibleScenarioCards.map((c, idx) => (
           <div key={c.href} className="animate-soft-in" style={{ animationDelay: `${idx * 45}ms` }}>
             <ScenarioCard {...c} />
@@ -211,6 +228,8 @@ export default function Scenarios() {
           </div>
         ) : null}
       </div>
+
+      <p className="pt-1 text-center">{guidesAboutDialog}</p>
     </PageShell>
   );
 }
