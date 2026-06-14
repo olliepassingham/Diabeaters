@@ -263,11 +263,13 @@ export function HomeHypoTimelineItem({
   whenText,
   treatment,
   notes,
+  footer,
 }: {
   bgLabel: string;
   whenText: string;
   treatment?: string | null;
   notes?: string | null;
+  footer?: React.ReactNode;
 }) {
   return (
     <li className="relative pl-4 border-l-2 border-primary/25 py-0.5">
@@ -279,6 +281,7 @@ export function HomeHypoTimelineItem({
         </div>
         {treatment ? <p className="text-muted-foreground text-xs">Treatment: {treatment}</p> : null}
         {notes ? <p className="text-muted-foreground text-xs whitespace-pre-wrap">{notes}</p> : null}
+        {footer ? <div className="pt-1.5">{footer}</div> : null}
       </div>
     </li>
   );

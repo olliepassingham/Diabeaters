@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
@@ -11,6 +12,7 @@ import {
   MessageCircle,
   Moon,
   MoreHorizontal,
+  ThumbsUp,
   Trash2,
 } from "lucide-react";
 
@@ -37,6 +39,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "feed_post_comment" || kind === "feed_comment_mention") return MessageCircle;
   if (kind === "feed_post_mention") return AtSign;
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
+  if (kind === "hypo_acknowledged") return ThumbsUp;
   if (kind === "scenario_started") return Activity;
   if (kind === "appointment_reminder_support") return Calendar;
   if (kind === "bedtime_reminder") return Moon;
@@ -51,6 +54,8 @@ export type NotificationInboxRowProps = {
   onOpen: () => void;
   onMarkRead?: () => void;
   onDelete?: () => void;
+  /** e.g. supporter “Got it” on hypo_logged alerts */
+  footer?: ReactNode;
   testId?: string;
 };
 
@@ -62,6 +67,7 @@ export function NotificationInboxRow({
   onOpen,
   onMarkRead,
   onDelete,
+  footer,
   testId,
 }: NotificationInboxRowProps) {
   const primary = primaryLineForNotification(row, actor);
@@ -119,6 +125,7 @@ export function NotificationInboxRow({
           {subtitle ? (
             <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{subtitle}</span>
           ) : null}
+          {footer ? <span className="block pt-2">{footer}</span> : null}
         </span>
 
         {isPopover ? (

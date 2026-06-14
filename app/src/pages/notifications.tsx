@@ -41,9 +41,16 @@ import {
   profileUserIdForInAppNotification,
 } from "@/lib/in-app-notification-display";
 import { NotificationEmptyState, NotificationInboxRow } from "@/components/notifications/notification-inbox-row";
+import { useAuth } from "@/lib/auth-context";
+import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
+import {
+  HypoNotificationAckFooter,
+  hypoLogIdFromInAppNotification,
+} from "@/components/hypo-notification-ack-footer";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const configured = isSupabaseConfigured();
 
@@ -57,6 +64,15 @@ export default function NotificationsPage() {
   const [clearBusy, setClearBusy] = useState(false);
 
   const unread = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
+
+  const hypoIdsForAck = useMemo(
+    () =>
+      rows
+        .map((row) => hypoLogIdFromInAppNotification(row))
+        .filter((id): id is string => Boolean(id)),
+    [rows],
+  );
+  const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
 
   const refresh = useCallback(async () => {
     if (!configured) {
@@ -268,6 +284,7 @@ export default function NotificationsPage() {
                   : "";
                 const actorId = profileUserIdForInAppNotification(r);
                 const actor = actorId ? senderMeta.get(actorId) : undefined;
+                const hypoLogId = hypoLogIdFromInAppNotification(r);
                 return (
                   <NotificationInboxRow
                     key={r.id}
@@ -279,6 +296,15 @@ export default function NotificationsPage() {
                     onOpen={() => void handleOpen(r)}
                     onMarkRead={() => void handleMarkOneRead(r)}
                     onDelete={() => void handleDeleteOne(r)}
+                    footer={
+                      hypoLogId ? (
+                        <HypoNotificationAckFooter
+                          row={r}
+                          acknowledged={hasAcked(hypoLogId)}
+                          onAcknowledged={() => void refreshHypoAcks()}
+                        />
+                      ) : undefined
+                    }
                   />
                 );
               })}

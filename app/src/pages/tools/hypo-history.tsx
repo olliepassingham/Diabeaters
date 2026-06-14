@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { CheckCircle2, History } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
 
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/empty-state";
 import { formatAppDate, formatAppTime } from "@/lib/region";
 import { storage, type HypoTreatment, type UserProfile } from "@/lib/storage";
+import { useAuth } from "@/lib/auth-context";
+import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
+import { formatHypoAcknowledgementSummary } from "@/lib/hypo-log-acknowledgements";
 
 function sortTreatmentsNewestFirst(rows: HypoTreatment[]): HypoTreatment[] {
   return [...rows].sort((a, b) => {
@@ -19,8 +23,18 @@ function sortTreatmentsNewestFirst(rows: HypoTreatment[]): HypoTreatment[] {
 }
 
 export default function HypoHistoryPage() {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(() => storage.getProfile() ?? null);
   const [entries, setEntries] = useState<HypoTreatment[]>(() => sortTreatmentsNewestFirst(storage.getHypoTreatments()));
+
+  const cloudHypoIds = useMemo(
+    () =>
+      entries
+        .map((entry) => entry.supabaseHypoLogId)
+        .filter((id): id is string => Boolean(id)),
+    [entries],
+  );
+  const { byHypoId } = useHypoAcknowledgementIndex(cloudHypoIds, user?.id);
 
   const refresh = useCallback(() => {
     setProfile(storage.getProfile() ?? null);
@@ -81,6 +95,15 @@ export default function HypoHistoryPage() {
                 const date = new Date(entry.timestamp);
                 const timeStr = formatAppTime(date, profile, { hour: "2-digit", minute: "2-digit" });
                 const dateStr = formatAppDate(date, profile, { day: "numeric", month: "short", year: "numeric" });
+                const acks = entry.supabaseHypoLogId ? byHypoId.get(entry.supabaseHypoLogId) ?? [] : [];
+                const latestAck = acks.length > 0 ? acks[acks.length - 1] : null;
+                const ackSummary =
+                  latestAck &&
+                  formatHypoAcknowledgementSummary(acks, {
+                    relativeWhen: formatDistanceToNowStrict(new Date(latestAck.acknowledged_at), {
+                      addSuffix: true,
+                    }),
+                  });
                 return (
                   <li
                     key={entry.id}
@@ -107,9 +130,17 @@ export default function HypoHistoryPage() {
                             {entry.glucoseLevel} {bgUnitsLabel}
                           </span>
                         )}
-                        {entry.carerNotified ? (
+                        {entry.carerNotified && !ackSummary ? (
                           <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
                             Supporters notified
+                          </Badge>
+                        ) : null}
+                        {ackSummary ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-normal text-emerald-800 border-emerald-500/35 dark:text-emerald-300"
+                          >
+                            {ackSummary}
                           </Badge>
                         ) : null}
                       </div>

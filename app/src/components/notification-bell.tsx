@@ -43,6 +43,12 @@ import {
 import { NotificationEmptyState, NotificationInboxRow } from "@/components/notifications/notification-inbox-row";
 import { prefetchNotificationsPage } from "@/components/bottom-nav";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
+import {
+  HypoNotificationAckFooter,
+  hypoLogIdFromInAppNotification,
+} from "@/components/hypo-notification-ack-footer";
 
 function InAppToastContent(props: {
   title: string;
@@ -71,6 +77,7 @@ function InAppToastContent(props: {
 export function NotificationBell() {
   try {
     const { toast } = useToast();
+    const { user } = useAuth();
     const configured = isSupabaseConfigured();
 
     const [, setLocation] = useLocation();
@@ -83,6 +90,15 @@ export function NotificationBell() {
     const [clearDialogOpen, setClearDialogOpen] = useState(false);
     const [clearBusy, setClearBusy] = useState(false);
     const unreadCount = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
+
+    const hypoIdsForAck = useMemo(
+      () =>
+        rows
+          .map((row) => hypoLogIdFromInAppNotification(row))
+          .filter((id): id is string => Boolean(id)),
+      [rows],
+    );
+    const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
 
     const sortedRows = useMemo(() => {
       return [...rows].sort((a, b) => Number(a.read) - Number(b.read));
@@ -432,6 +448,7 @@ export function NotificationBell() {
                     const when = n.created_at
                       ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true })
                       : "";
+                    const hypoLogId = hypoLogIdFromInAppNotification(n);
                     return (
                       <NotificationInboxRow
                         key={n.id}
@@ -440,6 +457,15 @@ export function NotificationBell() {
                         when={when}
                         variant="popover"
                         testId={`bell-notif-row-${n.id}`}
+                        footer={
+                          hypoLogId ? (
+                            <HypoNotificationAckFooter
+                              row={n}
+                              acknowledged={hasAcked(hypoLogId)}
+                              onAcknowledged={() => void refreshHypoAcks()}
+                            />
+                          ) : undefined
+                        }
                         onOpen={() => {
                           void (async () => {
                             if (!n.read) {

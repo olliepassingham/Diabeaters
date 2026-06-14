@@ -50,6 +50,15 @@ export type InAppNotificationRow = {
   dedupe_key?: string | null;
 };
 
+/** Patient inbox when a linked supporter acknowledges a hypo log. */
+export type HypoAcknowledgedNotificationPayload = {
+  kind: "hypo_acknowledged";
+  hypo_id: string;
+  carer_id?: string;
+  carer_name?: string;
+  deep_link?: string;
+};
+
 /** Alias matching product language (“in-app notification”). */
 export type Notification = InAppNotificationRow;
 

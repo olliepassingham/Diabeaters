@@ -57,6 +57,9 @@ describe("getPathForInAppNotification", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_logged" } }))).toBe(
       "/carer-view",
     );
+    expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_acknowledged" } }))).toBe(
+      "/tools/hypo-history",
+    );
   });
 
   it("maps scenario_started to carer view", () => {
