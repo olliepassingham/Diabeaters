@@ -1,12 +1,14 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Save } from "lucide-react";
 import { Link } from "wouter";
 
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { PageBackLink, PageHeader, PageShell } from "@/components/layout";
+import { hapticLight } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 /** Uppercase section label above a settings group (iOS-style). */
@@ -241,6 +243,50 @@ export function SettingsSetupBanner({
         <span className="shrink-0 text-xs font-semibold tabular-nums text-primary">{percentage}%</span>
       </div>
       <Progress value={percentage} className="mt-2.5 h-1.5" />
+    </div>
+  );
+}
+
+/** Extra scroll padding when the mobile sticky save bar is visible (`md:hidden`). */
+export const SETTINGS_STICKY_SAVE_SCROLL_CLASS = "pb-[4.75rem] md:pb-6";
+
+/** Floating mobile save bar above the bottom nav; hidden on desktop and when `visible` is false. */
+export function SettingsStickySaveBar({
+  visible,
+  onSave,
+  label = "Save",
+  testId = "button-settings-save-sticky",
+}: {
+  visible: boolean;
+  onSave: () => void;
+  label?: string;
+  testId?: string;
+}) {
+  if (!visible) return null;
+
+  return (
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-[110] md:hidden",
+        "bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]",
+      )}
+    >
+      <div className="pointer-events-auto mx-auto w-full max-w-lg px-4 pb-2 pt-1">
+        <div className="rounded-2xl border border-border/35 bg-background/95 p-1.5 shadow-lg shadow-black/15 backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
+          <Button
+            type="button"
+            className="h-10 w-full rounded-xl text-sm font-semibold shadow-none"
+            onClick={() => {
+              void hapticLight();
+              onSave();
+            }}
+            data-testid={testId}
+          >
+            <Save className="mr-2 h-4 w-4" aria-hidden />
+            {label}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

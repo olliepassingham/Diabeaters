@@ -276,7 +276,7 @@ export default function SettingsPharmacyPage() {
         </SettingsPanel>
       ) : (
         <SettingsPanel>
-          <SettingsPanelBody className="space-y-6 pb-32 md:pb-2">
+          <SettingsPanelBody className="space-y-6 pb-6 md:pb-2">
             <SettingsSectionHeader title="Pharmacy details" />
 
             {mode === "view" && hadExisting ? (

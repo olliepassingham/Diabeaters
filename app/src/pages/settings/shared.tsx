@@ -52,6 +52,8 @@ export {
   SettingsPanelBody,
   SettingsSectionHeader,
   SettingsSetupBanner,
+  SettingsStickySaveBar,
+  SETTINGS_STICKY_SAVE_SCROLL_CLASS,
   SettingsSubPageShell,
   SettingsToggleRow,
 } from "@/components/settings/settings-ui";

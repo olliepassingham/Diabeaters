@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -80,11 +80,9 @@ import { SettingsNotificationsRoute } from "./notifications";
 import { SettingsAboutRoute } from "./about";
 import { SettingsFeedbackRoute } from "./feedback";
 import { SettingsRatiosRoute } from "./ratios";
-import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink, SettingsSectionHeader, SettingsSetupBanner } from "./shared";
-
-/** Mobile save bars must sit above `BottomNav` (z-[100]); `bottom-0` + lower z-index left them untappable behind the tabs. */
-const SETTINGS_MOBILE_STICKY_FOOTER =
-  "md:hidden fixed left-0 right-0 z-[110] border-t bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/70 bottom-[calc(var(--keyboard-inset-bottom,0px)+var(--bottom-nav-height,7.5rem))]";
+import { SettingsDataBackupSection, SettingsHubGroup, SettingsHubNavLink, SettingsSectionHeader, SettingsSetupBanner, SettingsStickySaveBar, SETTINGS_STICKY_SAVE_SCROLL_CLASS } from "./shared";
+import { buildRatiosPageSnapshot, buildUsagePageSnapshot } from "@/lib/settings-page-snapshots";
+import { cn } from "@/lib/utils";
 
 function ProfileTab({
   userDisplayName,
@@ -107,6 +105,7 @@ function ProfileTab({
   setWeightDisplayUnit,
   weightRequiredForHypo,
   onSave,
+  showDesktopSave = true,
 }: {
   userDisplayName: string;
   setUserDisplayName: (v: string) => void;
@@ -128,6 +127,7 @@ function ProfileTab({
   setWeightDisplayUnit: (v: WeightDisplayUnit) => void;
   weightRequiredForHypo: boolean;
   onSave: () => void;
+  showDesktopSave?: boolean;
 }) {
   const handleRegionChange = (next: AppRegion) => {
     if (next === appRegion) return;
@@ -330,12 +330,14 @@ function ProfileTab({
           </div>
         </div>
       </div>
-      <div className="hidden justify-end pt-1 md:flex">
-        <Button onClick={onSave} data-testid="button-save-profile">
-          <Save className="h-4 w-4 mr-2" />
-          Save profile
-        </Button>
-      </div>
+      {showDesktopSave ? (
+        <div className="hidden justify-end pt-1 md:flex">
+          <Button onClick={onSave} data-testid="button-save-profile">
+            <Save className="h-4 w-4 mr-2" />
+            Save profile
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -347,7 +349,8 @@ function InsulinTab({
   dinnerRatio, setDinnerRatio, snackRatio, setSnackRatio,
   ratioFormat, onRatioFormatChange,
   carbPortionSize, onCarbPortionSizeChange,
-  onSave
+  onSave,
+  showDesktopSave = true,
 }: {
   bgUnits: string;
   tdd: string; setTdd: (v: string) => void;
@@ -361,6 +364,7 @@ function InsulinTab({
   ratioFormat: RatioFormat; onRatioFormatChange: (format: RatioFormat) => void;
   carbPortionSize: string; onCarbPortionSizeChange: (size: string) => void;
   onSave: () => void;
+  showDesktopSave?: boolean;
 }) {
   const cpSize = carbPortionSize ? parseFloat(carbPortionSize) : undefined;
   const ratioFormatLabel = formatRatioInputLabel(ratioFormat, cpSize);
@@ -388,8 +392,7 @@ function InsulinTab({
   ];
 
   return (
-    <>
-      <div className="space-y-4 pb-28 md:pb-2">
+    <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <FieldLabelWithInfo
@@ -557,24 +560,15 @@ function InsulinTab({
           </div>
         </div>
 
-          <div className="hidden md:flex justify-end">
-            <Button onClick={onSave} className="rounded-xl" data-testid="button-save-insulin">
-              <Save className="h-4 w-4 mr-2" />
-              Save Insulin Settings
-            </Button>
-          </div>
-        </div>
-
-      {/* Mobile-only sticky action bar for long forms */}
-      <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
-        <div className="mx-auto w-full max-w-lg px-4 pt-3 pb-3">
-          <Button onClick={onSave} className="h-11 w-full rounded-xl" data-testid="button-save-insulin-sticky">
-            <Save className="h-4 w-4 mr-2" />
-            Save Insulin Settings
-          </Button>
-        </div>
-      </div>
-    </>
+          {showDesktopSave ? (
+            <div className="hidden md:flex justify-end">
+              <Button onClick={onSave} className="rounded-xl" data-testid="button-save-insulin">
+                <Save className="h-4 w-4 mr-2" />
+                Save ratios
+              </Button>
+            </div>
+          ) : null}
+    </div>
   );
 }
 
@@ -598,7 +592,8 @@ function UsageTab({
   insulinCartridgeUnits, setInsulinCartridgeUnits,
   suppliesSmarterForecastEnabled, setSuppliesSmarterForecastEnabled,
   usesClosedLoop, setUsesClosedLoop,
-  onSave
+  onSave,
+  showDesktopSave = true,
 }: {
   isPumpUser: boolean; tdd: string;
   shortActingUnitsPerDay: string; setShortActingUnitsPerDay: (v: string) => void;
@@ -620,6 +615,7 @@ function UsageTab({
   suppliesSmarterForecastEnabled: boolean; setSuppliesSmarterForecastEnabled: (v: boolean) => void;
   usesClosedLoop: boolean; setUsesClosedLoop: (v: boolean) => void;
   onSave: () => void;
+  showDesktopSave?: boolean;
 }) {
   const usageFieldInputClass = "h-10 border-border/60 bg-background/85 shadow-none";
   const usageSelectTriggerClass = "h-10 rounded-xl border-border/60 bg-background/85";
@@ -954,12 +950,14 @@ function UsageTab({
           </div>
         </div>
 
-      <div className="hidden justify-end pt-1 md:flex">
-        <Button onClick={onSave} data-testid="button-save-usage">
-          <Save className="h-4 w-4 mr-2" />
-          Save usage
-        </Button>
-      </div>
+      {showDesktopSave ? (
+        <div className="hidden justify-end pt-1 md:flex">
+          <Button onClick={onSave} data-testid="button-save-usage">
+            <Save className="h-4 w-4 mr-2" />
+            Save usage
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1349,6 +1347,38 @@ export default function Settings() {
       });
     }
 
+    setUsageBaseline(
+      buildUsagePageSnapshot({
+        userDisplayName,
+        appRegion,
+        emergencyNumber,
+        bgUnits,
+        carbUnits,
+        deliveryMethod,
+        bodyWeightInput,
+        weightDisplayUnit,
+        dateOfBirth: updatedProfile.dateOfBirth ?? "",
+        shortActingUnitsPerDay,
+        longActingUnitsPerDay,
+        shortActingInjectionsPerDay,
+        longActingInjectionsPerDay,
+        primingUnits,
+        basalInjectionTime,
+        basalInjectionTime2,
+        cgmDays,
+        siteChangeDays,
+        reservoirChangeDays,
+        reservoirCapacity,
+        unitsPerInsulinPen,
+        needlesPerBox,
+        infusionSetsPerBox,
+        reservoirsPerBox,
+        insulinCartridgeUnits,
+        suppliesSmarterForecastEnabled,
+        usesClosedLoop,
+      }),
+    );
+
     return {
       ok: true,
       dateOfBirthCloudSkipped: cloud.dateOfBirthCloudSkipped,
@@ -1435,6 +1465,20 @@ export default function Settings() {
         ? `Your insulin settings have been updated. ${partial}`
         : "Your insulin settings have been updated.",
     });
+    setRatiosBaseline(
+      buildRatiosPageSnapshot({
+        tdd,
+        breakfastRatio,
+        lunchRatio,
+        dinnerRatio,
+        snackRatio,
+        correctionFactor,
+        targetBgLow,
+        targetBgHigh,
+        ratioFormat,
+        carbPortionSize,
+      }),
+    );
   };
 
   const handleSaveUsage = (opts?: { quietSuccess?: boolean }): boolean => {
@@ -1489,6 +1533,37 @@ export default function Settings() {
         : "Your supply usage settings have been updated.";
       toast({ title: "Usage settings saved", description });
     }
+    setUsageBaseline(
+      buildUsagePageSnapshot({
+        userDisplayName,
+        appRegion,
+        emergencyNumber,
+        bgUnits,
+        carbUnits,
+        deliveryMethod,
+        bodyWeightInput,
+        weightDisplayUnit,
+        dateOfBirth: profile?.dateOfBirth ?? "",
+        shortActingUnitsPerDay,
+        longActingUnitsPerDay,
+        shortActingInjectionsPerDay,
+        longActingInjectionsPerDay,
+        primingUnits,
+        basalInjectionTime,
+        basalInjectionTime2,
+        cgmDays,
+        siteChangeDays,
+        reservoirChangeDays,
+        reservoirCapacity,
+        unitsPerInsulinPen,
+        needlesPerBox,
+        infusionSetsPerBox,
+        reservoirsPerBox,
+        insulinCartridgeUnits,
+        suppliesSmarterForecastEnabled,
+        usesClosedLoop,
+      }),
+    );
     return tddReconciled;
   };
 
@@ -1521,6 +1596,37 @@ export default function Settings() {
         ? `Personal & usage settings are updated on this device. ${partial}`
         : "Personal & usage settings are updated on this device.",
     });
+    setUsageBaseline(
+      buildUsagePageSnapshot({
+        userDisplayName,
+        appRegion,
+        emergencyNumber,
+        bgUnits,
+        carbUnits,
+        deliveryMethod,
+        bodyWeightInput,
+        weightDisplayUnit,
+        dateOfBirth: profile?.dateOfBirth ?? "",
+        shortActingUnitsPerDay,
+        longActingUnitsPerDay,
+        shortActingInjectionsPerDay,
+        longActingInjectionsPerDay,
+        primingUnits,
+        basalInjectionTime,
+        basalInjectionTime2,
+        cgmDays,
+        siteChangeDays,
+        reservoirChangeDays,
+        reservoirCapacity,
+        unitsPerInsulinPen,
+        needlesPerBox,
+        infusionSetsPerBox,
+        reservoirsPerBox,
+        insulinCartridgeUnits,
+        suppliesSmarterForecastEnabled,
+        usesClosedLoop,
+      }),
+    );
   };
 
   const isPumpUser = isPumpDeliveryMethod(deliveryMethod);
@@ -1562,6 +1668,117 @@ export default function Settings() {
     void syncNotificationPreferences(updated);
   };
 
+  const [usageBaseline, setUsageBaseline] = useState<string | null>(null);
+  const [ratiosBaseline, setRatiosBaseline] = useState<string | null>(null);
+  const formBaselineInitialized = useRef(false);
+
+  const usageSnapshotFields = useMemo(
+    () => ({
+      userDisplayName,
+      appRegion,
+      emergencyNumber,
+      bgUnits,
+      carbUnits,
+      deliveryMethod,
+      bodyWeightInput,
+      weightDisplayUnit,
+      dateOfBirth: profile?.dateOfBirth ?? "",
+      shortActingUnitsPerDay,
+      longActingUnitsPerDay,
+      shortActingInjectionsPerDay,
+      longActingInjectionsPerDay,
+      primingUnits,
+      basalInjectionTime,
+      basalInjectionTime2,
+      cgmDays,
+      siteChangeDays,
+      reservoirChangeDays,
+      reservoirCapacity,
+      unitsPerInsulinPen,
+      needlesPerBox,
+      infusionSetsPerBox,
+      reservoirsPerBox,
+      insulinCartridgeUnits,
+      suppliesSmarterForecastEnabled,
+      usesClosedLoop,
+    }),
+    [
+      userDisplayName,
+      appRegion,
+      emergencyNumber,
+      bgUnits,
+      carbUnits,
+      deliveryMethod,
+      bodyWeightInput,
+      weightDisplayUnit,
+      profile?.dateOfBirth,
+      shortActingUnitsPerDay,
+      longActingUnitsPerDay,
+      shortActingInjectionsPerDay,
+      longActingInjectionsPerDay,
+      primingUnits,
+      basalInjectionTime,
+      basalInjectionTime2,
+      cgmDays,
+      siteChangeDays,
+      reservoirChangeDays,
+      reservoirCapacity,
+      unitsPerInsulinPen,
+      needlesPerBox,
+      infusionSetsPerBox,
+      reservoirsPerBox,
+      insulinCartridgeUnits,
+      suppliesSmarterForecastEnabled,
+      usesClosedLoop,
+    ],
+  );
+
+  const ratiosSnapshotFields = useMemo(
+    () => ({
+      tdd,
+      breakfastRatio,
+      lunchRatio,
+      dinnerRatio,
+      snackRatio,
+      correctionFactor,
+      targetBgLow,
+      targetBgHigh,
+      ratioFormat,
+      carbPortionSize,
+    }),
+    [
+      tdd,
+      breakfastRatio,
+      lunchRatio,
+      dinnerRatio,
+      snackRatio,
+      correctionFactor,
+      targetBgLow,
+      targetBgHigh,
+      ratioFormat,
+      carbPortionSize,
+    ],
+  );
+
+  const usageSnapshotCurrent = useMemo(
+    () => buildUsagePageSnapshot(usageSnapshotFields),
+    [usageSnapshotFields],
+  );
+  const ratiosSnapshotCurrent = useMemo(
+    () => buildRatiosPageSnapshot(ratiosSnapshotFields),
+    [ratiosSnapshotFields],
+  );
+
+  const usagePageDirty = usageBaseline !== null && usageSnapshotCurrent !== usageBaseline;
+  const ratiosPageDirty = ratiosBaseline !== null && ratiosSnapshotCurrent !== ratiosBaseline;
+
+  useEffect(() => {
+    if (formBaselineInitialized.current || !profile) return;
+    formBaselineInitialized.current = true;
+    setUsageBaseline(usageSnapshotCurrent);
+    setRatiosBaseline(ratiosSnapshotCurrent);
+  }, [profile, usageSnapshotCurrent, ratiosSnapshotCurrent]);
+
   const settingsInfoDialog = (
     <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
       <InfoSection title="Personal & usage">
@@ -1585,7 +1802,12 @@ export default function Settings() {
   );
 
   const usageToolsInner = (
-    <div className="space-y-5 px-4 py-4 sm:px-5 sm:py-5 md:space-y-6 pb-36 md:pb-6">
+    <div
+      className={cn(
+        "space-y-5 px-4 py-4 sm:px-5 sm:py-5 md:space-y-6",
+        usagePageDirty ? SETTINGS_STICKY_SAVE_SCROLL_CLASS : "pb-6",
+      )}
+    >
       <section id="settings-personal" className="scroll-mt-24 space-y-2.5">
         <SettingsSectionHeader
           title="Personal & units"
@@ -1630,6 +1852,7 @@ export default function Settings() {
             normalizeDateOfBirthInput(profile?.dateOfBirth?.trim() || null),
           )}
           onSave={() => void handleSaveProfile()}
+          showDesktopSave={usagePageDirty}
         />
       </section>
 
@@ -1678,6 +1901,7 @@ export default function Settings() {
           usesClosedLoop={usesClosedLoop}
           setUsesClosedLoop={setUsesClosedLoop}
           onSave={() => handleSaveUsage()}
+          showDesktopSave={usagePageDirty}
         />
       </section>
 
@@ -1685,25 +1909,18 @@ export default function Settings() {
         <SettingsDataBackupSection embedded />
       </div>
 
-      <div className={SETTINGS_MOBILE_STICKY_FOOTER}>
-        <div className="mx-auto w-full max-w-lg px-4 pt-2.5 pb-2.5">
-          <Button
-            type="button"
-            className="h-11 w-full rounded-xl"
-            data-testid="button-save-usage-page-sticky"
-            onClick={() => void handleSaveUsagePage()}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-        </div>
-      </div>
+      <SettingsStickySaveBar
+        visible={usagePageDirty}
+        onSave={() => void handleSaveUsagePage()}
+        label="Save personal & usage"
+        testId="button-save-usage-page-sticky"
+      />
     </div>
   );
 
   const ratiosToolsInner = (
-    <div className="space-y-4 px-4 py-4 sm:p-5">
-      <div id="settings-ratios" className="scroll-mt-28 space-y-3 pb-28 md:pb-0">
+    <div className={cn("space-y-4 px-4 py-4 sm:p-5", ratiosPageDirty ? SETTINGS_STICKY_SAVE_SCROLL_CLASS : "pb-2")}>
+      <div id="settings-ratios" className="scroll-mt-28 space-y-3">
         <SettingsSectionHeader
           title="Insulin ratios"
           description="TDD, correction factor, targets, and meal ratios used across tools and advisers."
@@ -1730,9 +1947,16 @@ export default function Settings() {
           onRatioFormatChange={handleRatioFormatChange}
           carbPortionSize={carbPortionSize}
           onCarbPortionSizeChange={handleCarbPortionSizeChange}
-          onSave={handleSaveInsulin}
+          onSave={() => void handleSaveInsulin()}
+          showDesktopSave={ratiosPageDirty}
         />
       </div>
+      <SettingsStickySaveBar
+        visible={ratiosPageDirty}
+        onSave={() => void handleSaveInsulin()}
+        label="Save ratios"
+        testId="button-save-insulin-sticky"
+      />
     </div>
   );
 
