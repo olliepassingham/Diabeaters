@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,7 @@ import { PharmacyCard } from "@/components/pharmacy-card";
 import { ToastAction } from "@/components/ui/toast";
 import { SupplyRunwayAtAGlance } from "@/components/visualizations/supply-runway-at-glance";
 import { addLocalSupplyEvent, enqueueSupplyEventForCloud, inferDailyUsageFromLocalEvents, listLocalSupplyEvents } from "@/lib/supply-events";
+import { SettingsGroupLabel, SettingsPanel, SettingsPanelBody } from "@/components/settings/settings-ui";
 
 const typeIcons: Record<string, any> = {
   needle: Syringe,
@@ -1071,6 +1072,36 @@ function SupplyCard({
   );
 }
 
+function SupplyDialogField({
+  label,
+  htmlFor,
+  hint,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
+        {label}
+      </Label>
+      {children}
+      {hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function SupplyDialogHint({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-primary/15 bg-primary/[0.05] px-3.5 py-3 text-xs leading-relaxed text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
 function SupplyDialog({ 
   supply, 
   open, 
@@ -1159,234 +1190,295 @@ function SupplyDialog({
   const usesDurationSettings = type === "cgm" || type === "infusion_set" || type === "reservoir";
   const isValid = name.trim() && quantity && (usesDurationSettings || dailyUsage);
   const showPumpSupplyTypes = isPumpUser || (!!supply && isPumpOnlySupplyType(type));
+  const TypeIcon = typeIcons[type] || Package;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{supply ? "Edit Supply" : "Add New Supply"}</DialogTitle>
-          <DialogDescription>
-            {supply ? "Update the details of your supply item." : "Add a new item to track in your inventory."}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto pr-2">
-          {!supply && showLastPrescriptionOption && lastPrescription && (
-            <Card className="bg-primary/5 border-primary/20 mb-4">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Use last prescription?</p>
-                    <p className="text-xs text-muted-foreground truncate">{lastPrescription.name}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setShowLastPrescriptionOption(false)} data-testid="button-add-different">
-                      New
-                    </Button>
-                    <Button size="sm" onClick={useLastPrescription} data-testid="button-use-last">
-                      Use
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input 
-              id="name" 
-              placeholder="e.g., NovoRapid FlexPen" 
-              value={name} 
-              onChange={e => setName(e.target.value)}
-              data-testid="input-supply-name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
-            <Select value={type} onValueChange={(v) => {
-              const newType = v as Supply["type"];
-              setType(newType);
-              if (!supply) {
-                const suggested = storage.getSuggestedDailyUsage(newType);
-                setDailyUsage(suggested ? suggested.value.toString() : "");
-              }
-            }}>
-              <SelectTrigger id="type" data-testid="select-supply-type">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="needle">Needles/Lancets</SelectItem>
-                <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
-                <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
-                {showPumpSupplyTypes ? <PumpOnlySupplySelectItems /> : null}
-                <SelectItem value="cgm">CGM/Monitors</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">
-                {type === "cgm" ? "Number of Sensors" : 
-                 type === "infusion_set" ? "Number of Infusion Sets" :
-                 type === "reservoir" ? "Number of Reservoirs" : "Current Quantity"}
-              </Label>
-              <Input 
-                id="quantity" 
-                type="number" 
-                placeholder={type === "cgm" || type === "infusion_set" || type === "reservoir" ? "e.g., 10" : "e.g., 50"}
-                value={quantity} 
-                onChange={e => setQuantity(e.target.value)}
-                data-testid="input-supply-quantity"
-              />
+      <DialogContent className="flex max-h-[min(90dvh,720px)] flex-col gap-0 overflow-hidden rounded-2xl border-border/50 p-0 sm:max-w-md">
+        <DialogHeader className="shrink-0 space-y-3 border-b border-border/40 px-5 pb-4 pt-5 text-left">
+          <div className="flex items-start gap-3 pr-8">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+              <TypeIcon className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <DialogTitle>{supply ? "Edit supply" : "Add supply"}</DialogTitle>
+              <DialogDescription className="text-left">
+                {supply ? "Update stock details and how the app forecasts this item." : "Add a new item to track in your inventory."}
+              </DialogDescription>
             </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {!supply && showLastPrescriptionOption && lastPrescription && (
+            <SettingsPanel className="mb-4">
+              <SettingsPanelBody className="flex items-center justify-between gap-3 p-3.5 sm:p-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">Use last prescription?</p>
+                  <p className="truncate text-xs text-muted-foreground">{lastPrescription.name}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setShowLastPrescriptionOption(false)} data-testid="button-add-different">
+                    New
+                  </Button>
+                  <Button size="sm" className="rounded-xl" onClick={useLastPrescription} data-testid="button-use-last">
+                    Use
+                  </Button>
+                </div>
+              </SettingsPanelBody>
+            </SettingsPanel>
+          )}
+
+          <div className="space-y-5">
+            <section className="space-y-3">
+              <SettingsGroupLabel>Basics</SettingsGroupLabel>
+              <SettingsPanel>
+                <SettingsPanelBody className="space-y-4 p-4 sm:p-5">
+                  <SupplyDialogField label="Name" htmlFor="name">
+                    <Input
+                      id="name"
+                      placeholder="e.g., NovoRapid FlexPen"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      data-testid="input-supply-name"
+                    />
+                  </SupplyDialogField>
+
+                  <SupplyDialogField label="Type" htmlFor="type">
+                    <Select
+                      value={type}
+                      onValueChange={(v) => {
+                        const newType = v as Supply["type"];
+                        setType(newType);
+                        if (!supply) {
+                          const suggested = storage.getSuggestedDailyUsage(newType);
+                          setDailyUsage(suggested ? suggested.value.toString() : "");
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="type" className="h-10 rounded-xl" data-testid="select-supply-type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="needle">Needles/Lancets</SelectItem>
+                        <SelectItem value="insulin_short">Short-Acting Insulin</SelectItem>
+                        <SelectItem value="insulin_long">Long-Acting Insulin</SelectItem>
+                        {showPumpSupplyTypes ? <PumpOnlySupplySelectItems /> : null}
+                        <SelectItem value="cgm">CGM/Monitors</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SupplyDialogField>
+
+                  <SupplyDialogField
+                    label={
+                      type === "cgm"
+                        ? "Number of sensors"
+                        : type === "infusion_set"
+                          ? "Number of infusion sets"
+                          : type === "reservoir"
+                            ? "Number of reservoirs"
+                            : "Current quantity"
+                    }
+                    htmlFor="quantity"
+                  >
+                    <Input
+                      id="quantity"
+                      type="number"
+                      placeholder={type === "cgm" || type === "infusion_set" || type === "reservoir" ? "e.g., 10" : "e.g., 50"}
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      data-testid="input-supply-quantity"
+                    />
+                  </SupplyDialogField>
+                </SettingsPanelBody>
+              </SettingsPanel>
+            </section>
+
             {type === "cgm" ? (
-              <div className="space-y-3">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Depletion is calculated using your CGM Sensor Duration from Settings (Usual Habits). 
-                    Each sensor lasts the number of days you've configured there.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="active-item-date">Current sensor applied on (optional)</Label>
-                  <Input
-                    id="active-item-date"
-                    type="date"
-                    value={activeItemDate}
-                    onChange={e => setActiveItemDate(e.target.value)}
-                    data-testid="input-active-item-date"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    When did you apply your current sensor? This lets the app know the stock quantity is your unused sensors,
-                    separate from the one you're wearing.
-                  </p>
-                </div>
-              </div>
+              <section className="space-y-3">
+                <SettingsGroupLabel>Sensor tracking</SettingsGroupLabel>
+                <SettingsPanel>
+                  <SettingsPanelBody className="space-y-4 p-4 sm:p-5">
+                    <SupplyDialogHint>
+                      Depletion uses your CGM sensor duration from{" "}
+                      <Link href="/settings#usage" className="font-medium text-primary underline-offset-2 hover:underline">
+                        Settings → Usual Habits
+                      </Link>
+                      . Each sensor lasts the number of days configured there.
+                    </SupplyDialogHint>
+                    <SupplyDialogField
+                      label="Current sensor applied on (optional)"
+                      htmlFor="active-item-date"
+                      hint="When did you apply your current sensor? This separates the one you're wearing from unused stock."
+                    >
+                      <Input
+                        id="active-item-date"
+                        type="date"
+                        value={activeItemDate}
+                        onChange={(e) => setActiveItemDate(e.target.value)}
+                        data-testid="input-active-item-date"
+                      />
+                    </SupplyDialogField>
+                  </SettingsPanelBody>
+                </SettingsPanel>
+              </section>
             ) : type === "infusion_set" ? (
-              <div className="space-y-3">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Depletion is calculated using your Site Change frequency from Settings (Usual Habits). 
-                    Each infusion set lasts the number of days you've configured there.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="active-item-date">Current set applied on (optional)</Label>
-                  <Input
-                    id="active-item-date"
-                    type="date"
-                    value={activeItemDate}
-                    onChange={e => setActiveItemDate(e.target.value)}
-                    data-testid="input-active-item-date"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    When did you last change your infusion set? This separates your active set from unused stock.
-                  </p>
-                </div>
-              </div>
+              <section className="space-y-3">
+                <SettingsGroupLabel>Site changes</SettingsGroupLabel>
+                <SettingsPanel>
+                  <SettingsPanelBody className="space-y-4 p-4 sm:p-5">
+                    <SupplyDialogHint>
+                      Depletion uses your site change frequency from{" "}
+                      <Link href="/settings#usage" className="font-medium text-primary underline-offset-2 hover:underline">
+                        Settings → Usual Habits
+                      </Link>
+                      .
+                    </SupplyDialogHint>
+                    <SupplyDialogField
+                      label="Current set applied on (optional)"
+                      htmlFor="active-item-date"
+                      hint="When did you last change your infusion set? This separates your active set from unused stock."
+                    >
+                      <Input
+                        id="active-item-date"
+                        type="date"
+                        value={activeItemDate}
+                        onChange={(e) => setActiveItemDate(e.target.value)}
+                        data-testid="input-active-item-date"
+                      />
+                    </SupplyDialogField>
+                  </SettingsPanelBody>
+                </SettingsPanel>
+              </section>
             ) : type === "reservoir" ? (
-              <div className="space-y-3">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Depletion is calculated using your Reservoir Change frequency from Settings (Usual Habits). 
-                    Each reservoir lasts the number of days you've configured there.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="active-item-date">Current reservoir changed on (optional)</Label>
-                  <Input
-                    id="active-item-date"
-                    type="date"
-                    value={activeItemDate}
-                    onChange={e => setActiveItemDate(e.target.value)}
-                    data-testid="input-active-item-date"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    When did you last change your reservoir? This separates your active reservoir from unused stock.
-                  </p>
-                </div>
-              </div>
-            ) : (() => {
-              const suggested = storage.getSuggestedDailyUsage(type);
-              return (
-                <div className="space-y-2">
-                  <Label htmlFor="daily-usage">
-                    {isInsulinType(type) ? "Daily Insulin Usage (units/day)" : 
-                     type === "needle" ? "Needles Used Per Day" : "Daily Usage"}
-                  </Label>
-                  <Input 
-                    id="daily-usage" 
-                    type="number" 
-                    step="0.1"
-                    placeholder={isInsulinType(type) ? "e.g., 40" : type === "needle" ? "e.g., 4" : "e.g., 4"} 
-                    value={dailyUsage} 
-                    onChange={e => setDailyUsage(e.target.value)}
-                    data-testid="input-supply-daily-usage"
-                  />
-                  {suggested && dailyUsage === suggested.value.toString() && (
-                    <p className="text-xs text-primary">
-                      Auto-filled {suggested.source}
-                    </p>
-                  )}
-                  {type === "insulin_short" && (
-                    <p className="text-xs text-muted-foreground">
-                      Short-acting (rapid) insulin units you use per day, e.g. NovoRapid, Humalog, Fiasp.
-                    </p>
-                  )}
-                  {type === "insulin_long" && (
-                    <p className="text-xs text-muted-foreground">
-                      Long-acting (basal) insulin units you use per day, e.g. Lantus, Levemir, Tresiba.
-                    </p>
-                  )}
-                  {type === "insulin_vial" && (
-                    <p className="text-xs text-muted-foreground">
-                      Insulin vials for pump use (typically 10ml / 1000 units), e.g. NovoRapid, Humalog, Fiasp.
-                    </p>
-                  )}
-                  {type === "insulin" && (
-                    <p className="text-xs text-muted-foreground">
-                      Total insulin units you use per day. This determines how quickly your pens deplete.
-                    </p>
-                  )}
-                  {type === "needle" && (
-                    <p className="text-xs text-muted-foreground">
-                      Number of needles you use per day (typically matches your injections per day).
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pickup-date">Pickup Date</Label>
-            <Input 
-              id="pickup-date" 
-              type="date"
-              value={pickupDate} 
-              onChange={e => setPickupDate(e.target.value)}
-              data-testid="input-supply-pickup-date"
-            />
-            <p className="text-xs text-muted-foreground">
-              When you received this supply. Used to estimate remaining quantity.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (optional)</Label>
-            <Input 
-              id="notes" 
-              placeholder="Any additional notes..." 
-              value={notes} 
-              onChange={e => setNotes(e.target.value)}
-              data-testid="input-supply-notes"
-            />
-          </div>
+              <section className="space-y-3">
+                <SettingsGroupLabel>Reservoir changes</SettingsGroupLabel>
+                <SettingsPanel>
+                  <SettingsPanelBody className="space-y-4 p-4 sm:p-5">
+                    <SupplyDialogHint>
+                      Depletion uses your reservoir change frequency from{" "}
+                      <Link href="/settings#usage" className="font-medium text-primary underline-offset-2 hover:underline">
+                        Settings → Usual Habits
+                      </Link>
+                      .
+                    </SupplyDialogHint>
+                    <SupplyDialogField
+                      label="Current reservoir changed on (optional)"
+                      htmlFor="active-item-date"
+                      hint="When did you last change your reservoir? This separates your active reservoir from unused stock."
+                    >
+                      <Input
+                        id="active-item-date"
+                        type="date"
+                        value={activeItemDate}
+                        onChange={(e) => setActiveItemDate(e.target.value)}
+                        data-testid="input-active-item-date"
+                      />
+                    </SupplyDialogField>
+                  </SettingsPanelBody>
+                </SettingsPanel>
+              </section>
+            ) : (
+              (() => {
+                const suggested = storage.getSuggestedDailyUsage(type);
+                return (
+                  <section className="space-y-3">
+                    <SettingsGroupLabel>Usage</SettingsGroupLabel>
+                    <SettingsPanel>
+                      <SettingsPanelBody className="space-y-3 p-4 sm:p-5">
+                        <SupplyDialogField
+                          label={
+                            isInsulinType(type)
+                              ? "Daily insulin usage (units/day)"
+                              : type === "needle"
+                                ? "Needles used per day"
+                                : "Daily usage"
+                          }
+                          htmlFor="daily-usage"
+                          hint={
+                            type === "insulin_short"
+                              ? "Short-acting (rapid) insulin units per day, e.g. NovoRapid, Humalog, Fiasp."
+                              : type === "insulin_long"
+                                ? "Long-acting (basal) insulin units per day, e.g. Lantus, Levemir, Tresiba."
+                                : type === "insulin_vial"
+                                  ? "Insulin vials for pump use (typically 10ml / 1000 units)."
+                                  : type === "insulin"
+                                    ? "Total insulin units per day — determines how quickly pens deplete."
+                                    : type === "needle"
+                                      ? "Number of needles per day (typically matches injections per day)."
+                                      : undefined
+                          }
+                        >
+                          <Input
+                            id="daily-usage"
+                            type="number"
+                            step="0.1"
+                            placeholder={isInsulinType(type) ? "e.g., 40" : type === "needle" ? "e.g., 4" : "e.g., 4"}
+                            value={dailyUsage}
+                            onChange={(e) => setDailyUsage(e.target.value)}
+                            data-testid="input-supply-daily-usage"
+                          />
+                          {suggested && dailyUsage === suggested.value.toString() ? (
+                            <p className="text-xs font-medium text-primary">Auto-filled from {suggested.source}</p>
+                          ) : null}
+                        </SupplyDialogField>
+                      </SettingsPanelBody>
+                    </SettingsPanel>
+                  </section>
+                );
+              })()
+            )}
+
+            <section className="space-y-3">
+              <SettingsGroupLabel>Details</SettingsGroupLabel>
+              <SettingsPanel>
+                <SettingsPanelBody className="space-y-4 p-4 sm:p-5">
+                  <SupplyDialogField
+                    label="Pickup date"
+                    htmlFor="pickup-date"
+                    hint="When you received this supply. Used to estimate remaining quantity."
+                  >
+                    <Input
+                      id="pickup-date"
+                      type="date"
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      data-testid="input-supply-pickup-date"
+                    />
+                  </SupplyDialogField>
+
+                  <SupplyDialogField label="Notes (optional)" htmlFor="notes">
+                    <Input
+                      id="notes"
+                      placeholder="Any additional notes…"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      data-testid="input-supply-notes"
+                    />
+                  </SupplyDialogField>
+                </SettingsPanelBody>
+              </SettingsPanel>
+            </section>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-supply">Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!isValid} data-testid="button-save-supply">
-            {supply ? "Save Changes" : "Add Supply"}
+
+        <DialogFooter className="shrink-0 flex-col gap-2 border-t border-border/40 bg-muted/15 px-5 py-4 sm:flex-row sm:justify-end">
+          <Button
+            variant="outline"
+            className="min-h-10 w-full rounded-xl sm:w-auto"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-supply"
+          >
+            Cancel
+          </Button>
+          <Button
+            className="min-h-10 w-full rounded-xl sm:w-auto"
+            onClick={handleSubmit}
+            disabled={!isValid}
+            data-testid="button-save-supply"
+          >
+            {supply ? "Save changes" : "Add supply"}
           </Button>
         </DialogFooter>
       </DialogContent>
