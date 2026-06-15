@@ -32,7 +32,6 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronUp,
-  Hospital,
   Pill,
   Info,
   Globe,
@@ -40,7 +39,6 @@ import {
   Sun,
   Snowflake,
   Calendar,
-  Heart,
   Languages,
   Phone,
   Navigation,
@@ -860,21 +858,21 @@ function CompactRiskConsiderations({ warnings }: { warnings: RiskWarning[] }) {
   const top = sorted.slice(0, 3);
   const more = sorted.length - top.length;
   return (
-    <Card className="border-orange-500/35 bg-orange-50/25 dark:bg-orange-950/20" data-testid="card-travel-risks-compact">
+    <Card className="surface-card border-amber-500/25 bg-amber-500/5 shadow-none" data-testid="card-travel-risks-compact">
       <CardHeader className="py-2.5 px-3 pb-1">
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-orange-600 dark:text-orange-400 shrink-0" />
-          Heads-up for this trip
+          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          Heads-up
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-3 pt-0 space-y-1.5">
         {top.map((w, i) => (
-          <p key={i} className="text-xs leading-snug text-foreground/90 border-l-2 border-orange-400/50 pl-2">
-            <span className="font-medium">{w.title}.</span> {truncateOneLine(w.description, 110)}
+          <p key={i} className="text-xs leading-snug text-foreground/90">
+            <span className="font-medium">{w.title}.</span> {truncateOneLine(w.description, 100)}
           </p>
         ))}
         {more > 0 ? (
-          <p className="text-[11px] text-muted-foreground">+{more} more — your team can help prioritise what matters for you.</p>
+          <p className="text-[11px] text-muted-foreground">+{more} more</p>
         ) : null}
       </CardContent>
     </Card>
@@ -1720,6 +1718,17 @@ export default function Travel() {
                     variant="outline"
                     size="sm"
                     className="min-h-9"
+                    onClick={() => setActiveTravelTab("plan")}
+                    data-testid="button-overview-open-plan"
+                  >
+                    <Clock className="h-3.5 w-3.5 mr-1.5" aria-hidden />
+                    Plan
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-9"
                     onClick={() => setActiveTravelTab("checklist")}
                     data-testid="button-overview-open-checklist"
                   >
@@ -1745,94 +1754,25 @@ export default function Travel() {
             <CompactRiskConsiderations warnings={riskWarnings} />
 
             {isSickDayAlsoActive && (
-              <Card className="border-orange-500/30 bg-orange-50/50 dark:bg-orange-950/20" data-testid="card-sick-day-also-active">
+              <Card className="surface-card border-amber-500/25 shadow-none" data-testid="card-sick-day-also-active">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <div className="p-1.5 rounded-full bg-orange-100 dark:bg-orange-900 shrink-0">
-                      <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">Sick day mode is also active{sickDaySeverity ? ` — ${sickDaySeverity} severity` : ""}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Being unwell while travelling significantly increases supply needs. Your supply forecasts now show the combined impact. Make sure you have access to medical care at your destination.
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+                      <Thermometer className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </span>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <p className="text-sm font-medium">
+                        Sick day mode is also on{sickDaySeverity ? ` · ${sickDaySeverity}` : ""}
                       </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <Link href="/scenarios/sick-day">
-                          <Button variant="outline" size="sm" className="min-h-11" data-testid="button-view-sick-day-from-travel">
-                            <Thermometer className="h-3 w-3 mr-1" />
-                            View sick day dashboard
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    Today&apos;s insulin timing
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-4">
-                    {todayScheduleEntries.map((row, idx) => (
-                      <div
-                        key={`${row.doseLabel}-${idx}`}
-                        className={idx > 0 ? "pt-4 border-t border-purple-200 dark:border-purple-800" : ""}
-                      >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">{row.doseLabel}</p>
-                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 font-mono" data-testid={idx === 0 ? "text-today-injection-time" : `text-today-injection-time-${idx + 1}`}>
-                          {row.localTime} <span className="text-sm font-normal">local time</span>
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          ({row.homeTime} home time)
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="outline" className="text-purple-700 dark:text-purple-300">
-                          {row.label}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">{row.note}</p>
-                      </div>
-                    </div>
-                      </div>
-                    ))}
-                    {plan.timezoneChange === "major" && (
-                      <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
-                        Shifting by up to 2 hours per day until adjusted to local time ({plan.timezoneHours}h {plan.timezoneDirection}).
-                        Monitor blood glucose extra closely during adjustment.
+                      <p className="text-xs text-muted-foreground">
+                        Supply needs may be higher while unwell — confirm care access at your destination.
                       </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
-              <Card className="surface-card border-border/60 shadow-none">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    Timezone Reminder
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg space-y-2">
-                    <p className="text-sm">
-                      You're {plan.timezoneHours} hours {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {daysElapsed < 2 
-                        ? "Consider keeping your pump on home time for the first day, then update the clock."
-                        : "Your pump clock should now be set to local time. Check basal rates are appropriate."}
-                    </p>
+                      <Link href="/scenarios/sick-day">
+                        <Button variant="outline" size="sm" className="min-h-9 rounded-xl" data-testid="button-view-sick-day-from-travel">
+                          View sick day
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1840,101 +1780,160 @@ export default function Travel() {
           </TabsContent>
 
           <TabsContent value="plan" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
+            {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
+              <Card className="surface-card border-border/60 shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clock className="h-4 w-4 text-primary" aria-hidden />
+                    Today&apos;s insulin timing
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  {todayScheduleEntries.map((row, idx) => (
+                    <div
+                      key={`${row.doseLabel}-${idx}`}
+                      className={cn(
+                        "flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/15 px-3 py-2.5",
+                        idx > 0 && "mt-0",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">{row.doseLabel}</p>
+                        <p
+                          className="text-xl font-bold tabular-nums text-foreground"
+                          data-testid={idx === 0 ? "text-today-injection-time" : `text-today-injection-time-${idx + 1}`}
+                        >
+                          {row.localTime}
+                          <span className="ml-1 text-sm font-normal text-muted-foreground">local</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">{row.homeTime} home</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="outline">{row.label}</Badge>
+                        <p className="mt-1 text-xs text-muted-foreground">{row.note}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {plan.timezoneChange === "major" ? (
+                    <p className="text-xs text-muted-foreground">
+                      Shift up to 2h per day until local time ({plan.timezoneHours}h {plan.timezoneDirection}). Check BG more often.
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
+
+            {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
+              <Card className="surface-card border-border/60 shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Clock className="h-4 w-4 text-primary" aria-hidden />
+                    Timezone
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 pt-0 text-sm">
+                  <p>
+                    {plan.timezoneHours}h {plan.timezoneDirection === "east" ? "ahead of" : "behind"} home time.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {daysElapsed < 2
+                      ? "Consider home time on your pump for day one, then switch to local."
+                      : "Pump should be on local time — check basal rates suit."}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="surface-card border-border/60 shadow-none">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Heart className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  Emergency Quick Access
-                </CardTitle>
+                <CardTitle className="text-base font-semibold">Emergency</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Link href="/emergency-card">
-                  <Button variant="outline" className="min-h-11 w-full" data-testid="button-active-emergency-card">
-                    <Globe className="h-4 w-4 mr-2 text-red-600" />
-                    View Full Emergency Card
-                    <ChevronRight className="h-4 w-4 ml-auto" />
-                  </Button>
-                </Link>
+              <CardContent className="space-y-3 pt-0">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Link href="/emergency-card">
+                    <Button variant="secondary" className="min-h-10 w-full rounded-xl" data-testid="button-active-emergency-card">
+                      <Globe className="h-4 w-4 mr-2" />
+                      Emergency card
+                    </Button>
+                  </Link>
+                  <Link href="/help-now">
+                    <Button variant="outline" className="min-h-10 w-full rounded-xl" data-testid="button-help-now-link">
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      Help now
+                    </Button>
+                  </Link>
+                </div>
 
-                <Collapsible defaultOpen={false} className="group rounded-xl border border-border/60">
+                <Collapsible defaultOpen={false} className="group rounded-xl border border-border/60 bg-muted/10">
                   <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-                    <CollapsibleTrigger className="flex min-h-11 flex-1 items-center gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
-                      <Languages className="h-4 w-4 shrink-0" aria-hidden />
+                    <CollapsibleTrigger className="flex min-h-10 flex-1 items-center gap-2 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+                      <Languages className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                       Key phrases
                       <ChevronDown className="ml-auto h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
                     </CollapsibleTrigger>
                     <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                      <SelectTrigger className="h-11 w-full min-w-[8.5rem] max-w-[10rem] sm:w-40" data-testid="select-phrase-language">
+                      <SelectTrigger className="h-10 w-full min-w-[8.5rem] max-w-[10rem] sm:w-40" data-testid="select-phrase-language">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.keys(emergencyPhrases).map(lang => (
-                          <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                        {Object.keys(emergencyPhrases).map((lang) => (
+                          <SelectItem key={lang} value={lang}>
+                            {lang}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <CollapsibleContent className="space-y-2 border-t border-border/60 px-3 pb-3 pt-1">
-                  {selectedPhrases && (
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">"I am diabetic"</p>
-                        <p className="text-lg font-medium" data-testid="text-phrase-diabetic">{selectedPhrases.iAmDiabetic}</p>
-                      </div>
-                      <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">"I need sugar"</p>
-                        <p className="text-lg font-medium" data-testid="text-phrase-sugar">{selectedPhrases.needSugar}</p>
-                      </div>
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">"I need medical help"</p>
-                        <p className="text-lg font-medium" data-testid="text-phrase-help">{selectedPhrases.needHelp}</p>
-                      </div>
-                      <div className="p-3 bg-muted/50 rounded-lg flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Emergency Number ({selectedLanguage})</p>
-                          <p className="text-lg font-bold font-mono" data-testid="text-emergency-number">{selectedPhrases.emergencyNumber}</p>
+                  <CollapsibleContent className="space-y-2 border-t border-border/60 px-3 pb-3 pt-2">
+                    {selectedPhrases ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">I am diabetic</p>
+                          <p className="text-base font-medium" data-testid="text-phrase-diabetic">
+                            {selectedPhrases.iAmDiabetic}
+                          </p>
                         </div>
-                        <Phone className="h-5 w-5 text-muted-foreground" />
+                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">I need sugar</p>
+                          <p className="text-base font-medium" data-testid="text-phrase-sugar">
+                            {selectedPhrases.needSugar}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                          <p className="text-[11px] text-muted-foreground">I need medical help</p>
+                          <p className="text-base font-medium" data-testid="text-phrase-help">
+                            {selectedPhrases.needHelp}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                          <div>
+                            <p className="text-[11px] text-muted-foreground">Emergency ({selectedLanguage})</p>
+                            <p className="text-lg font-bold tabular-nums" data-testid="text-emergency-number">
+                              {selectedPhrases.emergencyNumber}
+                            </p>
+                          </div>
+                          <Phone className="h-4 w-4 text-muted-foreground" aria-hidden />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null}
                   </CollapsibleContent>
                 </Collapsible>
-
-                <Link href="/help-now">
-                  <Button variant="outline" className="min-h-11 w-full mt-2" data-testid="button-help-now-link">
-                    <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
-                    Help Now Page
-                    <ChevronRight className="h-4 w-4 ml-auto" />
-                  </Button>
-                </Link>
               </CardContent>
             </Card>
-
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-checklist">
-            <Card>
-              <CardHeader>
+            <Card className="surface-card border-border/60 shadow-none">
+              <CardHeader className="pb-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    Packing Checklist
-                  </CardTitle>
+                  <CardTitle className="text-base font-semibold">Packing checklist</CardTitle>
                   <Badge variant={checkedCount === packingList.length ? "default" : "secondary"} data-testid="badge-packing-progress">
-                    {checkedCount}/{packingList.length} packed
+                    {checkedCount}/{packingList.length}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-0.5 pt-0.5">
-                  <CardDescription className="mb-0">Packing checklist</CardDescription>
-                  <InlineInfoHint
-                    ariaLabel="How to use the packing checklist"
-                    content="Tap each item when it is in your bag. Progress saves for this trip."
-                  />
-                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 pt-0">
                 {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map(category => {
                   const items = groupedItems[category];
                   if (!items || items.length === 0) return null;
@@ -2881,55 +2880,37 @@ export default function Travel() {
         </TabsContent>
 
         <TabsContent value="emergency" className="mt-4 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Link href="/emergency-card" className="flex-1">
-              <Button className="w-full" variant="secondary" data-testid="button-travel-tab-emergency-card">
-                Open emergency card
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Link href="/emergency-card">
+              <Button className="w-full rounded-xl" variant="secondary" data-testid="button-travel-tab-emergency-card">
+                Emergency card
               </Button>
             </Link>
-            <Link href="/help-now" className="flex-1">
-              <Button className="w-full" variant="outline" data-testid="button-travel-tab-help-now">
+            <Link href="/help-now">
+              <Button className="w-full rounded-xl" variant="outline" data-testid="button-travel-tab-help-now">
                 Help now
               </Button>
             </Link>
           </div>
 
-          <Card className="border-border/70">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Hospital className="h-5 w-5 shrink-0" />
-                If something goes wrong — start here
-              </CardTitle>
-              <CardDescription className="text-xs leading-snug">
-                Three priorities; open a section below for step-by-step detail.
-              </CardDescription>
+          <Card className="surface-card border-border/60 shadow-none">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">If something goes wrong</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm text-foreground/90">
-              <p className="flex gap-2.5">
-                <span className="font-bold text-primary tabular-nums shrink-0">1</span>
-                <span>
-                  <strong>Hypo first.</strong> Treat low glucose, then reassess — get urgent help if you do not recover
-                  or someone else needs to help you.
-                </span>
+            <CardContent className="space-y-2 pt-0 text-xs text-foreground/90">
+              <p>
+                <span className="font-semibold">1. Hypo first.</span> Treat lows, then reassess.
               </p>
-              <p className="flex gap-2.5">
-                <span className="font-bold text-primary tabular-nums shrink-0">2</span>
-                <span>
-                  <strong>Lost insulin or supplies.</strong> Pharmacy first, then urgent care or hospital with your
-                  prescription and letter; use insurance if you have it.
-                </span>
+              <p>
+                <span className="font-semibold">2. Lost supplies.</span> Pharmacy, then urgent care with your letter.
               </p>
-              <p className="flex gap-2.5">
-                <span className="font-bold text-primary tabular-nums shrink-0">3</span>
-                <span>
-                  <strong>Prevent the crisis.</strong> Keep insulin and kit in carry-on only; know how to reach your
-                  team and the local emergency number.
-                </span>
+              <p>
+                <span className="font-semibold">3. Prevent crisis.</span> Carry-on only; know your team and local emergency number.
               </p>
             </CardContent>
           </Card>
 
-          <Accordion type="multiple" className="w-full rounded-lg border border-border/60 bg-card px-1">
+          <Accordion type="multiple" className="w-full rounded-2xl border border-border/60 bg-card/40 px-1">
             <AccordionItem value="lost-insulin" className="border-b-0 px-2">
               <AccordionTrigger className="text-sm py-3 hover:no-underline">
                 Lost or damaged insulin
@@ -2995,9 +2976,9 @@ export default function Travel() {
             const weather = climateWeatherGuidance(plan, isPumpUser);
             if (!weather) return null;
             return (
-              <Card className="border-border/70">
-                <CardHeader className="pb-2 pt-4">
-                  <CardTitle className="text-base flex items-center gap-2">
+              <Card className="surface-card border-border/60 shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
                     {plan.weatherChange === "warmer" ? (
                       <Sun className="h-4 w-4 shrink-0 text-red-500" aria-hidden />
                     ) : plan.weatherChange === "colder" ? (
@@ -3007,7 +2988,7 @@ export default function Travel() {
                     )}
                     {weather.title}
                   </CardTitle>
-                  <CardDescription className="text-xs leading-snug">{weather.subtitle}</CardDescription>
+                  <CardDescription className="text-xs">{weather.subtitle}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 pt-0 pb-4">
                   <ul className="space-y-2.5 text-sm leading-snug text-foreground/90">
@@ -3031,10 +3012,10 @@ export default function Travel() {
           {plan.timezoneChange !== "none" && (() => {
             const tz = climateTimezoneGuidance(plan);
             return (
-            <Card className="border-border/70">
-              <CardHeader className="pb-2 pt-4">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Clock className="h-4 w-4 shrink-0 text-purple-500" aria-hidden />
+            <Card className="surface-card border-border/60 shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
                   {tz.title}
                 </CardTitle>
                 <CardDescription className="text-xs leading-snug">{tz.subtitle}</CardDescription>
