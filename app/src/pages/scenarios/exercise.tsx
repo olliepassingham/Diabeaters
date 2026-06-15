@@ -40,7 +40,7 @@ export default function ScenarioExercisePage() {
     "min-h-10 w-full justify-center rounded-xl px-3 text-sm font-medium shadow-none sm:min-h-9 sm:w-auto";
 
   return (
-    <PageShell variant="standard" density="compact" className="space-y-4 max-sm:space-y-3 sm:space-y-6">
+    <PageShell variant="narrow" density="compact" className="space-y-4 max-sm:space-y-3 sm:space-y-6">
       <PageHeader
         stackActionsMaxSm
         className="max-sm:gap-1.5"

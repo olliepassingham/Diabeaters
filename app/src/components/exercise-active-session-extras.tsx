@@ -53,9 +53,7 @@ export function ExerciseWorkoutProgressBar(props: {
       >
         <div
           className={cn(
-            "h-full rounded-full bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500",
-            "shadow-[0_0_12px_-2px_rgba(16,185,129,0.45)] transition-[width] duration-500 ease-out",
-            "dark:from-emerald-500 dark:via-teal-400 dark:to-cyan-400",
+            "h-full rounded-full bg-primary transition-[width] duration-500 ease-out",
           )}
           style={{ width: `${pct}%` }}
           data-testid="progress-exercise"
@@ -92,14 +90,13 @@ export function ExerciseFuelPlanSummary(props: {
     return (
       <div
         className={cn(
-          "rounded-xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-teal-500/[0.03]",
-          "px-3.5 py-3 dark:from-teal-950/40",
+          "rounded-xl border border-border/60 bg-muted/15 px-3.5 py-3",
           className,
         )}
         data-testid="exercise-fuel-plan"
       >
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-500/15 text-teal-700 dark:text-teal-300">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <UtensilsCrossed className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0 flex-1 space-y-2">
@@ -107,7 +104,7 @@ export function ExerciseFuelPlanSummary(props: {
             <p className="text-xl font-bold tabular-nums leading-none tracking-tight text-foreground">{amount}</p>
             {detail ? <p className="text-sm leading-snug text-muted-foreground">{detail}</p> : null}
             {extras.length > 0 ? (
-              <ul className="space-y-1.5 border-t border-teal-500/15 pt-2">
+              <ul className="space-y-1.5 border-t border-border/50 pt-2">
                 {extras.map((line) => (
                   <li key={line.id} className="text-sm leading-snug">
                     <span className="font-medium text-foreground">{line.label}</span>
@@ -127,14 +124,13 @@ export function ExerciseFuelPlanSummary(props: {
   return (
     <div
       className={cn(
-        "rounded-xl border border-teal-500/25 bg-gradient-to-br from-teal-500/[0.07] to-transparent",
-        "px-3 py-2.5 dark:from-teal-950/35",
+        "rounded-xl border border-border/60 bg-muted/15 px-3 py-2.5",
         className,
       )}
       data-testid="exercise-fuel-plan"
     >
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-500/15 text-teal-700 dark:text-teal-300">
+        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <UtensilsCrossed className="h-3.5 w-3.5" aria-hidden />
         </span>
         <div className="min-w-0 space-y-1.5">
@@ -163,8 +159,7 @@ export function ExerciseHypoTreatmentHint(props: {
   return (
     <div
       className={cn(
-        "rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/[0.06] to-transparent",
-        "px-3 py-2.5 dark:from-amber-950/35",
+        "rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5",
         className,
       )}
       data-testid="exercise-hypo-auto-hint"

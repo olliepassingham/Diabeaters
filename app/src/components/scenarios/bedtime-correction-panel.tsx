@@ -94,22 +94,18 @@ export function BedtimeCorrectionPanel({
 
   return (
     <div
-      className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05]"
+      className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-none"
       data-testid="card-correction-suggestion"
     >
-      <div className="border-b border-border/50 bg-gradient-to-br from-violet-500/[0.07] via-card to-indigo-500/[0.05] px-4 py-5 sm:px-5">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Suggested bedtime dose
+      <div className="overflow-hidden rounded-t-2xl border-b border-primary/20 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested bedtime dose</p>
+        <p
+          className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground"
+          data-testid="text-correction-suggested-dose"
+        >
+          {correction.suggestedDose}
+          <span className="text-2xl font-semibold text-muted-foreground">u</span>
         </p>
-        <div className="mt-2 flex items-baseline justify-center gap-2">
-          <span
-            className="text-5xl font-semibold tracking-tight tabular-nums text-foreground"
-            data-testid="text-correction-suggested-dose"
-          >
-            {correction.suggestedDose}
-          </span>
-          <span className="text-lg font-medium text-muted-foreground">units</span>
-        </div>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <Badge variant="secondary" className="rounded-full px-2.5 text-xs font-medium">
             ~{pct}% of full dose
@@ -157,7 +153,7 @@ export function BedtimeCorrectionPanel({
             {correction.fullDose > correction.suggestedDose ? ` Full dose would be ${correction.fullDose}u.` : ""}
           </p>
           {isPumpUser ? (
-            <p className="text-sm text-indigo-700 dark:text-indigo-300" data-testid="text-pump-correction-tip">
+            <p className="text-sm text-muted-foreground" data-testid="text-pump-correction-tip">
               Check your pump&apos;s IOB — active insulin may already be working on this high.
             </p>
           ) : null}

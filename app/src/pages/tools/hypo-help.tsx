@@ -347,40 +347,41 @@ export default function HypoHelpPage() {
           </Button>
 
           {hypoResult && (
-            <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800 space-y-4">
-              <MedicalNumericOutputDisclaimer compact />
-              <h4 className="font-medium flex items-center gap-2 text-red-800 dark:text-red-200">
-                <Droplet className="h-4 w-4" />
-                You need approximately:
-              </h4>
-              <div className="text-center p-4 bg-card rounded-lg border border-red-200/60 dark:border-red-800/50">
-                <p className="text-4xl font-bold text-red-600 dark:text-red-400">{hypoResult.carbsGrams}g</p>
-                <p className="text-small text-red-700 dark:text-red-300">fast-acting carbs</p>
-                {hypoResult && hypoTreatmentLine(hypoResult.carbsGrams) ? (
-                  <p className="mt-2 text-sm font-medium text-red-800 dark:text-red-200">
+            <div className="space-y-3">
+              <div className="overflow-hidden rounded-2xl border border-red-500/35 bg-gradient-to-b from-red-500/10 via-card to-card px-5 py-5 text-center shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-red-700/90 dark:text-red-300/90">
+                  Fast carbs
+                </p>
+                <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                  {hypoResult.carbsGrams}g
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">fast-acting carbs</p>
+                {hypoTreatmentLine(hypoResult.carbsGrams) ? (
+                  <p className="mt-2 text-xs font-medium text-foreground/90">
                     Your usual choice: {hypoTreatmentLine(hypoResult.carbsGrams)}
                   </p>
                 ) : null}
               </div>
+              <MedicalNumericOutputDisclaimer compact />
               <Collapsible>
-                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-red-200/60 bg-card/80 px-3 py-2 text-left text-sm font-medium text-red-800 dark:text-red-200 dark:border-red-900/50">
+                <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-sm font-medium">
                   <span>{hypoCarbSource ? "Other options" : "That's about"}</span>
                   <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="grid gap-2 text-small pt-2">
+                  <div className="grid gap-2 pt-2">
                     <div className="grid gap-2 md:grid-cols-3">
-                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.glucoseTablets}</p>
-                        <p className="text-tiny text-red-600 dark:text-red-400">glucose tablets</p>
+                      <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
+                        <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.glucoseTablets}</p>
+                        <p className="text-xs text-muted-foreground">glucose tablets</p>
                       </div>
-                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.juiceMl}ml</p>
-                        <p className="text-tiny text-red-600 dark:text-red-400">fruit juice</p>
+                      <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
+                        <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.juiceMl}ml</p>
+                        <p className="text-xs text-muted-foreground">fruit juice</p>
                       </div>
-                      <div className="p-2 bg-card rounded text-center border border-red-200/40 dark:border-red-900/40">
-                        <p className="text-lg font-bold text-red-700 dark:text-red-300">{hypoResult.jellyBabies}</p>
-                        <p className="text-tiny text-red-600 dark:text-red-400">jelly babies</p>
+                      <div className="rounded-lg border border-border/60 bg-muted/15 p-2 text-center">
+                        <p className="text-lg font-bold tabular-nums text-foreground">{hypoResult.jellyBabies}</p>
+                        <p className="text-xs text-muted-foreground">jelly babies</p>
                       </div>
                     </div>
                     {!hypoCarbSource ? (
@@ -395,7 +396,7 @@ export default function HypoHelpPage() {
                   </div>
                 </CollapsibleContent>
               </Collapsible>
-              <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded text-tiny text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-foreground">
                 <strong>Remember:</strong> Wait 15 minutes, then recheck. If still low, treat again.
               </div>
             </div>

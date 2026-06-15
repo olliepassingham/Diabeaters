@@ -240,14 +240,17 @@ export default function CorrectionHelpPage() {
                 <div className="space-y-3">
                   {result.status === "dose" && (
                     <div
-                      className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2"
+                      className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm"
                       data-testid="card-correction-result"
                     >
-                      <p className="text-sm font-medium text-foreground">Standard correction (full dose)</p>
-                      <p className="text-3xl font-bold font-mono text-primary" data-testid="text-correction-dose">
-                        {result.fullDoseRounded}u
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
+                        Standard correction
                       </p>
-                      <p className="text-xs text-muted-foreground font-mono break-words" data-testid="text-correction-formula">
+                      <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground" data-testid="text-correction-dose">
+                        {result.fullDoseRounded}
+                        <span className="text-2xl font-semibold text-muted-foreground">u</span>
+                      </p>
+                      <p className="mt-2 text-xs text-muted-foreground font-mono break-words" data-testid="text-correction-formula">
                         ({result.currentBg} − {result.targetBg}) ÷ {result.correctionFactor} = {result.fullDoseRounded}u
                       </p>
                     </div>

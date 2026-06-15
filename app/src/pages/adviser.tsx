@@ -871,33 +871,23 @@ export default function Adviser() {
           <div ref={splitCalculatorRef}>
           <Card
             className={cn(
-              "overflow-hidden border-primary/30 shadow-md shadow-primary/5",
-              showSplitCalculator ? "ring-2 ring-primary/25" : "ring-1 ring-primary/15",
+              "overflow-hidden rounded-2xl border-border/60 bg-card shadow-none",
+              showSplitCalculator ? "ring-2 ring-primary/20" : "",
             )}
             data-testid="card-split-dose-calculator"
           >
-            <div className="border-b border-primary/10 bg-gradient-to-br from-primary/14 via-primary/6 to-transparent px-4 py-4 sm:px-5">
-              <div className="flex items-start gap-3.5">
-                <div
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/20"
-                  aria-hidden
-                >
-                  <Pizza className="h-6 w-6" strokeWidth={1.75} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
-                      Split dose calculator
-                    </h3>
-                    <Badge
-                      variant="secondary"
-                      className="rounded-full border-primary/20 bg-primary/10 px-2.5 py-0 text-[10px] font-semibold uppercase tracking-wide text-primary"
-                    >
-                      High-fat meals
-                    </Badge>
-                  </div>
-                </div>
+            <div className="border-b border-border/50 px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                  Split dose calculator
+                </h3>
+                <Badge variant="secondary" className="rounded-full px-2.5 py-0 text-[10px] font-semibold uppercase tracking-wide">
+                  High-fat meals
+                </Badge>
               </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Split bolus for slower-absorbing meals — pizza, curry, fish &amp; chips.
+              </p>
             </div>
 
             <Collapsible open={showSplitCalculator} onOpenChange={setShowSplitCalculator}>
@@ -972,32 +962,36 @@ export default function Adviser() {
 
                   {splitResult && (
                     <div className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h4 className="font-medium flex items-center gap-2">
-                          <Pizza className="h-4 w-4 text-primary" />
-                          Split plan
-                        </h4>
-                        <Badge variant="secondary" className="font-mono text-xs tabular-nums">
+                      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Split plan</p>
+                        <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                          {splitResult.firstDose + splitResult.secondDose}
+                          <span className="text-2xl font-semibold text-muted-foreground">u</span>
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {splitResult.firstDose}u now · {splitResult.secondDose}u in {splitResult.secondDoseDelay}h
+                        </p>
+                        <Badge variant="secondary" className="mt-2 font-mono text-xs tabular-nums">
                           {splitResult.splitRatio}
                         </Badge>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-2">
-                        <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            {isPumpUser ? "FIRST PART — NOW" : "FIRST DOSE - NOW"}
+                        <div className="rounded-xl border border-border/60 bg-muted/15 p-3 text-center">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {isPumpUser ? "First part — now" : "First dose — now"}
                           </p>
-                          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{splitResult.firstDose} units</p>
-                          <p className="text-xs text-green-600 dark:text-green-400">
+                          <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{splitResult.firstDose}u</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {isPumpUser ? "Program or deliver at meal start" : "Take when you start eating"}
                           </p>
                         </div>
-                        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                            {isPumpUser ? "SECOND PART — LATER" : "SECOND DOSE - LATER"}
+                        <div className="rounded-xl border border-border/60 bg-muted/15 p-3 text-center">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            {isPumpUser ? "Second part — later" : "Second dose — later"}
                           </p>
-                          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{splitResult.secondDose} units</p>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                          <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{splitResult.secondDose}u</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
                             {isPumpUser
                               ? `Program remainder in ${splitResult.secondDoseDelay} h (or use extended bolus)`
                               : `Take in ${splitResult.secondDoseDelay} hours`}
