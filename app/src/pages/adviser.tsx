@@ -37,6 +37,7 @@ import { FaceLogoWatermark } from "@/components/face-logo";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
 import { MealDoseResultCard } from "@/components/meal-dose-result-card";
+import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 
 import { Link, useLocation } from "wouter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -962,19 +963,22 @@ export default function Adviser() {
 
                   {splitResult && (
                     <div className="space-y-3">
-                      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Split plan</p>
-                        <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
-                          {splitResult.firstDose + splitResult.secondDose}
-                          <span className="text-2xl font-semibold text-muted-foreground">u</span>
-                        </p>
+                      <ScenarioResultHero
+                        label="Split plan"
+                        value={
+                          <>
+                            {splitResult.firstDose + splitResult.secondDose}
+                            <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
+                          </>
+                        }
+                      >
                         <p className="mt-2 text-sm text-muted-foreground">
                           {splitResult.firstDose}u now · {splitResult.secondDose}u in {splitResult.secondDoseDelay}h
                         </p>
                         <Badge variant="secondary" className="mt-2 font-mono text-xs tabular-nums">
                           {splitResult.splitRatio}
                         </Badge>
-                      </div>
+                      </ScenarioResultHero>
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded-xl border border-border/60 bg-muted/15 p-3 text-center">

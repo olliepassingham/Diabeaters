@@ -370,7 +370,7 @@ export default function PumpFailurePage() {
   );
 
   return (
-    <PageShell variant="standard" className="space-y-4">
+    <PageShell variant="narrow" density="compact" className="space-y-4">
       <PageHeader
         leading={<PageBackButton />}
         title="Pump failure"

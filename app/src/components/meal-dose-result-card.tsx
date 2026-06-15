@@ -2,6 +2,7 @@ import { BookOpen, Calculator, ChevronDown, ChevronUp, Plane, Thermometer, Utens
 
 import { MealCarbAbsorptionPreview } from "@/components/meal-carb-absorption-preview";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -40,38 +41,39 @@ function MealDoseHero({
   isPumpUser: boolean;
   isPage: boolean;
 }) {
-  const mainDoseClass = isPage ? "text-5xl sm:text-6xl" : "text-4xl";
-  const exerciseDoseClass = isPage ? "text-4xl sm:text-5xl" : "text-3xl";
+  const compactValue = isPage ? undefined : "text-4xl";
 
   if (mealResult.exerciseContext === "during") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">During exercise</p>
-        <p className={cn("mt-1 font-display font-bold text-foreground", exerciseDoseClass)}>
-          {isPumpUser ? "Usually no meal bolus" : "Usually no insulin"}
-        </p>
+      <ScenarioResultHero label="During exercise" value={isPumpUser ? "Usually no meal bolus" : "Usually no insulin"} valueClassName="text-3xl sm:text-4xl">
         <p className="mt-2 text-sm text-muted-foreground">
           {mealResult.carbs}g carbs
           {mealResult.standardDose != null
             ? ` · standard would be ${mealResult.standardDose}u${isPumpUser ? " (meal bolus)" : ""}`
             : ""}
         </p>
-      </div>
+      </ScenarioResultHero>
     );
   }
 
   if (mealResult.exerciseContext && mealResult.standardDose !== undefined) {
     return (
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">
-            {mealResult.exerciseContext === "before" ? "Pre-exercise" : "Post-exercise"}
-            {typeof mealResult.exerciseReduction === "number" ? ` · −${mealResult.exerciseReduction}%` : ""}
-          </p>
-          <p className={cn("mt-1 font-display font-bold tabular-nums tracking-tight text-foreground", exerciseDoseClass)} data-testid="text-meal-dose">
-            {mealResult.dose}
-            <span className="text-2xl font-semibold text-muted-foreground">u</span>
-          </p>
+        <ScenarioResultHero
+          label={
+            mealResult.exerciseContext === "before"
+              ? `Pre-exercise${typeof mealResult.exerciseReduction === "number" ? ` · −${mealResult.exerciseReduction}%` : ""}`
+              : `Post-exercise${typeof mealResult.exerciseReduction === "number" ? ` · −${mealResult.exerciseReduction}%` : ""}`
+          }
+          value={
+            <>
+              {mealResult.dose}
+              <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
+            </>
+          }
+          valueTestId="text-meal-dose"
+          valueClassName={compactValue}
+        >
           <p className="mt-2 text-sm text-muted-foreground">
             {mealResult.carbs}g · {mealResult.mealType}
             {isPumpUser ? " · program on pump" : ""}
@@ -79,7 +81,7 @@ function MealDoseHero({
           <p className="mt-1 text-xs text-muted-foreground">
             vs <span className="line-through tabular-nums">{mealResult.standardDose}u</span> standard
           </p>
-        </div>
+        </ScenarioResultHero>
         {isPumpUser ? (
           <p className="text-center text-xs text-muted-foreground">
             Check IOB before delivering; your pump may show a different recommended bolus if automation is active.
@@ -90,12 +92,17 @@ function MealDoseHero({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested dose</p>
-      <p className={cn("mt-1 font-display font-bold tabular-nums tracking-tight text-foreground", mainDoseClass)} data-testid="text-meal-dose">
-        {mealResult.dose}
-        <span className="text-2xl font-semibold text-muted-foreground">u</span>
-      </p>
+    <ScenarioResultHero
+      label="Suggested dose"
+      value={
+        <>
+          {mealResult.dose}
+          <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
+        </>
+      }
+      valueTestId="text-meal-dose"
+      valueClassName={compactValue}
+    >
       <p className="mt-2 text-sm text-muted-foreground">
         {mealResult.carbs}g · {mealResult.mealType}
       </p>
@@ -104,7 +111,7 @@ function MealDoseHero({
           Check IOB on your pump before delivering; use extended or combo bolus if your team recommends it for this meal.
         </p>
       ) : null}
-    </div>
+    </ScenarioResultHero>
   );
 }
 

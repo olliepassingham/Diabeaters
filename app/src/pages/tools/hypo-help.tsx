@@ -23,6 +23,7 @@ import {
   suggestedRecoveryTargetBg,
 } from "@/lib/hypo-context";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { PageInfoDialog } from "@/components/page-info-dialog";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -169,7 +170,7 @@ export default function HypoHelpPage() {
   };
 
   return (
-    <PageShell variant="standard" className="space-y-6">
+    <PageShell variant="narrow" density="compact" className="space-y-4">
       <PageHeader
         leading={<PageBackButton />}
         title="Hypo help"
@@ -348,20 +349,14 @@ export default function HypoHelpPage() {
 
           {hypoResult && (
             <div className="space-y-3">
-              <div className="overflow-hidden rounded-2xl border border-red-500/35 bg-gradient-to-b from-red-500/10 via-card to-card px-5 py-5 text-center shadow-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-red-700/90 dark:text-red-300/90">
-                  Fast carbs
-                </p>
-                <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
-                  {hypoResult.carbsGrams}g
-                </p>
+              <ScenarioResultHero label="Fast carbs" tone="hypo" value={`${hypoResult.carbsGrams}g`}>
                 <p className="mt-2 text-sm text-muted-foreground">fast-acting carbs</p>
                 {hypoTreatmentLine(hypoResult.carbsGrams) ? (
                   <p className="mt-2 text-xs font-medium text-foreground/90">
                     Your usual choice: {hypoTreatmentLine(hypoResult.carbsGrams)}
                   </p>
                 ) : null}
-              </div>
+              </ScenarioResultHero>
               <MedicalNumericOutputDisclaimer compact />
               <Collapsible>
                 <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-left text-sm font-medium">

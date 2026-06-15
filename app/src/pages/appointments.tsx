@@ -45,6 +45,7 @@ import { storage, Appointment, AppointmentType } from "@/lib/storage";
 import { format, isAfter, isBefore, addDays, differenceInCalendarDays } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { ScenarioResultHero } from "@/components/scenarios/scenario-result-hero";
 import { syncAppointments } from "@/lib/appointments-supabase";
 import { rescheduleAppointmentReminders } from "@/lib/appointment-reminders";
 import { cn } from "@/lib/utils";
@@ -532,40 +533,12 @@ export default function Appointments() {
       </div>
 
       {/* Hero / next up */}
-      <div
-        className={cn(
-          "overflow-hidden rounded-2xl border shadow-sm",
-          nextAppointment
-            ? "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card"
-            : "border-dashed border-border/70 bg-muted/20",
-        )}
-        data-testid={nextAppointment ? `appointment-card-${nextAppointment.id}` : undefined}
-      >
-        {nextAppointment ? (
-          <>
-            <div className="px-5 pb-4 pt-5 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Next up</p>
-              <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
-                {nextDays !== null && nextDays <= 0 ? "Today" : nextDays}
-              </p>
-              {nextDays !== null && nextDays > 0 ? (
-                <p className="text-sm text-muted-foreground">{nextDays === 1 ? "day" : "days"}</p>
-              ) : null}
-              <p className="mt-3 text-lg font-semibold text-foreground">{nextAppointment.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {parseAppointmentDate(nextAppointment.date)
-                  ? format(parseAppointmentDate(nextAppointment.date)!, "EEEE d MMMM")
-                  : "Date TBC"}
-                {nextAppointment.time ? ` · ${nextAppointment.time}` : ""}
-              </p>
-              {nextAppointment.location ? (
-                <p className="mt-2 inline-flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  {nextAppointment.location}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex gap-2 border-t border-border/50 px-4 py-3">
+      {nextAppointment ? (
+        <ScenarioResultHero
+          label="Next up"
+          value={nextDays !== null && nextDays <= 0 ? "Today" : nextDays}
+          footer={
+            <div className="flex gap-2 px-4 py-3">
               <Button
                 size="sm"
                 className="min-h-9 flex-1 rounded-xl"
@@ -586,8 +559,31 @@ export default function Appointments() {
                 <Trash2 className="h-4 w-4" aria-hidden />
               </Button>
             </div>
-          </>
-        ) : (
+          }
+          data-testid={`appointment-card-${nextAppointment.id}`}
+        >
+          {nextDays !== null && nextDays > 0 ? (
+            <p className="text-sm text-muted-foreground">{nextDays === 1 ? "day" : "days"}</p>
+          ) : null}
+          <p className="mt-3 text-lg font-semibold text-foreground">{nextAppointment.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {parseAppointmentDate(nextAppointment.date)
+              ? format(parseAppointmentDate(nextAppointment.date)!, "EEEE d MMMM")
+              : "Date TBC"}
+            {nextAppointment.time ? ` · ${nextAppointment.time}` : ""}
+          </p>
+          {nextAppointment.location ? (
+            <p className="mt-2 inline-flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              {nextAppointment.location}
+            </p>
+          ) : null}
+        </ScenarioResultHero>
+      ) : (
+        <div
+          className="overflow-hidden rounded-2xl border border-dashed border-border/70 bg-muted/20"
+          data-testid="appointment-card-empty"
+        >
           <div className="flex flex-col items-center gap-3 px-5 py-5 text-center sm:flex-row sm:text-left">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <Calendar className="h-6 w-6" aria-hidden />
@@ -608,8 +604,8 @@ export default function Appointments() {
               Add appointment
             </Button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/15 px-4 py-3 text-sm">
         <div className="flex items-center gap-2 text-muted-foreground">

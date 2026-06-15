@@ -2,6 +2,7 @@ import { Activity, AlertCircle, ChevronDown, Clock, Thermometer, Wine } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MedicalNumericOutputDisclaimer } from "@/components/medical-numeric-output-disclaimer";
+import { ScenarioResultHero, ScenarioResultHeroSuffix } from "@/components/scenarios/scenario-result-hero";
 import { cn } from "@/lib/utils";
 
 export type BedtimeCorrectionData = {
@@ -93,19 +94,17 @@ export function BedtimeCorrectionPanel({
   };
 
   return (
-    <div
-      className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-none"
-      data-testid="card-correction-suggestion"
-    >
-      <div className="overflow-hidden rounded-t-2xl border-b border-primary/20 bg-gradient-to-b from-primary/10 via-card to-card px-5 py-5 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested bedtime dose</p>
-        <p
-          className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground"
-          data-testid="text-correction-suggested-dose"
-        >
-          {correction.suggestedDose}
-          <span className="text-2xl font-semibold text-muted-foreground">u</span>
-        </p>
+    <div className="space-y-0" data-testid="card-correction-suggestion">
+      <ScenarioResultHero
+        label="Suggested bedtime dose"
+        value={
+          <>
+            {correction.suggestedDose}
+            <ScenarioResultHeroSuffix>u</ScenarioResultHeroSuffix>
+          </>
+        }
+        valueTestId="text-correction-suggested-dose"
+      >
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <Badge variant="secondary" className="rounded-full px-2.5 text-xs font-medium">
             ~{pct}% of full dose
@@ -116,10 +115,10 @@ export function BedtimeCorrectionPanel({
             <span data-testid="text-correction-target-bg">{correction.targetBg}</span> {correction.bgUnits}
           </span>
         </div>
-      </div>
+      </ScenarioResultHero>
 
       {warnings.length > 0 ? (
-        <div className="border-b border-border/50 px-4 py-3 sm:px-5">
+        <div className="mt-3 overflow-hidden rounded-2xl border border-border/60 bg-card px-4 py-3 sm:px-5">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Before you decide
           </p>
@@ -137,7 +136,7 @@ export function BedtimeCorrectionPanel({
         </div>
       ) : null}
 
-      <Collapsible className="group">
+      <Collapsible className="group mt-3 overflow-hidden rounded-2xl border border-border/60 bg-card">
         <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium text-foreground hover:bg-muted/20 sm:px-5">
           How we calculated this
           <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
