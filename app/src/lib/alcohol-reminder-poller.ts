@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 
+import { endAlcoholNightMode } from "@/lib/alcohol-reminders";
 import { createAlcoholInAppNotification } from "@/lib/alcohol-inapp";
 import { storage, type AlcoholReminderKind } from "@/lib/storage";
 import { getSupabase } from "@/lib/supabase";
@@ -70,7 +71,7 @@ export async function runAlcoholReminderNotifier(): Promise<void> {
       // Auto-end Alcohol Mode after the morning review reminder is sent.
       if (r.kind === "morning_review") {
         try {
-          storage.endAlcoholMode();
+          await endAlcoholNightMode();
         } catch {
           // ignore
         }

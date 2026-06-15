@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Utensils,
   Moon,
+  Power,
   Calculator,
   ChevronDown,
   ChevronRight,
@@ -31,7 +32,7 @@ import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
-import { scheduleAlcoholReminders } from "@/lib/alcohol-reminders";
+import { endAlcoholNightMode, scheduleAlcoholReminders } from "@/lib/alcohol-reminders";
 import { formatAlcoholDoseRange, formatAlcoholLeanLine, buildAlcoholNightModeSchedule, formatNightModeTime, type AlcoholDoseGuidance } from "@/lib/alcohol-dose-guidance";
 import { useToast } from "@/hooks/use-toast";
 import { listCarerLinksForPatient } from "@/lib/carers";
@@ -236,6 +237,20 @@ function AlcoholNightModeCard({
     new Date(bedtimeLocal).toISOString(),
   );
 
+  const deactivate = async () => {
+    setBusy(true);
+    try {
+      await endAlcoholNightMode();
+      setActive(false);
+      toast({
+        title: "Night mode off",
+        description: "Scheduled reminders were cancelled.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (active) {
     const session = storage.getAlcoholSession();
     const schedule = session
@@ -265,6 +280,16 @@ function AlcoholNightModeCard({
             </li>
           ))}
         </ul>
+        <Button
+          variant="outline"
+          className="w-full min-h-11"
+          onClick={() => void deactivate()}
+          disabled={busy}
+          data-testid="button-alcohol-night-mode-off"
+        >
+          <Power className="h-4 w-4 mr-2" aria-hidden />
+          Turn off night mode
+        </Button>
       </div>
     );
   }

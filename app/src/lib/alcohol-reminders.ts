@@ -42,6 +42,14 @@ function upcomingReminders(session: AlcoholSession, nowMs: number): AlcoholRemin
   });
 }
 
+export async function endAlcoholNightMode(): Promise<void> {
+  const session = storage.getAlcoholSession();
+  if (session?.id) {
+    await cancelAlcoholReminders(session.id);
+  }
+  storage.endAlcoholMode();
+}
+
 export async function cancelAlcoholReminders(sessionId: string): Promise<void> {
   if (!supportsNativeLocalNotifications()) return;
   try {
