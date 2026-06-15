@@ -201,9 +201,10 @@ function KnownCarbsPlanHero({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-violet-500/35 bg-violet-500/10 px-4 py-5 text-center shadow-sm">
-        <p className="text-5xl font-bold tabular-nums tracking-tight text-foreground">{insulin.totalUnits}</p>
-        <p className="mt-1 text-lg font-semibold text-foreground">units before exercise</p>
+      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-4 py-5 text-center shadow-sm">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Pre-exercise dose</p>
+        <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">{insulin.totalUnits}</p>
+        <p className="mt-1 text-sm font-medium text-muted-foreground">units before exercise</p>
         {insulin.correctionUnits > 0 ? (
           <p className="mt-1 text-sm text-muted-foreground">
             {insulin.adjustedUnits}u meal + {insulin.correctionUnits}u correction
@@ -788,7 +789,7 @@ export function ExerciseFuelCalculator() {
       {result && !hasActiveExercise ? (
         <Card
           ref={resultRef}
-          className="border-primary/25 bg-primary/5 shadow-sm scroll-mt-4"
+          className="rounded-2xl border-border/60 bg-card shadow-none scroll-mt-4"
           data-testid="efc-result"
         >
           <CardHeader className="space-y-2 pb-2">
@@ -835,8 +836,9 @@ export function ExerciseFuelCalculator() {
                 durationMinutes={parseInt(duration, 10) || result.breakdown.durationMinutes}
               />
             ) : result.mealCarbs > 0 ? (
-              <div className="rounded-2xl border border-primary/25 bg-background/90 px-4 py-4 text-center shadow-sm">
-                <p className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
+              <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card px-4 py-4 text-center shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Pre-exercise carbs</p>
+                <p className="mt-1 font-display text-4xl font-bold tabular-nums tracking-tight text-foreground">
                   {result.mealCarbsIsSuggested ? "~" : ""}
                   {result.mealCarbs}g
                 </p>

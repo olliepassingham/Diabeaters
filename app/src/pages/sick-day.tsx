@@ -2043,21 +2043,18 @@ export default function SickDay() {
             <Card
               id="sickday-log"
               data-testid="card-log-check"
-              className={cn(
-                "overflow-hidden rounded-2xl border-emerald-500/20 shadow-md ring-1 ring-emerald-500/10 dark:ring-emerald-400/10",
-                "bg-gradient-to-br from-emerald-500/[0.07] via-card to-teal-500/[0.05] dark:from-emerald-950/35 dark:via-card dark:to-teal-950/18",
-              )}
+              className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-none"
             >
-              <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pt-6">
+              <CardHeader className="space-y-0 border-b border-border/50 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
                 <div className="flex items-start gap-3">
                   <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-700 shadow-inner shadow-emerald-950/10 dark:bg-emerald-400/10 dark:text-emerald-200"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
                     aria-hidden
                   >
                     <Activity className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-emerald-800/90 dark:text-emerald-200/90">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Journal
                     </span>
                     <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Log a check</CardTitle>
@@ -2065,20 +2062,17 @@ export default function SickDay() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-5 border-t border-border/50 bg-background/45 px-4 py-5 backdrop-blur-[2px] dark:bg-background/30 sm:px-6 sm:py-6">
+              <CardContent className="space-y-5 border-t border-border/50 px-4 py-5 sm:px-6 sm:py-6">
                 <section
-                  className="space-y-3 rounded-2xl border border-emerald-500/18 bg-emerald-500/[0.04] p-4 dark:bg-emerald-950/15"
+                  className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-4"
                   aria-labelledby="sickday-log-section-readings"
                 >
-                  <h3 id="sickday-log-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-emerald-900 dark:text-emerald-100/90">
+                  <h3 id="sickday-log-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Readings
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="journal-bg" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-emerald-800 dark:text-emerald-200">
-                          <Activity className="h-3.5 w-3.5" aria-hidden />
-                        </span>
+                      <Label htmlFor="journal-bg" className="text-sm font-medium text-foreground">
                         Blood glucose ({bgUnits})
                       </Label>
                       <Input
@@ -2087,19 +2081,16 @@ export default function SickDay() {
                         placeholder={bgUnits === "mmol/L" ? "e.g., 12.5" : "e.g., 225"}
                         value={journalBg}
                         onChange={(e) => setJournalBg(e.target.value)}
-                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        className="h-11"
                         data-testid="input-journal-bg"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="journal-ketone" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-emerald-800 dark:text-emerald-200">
-                          <Droplets className="h-3.5 w-3.5" aria-hidden />
-                        </span>
+                      <Label htmlFor="journal-ketone" className="text-sm font-medium text-foreground">
                         Ketone level
                       </Label>
                       <Select value={journalKetone} onValueChange={setJournalKetone}>
-                        <SelectTrigger id="journal-ketone" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-journal-ketone">
+                        <SelectTrigger id="journal-ketone" className="h-11" data-testid="select-journal-ketone">
                           <SelectValue placeholder="Select level" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2114,7 +2105,7 @@ export default function SickDay() {
                   </div>
                 </section>
                 <section
-                  className="space-y-3 rounded-2xl border border-border/60 bg-muted/15 p-4 dark:bg-muted/10"
+                  className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-4"
                   aria-labelledby="sickday-log-section-care"
                 >
                   <h3 id="sickday-log-section-care" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2122,10 +2113,7 @@ export default function SickDay() {
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="journal-correction" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
-                          <Syringe className="h-3.5 w-3.5" aria-hidden />
-                        </span>
+                      <Label htmlFor="journal-correction" className="text-sm font-medium text-foreground">
                         Correction (units)
                       </Label>
                       <Input
@@ -2134,15 +2122,12 @@ export default function SickDay() {
                         placeholder="Optional"
                         value={journalCorrection}
                         onChange={(e) => setJournalCorrection(e.target.value)}
-                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        className="h-11"
                         data-testid="input-journal-correction"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="journal-fluids" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-muted-foreground">
-                          <Droplets className="h-3.5 w-3.5" aria-hidden />
-                        </span>
+                      <Label htmlFor="journal-fluids" className="text-sm font-medium text-foreground">
                         Fluids (ml)
                       </Label>
                       <Input
@@ -2151,17 +2136,17 @@ export default function SickDay() {
                         placeholder="Optional"
                         value={journalFluids}
                         onChange={(e) => setJournalFluids(e.target.value)}
-                        className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                        className="h-11"
                         data-testid="input-journal-fluids"
                       />
                     </div>
                   </div>
                 </section>
                 <section
-                  className="space-y-3 rounded-2xl border border-teal-500/12 bg-teal-500/[0.03] p-4 dark:bg-teal-950/12"
+                  className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-4"
                   aria-labelledby="sickday-log-section-notes"
                 >
-                  <h3 id="sickday-log-section-notes" className="text-[11px] font-semibold uppercase tracking-wider text-teal-900 dark:text-teal-100/90">
+                  <h3 id="sickday-log-section-notes" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Symptoms & notes
                   </h3>
                   <div className="space-y-2">
@@ -2174,7 +2159,7 @@ export default function SickDay() {
                       placeholder="e.g., headache, nausea, fever"
                       value={journalSymptoms}
                       onChange={(e) => setJournalSymptoms(e.target.value)}
-                      className="h-11 border-border/70 bg-background/80 dark:bg-background/60"
+                      className="h-11"
                       data-testid="input-journal-symptoms"
                     />
                   </div>
@@ -2187,7 +2172,7 @@ export default function SickDay() {
                       placeholder="Any additional notes..."
                       value={journalNotes}
                       onChange={(e) => setJournalNotes(e.target.value)}
-                      className="resize-none border-border/70 bg-background/80 dark:bg-background/60"
+                      className="resize-none"
                       rows={2}
                       data-testid="textarea-journal-notes"
                     />
@@ -2195,11 +2180,7 @@ export default function SickDay() {
                 </section>
                 <Button
                   onClick={handleLogJournalEntry}
-                  className={cn(
-                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
-                    "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500",
-                    "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
-                  )}
+                  className="h-12 w-full rounded-xl text-base font-semibold"
                   data-testid="button-log-journal-entry"
                 >
                   <Check className="mr-2 h-4 w-4" aria-hidden />
@@ -2294,11 +2275,7 @@ export default function SickDay() {
                     scrollToId("sickday-log");
                     handleLogJournalEntry();
                   }}
-                  className={cn(
-                    "h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all",
-                    "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-500 hover:to-teal-500",
-                    "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
-                  )}
+                  className="h-12 w-full rounded-xl text-base font-semibold"
                   disabled={!journalBg.trim() || !journalKetone}
                   data-testid="button-log-journal-entry-sticky"
                 >

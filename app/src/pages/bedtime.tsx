@@ -741,30 +741,21 @@ export default function Bedtime() {
     switch (level) {
       case "steady":
         return {
-          surface: "from-emerald-500/[0.12] via-card to-card dark:from-emerald-500/[0.08]",
-          border: "border-emerald-500/25 dark:border-emerald-500/20",
-          iconWrap: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
-          icon: "text-emerald-600 dark:text-emerald-400",
-          title: "text-emerald-800 dark:text-emerald-200",
-          chip: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 border-emerald-500/20",
+          heroSurface: "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card",
+          title: "text-foreground",
+          chip: "bg-emerald-500/15 text-emerald-900 dark:text-emerald-100",
         };
       case "monitor":
         return {
-          surface: "from-amber-500/[0.12] via-card to-card dark:from-amber-500/[0.08]",
-          border: "border-amber-500/25 dark:border-amber-500/20",
-          iconWrap: "bg-amber-500/15 text-amber-800 dark:text-amber-200",
-          icon: "text-amber-600 dark:text-amber-400",
-          title: "text-amber-900 dark:text-amber-100",
-          chip: "bg-amber-500/10 text-amber-900 dark:text-amber-100 border-amber-500/20",
+          heroSurface: "border-amber-500/35 bg-gradient-to-b from-amber-500/10 via-card to-card",
+          title: "text-foreground",
+          chip: "bg-amber-500/15 text-amber-900 dark:text-amber-100",
         };
       case "alert":
         return {
-          surface: "from-red-500/[0.14] via-card to-card dark:from-red-500/[0.1]",
-          border: "border-red-500/30 dark:border-red-500/25",
-          iconWrap: "bg-red-500/15 text-red-700 dark:text-red-300",
-          icon: "text-red-600 dark:text-red-400",
-          title: "text-red-800 dark:text-red-200",
-          chip: "bg-red-500/10 text-red-800 dark:text-red-200 border-red-500/20",
+          heroSurface: "border-red-500/35 bg-gradient-to-b from-red-500/12 via-card to-card",
+          title: "text-foreground",
+          chip: "bg-red-500/15 text-red-800 dark:text-red-100",
         };
     }
   };
@@ -827,7 +818,7 @@ export default function Bedtime() {
   const patternInsight = getPatternInsight();
 
   return (
-    <PageShell variant="standard" density="compact" className="space-y-4 max-sm:space-y-3">
+    <PageShell variant="narrow" density="compact" className="space-y-4 max-sm:space-y-3">
       <PageHeader
         leading={<PageBackButton />}
         title="Bedtime"
@@ -858,85 +849,62 @@ export default function Bedtime() {
 
       {result && (() => {
         const colors = getLevelColors(result.level);
-        const VerdictIcon =
-          result.level === "steady" ? CheckCircle2 : result.level === "monitor" ? AlertCircle : AlertTriangle;
         return (
-          <Card
-            data-testid="card-bedtime-result-hero"
-            className={cn(
-              "overflow-hidden rounded-2xl border shadow-md ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
-              "bg-gradient-to-b",
-              colors.surface,
-              colors.border,
-            )}
-          >
-            <CardContent className="space-y-0 p-0">
-              <div className="flex items-start gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
-                <div
-                  className={cn(
-                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-inner",
-                    colors.iconWrap,
-                  )}
+          <div className="space-y-3" data-testid="card-bedtime-result-hero">
+            <div className={cn("overflow-hidden rounded-2xl border shadow-sm", colors.heroSurface)}>
+              <div className="relative px-5 pb-4 pt-5 text-center">
+                <Badge
+                  variant="secondary"
+                  className={cn("absolute right-3 top-3 rounded-full font-medium", colors.chip)}
                 >
-                  <VerdictIcon className={cn("h-6 w-6", colors.icon)} aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1 space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Tonight&apos;s check
-                  </p>
-                  <h2
-                    className={cn("font-display text-2xl font-semibold tracking-tight", colors.title)}
-                    data-testid="text-bedtime-verdict"
-                  >
-                    {verdictLabel(result.level)}
-                  </h2>
-                  <p className="text-sm leading-relaxed text-foreground/85">{result.headline}</p>
+                  {verdictLabel(result.level)}
+                </Badge>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Tonight&apos;s check</p>
+                <p
+                  className={cn("mt-1 font-display text-5xl font-bold tracking-tight", colors.title)}
+                  data-testid="text-bedtime-verdict"
+                >
+                  {verdictLabel(result.level)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{result.headline}</p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <Badge variant="secondary" className="rounded-lg px-2.5 py-1 font-semibold tabular-nums">
+                    {result.bgGlance.display}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-lg border-border/60 px-2.5 py-1 text-xs">
+                    {result.bgGlance.trendLabel}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-lg border-border/60 px-2.5 py-1 text-xs">
+                    {result.bgGlance.rangeLabel}
+                  </Badge>
                 </div>
               </div>
+            </div>
 
-              <div className="flex flex-wrap gap-2 border-y border-border/50 bg-background/40 px-5 py-3 backdrop-blur-sm dark:bg-background/25 sm:px-6">
-                <Badge variant="secondary" className={cn("rounded-lg px-2.5 py-1 font-semibold tabular-nums", colors.chip)}>
-                  {result.bgGlance.display}
-                </Badge>
-                <Badge variant="outline" className="rounded-lg border-border/60 bg-background/50 px-2.5 py-1 text-xs">
-                  {result.bgGlance.trendLabel}
-                </Badge>
-                <Badge variant="outline" className="rounded-lg border-border/60 bg-background/50 px-2.5 py-1 text-xs">
-                  {result.bgGlance.rangeLabel}
-                </Badge>
+            <div className="rounded-2xl border border-border/60 bg-card/40 px-4 py-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What to do</p>
+              <ol className="mt-2.5 space-y-2" aria-label="Bedtime guidance">
+                {result.guidance.map((line, i) => (
+                  <li key={line} className="flex gap-2.5 text-sm leading-relaxed text-foreground/90">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground" aria-hidden>
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 pt-0.5">{line}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {result.snack ? (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3">
+                <p className="text-sm font-medium text-foreground">Optional snack</p>
+                <p className="mt-0.5 text-sm text-foreground/90">
+                  <span className="font-semibold tabular-nums">{result.snack.grams}g</span> fast carbs
+                  <span className="text-muted-foreground"> — {result.snack.reason}</span>
+                </p>
               </div>
-
-              <div className="space-y-3 px-5 py-4 sm:px-6 sm:py-5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">What to do</p>
-                <ol className="space-y-2.5" aria-label="Bedtime guidance">
-                  {result.guidance.map((line, i) => (
-                    <li key={line} className="flex gap-3 text-sm leading-relaxed text-foreground/90">
-                      <span
-                        className={cn(
-                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                          colors.iconWrap,
-                        )}
-                        aria-hidden
-                      >
-                        {i + 1}
-                      </span>
-                      <span className="min-w-0 pt-0.5">{line}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              {result.snack ? (
-                <div className="mx-5 mb-5 rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-4 py-3 sm:mx-6 sm:mb-6">
-                  <p className="text-sm font-medium text-foreground">Optional snack</p>
-                  <p className="mt-0.5 text-sm text-foreground/90">
-                    <span className="font-semibold tabular-nums">{result.snack.grams}g</span> fast carbs
-                    <span className="text-muted-foreground"> — {result.snack.reason}</span>
-                  </p>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+            ) : null}
+          </div>
         );
       })()}
 
@@ -950,7 +918,7 @@ export default function Bedtime() {
 
       {result ? (
         <div
-          className="overflow-hidden rounded-2xl border-2 border-emerald-500/35 bg-emerald-500/[0.08] shadow-md"
+          className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-none"
           data-testid="card-bedtime-save-prompt"
         >
           <div className="px-4 py-4 sm:px-5">
@@ -1122,10 +1090,7 @@ export default function Bedtime() {
 
       <Collapsible open={quickCheckOpen} onOpenChange={setQuickCheckOpen}>
         <Card
-          className={cn(
-            "overflow-hidden rounded-2xl border-indigo-500/20 shadow-md ring-1 ring-indigo-500/10 dark:ring-indigo-400/10",
-            "bg-gradient-to-br from-indigo-500/[0.08] via-card to-violet-600/[0.06] dark:from-indigo-950/50 dark:via-card dark:to-violet-950/25",
-          )}
+          className="overflow-hidden rounded-2xl border-border/60 bg-card shadow-none"
           data-testid="card-bedtime-inputs"
         >
           <CollapsibleTrigger asChild>
@@ -1137,7 +1102,7 @@ export default function Bedtime() {
             >
               <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
                 <div
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
                   aria-hidden
                 >
                   <Moon className="h-4 w-4" />
@@ -1158,7 +1123,7 @@ export default function Bedtime() {
           </CollapsibleTrigger>
 
           <CollapsibleContent>
-            <CardContent className="space-y-3 border-t border-border/50 bg-background/45 px-4 pb-4 pt-3 dark:bg-background/30 sm:px-5">
+            <CardContent className="space-y-3 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5">
               <section className="space-y-2" aria-labelledby="bedtime-section-glucose">
                 <BedtimeSectionTitle id="bedtime-section-glucose" title="Glucose now" info={BEDTIME_SECTION_INFO.glucose} />
                 <div className="space-y-2">
@@ -1195,7 +1160,7 @@ export default function Bedtime() {
                         size="sm"
                         className={cn(
                           "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
-                          bgTrend === "steady" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
+                          bgTrend === "steady" ? "" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "steady" ? "not_sure" : "steady"))}
                         data-testid="button-bedtime-bg-trend-stable"
@@ -1209,7 +1174,7 @@ export default function Bedtime() {
                         size="sm"
                         className={cn(
                           "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
-                          bgTrend === "rising" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
+                          bgTrend === "rising" ? "" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "rising" ? "not_sure" : "rising"))}
                         data-testid="button-bedtime-bg-trend-rising"
@@ -1223,7 +1188,7 @@ export default function Bedtime() {
                         size="sm"
                         className={cn(
                           "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
-                          bgTrend === "falling" ? "bg-indigo-600 text-white hover:bg-indigo-600 dark:bg-indigo-500" : "text-muted-foreground",
+                          bgTrend === "falling" ? "" : "text-muted-foreground",
                         )}
                         onClick={() => setBgTrend((prev) => (prev === "falling" ? "not_sure" : "falling"))}
                         data-testid="button-bedtime-bg-trend-falling"
@@ -1389,11 +1354,7 @@ export default function Bedtime() {
               <Button
                 onClick={calculateReadiness}
                 disabled={!canCalculate}
-                className={cn(
-                  "h-11 w-full rounded-xl text-base font-semibold shadow-sm",
-                  "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500",
-                  "disabled:from-muted disabled:to-muted disabled:text-muted-foreground disabled:shadow-none",
-                )}
+                className="h-11 w-full rounded-xl text-base font-semibold"
                 data-testid="button-check-bedtime"
               >
                 <Moon className="mr-2 h-4 w-4" aria-hidden />
