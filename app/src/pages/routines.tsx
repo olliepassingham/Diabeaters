@@ -383,14 +383,16 @@ export function RoutinesContent() {
 
         {activeSection === "meals" && (
         <>
-        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-100 dark:border-emerald-900">
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl border-border/60 bg-card shadow-none">
+          <CardContent className="pt-5">
             <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                <Sparkles className="h-5 w-5" aria-hidden />
+              </span>
               <div>
-                <p className="font-medium text-emerald-800 dark:text-emerald-200">Your Success Library</p>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                  Save meals that went well so you can repeat them with confidence. No calculations, no recommendations - just your own patterns that work for you.
+                <p className="font-medium text-foreground">Your Success Library</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Save meals that went well so you can repeat them with confidence. No calculations, no recommendations — just your own patterns that work for you.
                 </p>
               </div>
             </div>
@@ -398,7 +400,7 @@ export function RoutinesContent() {
         </Card>
 
         {logHints.meal && (
-          <Card className="border-emerald-200/60 dark:border-emerald-800/50" data-testid="card-meal-log-hint">
+          <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-meal-log-hint">
             <CardContent className="pt-4 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
@@ -750,13 +752,15 @@ export function RoutinesContent() {
 
         {activeSection === "exercise" && (
         <>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-100 dark:border-green-900">
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl border-border/60 bg-card shadow-none">
+          <CardContent className="pt-5">
             <div className="flex items-start gap-3">
-              <Dumbbell className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                <Dumbbell className="h-5 w-5" aria-hidden />
+              </span>
               <div>
-                <p className="font-medium text-green-800 dark:text-green-200">Exercise Schedule</p>
-                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                <p className="font-medium text-foreground">Exercise schedule</p>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Plan and track your exercise routines. Set your schedule and log when you complete workouts.
                 </p>
               </div>
@@ -765,7 +769,7 @@ export function RoutinesContent() {
         </Card>
 
         {logHints.exercise && (
-          <Card className="border-green-200/60 dark:border-green-800/50" data-testid="card-exercise-log-hint">
+          <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-exercise-log-hint">
             <CardContent className="pt-4 pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <p className="text-sm text-muted-foreground">

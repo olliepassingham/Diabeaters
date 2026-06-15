@@ -534,73 +534,61 @@ export default function Appointments() {
       {/* Hero / next up */}
       <div
         className={cn(
-          "relative overflow-hidden rounded-3xl px-5 py-5 shadow-sm ring-1",
+          "overflow-hidden rounded-2xl border shadow-sm",
           nextAppointment
-            ? "bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 text-white ring-blue-500/30"
-            : "border border-dashed border-border/70 bg-muted/20 text-foreground ring-transparent",
+            ? "border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card"
+            : "border-dashed border-border/70 bg-muted/20",
         )}
         data-testid={nextAppointment ? `appointment-card-${nextAppointment.id}` : undefined}
       >
         {nextAppointment ? (
           <>
-            <div
-              className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 blur-2xl"
-              aria-hidden
-            />
-            <div className="relative space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-100">Next up</p>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="font-display text-2xl font-bold leading-tight">{nextAppointment.title}</p>
-                  <p className="text-sm text-blue-50">
-                    {parseAppointmentDate(nextAppointment.date)
-                      ? format(parseAppointmentDate(nextAppointment.date)!, "EEEE d MMMM")
-                      : "Date TBC"}
-                    {nextAppointment.time ? ` · ${nextAppointment.time}` : ""}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-white/15 px-3 py-2 text-center ring-1 ring-white/20">
-                  <p className="text-2xl font-bold tabular-nums leading-none">
-                    {nextDays !== null && nextDays <= 0 ? "Today" : nextDays}
-                  </p>
-                  {nextDays !== null && nextDays > 0 ? (
-                    <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-100">
-                      {nextDays === 1 ? "day" : "days"}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
+            <div className="px-5 pb-4 pt-5 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Next up</p>
+              <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+                {nextDays !== null && nextDays <= 0 ? "Today" : nextDays}
+              </p>
+              {nextDays !== null && nextDays > 0 ? (
+                <p className="text-sm text-muted-foreground">{nextDays === 1 ? "day" : "days"}</p>
+              ) : null}
+              <p className="mt-3 text-lg font-semibold text-foreground">{nextAppointment.title}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {parseAppointmentDate(nextAppointment.date)
+                  ? format(parseAppointmentDate(nextAppointment.date)!, "EEEE d MMMM")
+                  : "Date TBC"}
+                {nextAppointment.time ? ` · ${nextAppointment.time}` : ""}
+              </p>
               {nextAppointment.location ? (
-                <p className="inline-flex items-center gap-1.5 text-sm text-blue-50">
+                <p className="mt-2 inline-flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   {nextAppointment.location}
                 </p>
               ) : null}
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  className="min-h-9 flex-1 rounded-xl bg-white/15 text-white ring-1 ring-white/25 hover:bg-white/25"
-                  onClick={() => void handleComplete(nextAppointment.id)}
-                  data-testid={`button-complete-${nextAppointment.id}`}
-                >
-                  <Check className="mr-1.5 h-4 w-4" aria-hidden />
-                  Mark done
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="min-h-9 rounded-xl text-blue-50 hover:bg-white/10 hover:text-white"
-                  onClick={() => requestDelete(nextAppointment.id)}
-                  data-testid={`button-delete-${nextAppointment.id}`}
-                  aria-label="Delete appointment"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
+            </div>
+            <div className="flex gap-2 border-t border-border/50 px-4 py-3">
+              <Button
+                size="sm"
+                className="min-h-9 flex-1 rounded-xl"
+                onClick={() => void handleComplete(nextAppointment.id)}
+                data-testid={`button-complete-${nextAppointment.id}`}
+              >
+                <Check className="mr-1.5 h-4 w-4" aria-hidden />
+                Mark done
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-9 rounded-xl"
+                onClick={() => requestDelete(nextAppointment.id)}
+                data-testid={`button-delete-${nextAppointment.id}`}
+                aria-label="Delete appointment"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </Button>
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-3 py-2 text-center sm:flex-row sm:text-left">
+          <div className="flex flex-col items-center gap-3 px-5 py-5 text-center sm:flex-row sm:text-left">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
               <Calendar className="h-6 w-6" aria-hidden />
             </span>
