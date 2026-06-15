@@ -29,7 +29,6 @@ import { parseRatioToGramsPerUnit, formatRatioForDisplay } from "@/lib/ratio-uti
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { ScenarioActiveCard } from "@/components/scenarios/ScenarioActiveCard";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
-import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import {
   upsertScenario,
   fetchScenarioStateForUser,
@@ -43,6 +42,8 @@ import {
   SickDayDisclaimerFooter,
   SickDayResultsPanel,
   SickDayUpdateReadingsCollapsible,
+  SickDayReadingsFields,
+  SickDayTddField,
   scrollToSickDayPageTop,
 } from "@/components/scenarios/sick-day-results-ui";
 import { cancelSickDayMedReminder, scheduleSickDayMedReminder } from "@/lib/sick-day-med-reminders";
@@ -665,9 +666,9 @@ export default function SickDay() {
         ? "Proceed carefully"
         : "You’re in a safer zone";
     const message = urgent
-      ? "Follow the urgent steps below and contact your diabetes team / urgent care."
+      ? "Follow urgent steps below and contact your team."
       : caution
-        ? "Monitor more often and follow the checklist to avoid complications."
+        ? "Check more often and follow the plan below."
         : "Keep monitoring and stay hydrated.";
     return { label, tone, title, message };
   }, [results, severity]);
@@ -2511,164 +2512,33 @@ export default function SickDay() {
       <div className="space-y-4">
         {!results ? (
           <>
-          <Card
-            className={cn(
-              "overflow-hidden rounded-2xl border-orange-500/20 shadow-md ring-1 ring-orange-500/10 dark:ring-orange-400/10",
-              "bg-gradient-to-br from-orange-500/[0.07] via-card to-rose-500/[0.05] dark:from-orange-950/40 dark:via-card dark:to-rose-950/20",
-            )}
-          >
-            <CardHeader className="space-y-0 border-b border-border/50 bg-background/30 px-4 pb-4 pt-5 backdrop-blur-sm sm:px-6 sm:pt-6">
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-700 shadow-inner shadow-orange-950/10 dark:bg-orange-400/10 dark:text-orange-200"
-                  aria-hidden
-                >
-                  <Thermometer className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-orange-800/90 dark:text-orange-200/90">
-                    Sick day adviser
-                  </span>
-                  <CardTitle className="mt-0.5 text-lg tracking-tight sm:text-xl">Your readings</CardTitle>
-                </div>
+          <Card className="surface-card border-border/60 shadow-none">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                  <Thermometer className="h-4 w-4 text-orange-600 dark:text-orange-400" aria-hidden />
+                </span>
+                <CardTitle className="text-base font-semibold leading-snug">Your readings</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 border-t border-border/50 bg-background/45 px-4 py-4 sm:px-5 sm:py-5">
-              <section
-                className="space-y-3 rounded-2xl border border-amber-500/15 bg-amber-500/[0.04] p-4 dark:bg-amber-950/15"
-                aria-labelledby="sickday-input-section-tdd"
-              >
-                <h3 id="sickday-input-section-tdd" className="text-[11px] font-semibold uppercase tracking-wider text-amber-900 dark:text-amber-100/90">
-                  Insulin profile
-                </h3>
-                <div className="space-y-2">
-                  <Label htmlFor="tdd" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-amber-700 dark:text-amber-300">
-                      <Syringe className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                    Total Daily Dose (TDD)
-                    <InfoTooltip {...DIABETES_TERMS.tdd} />
-                  </Label>
-                  {hasConfiguredTdd(settings) ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="tdd"
-                          type="number"
-                          value={tdd}
-                          readOnly
-                          className="h-11 cursor-default bg-muted"
-                          data-testid="input-tdd"
-                        />
-                        <span className="whitespace-nowrap text-xs text-muted-foreground">units/day</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        From your{" "}
-                        <Link href="/settings/ratios" className="text-primary hover:underline" data-testid="link-insulin-settings">
-                          Insulin & Ratios
-                        </Link>
-                      </p>
-                    </>
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-amber-500/25 bg-background/60 p-3 dark:bg-background/40">
-                      <p className="text-sm text-muted-foreground">
-                        TDD not configured. Please set your Total Daily Dose in{" "}
-                        <Link href="/settings/ratios" className="font-medium text-primary hover:underline" data-testid="link-settings-insulin">
-                          Settings → Insulin & Ratios
-                        </Link>{" "}
-                        to use the Sick day adviser.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section
-                className="space-y-3 rounded-2xl border border-orange-500/18 bg-orange-500/[0.045] p-4 dark:bg-orange-950/20"
-                aria-labelledby="sickday-input-section-severity"
-              >
-                <h3 id="sickday-input-section-severity" className="text-[11px] font-semibold uppercase tracking-wider text-orange-900 dark:text-orange-100/90">
-                  Illness
-                </h3>
-                <div className="space-y-2">
-                  <Label htmlFor="severity" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-orange-700 dark:text-orange-300">
-                      <Thermometer className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                    Illness severity
-                  </Label>
-                  <Select value={severity} onValueChange={setSeverity}>
-                    <SelectTrigger id="severity" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-severity">
-                      <SelectValue placeholder="Select severity level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="minor">Minor (slight cold, feeling off)</SelectItem>
-                      <SelectItem value="moderate">Moderate (fever, flu symptoms)</SelectItem>
-                      <SelectItem value="severe">Severe (high fever, vomiting, unable to eat)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </section>
-
-              <section
-                className="space-y-4 rounded-2xl border border-rose-500/15 bg-rose-500/[0.04] p-4 dark:bg-rose-950/18"
-                aria-labelledby="sickday-input-section-readings"
-              >
-                <h3 id="sickday-input-section-readings" className="text-[11px] font-semibold uppercase tracking-wider text-rose-900 dark:text-rose-100/90">
-                  Readings now
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="bg-level" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-rose-700 dark:text-rose-300">
-                        <Activity className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Current blood glucose ({bgUnits})
-                    </Label>
-                    <Input
-                      id="bg-level"
-                      type="number"
-                      placeholder={bgUnits === "mmol/L" ? "e.g., 10.0" : "e.g., 180"}
-                      value={bgLevel}
-                      onChange={(e) => setBgLevel(e.target.value)}
-                      className="h-11 border-border/70 bg-background/80 text-base shadow-sm dark:bg-background/60"
-                      data-testid="input-bg-level"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ketone-level" className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-background/80 text-rose-700 dark:text-rose-300">
-                        <Droplets className="h-3.5 w-3.5" aria-hidden />
-                      </span>
-                      Ketone level
-                      <InfoTooltip {...DIABETES_TERMS.ketones} />
-                    </Label>
-                    <Select value={ketoneLevel} onValueChange={(v) => setKetoneLevel(v as KetoneLevel)}>
-                      <SelectTrigger id="ketone-level" className="h-11 bg-background/80 dark:bg-background/60" data-testid="select-ketone-level">
-                        <SelectValue placeholder="Select ketone level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None / Negative</SelectItem>
-                        <SelectItem value="trace">Trace (0.1-0.5 mmol/L)</SelectItem>
-                        <SelectItem value="small">Small (0.6-1.5 mmol/L)</SelectItem>
-                        <SelectItem value="moderate">Moderate (1.6-3.0 mmol/L)</SelectItem>
-                        <SelectItem value="large">Large (&gt;3.0 mmol/L)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </section>
-
+            <CardContent className="space-y-5 pt-0">
+              <SickDayReadingsFields
+                severity={severity}
+                onSeverityChange={setSeverity}
+                bgLevel={bgLevel}
+                onBgLevelChange={setBgLevel}
+                ketoneLevel={ketoneLevel}
+                onKetoneLevelChange={setKetoneLevel}
+                bgUnits={bgUnits}
+              />
+              <SickDayTddField tdd={tdd} hasTdd={hasConfiguredTdd(settings)} />
               <Button
                 onClick={handleCalculate}
-                className={cn(
-                  "hidden h-12 w-full rounded-2xl text-base font-semibold shadow-md transition-all sm:flex",
-                  "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
-                )}
+                className="hidden h-11 w-full rounded-xl font-semibold sm:flex"
                 data-testid="button-calculate"
               >
                 <Activity className="mr-2 h-4 w-4" aria-hidden />
-                Calculate recommendations
+                Get recommendations
               </Button>
             </CardContent>
           </Card>
@@ -2752,14 +2622,11 @@ export default function SickDay() {
       >
         <Button
           onClick={handleCalculate}
-          className={cn(
-            "mx-auto flex h-11 w-full max-w-lg rounded-xl font-semibold shadow-md",
-            "bg-gradient-to-r from-orange-600 to-rose-600 text-white hover:from-orange-500 hover:to-rose-500",
-          )}
+          className="mx-auto flex h-11 w-full max-w-lg rounded-xl font-semibold"
           data-testid="button-calculate-sticky"
         >
           <Activity className="mr-2 h-4 w-4" aria-hidden />
-          Calculate recommendations
+          Get recommendations
         </Button>
       </div>
     ) : null}
