@@ -178,6 +178,7 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
   const [restoreImportScopes, setRestoreImportScopes] = useState<Set<BackupScope>>(
     () => new Set<BackupScope>(ALL_BACKUP_SCOPES),
   );
+  const [restoreReplaceAcknowledged, setRestoreReplaceAcknowledged] = useState(false);
 
   useEffect(() => {
     if (!embedded || typeof window === "undefined") return;
@@ -208,6 +209,7 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
     setPendingJson(null);
     setRestoreMode("merge");
     setRestoreImportScopes(new Set(ALL_BACKUP_SCOPES));
+    setRestoreReplaceAcknowledged(false);
     setRestoreOpen(false);
   };
 
@@ -513,7 +515,10 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
                       <p className="font-medium text-foreground">How should we apply it?</p>
                       <RadioGroup
                         value={restoreMode}
-                        onValueChange={(v) => setRestoreMode(v as ImportBackupMode)}
+                        onValueChange={(v) => {
+                          setRestoreMode(v as ImportBackupMode);
+                          if (v !== "replace") setRestoreReplaceAcknowledged(false);
+                        }}
                         className="space-y-2"
                       >
                         <div className="flex items-start gap-2">
@@ -533,6 +538,26 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
                           </Label>
                         </div>
                       </RadioGroup>
+                      {restoreMode === "replace" ? (
+                        <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                          <p className="text-xs leading-relaxed text-amber-950 dark:text-amber-100">
+                            Replace clears local data in the categories you selected above, then restores from this file.
+                            Your sign-in is unchanged. Export a fresh backup first if you might need to undo this.
+                          </p>
+                          <div className="flex items-start gap-2">
+                            <Checkbox
+                              id="restore-replace-ack"
+                              checked={restoreReplaceAcknowledged}
+                              onCheckedChange={(c) => setRestoreReplaceAcknowledged(c === true)}
+                              className="mt-0.5"
+                              data-testid="checkbox-restore-replace-ack"
+                            />
+                            <Label htmlFor="restore-replace-ack" className="cursor-pointer text-xs font-normal leading-snug">
+                              I understand selected categories on this device will be cleared before restore
+                            </Label>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -543,8 +568,14 @@ export function SettingsDataBackupSection({ embedded }: { embedded?: boolean } =
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-0">
             <AlertDialogCancel data-testid="button-restore-cancel">Cancel</AlertDialogCancel>
-            <Button type="button" onClick={() => runRestore()} disabled={!peekOk} data-testid="button-restore-confirm">
-              Restore
+            <Button
+              type="button"
+              variant={restoreMode === "replace" ? "destructive" : "default"}
+              onClick={() => runRestore()}
+              disabled={!peekOk || (restoreMode === "replace" && !restoreReplaceAcknowledged)}
+              data-testid="button-restore-confirm"
+            >
+              {restoreMode === "replace" ? "Replace and restore" : "Restore"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

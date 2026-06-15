@@ -136,6 +136,8 @@ Skip entire phase if v1 ships without remote push on Android.
 
 ## Phase 6 — Device QA (before production)
 
+**Structured script:** [pre_launch_qa_script.md](./pre_launch_qa_script.md) (~30 min, scenarios + backup + auth).
+
 Test on a **physical Android** device (Android 13+ recommended for notification permission).
 
 ### Install and auth
