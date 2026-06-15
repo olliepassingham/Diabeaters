@@ -32,7 +32,7 @@ import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { scheduleAlcoholReminders } from "@/lib/alcohol-reminders";
-import { formatAlcoholDoseRange, buildAlcoholNightModeSchedule, formatNightModeTime, type AlcoholDoseGuidance } from "@/lib/alcohol-dose-guidance";
+import { formatAlcoholDoseRange, formatAlcoholLeanLine, buildAlcoholNightModeSchedule, formatNightModeTime, type AlcoholDoseGuidance } from "@/lib/alcohol-dose-guidance";
 import { useToast } from "@/hooks/use-toast";
 import { listCarerLinksForPatient } from "@/lib/carers";
 import { invokeNotifyAlcoholNightMode } from "@/lib/invoke-notify-alcohol-night-mode";
@@ -253,7 +253,7 @@ function AlcoholNightModeCard({
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-semibold text-foreground">Night mode is on</p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Reminders are scheduled for tonight. Alcohol mode ends after your morning review.
+              Reminders on until your morning review.
             </p>
           </div>
         </div>
@@ -316,10 +316,8 @@ function AlcoholNightModeCard({
           <Moon className="h-4 w-4" aria-hidden />
         </span>
         <div className="min-w-0 space-y-1">
-          <p className="text-sm font-semibold text-foreground">Schedule tonight&apos;s checks</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Night mode sends bedtime and overnight glucose reminders on this device, then ends after a morning review.
-          </p>
+          <p className="text-sm font-semibold text-foreground">Tonight&apos;s checks</p>
+          <p className="text-xs text-muted-foreground">Bedtime and overnight reminders on this device.</p>
         </div>
       </div>
       <div className="space-y-1.5">
@@ -355,11 +353,8 @@ function AlcoholNightModeCard({
             className="mt-0.5"
             data-testid="checkbox-alcohol-notify-supporters"
           />
-          <span className="min-w-0 text-xs leading-relaxed text-foreground/90">
-            Let linked supporters know
-            <span className="block text-muted-foreground">
-              Sends an alert to supporters with scenario access — optional.
-            </span>
+          <span className="min-w-0 text-xs text-foreground/90">
+            Let supporters know
           </span>
         </label>
       ) : null}
@@ -397,6 +392,8 @@ function AlcoholEstimateResult({
   const accent = riskAccent(guidance.riskLevel);
   const rangeLabel = formatAlcoholDoseRange(guidance);
   const showRange = guidance.standardDose > 0 && guidance.reductionPctMax > 0;
+  const leanLine = formatAlcoholLeanLine(guidance);
+  const overnightNote = guidance.overnightBullets[0] ?? null;
 
   return (
     <div className="space-y-3" data-testid="alcohol-plan-card">
@@ -420,56 +417,39 @@ function AlcoholEstimateResult({
           >
             {showRange ? rangeLabel : "Discuss with team"}
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">{guidance.contextLabel}</p>
           {guidance.standardDose > 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              vs <span className="font-medium tabular-nums text-foreground/85">{guidance.standardDose}u</span> for food
-              alone
+            <p className="mt-1 text-xs text-muted-foreground">
+              vs <span className="font-medium tabular-nums text-foreground/85">{guidance.standardDose}u</span> food alone
               {rounding ? (
                 <>
                   {" "}
-                  (exact <span className="tabular-nums">{rounding.exactLabel}</span>)
+                  · exact <span className="tabular-nums">{rounding.exactLabel}</span>
                 </>
               ) : null}
             </p>
           ) : null}
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{guidance.riskLead}</p>
-          {guidance.bgUsed && guidance.bgNote ? (
-            <p className="mt-2 text-xs leading-relaxed text-foreground/85" data-testid="alcohol-bg-note">
-              {guidance.bgNote}
-              {guidance.suggestedLeanDose != null && guidance.considerMinDose !== guidance.considerMaxDose ? (
-                <>
-                  {" "}
-                  Suggested lean:{" "}
-                  <span className="font-medium tabular-nums">{guidance.suggestedLeanDose}u</span>.
-                </>
-              ) : null}
+          {leanLine ? (
+            <p className="mt-2 text-xs font-medium text-foreground/90" data-testid="alcohol-bg-note">
+              {leanLine}
             </p>
           ) : null}
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border/40 bg-background/20 px-4 py-3">
-          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium ring-1 ring-border/50">
-            {guidance.contextLabel}
-          </span>
         </div>
       </div>
 
-      <div className={cn("rounded-2xl border px-4 py-3.5", accent.border, accent.bg)}>
-        <div className="flex items-start gap-3">
-          <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", accent.icon)}>
-            <AlertTriangle className="h-4 w-4" aria-hidden />
-          </span>
-          <div className="min-w-0 space-y-2">
-            <p className="text-sm font-semibold text-foreground">{guidance.riskHeadline}</p>
-            <ul className="space-y-1.5">
-              {guidance.overnightBullets.map((item) => (
-                <li key={item} className="text-xs leading-relaxed text-foreground/85">
-                  {item}
-                </li>
-              ))}
-            </ul>
+      {overnightNote ? (
+        <div className={cn("rounded-2xl border px-4 py-3", accent.border, accent.bg)}>
+          <div className="flex items-start gap-3">
+            <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", accent.icon)}>
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+            </span>
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold text-foreground">{guidance.riskHeadline}</p>
+              <p className="text-xs text-foreground/80">{overnightNote}</p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       <AlcoholNightModeCard intensity={guidance.drinkingIntensity} situationLabel={situationLabel} />
 
@@ -709,7 +689,7 @@ export default function AlcoholScenarioPage() {
   const [bgTrend, setBgTrend] = useState<AlcoholTrend>("unknown");
   const [intensity, setIntensity] = useState<AlcoholIntensity>("light");
   const [carbsInput, setCarbsInput] = useState("");
-  const [mealType, setMealType] = useState<string>("lunch");
+  const [mealType, setMealType] = useState<string>("snack");
   const [redFlags, setRedFlags] = useState<AlcoholRedFlags>({
     vomiting: false,
     severeAbdominalPain: false,
@@ -815,7 +795,7 @@ export default function AlcoholScenarioPage() {
     setBgTrend("unknown");
     setIntensity("light");
     setCarbsInput("");
-    setMealType("lunch");
+    setMealType("snack");
     setRedFlags({
       vomiting: false,
       severeAbdominalPain: false,
@@ -829,6 +809,7 @@ export default function AlcoholScenarioPage() {
 
   const pickSituation = (id: AlcoholSituationKind) => {
     setSituation(id);
+    if (id === "late_snack") setMealType("snack");
     setPhase("inputs");
     setCarbsError(null);
     setOutcome(null);

@@ -65,35 +65,9 @@ function buildContextLabel(params: {
   return parts.join(" · ");
 }
 
-function buildRiskLead(params: {
-  standardDose: number;
-  considerMinDose: number;
-  considerMaxDose: number;
-  drinkingIntensity: AlcoholIntensity;
-  carbsG: number | null;
-  mealType: string;
-  situation: AlcoholDoseSituation;
-}): string {
-  const meal = formatMealLabel(params.mealType);
-  const intensity = INTENSITY_LABEL[params.drinkingIntensity];
-
-  if (params.standardDose <= 0) {
-    return `With ${intensity}, focus on glucose checks rather than a food bolus.`;
-  }
-
-  if (params.considerMinDose === params.considerMaxDose && params.considerMaxDose < params.standardDose) {
-    return `For ${params.carbsG ?? "your"}g ${meal} with ${intensity}, your team might land around ${params.considerMaxDose}u instead of ${params.standardDose}u.`;
-  }
-
-  if (params.considerMinDose !== params.considerMaxDose) {
-    return `For ${params.carbsG ?? "your"}g ${meal} with ${intensity}, many teams discuss ${params.considerMinDose}–${params.considerMaxDose}u instead of ${params.standardDose}u.`;
-  }
-
-  if (params.situation === "late_snack") {
-    return `Late ${meal} with ${intensity} — confirm bolus timing with your team before dosing.`;
-  }
-
-  return `Food bolus for ${params.carbsG ?? "your"}g ${meal}; ${intensity} may still mean less than ${params.standardDose}u — confirm with your team.`;
+function buildRiskLead(params: { standardDose: number }): string {
+  if (params.standardDose <= 0) return "Focus on checks — confirm any bolus with your team.";
+  return "Confirm with your team before dosing.";
 }
 
 function buildOvernightBullets(params: {
@@ -101,26 +75,13 @@ function buildOvernightBullets(params: {
   situation: AlcoholDoseSituation;
 }): string[] {
   if (params.situation === "late_snack") {
-    if (params.drinkingIntensity === "long_or_heavy") {
-      return [
-        "Late food after drinking — plan a bedtime check and consider night mode below.",
-      ];
-    }
-    return ["Late snack after drinks — one extra check before sleep is reasonable."];
+    if (params.drinkingIntensity === "long_or_heavy") return ["Plan a bedtime check."];
+    return ["Extra check before sleep."];
   }
 
-  if (params.drinkingIntensity === "long_or_heavy") {
-    return [
-      "Delayed lows can run into the early morning on heavier nights.",
-      "Turn on night mode below to schedule bedtime and overnight checks.",
-    ];
-  }
-
-  if (params.drinkingIntensity === "moderate") {
-    return ["Plan bedtime and overnight checks — night mode can schedule them for you."];
-  }
-
-  return ["One extra check before sleep is reasonable even with light drinking."];
+  if (params.drinkingIntensity === "long_or_heavy") return ["Delayed lows possible — schedule checks below."];
+  if (params.drinkingIntensity === "moderate") return ["Schedule bedtime checks below."];
+  return ["One extra check before sleep."];
 }
 
 function applyBgToDoseRange(
@@ -154,20 +115,12 @@ function applyBgToDoseRange(
 
   if (isBgLow(bg, u) || trend === "falling" || bg < lowLine) {
     lean = "lower";
-    bgNote =
-      trend === "falling"
-        ? `BG ${bg} ${u} and falling — range leans toward the lower end.`
-        : `BG ${bg} ${u} is on the lower side — lean toward the bottom of the range.`;
+    bgNote = trend === "falling" ? `BG ${bg} falling` : `BG ${bg} low`;
   } else if (trend === "rising" || bg > highLine) {
     lean = "higher";
-    bgNote =
-      bg > highLine && trend === "rising"
-        ? `BG ${bg} ${u} and rising — upper range may suit food; alcohol lows remain possible overnight.`
-        : trend === "rising"
-          ? `BG ${bg} ${u} is rising — slight lean toward the top of the range for food.`
-          : `BG ${bg} ${u} is high — upper end may fit the food bolus; plan for delayed lows later.`;
+    bgNote = bg > highLine ? `BG ${bg} high` : `BG ${bg} rising`;
   } else {
-    bgNote = `BG ${bg} ${u} looks steady — middle of the range may suit if your team agrees.`;
+    bgNote = `BG ${bg} steady`;
   }
 
   let adjMin = minDose;
@@ -205,7 +158,7 @@ export function buildAlcoholDoseGuidance(params: {
   const meta = REDUCTION_BY_INTENSITY[params.drinkingIntensity];
   const base = params.exactDose > 0 ? params.exactDose : params.standardDose;
   const situation = params.situation ?? "meal_with_drinks";
-  const mealType = params.mealType ?? "lunch";
+  const mealType = params.mealType ?? "snack";
   const carbsG = params.carbsG ?? null;
 
   let considerMinDose = 0;
@@ -243,15 +196,7 @@ export function buildAlcoholDoseGuidance(params: {
   considerMinDose = bgAdj.minDose;
   considerMaxDose = bgAdj.maxDose;
 
-  let riskLead = buildRiskLead({
-    standardDose: params.standardDose,
-    considerMinDose,
-    considerMaxDose,
-    drinkingIntensity: params.drinkingIntensity,
-    carbsG,
-    mealType,
-    situation,
-  });
+  const riskLead = buildRiskLead({ standardDose: params.standardDose });
 
   return {
     riskLevel: meta.riskLevel,
@@ -271,6 +216,19 @@ export function buildAlcoholDoseGuidance(params: {
     suggestedLeanDose: bgAdj.suggestedLeanDose,
     bgUsed: !params.bgSkipped && params.bgValue != null,
   };
+}
+
+/** One-line lean + BG hint for the result hero. */
+export function formatAlcoholLeanLine(guidance: AlcoholDoseGuidance): string | null {
+  const parts: string[] = [];
+  if (
+    guidance.suggestedLeanDose != null &&
+    guidance.considerMinDose !== guidance.considerMaxDose
+  ) {
+    parts.push(`Lean ${guidance.suggestedLeanDose}u`);
+  }
+  if (guidance.bgNote) parts.push(guidance.bgNote);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 export function formatAlcoholDoseRange(guidance: AlcoholDoseGuidance): string {
