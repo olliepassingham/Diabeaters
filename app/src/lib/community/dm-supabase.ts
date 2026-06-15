@@ -549,6 +549,14 @@ export async function countUnreadDmThreadsForCurrentUser(): Promise<{
   const uid = sessionData.session?.user?.id;
   if (!uid) return { count: 0, error: null };
 
+  const { data: rpcData, error: rpcErr } = await supabase.rpc("count_unread_dm_threads_for_user", {
+    p_user_id: uid,
+  });
+  if (!rpcErr) {
+    const n = typeof rpcData === "number" ? rpcData : Number(rpcData ?? 0);
+    return { count: Number.isFinite(n) ? Math.max(0, n) : 0, error: null };
+  }
+
   const threadsRes = await fetchDmThreadsForCurrentUser();
   if (threadsRes.error) return { count: 0, error: threadsRes.error };
 

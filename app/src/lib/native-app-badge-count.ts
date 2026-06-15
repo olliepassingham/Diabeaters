@@ -1,7 +1,10 @@
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { countUnreadDmThreadsForCurrentUser } from "@/lib/community/dm-supabase";
+import { includeDmThreadsInHomeScreenBadge } from "@/lib/flags";
 import { isDmMessageInAppNotification } from "@/lib/in-app-notification-display";
 import { getSupabase } from "@/lib/supabase";
+
+export { includeDmThreadsInHomeScreenBadge };
 
 /** Unread in-app rows that appear in the bell (excludes DM message rows). */
 export function countUnreadInAppExcludingDmFromRows(rows: InAppNotificationRow[]): number {
@@ -47,17 +50,39 @@ export async function countUnreadInAppNotificationsExcludingDm(): Promise<{
   return { count: Math.max(0, totalUnread - dmUnread), error: null };
 }
 
-export async function fetchNativeAppBadgeCount(): Promise<{ count: number; error: Error | null }> {
-  const [inAppRes, dmRes] = await Promise.all([
-    countUnreadInAppNotificationsExcludingDm(),
-    countUnreadDmThreadsForCurrentUser(),
-  ]);
+export type HeaderUnreadCounts = {
+  bell: number;
+  dmThreads: number;
+  total: number;
+};
 
-  if (inAppRes.error) return { count: 0, error: inAppRes.error };
-  if (dmRes.error) return { count: 0, error: dmRes.error };
+export async function fetchHeaderUnreadCounts(options?: {
+  includeDmThreads?: boolean;
+}): Promise<{ counts: HeaderUnreadCounts; error: Error | null }> {
+  const includeDm = options?.includeDmThreads ?? includeDmThreadsInHomeScreenBadge();
+
+  const inAppRes = await countUnreadInAppNotificationsExcludingDm();
+  if (inAppRes.error) return { counts: { bell: 0, dmThreads: 0, total: 0 }, error: inAppRes.error };
+
+  let dmThreads = 0;
+  if (includeDm) {
+    const dmRes = await countUnreadDmThreadsForCurrentUser();
+    if (dmRes.error) return { counts: { bell: 0, dmThreads: 0, total: 0 }, error: dmRes.error };
+    dmThreads = dmRes.count;
+  }
 
   return {
-    count: nativeAppBadgeCountFromParts(inAppRes.count, dmRes.count),
+    counts: {
+      bell: inAppRes.count,
+      dmThreads,
+      total: nativeAppBadgeCountFromParts(inAppRes.count, dmThreads),
+    },
     error: null,
   };
+}
+
+export async function fetchNativeAppBadgeCount(): Promise<{ count: number; error: Error | null }> {
+  const { counts, error } = await fetchHeaderUnreadCounts();
+  if (error) return { count: 0, error };
+  return { count: counts.total, error: null };
 }

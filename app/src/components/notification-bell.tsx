@@ -46,6 +46,7 @@ import { prefetchNotificationsPage } from "@/components/bottom-nav";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
+import { useInAppBellUnreadCount } from "@/hooks/use-in-app-bell-unread-count";
 import {
   HypoNotificationAckFooter,
   hypoLogIdFromInAppNotification,
@@ -90,7 +91,7 @@ export function NotificationBell() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [clearDialogOpen, setClearDialogOpen] = useState(false);
     const [clearBusy, setClearBusy] = useState(false);
-    const unreadCount = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
+    const unreadCount = useInAppBellUnreadCount();
 
     const hypoIdsForAck = useMemo(
       () =>
@@ -449,6 +450,11 @@ export function NotificationBell() {
               ) : loadError ? (
                 <div className="p-6 text-center text-muted-foreground">
                   <p className="text-sm text-destructive">Could not load notifications</p>
+                  {unreadCount > 0 ? (
+                    <p className="text-xs mt-1">
+                      You still have {unreadCount} unread — try again or open notification settings.
+                    </p>
+                  ) : null}
                   <p className="text-xs mt-1 break-words">{loadError}</p>
                   <Button variant="outline" size="sm" className="mt-4" type="button" onClick={() => load()}>
                     Try again

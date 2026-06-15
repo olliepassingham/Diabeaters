@@ -43,6 +43,7 @@ import {
 import { NotificationEmptyState, NotificationInboxRow } from "@/components/notifications/notification-inbox-row";
 import { useAuth } from "@/lib/auth-context";
 import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
+import { useInAppBellUnreadCount } from "@/hooks/use-in-app-bell-unread-count";
 import {
   HypoNotificationAckFooter,
   hypoLogIdFromInAppNotification,
@@ -63,7 +64,7 @@ export default function NotificationsPage() {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
 
-  const unread = useMemo(() => rows.filter((r) => !r.read).length, [rows]);
+  const unread = useInAppBellUnreadCount();
 
   const hypoIdsForAck = useMemo(
     () =>

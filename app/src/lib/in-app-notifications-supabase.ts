@@ -27,15 +27,36 @@ export async function fetchInAppNotificationsForUser(): Promise<{
   const uid = sessionData.session?.user?.id;
   if (!uid) return { data: [], error: null };
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", uid)
-    .order("created_at", { ascending: false })
-    .limit(40);
+  // Always load every unread row (badge + bell count use DB totals). Recent read rows fill the inbox.
+  const [unreadRes, readRes] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", uid)
+      .eq("read", false)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", uid)
+      .eq("read", true)
+      .order("created_at", { ascending: false })
+      .limit(40),
+  ]);
 
-  if (error) return { data: null, error: new Error(error.message) };
-  return { data: (data ?? []).map((r) => mapRow(r as Record<string, unknown>)), error: null };
+  if (unreadRes.error) return { data: null, error: new Error(unreadRes.error.message) };
+  if (readRes.error) return { data: null, error: new Error(readRes.error.message) };
+
+  const seen = new Set<string>();
+  const merged: Record<string, unknown>[] = [];
+  for (const row of [...(unreadRes.data ?? []), ...(readRes.data ?? [])]) {
+    const id = String((row as { id?: unknown }).id ?? "");
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(row as Record<string, unknown>);
+  }
+
+  return { data: merged.map((r) => mapRow(r)), error: null };
 }
 
 export async function markInAppNotificationRead(id: string): Promise<{ error: Error | null }> {

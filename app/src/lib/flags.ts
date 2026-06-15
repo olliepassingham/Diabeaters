@@ -18,6 +18,11 @@ export const isCommunityEnabled =
   import.meta.env.VITE_FEATURE_COMMUNITY === "true" ||
   (import.meta.env.DEV && import.meta.env.VITE_FEATURE_COMMUNITY !== "false");
 
+/** DM threads count toward the home-screen badge only when Messages appears in the header. */
+export function includeDmThreadsInHomeScreenBadge(): boolean {
+  return isCommunityEnabled;
+}
+
 /**
  * Diabeaters AI guide (Edge Function + OpenAI). **Visible by default** — `/coach` and the
  * Tools tile register unless you explicitly set `VITE_FEATURE_AI_COACH=false`.
