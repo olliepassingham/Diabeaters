@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
 import { useAuth } from "@/lib/auth-context";
+import { useLinkedPatient } from "@/hooks/use-linked-patient";
 import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-prompt";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
@@ -164,6 +165,8 @@ export default function Bedtime() {
   const [tipsOpen, setTipsOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { data: linkedPatient } = useLinkedPatient();
+  const hasCarerLink = !!linkedPatient;
   const [secondChancePromptOpen, setSecondChancePromptOpen] = useState(false);
 
   useEffect(() => {
@@ -294,7 +297,7 @@ export default function Bedtime() {
     };
     storage.saveBedtimeLog(log);
     setBedtimeLogs(storage.getBedtimeLogs());
-    void rescheduleBedtimeReminders();
+    void rescheduleBedtimeReminders({ hasCarerLink });
     toast({
       title: "Bedtime check logged",
       description: "Counted for your streak, activity history, and linked supporters.",

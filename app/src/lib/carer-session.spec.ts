@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   applySupporterAccountRoleAfterLink,
+  cacheCloudPrimaryAppRole,
   canSwitchAppMode,
   clearCarerClientSessionKeys,
   getPrimaryAppRole,
@@ -53,6 +54,14 @@ describe("carer-session supporter-only accounts", () => {
     clearCarerClientSessionKeys();
     expect(getPrimaryAppRole()).toBe("carer");
     expect(isSupporterOnlyAccount()).toBe(true);
+  });
+
+  it("treats onboarding supporter path as supporter-only even when cloud role is patient", () => {
+    setOnboardingAccountPath("supporter");
+    cacheCloudPrimaryAppRole("patient");
+    expect(isSupporterOnlyAccount()).toBe(true);
+    expect(canSwitchAppMode()).toBe(false);
+    expect(isCarerSessionMode(true, "patient")).toBe(true);
   });
 });
 

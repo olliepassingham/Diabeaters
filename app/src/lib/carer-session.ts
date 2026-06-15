@@ -215,15 +215,16 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 
 /** Account created as supporter-only on /welcome — no User Mode or mode switcher. */
 export function isSupporterOnlyAccount(): boolean {
+  const path = getOnboardingAccountPath();
+  if (path === "supporter") return true;
+  if (isPersistedSupporterAccount()) return true;
+
   const cloud = getCachedCloudPrimaryAppRole();
   if (cloud === "carer") return true;
   if (cloud === "patient" || cloud === "community") return false;
 
-  const path = getOnboardingAccountPath();
-  if (path === "supporter") return true;
-  if (path === "patient" || path === "both" || path === "community") return false;
   if (getPrimaryAppRole() === "carer") return true;
-  return isPersistedSupporterAccount();
+  return false;
 }
 
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */

@@ -21,7 +21,7 @@ import { fetchNativeAppBadgeCountForUser } from "./native-app-badge-count.ts";
 type SupabaseAdmin = ReturnType<typeof createClient>;
 
 /** Home-screen badge disabled until unread sync is reliable (phantom "1" reports). */
-export const HOME_SCREEN_BADGE_ENABLED = false;
+export const HOME_SCREEN_BADGE_ENABLED = true;
 
 export type PushPlatform = "ios" | "android";
 

@@ -1655,7 +1655,7 @@ export default function Settings() {
       }
     }
     if (key === "bedtimeCheckReminders" || key === "enabled") {
-      void rescheduleBedtimeReminders();
+      void rescheduleBedtimeReminders({ hasCarerLink: isCarer });
     }
     if (key === "pumpChangeReminders" || key === "enabled") {
       void reschedulePumpChangeReminders();
@@ -1667,7 +1667,7 @@ export default function Settings() {
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
     void syncNotificationPreferences(updated);
-    void rescheduleBedtimeReminders();
+    void rescheduleBedtimeReminders({ hasCarerLink: isCarer });
   };
 
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {

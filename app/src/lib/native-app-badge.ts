@@ -15,7 +15,7 @@ let needsFollowUpSync = false;
  * Home-screen icon badge is disabled until unread-count sync is reliable (phantom "1" reports).
  * When false, the OS badge is always cleared to 0 — pushes and in-app sync never increment it.
  */
-export const NATIVE_HOME_SCREEN_BADGE_ENABLED = false;
+export const NATIVE_HOME_SCREEN_BADGE_ENABLED = true;
 
 /** Whether the app should reflect unread counts on the OS home-screen icon. */
 export function isNativeHomeScreenBadgeEnabled(): boolean {
@@ -135,10 +135,16 @@ export function scheduleNativeAppBadgeSync(delayMs = 400): void {
   }, delayMs);
 }
 
-/** Clears stale SpringBoard badges repeatedly after cold start (APNs can race JS). */
+/** Clears stale SpringBoard badges after cold start; syncs when badge is enabled. */
 export function scheduleNativeAppBadgeBootClear(): void {
   if (!canWriteNativeAppBadge()) return;
+  if (!NATIVE_HOME_SCREEN_BADGE_ENABLED) {
+    for (const ms of [400, 1200, 3500]) {
+      window.setTimeout(() => void clearNativeAppBadge(), ms);
+    }
+    return;
+  }
   for (const ms of [400, 1200, 3500]) {
-    window.setTimeout(() => void clearNativeAppBadge(), ms);
+    window.setTimeout(() => void syncNativeAppBadgeNow(), ms);
   }
 }

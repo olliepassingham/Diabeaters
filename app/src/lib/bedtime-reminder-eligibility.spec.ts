@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   clearActiveAppMode,
+  cacheCloudPrimaryAppRole,
   clearCarerClientSessionKeys,
   setActiveAppMode,
   setOnboardingAccountPath,
@@ -28,6 +29,12 @@ describe("shouldReceiveBedtimeCheckReminders", () => {
   it("blocks supporter-only accounts even without a link", () => {
     setOnboardingAccountPath("supporter");
     setPrimaryAppRole("carer");
+    expect(shouldReceiveBedtimeCheckReminders()).toBe(false);
+  });
+
+  it("blocks supporter-only accounts when cloud primary role is patient", () => {
+    setOnboardingAccountPath("supporter");
+    cacheCloudPrimaryAppRole("patient");
     expect(shouldReceiveBedtimeCheckReminders()).toBe(false);
   });
 

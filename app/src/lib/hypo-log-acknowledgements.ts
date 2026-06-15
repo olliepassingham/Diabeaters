@@ -1,6 +1,7 @@
 /**
  * Supporter acknowledgements for cloud hypo_logs rows.
  */
+import { invokeNotifyPatientHypoAcknowledged } from "@/lib/invoke-notify-patient-hypo-ack";
 import { getSupabase } from "./supabase";
 
 export type HypoLogAcknowledgementRow = {
@@ -100,6 +101,12 @@ export async function acknowledgeHypoLog(
 
   const row = data as Record<string, unknown> | null;
   if (!row) return { data: null, error: new Error("No acknowledgement returned") };
+
+  void invokeNotifyPatientHypoAcknowledged({ hypoLogId: id }).then((notifyRes) => {
+    if (!notifyRes.success && import.meta.env.DEV) {
+      console.warn("[hypo-log-acknowledgements] patient notify failed:", notifyRes.error, notifyRes.detail);
+    }
+  });
 
   return {
     data: {
