@@ -23,7 +23,7 @@ export function notificationSettingsLookHealthy(s: NotificationSettingsSnapshot 
   ok: boolean;
   issues: string[];
 } {
-  if (!s) return { ok: false, issues: ["Could not read iOS notification settings (needs app build 1.0.5+)."] };
+  if (!s) return { ok: false, issues: ["Could not read iOS notification settings."] };
   const issues: string[] = [];
   if (s.authorizationStatus === "denied") {
     issues.push("Notifications are denied for Diabeaters.");
