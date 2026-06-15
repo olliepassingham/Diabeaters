@@ -21,7 +21,7 @@ export function getPathForInAppNotification(row: InAppNotificationRow): string |
   if (kind === "supplies_low") return "/supplies";
   if (kind === "hypo_logged_self") return "/tools/hypo-history";
   if (kind === "hypo_acknowledged") return "/tools/hypo-history";
-  if (kind === "hypo_logged" || kind === "scenario_started" || kind === "appointment_reminder_support") {
+  if (kind === "hypo_logged" || kind === "scenario_started" || kind === "alcohol_night_mode" || kind === "appointment_reminder_support") {
     return "/carer-view";
   }
   if (

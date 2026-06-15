@@ -7,6 +7,7 @@ import {
   type AlcoholRedFlags,
   type AlcoholTrend,
 } from "@/lib/alcohol-night-tool";
+import { buildAlcoholDoseGuidance, type AlcoholDoseGuidance } from "@/lib/alcohol-dose-guidance";
 
 export type AlcoholSituationKind = "meal_with_drinks" | "late_snack" | "before_out" | "feels_wrong";
 
@@ -47,6 +48,7 @@ export type AlcoholSituationOutcome =
   | {
       kind: "estimate";
       meal: MealDoseResult;
+      alcoholGuidance: AlcoholDoseGuidance;
       tips: string[];
       disclaimer: string;
     }
@@ -185,23 +187,24 @@ export function buildAlcoholSituationOutcome(
       };
     }
 
-    const baseTips =
-      input.situation === "late_snack"
-        ? [
-            "Late eating after drinking still interacts with insulin and alcohol — stay alert for delayed lows.",
-            "Recheck glucose on the schedule your team recommends after alcohol.",
-            "Never treat a hypo with more alcohol.",
-          ]
-        : [
-            "Food with alcohol is often handled differently than food alone — confirm bolus decisions with your team.",
-            "Plan for delayed lows overnight after drinking.",
-            "Never treat a hypo with more alcohol.",
-          ];
+    const alcoholGuidance = buildAlcoholDoseGuidance({
+      standardDose: meal.dose,
+      exactDose: meal.exactDose,
+      drinkingIntensity: input.drinkingIntensity,
+      carbsG: carbs,
+      mealType: input.mealType,
+      situation: input.situation,
+      bgSkipped: input.bgSkipped,
+      bgValue: input.bgValue,
+      bgTrend: input.bgTrend,
+      bgUnits,
+    });
 
     return {
       kind: "estimate",
       meal,
-      tips: baseTips,
+      alcoholGuidance,
+      tips: [],
       disclaimer: ESTIMATE_DISCLAIMER,
     };
   }

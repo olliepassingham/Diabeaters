@@ -41,6 +41,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
   if (kind === "hypo_acknowledged") return ThumbsUp;
   if (kind === "scenario_started") return Activity;
+  if (kind === "alcohol_night_mode") return Moon;
   if (kind === "appointment_reminder_support") return Calendar;
   if (kind === "bedtime_reminder") return Moon;
   return Bell;

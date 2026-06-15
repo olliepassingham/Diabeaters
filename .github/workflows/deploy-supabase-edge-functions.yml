@@ -43,6 +43,7 @@ jobs:
           fi
           supabase functions deploy notify_carers_on_hypo --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_scenario_started --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy notify_alcohol_night_mode --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supply_low_cron --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_supporter_appointment_reminders --project-ref "$REF" --no-verify-jwt

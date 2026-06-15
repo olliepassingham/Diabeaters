@@ -25,6 +25,9 @@ verify_jwt = false
 [functions.notify_scenario_started]
 verify_jwt = false
 
+[functions.notify_alcohol_night_mode]
+verify_jwt = false
+
 [functions.notify_supply_low]
 verify_jwt = false
 

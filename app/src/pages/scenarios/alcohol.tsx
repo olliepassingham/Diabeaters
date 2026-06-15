@@ -31,6 +31,12 @@ import { Disclaimer } from "@/components/disclaimer";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { storage, type UserProfile, type UserSettings, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
+import { scheduleAlcoholReminders } from "@/lib/alcohol-reminders";
+import { formatAlcoholDoseRange, buildAlcoholNightModeSchedule, formatNightModeTime, type AlcoholDoseGuidance } from "@/lib/alcohol-dose-guidance";
+import { useToast } from "@/hooks/use-toast";
+import { listCarerLinksForPatient } from "@/lib/carers";
+import { invokeNotifyAlcoholNightMode } from "@/lib/invoke-notify-alcohol-night-mode";
+import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { canShowAlcoholScenarios } from "@/lib/user-age";
 import { recordLastInteraction } from "@/lib/last-interaction";
@@ -137,10 +143,6 @@ function ChoiceGroup<T extends string>({ label, value, onChange, options, name }
   );
 }
 
-function formatMealTypeLabel(mealType: string): string {
-  if (!mealType) return "Meal";
-  return mealType.charAt(0).toUpperCase() + mealType.slice(1);
-}
 
 function AlcoholActionLinks({ links }: { links: AlcoholSituationLinks }) {
   return (
@@ -170,30 +172,235 @@ function AlcoholActionLinks({ links }: { links: AlcoholSituationLinks }) {
   );
 }
 
+function defaultBedtimeLocal(): string {
+  const d = new Date();
+  d.setHours(23, 0, 0, 0);
+  if (d.getTime() <= Date.now() + 30 * 60_000) {
+    d.setDate(d.getDate() + 1);
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function riskAccent(level: AlcoholDoseGuidance["riskLevel"]) {
+  if (level === "high") {
+    return {
+      border: "border-amber-500/35",
+      bg: "bg-gradient-to-b from-amber-500/12 to-card",
+      icon: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    };
+  }
+  if (level === "elevated") {
+    return {
+      border: "border-amber-500/25",
+      bg: "bg-gradient-to-b from-amber-500/8 to-card",
+      icon: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
+    };
+  }
+  return {
+    border: "border-primary/25",
+    bg: "bg-gradient-to-b from-primary/8 to-card",
+    icon: "bg-primary/10 text-primary",
+  };
+}
+
+function AlcoholNightModeCard({
+  intensity,
+  situationLabel,
+}: {
+  intensity: AlcoholIntensity;
+  situationLabel?: string | null;
+}) {
+  const { toast } = useToast();
+  const [bedtimeLocal, setBedtimeLocal] = useState(defaultBedtimeLocal);
+  const [active, setActive] = useState(() => storage.getScenarioState().alcoholModeActive === true);
+  const [busy, setBusy] = useState(false);
+  const [notifySupporters, setNotifySupporters] = useState(false);
+  const [scenarioSupporterCount, setScenarioSupporterCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await listCarerLinksForPatient();
+      if (cancelled) return;
+      const count = (data ?? []).filter((link) => link.scopes.scenarios).length;
+      setScenarioSupporterCount(count);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const previewSchedule = buildAlcoholNightModeSchedule(
+    intensity,
+    new Date(bedtimeLocal).toISOString(),
+  );
+
+  if (active) {
+    const session = storage.getAlcoholSession();
+    const schedule = session
+      ? buildAlcoholNightModeSchedule(session.intensity, session.plannedBedtimeIso)
+      : previewSchedule;
+    return (
+      <div
+        className="rounded-2xl border border-primary/25 bg-primary/[0.05] px-4 py-3.5 space-y-3"
+        data-testid="alcohol-night-mode-active"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Moon className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-semibold text-foreground">Night mode is on</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Reminders are scheduled for tonight. Alcohol mode ends after your morning review.
+            </p>
+          </div>
+        </div>
+        <ul className="space-y-1.5 border-t border-border/40 pt-3">
+          {schedule.map((item) => (
+            <li key={item.kind} className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-foreground/90">{item.label}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{formatNightModeTime(item.atIso)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  const activate = async () => {
+    setBusy(true);
+    try {
+      const at = new Date(bedtimeLocal);
+      if (Number.isNaN(at.getTime())) {
+        toast({ title: "Choose a valid bedtime", variant: "destructive" });
+        return;
+      }
+      const session = storage.activateAlcoholMode({
+        intensity,
+        plannedBedtimeIso: at.toISOString(),
+        situation: situationLabel ?? null,
+      });
+      await scheduleAlcoholReminders(session);
+      setActive(true);
+      toast({
+        title: "Night mode on",
+        description: "Check reminders are scheduled for your bedtime.",
+      });
+      if (notifySupporters) {
+        const res = await invokeNotifyAlcoholNightMode({
+          sessionId: session.id,
+          intensity: session.intensity,
+          plannedBedtimeIso: session.plannedBedtimeIso,
+        });
+        if (res.success) {
+          toast({ title: "Supporters notified" });
+        } else {
+          toast({
+            title: NOTIFY_EDGE_FAILURE_TITLE,
+            description: notifyEdgeFailureDescription(res),
+            variant: "destructive",
+          });
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card/40 px-4 py-4 space-y-3" data-testid="alcohol-night-mode-offer">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-700 dark:text-violet-300">
+          <Moon className="h-4 w-4" aria-hidden />
+        </span>
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm font-semibold text-foreground">Schedule tonight&apos;s checks</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Night mode sends bedtime and overnight glucose reminders on this device, then ends after a morning review.
+          </p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="alcohol-bedtime" className="text-xs text-muted-foreground">
+          Planned bedtime
+        </Label>
+        <Input
+          id="alcohol-bedtime"
+          type="datetime-local"
+          step={60}
+          value={bedtimeLocal}
+          onChange={(e) => setBedtimeLocal(e.target.value)}
+          data-testid="input-alcohol-bedtime"
+        />
+      </div>
+      <ul className="space-y-1.5 rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5">
+        {previewSchedule.map((item) => (
+          <li key={item.kind} className="flex items-center justify-between gap-2 text-xs">
+            <span className="text-foreground/90">{item.label}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{formatNightModeTime(item.atIso)}</span>
+          </li>
+        ))}
+      </ul>
+      {scenarioSupporterCount > 0 ? (
+        <label
+          htmlFor="alcohol-notify-supporters"
+          className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-border/40 bg-muted/15 px-3 py-2.5"
+        >
+          <Checkbox
+            id="alcohol-notify-supporters"
+            checked={notifySupporters}
+            onCheckedChange={(v) => setNotifySupporters(v === true)}
+            className="mt-0.5"
+            data-testid="checkbox-alcohol-notify-supporters"
+          />
+          <span className="min-w-0 text-xs leading-relaxed text-foreground/90">
+            Let linked supporters know
+            <span className="block text-muted-foreground">
+              Sends an alert to supporters with scenario access — optional.
+            </span>
+          </span>
+        </label>
+      ) : null}
+      <Button
+        type="button"
+        className="w-full min-h-10 rounded-xl"
+        disabled={busy}
+        onClick={() => void activate()}
+        data-testid="button-alcohol-night-mode"
+      >
+        {busy ? "Scheduling…" : "Turn on night mode"}
+      </Button>
+    </div>
+  );
+}
+
 function AlcoholEstimateResult({
   meal,
-  tips,
+  guidance,
   bgUnits,
   mealType,
-  tipsOpen,
-  onTipsOpenChange,
+  situationLabel,
   onEdit,
   onReset,
 }: {
   meal: MealDoseResult;
-  tips: string[];
+  guidance: AlcoholDoseGuidance;
   bgUnits: string;
   mealType: string;
-  tipsOpen: boolean;
-  onTipsOpenChange: (open: boolean) => void;
+  situationLabel: string | null;
   onEdit: () => void;
   onReset: () => void;
 }) {
   const rounding = getMealDoseRoundingGuide(meal.exactDose, meal.dose, bgUnits);
+  const accent = riskAccent(guidance.riskLevel);
+  const rangeLabel = formatAlcoholDoseRange(guidance);
+  const showRange = guidance.standardDose > 0 && guidance.reductionPctMax > 0;
 
   return (
     <div className="space-y-3" data-testid="alcohol-plan-card">
-      <div className="overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/12 via-card to-card shadow-sm ring-1 ring-primary/10">
+      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/12 via-card to-card shadow-sm ring-1 ring-primary/10">
         <div className="relative px-5 pb-4 pt-5 text-center">
           <Button
             type="button"
@@ -206,80 +413,77 @@ function AlcoholEstimateResult({
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
           </Button>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Suggested dose</p>
-          <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
-            {meal.dose}
-            <span className="ml-0.5 text-2xl font-semibold text-muted-foreground">u</span>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Your range tonight</p>
+          <p
+            className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground"
+            data-testid="alcohol-dose-range"
+          >
+            {showRange ? rangeLabel : "Discuss with team"}
           </p>
-          {rounding ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Exact <span className="font-medium tabular-nums text-foreground/80">{rounding.exactLabel}</span>
+          {guidance.standardDose > 0 ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              vs <span className="font-medium tabular-nums text-foreground/85">{guidance.standardDose}u</span> for food
+              alone
+              {rounding ? (
+                <>
+                  {" "}
+                  (exact <span className="tabular-nums">{rounding.exactLabel}</span>)
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{guidance.riskLead}</p>
+          {guidance.bgUsed && guidance.bgNote ? (
+            <p className="mt-2 text-xs leading-relaxed text-foreground/85" data-testid="alcohol-bg-note">
+              {guidance.bgNote}
+              {guidance.suggestedLeanDose != null && guidance.considerMinDose !== guidance.considerMaxDose ? (
+                <>
+                  {" "}
+                  Suggested lean:{" "}
+                  <span className="font-medium tabular-nums">{guidance.suggestedLeanDose}u</span>.
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border/40 bg-background/25 px-4 py-3">
-          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium tabular-nums ring-1 ring-border/50">
-            {meal.carbs}g carbs
-          </span>
-          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium capitalize ring-1 ring-border/50">
-            {formatMealTypeLabel(meal.mealType)}
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border/40 bg-background/20 px-4 py-3">
+          <span className="rounded-full bg-background/70 px-3 py-1 text-sm font-medium ring-1 ring-border/50">
+            {guidance.contextLabel}
           </span>
         </div>
       </div>
 
-      {rounding ? (
-        <div className="grid grid-cols-2 gap-2">
-          {rounding.options.map((opt) => (
-            <div
-              key={`${opt.dose}-${opt.when}`}
-              className={cn(
-                "rounded-xl border px-3 py-3 text-center transition-colors",
-                opt.isSuggested
-                  ? "border-primary/35 bg-primary/8 ring-1 ring-primary/15"
-                  : "border-border/60 bg-card/40",
-              )}
-            >
-              <p className="text-xl font-bold tabular-nums text-foreground">{opt.label}</p>
-              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{opt.when}</p>
-              {opt.isSuggested ? (
-                <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-primary">Suggested</p>
-              ) : null}
-            </div>
-          ))}
+      <div className={cn("rounded-2xl border px-4 py-3.5", accent.border, accent.bg)}>
+        <div className="flex items-start gap-3">
+          <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", accent.icon)}>
+            <AlertTriangle className="h-4 w-4" aria-hidden />
+          </span>
+          <div className="min-w-0 space-y-2">
+            <p className="text-sm font-semibold text-foreground">{guidance.riskHeadline}</p>
+            <ul className="space-y-1.5">
+              {guidance.overnightBullets.map((item) => (
+                <li key={item} className="text-xs leading-relaxed text-foreground/85">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      ) : null}
+      </div>
+
+      <AlcoholNightModeCard intensity={guidance.drinkingIntensity} situationLabel={situationLabel} />
 
       <div className="flex gap-2">
-        <Button asChild className="min-h-11 flex-1 gap-2">
+        <Button asChild className="min-h-11 flex-1 gap-2 rounded-xl">
           <Link href={linkWithFrom(adviserLinkFromAlcohol(meal.carbs, mealType))}>
             <Calculator className="h-4 w-4" />
             Open Meal Adviser
           </Link>
         </Button>
-        <Button type="button" variant="outline" className="min-h-11 shrink-0" onClick={onEdit}>
+        <Button type="button" variant="outline" className="min-h-11 shrink-0 rounded-xl" onClick={onEdit}>
           Edit
         </Button>
       </div>
-
-      {tips.length > 0 ? (
-        <Collapsible open={tipsOpen} onOpenChange={onTipsOpenChange}>
-          <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 rounded-xl border border-border/60 bg-card/50 px-3.5 py-2.5 text-left text-sm font-medium outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring">
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />
-              Alcohol tips
-              <span className="text-xs font-normal text-muted-foreground">({tips.length})</span>
-            </span>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" aria-hidden />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2 space-y-2">
-            {tips.map((tip) => (
-              <p key={tip} className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5 text-sm leading-relaxed text-foreground/90">
-                {tip}
-              </p>
-            ))}
-          </CollapsibleContent>
-        </Collapsible>
-      ) : null}
     </div>
   );
 }
@@ -350,12 +554,16 @@ function AlcoholSafetyResult({
 
 function AlcoholPrepResult({
   outcome,
+  intensity,
+  situationLabel,
   tipsOpen,
   onTipsOpenChange,
   onEdit,
   onReset,
 }: {
   outcome: Extract<AlcoholSituationOutcome, { kind: "prep_only" }>;
+  intensity: AlcoholIntensity;
+  situationLabel: string | null;
   tipsOpen: boolean;
   onTipsOpenChange: (open: boolean) => void;
   onEdit: () => void;
@@ -415,7 +623,9 @@ function AlcoholPrepResult({
         </Collapsible>
       ) : null}
 
-      <Button type="button" variant="outline" className="w-full gap-1.5" onClick={onEdit}>
+      <AlcoholNightModeCard intensity={intensity} situationLabel={situationLabel} />
+
+      <Button type="button" variant="outline" className="w-full gap-1.5 rounded-xl" onClick={onEdit}>
         <ArrowLeft className="h-4 w-4" />
         Edit details
       </Button>
@@ -675,7 +885,12 @@ export default function AlcoholScenarioPage() {
                   </InfoSection>
                   <InfoSection title="Estimates">
                     <p>
-                      Carb coverage numbers use the same ratio logic as Meal Adviser. They do not replace your clinic&apos;s plan.
+                      Food bolus numbers use your carb ratios. An alcohol-aware range may suggest less than a normal meal — always confirm with your clinic.
+                    </p>
+                  </InfoSection>
+                  <InfoSection title="Night mode">
+                    <p>
+                      Pick your bedtime to schedule check reminders: bedtime glucose check, an overnight recheck on moderate or heavier nights (about 2 hours later), and a morning review at 10:00. On iPhone/Android you get local notifications; online you also get in-app alerts. Night mode ends after the morning review.
                     </p>
                   </InfoSection>
                 </PageInfoDialog>
@@ -911,11 +1126,10 @@ export default function AlcoholScenarioPage() {
             {outcome.kind === "estimate" ? (
               <AlcoholEstimateResult
                 meal={outcome.meal}
-                tips={outcome.tips}
+                guidance={outcome.alcoholGuidance}
                 bgUnits={bgUnits}
                 mealType={mealType}
-                tipsOpen={resultTipsOpen}
-                onTipsOpenChange={setResultTipsOpen}
+                situationLabel={activeSituation?.title ?? null}
                 onEdit={backToInputs}
                 onReset={resetFlow}
               />
@@ -924,6 +1138,8 @@ export default function AlcoholScenarioPage() {
             ) : outcome.kind === "prep_only" ? (
               <AlcoholPrepResult
                 outcome={outcome}
+                intensity={intensity}
+                situationLabel={activeSituation?.title ?? null}
                 tipsOpen={resultTipsOpen}
                 onTipsOpenChange={setResultTipsOpen}
                 onEdit={backToInputs}
