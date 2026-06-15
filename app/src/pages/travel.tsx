@@ -29,6 +29,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Hospital,
@@ -962,6 +963,9 @@ const EMERGENCY_PHRASES: Record<string, { lang: string; iAmDiabetic: string; nee
 
 export default function Travel() {
   const [step, setStep] = useState<"entry" | "inputs" | "results">("entry");
+  const TRAVEL_INPUT_STEPS = 3;
+  const INPUT_STEP_TITLES = ["Trip details", "Timezone & style", "Conditions"] as const;
+  const [travelWizardStep, setTravelWizardStep] = useState(0);
   const [isTravelModeActive, setIsTravelModeActive] = useState(false);
   const [isSickDayAlsoActive, setIsSickDayAlsoActive] = useState(false);
   const [sickDaySeverity, setSickDaySeverity] = useState<string | undefined>();
@@ -1162,7 +1166,26 @@ export default function Travel() {
   }, [step, plan, packingList, resultsTab]);
 
   const handleStartPlan = () => {
+    setTravelWizardStep(0);
     setStep("inputs");
+  };
+
+  const inputWizardProgressPct = ((travelWizardStep + 1) / TRAVEL_INPUT_STEPS) * 100;
+
+  const advanceTravelWizard = () => {
+    if (travelWizardStep < TRAVEL_INPUT_STEPS - 1) {
+      setTravelWizardStep((s) => s + 1);
+      return;
+    }
+    handleGeneratePlan();
+  };
+
+  const backTravelWizard = () => {
+    if (travelWizardStep > 0) {
+      setTravelWizardStep((s) => s - 1);
+      return;
+    }
+    setStep("entry");
   };
   
   const defaultChecklist = [
@@ -1534,7 +1557,7 @@ export default function Travel() {
         </header>
 
         <ScenarioToolHeroCard
-          className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800"
+          className="surface-card border-border/60 shadow-none"
           classNames={{ content: "space-y-2 !pt-3 !pb-3.5 px-4 sm:px-5" }}
           body={
             <>
@@ -1546,7 +1569,7 @@ export default function Travel() {
               <p className="text-xs leading-snug text-muted-foreground" data-testid="travel-progress-guidance">
                 {todayFocus}
               </p>
-              <div className="border-t border-green-200/60 pt-2 dark:border-green-800/60">
+              <div className="border-t border-border/50 pt-2">
                 <ScenarioCoachLink
                   topic="travel"
                   from="travel-active"
@@ -1560,7 +1583,7 @@ export default function Travel() {
 
         {plan.tripStyle === "active" && hasStarted && !hasEnded ? (
           <Card
-            className="border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/25"
+            className="surface-card border-border/60 shadow-none"
             data-testid="card-travel-active-exercise"
           >
             <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:p-4">
@@ -1644,7 +1667,7 @@ export default function Travel() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-overview">
-            <Card data-testid="card-travel-overview-glance">
+            <Card className="surface-card border-border/60 shadow-none" data-testid="card-travel-overview-glance">
               <CardContent className="space-y-3 p-3 sm:p-4">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                   <div>
@@ -1748,9 +1771,9 @@ export default function Travel() {
             )}
 
             {todayScheduleEntries.length > 0 && !isPumpUser && hasStarted && !hasEnded && (
-              <Card className="border-purple-200 dark:border-purple-800">
+              <Card className="surface-card border-border/60 shadow-none">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     Today&apos;s insulin timing
                   </CardTitle>
@@ -1793,9 +1816,9 @@ export default function Travel() {
             )}
 
             {isPumpUser && plan.timezoneChange !== "none" && hasStarted && !hasEnded && (
-              <Card className="border-purple-200 dark:border-purple-800">
+              <Card className="surface-card border-border/60 shadow-none">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-lg">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     Timezone Reminder
                   </CardTitle>
@@ -1817,9 +1840,9 @@ export default function Travel() {
           </TabsContent>
 
           <TabsContent value="plan" className="mt-3 space-y-3 animate-fade-in-up" data-testid="tabcontent-travel-plan">
-            <Card className="border-red-200 dark:border-red-800">
+            <Card className="surface-card border-border/60 shadow-none">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-lg">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <Heart className="h-5 w-5 text-red-600 dark:text-red-400" />
                   Emergency Quick Access
                 </CardTitle>
@@ -1952,11 +1975,10 @@ export default function Travel() {
 
   if (step === "entry") {
     return (
-      <PageShell variant="standard" className="space-y-7">
+      <PageShell variant="narrow" density="compact" className="space-y-4">
         <PageHeader
           leading={<PageBackButton />}
           title="Travel"
-          description="Build a packing list from your supplies, or track holiday prep before you go."
           actions={
             <div data-testid="link-travel-entry-coach-wrap">
               <ScenarioCoachLink topic="travel" />
@@ -1964,71 +1986,56 @@ export default function Travel() {
           }
         />
 
-        <Card variant="glass" data-testid="card-travel-entry-hub">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Get started</CardTitle>
-            <CardDescription>
-              Choose a full travel plan (dates, timezone, packing list) or optional holiday prep (countdown + checklist).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8 pt-2">
-            <section className="space-y-3" aria-labelledby="travel-plan-heading">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h2 id="travel-plan-heading" className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  Travel plan
-                </h2>
-                <InlineInfoHint
-                  ariaLabel="What Travel Mode does"
-                  content={
-                    <div className="space-y-3 text-sm">
-                      <p>
-                        Builds a packing list from your trip details and tracked supplies, with buffers for delays and
-                        emergencies.
-                      </p>
-                      <p className="text-xs text-muted-foreground border-t border-border pt-2">
-                        Educational preparation only—not medical advice. Follow your care team.
-                      </p>
-                    </div>
-                  }
-                />
-              </div>
-              <Button onClick={handleStartPlan} className="w-full" size="lg" data-testid="button-start-travel-plan">
-                Start travel plan
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            </section>
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-foreground">What do you need?</h2>
+          <div className="grid gap-2">
+            <button
+              type="button"
+              onClick={handleStartPlan}
+              className={cn(
+                "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
+                "hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              )}
+              data-testid="button-start-travel-plan"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <MapPin className="h-4 w-4 text-primary" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-foreground">Travel plan</span>
+                <span className="block text-xs text-muted-foreground">Dates, packing list, timezone tips</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPrepForm(true)}
+              className={cn(
+                "group flex w-full items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3.5 py-3 text-left transition-all",
+                "hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              )}
+              data-testid="button-start-holiday-prep"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                <Luggage className="h-4 w-4 text-muted-foreground" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-foreground">Holiday prep</span>
+                <span className="block text-xs text-muted-foreground">Countdown and checklist before you go</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/70" aria-hidden />
+            </button>
+          </div>
+        </section>
 
-            <section className="space-y-3 border-t border-border/60 pt-6" aria-labelledby="holiday-prep-heading">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <h2 id="holiday-prep-heading" className="text-sm font-semibold flex items-center gap-2">
-                  <Luggage className="h-4 w-4 text-muted-foreground" />
-                  Holiday prep
-                </h2>
-                <InlineInfoHint
-                  ariaLabel="About Holiday Prep"
-                  content={
-                    <p className="text-sm">
-                      Optional: set trip dates for a supply coverage check and a preparation checklist. Clears
-                      automatically after your return date.
-                    </p>
-                  }
-                />
-              </div>
-              <div className="space-y-4">
-            {!holidayPrep && !showPrepForm && (
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={() => setShowPrepForm(true)}
-                data-testid="button-start-holiday-prep"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Plan a Holiday
-              </Button>
-            )}
-
-            {showPrepForm && !holidayPrep && (
+        {(showPrepForm || holidayPrep) && (
+          <Card className="surface-card border-border/60 shadow-none" data-testid="card-travel-entry-hub">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Holiday prep</CardTitle>
+              <CardDescription>Optional countdown and supply check before departure.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              {showPrepForm && !holidayPrep ? (
               <div className="space-y-4" data-testid="holiday-prep-form">
                 <div className="space-y-2">
                   <Label>Where are you going?</Label>
@@ -2079,7 +2086,7 @@ export default function Travel() {
                   </Button>
                 </div>
               </div>
-            )}
+              ) : null}
 
             {holidayPrep && (() => {
               const daysUntil = getPrepDaysUntilDeparture();
@@ -2299,58 +2306,57 @@ export default function Travel() {
                 </div>
               );
             })()}
-              </div>
-            </section>
+            </CardContent>
+          </Card>
+        )}
 
-            <section className="border-t border-border/60 pt-6 space-y-3" aria-labelledby="travel-extras-heading">
-              <h2 id="travel-extras-heading" className="text-sm font-semibold text-muted-foreground">
-                Before you go
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2" data-testid="card-pretravel-appointment">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-medium">Appointments</span>
-                    <InlineInfoHint
-                      ariaLabel="Why book before you travel"
-                      content={
-                        <p className="text-sm">
-                          Letters for travel and extra supplies often need planning—book ahead where you can.
-                        </p>
-                      }
-                    />
-                  </div>
-                  <Link href="/appointments" className="block">
-                    <Button variant="secondary" className="w-full" size="sm" data-testid="link-pretravel-appointments">
-                      View appointments
-                    </Button>
-                  </Link>
-                </div>
-                <div className="rounded-xl border border-border/60 bg-muted/10 p-3 space-y-2">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <Globe className="h-4 w-4 text-red-600 shrink-0" />
-                    <span className="text-sm font-medium">Emergency card</span>
-                    <InlineInfoHint
-                      ariaLabel="About the emergency card"
-                      content={
-                        <p className="text-sm">
-                          Short medical alert text you can show or translate when you need help abroad.
-                        </p>
-                      }
-                    />
-                  </div>
-                  <Link href="/emergency-card" className="block">
-                    <Button variant="secondary" className="w-full" size="sm" data-testid="button-emergency-card">
-                      <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
-                      Open emergency card
-                      <ChevronRight className="h-4 w-4 ml-auto" />
-                    </Button>
-                  </Link>
-                </div>
+        <section className="space-y-3" aria-labelledby="travel-extras-heading">
+          <h2 id="travel-extras-heading" className="text-sm font-semibold text-muted-foreground">
+            Before you go
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border/60 bg-card/40 p-3 space-y-2" data-testid="card-pretravel-appointment">
+              <div className="flex flex-wrap items-center gap-1">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium">Appointments</span>
+                <InlineInfoHint
+                  ariaLabel="Why book before you travel"
+                  content={
+                    <p className="text-sm">
+                      Letters for travel and extra supplies often need planning—book ahead where you can.
+                    </p>
+                  }
+                />
               </div>
-            </section>
-          </CardContent>
-        </Card>
+              <Link href="/appointments" className="block">
+                <Button variant="secondary" className="w-full rounded-xl" size="sm" data-testid="link-pretravel-appointments">
+                  View appointments
+                </Button>
+              </Link>
+            </div>
+            <div className="rounded-xl border border-border/60 bg-card/40 p-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-1">
+                <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium">Emergency card</span>
+                <InlineInfoHint
+                  ariaLabel="About the emergency card"
+                  content={
+                    <p className="text-sm">
+                      Short medical alert text you can show or translate when you need help abroad.
+                    </p>
+                  }
+                />
+              </div>
+              <Link href="/emergency-card" className="block">
+                <Button variant="secondary" className="w-full rounded-xl" size="sm" data-testid="button-emergency-card">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Open emergency card
+                  <ChevronRight className="h-4 w-4 ml-auto" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
 
         <TravelDisclaimerCard />
 
@@ -2360,29 +2366,52 @@ export default function Travel() {
 
   if (step === "inputs") {
     return (
-      <PageShell variant="standard" className="space-y-7">
-        <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-100 dark:border-purple-900">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <PageBackButton />
-              <CardTitle className="text-xl">
-                Travel{" "}
-                <span className="text-sm font-normal text-muted-foreground">— Tell us about your upcoming travel</span>
-              </CardTitle>
+      <PageShell variant="narrow" density="compact" className="space-y-4 pb-24">
+        <PageHeader
+          leading={
+            <Button type="button" variant="ghost" size="icon" className="mr-2" aria-label="Go back" onClick={backTravelWizard}>
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          }
+          title="Travel plan"
+          actions={<ScenarioCoachLink topic="travel" from="travel-setup" />}
+        />
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span>
+              Step {travelWizardStep + 1} of {TRAVEL_INPUT_STEPS}
+            </span>
+            <span>{INPUT_STEP_TITLES[travelWizardStep]}</span>
+          </div>
+          <Progress value={inputWizardProgressPct} className="h-1" data-testid="travel-input-progress" />
+        </div>
+
+        <Card className="surface-card border-border/60 shadow-none">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60">
+                <Plane className="h-4 w-4 text-primary" aria-hidden />
+              </span>
+              <CardTitle className="text-base font-semibold">{INPUT_STEP_TITLES[travelWizardStep]}</CardTitle>
             </div>
           </CardHeader>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Trip information</CardTitle>
-            <CardDescription>
-              We'll use this to calculate your supply needs with appropriate safety buffers.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-5 pt-0">
+            {travelWizardStep === 0 ? (
+              <>
             <div className="space-y-2">
-              <Label>Travel Duration</Label>
+              <Label htmlFor="destination">Destination</Label>
+              <Input
+                id="destination"
+                placeholder="City, country"
+                value={plan.destination}
+                onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
+                data-testid="input-destination"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Duration</Label>
               <div className="flex flex-wrap gap-2">
                 {[
                   { label: "Weekend", days: 3 },
@@ -2485,18 +2514,7 @@ export default function Travel() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="destination">Destination</Label>
-              <Input
-                id="destination"
-                placeholder="City, Country"
-                value={plan.destination}
-                onChange={(e) => setPlan(prev => ({ ...prev, destination: e.target.value }))}
-                data-testid="input-destination"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Travel Type</Label>
+              <Label>Travel type</Label>
               <Select 
                 value={plan.travelType} 
                 onValueChange={(value: "domestic" | "international") => setPlan(prev => ({ ...prev, travelType: value }))}
@@ -2510,11 +2528,15 @@ export default function Travel() {
                 </SelectContent>
               </Select>
             </div>
+              </>
+            ) : null}
 
+            {travelWizardStep === 1 ? (
+              <>
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Luggage className="h-4 w-4 text-muted-foreground" aria-hidden />
-                What&apos;s the trip like?
+                Trip style
               </Label>
               <Select
                 value={plan.tripStyle ?? "not_sure"}
@@ -2541,13 +2563,11 @@ export default function Travel() {
                   <SelectItem value="family">Visiting family or friends</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Shapes tips while you travel — you can change this when you edit your plan.
-              </p>
+              <p className="text-xs text-muted-foreground">Shapes tips while you travel.</p>
             </div>
 
             <div className="space-y-2">
-              <Label>Timezone Change</Label>
+              <Label>Timezone change</Label>
               <Select 
                 value={plan.timezoneChange} 
                 onValueChange={(value: "none" | "minor" | "major") => {
@@ -2608,9 +2628,13 @@ export default function Travel() {
                 </p>
               </div>
             )}
+              </>
+            ) : null}
 
+            {travelWizardStep === 2 ? (
+              <>
             <div className="space-y-2">
-              <Label>Pharmacy Access at Destination</Label>
+              <Label>Pharmacy access</Label>
               <Select 
                 value={plan.accessRisk} 
                 onValueChange={(value: "easy" | "limited" | "unsure") => setPlan(prev => ({ ...prev, accessRisk: value }))}
@@ -2675,23 +2699,38 @@ export default function Travel() {
               </div>
             )}
 
-            <Alert>
+            <Alert className="border-border/60 bg-muted/20">
               <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                Your packing list will be generated using data from your Supply Tracker. 
-                Make sure your supplies are up to date for the most accurate recommendations.
+              <AlertDescription className="text-xs">
+                Packing uses your Supply Tracker — keep supplies up to date for accurate quantities.
               </AlertDescription>
             </Alert>
+              </>
+            ) : null}
 
-            <Button 
-              onClick={handleGeneratePlan} 
-              className="w-full"
-              size="lg"
-              data-testid="button-generate-plan"
-            >
-              Generate Travel Plan
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
+            <div className="flex gap-2 pt-1">
+              <Button type="button" variant="outline" className="min-h-11 flex-1 rounded-xl" onClick={backTravelWizard}>
+                {travelWizardStep === 0 ? "Back" : "Previous"}
+              </Button>
+              <Button
+                type="button"
+                className="min-h-11 flex-1 rounded-xl"
+                onClick={advanceTravelWizard}
+                data-testid={travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? "button-generate-plan" : "button-travel-wizard-next"}
+              >
+                {travelWizardStep === TRAVEL_INPUT_STEPS - 1 ? (
+                  <>
+                    Generate plan
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </PageShell>
@@ -2706,46 +2745,45 @@ export default function Travel() {
 
   const checkedCount = packingList.filter(i => i.checked).length;
 
+  const packingPct = packingList.length > 0 ? Math.round((checkedCount / packingList.length) * 100) : 0;
+
   return (
-    <PageShell variant="standard" className="space-y-7">
-      <div className="flex items-start gap-2 border-b border-border/60 pb-3 mb-3">
-        <div className="shrink-0">
-          <PageBackButton />
-        </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <h1 className="text-base font-semibold leading-snug text-balance break-words sm:text-lg">
-            {plan.destination || "Trip"}
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              · {plan.duration} day{plan.duration === 1 ? "" : "s"}
-            </span>
-          </h1>
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <p className="text-xs text-muted-foreground min-w-0">
-              {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start date"} –{" "}
-              {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End date"}
-            </p>
-            <Badge variant="outline" className="shrink-0 text-xs">
-              {plan.travelType === "international" ? "International" : "Domestic"}
-            </Badge>
-          </div>
+    <PageShell variant="narrow" density="compact" className="space-y-4">
+      <PageHeader
+        leading={<PageBackButton fallbackHref="/scenarios" />}
+        title={plan.destination || "Trip"}
+        actions={<ScenarioCoachLink topic="travel" from="travel-results" />}
+      />
+
+      <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/10 via-card to-card shadow-sm ring-1 ring-primary/10">
+        <div className="px-5 pb-4 pt-5 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Packing progress</p>
+          <p className="mt-1 font-display text-5xl font-bold tabular-nums tracking-tight text-foreground">
+            {checkedCount}/{packingList.length}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {plan.duration} day{plan.duration === 1 ? "" : "s"} ·{" "}
+            {formatTripDate(plan.startDate, profile, { day: "numeric", month: "short" }) || "Start"} –{" "}
+            {formatTripDate(plan.endDate, profile, { day: "numeric", month: "short", year: "numeric" }) || "End"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground capitalize">
+            {plan.travelType} · {packingPct}% packed
+          </p>
         </div>
       </div>
 
       <div
         className={cn(
-          "rounded-xl border px-3 py-2.5 mb-4 flex flex-wrap items-center justify-between gap-2",
-          isTravelModeActive
-            ? "border-green-500/40 bg-green-500/[0.08] dark:bg-green-950/25"
-            : "border-border/60 bg-muted/20",
+          "rounded-2xl border px-3 py-2.5 flex flex-wrap items-center justify-between gap-2",
+          isTravelModeActive ? "border-primary/30 bg-primary/5" : "border-border/60 bg-card/40",
         )}
         data-testid="strip-travel-mode-status"
       >
         {isTravelModeActive ? (
           <>
             <div className="flex items-center gap-2 min-w-0">
-              <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-              <p className="text-sm font-medium text-green-900 dark:text-green-100 truncate">Travel mode on</p>
+              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+              <p className="text-sm font-medium truncate">Travel mode on</p>
             </div>
             <Button size="sm" variant="outline" onClick={handleDeactivateTravelMode} data-testid="button-deactivate-travel">
               End
@@ -2793,20 +2831,14 @@ export default function Travel() {
         </TabsList>
 
         <TabsContent value="packing" className="mt-4 space-y-4">
-          <Card data-testid="card-smart-packing-list">
+          <Card className="surface-card border-border/60 shadow-none" data-testid="card-smart-packing-list">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Package className="h-5 w-5" />
-                  Smart packing list
-                </CardTitle>
+                <CardTitle className="text-base font-semibold">Packing list</CardTitle>
                 <Badge variant="secondary" className="tabular-nums">
                   {checkedCount}/{packingList.length}
                 </Badge>
               </div>
-              <CardDescription className="text-xs">
-                Tap to pack. Use the info button on each row to see how quantities were estimated.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
               {(Object.keys(categoryLabels) as Array<keyof typeof categoryLabels>).map((category) => {
