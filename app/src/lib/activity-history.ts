@@ -262,6 +262,20 @@ export function collectAllActivityEvents(): ActivityEvent[] {
     );
   }
 
+  for (const touch of storage.getExerciseToolUses()) {
+    add(
+      event({
+        id: `exercise-tool-${touch.id}`,
+        kind: "exercise_session",
+        at: touch.usedAt,
+        title: touch.source === "calculate" ? "Exercise planning" : "Exercise session started",
+        subtitle:
+          touch.source === "calculate" ? "Pre-exercise fuel calculator" : "Guided exercise coach",
+        href: "/scenarios/exercise",
+      }),
+    );
+  }
+
   for (const ratio of storage.getRatioHistory()) {
     const at = ratio.date.includes("T") ? ratio.date : `${ratio.date}T12:00:00`;
     add(

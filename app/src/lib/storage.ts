@@ -69,6 +69,8 @@ const STORAGE_KEYS = {
   EXERCISE_ROUTINES: "diabeater_exercise_routines",
   ACTIVE_EXERCISE: "diabeater_active_exercise",
   EXERCISE_OUTCOMES: "diabeater_exercise_outcomes",
+  /** Lightweight exercise guide usage for streaks (calculate / start guided session). */
+  EXERCISE_TOOL_USES: "diabeater_exercise_tool_uses_v1",
   ALCOHOL_SESSION: "diabeater_alcohol_session",
   PUMP_FAILURE_SESSION: "diabeater_pump_failure_session",
   LAST_EXERCISE_ENDED_AT: "diabeater_last_exercise_ended_at",
@@ -82,6 +84,13 @@ const STORAGE_KEYS = {
 } as const;
 
 const MAX_APP_CHECK_IN_DAYS = 120;
+const MAX_EXERCISE_TOOL_USES = 120;
+
+function exerciseStreakDayKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return format(startOfDay(d), "yyyy-MM-dd");
+}
 
 type StorageLogicalKey = keyof typeof STORAGE_KEYS;
 
@@ -1402,6 +1411,14 @@ export interface ExerciseOutcome {
   /** Set when the session was logged while travel mode was active (local patterns only). */
   duringTravel?: boolean;
   completedAt: string;
+}
+
+export type ExerciseToolUseSource = "calculate" | "guided_start";
+
+export interface ExerciseToolUse {
+  id: string;
+  usedAt: string;
+  source: ExerciseToolUseSource;
 }
 
 export const ALL_QUICK_ACTIONS: { id: QuickActionId; label: string; href: string; iconName: string; color: string }[] = [
@@ -4664,6 +4681,64 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.EXERCISE_OUTCOMES, JSON.stringify(outcomes));
     notifyExerciseOutcomesChanged();
     return newOutcome;
+  },
+
+  getExerciseToolUses(): ExerciseToolUse[] {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.EXERCISE_TOOL_USES);
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      const out: ExerciseToolUse[] = [];
+      for (const row of parsed) {
+        if (!row || typeof row !== "object") continue;
+        const r = row as Record<string, unknown>;
+        const id = typeof r.id === "string" ? r.id : "";
+        const usedAt = typeof r.usedAt === "string" ? r.usedAt : "";
+        const source = r.source === "calculate" || r.source === "guided_start" ? r.source : null;
+        if (!id || !usedAt || !source) continue;
+        out.push({ id, usedAt, source });
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  },
+
+  hasExerciseStreakCreditForDay(dayKey: string): boolean {
+    if (!dayKey) return false;
+    for (const outcome of this.getExerciseOutcomes()) {
+      if (exerciseStreakDayKey(outcome.completedAt) === dayKey) return true;
+    }
+    for (const touch of this.getExerciseToolUses()) {
+      if (exerciseStreakDayKey(touch.usedAt) === dayKey) return true;
+    }
+    return false;
+  },
+
+  /**
+   * Records exercise guide usage for streaks/achievements (Calculate or Start guided session).
+   * At most one tool-use row per calendar day; finishing a session still counts via outcomes.
+   */
+  recordExerciseToolUse(source: ExerciseToolUseSource): boolean {
+    const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
+    if (this.hasExerciseStreakCreditForDay(todayKey)) return false;
+
+    const uses = this.getExerciseToolUses();
+    const entry: ExerciseToolUse = {
+      id: generateId(),
+      usedAt: new Date().toISOString(),
+      source,
+    };
+    uses.unshift(entry);
+    if (uses.length > MAX_EXERCISE_TOOL_USES) uses.length = MAX_EXERCISE_TOOL_USES;
+    try {
+      localStorage.setItem(STORAGE_KEYS.EXERCISE_TOOL_USES, JSON.stringify(uses));
+      notifyExerciseOutcomesChanged();
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   getExercisePatterns(exerciseType: ExerciseType, intensity?: ExerciseIntensity): {

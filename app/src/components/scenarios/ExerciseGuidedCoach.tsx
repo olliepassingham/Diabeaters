@@ -445,6 +445,7 @@ export function ExerciseGuidedCoach() {
     setActiveSession(withDefaults);
     setPlanWorkoutOpen(false);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
+    storage.recordExerciseToolUse("guided_start");
     void scheduleExercisePreReminders(session, 0);
     scrollToActiveGuidedCoach();
   };
@@ -463,6 +464,7 @@ export function ExerciseGuidedCoach() {
     setActiveSession(withDefaults);
     setPlanWorkoutOpen(false);
     setRoutines(storage.getRecentExercises?.(8) ?? []);
+    storage.recordExerciseToolUse("guided_start");
     void scheduleExercisePreReminders(session, 0);
     scrollToActiveGuidedCoach();
   };

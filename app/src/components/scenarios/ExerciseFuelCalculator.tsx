@@ -497,6 +497,7 @@ export function ExerciseFuelCalculator() {
     });
     setResult(next);
     setFormOpen(false);
+    storage.recordExerciseToolUse("calculate");
     window.requestAnimationFrame(() => {
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
