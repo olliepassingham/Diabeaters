@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeShellForPushTestUi } from "@/lib/native-platform";
+import { isProd } from "@/lib/flags";
 import { isPushTestUiUnlocked, unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
 /**
@@ -34,7 +35,7 @@ export function PushTestUnlockCallout({ className }: { className?: string }) {
     }, 450);
   }, [toast]);
 
-  if (!isNativeShellForPushTestUi() || isPushTestUiUnlocked()) return null;
+  if (isProd || !isNativeShellForPushTestUi() || isPushTestUiUnlocked()) return null;
 
   return (
     <div className={className}>

@@ -5,7 +5,6 @@ import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
-import { useLinkedPatient } from "@/lib/carers";
 import { upsertProfile, updateProfile, useProfile } from "@/lib/profile";
 import { getSupabase } from "@/lib/supabase";
 import { uploadProfileAvatar } from "@/lib/storage-profile";
@@ -31,7 +30,7 @@ import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { SettingsEmergencySection } from "@/pages/settings/shared";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { clearCarerClientSessionKeys, getActiveAppMode, getPrimaryAppRole, type ActiveAppMode, canSwitchAppMode } from "@/lib/carer-session";
-import { useLinkedCarer } from "@/hooks/use-linked-carer";
+import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -85,9 +84,7 @@ function accountTabFromHash(hash: string): AccountPageTab {
 
 export default function Account() {
   const { user } = useAuth();
-  const { isCarer: hasCarerLink, loading: carerLinkLoading } = useLinkedCarer();
-  const { data: linkedPatient } = useLinkedPatient();
-  const isCarer = !!linkedPatient;
+  const { hasCarerLink, inSupporterSession, loading: carerLinkLoading } = useSupporterSession();
   const { profile, loading: profileLoading, refresh } = useProfile();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -184,11 +181,11 @@ export default function Account() {
 
   useEffect(() => {
     if (!user) return;
-    if (!isCarer) return;
+    if (!inSupporterSession) return;
     if (typeof window === "undefined") return;
     if (window.location.hash !== "#account-emergency") return;
     setLocation("/carer-view#carer-emergency");
-  }, [user, isCarer, setLocation]);
+  }, [user, inSupporterSession, setLocation]);
 
   if (!user) return null;
 
@@ -535,7 +532,7 @@ export default function Account() {
             aria-label="Choose profile photo"
           />
 
-          {!isCarer && !isCommunityAccount && (
+          {!inSupporterSession && !isCommunityAccount && (
             <Button variant="outline" size="sm" className="col-span-2" asChild>
               <Link href="/family-carers" data-testid="link-manage-carers">
                 Manage supporters
@@ -569,7 +566,7 @@ export default function Account() {
         </Alert>
       )}
 
-      {!isCarer && !isCommunityAccount && (
+      {!inSupporterSession && !isCommunityAccount && (
         <ProfileMutedCard id="account-emergency" testId="account-emergency-card">
           <SettingsEmergencySection variant="embedded" showSyncButton={false} />
         </ProfileMutedCard>
@@ -626,7 +623,7 @@ export default function Account() {
         <PageHeader
           title="Account"
           description={
-            isCarer
+            inSupporterSession
               ? "Your account and sign-in options. Open Supporter Mode to see the people you support."
               : isCommunityAccount
                 ? "Your community profile and sign-in options."
@@ -689,7 +686,7 @@ export default function Account() {
               onOpenFollowers={() => void openFollowList("followers")}
               onOpenFollowing={() => void openFollowList("following")}
               onEditProfile={goToAccountProfileEditor}
-              supporterMode={isCarer}
+              supporterMode={inSupporterSession}
             />
           </TabsContent>
         </Tabs>

@@ -5,7 +5,7 @@ import { useLocation } from "wouter";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { isPushTestUiEnabled } from "@/lib/flags";
+import { isPushTestUiEnabled, isProd } from "@/lib/flags";
 import {
   ensureNativeLocalNotificationPermission,
 } from "@/lib/native-local-notifications";
@@ -72,8 +72,9 @@ export function DevPushNotificationTestPanel() {
   }, [location]);
 
   const nativeShell = isNativeShellForPushTestUi();
-  /** Never show in the browser — push test is native-only. Production users need the About → Version unlock. */
-  const showPanel = nativeShell && (isPushTestUiEnabled || unlocked);
+  /** Native-only, non-production: local dev, staging/TestFlight QA, or explicit build flag — never App Store / prod web. */
+  const showPanel =
+    !isProd && nativeShell && (import.meta.env.DEV || isPushTestUiEnabled || unlocked);
 
   useEffect(() => {
     if (!showPanel || !isNativePushPlatform()) return;

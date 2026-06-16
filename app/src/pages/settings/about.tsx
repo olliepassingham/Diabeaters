@@ -16,6 +16,7 @@ import {
 } from "./shared";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeShellForPushTestUi } from "@/lib/native-platform";
+import { isProd } from "@/lib/flags";
 import { unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
 type SettingsAboutRouteProps = {
@@ -29,7 +30,7 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
   const versionTapRef = useRef({ count: 0, lastAt: 0 });
 
   const onVersionTap = useCallback(() => {
-    if (!isNativeShellForPushTestUi()) return;
+    if (isProd || !isNativeShellForPushTestUi()) return;
     const now = Date.now();
     const maxGapMs = 2500;
     const prev = versionTapRef.current;

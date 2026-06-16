@@ -8,13 +8,13 @@ import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
 import { WidgetCard } from "./WidgetCard";
 import type { DashboardWidgetLayoutProps } from "./types";
 import { isCompactLayout } from "./types";
-import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 
 export function HelpNowInfoWidget(props: DashboardWidgetLayoutProps) {
   const compact = isCompactLayout(props);
-  const { data: linkedPatient } = useLinkedPatient();
-  const emergencyEditHref = emergencyDetailsEditHref(!!linkedPatient);
+  const { inSupporterSession } = useSupporterSession();
+  const emergencyEditHref = emergencyDetailsEditHref(inSupporterSession);
   const { data: emergency, syncGeneration } = useEmergencyProfile();
   const primaryContact = toLegacyPrimaryContact(emergency);
 

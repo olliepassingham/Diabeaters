@@ -802,14 +802,18 @@ function InnerRouter() {
         </Suspense>
       </Route>
       <Route path="/tools/hypo-history">
-        <Suspense fallback={<RouteFallback />}>
-          <HypoHistoryPage />
-        </Suspense>
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <HypoHistoryPage />
+          </Suspense>
+        </PatientRouteGuard>
       </Route>
       <Route path="/tools/activity">
-        <Suspense fallback={<RouteFallback />}>
-          <ActivityLogPage />
-        </Suspense>
+        <PatientRouteGuard>
+          <Suspense fallback={<RouteFallback />}>
+            <ActivityLogPage />
+          </Suspense>
+        </PatientRouteGuard>
       </Route>
       <Route path="/tools/achievements">
         <PatientRouteGuard>

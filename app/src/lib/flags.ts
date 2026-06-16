@@ -33,9 +33,8 @@ export function includeDmThreadsInHomeScreenBadge(): boolean {
 export const isAiCoachEnabled = import.meta.env.VITE_FEATURE_AI_COACH !== "false";
 
 /**
- * Settings → Notifications: “Send test push” panel (native shell only). Hidden on public App Store /
- * production web builds unless the tester unlocks via About → Version (seven taps on device). Use
- * **staging** or `VITE_SHOW_PUSH_TEST=true` at build time for internal TestFlight / QA.
+ * Settings → Notifications: “Send test push” panel (native shell only). Shown in local dev, staging
+ * (`VITE_APP_ENV=staging`), or when `VITE_SHOW_PUSH_TEST=true` at build time — never in production.
  */
 export const isPushTestUiEnabled =
   isStaging || import.meta.env.VITE_SHOW_PUSH_TEST === "true";

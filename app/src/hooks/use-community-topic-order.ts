@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { orderedCommunityTopicsForViewer, type CommunityTopicRow } from "@/lib/community/topics";
-import { getActiveAppMode, getPrimaryAppRole } from "@/lib/carer-session";
+import { getActiveAppMode, isCarerSessionMode } from "@/lib/carer-session";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useProfile } from "@/lib/profile";
 import { storage } from "@/lib/storage";
@@ -11,7 +11,7 @@ import { normalizeDateOfBirthInput } from "@/lib/user-age";
  */
 export function useCommunityTopicOrder(): readonly CommunityTopicRow[] {
   const { profile } = useProfile();
-  const { isCarer } = useLinkedCarer();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
   const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
 
   useEffect(() => {
@@ -20,8 +20,7 @@ export function useCommunityTopicOrder(): readonly CommunityTopicRow[] {
     return () => window.removeEventListener("diabeater:app-mode", onMode);
   }, []);
 
-  const lensMode = activeMode ?? getPrimaryAppRole();
-  const supporterFeed = Boolean(isCarer && lensMode === "carer");
+  const supporterFeed = isCarerSessionMode(hasCarerLink, activeMode);
 
   return useMemo(() => {
     const localDob = normalizeDateOfBirthInput(storage.getProfile()?.dateOfBirth ?? null);

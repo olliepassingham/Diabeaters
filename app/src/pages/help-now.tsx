@@ -15,7 +15,7 @@ import { Link } from "wouter";
 import { storage, UserProfile, DIABEATER_PROFILE_CHANGED_EVENT } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { useProfile } from "@/lib/profile";
-import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { emergencyDetailsEditHref } from "@/lib/emergency-details-edit-href";
 import { useEmergencyProfile } from "@/hooks/use-emergency-profile";
 import { toLegacyPrimaryContact } from "@/lib/emergency-sync";
@@ -62,9 +62,8 @@ function StepList({ steps, urgent }: { steps: readonly string[]; urgent?: boolea
 }
 
 export default function HelpNow() {
-  const { data: linkedPatient } = useLinkedPatient();
-  const isCarer = !!linkedPatient;
-  const emergencyEditHref = emergencyDetailsEditHref(isCarer);
+  const { inSupporterSession } = useSupporterSession();
+  const emergencyEditHref = emergencyDetailsEditHref(inSupporterSession);
   const { profile: cloudProfile } = useProfile();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [mode, setMode] = useState<"awake" | "unconscious">("awake");

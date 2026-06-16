@@ -73,7 +73,7 @@ import {
 } from "@/lib/region";
 import { getSupabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLinkedPatient } from "@/hooks/use-linked-patient";
+import { useSupporterSession } from "@/hooks/use-supporter-session";
 import { SettingsAppearanceRoute } from "./appearance";
 import { SettingsUsageRoute } from "./usage";
 import { SettingsNotificationsRoute } from "./notifications";
@@ -968,9 +968,8 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const { profile: cloudProfile } = useProfile();
   const [location, setLocation] = useLocation();
-  const { data: linkedPatient } = useLinkedPatient();
-  const isCarer = !!linkedPatient;
-  const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({ hasCarerLink: isCarer });
+  const { hasCarerLink, inSupporterSession } = useSupporterSession();
+  const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({ hasCarerLink });
   const pathOnly = (location.split("?")[0] ?? "/settings").replace(/\/$/, "") || "/settings";
   const skipSettingsHashScrollRef = useRef(false);
 
@@ -1018,7 +1017,7 @@ export default function Settings() {
   const [usesClosedLoop, setUsesClosedLoop] = useState(false);
   
   const isCommunityAccount = profile?.accountType === "community";
-  const hidePatientClinicalHub = isCarer || isCommunityAccount;
+  const hidePatientClinicalHub = inSupporterSession || isCommunityAccount;
 
   const [notifSettings, setNotifSettings] = useState<NotificationSettings>({
     enabled: true,
@@ -1173,7 +1172,7 @@ export default function Settings() {
 
     const qs = location.includes("?") ? location.slice(location.indexOf("?") + 1) : "";
     const tab = new URLSearchParams(qs).get("tab");
-    const emergencyEdit = isCarer ? "/carer-view#carer-emergency" : "/account#account-emergency";
+    const emergencyEdit = inSupporterSession ? "/carer-view#carer-emergency" : "/account#account-emergency";
     const tabRoutes: Record<string, string> = {
       profile: "/settings/usage#settings-personal",
       insulin: "/settings/ratios",
@@ -1212,7 +1211,7 @@ export default function Settings() {
     };
     const target = hashRoutes[raw];
     if (target) setLocation(target);
-  }, [location, pathOnly, setLocation, isCarer]);
+  }, [location, pathOnly, setLocation, inSupporterSession]);
 
   useLayoutEffect(() => {
     scrollAppMainToTop("auto");
@@ -1655,7 +1654,7 @@ export default function Settings() {
       }
     }
     if (key === "bedtimeCheckReminders" || key === "enabled") {
-      void rescheduleBedtimeReminders({ hasCarerLink: isCarer });
+      void rescheduleBedtimeReminders({ hasCarerLink });
     }
     if (key === "pumpChangeReminders" || key === "enabled") {
       void reschedulePumpChangeReminders();
@@ -1667,7 +1666,7 @@ export default function Settings() {
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
     void syncNotificationPreferences(updated);
-    void rescheduleBedtimeReminders({ hasCarerLink: isCarer });
+    void rescheduleBedtimeReminders({ hasCarerLink });
   };
 
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {
@@ -1978,7 +1977,7 @@ export default function Settings() {
         <PageHeader
           title="Settings"
           description={
-            isCarer
+            inSupporterSession
               ? "Your supporter account, alerts, and appearance."
               : isCommunityAccount
                 ? "Community profile, alerts, and appearance."
@@ -2013,7 +2012,7 @@ export default function Settings() {
           </Card>
         </Link>
 
-        {!isCarer && !isCommunityAccount && showSoftSetupCard ? (
+        {!inSupporterSession && !isCommunityAccount && showSoftSetupCard ? (
           <div className="space-y-2">
             <SettingsSetupBanner
               percentage={completion.percentage}
@@ -2060,7 +2059,7 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        {!isCarer && (
+        {!inSupporterSession && (
           <SettingsHubGroup title="Community">
             <SettingsHubNavLink
               href="/account#profile"
@@ -2088,7 +2087,7 @@ export default function Settings() {
           </SettingsHubGroup>
         )}
 
-        {!isCarer && !isCommunityAccount && (
+        {!inSupporterSession && !isCommunityAccount && (
           <SettingsHubGroup title="Family & sharing">
             <SettingsHubNavLink
               href="/family-carers"
@@ -2113,7 +2112,7 @@ export default function Settings() {
             href="/settings/notifications"
             label="Alerts"
             description={
-              isCarer
+              inSupporterSession
                 ? "Feed, messages, and device alerts for your supporter account"
                 : isCommunityAccount
                   ? "Feed, messages, and device alerts"
@@ -2162,7 +2161,7 @@ export default function Settings() {
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
         onBedtimeReminderTimeChange={handleBedtimeReminderTime}
-        supporterMode={isCarer}
+        supporterMode={inSupporterSession}
         showBedtimeCheckReminders={showBedtimeCheckReminders}
       />
     );
