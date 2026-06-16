@@ -398,8 +398,9 @@ test.describe("Account page", () => {
 
     await page.goto("/account");
     await page.getByTestId("account-delete-trigger").click();
+    await expect(page.getByTestId("account-delete-submit")).toBeVisible({ timeout: 5000 });
+    await page.getByTestId("account-delete-alternatives-trigger").click();
     await expect(page.getByTestId("account-delete-copy-request")).toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId("account-delete-submit")).toBeVisible();
     const gmailLink = page.getByTestId("account-delete-gmail");
     if ((await gmailLink.count()) > 0) {
       await expect(gmailLink).toHaveAttribute("href", /mail\.google\.com\/mail\//);

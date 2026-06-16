@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountPublicProfileTab } from "@/pages/account/account-public-tab";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { isUserVerified, logout } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedPatient } from "@/lib/carers";
@@ -36,6 +36,7 @@ import { isCommunityEnabled } from "@/lib/flags";
 import { getFollowCounts, listFollowers, listFollowing } from "@/lib/community";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AccountCommunityProfileFields } from "@/components/account-community-profile-fields";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import heic2any from "heic2any";
 import {
   AlertDialog,
@@ -108,6 +109,7 @@ export default function Account() {
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [accountDeletionOpen, setAccountDeletionOpen] = useState(false);
+  const [accountDeletionAlternativesOpen, setAccountDeletionAlternativesOpen] = useState(false);
   const [accountDeletionSubmitBusy, setAccountDeletionSubmitBusy] = useState(false);
   const [publicCounts, setPublicCounts] = useState<{ followers: number; following: number } | null>(null);
   const [followListKind, setFollowListKind] = useState<"followers" | "following" | null>(null);
@@ -263,9 +265,10 @@ export default function Account() {
     }
     toast({
       title: "Request received",
-      description: "We’ll process your deletion request. You can follow up by email if needed.",
+      description: `We'll process your deletion request for ${email}. Contact ${supportEmail} if you need to follow up.`,
     });
     setAccountDeletionOpen(false);
+    setAccountDeletionAlternativesOpen(false);
   }
 
   async function copyAccountDeletionRequest() {
@@ -694,95 +697,118 @@ export default function Account() {
         <div className="space-y-6">{accountTabPanel}</div>
       )}
 
-      <AlertDialog open={accountDeletionOpen} onOpenChange={setAccountDeletionOpen}>
+      <AlertDialog
+        open={accountDeletionOpen}
+        onOpenChange={(open) => {
+          setAccountDeletionOpen(open);
+          if (!open) setAccountDeletionAlternativesOpen(false);
+        }}
+      >
         <AlertDialogContent className="max-h-[90vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>Request account deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              We include your account email and user ID so support can verify your request. You can send a request in one
-              tap (saved for our team), copy the text to paste anywhere, open Gmail in your browser, or use your
-              device&apos;s default mail app.
+              We&apos;ll queue a deletion request for our team. This usually includes your profile, logs, and other data
+              tied to <span className="font-medium text-foreground">{email}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 text-sm text-left text-muted-foreground">
-            {!supportEmail.trim() ? (
+            <p>
+              Tap submit below and we&apos;ll take it from there. You don&apos;t need to write an email unless you
+              prefer to.
+            </p>
+            {!supportEmail.trim() && import.meta.env.DEV ? (
               <Alert>
                 <AlertDescription>
-                  {import.meta.env.DEV ? (
-                    <>
-                      Add{" "}
-                      <code className="text-xs">VITE_SUPPORT_EMAIL=info@diabeaters.world</code> to repo{" "}
-                      <code className="text-xs">.env.local</code> (then restart the dev server) for Gmail and default-mail
-                      links. &quot;Send deletion request&quot; still works without it. You can still copy the text below.
-                    </>
-                  ) : (
-                    <>
-                      Copy the message below and send it from your email app to your Diabeaters support address. If you
-                      don&apos;t have one, contact whoever gave you this app (for example your clinic or the publisher).
-                    </>
-                  )}
+                  Add <code className="text-xs">VITE_SUPPORT_EMAIL=info@diabeaters.world</code> to{" "}
+                  <code className="text-xs">.env.local</code> for email fallbacks in dev. Submit still works without it.
                 </AlertDescription>
               </Alert>
-            ) : (
-              <p>
-                Support: <span className="font-medium text-foreground">{supportEmail}</span>
-              </p>
-            )}
-            <pre className="rounded-md border border-border/60 bg-muted/40 p-3 text-xs whitespace-pre-wrap break-words max-h-40 overflow-y-auto text-foreground">
-              {deletionRequestText}
-            </pre>
+            ) : null}
           </div>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-col items-stretch">
             <Button
               type="button"
-              variant="default"
-              className="w-full sm:w-full"
-              data-testid="account-delete-copy-request"
-              onClick={() => void copyAccountDeletionRequest()}
-            >
-              Copy request text
-            </Button>
-            {gmailComposeUrl ? (
-              <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
-                <a
-                  href={gmailComposeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="account-delete-gmail"
-                  onClick={() => setAccountDeletionOpen(false)}
-                >
-                  Open in Gmail (browser)
-                </a>
-              </Button>
-            ) : null}
-            {accountDeletionMailtoHref ? (
-              <div className="w-full space-y-1">
-                <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
-                  <a
-                    href={accountDeletionMailtoHref}
-                    data-testid="account-delete-link"
-                    onClick={() => setAccountDeletionOpen(false)}
-                  >
-                    Open in default mail app
-                  </a>
-                </Button>
-                <p className="text-xs text-muted-foreground text-center px-1">
-                  Uses your system mail handler (on Windows this is often Microsoft Outlook, even if you usually use Gmail
-                  in the browser).
-                </p>
-              </div>
-            ) : null}
-            <Button
-              type="button"
-              variant="secondary"
+              variant="destructive"
               className="w-full sm:w-full"
               data-testid="account-delete-submit"
               disabled={accountDeletionSubmitBusy}
               onClick={() => void submitAccountDeletionRequest()}
             >
-              {accountDeletionSubmitBusy ? "Sending…" : "Send deletion request (no email app)"}
+              {accountDeletionSubmitBusy ? "Submitting…" : "Submit deletion request"}
             </Button>
-            <AlertDialogCancel className="w-full sm:w-full m-0">Close</AlertDialogCancel>
+            <Collapsible open={accountDeletionAlternativesOpen} onOpenChange={setAccountDeletionAlternativesOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full justify-between text-muted-foreground"
+                  data-testid="account-delete-alternatives-trigger"
+                >
+                  Other ways to contact support
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform",
+                      accountDeletionAlternativesOpen && "rotate-180",
+                    )}
+                    aria-hidden
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-1">
+                {supportEmail.trim() ? (
+                  <p className="text-xs text-muted-foreground px-1">
+                    Support: <span className="font-medium text-foreground">{supportEmail}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground px-1">
+                    Copy the message below and email whoever published this app (for example your clinic).
+                  </p>
+                )}
+                <pre className="rounded-md border border-border/60 bg-muted/40 p-3 text-xs whitespace-pre-wrap break-words max-h-32 overflow-y-auto text-foreground">
+                  {deletionRequestText}
+                </pre>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-full"
+                  data-testid="account-delete-copy-request"
+                  onClick={() => void copyAccountDeletionRequest()}
+                >
+                  Copy request text
+                </Button>
+                {gmailComposeUrl ? (
+                  <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
+                    <a
+                      href={gmailComposeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="account-delete-gmail"
+                      onClick={() => setAccountDeletionOpen(false)}
+                    >
+                      Open in Gmail (browser)
+                    </a>
+                  </Button>
+                ) : null}
+                {accountDeletionMailtoHref ? (
+                  <div className="w-full space-y-1">
+                    <Button type="button" variant="outline" className="w-full sm:w-full" asChild>
+                      <a
+                        href={accountDeletionMailtoHref}
+                        data-testid="account-delete-link"
+                        onClick={() => setAccountDeletionOpen(false)}
+                      >
+                        Open in default mail app
+                      </a>
+                    </Button>
+                    <p className="text-xs text-muted-foreground text-center px-1">
+                      On Windows this may open Outlook even if you usually use Gmail in the browser.
+                    </p>
+                  </div>
+                ) : null}
+              </CollapsibleContent>
+            </Collapsible>
+            <AlertDialogCancel className="w-full sm:w-full m-0">Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -72,5 +72,5 @@ export function isAccountDeletionTableUnavailableMessage(message: string | undef
 }
 
 export function accountDeletionSubmitUnavailableDescription(): string {
-  return "Use Copy request text, Open in Gmail, or Open in default mail app below. If you manage this app, apply the Supabase migration that creates public.account_deletion_requests (see supabase/migrations).";
+  return "Expand “Other ways to contact support” below to copy the request or email us instead.";
 }
