@@ -68,14 +68,19 @@ describe("syncNativeAppBadgeNow", () => {
     }
   });
 
-  it("always writes the resolved unread count when home-screen badge sync is enabled", async () => {
+  it("clears the OS badge when home-screen badge sync is disabled", async () => {
     fetchNativeAppBadgeCount.mockResolvedValue({ count: 3, error: null });
 
-    const { syncNativeAppBadgeNow } = await import("@/lib/native-app-badge");
+    const { syncNativeAppBadgeNow, isNativeHomeScreenBadgeEnabled } = await import("@/lib/native-app-badge");
     await syncNativeAppBadgeNow();
 
-    expect(fetchNativeAppBadgeCount).toHaveBeenCalled();
-    expect(applyCounts).toEqual([3]);
+    if (isNativeHomeScreenBadgeEnabled()) {
+      expect(fetchNativeAppBadgeCount).toHaveBeenCalled();
+      expect(applyCounts).toEqual([3]);
+    } else {
+      expect(fetchNativeAppBadgeCount).not.toHaveBeenCalled();
+      expect(applyCounts).toEqual([0]);
+    }
   });
 
   it("clears the badge when count resolution fails", async () => {

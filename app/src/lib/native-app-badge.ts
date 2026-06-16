@@ -12,10 +12,10 @@ let inFlight: Promise<void> | null = null;
 let needsFollowUpSync = false;
 
 /**
- * Home-screen icon badge is synced from unread bell + Messages counts (when community is enabled).
+ * Home-screen icon badge disabled until unread sync is reliable across all users.
  * When false, the OS badge is always cleared to 0 — pushes and in-app sync never increment it.
  */
-export const NATIVE_HOME_SCREEN_BADGE_ENABLED = true;
+export const NATIVE_HOME_SCREEN_BADGE_ENABLED = false;
 
 /** Whether the app should reflect unread counts on the OS home-screen icon. */
 export function isNativeHomeScreenBadgeEnabled(): boolean {
