@@ -229,9 +229,13 @@ export async function sendPasswordResetEmail(
   const supabase = getSupabase();
   if (!supabase) return { data: {}, error: NOT_CONFIGURED };
 
+  const redirectTo =
+    getResetPasswordUrl() ||
+    (typeof window !== "undefined" ? `${window.location.origin}/reset-password` : "");
+
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo,
     });
     return { data: {}, error };
   } catch (e) {
@@ -240,6 +244,76 @@ export async function sendPasswordResetEmail(
       error: e instanceof Error ? e : new Error(String(e)),
     };
   }
+}
+
+function authUrlParamError(): string | null {
+  if (typeof window === "undefined") return null;
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const queryParams = new URLSearchParams(window.location.search);
+  return (
+    hashParams.get("error_description") ||
+    hashParams.get("error") ||
+    queryParams.get("error_description") ||
+    queryParams.get("error")
+  );
+}
+
+/** Wait for Supabase to turn a password-reset email link into a recovery session (PKCE code or hash). */
+export async function establishPasswordRecoverySession(): Promise<
+  { ok: true } | { ok: false; message?: string }
+> {
+  const supabase = getSupabase();
+  if (!supabase) return { ok: false, message: NOT_CONFIGURED.message };
+
+  const urlError = authUrlParamError();
+  if (urlError) return { ok: false, message: urlError };
+
+  const hasSession = async (): Promise<boolean> => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+    if (error) throw error;
+    return Boolean(session?.user);
+  };
+
+  if (typeof window !== "undefined") {
+    const code = new URLSearchParams(window.location.search).get("code");
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error && (await hasSession())) return { ok: true };
+      // detectSessionInUrl may have consumed the code already.
+      if (error && (await hasSession())) return { ok: true };
+    }
+  }
+
+  if (await hasSession()) return { ok: true };
+
+  return new Promise((resolve) => {
+    const { data } = onAuthStateChange((event, sess) => {
+      if (
+        sess?.user &&
+        (event === "PASSWORD_RECOVERY" ||
+          event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION")
+      ) {
+        clearTimeout(timeoutId);
+        data?.unsubscribe();
+        resolve({ ok: true });
+      }
+    });
+
+    const timeoutId = setTimeout(() => {
+      void (async () => {
+        data?.unsubscribe();
+        try {
+          resolve((await hasSession()) ? { ok: true } : { ok: false });
+        } catch {
+          resolve({ ok: false });
+        }
+      })();
+    }, 8000);
+  });
 }
 
 export async function updatePassword(

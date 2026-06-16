@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { getSupabase } from "@/lib/supabase";
-import { updatePassword } from "@/lib/auth";
+import { establishPasswordRecoverySession, updatePassword } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,16 +21,33 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = getSupabase();
-    if (!supabase) {
+    let cancelled = false;
+
+    (async () => {
+      const supabase = getSupabase();
+      if (!supabase) {
+        if (!cancelled) setHasSession(false);
+        return;
+      }
+
+      const result = await establishPasswordRecoverySession();
+      if (cancelled) return;
+
+      if (result.ok) {
+        setHasSession(true);
+        return;
+      }
+
+      setLinkError(result.message ?? null);
       setHasSession(false);
-      return;
-    }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session?.user);
-    });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -83,8 +100,8 @@ export default function ResetPassword() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This password reset link is invalid or has expired. Please request
-              a new one.
+              {linkError ??
+                "This password reset link is invalid or has expired. Please request a new one."}
             </p>
             <Link href="/reset-request">
               <Button className="w-full" data-testid="btn-back-to-reset-request">
