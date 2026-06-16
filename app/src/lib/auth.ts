@@ -190,6 +190,16 @@ export async function handleAuthCallback(): Promise<{ user: User }> {
   const supabase = getSupabase();
   if (!supabase) throw NOT_CONFIGURED;
 
+  const linkResult = await establishAuthSessionFromEmailLink();
+  if (linkResult.ok) {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (session?.user) return { user: session.user };
+  }
+
   const {
     data: { session },
     error,
@@ -258,10 +268,51 @@ function authUrlParamError(): string | null {
   );
 }
 
-/** Wait for Supabase to turn a password-reset email link into a recovery session (PKCE code or hash). */
-export async function establishPasswordRecoverySession(): Promise<
-  { ok: true } | { ok: false; message?: string }
-> {
+type AuthLinkSessionResult = { ok: true } | { ok: false; message?: string };
+
+let authLinkSessionPromise: Promise<AuthLinkSessionResult> | null = null;
+
+function authQueryParams(): URLSearchParams {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
+}
+
+function authHashParams(): URLSearchParams {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.hash.replace(/^#/, ""));
+}
+
+function stripAuthLinkParamsFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("token_hash");
+  url.searchParams.delete("type");
+  url.searchParams.delete("code");
+  const next = `${url.pathname}${url.search}${url.hash}`;
+  window.history.replaceState(window.history.state, "", next);
+}
+
+function stripAuthHashFromUrl(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.hash) return;
+  url.hash = "";
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+}
+
+function pkceVerifierMissingMessage(): string {
+  return "This reset link was opened in a different browser or app than where you requested it. Request a new reset link, then open the email on this same device and browser.";
+}
+
+/** Exchange Supabase email-link params for a session (token_hash, hash tokens, or PKCE code). */
+export async function establishAuthSessionFromEmailLink(): Promise<AuthLinkSessionResult> {
+  if (!authLinkSessionPromise) {
+    authLinkSessionPromise = establishAuthSessionFromEmailLinkOnce();
+  }
+  return authLinkSessionPromise;
+}
+
+async function establishAuthSessionFromEmailLinkOnce(): Promise<AuthLinkSessionResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, message: NOT_CONFIGURED.message };
 
@@ -277,18 +328,77 @@ export async function establishPasswordRecoverySession(): Promise<
     return Boolean(session?.user);
   };
 
-  if (typeof window !== "undefined") {
-    const code = new URLSearchParams(window.location.search).get("code");
-    if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (!error && (await hasSession())) return { ok: true };
-      // detectSessionInUrl may have consumed the code already.
-      if (error && (await hasSession())) return { ok: true };
+  const tokenHash = authQueryParams().get("token_hash");
+  const tokenType = authQueryParams().get("type");
+  if (tokenHash && tokenType) {
+    const allowedTypes = new Set(["recovery", "email", "signup", "invite", "magiclink"]);
+    if (!allowedTypes.has(tokenType)) {
+      return { ok: false, message: `Unsupported verification type: ${tokenType}` };
     }
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: tokenType as "recovery" | "email" | "signup" | "invite" | "magiclink",
+    });
+    if (!error && data.session?.user) {
+      stripAuthLinkParamsFromUrl();
+      return { ok: true };
+    }
+    if (error) return { ok: false, message: error.message };
   }
 
   if (await hasSession()) return { ok: true };
 
+  const hashParams = authHashParams();
+  const accessToken = hashParams.get("access_token");
+  const refreshToken = hashParams.get("refresh_token");
+  if (accessToken && refreshToken) {
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (!error && data.session?.user) {
+      stripAuthHashFromUrl();
+      return { ok: true };
+    }
+    if (error) return { ok: false, message: error.message };
+  }
+
+  const code = authQueryParams().get("code");
+  let codeExchangeError: string | null = null;
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && (await hasSession())) {
+      stripAuthLinkParamsFromUrl();
+      return { ok: true };
+    }
+    if (error) {
+      codeExchangeError = error.message;
+      if (await hasSession()) {
+        stripAuthLinkParamsFromUrl();
+        return { ok: true };
+      }
+    }
+  }
+
+  const waited = await waitForAuthLinkSession(supabase, hasSession);
+  if (waited.ok) return waited;
+
+  if (code && codeExchangeError) {
+    const lower = codeExchangeError.toLowerCase();
+    if (lower.includes("pkce") || lower.includes("verifier") || lower.includes("code challenge")) {
+      return { ok: false, message: pkceVerifierMissingMessage() };
+    }
+    return { ok: false, message: codeExchangeError };
+  }
+
+  return waited;
+}
+
+function waitForAuthLinkSession(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  hasSession: () => Promise<boolean>,
+): Promise<AuthLinkSessionResult> {
   return new Promise((resolve) => {
     const { data } = onAuthStateChange((event, sess) => {
       if (
@@ -314,6 +424,13 @@ export async function establishPasswordRecoverySession(): Promise<
       })();
     }, 8000);
   });
+}
+
+/** Wait for a password-reset email link to produce a recovery session. */
+export async function establishPasswordRecoverySession(): Promise<
+  { ok: true } | { ok: false; message?: string }
+> {
+  return establishAuthSessionFromEmailLink();
 }
 
 export async function updatePassword(

@@ -27,6 +27,15 @@ export default function ResetPassword() {
     let cancelled = false;
 
     (async () => {
+      const errorFromUrl = new URLSearchParams(window.location.search).get("error");
+      if (errorFromUrl) {
+        if (!cancelled) {
+          setLinkError(errorFromUrl);
+          setHasSession(false);
+        }
+        return;
+      }
+
       const supabase = getSupabase();
       if (!supabase) {
         if (!cancelled) setHasSession(false);

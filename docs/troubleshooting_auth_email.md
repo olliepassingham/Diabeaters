@@ -18,7 +18,9 @@ Work through this in order. The app uses Supabase Auth (`signUp` + `resend` with
 | Field | Must match your live app |
 |--------|---------------------------|
 | **Site URL** | e.g. `https://diabeaters.vercel.app` |
-| **Redirect URLs** | Include `https://diabeaters.vercel.app/auth/callback` and `.../reset-password` |
+| **Redirect URLs** | Include `https://diabeaters.vercel.app/auth/callback`, `.../auth/confirm`, and `.../reset-password` |
+
+**Password reset:** if links open but show “Invalid or expired link”, update the **Reset password** email template to use `token_hash` (not `{{ .ConfirmationURL }}`). See [supabase_reset_password_email_template.md](supabase_reset_password_email_template.md).
 
 **Vercel:** `VITE_PUBLIC_SITE_URL` = **same origin** as Site URL (no trailing slash). **Redeploy** after changing it.
 

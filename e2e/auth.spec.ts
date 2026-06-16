@@ -50,7 +50,7 @@ test.describe("Auth routes and verification", () => {
     await page.goto("/reset-password");
     await expect(
       page.getByTestId("reset-password-invalid"),
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 10000 });
     await expect(
       page.getByText("This password reset link is invalid or has expired"),
     ).toBeVisible();

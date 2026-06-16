@@ -55,6 +55,7 @@ import Supplies from "@/pages/supplies";
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
 const AuthCallback = lazy(() => import("@/pages/auth-callback"));
+const AuthConfirm = lazy(() => import("@/pages/auth-confirm"));
 const ResetRequest = lazy(() => import("@/pages/reset-request"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const CheckEmail = lazy(() => import("@/pages/check-email"));
@@ -443,6 +444,7 @@ function bypassesOnboardingGate(path: string): boolean {
     "/signup",
     "/carer-setup",
     "/auth/callback",
+    "/auth/confirm",
     "/auth/email-verify",
     "/verified-success",
     "/verified-return",
@@ -1453,6 +1455,11 @@ function MainRouter() {
       <Route path="/auth/callback">
         <Suspense fallback={<RouteFallback />}>
           <AuthCallback />
+        </Suspense>
+      </Route>
+      <Route path="/auth/confirm">
+        <Suspense fallback={<RouteFallback />}>
+          <AuthConfirm />
         </Suspense>
       </Route>
       <Route path="/auth/email-verify">
