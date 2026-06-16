@@ -35,6 +35,7 @@ export function AccountPublicProfileTab({
   onOpenFollowers,
   onOpenFollowing,
   onEditProfile,
+  supporterMode = false,
 }: {
   userId: string;
   displayName: string;
@@ -49,6 +50,8 @@ export function AccountPublicProfileTab({
   onOpenFollowers: () => void;
   onOpenFollowing: () => void;
   onEditProfile: () => void;
+  /** When true (Supporter Mode), hide patient habit streaks — they are not earned in this mode. */
+  supporterMode?: boolean;
 }) {
   const { toast } = useToast();
   const publicProfileHref = `/community/profile/${encodeURIComponent(userId)}`;
@@ -157,7 +160,7 @@ export function AccountPublicProfileTab({
         </div>
       </ProfileHeroCard>
 
-      <AccountPublicAchievementsSummary />
+      {!supporterMode ? <AccountPublicAchievementsSummary /> : null}
 
       <div className="space-y-3">
         <ProfileSectionHeading title="Your posts" subtitle="What others see when they visit your profile" />

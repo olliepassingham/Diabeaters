@@ -88,9 +88,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HypoLogGotItButton } from "@/components/hypo-log-got-it-button";
-import { useHypoAcknowledgementIndex } from "@/hooks/use-hypo-acknowledgement-index";
-
 const RECENT_HYPOS_COLLAPSED_COUNT = 2;
 const RECENT_HYPOS_MAX_COUNT = 4;
 
@@ -1297,8 +1294,6 @@ export default function CarerViewPage() {
   const [scenarioRows, setScenarioRows] = useState<Record<string, unknown>[]>([]);
   const [hypoLogs, setHypoLogs] = useState<CloudHypoLogRow[]>([]);
   const [recentHyposExpanded, setRecentHyposExpanded] = useState(false);
-  const hypoLogIds = useMemo(() => hypoLogs.map((h) => h.id), [hypoLogs]);
-  const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoLogIds, user?.id);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [linkedBanner, setLinkedBanner] = useState<string | null>(null);
   const [supporterPushPromptOpen, setSupporterPushPromptOpen] = useState(false);
@@ -1757,13 +1752,6 @@ export default function CarerViewPage() {
                             whenText={whenText}
                             treatment={h.treatment}
                             notes={h.notes}
-                            footer={
-                              <HypoLogGotItButton
-                                hypoLogId={h.id}
-                                acknowledged={hasAcked(h.id)}
-                                onAcknowledged={() => void refreshHypoAcks()}
-                              />
-                            }
                           />
                         );
                       })}

@@ -686,6 +686,7 @@ export default function Account() {
               onOpenFollowers={() => void openFollowList("followers")}
               onOpenFollowing={() => void openFollowList("following")}
               onEditProfile={goToAccountProfileEditor}
+              supporterMode={isCarer}
             />
           </TabsContent>
         </Tabs>
