@@ -76,4 +76,15 @@ describe("profile-primary-role", () => {
     expect(isSupporterOnlyAccount()).toBe(true);
     expect(getOnboardingAccountPath()).toBe("supporter");
   });
+
+  it("finalizeSupporterLinkCloudSync keeps patient dual-role accounts on patient in cloud", async () => {
+    const { setOnboardingAccountPath, setPrimaryAppRole } = await import("@/lib/carer-session");
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+
+    const { finalizeSupporterLinkCloudSync } = await import("@/lib/profile-primary-role");
+    await finalizeSupporterLinkCloudSync("u1");
+
+    expect(updateProfile).toHaveBeenCalledWith({ id: "u1", primary_app_role: "patient" });
+  });
 });

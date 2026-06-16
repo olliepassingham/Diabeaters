@@ -23,6 +23,7 @@ import {
   setCarerLinkedBannerMessage,
   markCarerLinkJustCompleted,
 } from "@/lib/carer-session";
+import { finalizeSupporterLinkCloudSync } from "@/lib/profile-primary-role";
 import { clearCommunityProfileAfterSupporterLink } from "@/lib/community-to-supporter";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import { markSupporterPushPromptPending } from "@/lib/supporter-push-prompt";
@@ -89,11 +90,7 @@ function emitCarerLinkUpdated(): void {
 async function finalizeSupporterLink(userId: string | undefined): Promise<void> {
   const shouldClearCommunityProfile =
     isCommunityMemberAccount() || isCommunityAccountProfile(storage.getProfile());
-  applySupporterAccountRoleAfterLink();
-  if (userId) {
-    const { syncPrimaryAppRoleToCloud } = await import("@/lib/profile-primary-role");
-    await syncPrimaryAppRoleToCloud(userId, "carer");
-  }
+  await finalizeSupporterLinkCloudSync(userId);
   if (shouldClearCommunityProfile && userId) {
     await clearCommunityProfileAfterSupporterLink(userId);
   }

@@ -121,4 +121,15 @@ describe("carer-session community-only accounts", () => {
     expect(isSupporterOnlyAccount()).toBe(false);
     expect(canSwitchAppMode()).toBe(true);
   });
+
+  it("stays dual-role when cloud role was wrongly set to carer", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    cacheCloudPrimaryAppRole("carer");
+
+    expect(isSupporterOnlyAccount()).toBe(false);
+    expect(canSwitchAppMode()).toBe(true);
+    expect(isCarerSessionMode(true, "patient")).toBe(false);
+    expect(isCarerSessionMode(true, "carer")).toBe(true);
+  });
 });

@@ -1,4 +1,11 @@
 import type { PrimaryAppRole } from "@/lib/carer-session";
+import {
+  applySupporterAccountRoleAfterLink,
+  cacheCloudPrimaryAppRole,
+  getOnboardingAccountPath,
+  getPrimaryAppRole,
+  setPrimaryAppRole,
+} from "@/lib/carer-session";
 import { isMissingProfileColumnSchemaError } from "@/lib/clinical-prefs-cloud-sync";
 import { profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { getLinkedPatientForCarer } from "@/lib/carers";
@@ -49,6 +56,23 @@ export async function syncPrimaryAppRoleToCloud(
     return { error: null, skipped: true };
   }
   return { error };
+}
+
+/** After redeeming a supporter invite: keep dual-role patients on `patient`, sync role to cloud. */
+export async function finalizeSupporterLinkCloudSync(userId: string | undefined): Promise<void> {
+  applySupporterAccountRoleAfterLink();
+
+  const path = getOnboardingAccountPath();
+  if ((path === "patient" || path === "both") && getPrimaryAppRole() !== "patient") {
+    setPrimaryAppRole("patient");
+  }
+
+  if (!userId) return;
+  const role = getPrimaryAppRole();
+  if (!role) return;
+
+  await syncPrimaryAppRoleToCloud(userId, role);
+  cacheCloudPrimaryAppRole(role);
 }
 
 /** Push local primary role to cloud when the column exists (no-op if migration pending). */

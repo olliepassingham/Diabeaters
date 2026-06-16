@@ -216,12 +216,13 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 /** Account created as supporter-only on /welcome — no User Mode or mode switcher. */
 export function isSupporterOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
+  if (path === "patient" || path === "both") return false;
   if (path === "supporter") return true;
   if (isPersistedSupporterAccount()) return true;
 
   const cloud = getCachedCloudPrimaryAppRole();
-  if (cloud === "carer") return true;
   if (cloud === "patient" || cloud === "community") return false;
+  if (cloud === "carer") return true;
 
   if (getPrimaryAppRole() === "carer") return true;
   return false;
@@ -262,6 +263,11 @@ export function promoteCommunityMemberToSupporterAccount(): void {
 export function applySupporterAccountRoleAfterLink(): void {
   if (isCommunityMemberAccount()) {
     promoteCommunityMemberToSupporterAccount();
+    return;
+  }
+  const path = getOnboardingAccountPath();
+  if (path === "patient" || path === "both") {
+    if (getPrimaryAppRole() == null) setPrimaryAppRole("patient");
     return;
   }
   if (getPrimaryAppRole() == null) {
