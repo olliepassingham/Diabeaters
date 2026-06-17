@@ -19,6 +19,7 @@ import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt }
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
+import { buildCoachStarterContext, pickCoachStarterPrompts } from "@/lib/ai-coach/coach-starter-prompts";
 import { describeCoachProfileVisibility } from "@/lib/ai-coach/contextSummary";
 import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";

@@ -148,7 +148,7 @@ export function buildCoachStarterContext(now: Date = new Date()): CoachStarterCo
     timeBand: coachHourToTimeBand(now.getHours()),
     sickDayActive: scenario.sickDayActive,
     travelModeActive: scenario.travelModeActive,
-    pumpFailureActive: scenario.pumpFailureActive,
+    pumpFailureActive: Boolean(scenario.pumpFailureActive),
     suppliesLow,
     hasTrackedSupplies,
   };
