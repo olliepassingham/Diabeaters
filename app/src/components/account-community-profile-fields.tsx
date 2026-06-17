@@ -28,6 +28,7 @@ import {
   useProfile,
 } from "@/lib/profile";
 import { getPrimaryAppRole } from "@/lib/carer-session";
+import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { useAuth } from "@/lib/auth-context";
 import { applyDisplayNameToLocalProfile } from "@/lib/user-display-name";
 
@@ -54,6 +55,7 @@ export function AccountCommunityProfileFields({
   className,
 }: AccountCommunityProfileFieldsProps) {
   const { user } = useAuth();
+  const { isCarer: hasCarerLink } = useLinkedCarer();
   const { profile, loading, refresh } = useProfile();
   const { toast } = useToast();
   const accountEmail = user?.email?.trim() ?? "";
@@ -71,6 +73,7 @@ export function AccountCommunityProfileFields({
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingPublic, setSavingPublic] = useState(false);
+  const [savingSupportedBadge, setSavingSupportedBadge] = useState(false);
   const [editing, setEditing] = useState(false);
   const [handleAvailability, setHandleAvailability] = useState<
     "idle" | "checking" | "available" | "taken" | "invalid"
@@ -239,6 +242,36 @@ export function AccountCommunityProfileFields({
       description: next
         ? "Public profile is on. Add your name, @handle, and other required details, then save."
         : "Public profile is off. The Feed is hidden until you turn this on again.",
+    });
+  }
+
+  async function persistShowSupportedOnProfile(next: boolean) {
+    if (!profile?.id) return;
+    const previous = profile.show_supported_person_on_profile === true;
+    if (next === previous) return;
+
+    setSavingSupportedBadge(true);
+    const { error } = await updateProfile({
+      id: profile.id,
+      show_supported_person_on_profile: next,
+    });
+    setSavingSupportedBadge(false);
+
+    if (error) {
+      toast({
+        title: "Could not save",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    void refresh();
+    toast({
+      title: "Saved",
+      description: next
+        ? "Your public profile can show who you support when they allow it and their profile is public."
+        : "Who you support is hidden from your public profile.",
     });
   }
 
@@ -425,6 +458,43 @@ export function AccountCommunityProfileFields({
       }
     />
   );
+
+  const showSupportedOnProfile = profile?.show_supported_person_on_profile === true;
+
+  const supportedPersonToggle = hasCarerLink ? (
+    <ProfileToggleRow
+      label={
+        <span className="inline-flex items-center gap-1">
+          <Label htmlFor={`${idPrefix}-show-supported`} className="mb-0 cursor-pointer text-sm font-medium">
+            Show who I support
+          </Label>
+          <InlineInfoHint
+            ariaLabel="About showing who you support"
+            content="Adds a small badge on your public profile. Only appears when the person you support allows it under Family & supporters and their profile is public."
+          />
+        </span>
+      }
+      description="Optional — helps others understand your community context."
+      control={
+        <Switch
+          id={`${idPrefix}-show-supported`}
+          checked={showSupportedOnProfile}
+          onCheckedChange={(checked) => void persistShowSupportedOnProfile(checked)}
+          disabled={loading || savingSupportedBadge || !isPublic}
+          data-testid="account-show-supported-person-switch"
+        />
+      }
+      footer={
+        savingSupportedBadge ? (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            Saving…
+          </p>
+        ) : !isPublic ? (
+          <p className="text-xs text-muted-foreground">Turn on your public profile first.</p>
+        ) : undefined
+      }
+    />
+  ) : null;
 
   const editFields = (
     <div className="space-y-4">
@@ -689,8 +759,9 @@ export function AccountCommunityProfileFields({
         editFields
       )}
 
-      <div className={cn(readOnlyPublicSummary || editing || isPublic ? "border-t border-border/40 pt-4" : "pt-1")}>
+      <div className={cn(readOnlyPublicSummary || editing || isPublic ? "border-t border-border/40 pt-4 space-y-4" : "pt-1 space-y-4")}>
         {publicToggle}
+        {supportedPersonToggle}
       </div>
     </>
   );

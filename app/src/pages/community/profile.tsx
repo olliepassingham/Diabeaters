@@ -23,6 +23,7 @@ import {
   ProfileMetaRow,
   ProfileMutedCard,
   ProfileSectionHeading,
+  ProfileSupportedPersonBadge,
 } from "@/components/profile/profile-ui";
 import {
   Dialog,
@@ -57,6 +58,7 @@ import {
   formatLivingWithDiabetesLine,
   getProfile,
   getPublicCommunityProfile,
+  getPublicProfileSupportedPerson,
   getProfilesByIds,
   type PublicCommunityProfile,
 } from "@/lib/profile";
@@ -127,7 +129,10 @@ export default function CommunityProfilePage() {
     const viewingSelf = user?.id === userId;
     try {
       if (viewingSelf) {
-        const { profile: full } = await getProfile(userId);
+        const [{ profile: full }, supportedRes] = await Promise.all([
+          getProfile(userId),
+          getPublicProfileSupportedPerson(userId),
+        ]);
         if (!full) {
           setProfile(null);
           setLoadError("Could not load profile.");
@@ -140,6 +145,7 @@ export default function CommunityProfilePage() {
             public_handle: full.public_handle,
             is_public: full.is_public,
             diabetes_onset_date: full.diabetes_onset_date ?? null,
+            supported_person: supportedRes.data,
           });
         }
       } else {
@@ -398,6 +404,9 @@ export default function CommunityProfilePage() {
                 livingWithLine={livingWithLine}
                 emptyLabel={isBeatieProfile ? BEATIE_FEED_BOT_DEFAULT_BIO : "No bio yet."}
               />
+              {profile.supported_person ? (
+                <ProfileSupportedPersonBadge person={profile.supported_person} />
+              ) : null}
             </ProfileHeroRow>
 
             {!isSelf && !user ? (

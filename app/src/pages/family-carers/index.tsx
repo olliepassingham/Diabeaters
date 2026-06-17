@@ -129,6 +129,13 @@ const PRIVACY_TOGGLES = [
       "Lets a linked supporter update insulin delivery, total daily dose, and date of birth stored on the person's cloud profile (for multi-device sync). Off by default for new links.",
     testId: "privacy-toggle-clinical-settings",
   },
+  {
+    key: "public_profile_mention" as const,
+    label: "Public profile mention",
+    description:
+      "Lets a linked supporter show they support you on their public Feed profile (name and @handle only — when your profile is public too). Off by default.",
+    testId: "privacy-toggle-public-profile-mention",
+  },
 ] as const;
 
 function AvatarBubble({
@@ -160,6 +167,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
     hypo_alerts: true,
     emergency_info: true,
     clinical_settings: true,
+    public_profile_mention: true,
   };
   return links.reduce(
     (acc, l) => ({
@@ -169,6 +177,7 @@ function aggregateScopes(links: CarerLinkWithProfile[]): CarerScopes {
       hypo_alerts: acc.hypo_alerts && l.scopes.hypo_alerts,
       emergency_info: acc.emergency_info && l.scopes.emergency_info,
       clinical_settings: acc.clinical_settings && l.scopes.clinical_settings,
+      public_profile_mention: acc.public_profile_mention && l.scopes.public_profile_mention,
     }),
     allOn,
   );

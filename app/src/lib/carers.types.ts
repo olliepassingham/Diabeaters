@@ -7,6 +7,8 @@ export type CarerScopes = {
   emergency_info: boolean;
   /** When true, supporter may view/update cloud clinical basics on the patient's profile (delivery, TDD, DOB). */
   clinical_settings: boolean;
+  /** When true, supporter may show their linked patient on their public profile (patient must also allow). */
+  public_profile_mention: boolean;
 };
 
 export const DEFAULT_CARER_SCOPES: CarerScopes = {
@@ -16,6 +18,7 @@ export const DEFAULT_CARER_SCOPES: CarerScopes = {
   hypo_alerts: true,
   emergency_info: true,
   clinical_settings: false,
+  public_profile_mention: false,
 };
 
 /** Client shape; DB columns are snake_case — map in carers.ts. */

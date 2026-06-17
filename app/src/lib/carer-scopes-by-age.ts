@@ -19,9 +19,13 @@ export function defaultCarerScopesForAgeBand(band: UserAgeBand): CarerScopes {
       hypo_alerts: true,
       emergency_info: true,
       clinical_settings: true,
+      public_profile_mention: false,
     };
   }
-  return { ...DEFAULT_CARER_SCOPES };
+  return {
+    ...DEFAULT_CARER_SCOPES,
+    public_profile_mention: false,
+  };
 }
 
 /** Uses the same age bands as the rest of the app ({@link getAgeBand}). */

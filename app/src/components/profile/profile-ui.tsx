@@ -4,6 +4,8 @@ import { BadgeCheck, Camera, Clock3, Loader2, ShieldAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { HomeSectionHeading } from "@/components/home/home-ui";
 import { cn } from "@/lib/utils";
+import type { PublicProfileSupportedPerson } from "@/lib/profile";
+import { HeartHandshake } from "lucide-react";
 
 export const profileHeroCardClass =
   "dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 dark:border-primary/18 dark:from-primary/[0.09]";
@@ -345,6 +347,26 @@ export function ProfileBioPreview({
         </p>
       ) : null}
     </div>
+  );
+}
+
+export function ProfileSupportedPersonBadge({ person }: { person: PublicProfileSupportedPerson }) {
+  const handle = person.public_handle.replace(/^@/, "");
+  const name = person.full_name?.trim();
+  const label = name || `@${handle}`;
+
+  return (
+    <Link
+      href={`/community/profile/${encodeURIComponent(person.patient_id)}`}
+      className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1.5 text-xs text-foreground transition-colors hover:border-primary/30 hover:bg-primary/[0.1]"
+      data-testid="profile-supported-person-badge"
+    >
+      <HeartHandshake className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+      <span className="min-w-0 truncate">
+        Supports <span className="font-medium">{label}</span>
+        {name && handle ? <span className="text-muted-foreground"> · @{handle}</span> : null}
+      </span>
+    </Link>
   );
 }
 

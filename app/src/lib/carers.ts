@@ -218,6 +218,7 @@ export function normaliseScopes(raw: unknown): CarerScopes {
     hypo_alerts: Boolean(o.hypo_alerts),
     emergency_info: Boolean(o.emergency_info),
     clinical_settings: Boolean(o.clinical_settings),
+    public_profile_mention: Boolean(o.public_profile_mention),
   };
 }
 

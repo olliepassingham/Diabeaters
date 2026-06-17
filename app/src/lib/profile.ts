@@ -48,6 +48,8 @@ export type ProfileRow = {
   public_streak_counts?: Record<string, number> | null;
   /** Named carb favourites + scenario defaults for hypo/exercise/driving hints. */
   carb_source_prefs?: import("@/lib/carb-source-preferences").CarbSourcePreferences | null;
+  /** Supporter opt-in: show linked patient on public community profile when allowed. */
+  show_supported_person_on_profile?: boolean;
 };
 
 /** Loose JSON shape kept on `profiles.pharmacy`; canonical type lives in `storage.ts`. */
@@ -60,6 +62,14 @@ export type PharmacyJson = {
   updatedAt?: string;
 };
 
+/** Person a supporter may show on their public profile (when both sides opt in). */
+export type PublicProfileSupportedPerson = {
+  patient_id: string;
+  full_name: string | null;
+  public_handle: string;
+  avatar_url: string | null;
+};
+
 /** Safe fields for community public profile pages (never include emergency_*). */
 export type PublicCommunityProfile = Pick<
   ProfileRow,
@@ -68,6 +78,7 @@ export type PublicCommunityProfile = Pick<
   streaks?: PublicProfileStreak[];
   /** @deprecated Use streaks */
   achievements?: PublicProfileStreak[];
+  supported_person?: PublicProfileSupportedPerson | null;
 };
 
 export const profileQueryKey = (userId: string | undefined) => ["profile", userId] as const;
@@ -186,6 +197,8 @@ function rowFromData(data: Record<string, unknown>): ProfileRow {
     pinned_achievement_ids,
     public_streak_counts,
     carb_source_prefs,
+    show_supported_person_on_profile:
+      typeof data.show_supported_person_on_profile === "boolean" ? data.show_supported_person_on_profile : false,
   };
 }
 
@@ -291,6 +304,41 @@ export function needsCommunityProfileSetup(
   return !isPublicCommunityProfileComplete(profile);
 }
 
+function mapPublicProfileSupportedPersonRow(
+  row: Record<string, unknown> | null | undefined,
+): PublicProfileSupportedPerson | null {
+  if (!row) return null;
+  const handle = String(row.public_handle ?? "").trim().replace(/^@/, "");
+  const patientId = String(row.patient_id ?? "").trim();
+  if (!patientId || !handle) return null;
+  return {
+    patient_id: patientId,
+    full_name: (row.full_name as string | null) ?? null,
+    public_handle: handle,
+    avatar_url: (row.avatar_url as string | null) ?? null,
+  };
+}
+
+/** Linked patient shown on a supporter's public profile (RPC enforces consent + visibility). */
+export async function getPublicProfileSupportedPerson(userId: string): Promise<{
+  data: PublicProfileSupportedPerson | null;
+  error: Error | null;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { data: null, error: new Error("Supabase not configured") };
+
+  try {
+    const { data, error } = await supabase.rpc("get_public_profile_supported_person", {
+      p_user_id: userId,
+    });
+    if (error) return { data: null, error: new Error(error.message) };
+    const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : (data as Record<string, unknown> | null);
+    return { data: mapPublicProfileSupportedPersonRow(row), error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
 /** Load only community-safe columns for another user's profile card. */
 export async function getPublicCommunityProfile(userId: string): Promise<{
   profile: PublicCommunityProfile | null;
@@ -319,7 +367,10 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
         : null;
 
     const { fetchPublicProfileStreaks } = await import("./user-achievements");
-    const streaks = await fetchPublicProfileStreaks(userId, pinnedIds, streakCounts);
+    const [streaks, supportedRes] = await Promise.all([
+      fetchPublicProfileStreaks(userId, pinnedIds, streakCounts),
+      getPublicProfileSupportedPerson(userId),
+    ]);
 
     const profile: PublicCommunityProfile = {
       id: String(r.id),
@@ -331,6 +382,7 @@ export async function getPublicCommunityProfile(userId: string): Promise<{
       diabetes_onset_date: (r.diabetes_onset_date as string | null) ?? null,
       streaks,
       achievements: streaks,
+      supported_person: supportedRes.data,
     };
     if (!profile.is_public) return { profile: null, error: null };
     return { profile, error: null };
@@ -516,6 +568,7 @@ export type ProfileUpdatePayload = {
     | "pinned_achievement_ids"
     | "public_streak_counts"
     | "carb_source_prefs"
+    | "show_supported_person_on_profile"
   >
 >;
 
@@ -546,6 +599,7 @@ export async function updateProfile(
     pinned_achievement_ids,
     public_streak_counts,
     carb_source_prefs,
+    show_supported_person_on_profile,
   } = payload;
   const update: Record<string, unknown> = { id };
   if (full_name !== undefined) update.full_name = full_name ?? null;
@@ -653,6 +707,9 @@ export async function updateProfile(
   }
   if (carb_source_prefs !== undefined) {
     update.carb_source_prefs = carb_source_prefs ?? null;
+  }
+  if (show_supported_person_on_profile !== undefined) {
+    update.show_supported_person_on_profile = Boolean(show_supported_person_on_profile);
   }
 
   try {
