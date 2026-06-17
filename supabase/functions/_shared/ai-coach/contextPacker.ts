@@ -26,6 +26,12 @@ export interface ProfileInput {
   bgUnits?: string | null;
   /** ISO date `YYYY-MM-DD` from `profiles.diabetes_onset_date`. */
   diabetesOnsetDate?: string | null;
+  /** `grams` | `portions`; from local profile when synced via device setup hint. */
+  carbUnits?: string | null;
+  /** Whether the user tracks CGM (device setup hint). */
+  usesCgm?: boolean | null;
+  /** Closed-loop / automation on pump (device setup hint). */
+  usesClosedLoop?: boolean | null;
 }
 
 export interface LastFortnightInput {
@@ -115,6 +121,29 @@ function bgUnitsFrom(raw: string | null | undefined): CoachContext["profile"]["b
   return "unknown";
 }
 
+function carbUnitsFrom(raw: string | null | undefined): CoachContext["profile"]["carbUnits"] {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "grams" || v === "gram" || v === "g") return "grams";
+  if (v === "portions" || v === "portion") return "portions";
+  return "unknown";
+}
+
+function cgmUseFrom(raw: boolean | null | undefined): CoachContext["profile"]["cgmUse"] {
+  if (raw === true) return "yes";
+  if (raw === false) return "no";
+  return "unknown";
+}
+
+function closedLoopFrom(
+  deliveryMethod: CoachContext["profile"]["deliveryMethod"],
+  raw: boolean | null | undefined,
+): CoachContext["profile"]["closedLoop"] {
+  if (deliveryMethod !== "pump") return "not_applicable";
+  if (raw === true) return "yes";
+  if (raw === false) return "no";
+  return "unknown";
+}
+
 function diagnosedYearsAgoFrom(
   raw: string | null | undefined,
   now: Date,
@@ -154,11 +183,15 @@ function clampCoachTravelTripStyle(raw: unknown): CoachTravelTripStyle | undefin
 export function packContext(input: PackContextInput): CoachContext {
   const now = input.now ?? new Date();
   const dob = input.profile.dateOfBirth;
+  const deliveryMethod = deliveryMethodFrom(input.profile.insulinDeliveryMethod);
   const profile: CoachContext["profile"] = {
     ageBand: ageBandFromDob(dob, now),
     ageYears: ageInWholeYearsUtc(dob, now),
-    deliveryMethod: deliveryMethodFrom(input.profile.insulinDeliveryMethod),
+    deliveryMethod,
     bgUnits: bgUnitsFrom(input.profile.bgUnits),
+    carbUnits: carbUnitsFrom(input.profile.carbUnits),
+    cgmUse: cgmUseFrom(input.profile.usesCgm),
+    closedLoop: closedLoopFrom(deliveryMethod, input.profile.usesClosedLoop),
     diagnosedYearsAgo: diagnosedYearsAgoFrom(input.profile.diabetesOnsetDate, now),
   };
 

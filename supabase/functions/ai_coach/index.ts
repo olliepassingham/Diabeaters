@@ -246,6 +246,39 @@ function clampCoachExerciseSessions14d(raw: unknown): number {
   return Math.min(120, Math.max(0, v));
 }
 
+function normalizeDeviceSetup(raw: unknown): {
+  insulinDeliveryMethod: string | null;
+  carbUnits: string | null;
+  usesCgm: boolean | null;
+  usesClosedLoop: boolean | null;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  let insulinDeliveryMethod: string | null = null;
+  if (typeof o.insulinDeliveryMethod === "string") {
+    const dm = o.insulinDeliveryMethod.trim().toLowerCase();
+    if (dm === "pen" || dm === "mdi") insulinDeliveryMethod = "pen";
+    else if (dm === "pump") insulinDeliveryMethod = "pump";
+  }
+  let carbUnits: string | null = null;
+  if (typeof o.carbUnits === "string") {
+    const cu = o.carbUnits.trim().toLowerCase();
+    if (cu === "grams" || cu === "gram" || cu === "g") carbUnits = "grams";
+    else if (cu === "portions" || cu === "portion") carbUnits = "portions";
+  }
+  const usesCgm = typeof o.usesCgm === "boolean" ? o.usesCgm : null;
+  const usesClosedLoop = typeof o.usesClosedLoop === "boolean" ? o.usesClosedLoop : null;
+  if (
+    insulinDeliveryMethod == null &&
+    carbUnits == null &&
+    usesCgm == null &&
+    usesClosedLoop == null
+  ) {
+    return null;
+  }
+  return { insulinDeliveryMethod, carbUnits, usesCgm, usesClosedLoop };
+}
+
 function isPharmacyHoursQuestion(message: string): boolean {
   const m = message.trim().toLowerCase();
   if (!m) return false;
@@ -367,6 +400,7 @@ Deno.serve(async (req: Request) => {
      */
     const ratiosAreSet = Boolean(b.ratiosAreSet);
     const bgUnitsClient = normalizeBgUnits(b.bgUnits ?? b.bg_units);
+    const deviceSetup = normalizeDeviceSetup(b.deviceSetup);
     const requestedAudience: CoachAudience = normalizeAudience(b.audience);
     const pharmacyStatus = normalizePharmacyStatus(b.pharmacyStatus);
 
@@ -583,9 +617,13 @@ Deno.serve(async (req: Request) => {
     const context = packContext({
       profile: {
         dateOfBirth,
-        insulinDeliveryMethod: clinical.insulin_delivery_method,
+        insulinDeliveryMethod:
+          clinical.insulin_delivery_method ?? deviceSetup?.insulinDeliveryMethod ?? null,
         bgUnits: bgUnitsClient,
         diabetesOnsetDate: clinical.diabetes_onset_date,
+        carbUnits: deviceSetup?.carbUnits ?? null,
+        usesCgm: deviceSetup?.usesCgm ?? null,
+        usesClosedLoop: deviceSetup?.usesClosedLoop ?? null,
       },
       lastFortnight,
       ratiosAreSet,

@@ -11,6 +11,7 @@
 
 import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { isCommunityAccountProfile, storage } from "@/lib/storage";
+import { isPenDeliveryMethod, isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import type { TravelTripStyle } from "@/lib/travel-active-guidance";
 import {
   isPharmacyOpenAt,
@@ -61,14 +62,69 @@ export type AiCoachPharmacyStatusWire = {
   tomorrowSummary: string | null;
 };
 
+export type AiCoachDeviceSetupWire = {
+  insulinDeliveryMethod: "pen" | "pump" | null;
+  carbUnits: "grams" | "portions" | null;
+  usesCgm: boolean;
+  usesClosedLoop: boolean;
+};
+
 export interface AiCoachClientPayload {
   lastFortnight: AiCoachLastFortnightWire;
   ratiosAreSet: boolean;
   bgUnits: string | null;
+  deviceSetup: AiCoachDeviceSetupWire;
   /** `YYYY-MM-DD` when stored locally; omitted when unset or invalid. */
   dateOfBirth?: string;
   /** Client-computed pharmacy status (server cannot infer timezone in v1). */
   pharmacyStatus: AiCoachPharmacyStatusWire;
+}
+
+export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
+  const profile = storage.getProfile();
+  const settings = storage.getSettings();
+  const insulinDeliveryMethod = isPumpDeliveryMethod(profile?.insulinDeliveryMethod)
+    ? "pump"
+    : isPenDeliveryMethod(profile?.insulinDeliveryMethod)
+      ? "pen"
+      : null;
+  const carbUnitsRaw = profile?.carbUnits?.trim().toLowerCase();
+  const carbUnits: AiCoachDeviceSetupWire["carbUnits"] =
+    carbUnitsRaw === "portions" || carbUnitsRaw === "portion"
+      ? "portions"
+      : carbUnitsRaw === "grams" || carbUnitsRaw === "gram" || carbUnitsRaw === "g"
+        ? "grams"
+        : null;
+  const usesCgm =
+    (typeof settings.cgmDays === "number" && settings.cgmDays > 0) ||
+    storage.getSupplies().some((s) => s.type === "cgm");
+  const usesClosedLoop =
+    isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && settings.usesClosedLoop === true;
+  return { insulinDeliveryMethod, carbUnits, usesCgm, usesClosedLoop };
+}
+
+/** Short line for the coach UI — what setup enums Beatie receives (not dosing numbers). */
+export function describeCoachProfileVisibility(): string | null {
+  const setup = buildCoachDeviceSetupWire();
+  const profile = storage.getProfile();
+  const bits: string[] = [];
+  if (setup.insulinDeliveryMethod === "pump") bits.push("pump");
+  else if (setup.insulinDeliveryMethod === "pen") bits.push("MDI");
+  const bg = profile?.bgUnits?.trim();
+  if (bg) bits.push(bg);
+  if (setup.carbUnits) bits.push(setup.carbUnits === "portions" ? "carb portions" : "carb grams");
+  if (setup.usesCgm) bits.push("CGM");
+  if (setup.usesClosedLoop) bits.push("closed loop");
+  const settings = storage.getSettings();
+  const ratiosAreSet = Boolean(
+    settings.breakfastRatio?.trim() ||
+      settings.lunchRatio?.trim() ||
+      settings.dinnerRatio?.trim() ||
+      settings.snackRatio?.trim(),
+  );
+  if (ratiosAreSet) bits.push("ratios saved");
+  if (bits.length === 0) return null;
+  return `Beatie can see: ${bits.join(" · ")}`;
 }
 
 /**
@@ -90,6 +146,12 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
       },
       ratiosAreSet: false,
       bgUnits: null,
+      deviceSetup: {
+        insulinDeliveryMethod: null,
+        carbUnits: null,
+        usesCgm: false,
+        usesClosedLoop: false,
+      },
       pharmacyStatus: {
         configured: false,
         openNow: null,
@@ -204,6 +266,7 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
     },
     ratiosAreSet,
     bgUnits,
+    deviceSetup: buildCoachDeviceSetupWire(),
     pharmacyStatus,
     ...(dateOfBirth ? { dateOfBirth } : {}),
   };

@@ -111,6 +111,34 @@ describe("packContext — profile derivation", () => {
         .profile.diagnosedYearsAgo,
     ).toBeNull();
   });
+
+  it("derives carb units, CGM use, and closed-loop flags", () => {
+    const ctx = packContext(
+      input({
+        profile: {
+          ...input().profile,
+          insulinDeliveryMethod: "pump",
+          carbUnits: "portions",
+          usesCgm: true,
+          usesClosedLoop: true,
+        },
+      }),
+    );
+    expect(ctx.profile.carbUnits).toBe("portions");
+    expect(ctx.profile.cgmUse).toBe("yes");
+    expect(ctx.profile.closedLoop).toBe("yes");
+
+    const mdi = packContext(
+      input({
+        profile: {
+          ...input().profile,
+          insulinDeliveryMethod: "pen",
+          usesClosedLoop: true,
+        },
+      }),
+    );
+    expect(mdi.profile.closedLoop).toBe("not_applicable");
+  });
 });
 
 describe("packContext — lastFortnight clamping", () => {

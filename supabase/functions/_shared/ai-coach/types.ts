@@ -121,6 +121,10 @@ export interface CoachContext {
     ageYears: number | null;
     deliveryMethod: "mdi" | "pump" | "unknown";
     bgUnits: "mmol/L" | "mg/dL" | "unknown";
+    carbUnits: "grams" | "portions" | "unknown";
+    cgmUse: "yes" | "no" | "unknown";
+    /** Pump automation / loop flag; `not_applicable` when `deliveryMethod` is not `pump`. */
+    closedLoop: "yes" | "no" | "not_applicable" | "unknown";
     diagnosedYearsAgo: number | null;
   };
   /**

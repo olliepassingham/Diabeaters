@@ -19,7 +19,8 @@ import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt }
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
 import { captureAiCoachSendFailure } from "@/observability/sentry";
 import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/types";
-import { buildCoachStarterContext, pickCoachStarterPrompts } from "@/lib/ai-coach/coach-starter-prompts";
+import { describeCoachProfileVisibility } from "@/lib/ai-coach/contextSummary";
+import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
 import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
 import {
   AI_ASSISTANT_NAME,
@@ -307,6 +308,11 @@ export default function CoachPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user?.id || isSupporter) return;
+    void syncClinicalPrefsToCloud(user.id);
+  }, [user?.id, isSupporter]);
+
   const sendMutation = useMutation({
     mutationFn: async (payload: {
       message: string;
@@ -430,9 +436,23 @@ export default function CoachPage() {
     [],
   );
 
-  const headerDescription = isSupporter
-    ? "Education for supporters — UK type 1 diabetes"
-    : "Education & clinic-prep — UK type 1 diabetes";
+  const profileVisibility = useMemo(() => {
+    if (isSupporter) return null;
+    return describeCoachProfileVisibility();
+  }, [isSupporter]);
+
+  const headerDescription = isSupporter ? (
+    "Education for supporters — UK type 1 diabetes"
+  ) : (
+    <span className="block space-y-1">
+      <span>Education & clinic-prep — UK type 1 diabetes</span>
+      {profileVisibility ? (
+        <span className="block text-[11px] font-normal leading-snug text-muted-foreground" data-testid="coach-profile-visibility">
+          {profileVisibility}
+        </span>
+      ) : null}
+    </span>
+  );
 
   const topicHint = useMemo(() => {
     if (effectiveTopic === "general") return null;

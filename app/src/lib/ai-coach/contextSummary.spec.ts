@@ -16,6 +16,7 @@ vi.mock("@/lib/storage", () => ({
     getSettings: vi.fn(() => mockSettings),
     getProfile: vi.fn(() => ({ bgUnits: "mmol/L" })),
     getPharmacy: vi.fn(() => null),
+    getSupplies: vi.fn(() => []),
   },
 }));
 

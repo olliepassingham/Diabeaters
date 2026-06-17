@@ -58,6 +58,7 @@ export async function sendCoachMessage(args: {
     bgUnits: payload.bgUnits,
     pharmacyStatus: payload.pharmacyStatus,
     audience,
+    deviceSetup: payload.deviceSetup,
     ...(payload.dateOfBirth ? { dateOfBirth: payload.dateOfBirth } : {}),
   };
 
