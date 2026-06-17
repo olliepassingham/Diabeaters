@@ -88,15 +88,16 @@ export async function listFollowers(
   const supabase = getSupabase();
   if (!supabase) return { ids: [], error: new Error("Supabase not configured") };
 
-  const { data, error } = await supabase
-    .from("user_follows")
-    .select("follower_id")
-    .eq("followee_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data, error } = await supabase.rpc("list_public_profile_followers", {
+    p_user_id: userId,
+    p_limit: limit,
+  });
 
   if (error) return { ids: [], error: new Error(error.message) };
-  const ids = (data ?? []).map((r) => String((r as { follower_id: string }).follower_id));
+  const ids = (data ?? []).map((row) => {
+    const r = row as { user_id?: string };
+    return String(r.user_id ?? "");
+  }).filter(Boolean);
   return { ids, error: null };
 }
 
@@ -107,15 +108,16 @@ export async function listFollowing(
   const supabase = getSupabase();
   if (!supabase) return { ids: [], error: new Error("Supabase not configured") };
 
-  const { data, error } = await supabase
-    .from("user_follows")
-    .select("followee_id")
-    .eq("follower_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data, error } = await supabase.rpc("list_public_profile_following", {
+    p_user_id: userId,
+    p_limit: limit,
+  });
 
   if (error) return { ids: [], error: new Error(error.message) };
-  const ids = (data ?? []).map((r) => String((r as { followee_id: string }).followee_id));
+  const ids = (data ?? []).map((row) => {
+    const r = row as { user_id?: string };
+    return String(r.user_id ?? "");
+  }).filter(Boolean);
   return { ids, error: null };
 }
 

@@ -194,6 +194,13 @@ export default function CommunityProfilePage() {
 
   async function openList(kind: ListKind) {
     if (!userId) return;
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Sign in to see who follows this profile.",
+      });
+      return;
+    }
     setListKind(kind);
     setListOpen(true);
     setListLoading(true);
