@@ -1213,6 +1213,13 @@ function AuthenticatedShell() {
   }, [hasCarerLink]);
 
   useEffect(() => {
+    if (!user?.id || !hasCarerLink) return;
+    void import("@/lib/welcome-path-dual-role-reconcile").then((m) =>
+      m.repairMisclassifiedDualRolePatientOnSession(user.id!),
+    );
+  }, [user?.id, hasCarerLink]);
+
+  useEffect(() => {
     if (hasCarerLink) return;
     if (isCommunityOnlyAccount() && getActiveAppMode() !== "community") {
       setActiveAppMode("community");

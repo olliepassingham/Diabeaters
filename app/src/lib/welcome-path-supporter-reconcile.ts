@@ -11,7 +11,7 @@ import {
   setPendingCarer,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
-import { isCommunityWelcomePathChosen, profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
+import { isCommunityWelcomePathChosen, localIndicatesPatientAccount, profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
 import {
   backfillSupporterRoleToCloudIfNeeded,
   profileIsSupporterOnlyRole,
@@ -58,6 +58,10 @@ async function indicatesExistingSupporterOnlyAccount(userId: string): Promise<bo
   const [{ profile }, link] = await Promise.all([getProfile(userId), getLinkedPatientForCarer()]);
   const hasCarerLink = Boolean(link.data);
 
+  if (profileIndicatesExistingPatientAccount(profile) || localIndicatesPatientAccount()) {
+    return false;
+  }
+
   if (profileIsSupporterOnlyRole(profile)) return true;
 
   if (
@@ -74,14 +78,8 @@ async function indicatesExistingSupporterOnlyAccount(userId: string): Promise<bo
     return true;
   }
 
-  if (profileIndicatesExistingPatientAccount(profile)) {
-    return false;
-  }
-
   if (hasCarerLink) {
-    markPersistedSupporterAccount();
-    await syncPrimaryAppRoleToCloud(userId, "carer");
-    return true;
+    return isPersistedSupporterAccount();
   }
 
   return isPersistedSupporterAccount();

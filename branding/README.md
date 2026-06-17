@@ -8,6 +8,7 @@ Place `appstore-icon-1024.png` here: a 1024×1024 PNG with **no transparency** f
 | `npm run icons:validate` | Check iOS + Android icon requirements |
 | `python3 branding/export-instagram-profiles.py` | Export sunrise IG profile + circle previews |
 | `node branding/capture-instagram-profiles.mjs` | Export teal IG profile (HTML render) |
+| `node branding/capture-linkedin-cover.mjs` | Export LinkedIn company cover (1584×396) |
 
 ### Instagram profile pictures
 

@@ -1,5 +1,5 @@
-import { Link } from "wouter";
-import { Phone, Plane, Sparkles, Thermometer } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { History, MessageCircle, Phone, Plane, Sparkles, Thermometer, User as UserIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { isAiCoachEnabled } from "@/lib/flags";
@@ -18,7 +18,7 @@ import {
   sortSuppliesByUrgency,
   type HomeGlanceType,
 } from "@/components/home/home-ui";
-import { History, MessageCircle } from "lucide-react";
+import { setActiveAppMode } from "@/lib/carer-session";
 
 export type CarerGlanceType = HomeGlanceType;
 
@@ -158,9 +158,16 @@ export function SupporterHero({
   );
 }
 
-export function SupporterQuickActions({ showActivity }: { showActivity: boolean }) {
+export function SupporterQuickActions({
+  showActivity,
+  showUserModeSwitch = false,
+}: {
+  showActivity: boolean;
+  showUserModeSwitch?: boolean;
+}) {
+  const [, setLocation] = useLocation();
   const showCoach = isAiCoachEnabled;
-  if (!showCoach && !showActivity) return null;
+  if (!showCoach && !showActivity && !showUserModeSwitch) return null;
 
   return (
     <div
@@ -168,6 +175,21 @@ export function SupporterQuickActions({ showActivity }: { showActivity: boolean 
       style={{ animationDelay: "40ms" }}
       data-testid="carer-quick-actions"
     >
+      {showUserModeSwitch ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 w-full rounded-2xl shadow-none"
+          data-testid="button-switch-user-mode"
+          onClick={() => {
+            setActiveAppMode("patient");
+            setLocation("/");
+          }}
+        >
+          <UserIcon className="h-4 w-4 mr-2 shrink-0" aria-hidden />
+          Switch to User Mode
+        </Button>
+      ) : null}
       {showCoach ? (
         <div className="coach-entry-glow w-full rounded-2xl" data-testid="link-carer-coach-open-glow">
           <Button

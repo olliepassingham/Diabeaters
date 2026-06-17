@@ -1,3 +1,5 @@
+import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
+
 const CARER_INTENT_KEY = "diabeater_carer_intent";
 const CARER_LINKED_BANNER_KEY = "diabeater_carer_linked_banner";
 const PENDING_CARER_KEY = "diabeater_pending_carer";
@@ -217,6 +219,8 @@ export function getPrimaryAppRole(): PrimaryAppRole | null {
 export function isSupporterOnlyAccount(): boolean {
   const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") return false;
+  if (localIndicatesPatientAccount()) return false;
+  if (getPrimaryAppRole() === "patient") return false;
   if (path === "supporter") return true;
   if (isPersistedSupporterAccount()) return true;
 
@@ -226,6 +230,13 @@ export function isSupporterOnlyAccount(): boolean {
 
   if (getPrimaryAppRole() === "carer") return true;
   return false;
+}
+
+/** Patient who also supports someone — keep User Mode and clear mistaken supporter-only flags. */
+export function markDualRolePatientAfterLink(): void {
+  setOnboardingAccountPath("both");
+  setPrimaryAppRole("patient");
+  clearPersistedSupporterAccount();
 }
 
 /** Dual-role accounts (patient + linked supporter) can swap User / Supporter mode. */
@@ -265,9 +276,20 @@ export function applySupporterAccountRoleAfterLink(): void {
     promoteCommunityMemberToSupporterAccount();
     return;
   }
+  if (localIndicatesPatientAccount()) {
+    markDualRolePatientAfterLink();
+    return;
+  }
   const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") {
+    if (path === "patient") setOnboardingAccountPath("both");
     if (getPrimaryAppRole() == null) setPrimaryAppRole("patient");
+    clearPersistedSupporterAccount();
+    return;
+  }
+  if (getPrimaryAppRole() === "patient") {
+    setOnboardingAccountPath("both");
+    clearPersistedSupporterAccount();
     return;
   }
   if (getPrimaryAppRole() == null) {

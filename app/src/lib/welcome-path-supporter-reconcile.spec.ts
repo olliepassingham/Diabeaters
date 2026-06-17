@@ -135,20 +135,20 @@ describe("welcome-path-supporter-reconcile", () => {
     expect(result.reconciled).toBe(false);
   });
 
-  it("reconciles when cloud profile marks supporter-only even without local markers", async () => {
+  it("does not lock dual-role patients when cloud role was wrongly set to carer", async () => {
     const { setOnboardingAccountPath } = await import("@/lib/carer-session");
     setOnboardingAccountPath("patient");
 
     getProfile.mockResolvedValue({
       profile: {
         id: "u1",
-        full_name: "Sup",
+        full_name: "Pat",
         avatar_url: null,
         bio: null,
         public_handle: null,
         is_public: false,
-        onboarding_complete: false,
-        account_type: null,
+        onboarding_complete: true,
+        account_type: "patient",
         primary_app_role: "carer",
       },
     });
@@ -162,8 +162,6 @@ describe("welcome-path-supporter-reconcile", () => {
     );
 
     const result = await reconcileSupporterWelcomeWithExistingAccount("u1");
-    expect(result.reconciled).toBe(true);
-    if (!result.reconciled) return;
-    expect(result.destination).toBe("/carer-view");
+    expect(result.reconciled).toBe(false);
   });
 });

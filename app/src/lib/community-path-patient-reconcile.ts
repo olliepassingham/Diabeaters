@@ -6,6 +6,8 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { getProfile, type ProfileRow } from "@/lib/profile";
+import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { isCommunityAccountProfile, storage } from "@/lib/storage";
 import type { PostLoginToastMessage } from "@/lib/post-login-toast-stash";
 import { stashPostLoginToast } from "@/lib/post-login-toast-stash";
 
@@ -25,12 +27,28 @@ export function isCommunityWelcomePathChosen(): boolean {
 /** Cloud or local markers show a completed patient account (not community-only). */
 export function profileIndicatesExistingPatientAccount(profile: ProfileRow | null | undefined): boolean {
   if (profile?.account_type === "community") return false;
+  if (profile?.account_type === "patient") return true;
   if (profile?.onboarding_complete === true) return true;
+  return localIndicatesPatientAccount();
+}
+
+/** Local device markers for a completed Type 1 / insulin user account (excludes community-only). */
+export function localIndicatesPatientAccount(): boolean {
+  if (isCommunityAccountProfile(storage.getProfile())) return false;
   try {
-    return typeof localStorage !== "undefined" && localStorage.getItem(ONBOARDING_LS) === "true";
+    if (localStorage.getItem(ONBOARDING_LS) !== "true") return false;
   } catch {
     return false;
   }
+  const local = storage.getProfile();
+  if (!local) return false;
+  if (local.accountType === "community") return false;
+  if (local.diabetesType && local.diabetesType !== "none") return true;
+  if (local.usingInsulin === true) return true;
+  if (local.insulinDeliveryMethod === "pen" || isPumpDeliveryMethod(local.insulinDeliveryMethod)) {
+    return true;
+  }
+  return false;
 }
 
 /** Undo a mistaken Community Member welcome tap for returning patient accounts. */

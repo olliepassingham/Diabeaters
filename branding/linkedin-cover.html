@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root {
+    --teal: #148276;
+    --teal-dark: #0c665c;
+    --mint: #54c4ba;
+    --mint-bright: #6ee7d9;
+    --bg-deep: #051614;
+    --bg-mid: #081f1c;
+    --bg-base: #0a2824;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* LinkedIn company cover — upload at 1584×396 (4:1). */
+  html, body { width: 1584px; height: 396px; }
+
+  body {
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", "Segoe UI", Arial, sans-serif;
+    overflow: hidden;
+    position: relative;
+    color: #fff;
+  }
+
+  .bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 55% 120% at 18% 85%, rgba(84, 196, 186, 0.22) 0%, rgba(84, 196, 186, 0) 70%),
+      radial-gradient(ellipse 70% 90% at 72% 40%, rgba(20, 130, 118, 0.34) 0%, rgba(20, 130, 118, 0) 68%),
+      radial-gradient(ellipse 45% 80% at 92% 70%, rgba(110, 231, 217, 0.12) 0%, rgba(110, 231, 217, 0) 70%),
+      linear-gradient(105deg, var(--bg-deep) 0%, var(--bg-mid) 42%, var(--bg-base) 72%, #06201c 100%);
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  }
+
+  /* Safe zone guide — hidden in export; toggle .show-guides on body to QA crop. */
+  .safe {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: none;
+  }
+  body.show-guides .safe { display: block; }
+  .safe-logo {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 320px;
+    height: 180px;
+    border: 2px dashed rgba(255, 80, 80, 0.55);
+    background: rgba(255, 80, 80, 0.06);
+  }
+  .safe-mobile {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 140px;
+    right: 140px;
+    border-left: 2px dashed rgba(255, 200, 80, 0.45);
+    border-right: 2px dashed rgba(255, 200, 80, 0.45);
+  }
+
+  .content {
+    position: relative;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0 96px 0 360px;
+  }
+
+  .copy {
+    max-width: 980px;
+    text-align: right;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(110, 231, 217, 0.45);
+    background: rgba(20, 130, 118, 0.16);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2.4px;
+    text-transform: uppercase;
+    color: var(--mint-bright);
+  }
+
+  .eyebrow .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 10px rgba(84, 196, 186, 0.9);
+  }
+
+  .headline {
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 28px rgba(0, 0, 0, 0.35);
+  }
+
+  .headline em {
+    font-style: normal;
+    color: var(--mint-bright);
+  }
+
+  .subline {
+    margin-top: 14px;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.82);
+    letter-spacing: 0.01em;
+  }
+
+  .platform {
+    margin-top: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+</style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="grain"></div>
+  <div class="safe">
+    <div class="safe-logo" title="Profile logo overlap — keep clear"></div>
+    <div class="safe-mobile" title="Mobile side crop"></div>
+  </div>
+  <div class="content">
+    <div class="copy">
+      <div class="eyebrow"><span class="dot" aria-hidden="true"></span> Type 1 diabetes companion</div>
+      <h1 class="headline">Stay one step ahead <em>with Type 1</em></h1>
+      <p class="subline">Supplies · planning · guides · community</p>
+      <p class="platform">iOS &amp; Android</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -7,7 +7,7 @@ import {
   setPrimaryAppRole,
 } from "@/lib/carer-session";
 import { isMissingProfileColumnSchemaError } from "@/lib/clinical-prefs-cloud-sync";
-import { profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
+import { profileIndicatesExistingPatientAccount, localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { getLinkedPatientForCarer } from "@/lib/carers";
 import { getProfile, updateProfile, type ProfileRow } from "@/lib/profile";
 
@@ -39,6 +39,9 @@ export function resolveSupporterOnlyAccount(opts: {
   hasCarerLink: boolean;
   localIsSupporterOnly: boolean;
 }): boolean {
+  if (profileIndicatesExistingPatientAccount(opts.profile) || localIndicatesPatientAccount()) {
+    return false;
+  }
   const cloud = cloudPrimaryAppRoleFromProfile(opts.profile);
   if (cloud === "carer") return true;
   if (cloud === "patient" || cloud === "community") return false;

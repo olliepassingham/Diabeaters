@@ -48,10 +48,12 @@ import { resolveProfileImageUrl } from "@/lib/storage-profile";
 import { getSupabase } from "@/lib/supabase";
 import {
   consumeCarerLinkedBannerMessage,
+  canSwitchAppMode,
   clearCarerLinkJustCompleted,
   getActiveCarerPatientId,
   setActiveCarerPatientId,
 } from "@/lib/carer-session";
+import { localIndicatesPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { collectCarerActivityEvents, getActivityWeekSummary } from "@/lib/activity-history";
 import { DevNote } from "@/components/dev/DevNote";
 import { SupporterPushPromptDialog } from "@/components/supporter-push-prompt-dialog";
@@ -1669,7 +1671,10 @@ export default function CarerViewPage() {
             onPatientChange={onPatientChange}
           />
 
-          <SupporterQuickActions showActivity={showCarerActivityLog} />
+          <SupporterQuickActions
+            showActivity={showCarerActivityLog}
+            showUserModeSwitch={canSwitchAppMode() || localIndicatesPatientAccount()}
+          />
 
           {activeLink?.patientId ? (
             <CarerClinicalPrefsCard patientId={activeLink.patientId} enabled={scopes.clinical_settings ?? false} />

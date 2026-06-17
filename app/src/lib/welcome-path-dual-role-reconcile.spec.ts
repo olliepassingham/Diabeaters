@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getProfile = vi.fn();
 const getLinkedPatientForCarer = vi.fn();
+const updateProfile = vi.fn();
 
 vi.mock("@/lib/profile", () => ({
   getProfile: (...args: unknown[]) => getProfile(...args),
+  updateProfile: (...args: unknown[]) => updateProfile(...args),
 }));
 
 vi.mock("@/lib/carers", () => ({
@@ -18,6 +20,8 @@ describe("welcome-path-dual-role-reconcile", () => {
     localStorage.clear();
     getProfile.mockReset();
     getLinkedPatientForCarer.mockReset();
+    updateProfile.mockReset();
+    updateProfile.mockResolvedValue({ data: null, error: null });
   });
 
   it("heals dual-role sessions on the User welcome path", async () => {
@@ -50,7 +54,7 @@ describe("welcome-path-dual-role-reconcile", () => {
 
     const result = await healDualRolePatientSessionIfNeeded("u1");
     expect(result.healed).toBe(true);
-    expect(getOnboardingAccountPath()).toBe("patient");
+    expect(getOnboardingAccountPath()).toBe("both");
     expect(isPersistedSupporterAccount()).toBe(false);
   });
 });

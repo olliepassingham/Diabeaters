@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { storage } from "@/lib/storage";
 import {
   applySupporterAccountRoleAfterLink,
   cacheCloudPrimaryAppRole,
@@ -14,6 +15,7 @@ import {
   isSupporterOnlyAccount,
   setOnboardingAccountPath,
   setPrimaryAppRole,
+  getOnboardingAccountPath,
 } from "@/lib/carer-session";
 
 describe("carer-session supporter-only accounts", () => {
@@ -118,8 +120,32 @@ describe("carer-session community-only accounts", () => {
     applySupporterAccountRoleAfterLink();
 
     expect(getPrimaryAppRole()).toBe("patient");
+    expect(getOnboardingAccountPath()).toBe("both");
     expect(isSupporterOnlyAccount()).toBe(false);
     expect(canSwitchAppMode()).toBe(true);
+  });
+
+  it("promotes local patient accounts to dual-role when linking without welcome path", () => {
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    storage.saveProfile({
+      name: "Pat",
+      email: "",
+      bgUnits: "mmol/L",
+      carbUnits: "grams",
+      diabetesType: "type1",
+      insulinDeliveryMethod: "pen",
+      usingInsulin: true,
+      hasAcceptedDisclaimer: true,
+      dateOfBirth: "2000-01-01",
+      region: "UK",
+      weightDisplayUnit: "kg",
+    });
+
+    applySupporterAccountRoleAfterLink();
+
+    expect(getPrimaryAppRole()).toBe("patient");
+    expect(getOnboardingAccountPath()).toBe("both");
+    expect(isSupporterOnlyAccount()).toBe(false);
   });
 
   it("stays dual-role when cloud role was wrongly set to carer", () => {

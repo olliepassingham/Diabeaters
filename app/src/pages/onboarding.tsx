@@ -581,10 +581,15 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     localStorage.setItem("diabeater_onboarding_completed", "true");
     recordOnboardingFinishedAt();
     markBedtimeReminderPromptPending();
+    setPrimaryAppRole("patient");
+    const onboardingPath = getOnboardingAccountPath();
+    if (onboardingPath !== "both") {
+      setOnboardingAccountPath(onboardingPath === "supporter" ? "both" : onboardingPath ?? "patient");
+    }
     if (upgradeFlow) {
       setActiveAppMode("patient");
-      setPrimaryAppRole("patient");
       clearOnboardingAccountPath();
+      setOnboardingAccountPath("patient");
     }
     if (user?.id) {
       const fullName = data.name.trim() ? data.name.trim() : null;
