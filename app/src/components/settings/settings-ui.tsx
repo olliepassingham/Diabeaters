@@ -319,7 +319,7 @@ export function SettingsSubPageShell({
   return (
     <PageShell variant="narrow" density="compact" className={cn("space-y-4 pb-6", className)}>
       <PageBackLink fallbackHref={backHref} label={backLabel} />
-      <PageHeader title={title} description={description} actions={actions} stackActionsMaxSm />
+      <PageHeader title={title} description={description} actions={actions} />
       {children}
     </PageShell>
   );

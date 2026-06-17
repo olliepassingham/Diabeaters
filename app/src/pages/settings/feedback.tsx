@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Bug, Lightbulb, Mail, Send } from "lucide-react";
 
@@ -31,12 +31,9 @@ import {
   SettingsPanelBody,
   SettingsSubPageShell,
 } from "./shared";
+import { SettingsFeedbackInfoDialog } from "./settings-page-info";
 
-type SettingsFeedbackRouteProps = {
-  settingsInfoDialog: ReactNode;
-};
-
-export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRouteProps) {
+export function SettingsFeedbackRoute() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [kind, setKind] = useState<FeedbackKind>("suggestion");
@@ -174,7 +171,7 @@ export function SettingsFeedbackRoute({ settingsInfoDialog }: SettingsFeedbackRo
     <SettingsSubPageShell
       title="Send feedback"
       description="Tell us what is working well and what we should improve next."
-      actions={settingsInfoDialog}
+      actions={<SettingsFeedbackInfoDialog />}
     >
       <div className="space-y-6">
         <SettingsPanel>

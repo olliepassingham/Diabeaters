@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +18,7 @@ import {
   SettingsSubPageShell,
   SettingsToggleRow,
 } from "./shared";
+import { SettingsNotificationsInfoDialog } from "./settings-page-info";
 
 function PushSoundHint() {
   return (
@@ -331,7 +331,6 @@ export function NotificationsTab({
 }
 
 type SettingsNotificationsRouteProps = {
-  settingsInfoDialog: ReactNode;
   notifSettings: NotificationSettings;
   onToggle: (key: keyof NotificationSettings, value: boolean) => void;
   onThreshold: (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => void;
@@ -341,7 +340,6 @@ type SettingsNotificationsRouteProps = {
 };
 
 export function SettingsNotificationsRoute({
-  settingsInfoDialog,
   notifSettings,
   onToggle,
   onThreshold,
@@ -371,7 +369,7 @@ export function SettingsNotificationsRoute({
           ? "Alerts from the person you support and for your own community activity."
           : "Hypo alerts, supply trends, travel and sick-day guides, and community."
       }
-      actions={settingsInfoDialog}
+      actions={<SettingsNotificationsInfoDialog supporterMode={supporterMode} />}
     >
       <SettingsPanel>
         <SettingsPanelBody className="space-y-5">

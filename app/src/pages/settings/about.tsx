@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { useCallback, useRef } from "react";
 import { Disclaimer } from "@/components/disclaimer";
 import { InfoTooltip } from "@/components/info-tooltip";
@@ -14,16 +13,13 @@ import {
   SettingsPanelBody,
   SettingsSubPageShell,
 } from "./shared";
+import { SettingsAboutInfoDialog } from "./settings-page-info";
 import { useToast } from "@/hooks/use-toast";
 import { isNativeShellForPushTestUi } from "@/lib/native-platform";
 import { isProd } from "@/lib/flags";
 import { unlockPushTestUi } from "@/lib/push-test-ui-unlock";
 
-type SettingsAboutRouteProps = {
-  settingsInfoDialog: ReactNode;
-};
-
-export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRouteProps) {
+export function SettingsAboutRoute() {
   const year = new Date().getFullYear();
   const { toast } = useToast();
   /** Count consecutive taps; reset if the gap since the *previous* tap is too long. */
@@ -56,7 +52,7 @@ export function SettingsAboutRoute({ settingsInfoDialog }: SettingsAboutRoutePro
     <SettingsSubPageShell
       title="About"
       description="Legal, support, and references."
-      actions={settingsInfoDialog}
+      actions={<SettingsAboutInfoDialog />}
     >
       <div className="space-y-6">
         <div>

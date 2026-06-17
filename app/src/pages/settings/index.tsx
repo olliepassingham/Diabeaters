@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
+import { SettingsHubInfoDialog } from "./settings-page-info";
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { shouldReceiveBedtimeCheckReminders } from "@/lib/bedtime-reminder-eligibility";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
@@ -1788,27 +1788,7 @@ export default function Settings() {
     setRatiosBaseline(ratiosSnapshotCurrent);
   }, [profile, usageSnapshotCurrent, ratiosSnapshotCurrent]);
 
-  const settingsInfoDialog = (
-    <PageInfoDialog title="About Settings" description="Configure your personal diabetes management preferences">
-      <InfoSection title="Personal & usage">
-        <p>Your units, insulin habits, supply pack sizes, and backup.</p>
-      </InfoSection>
-      <InfoSection title="Appearance">
-        <p>Light, dark, or Auto (matches your device), plus primary accent colour.</p>
-      </InfoSection>
-      <InfoSection title="Notifications">
-        <p>
-          Hypo alerts, supply trend alerts, travel and sick-day guide alerts, community feed likes and comments.
-        </p>
-      </InfoSection>
-      <InfoSection title="About">
-        <p>
-          Version, privacy, terms, support, third-party references, and medical disclaimers. Backup and restore is at
-          the bottom of Personal & usage.
-        </p>
-      </InfoSection>
-    </PageInfoDialog>
-  );
+  const settingsInfoDialog = <SettingsHubInfoDialog />;
 
   const usageToolsInner = (
     <div
@@ -2142,21 +2122,20 @@ export default function Settings() {
   }
 
   if (pathOnly === "/settings/usage") {
-    return <SettingsUsageRoute settingsInfoDialog={settingsInfoDialog} usageToolsInner={usageToolsInner} />;
+    return <SettingsUsageRoute usageToolsInner={usageToolsInner} />;
   }
 
   if (pathOnly === "/settings/ratios") {
-    return <SettingsRatiosRoute settingsInfoDialog={settingsInfoDialog} ratiosInner={ratiosToolsInner} />;
+    return <SettingsRatiosRoute ratiosInner={ratiosToolsInner} />;
   }
 
   if (pathOnly === "/settings/appearance") {
-    return <SettingsAppearanceRoute settingsInfoDialog={settingsInfoDialog} />;
+    return <SettingsAppearanceRoute />;
   }
 
   if (pathOnly === "/settings/notifications") {
     return (
       <SettingsNotificationsRoute
-        settingsInfoDialog={settingsInfoDialog}
         notifSettings={notifSettings}
         onToggle={handleNotifToggle}
         onThreshold={handleNotifThreshold}
@@ -2168,11 +2147,11 @@ export default function Settings() {
   }
 
   if (pathOnly === "/settings/about") {
-    return <SettingsAboutRoute settingsInfoDialog={settingsInfoDialog} />;
+    return <SettingsAboutRoute />;
   }
 
   if (pathOnly === "/settings/feedback") {
-    return <SettingsFeedbackRoute settingsInfoDialog={settingsInfoDialog} />;
+    return <SettingsFeedbackRoute />;
   }
 
   return (

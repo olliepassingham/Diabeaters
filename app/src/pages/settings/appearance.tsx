@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { PRIMARY_THEMES, useTheme, type AppPrimaryTheme } from "@/hooks/use-theme";
@@ -12,10 +11,7 @@ import {
   SettingsSectionHeader,
   SettingsSubPageShell,
 } from "./shared";
-
-type SettingsAppearanceRouteProps = {
-  settingsInfoDialog: ReactNode;
-};
+import { SettingsAppearanceInfoDialog } from "./settings-page-info";
 
 const THEME_BOXES: {
   value: ThemeMode;
@@ -51,7 +47,7 @@ const THEME_BOXES: {
   },
 ];
 
-export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearanceRouteProps) {
+export function SettingsAppearanceRoute() {
   const { toast } = useToast();
   const { themeMode, setThemeMode, primaryTheme, setPrimaryTheme } = useTheme();
 
@@ -59,7 +55,7 @@ export function SettingsAppearanceRoute({ settingsInfoDialog }: SettingsAppearan
     <SettingsSubPageShell
       title="Appearance"
       description="Theme and primary colour."
-      actions={settingsInfoDialog}
+      actions={<SettingsAppearanceInfoDialog />}
     >
       <SettingsPanel id="appearance-theme" className="scroll-mt-28" data-testid="tab-appearance">
         <SettingsPanelBody className="space-y-4">
