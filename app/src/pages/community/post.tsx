@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { FeedPostCard } from "@/components/community/feed-post-card";
+import { PostEditImagesField } from "@/components/community/post-edit-images-field";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,9 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useCommunityTopicOrder } from "@/hooks/use-community-topic-order";
+import { usePostEditImages } from "@/hooks/use-post-edit-images";
 import { useAuth } from "@/lib/auth-context";
 import {
   DEFAULT_COMMUNITY_TOPIC,
@@ -94,7 +95,7 @@ export default function CommunityPostPage() {
   const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
   const [editBody, setEditBody] = useState("");
   const [editTopic, setEditTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
-  const [editImageAlts, setEditImageAlts] = useState<string[]>([]);
+  const editImages = usePostEditImages();
   const [editBusy, setEditBusy] = useState(false);
 
   const loadPost = useCallback(async () => {
@@ -309,11 +310,26 @@ export default function CommunityPostPage() {
     setLocation("/community");
   }
 
+  function closeEditPost() {
+    setEditPost(null);
+    editImages.reset();
+  }
+
   async function saveEditPost() {
     if (!editPost || !post) return;
+    if (!editImages.hasBodyOrImages(editBody)) {
+      toast({
+        title: "Add text or a photo",
+        description: "Posts need some text or at least one photo.",
+        variant: "destructive",
+      });
+      return;
+    }
     setEditBusy(true);
     const res = await updateCommunityPost(editPost.id, editBody, editTopic, {
-      imageAltTexts: editImageAlts,
+      keepImagePaths: editImages.keptPaths,
+      addImageFiles: editImages.newFiles,
+      imageAltTexts: editImages.imageAlts,
     });
     setEditBusy(false);
     if (res.error) {
@@ -321,7 +337,7 @@ export default function CommunityPostPage() {
       return;
     }
     if (res.data) setPost(res.data);
-    setEditPost(null);
+    closeEditPost();
     toast({ title: "Post updated" });
   }
 
@@ -434,7 +450,7 @@ export default function CommunityPostPage() {
           setEditPost(post);
           setEditBody(post.body);
           setEditTopic(post.topic);
-          setEditImageAlts([...post.image_alt_texts]);
+          editImages.loadFromPost(post.image_urls, post.image_alt_texts ?? []);
         }}
         onMenuDelete={() => setDeletePostId(post.id)}
         onDeleteComment={(cid) => void handleDeleteComment(cid)}
@@ -498,70 +514,58 @@ export default function CommunityPostPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editPost != null} onOpenChange={(o) => !o && !editBusy && setEditPost(null)}>
+      <Dialog open={editPost != null} onOpenChange={(o) => !o && !editBusy && closeEditPost()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit post</DialogTitle>
-            <DialogDescription>Update topic or text. Photos stay the same.</DialogDescription>
+            <DialogDescription>Update your text, topic, and photos.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="post-edit-topic" className="text-sm">
-              Topic
-            </Label>
-            <Select
-              value={editTopic}
-              onValueChange={(v) => setEditTopic(v as CommunityTopicId)}
-              disabled={editBusy}
-            >
-              <SelectTrigger id="post-edit-topic" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {orderedTopics.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Textarea
-            value={editBody}
-            onChange={(e) => setEditBody(e.target.value)}
-            rows={6}
-            maxLength={8000}
-            disabled={editBusy}
-          />
-          {editPost && editPost.image_urls.length > 0 ? (
-            <div className="max-h-48 space-y-2 overflow-y-auto">
-              <p className="text-xs font-medium text-foreground">Photo descriptions</p>
-              {editPost.image_urls.map((_, i) => (
-                <div key={`${editPost.id}-alt-${i}`} className="space-y-1">
-                  <Label htmlFor={`post-edit-alt-${i}`} className="text-xs">
-                    Photo {i + 1}
-                  </Label>
-                  <Input
-                    id={`post-edit-alt-${i}`}
-                    value={editImageAlts[i] ?? ""}
-                    onChange={(e) =>
-                      setEditImageAlts((prev) => {
-                        const next = [...prev];
-                        next[i] = e.target.value.slice(0, 500);
-                        return next;
-                      })
-                    }
-                    maxLength={500}
-                    disabled={editBusy}
-                  />
-                </div>
-              ))}
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="post-edit-topic" className="text-sm">
+                Topic
+              </Label>
+              <Select
+                value={editTopic}
+                onValueChange={(v) => setEditTopic(v as CommunityTopicId)}
+                disabled={editBusy}
+              >
+                <SelectTrigger id="post-edit-topic" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {orderedTopics.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : null}
+            <div className="space-y-1.5">
+              <Label htmlFor="post-edit-body" className="text-sm">
+                Post
+              </Label>
+              <Textarea
+                id="post-edit-body"
+                value={editBody}
+                onChange={(e) => setEditBody(e.target.value)}
+                rows={6}
+                maxLength={8000}
+                disabled={editBusy}
+              />
+            </div>
+            <PostEditImagesField images={editImages} disabled={editBusy} />
+          </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setEditPost(null)} disabled={editBusy}>
+            <Button type="button" variant="outline" onClick={closeEditPost} disabled={editBusy}>
               Cancel
             </Button>
-            <Button type="button" onClick={() => void saveEditPost()} disabled={editBusy}>
+            <Button
+              type="button"
+              onClick={() => void saveEditPost()}
+              disabled={editBusy || !editImages.hasBodyOrImages(editBody)}
+            >
               {editBusy ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>

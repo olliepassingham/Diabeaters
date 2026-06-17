@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/r
 import { Loader2, RefreshCw, SearchX, Users } from "lucide-react";
 import { EmptyState, FeedLoadingSkeleton } from "@/components/empty-state";
 import { FeedPostCard } from "@/components/community/feed-post-card";
+import { PostEditImagesField } from "@/components/community/post-edit-images-field";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -32,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { usePostEditImages } from "@/hooks/use-post-edit-images";
 import { useToast } from "@/hooks/use-toast";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import {
@@ -165,7 +167,7 @@ export function FeedPostList(props: {
   const [editPost, setEditPost] = useState<CommunityPostRow | null>(null);
   const [editBody, setEditBody] = useState("");
   const [editTopic, setEditTopic] = useState<CommunityTopicId>(DEFAULT_COMMUNITY_TOPIC);
-  const [editImageAlts, setEditImageAlts] = useState<string[]>([]);
+  const editImages = usePostEditImages();
   const [editBusy, setEditBusy] = useState(false);
 
   const [debouncedSearch, setDebouncedSearch] = useState(props.searchQuery ?? "");
@@ -614,14 +616,31 @@ export function FeedPostList(props: {
     setEditPost(p);
     setEditBody(p.body);
     setEditTopic(p.topic);
-    setEditImageAlts(p.image_alt_texts ?? []);
+    editImages.loadFromPost(p.image_urls, p.image_alt_texts ?? []);
+  }
+
+  function closeEditPost() {
+    setEditPost(null);
+    editImages.reset();
   }
 
   async function submitEditPost() {
     if (!editPost) return;
+    if (!editImages.hasBodyOrImages(editBody)) {
+      toast({
+        title: "Add text or a photo",
+        description: "Posts need some text or at least one photo.",
+        variant: "destructive",
+      });
+      return;
+    }
     const topic = isCommunityTopicId(editTopic) ? editTopic : DEFAULT_COMMUNITY_TOPIC;
     setEditBusy(true);
-    const res = await updateCommunityPost(editPost.id, editBody, topic, { imageAltTexts: editImageAlts });
+    const res = await updateCommunityPost(editPost.id, editBody, topic, {
+      keepImagePaths: editImages.keptPaths,
+      addImageFiles: editImages.newFiles,
+      imageAltTexts: editImages.imageAlts,
+    });
     setEditBusy(false);
     if (res.error) {
       toast({ title: "Could not update", description: res.error.message, variant: "destructive" });
@@ -630,7 +649,7 @@ export function FeedPostList(props: {
     if (res.data) {
       patchPostsInCache((p) => (p.id === editPost.id ? res.data! : p));
     }
-    setEditPost(null);
+    closeEditPost();
     toast({ title: "Updated", description: "Your post was updated." });
   }
 
@@ -877,11 +896,11 @@ export function FeedPostList(props: {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={editPost !== null} onOpenChange={(v) => (v ? null : setEditPost(null))}>
+      <Dialog open={editPost !== null} onOpenChange={(v) => (v ? null : !editBusy && closeEditPost())}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit post</DialogTitle>
-            <DialogDescription>Update your post text and topic. Photos stay the same.</DialogDescription>
+            <DialogDescription>Update your text, topic, and photos.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -891,6 +910,7 @@ export function FeedPostList(props: {
                 onValueChange={(v) => {
                   if (isCommunityTopicId(v)) setEditTopic(v);
                 }}
+                disabled={editBusy}
               >
                 <SelectTrigger id="edit-post-topic">
                   <SelectValue placeholder="Choose a topic" />
@@ -912,14 +932,20 @@ export function FeedPostList(props: {
                 value={editBody}
                 onChange={(e) => setEditBody(e.target.value)}
                 maxLength={8000}
+                disabled={editBusy}
               />
             </div>
+            <PostEditImagesField images={editImages} disabled={editBusy} />
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button type="button" variant="outline" onClick={() => setEditPost(null)} disabled={editBusy}>
+            <Button type="button" variant="outline" onClick={closeEditPost} disabled={editBusy}>
               Cancel
             </Button>
-            <Button type="button" onClick={() => void submitEditPost()} disabled={editBusy || !editPost}>
+            <Button
+              type="button"
+              onClick={() => void submitEditPost()}
+              disabled={editBusy || !editPost || !editImages.hasBodyOrImages(editBody)}
+            >
               {editBusy ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>

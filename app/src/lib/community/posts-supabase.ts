@@ -1057,9 +1057,13 @@ export async function deleteCommunityPost(postId: string): Promise<{ error: Erro
 
 export type UpdateCommunityPostOptions = {
   imageAltTexts?: string[];
+  /** Existing storage paths to keep, in order. Omitted paths are deleted from storage. */
+  keepImagePaths?: string[];
+  /** New images to upload and append after kept paths. */
+  addImageFiles?: File[];
 };
 
-/** Update body and optional topic; images unchanged. Standard posts only. */
+/** Update body, topic, and optional images. Standard posts only. */
 export async function updateCommunityPost(
   postId: string,
   body: string,
@@ -1091,34 +1095,84 @@ export async function updateCommunityPost(
     return { data: null, error: new Error("Only standard posts can be edited.") };
   }
 
-  const imgs = parseImageUrls(ex.image_urls);
-  if (trimmed.length === 0 && imgs.length === 0) {
+  const existingImgs = parseImageUrls(ex.image_urls);
+  const keepPaths = options?.keepImagePaths ?? existingImgs;
+  const addFiles = options?.addImageFiles ?? [];
+
+  for (const path of keepPaths) {
+    if (!existingImgs.includes(path)) {
+      return { data: null, error: new Error("Invalid image reference.") };
+    }
+  }
+
+  const fileErr = validateImageFiles(addFiles);
+  if (fileErr) return { data: null, error: fileErr };
+
+  const finalCount = keepPaths.length + addFiles.length;
+  if (finalCount > MAX_POST_IMAGES) {
+    return { data: null, error: new Error(`You can attach up to ${MAX_POST_IMAGES} images per post.`) };
+  }
+
+  if (trimmed.length === 0 && finalCount === 0) {
     return { data: null, error: new Error("Add text or keep at least one photo.") };
   }
 
-  const imageAlts =
-    options?.imageAltTexts !== undefined
-      ? normalizeAltsForCount(options.imageAltTexts, imgs.length)
-      : parseImageAltTexts(ex.image_alt_texts, imgs.length);
+  const removePaths = existingImgs.filter((p) => !keepPaths.includes(p));
+  const uploadedPaths: string[] = [];
 
-  const updatePayload: Record<string, unknown> = {
-    body: trimmed,
-    topic,
-  };
-  if (imageAlts.some((s) => s.trim().length > 0)) {
-    updatePayload.image_alt_texts = imageAlts;
+  try {
+    for (let i = 0; i < addFiles.length; i++) {
+      const f = addFiles[i]!;
+      const ext = extFromFile(f);
+      const dest = `${uid}/${postId}/${Date.now()}-${i}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).upload(dest, f, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: f.type || undefined,
+      });
+      if (upErr) throw new Error(upErr.message);
+      uploadedPaths.push(dest);
+    }
+
+    const finalPaths = [...keepPaths, ...uploadedPaths];
+    const imageAlts =
+      options?.imageAltTexts !== undefined
+        ? normalizeAltsForCount(options.imageAltTexts, finalPaths.length)
+        : parseImageAltTexts(ex.image_alt_texts, finalPaths.length);
+
+    const updatePayload: Record<string, unknown> = {
+      body: trimmed,
+      topic,
+      image_urls: finalPaths,
+    };
+    if (imageAlts.some((s) => s.trim().length > 0)) {
+      updatePayload.image_alt_texts = imageAlts;
+    } else if (finalPaths.length === 0) {
+      updatePayload.image_alt_texts = [];
+    }
+
+    const { data, error } = await supabase
+      .from("community_posts")
+      .update(updatePayload)
+      .eq("id", postId)
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("No row returned");
+
+    if (removePaths.length > 0) {
+      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(removePaths);
+    }
+
+    return { data: await finalizeSinglePostRow(mapPost(data as Record<string, unknown>)), error: null };
+  } catch (e) {
+    if (uploadedPaths.length > 0) {
+      await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uploadedPaths);
+    }
+    const msg = e instanceof Error ? e.message : "Could not update post.";
+    return { data: null, error: new Error(msg) };
   }
-
-  const { data, error } = await supabase
-    .from("community_posts")
-    .update(updatePayload)
-    .eq("id", postId)
-    .select("*")
-    .single();
-
-  if (error) return { data: null, error: new Error(error.message) };
-  if (!data) return { data: null, error: new Error("No row returned") };
-  return { data: mapPost(data as Record<string, unknown>), error: null };
 }
 
 export async function deleteCommunityComment(commentId: string): Promise<{ error: Error | null }> {
