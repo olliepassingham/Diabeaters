@@ -1850,7 +1850,12 @@ export const storage = {
     if (!data) {
       return [];
     }
-    return JSON.parse(data);
+    try {
+      const parsed: unknown = JSON.parse(data);
+      return Array.isArray(parsed) ? (parsed as Supply[]) : [];
+    } catch {
+      return [];
+    }
   },
 
   addSupply(supply: Omit<Supply, "id">): { supply: Supply; merged: boolean } {

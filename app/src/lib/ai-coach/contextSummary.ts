@@ -24,6 +24,19 @@ import {
 
 const FORTNIGHT_MS = 14 * 24 * 60 * 60 * 1000;
 
+function trimIfString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function listSupplies(): ReturnType<typeof storage.getSupplies> {
+  try {
+    const supplies = storage.getSupplies();
+    return Array.isArray(supplies) ? supplies : [];
+  } catch {
+    return [];
+  }
+}
+
 function cutoff(): number {
   return Date.now() - FORTNIGHT_MS;
 }
@@ -82,13 +95,13 @@ export interface AiCoachClientPayload {
 
 export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
   const profile = storage.getProfile();
-  const settings = storage.getSettings();
+  const settings = storage.getSettings() ?? {};
   const insulinDeliveryMethod = isPumpDeliveryMethod(profile?.insulinDeliveryMethod)
     ? "pump"
     : isPenDeliveryMethod(profile?.insulinDeliveryMethod)
       ? "pen"
       : null;
-  const carbUnitsRaw = profile?.carbUnits?.trim().toLowerCase();
+  const carbUnitsRaw = trimIfString(profile?.carbUnits).toLowerCase();
   const carbUnits: AiCoachDeviceSetupWire["carbUnits"] =
     carbUnitsRaw === "portions" || carbUnitsRaw === "portion"
       ? "portions"
@@ -97,7 +110,7 @@ export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
         : null;
   const usesCgm =
     (typeof settings.cgmDays === "number" && settings.cgmDays > 0) ||
-    storage.getSupplies().some((s) => s.type === "cgm");
+    listSupplies().some((s) => s.type === "cgm");
   const usesClosedLoop =
     isPumpDeliveryMethod(profile?.insulinDeliveryMethod) && settings.usesClosedLoop === true;
   return { insulinDeliveryMethod, carbUnits, usesCgm, usesClosedLoop };
@@ -105,26 +118,30 @@ export function buildCoachDeviceSetupWire(): AiCoachDeviceSetupWire {
 
 /** Short line for the coach UI — what setup enums Beatie receives (not dosing numbers). */
 export function describeCoachProfileVisibility(): string | null {
-  const setup = buildCoachDeviceSetupWire();
-  const profile = storage.getProfile();
-  const bits: string[] = [];
-  if (setup.insulinDeliveryMethod === "pump") bits.push("pump");
-  else if (setup.insulinDeliveryMethod === "pen") bits.push("MDI");
-  const bg = profile?.bgUnits?.trim();
-  if (bg) bits.push(bg);
-  if (setup.carbUnits) bits.push(setup.carbUnits === "portions" ? "carb portions" : "carb grams");
-  if (setup.usesCgm) bits.push("CGM");
-  if (setup.usesClosedLoop) bits.push("closed loop");
-  const settings = storage.getSettings();
-  const ratiosAreSet = Boolean(
-    settings.breakfastRatio?.trim() ||
-      settings.lunchRatio?.trim() ||
-      settings.dinnerRatio?.trim() ||
-      settings.snackRatio?.trim(),
-  );
-  if (ratiosAreSet) bits.push("ratios saved");
-  if (bits.length === 0) return null;
-  return `Beatie can see: ${bits.join(" · ")}`;
+  try {
+    const setup = buildCoachDeviceSetupWire();
+    const profile = storage.getProfile();
+    const bits: string[] = [];
+    if (setup.insulinDeliveryMethod === "pump") bits.push("pump");
+    else if (setup.insulinDeliveryMethod === "pen") bits.push("MDI");
+    const bg = trimIfString(profile?.bgUnits);
+    if (bg) bits.push(bg);
+    if (setup.carbUnits) bits.push(setup.carbUnits === "portions" ? "carb portions" : "carb grams");
+    if (setup.usesCgm) bits.push("CGM");
+    if (setup.usesClosedLoop) bits.push("closed loop");
+    const settings = storage.getSettings() ?? {};
+    const ratiosAreSet = Boolean(
+      trimIfString(settings.breakfastRatio) ||
+        trimIfString(settings.lunchRatio) ||
+        trimIfString(settings.dinnerRatio) ||
+        trimIfString(settings.snackRatio),
+    );
+    if (ratiosAreSet) bits.push("ratios saved");
+    if (bits.length === 0) return null;
+    return `Beatie can see: ${bits.join(" · ")}`;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -171,16 +188,16 @@ export function buildAiCoachClientPayload(): AiCoachClientPayload {
   const exerciseWithBg = outcomes.filter((o) => o.bgResponse != null).length;
   const bgReadings = hypos.length + exerciseWithBg;
 
-  const settings = storage.getSettings();
+  const settings = storage.getSettings() ?? {};
   const ratiosAreSet = Boolean(
-    (settings.breakfastRatio && settings.breakfastRatio.trim()) ||
-      (settings.lunchRatio && settings.lunchRatio.trim()) ||
-      (settings.dinnerRatio && settings.dinnerRatio.trim()) ||
-      (settings.snackRatio && settings.snackRatio.trim()),
+    trimIfString(settings.breakfastRatio) ||
+      trimIfString(settings.lunchRatio) ||
+      trimIfString(settings.dinnerRatio) ||
+      trimIfString(settings.snackRatio),
   );
 
   const profile = storage.getProfile();
-  const bgUnitsRaw = profile?.bgUnits?.trim();
+  const bgUnitsRaw = trimIfString(profile?.bgUnits);
   const bgUnits =
     bgUnitsRaw === "mmol/L" || bgUnitsRaw?.toLowerCase() === "mmol/l"
       ? "mmol/L"

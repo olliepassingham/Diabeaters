@@ -310,7 +310,9 @@ export default function CoachPage() {
 
   useEffect(() => {
     if (!user?.id || isSupporter) return;
-    void syncClinicalPrefsToCloud(user.id);
+    void syncClinicalPrefsToCloud(user.id).catch(() => {
+      /* non-fatal — coach still works with local device setup hints */
+    });
   }, [user?.id, isSupporter]);
 
   const sendMutation = useMutation({
