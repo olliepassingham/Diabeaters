@@ -9,7 +9,7 @@ import {
 } from "@/components/community/feed-stories-composer-header";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { StoryCreateSheet } from "@/components/community/story-create-sheet";
-import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
+import { StoryViewerDialog, buildStoryViewerQueue, type StoryViewerEntry } from "@/components/community/story-viewer-dialog";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -133,9 +133,8 @@ export default function CommunityHomePage() {
     { id: string; name: string; avatar_url: string | null }[]
   >([]);
   const [storyViewerOpen, setStoryViewerOpen] = useState(false);
-  const [storyViewerAuthorId, setStoryViewerAuthorId] = useState<string | null>(null);
-  const [storyViewerStory, setStoryViewerStory] = useState<CommunityStoryRow | null>(null);
-  const [storyViewerName, setStoryViewerName] = useState<string | undefined>();
+  const [storyViewerInitialIndex, setStoryViewerInitialIndex] = useState(0);
+  const [storyViewerEntriesOverride, setStoryViewerEntriesOverride] = useState<StoryViewerEntry[] | null>(null);
   const [storyCreateOpen, setStoryCreateOpen] = useState(false);
 
   useEffect(() => {
@@ -315,16 +314,35 @@ export default function CommunityHomePage() {
     };
   }, [storyFolloweeIdsOnly.join(",")]);
 
+  const storyViewerQueue = useMemo(
+    () => buildStoryViewerQueue(selfStoryPerson, storyPeople, storiesByAuthor),
+    [selfStoryPerson, storyPeople, storiesByAuthor],
+  );
+
   const openStory = useCallback(
-    (authorId: string, story?: CommunityStoryRow) => {
-      const person =
-        authorId === user?.id ? selfStoryPerson : storyPeople.find((p) => p.id === authorId);
-      setStoryViewerAuthorId(authorId);
-      setStoryViewerStory(story ?? storiesByAuthor.get(authorId) ?? null);
-      setStoryViewerName(person?.name);
+    (authorId: string, story?: CommunityStoryRow, displayName?: string) => {
+      const isSelf = authorId === user?.id;
+      const isFollowee = storyFolloweeIds.includes(authorId);
+      if (!isSelf && !isFollowee) return;
+
+      const queueIdx = storyViewerQueue.findIndex((e) => e.authorId === authorId);
+      if (queueIdx >= 0) {
+        setStoryViewerEntriesOverride(null);
+        setStoryViewerInitialIndex(queueIdx);
+      } else {
+        const person = storyPeople.find((p) => p.id === authorId);
+        setStoryViewerEntriesOverride([
+          {
+            authorId,
+            story: story ?? storiesByAuthor.get(authorId) ?? null,
+            authorDisplayName: displayName ?? person?.name ?? undefined,
+          },
+        ]);
+        setStoryViewerInitialIndex(0);
+      }
       setStoryViewerOpen(true);
     },
-    [user?.id, selfStoryPerson, storyPeople, storiesByAuthor],
+    [user?.id, storyFolloweeIds, storyViewerQueue, storyPeople, storiesByAuthor],
   );
 
   useEffect(() => {
@@ -571,15 +589,14 @@ export default function CommunityHomePage() {
         suggested={suggested}
         suggestedLoading={suggestedLoading}
         onRefreshSuggested={refreshSuggestedForFindPeople}
-        onStoryClick={(id) => openStory(id)}
+        onStoryClick={(id, story, name) => openStory(id, story, name)}
       />
 
       <StoryViewerDialog
         open={storyViewerOpen}
         onOpenChange={setStoryViewerOpen}
-        authorId={storyViewerAuthorId}
-        story={storyViewerStory}
-        authorDisplayName={storyViewerName}
+        entries={storyViewerEntriesOverride ?? storyViewerQueue}
+        initialIndex={storyViewerInitialIndex}
         onViewed={() => refreshStories()}
       />
       <StoryCreateSheet

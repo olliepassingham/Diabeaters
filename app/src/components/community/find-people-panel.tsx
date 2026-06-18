@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { type FollowSuggestion } from "@/lib/community";
-import type { StoryRingState } from "@/lib/community/stories-supabase";
+import type { CommunityStoryRow, StoryRingState } from "@/lib/community/stories-supabase";
 import { searchProfilesByHandlePrefix } from "@/lib/profile";
 
 type FindPeoplePerson = {
@@ -163,7 +163,7 @@ function FindPeoplePanelBody({
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
   ringState: (authorId: string) => StoryRingState;
-  onStoryClick?: (authorId: string) => void;
+  onStoryClick?: (authorId: string, displayName: string) => void;
 }) {
   const trimmed = query.trim();
   const searching = Boolean(trimmed);
@@ -227,8 +227,10 @@ function FindPeoplePanelBody({
                     waitFollowees={Boolean(userId && followeesLoading)}
                     hasUser={Boolean(userId)}
                     onFollow={() => onFollow(p.id)}
-                    storyRing={ringState(p.id)}
-                    onStoryClick={onStoryClick ? () => onStoryClick(p.id) : undefined}
+                    storyRing={alreadyFollowing ? ringState(p.id) : "none"}
+                    onStoryClick={
+                      alreadyFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
+                    }
                   />
                 ))}
               </ul>
@@ -275,8 +277,10 @@ function FindPeoplePanelBody({
                     waitFollowees={Boolean(userId && followeesLoading)}
                     hasUser={Boolean(userId)}
                     onFollow={() => onFollow(p.id)}
-                    storyRing={ringState(p.id)}
-                    onStoryClick={onStoryClick ? () => onStoryClick(p.id) : undefined}
+                    storyRing={alreadyFollowing ? ringState(p.id) : "none"}
+                    onStoryClick={
+                      alreadyFollowing && onStoryClick ? () => onStoryClick(p.id, p.name) : undefined
+                    }
                   />
                 ))}
               </ul>
@@ -299,7 +303,7 @@ type FindPeoplePanelProps = {
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
   onRefreshSuggested: () => void;
-  onStoryClick?: (authorId: string) => void;
+  onStoryClick?: (authorId: string, story?: CommunityStoryRow, displayName?: string) => void;
 };
 
 export function FindPeoplePanel({
@@ -328,7 +332,7 @@ export function FindPeoplePanel({
     return [...ids];
   }, [peopleResults, suggested]);
 
-  const { ringState } = useCommunityStories(userId, visibleAuthorIds);
+  const { ringState, storiesByAuthor } = useCommunityStories(userId, visibleAuthorIds);
 
   useEffect(() => {
     if (!open) {
@@ -390,7 +394,10 @@ export function FindPeoplePanel({
     suggested,
     suggestedLoading,
     ringState,
-    onStoryClick,
+    onStoryClick: onStoryClick
+      ? (authorId: string, displayName: string) =>
+          onStoryClick(authorId, storiesByAuthor.get(authorId), displayName)
+      : undefined,
   };
 
   const title = "Find people";

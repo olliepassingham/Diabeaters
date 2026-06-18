@@ -142,6 +142,7 @@ export default function CommunityProfilePage() {
   const storyRing = profileRingState(userId ?? "");
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
+  const canViewStory = Boolean(isSelf || followingThem);
   /** Diabetes journey line: show to others when present; on your own profile only if you use the app as a patient. */
   const onset = profile?.diabetes_onset_date?.trim() ?? "";
   const showDiabetesJourneyLine = Boolean(
@@ -412,7 +413,7 @@ export default function CommunityProfilePage() {
           <div className="flex flex-col gap-3">
             <ProfileHeroRow
               avatar={
-                storyRing !== "none" && activeStory ? (
+                storyRing !== "none" && activeStory && canViewStory ? (
                   <StoryAvatarRing
                     state={storyRing}
                     onClick={() => setStoryViewerOpen(true)}
@@ -647,9 +648,12 @@ export default function CommunityProfilePage() {
       <StoryViewerDialog
         open={storyViewerOpen}
         onOpenChange={setStoryViewerOpen}
-        authorId={userId}
-        story={activeStory}
-        authorDisplayName={displayName}
+        entries={
+          activeStory && userId && canViewStory
+            ? [{ authorId: userId, story: activeStory, authorDisplayName: displayName }]
+            : []
+        }
+        initialIndex={0}
         onViewed={() => refreshStories()}
       />
       <StoryCreateSheet
