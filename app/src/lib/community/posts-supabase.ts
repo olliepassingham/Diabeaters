@@ -29,6 +29,7 @@ import {
 export const COMMUNITY_POST_IMAGES_BUCKET = "community_post_images";
 export const MAX_POST_IMAGES = 4;
 export const MAX_POST_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_POST_VIDEO_BYTES = 50 * 1024 * 1024;
 
 export type FeedCursor = { created_at: string; id: string };
 
@@ -67,6 +68,11 @@ function wrapFeedRpcError(err: { message: string }): Error {
   if (msg.includes("mention_map") || msg.includes("mentioned_user_ids")) {
     return new Error(
       `${msg} Apply migrations 20260412120000_community_posts_poll_event_mentions.sql and 20260601120000_community_comment_mentions.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
+    );
+  }
+  if (msg.includes("video_url")) {
+    return new Error(
+      `${msg} Apply migration 20260621120000_community_post_video.sql, then reload the API schema in Supabase Dashboard → Settings → API.`,
     );
   }
   return new Error(msg);
@@ -122,6 +128,8 @@ function mapPost(r: Record<string, unknown>): CommunityPostRow {
     topic: mapTopic(r.topic),
     image_urls: imgs,
     image_alt_texts: parseImageAltTexts(r.image_alt_texts, imgs.length),
+    video_url:
+      typeof r.video_url === "string" && r.video_url.trim().length > 0 ? r.video_url.trim() : null,
     content_note: mapContentNote(r.content_note),
     post_kind,
     post_extra,
@@ -407,6 +415,13 @@ function extFromFile(f: File): string {
   return "jpg";
 }
 
+function extFromVideoFile(f: File): string {
+  const t = f.type.toLowerCase();
+  if (t.includes("webm")) return "webm";
+  if (t.includes("quicktime") || f.name.toLowerCase().endsWith(".mov")) return "mov";
+  return "mp4";
+}
+
 function validateImageFiles(files: File[]): Error | null {
   if (files.length > MAX_POST_IMAGES) {
     return new Error(`You can attach up to ${MAX_POST_IMAGES} images per post.`);
@@ -420,6 +435,36 @@ function validateImageFiles(files: File[]): Error | null {
     }
   }
   return null;
+}
+
+function validateVideoFile(file: File | null | undefined): Error | null {
+  if (!file) return null;
+  if (file.size > MAX_POST_VIDEO_BYTES) {
+    return new Error("Video must be 50MB or smaller.");
+  }
+  const t = file.type.toLowerCase();
+  const allowed =
+    t === "video/mp4" ||
+    t === "video/quicktime" ||
+    t === "video/webm" ||
+    file.name.toLowerCase().endsWith(".mp4") ||
+    file.name.toLowerCase().endsWith(".mov") ||
+    file.name.toLowerCase().endsWith(".webm");
+  if (!allowed) {
+    return new Error("Only MP4, MOV, or WebM videos are allowed.");
+  }
+  return null;
+}
+
+/** Signed URL for a private bucket video (short TTL; refresh on feed load). */
+export async function getPostVideoSignedUrl(path: string): Promise<string | null> {
+  const supabase = getSupabase();
+  const trimmed = String(path ?? "").trim();
+  if (!supabase || !trimmed) return null;
+  const { data, error } = await supabase.storage
+    .from(COMMUNITY_POST_IMAGES_BUCKET)
+    .createSignedUrl(trimmed, 3600);
+  return !error && data?.signedUrl ? data.signedUrl : null;
 }
 
 /** Signed URLs for displaying private bucket images (short TTL; refresh on feed load). */
@@ -625,6 +670,7 @@ export type InsertFeedPostInput =
       topic: CommunityTopicId;
       body: string;
       imageFiles?: File[];
+      videoFile?: File;
       imageAlts?: string[];
       mentions: FeedPostMentions;
     }
@@ -677,12 +723,19 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
   mention_map: Record<string, string>;
   mentioned_user_ids: string[];
   imageFiles: File[];
+  videoFile?: File | null;
   imageAlts?: string[];
 }): Promise<{ data: CommunityPostRow | null; error: Error | null }> {
   const { supabase, uid, mentioned_user_ids } = params;
   const files = params.imageFiles.filter(Boolean);
-  const vErr = validateImageFiles(files);
+  const videoFile = params.videoFile ?? null;
+  if (videoFile && files.length > 0) {
+    return { data: null, error: new Error("Choose photos or a video, not both.") };
+  }
+  const vErr = validateVideoFile(videoFile);
   if (vErr) return { data: null, error: vErr };
+  const iErr = validateImageFiles(files);
+  if (iErr) return { data: null, error: iErr };
 
   const imageAltsForInsert = normalizeAltsForCount(params.imageAlts, files.length);
 
@@ -696,11 +749,12 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
   };
 
-  if (files.length === 0) {
+  if (files.length === 0 && !videoFile) {
     const insertRow: Record<string, unknown> = {
       author_id: uid,
       body: params.body,
       image_urls: [],
+      video_url: null,
       topic: params.topic,
       post_kind: params.post_kind,
       post_extra: params.post_extra,
@@ -718,10 +772,24 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
 
   const pendingId = crypto.randomUUID();
   const pendingPaths: string[] = [];
+  let pendingVideoPath: string | null = null;
   let postId: string | null = null;
   const movedDests: string[] = [];
 
   try {
+    if (videoFile) {
+      const ext = extFromVideoFile(videoFile);
+      pendingVideoPath = `${uid}/pending/${pendingId}/video.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(COMMUNITY_POST_IMAGES_BUCKET)
+        .upload(pendingVideoPath, videoFile, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: videoFile.type || undefined,
+        });
+      if (upErr) throw new Error(upErr.message);
+    }
+
     for (let i = 0; i < files.length; i++) {
       const ext = extFromFile(files[i]!);
       const path = `${uid}/pending/${pendingId}/${i}.${ext}`;
@@ -741,9 +809,11 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
       body: params.body,
       /* Avoid publishing pending storage paths: we move() those objects away immediately, so any
        * feed/realtime read between move and DB update would sign URLs for paths that no longer exist.
-       * Standard image-only posts must reference at least one image at insert time (CHECK constraint). */
+       * Standard media-only posts must reference media at insert time (CHECK constraint). */
       image_urls:
         params.post_kind === "standard" && !params.body.trim() && files.length > 0 ? pendingPaths : [],
+      video_url:
+        params.post_kind === "standard" && !params.body.trim() && pendingVideoPath ? pendingVideoPath : null,
       topic: params.topic,
       post_kind: params.post_kind,
       post_extra: params.post_extra,
@@ -761,6 +831,17 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
 
     postId = String((data as Record<string, unknown>).id);
     const finalPaths: string[] = [];
+    let finalVideoPath: string | null = null;
+
+    if (pendingVideoPath && videoFile) {
+      const ext = extFromVideoFile(videoFile);
+      finalVideoPath = `${uid}/${postId}/video.${ext}`;
+      const { error: mvErr } = await supabase.storage
+        .from(COMMUNITY_POST_IMAGES_BUCKET)
+        .move(pendingVideoPath, finalVideoPath);
+      if (mvErr) throw new Error(mvErr.message);
+      movedDests.push(finalVideoPath);
+    }
 
     for (let i = 0; i < pendingPaths.length; i++) {
       const ext = extFromFile(files[i]!);
@@ -772,6 +853,9 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     }
 
     const updatePayload: Record<string, unknown> = { image_urls: finalPaths };
+    if (finalVideoPath) {
+      updatePayload.video_url = finalVideoPath;
+    }
     if (imageAltsForInsert.some((s) => s.trim().length > 0)) {
       updatePayload.image_alt_texts = imageAltsForInsert;
     }
@@ -792,7 +876,7 @@ async function insertCommunityPostRowWithOptionalImageUploads(params: {
     if (postId) {
       await supabase.from("community_posts").delete().eq("id", postId);
     }
-    const uniq = [...new Set([...pendingPaths, ...movedDests])];
+    const uniq = [...new Set([...pendingPaths, ...movedDests, ...(pendingVideoPath ? [pendingVideoPath] : [])])];
     if (uniq.length > 0) {
       await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(uniq);
     }
@@ -884,8 +968,12 @@ export async function insertFeedPost(
 
   const trimmed = input.body.trim();
   const files = input.imageFiles?.filter(Boolean) ?? [];
-  if (!trimmed && files.length === 0) {
-    return { data: null, error: new Error("Add text or at least one photo.") };
+  const videoFile = input.videoFile ?? null;
+  if (videoFile && files.length > 0) {
+    return { data: null, error: new Error("Choose photos or a video, not both.") };
+  }
+  if (!trimmed && files.length === 0 && !videoFile) {
+    return { data: null, error: new Error("Add text, a photo, or a video.") };
   }
   return insertCommunityPostRowWithOptionalImageUploads({
     supabase,
@@ -897,6 +985,7 @@ export async function insertFeedPost(
     mention_map,
     mentioned_user_ids,
     imageFiles: files,
+    videoFile,
     imageAlts: input.imageAlts,
   });
 }
@@ -1036,7 +1125,7 @@ export async function deleteCommunityPost(postId: string): Promise<{ error: Erro
 
   const { data: row, error: selErr } = await supabase
     .from("community_posts")
-    .select("id, image_urls, author_id")
+    .select("id, image_urls, video_url, author_id")
     .eq("id", postId)
     .eq("author_id", uid)
     .maybeSingle();
@@ -1045,8 +1134,13 @@ export async function deleteCommunityPost(postId: string): Promise<{ error: Erro
   if (!row) return { error: new Error("Post not found or you cannot delete it.") };
 
   const paths = parseImageUrls((row as Record<string, unknown>).image_urls);
-  if (paths.length > 0) {
-    const { error: rmErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(paths);
+  const videoPath =
+    typeof (row as Record<string, unknown>).video_url === "string"
+      ? String((row as Record<string, unknown>).video_url).trim()
+      : "";
+  const storagePaths = [...paths, ...(videoPath ? [videoPath] : [])];
+  if (storagePaths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from(COMMUNITY_POST_IMAGES_BUCKET).remove(storagePaths);
     if (rmErr) return { error: new Error(rmErr.message) };
   }
 
@@ -1096,8 +1190,14 @@ export async function updateCommunityPost(
   }
 
   const existingImgs = parseImageUrls(ex.image_urls);
+  const existingVideo =
+    typeof ex.video_url === "string" && ex.video_url.trim().length > 0 ? ex.video_url.trim() : null;
   const keepPaths = options?.keepImagePaths ?? existingImgs;
   const addFiles = options?.addImageFiles ?? [];
+
+  if (existingVideo && (addFiles.length > 0 || keepPaths.length > 0)) {
+    return { data: null, error: new Error("Video posts cannot include photos.") };
+  }
 
   for (const path of keepPaths) {
     if (!existingImgs.includes(path)) {
@@ -1113,8 +1213,8 @@ export async function updateCommunityPost(
     return { data: null, error: new Error(`You can attach up to ${MAX_POST_IMAGES} images per post.`) };
   }
 
-  if (trimmed.length === 0 && finalCount === 0) {
-    return { data: null, error: new Error("Add text or keep at least one photo.") };
+  if (trimmed.length === 0 && finalCount === 0 && !existingVideo) {
+    return { data: null, error: new Error("Add text or keep at least one photo or video.") };
   }
 
   const removePaths = existingImgs.filter((p) => !keepPaths.includes(p));

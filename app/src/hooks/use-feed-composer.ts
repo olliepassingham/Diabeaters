@@ -50,8 +50,10 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   );
   const [composer, setComposer] = useState(() => readFeedComposerDraft()?.body ?? "");
   const [composerFiles, setComposerFiles] = useState<File[]>([]);
+  const [composerVideoFile, setComposerVideoFile] = useState<File | null>(null);
   const [composerImageAlts, setComposerImageAlts] = useState<string[]>([]);
   const [composerPreviews, setComposerPreviews] = useState<string[]>([]);
+  const [composerVideoPreview, setComposerVideoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [composerPostKind, setComposerPostKind] = useState<ComposerPostKind>("standard");
   const [pollQuestion, setPollQuestion] = useState("");
@@ -62,6 +64,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   const [eventDetails, setEventDetails] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const hasFeedHandle = Boolean(profile?.public_handle?.trim());
   const canComposeToFeed = Boolean(user?.id) && !profileLoading && hasFeedHandle;
@@ -76,6 +79,16 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     setComposerPreviews(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [composerFiles]);
+
+  useEffect(() => {
+    if (!composerVideoFile) {
+      setComposerVideoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(composerVideoFile);
+    setComposerVideoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [composerVideoFile]);
 
   useEffect(() => {
     setComposerImageAlts((prev) => {
@@ -107,6 +120,8 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
 
   function onPickImages(files: FileList | null) {
     if (!files?.length) return;
+    setComposerVideoFile(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
     const next: File[] = [...composerFiles];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
@@ -117,6 +132,25 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     }
     setComposerFiles(next);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function onPickVideo(files: FileList | null) {
+    const f = files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("video/")) {
+      toast({ title: "Unsupported file", description: "Choose an MP4, MOV, or WebM video.", variant: "destructive" });
+      return;
+    }
+    setComposerFiles([]);
+    setComposerImageAlts([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setComposerVideoFile(f);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  }
+
+  function removeComposerVideo() {
+    setComposerVideoFile(null);
+    if (videoInputRef.current) videoInputRef.current.value = "";
   }
 
   async function pickImagesFromLibraryOnly() {
@@ -164,6 +198,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
   function resetComposerAfterPost() {
     setComposer("");
     setComposerFiles([]);
+    setComposerVideoFile(null);
     setComposerImageAlts([]);
     setComposerPostKind("standard");
     setPollQuestion("");
@@ -208,7 +243,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     if (!user) return false;
     if (composerPostKind === "standard") {
       const t = composer.trim();
-      return Boolean(t || composerFiles.length > 0);
+      return Boolean(t || composerFiles.length > 0 || composerVideoFile);
     }
     if (composerPostKind === "poll") {
       const q = pollQuestion.trim();
@@ -218,14 +253,15 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     const titleOk = eventTitle.trim().length > 0;
     const whenOk = eventStartsAt.trim().length > 0;
     return titleOk && whenOk;
-  }, [user, composerPostKind, composer, composerFiles.length, pollQuestion, pollOptions, eventTitle, eventStartsAt]);
+  }, [user, composerPostKind, composer, composerFiles.length, composerVideoFile, pollQuestion, pollOptions, eventTitle, eventStartsAt]);
 
   const composerExpandSignal = useMemo(() => {
     if (composer.trim()) return true;
     if (composerFiles.length > 0) return true;
+    if (composerVideoFile) return true;
     if (composerPostKind !== "standard") return true;
     return false;
-  }, [composer, composerFiles.length, composerPostKind]);
+  }, [composer, composerFiles.length, composerVideoFile, composerPostKind]);
 
   async function handlePost(e: FormEvent) {
     e.preventDefault();
@@ -249,6 +285,7 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
         topic: composerTopic,
         body: composer,
         imageFiles: composerFiles.length ? composerFiles : undefined,
+        videoFile: composerVideoFile ?? undefined,
         imageAlts: composerImageAlts,
         mentions,
       });
@@ -336,11 +373,16 @@ export function useFeedComposer(options: UseFeedComposerOptions = {}) {
     setComposer,
     composerPreviews,
     composerFiles,
+    composerVideoPreview,
+    composerVideoFile,
     removeComposerImage,
+    removeComposerVideo,
     composerImageAlts,
     setComposerImageAlts,
     fileInputRef,
+    videoInputRef,
     onPickImages,
+    onPickVideo,
     pickImagesFromLibraryOnly,
     onPollModeClick,
     onEventModeClick,

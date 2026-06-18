@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ChevronRight, MessageCircle, UserCheck, UserPlus } from "lucide-react";
+import { ChevronRight, Grid3X3, LayoutList, MessageCircle, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { FeedPostList } from "@/components/community/feed-post-list";
+import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
 import { useToast } from "@/hooks/use-toast";
@@ -62,12 +63,13 @@ import {
   getProfilesByIds,
   type PublicCommunityProfile,
 } from "@/lib/profile";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import {
   BEATIE_FEED_AVATAR_FALLBACK_SRC,
   BEATIE_FEED_BOT_DEFAULT_BIO,
   getBeatieFeedBotUserIdFromEnv,
 } from "@/lib/ai-feed-reply/config";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…` : id;
@@ -82,6 +84,20 @@ function profileInitials(name: string): string {
 }
 
 type ListKind = "followers" | "following";
+type ProfilePostsView = "list" | "photos";
+
+const PROFILE_POSTS_VIEW_KEY = "diabeater.community.profile_posts_view";
+
+function readStoredProfilePostsView(): ProfilePostsView {
+  if (typeof window === "undefined") return "list";
+  try {
+    const raw = window.localStorage.getItem(PROFILE_POSTS_VIEW_KEY);
+    if (raw === "photos" || raw === "list") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "list";
+}
 
 export default function CommunityProfilePage() {
   const [, params] = useRoute("/community/profile/:userId");
@@ -109,6 +125,7 @@ export default function CommunityProfilePage() {
   const [reportBusy, setReportBusy] = useState(false);
 
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
+  const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
   /** Diabetes journey line: show to others when present; on your own profile only if you use the app as a patient. */
@@ -458,19 +475,73 @@ export default function CommunityProfilePage() {
           </ProfileMutedCard>
         ) : (
           <div className="space-y-3">
-            <ProfileSectionHeading
-              title={isSelf ? "Your posts" : "Posts"}
-              subtitle={isSelf ? "What you've shared on the Feed" : `Posts from ${displayName}`}
-            />
-            <FeedPostList
-              viewerId={user.id}
-              scopeKey={`profile:${userId}`}
-              pageSize={20}
-              showRefreshButton={false}
-              emptyStateTitle="No posts yet"
-              emptyStateDescription={isSelf ? "You haven’t posted yet." : "This member hasn’t posted yet."}
-              fetchPage={(limit, cursor) => fetchCommunityPostsByAuthorPage(userId, limit, cursor, null)}
-            />
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <ProfileSectionHeading
+                title={isSelf ? "Your posts" : "Posts"}
+                subtitle={isSelf ? "What you've shared on the Feed" : `Posts from ${displayName}`}
+              />
+              <div className="inline-flex rounded-full border border-border/50 bg-muted/30 p-0.5" role="tablist" aria-label="Posts view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={postsView === "list"}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+                    postsView === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                  onClick={() => {
+                    setPostsView("list");
+                    try {
+                      window.localStorage.setItem(PROFILE_POSTS_VIEW_KEY, "list");
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                >
+                  <LayoutList className="h-3.5 w-3.5" aria-hidden />
+                  All
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={postsView === "photos"}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+                    postsView === "photos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                  onClick={() => {
+                    setPostsView("photos");
+                    try {
+                      window.localStorage.setItem(PROFILE_POSTS_VIEW_KEY, "photos");
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                >
+                  <Grid3X3 className="h-3.5 w-3.5" aria-hidden />
+                  Photos
+                </button>
+              </div>
+            </div>
+            {postsView === "photos" ? (
+              <ProfilePostMediaGrid
+                authorId={userId}
+                emptyTitle={isSelf ? "No photos yet" : "No photos shared"}
+                emptyDescription={
+                  isSelf ? "Posts with photos will show up here." : "This member hasn't shared any photos yet."
+                }
+              />
+            ) : (
+              <FeedPostList
+                viewerId={user.id}
+                scopeKey={`profile:${userId}`}
+                pageSize={20}
+                showRefreshButton={false}
+                emptyStateTitle="No posts yet"
+                emptyStateDescription={isSelf ? "You haven’t posted yet." : "This member hasn’t posted yet."}
+                fetchPage={(limit, cursor) => fetchCommunityPostsByAuthorPage(userId, limit, cursor, null)}
+              />
+            )}
           </div>
         )
       ) : null}

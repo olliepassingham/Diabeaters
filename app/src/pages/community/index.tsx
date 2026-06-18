@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { Bookmark, ChevronDown, MessageCircle, Plus, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,6 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
@@ -41,6 +41,10 @@ import {
   dismissCommunityFeedProfileReminder,
   shouldShowCommunityFeedProfileReminder,
 } from "@/lib/community-profile-prompt";
+import {
+  dismissFeedSuggestions,
+  isFeedSuggestionsDismissed,
+} from "@/lib/community/feed-suggestions-dismiss";
 import { buildMainFeedScopeKey, MAIN_FEED_PAGE_SIZE } from "@/lib/community-feed-cache";
 import { CommunityPushPromptDialog } from "@/components/community-push-prompt-dialog";
 import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-push-prompt-after-onboarding";
@@ -107,7 +111,6 @@ export default function CommunityHomePage() {
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [suggested, setSuggested] = useState<FollowSuggestion[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState(false);
-  const [suggestedOpen, setSuggestedOpen] = useState(false);
   const [followBusyIds, setFollowBusyIds] = useState<Record<string, boolean>>({});
   /** Current user’s followees — refreshed when Find people opens so search results show Following vs Follow. */
   const [followeeIds, setFolloweeIds] = useState<Set<string>>(() => new Set());
@@ -118,6 +121,7 @@ export default function CommunityHomePage() {
   const [searchMatchedAuthorIds, setSearchMatchedAuthorIds] = useState<string[] | null>(null);
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
   const [showProfileReminder, setShowProfileReminder] = useState(false);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
 
   useEffect(() => {
     if (!user?.id || profileLoading) {
@@ -126,6 +130,14 @@ export default function CommunityHomePage() {
     }
     setShowProfileReminder(shouldShowCommunityFeedProfileReminder(user.id, profile));
   }, [user?.id, profile, profileLoading]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSuggestionsDismissed(false);
+      return;
+    }
+    setSuggestionsDismissed(isFeedSuggestionsDismissed(user.id));
+  }, [user?.id]);
 
   // Preserve scroll position across Everyone / Following toggles.
   useEffect(() => {
@@ -305,10 +317,9 @@ export default function CommunityHomePage() {
     void loadSuggestedPeople();
   }, [user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
-  // Discovery on Following tab — deferred until idle so the feed load is not competing on weak WiFi.
+  // Discovery — deferred until idle so the feed load is not competing on weak WiFi.
   useEffect(() => {
     if (!user?.id) return;
-    if (feedTab !== "following") return;
     if (suggestedLoading || suggested.length > 0) return;
     if (savedOnly || feedSearch.trim()) return;
 
@@ -332,7 +343,7 @@ export default function CommunityHomePage() {
       if (idleId) window.cancelIdleCallback(idleId);
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [user?.id, feedTab, savedOnly, feedSearch, suggestedLoading, suggested.length, loadSuggestedPeople]);
+  }, [user?.id, savedOnly, feedSearch, suggestedLoading, suggested.length, loadSuggestedPeople]);
 
   async function handleFollow(id: string) {
     if (!user?.id) {
@@ -761,92 +772,20 @@ export default function CommunityHomePage() {
         ) : null}
       </div>
 
-      {feedTab === "following" && !savedOnly && !feedSearch.trim() && (suggestedLoading || suggested.length > 0) ? (
-        <Collapsible
-          open={suggestedOpen}
-          onOpenChange={setSuggestedOpen}
-          className="rounded-xl border border-border/40 bg-muted/15"
-          data-testid="card-feed-suggested-following"
-        >
-          <div className="flex items-center gap-0.5 pr-1">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-l-xl px-3 py-2 text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-expanded={suggestedOpen}
-              >
-                <ChevronDown
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                    suggestedOpen && "rotate-180",
-                  )}
-                  aria-hidden
-                />
-                <span className="truncate text-xs font-medium">Suggested for you</span>
-                {suggestedLoading ? (
-                  <span className="text-[10px] text-muted-foreground">Loading…</span>
-                ) : suggested.length > 0 ? (
-                  <span className="rounded-full bg-muted/80 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
-                    {Math.min(3, suggested.length)}
-                  </span>
-                ) : null}
-              </button>
-            </CollapsibleTrigger>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 px-2 text-xs"
-              onClick={() => setPeopleOpen(true)}
-            >
-              Find people
-            </Button>
-          </div>
-          <CollapsibleContent>
-            <div className="space-y-1 border-t border-border/35 px-2 pb-2 pt-1">
-              {suggestedLoading ? (
-                <p className="px-1 py-1 text-[11px] text-muted-foreground">Finding people you may know…</p>
-              ) : (
-                suggested.slice(0, 3).map((p) => {
-                  const alreadyFollowing = Boolean(user?.id && followeeIds.has(p.id));
-                  const busy = Boolean(followBusyIds[p.id]);
-                  return (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between gap-2 rounded-lg px-1 py-1"
-                    >
-                      <Link
-                        href={`/community/profile/${encodeURIComponent(p.id)}`}
-                        className="flex min-w-0 flex-1 items-center gap-2"
-                      >
-                        <CommunityAuthorAvatar
-                          displayName={p.name}
-                          avatarPath={p.avatar_url ?? null}
-                          size="sm"
-                          className="!h-7 !w-7"
-                        />
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-medium leading-tight">{p.name}</p>
-                          <p className="truncate text-[10px] text-muted-foreground">@{p.handle}</p>
-                        </div>
-                      </Link>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-6 shrink-0 px-2 text-[11px]"
-                        variant={alreadyFollowing ? "secondary" : "outline"}
-                        disabled={alreadyFollowing || busy}
-                        onClick={() => void handleFollow(p.id)}
-                      >
-                        {alreadyFollowing ? "Following" : busy ? "…" : "Follow"}
-                      </Button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+      {user && !savedOnly && !feedSearch.trim() && !suggestionsDismissed ? (
+        <FeedFollowSuggestionsStrip
+          suggestions={suggested}
+          loading={suggestedLoading}
+          followeeIds={followeeIds}
+          followBusyIds={followBusyIds}
+          onFollow={(id) => void handleFollow(id)}
+          onFindPeople={() => setPeopleOpen(true)}
+          onDismiss={() => {
+            if (!user?.id) return;
+            dismissFeedSuggestions(user.id);
+            setSuggestionsDismissed(true);
+          }}
+        />
       ) : null}
 
       {!isMobile ? (

@@ -11,7 +11,8 @@ type Props = {
   altTexts?: string[];
   className?: string;
   /** `event-banner`: wide hero image for the first photo (feed event cards). */
-  variant?: "default" | "event-banner";
+  /** `feed`: edge-to-edge media in post cards. */
+  variant?: "default" | "event-banner" | "feed";
   /** Shown in placeholder when cover photo is missing or failed. */
   eventTitle?: string;
 };
@@ -180,6 +181,127 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
                 </Button>
               ) : null}
 
+              {activeSrc ? (
+                <img
+                  src={activeSrc}
+                  alt={activeAlt}
+                  className="block h-auto max-h-[80vh] w-full bg-black/95 object-contain"
+                />
+              ) : null}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  if (variant === "feed") {
+    const waitingForUrls = urls.length !== paths.length || (paths.length > 0 && loadedIndices.length === 0 && !loadFailed);
+    const tileButtonClass =
+      "block w-full overflow-hidden bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
+
+    return (
+      <>
+        <div className={cn("overflow-hidden bg-muted/20", className)}>
+          {paths.length === 1 ? (
+            loadedIndices[0] != null ? (
+              <button type="button" onClick={() => setOpenIdx(loadedIndices[0]!)} className={tileButtonClass} aria-label="Open photo">
+                <img
+                  src={urls[loadedIndices[0]!]!}
+                  alt={altTexts?.[loadedIndices[0]!]?.trim() || "Photo attached to post"}
+                  className="aspect-[4/5] max-h-[min(72vw,28rem)] w-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+            ) : waitingForUrls ? (
+              <div className="aspect-[4/5] max-h-[min(72vw,28rem)] w-full animate-pulse bg-muted/40" aria-hidden />
+            ) : null
+          ) : (
+            <div className="grid grid-cols-2 gap-px bg-border/50">
+              {paths.map((path, i) => {
+                const src = urls[i];
+                if (!src) {
+                  if (waitingForUrls) {
+                    return <div key={`${path}-${i}`} className="aspect-square animate-pulse bg-muted/40" aria-hidden />;
+                  }
+                  return null;
+                }
+                const alt = altTexts?.[i]?.trim() || "Photo attached to post";
+                return (
+                  <button
+                    key={`${path}-${i}`}
+                    type="button"
+                    onClick={() => setOpenIdx(i)}
+                    className={cn(tileButtonClass, paths.length === 3 && i === 0 && "col-span-2 aspect-[2/1]")}
+                    aria-label={`Open photo ${i + 1}`}
+                  >
+                    <img
+                      src={src}
+                      alt={alt}
+                      className={cn(
+                        "h-full w-full object-cover",
+                        paths.length === 3 && i === 0 ? "aspect-[2/1]" : "aspect-square max-h-56",
+                      )}
+                      loading="lazy"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {loadFailed ? (
+          <p className="px-3 pt-1 text-xs text-muted-foreground">Photos could not be loaded. Try refreshing the feed.</p>
+        ) : null}
+        <Dialog
+          open={safeIdx != null}
+          onOpenChange={(v) => {
+            if (!v) setOpenIdx(null);
+          }}
+        >
+          <DialogContent className="max-w-[min(96vw,48rem)] overflow-hidden bg-background p-0">
+            <div className="relative">
+              <div className="absolute left-2 top-2 z-10 flex items-center gap-2">
+                {slideTotal > 1 ? (
+                  <div className="rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground backdrop-blur">
+                    {slidePosition} / {slideTotal}
+                  </div>
+                ) : null}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 z-10 rounded-full border border-border/60 bg-background/80 backdrop-blur"
+                onClick={() => setOpenIdx(null)}
+                aria-label="Close image"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              {prevIdx != null ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border/60 bg-background/80 backdrop-blur"
+                  onClick={() => setOpenIdx(prevIdx)}
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+              ) : null}
+              {nextIdx != null ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-border/60 bg-background/80 backdrop-blur"
+                  onClick={() => setOpenIdx(nextIdx)}
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              ) : null}
               {activeSrc ? (
                 <img
                   src={activeSrc}

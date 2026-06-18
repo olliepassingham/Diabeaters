@@ -1,5 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { BarChart2, Calendar, ImagePlus, Plus, Send, X } from "lucide-react";
+import { BarChart2, Calendar, ImagePlus, Plus, Send, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import {
 import { MentionTextarea } from "@/components/community/mention-textarea";
 import { Textarea } from "@/components/ui/textarea";
 import { InlineInfoHint } from "@/components/ui/field-label-with-info";
-import { MAX_POST_IMAGES } from "@/lib/community";
+import { MAX_POST_IMAGES, MAX_POST_VIDEO_BYTES } from "@/lib/community";
 import type { CommunityTopicId } from "@/lib/community";
 import type { CommunityTopicRow } from "@/lib/community/topics";
 import { eventQuickStartPresets } from "@/lib/community/event-display";
@@ -47,11 +47,16 @@ export type FeedComposerFormBodyProps = {
   setComposer: (v: string) => void;
   composerPreviews: string[];
   composerFiles: File[];
+  composerVideoPreview: string | null;
+  composerVideoFile: File | null;
   removeComposerImage: (index: number) => void;
+  removeComposerVideo: () => void;
   composerImageAlts: string[];
   setComposerImageAlts: Dispatch<SetStateAction<string[]>>;
   fileInputRef: RefObject<HTMLInputElement | null>;
+  videoInputRef: RefObject<HTMLInputElement | null>;
   onPickImages: (files: FileList | null) => void;
+  onPickVideo: (files: FileList | null) => void;
   pickImagesFromLibraryOnly: () => Promise<void>;
   onPollModeClick: () => void;
   onEventModeClick: () => void;
@@ -82,11 +87,16 @@ export function FeedComposerFormBody({
   setComposer,
   composerPreviews,
   composerFiles,
+  composerVideoPreview,
+  composerVideoFile,
   removeComposerImage,
+  removeComposerVideo,
   composerImageAlts,
   setComposerImageAlts,
   fileInputRef,
+  videoInputRef,
   onPickImages,
+  onPickVideo,
   pickImagesFromLibraryOnly,
   onPollModeClick,
   onEventModeClick,
@@ -94,6 +104,7 @@ export function FeedComposerFormBody({
 }: FeedComposerFormBodyProps) {
   const audienceInfo =
     "Posts are shared to the Diabeaters community feed. Avoid personal identifiers. Be kind — report anything unsafe.";
+  const videoMaxMb = Math.round(MAX_POST_VIDEO_BYTES / (1024 * 1024));
 
   return (
     <>
@@ -348,6 +359,30 @@ export function FeedComposerFormBody({
       {composerPostKind === "standard" ? (
       <p className="text-right text-xs text-muted-foreground tabular-nums">{composer.length} / 8000</p>
       ) : null}
+      {composerVideoPreview && composerPostKind === "standard" ? (
+        <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Attached video</p>
+            <button
+              type="button"
+              className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              onClick={removeComposerVideo}
+              disabled={submitting}
+            >
+              <X className="h-3.5 w-3.5" />
+              Remove
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-border/70 bg-black">
+            <video src={composerVideoPreview} controls playsInline preload="metadata" className="max-h-64 w-full" />
+          </div>
+          {composerVideoFile?.name ? (
+            <p className="truncate text-[11px] text-muted-foreground" title={composerVideoFile.name}>
+              {composerVideoFile.name}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {composerPreviews.length > 0 && composerPostKind !== "event" ? (
         <div className="space-y-2 rounded-xl border border-border/50 bg-muted/15 p-3 sm:p-3.5">
           <p className="text-xs font-medium text-muted-foreground">
@@ -416,20 +451,60 @@ export function FeedComposerFormBody({
           multiple
           className="sr-only"
           id="feed-composer-images"
-          disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
+          disabled={
+            submitting ||
+            !user ||
+            !canComposeToFeed ||
+            composerFiles.length >= MAX_POST_IMAGES ||
+            Boolean(composerVideoFile)
+          }
           onChange={(e) => onPickImages(e.target.files)}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+          className="sr-only"
+          id="feed-composer-video"
+          disabled={submitting || !user || !canComposeToFeed || composerPostKind !== "standard" || Boolean(composerVideoFile) || composerFiles.length > 0}
+          onChange={(e) => onPickVideo(e.target.files)}
         />
         <Button
           type="button"
           variant="outline"
           size="sm"
-          disabled={submitting || !user || !canComposeToFeed || composerFiles.length >= MAX_POST_IMAGES}
+          disabled={
+            submitting ||
+            !user ||
+            !canComposeToFeed ||
+            composerFiles.length >= MAX_POST_IMAGES ||
+            Boolean(composerVideoFile)
+          }
           onClick={() => void pickImagesFromLibraryOnly()}
           aria-label="Add photos to post"
         >
           <ImagePlus className="h-4 w-4 mr-1.5" />
           {composerPostKind === "event" ? "Cover photo" : "Photo"}
         </Button>
+        {composerPostKind === "standard" ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              submitting ||
+              !user ||
+              !canComposeToFeed ||
+              Boolean(composerVideoFile) ||
+              composerFiles.length > 0
+            }
+            onClick={() => videoInputRef.current?.click()}
+            aria-label="Add video to post"
+          >
+            <Video className="h-4 w-4 mr-1.5" />
+            Video
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant={composerPostKind === "poll" ? "default" : "outline"}
@@ -454,7 +529,10 @@ export function FeedComposerFormBody({
           <Calendar className="h-4 w-4 mr-1.5" />
           Event
         </Button>
-        <InlineInfoHint ariaLabel="Photo limits for posts" content={`Up to ${MAX_POST_IMAGES} photos per post, 5MB each.`} />
+        <InlineInfoHint
+          ariaLabel="Media limits for posts"
+          content={`Up to ${MAX_POST_IMAGES} photos (5MB each) or one video (${videoMaxMb}MB, MP4/MOV/WebM).`}
+        />
         <Button type="submit" size="sm" className="ml-auto" disabled={submitting || !composerCanSubmit || !canComposeToFeed}>
           <Send className="h-4 w-4 mr-1.5" />
           {composerPostKind === "event" ? "Share event" : composerPostKind === "poll" ? "Share poll" : "Post"}

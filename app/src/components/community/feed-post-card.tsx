@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { CommunityPostImageGrid } from "@/components/community/community-post-image-grid";
+import { FeedPostVideo } from "@/components/community/feed-post-video";
 import { FeedEventCard } from "@/components/community/feed-event-card";
 import { FeedPollCard } from "@/components/community/feed-poll-card";
 import { FeedCommentItem } from "@/components/community/feed-comment-item";
@@ -428,20 +429,29 @@ export function FeedPostCard({
   }
 
   const topicLabel = communityTopicLabel(post.topic);
+  const bodyText = (() => {
+    const b = post.body.trim();
+    if (b.length === 0) return null;
+    if (pollExtra && b === pollExtra.question.trim()) return null;
+    if (eventExtra && b === eventExtra.title.trim()) return null;
+    return b;
+  })();
+  const hasFeedImages = !eventExtra && !post.video_url && post.image_urls.length > 0;
+  const hasFeedVideo = !eventExtra && Boolean(post.video_url);
 
   return (
     <Card variant="glass" className="pressable card-interactive h-fit w-full overflow-hidden border-border/40 shadow-sm">
-      <CardContent className="space-y-2 px-3 pb-2.5 pt-3 sm:space-y-2.5 sm:px-3.5 sm:pb-3 sm:pt-3.5">
-        <div className="flex items-start gap-2">
+      <CardContent className="space-y-0 p-0">
+        <div className="flex items-start gap-2.5 px-3 pb-2 pt-3 sm:px-3.5 sm:pt-3.5">
           <CommunityAuthorAvatar
             displayName={authorDisplayName}
             avatarPath={authorAvatarPath}
             profileHref={`/community/profile/${post.author_id}`}
             size="sm"
-            className="!h-9 !w-9"
+            className="!h-10 !w-10"
           />
           <div className="min-w-0 flex-1">
-            <div className="flex justify-between gap-1.5 text-xs text-muted-foreground items-start">
+            <div className="flex items-start justify-between gap-1.5 text-xs text-muted-foreground">
               <div className="min-w-0 flex-1">
                 {authorLoading ? (
                   <div className="space-y-1">
@@ -450,7 +460,7 @@ export function FeedPostCard({
                   </div>
                 ) : (
                   <div className="space-y-0.5">
-                    <div className="flex min-w-0 items-baseline gap-1">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
                       <Link
                         href={`/community/profile/${post.author_id}`}
                         className="truncate text-sm font-semibold text-foreground hover:underline underline-offset-2"
@@ -460,6 +470,15 @@ export function FeedPostCard({
                       {authorPublicHandle?.trim() ? (
                         <span className="shrink-0 truncate text-xs text-muted-foreground">
                           @{authorPublicHandle.trim()}
+                        </span>
+                      ) : null}
+                      {!authorLoading ? (
+                        <span
+                          className="inline-flex max-w-full items-center rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
+                          data-testid="feed-post-topic"
+                          title={topicLabel}
+                        >
+                          <span className="truncate">{topicLabel}</span>
                         </span>
                       ) : null}
                     </div>
@@ -518,29 +537,25 @@ export function FeedPostCard({
                 ) : null}
               </span>
             </div>
-            {!authorLoading ? (
-              <span
-                className="mt-1.5 inline-flex max-w-full items-center rounded-full bg-muted/55 px-2 py-0.5 text-[11px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
-                data-testid="feed-post-topic"
-                title={topicLabel}
-              >
-                <span className="truncate">{topicLabel}</span>
-              </span>
-            ) : null}
           </div>
         </div>
-        <div className="space-y-2.5">
-          {(() => {
-            const b = post.body.trim();
-            if (b.length === 0) return null;
-            if (pollExtra && b === pollExtra.question.trim()) return null;
-            if (eventExtra && b === eventExtra.title.trim()) return null;
-            return (
-              <p className="text-[15px] leading-[1.4] whitespace-pre-wrap text-foreground">
-                {renderBodyWithMentions(post.body, post.mention_map)}
-              </p>
-            );
-          })()}
+
+        {hasFeedVideo && post.video_url ? <FeedPostVideo path={post.video_url} /> : null}
+
+        {hasFeedImages ? (
+          <CommunityPostImageGrid
+            paths={post.image_urls}
+            altTexts={post.image_alt_texts}
+            variant="feed"
+          />
+        ) : null}
+
+        <div className="space-y-2 px-3 pb-2 sm:px-3.5">
+          {bodyText ? (
+            <p className="text-[15px] leading-[1.45] whitespace-pre-wrap text-foreground">
+              {renderBodyWithMentions(bodyText, post.mention_map)}
+            </p>
+          ) : null}
           {eventExtra ? (
             <FeedEventCard
               event={eventExtra}
@@ -562,11 +577,11 @@ export function FeedPostCard({
             />
           ) : null}
           {previewLink ? <FeedLinkPreview href={previewLink} className="mt-1" /> : null}
-          {!eventExtra ? (
+          {!eventExtra && !hasFeedImages ? (
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
           <div
-            className="flex items-center justify-between gap-0.5 border-t border-border/35 pt-1.5"
+            className="flex items-center justify-between gap-0.5 border-t border-border/35 pt-1"
             data-testid="post-engagement-row"
           >
             <div className="flex min-w-0 flex-1 items-center">
@@ -684,6 +699,7 @@ export function FeedPostCard({
               </DropdownMenu>
             </div>
           </div>
+
           {expanded && (
             <div className="space-y-2 border-t border-border/35 pt-2">
               {loadingComments ? (
