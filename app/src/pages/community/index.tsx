@@ -395,7 +395,7 @@ export default function CommunityHomePage() {
   const needsPublicSetup = !profileLoading && profile && !profile.is_public;
 
   return (
-    <PageShell variant="narrow" density="compact" className="pb-2">
+    <PageShell variant="full" density="compact" className="pb-2">
       <PageHeader
         title="Feed"
         stackActionsMaxSm
@@ -833,6 +833,7 @@ export default function CommunityHomePage() {
       </Collapsible>
       ) : null}
 
+      <div className="-mx-4 min-w-0 md:-mx-6">
       <FeedPostList
         key={feedListKey}
         viewerId={user?.id}
@@ -874,6 +875,7 @@ export default function CommunityHomePage() {
         }
         fetchPage={fetchFeedPage}
       />
+      </div>
       <CommunityPushPromptDialog
         open={communityPushPromptOpen}
         onOpenChange={setCommunityPushPromptOpen}

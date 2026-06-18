@@ -1,14 +1,15 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
-export type PageShellVariant = "narrow" | "standard" | "wide";
+export type PageShellVariant = "narrow" | "standard" | "wide" | "full";
 
 export type PageShellProps = ComponentProps<"div"> & {
   /**
    * Max content width (centered).
-   * - narrow: forms, community, auth (`max-w-lg`)
+   * - narrow: forms, community auth, handle setup (`max-w-lg`)
    * - standard: most app pages (`max-w-3xl`)
    * - wide: dashboard-style (`max-w-3xl md:max-w-4xl`)
+   * - full: edge-to-edge within the app shell (feed, media-heavy views)
    */
   variant?: PageShellVariant;
   /** Vertical gap between direct children (`space-y-*`). */
@@ -19,6 +20,7 @@ const variantClass: Record<PageShellVariant, string> = {
   narrow: "max-w-lg",
   standard: "max-w-3xl",
   wide: "max-w-3xl md:max-w-4xl",
+  full: "max-w-none",
 };
 
 const densityClass = {

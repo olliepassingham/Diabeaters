@@ -5,12 +5,10 @@ import {
   ChevronRight,
   Flag,
   Heart,
-  Link2,
   Loader2,
   MessageSquare,
   MoreHorizontal,
   Pencil,
-  Reply,
   Share2,
   Sparkles,
   Trash2,
@@ -32,7 +30,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -438,119 +435,181 @@ export function FeedPostCard({
   })();
   const hasFeedImages = !eventExtra && !post.video_url && post.image_urls.length > 0;
   const hasFeedVideo = !eventExtra && Boolean(post.video_url);
+  const isMediaFirst = hasFeedVideo || hasFeedImages;
+
+  const engagementRow = (
+    <div
+      className="flex items-center justify-between gap-1 px-1.5 pt-0.5"
+      data-testid="post-engagement-row"
+    >
+      <div className="flex min-w-0 items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+          disabled={!viewerId}
+          aria-pressed={post.liked_by_me}
+          aria-label={post.liked_by_me ? "Unlike" : "Like"}
+          onClick={onLike}
+        >
+          <Heart
+            className={cn(
+              "h-[22px] w-[22px] shrink-0 transition-all duration-200 ease-out",
+              post.liked_by_me ? "fill-primary text-primary scale-105" : "scale-100",
+            )}
+          />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+          aria-expanded={expanded}
+          aria-label={
+            expanded
+              ? "Hide comments"
+              : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
+          }
+          onClick={onToggleComments}
+        >
+          <MessageSquare className="h-[22px] w-[22px] shrink-0" />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+              aria-label="Share post"
+              data-testid="button-share-post-to-dm"
+            >
+              <Share2 className="h-[21px] w-[21px] shrink-0" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuItem disabled={!viewerId} onClick={() => setShareOpen(true)}>
+              Send in message
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                void sharePostLinkExternally();
+              }}
+            >
+              Share link
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-11 w-11 p-0 text-foreground hover:text-foreground"
+        disabled={!viewerId}
+        aria-pressed={post.saved_by_me}
+        aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
+        onClick={onSavePost}
+      >
+        <Bookmark
+          className={cn(
+            "h-[22px] w-[22px] shrink-0 transition-colors",
+            post.saved_by_me && "fill-primary text-primary",
+          )}
+        />
+      </Button>
+    </div>
+  );
 
   return (
-    <Card variant="glass" className="pressable card-interactive h-fit w-full overflow-hidden border-border/40 shadow-sm">
-      <CardContent className="space-y-0 p-0">
-        <div className="flex items-start gap-2.5 px-3 pb-2 pt-3 sm:px-3.5 sm:pt-3.5">
-          <CommunityAuthorAvatar
-            displayName={authorDisplayName}
-            avatarPath={authorAvatarPath}
-            profileHref={`/community/profile/${post.author_id}`}
-            size="sm"
-            className="!h-10 !w-10"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-1.5 text-xs text-muted-foreground">
-              <div className="min-w-0 flex-1">
-                {authorLoading ? (
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                ) : (
-                  <div className="space-y-0.5">
-                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                      <Link
-                        href={`/community/profile/${post.author_id}`}
-                        className="truncate text-sm font-semibold text-foreground hover:underline underline-offset-2"
-                      >
-                        {authorDisplayName}
-                      </Link>
-                      {authorPublicHandle?.trim() ? (
-                        <span className="shrink-0 truncate text-xs text-muted-foreground">
-                          @{authorPublicHandle.trim()}
-                        </span>
-                      ) : null}
-                      {!authorLoading ? (
-                        <span
-                          className="inline-flex max-w-full items-center rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
-                          data-testid="feed-post-topic"
-                          title={topicLabel}
-                        >
-                          <span className="truncate">{topicLabel}</span>
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground" title={post.created_at}>
-                      {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <span className="flex shrink-0 items-center gap-0.5">
-                {canReportPost && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-1.5 text-muted-foreground"
-                    onClick={onReportPost}
-                    aria-label="Report post"
-                  >
-                    <Flag className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                {isAuthor && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-8 p-0 text-muted-foreground"
-                        aria-label="Post options"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {post.post_kind === "standard" ? (
-                        <DropdownMenuItem onClick={onMenuEdit}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit post
-                        </DropdownMenuItem>
-                      ) : null}
-                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onMenuDelete}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete post
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-                {showPermalink ? (
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5" asChild>
-                    <Link href={`/community/post/${post.id}`} aria-label="Open post">
-                      <Link2 className="h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                ) : null}
-              </span>
+    <>
+    <article className="border-b border-border/70 bg-background py-4 last:border-b-0 dark:border-border/80">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <CommunityAuthorAvatar
+          displayName={authorDisplayName}
+          avatarPath={authorAvatarPath}
+          profileHref={`/community/profile/${post.author_id}`}
+          size="sm"
+          className="!h-9 !w-9 ring-1 ring-border/30"
+        />
+        <div className="min-w-0 flex-1">
+          {authorLoading ? (
+            <div className="space-y-1">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-36" />
             </div>
-          </div>
+          ) : (
+            <div className="space-y-0.5">
+              <Link
+                href={`/community/profile/${post.author_id}`}
+                className="block truncate text-sm font-semibold leading-tight text-foreground hover:underline underline-offset-2"
+              >
+                {authorDisplayName}
+              </Link>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <span
+                  className="inline-flex max-w-full items-center rounded-full bg-muted/55 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-muted-foreground ring-1 ring-border/40"
+                  data-testid="feed-post-topic"
+                  title={topicLabel}
+                >
+                  <span className="truncate">{topicLabel}</span>
+                </span>
+                <time className="text-[11px] text-muted-foreground" title={post.created_at}>
+                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                </time>
+              </div>
+            </div>
+          )}
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground"
+              aria-label="Post options"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {showPermalink ? (
+              <DropdownMenuItem asChild>
+                <Link href={`/community/post/${post.id}`}>Open post</Link>
+              </DropdownMenuItem>
+            ) : null}
+            {isAuthor && post.post_kind === "standard" ? (
+              <DropdownMenuItem onClick={onMenuEdit}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit post
+              </DropdownMenuItem>
+            ) : null}
+            {isAuthor ? (
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={onMenuDelete}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete post
+              </DropdownMenuItem>
+            ) : null}
+            {canReportPost ? (
+              <DropdownMenuItem onClick={onReportPost}>
+                <Flag className="h-4 w-4 mr-2" />
+                Report
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
-        {hasFeedVideo && post.video_url ? <FeedPostVideo path={post.video_url} /> : null}
+      {hasFeedVideo && post.video_url ? <FeedPostVideo path={post.video_url} /> : null}
 
-        {hasFeedImages ? (
-          <CommunityPostImageGrid
-            paths={post.image_urls}
-            altTexts={post.image_alt_texts}
-            variant="feed"
-          />
-        ) : null}
+      {hasFeedImages ? (
+        <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} variant="feed" />
+      ) : null}
 
-        <div className="space-y-2 px-3 pb-2 sm:px-3.5">
+      {!isMediaFirst ? (
+        <div className="space-y-2 px-3 pb-1">
           {bodyText ? (
             <p className="text-[15px] leading-[1.45] whitespace-pre-wrap text-foreground">
               {renderBodyWithMentions(bodyText, post.mention_map)}
@@ -580,207 +639,147 @@ export function FeedPostCard({
           {!eventExtra && !hasFeedImages ? (
             <CommunityPostImageGrid paths={post.image_urls} altTexts={post.image_alt_texts} />
           ) : null}
-          <div
-            className="flex items-center justify-between gap-0.5 border-t border-border/35 pt-1"
-            data-testid="post-engagement-row"
-          >
-            <div className="flex min-w-0 flex-1 items-center">
-              <div className="flex items-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
-                  disabled={!viewerId}
-                  aria-pressed={post.liked_by_me}
-                  aria-label={post.liked_by_me ? "Unlike" : "Like"}
-                  onClick={onLike}
-                >
-                  <Heart
-                    className={cn(
-                      "h-[18px] w-[18px] shrink-0 transition-all duration-200 ease-out",
-                      post.liked_by_me ? "fill-primary text-primary scale-110" : "scale-100",
-                    )}
-                  />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-9 min-w-9 px-1.5 text-muted-foreground hover:text-foreground"
-                  disabled={!viewerId}
-                  aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
-                  onClick={() => setLikersOpen(true)}
-                  data-testid="button-post-likers"
-                >
-                  <span className="text-xs font-medium tabular-nums text-foreground">{post.like_count}</span>
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1 px-2.5 text-muted-foreground hover:text-foreground"
-                aria-expanded={expanded}
-                aria-label={
-                  expanded
-                    ? "Hide comments"
-                    : `${post.comment_count} comment${post.comment_count === 1 ? "" : "s"}`
-                }
-                onClick={onToggleComments}
-              >
-                <MessageSquare className="h-[18px] w-[18px] shrink-0" />
-                <span className="text-xs font-medium tabular-nums text-foreground">
-                  {expanded ? (
-                    <span className="hidden sm:inline">Hide</span>
-                  ) : (
-                    post.comment_count
-                  )}
-                </span>
-                {expanded ? (
-                  <span className="hidden text-xs text-foreground sm:inline">comments</span>
-                ) : null}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
-                disabled={!viewerId}
-                aria-label="Reply"
-                onClick={onReplyFocus}
-              >
-                <Reply className="h-[18px] w-[18px] shrink-0" />
-              </Button>
-            </div>
-            <div className="flex shrink-0 items-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
-                disabled={!viewerId}
-                aria-pressed={post.saved_by_me}
-                aria-label={post.saved_by_me ? "Remove bookmark" : "Save post"}
-                onClick={onSavePost}
-              >
-                <Bookmark
-                  className={cn(
-                    "h-[18px] w-[18px] shrink-0 transition-colors",
-                    post.saved_by_me && "fill-primary text-primary",
-                  )}
-                />
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 w-9 p-0 text-muted-foreground hover:text-foreground"
-                    aria-label="Share post"
-                    data-testid="button-share-post-to-dm"
-                  >
-                    <Share2 className="h-[18px] w-[18px] shrink-0" aria-hidden />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem disabled={!viewerId} onClick={() => setShareOpen(true)}>
-                    Send in message
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      void sharePostLinkExternally();
-                    }}
-                  >
-                    Share link
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+        </div>
+      ) : null}
 
-          {expanded && (
-            <div className="space-y-2 border-t border-border/35 pt-2">
-              {loadingComments ? (
-                <div className="space-y-1.5" aria-busy="true">
-                  <Skeleton className="h-11 w-full rounded-lg" />
-                  <Skeleton className="h-11 w-full rounded-lg" />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {isAuthor && onAskBeatie ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 rounded-full px-2.5 text-[11px]"
-                      disabled={askBeatieBusy}
-                      onClick={onAskBeatie}
-                    >
-                      {askBeatieBusy ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-                          Beatie is writing…
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                          Ask Beatie (educational)
-                        </>
-                      )}
-                    </Button>
-                  ) : null}
-                  {comments.length > 0 ? (
-                    <ul className="space-y-1" role="list">
-                      {comments.map((c) => (
-                        <FeedCommentItem
-                          key={c.id}
-                          commentId={c.id}
-                          authorId={c.author_id}
-                          body={c.body}
-                          createdAt={c.created_at}
-                          mentionMap={c.mention_map}
-                          meta={commentMeta(c.author_id)}
-                          beatieFeedBotUserId={beatieFeedBotUserId}
-                          viewerId={viewerId}
-                          onReport={() => onReportComment(c.id)}
-                          onDelete={() => setPendingDeleteCommentId(c.id)}
-                        />
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet.</p>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/15 py-1 pl-2 pr-1">
-                <div className="min-w-0 flex-1">
-                  <MentionTextarea
-                    textareaRef={commentInputRef}
-                    value={commentDraft}
-                    onChange={onCommentDraftChange}
-                    currentUserId={viewerId}
-                    rows={1}
-                    maxLength={4000}
-                    hideHint
-                    placeholder="Add comment"
-                    className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-base shadow-none focus-visible:ring-0"
-                  />
-                </div>
+      {engagementRow}
+
+      {post.like_count > 0 ? (
+        <button
+          type="button"
+          className="block px-3 pt-1.5 text-left text-sm font-semibold text-foreground hover:underline underline-offset-2"
+          disabled={!viewerId}
+          aria-label={`${post.like_count} ${post.like_count === 1 ? "like" : "likes"} — see who liked`}
+          onClick={() => setLikersOpen(true)}
+          data-testid="button-post-likers"
+        >
+          {post.like_count} {post.like_count === 1 ? "like" : "likes"}
+        </button>
+      ) : null}
+
+      {isMediaFirst && bodyText ? (
+        <p className="px-3 pt-1.5 text-sm leading-snug text-foreground">
+          <Link
+            href={`/community/profile/${post.author_id}`}
+            className="mr-1.5 font-semibold hover:underline underline-offset-2"
+          >
+            {authorDisplayName}
+          </Link>
+          <span className="whitespace-pre-wrap">{renderBodyWithMentions(bodyText, post.mention_map)}</span>
+        </p>
+      ) : null}
+
+      {isMediaFirst && (eventExtra || pollExtra || previewLink) ? (
+        <div className="space-y-2 px-3 pt-2">
+          {eventExtra ? (
+            <FeedEventCard
+              event={eventExtra}
+              imagePaths={post.image_urls}
+              imageAltTexts={post.image_alt_texts}
+              interestedCount={post.interested_count}
+              interestedByMe={post.interested_by_me}
+              viewerCanReact={Boolean(viewerId)}
+              onInterested={onEventInterest}
+              onShowInterested={() => setInterestedOpen(true)}
+            />
+          ) : null}
+          {pollExtra ? (
+            <FeedPollCard
+              postId={post.id}
+              question={pollExtra.question}
+              options={pollExtra.options}
+              viewerId={viewerId}
+            />
+          ) : null}
+          {previewLink ? <FeedLinkPreview href={previewLink} /> : null}
+        </div>
+      ) : null}
+
+      {!expanded && post.comment_count > 0 ? (
+        <button
+          type="button"
+          className="block px-3 pt-1 text-left text-xs text-muted-foreground hover:text-foreground"
+          onClick={onToggleComments}
+        >
+          View all {post.comment_count} comment{post.comment_count === 1 ? "" : "s"}
+        </button>
+      ) : null}
+
+      {expanded ? (
+        <div className="mt-2 space-y-2 border-t border-border/20 px-3 pt-3">
+          {loadingComments ? (
+            <div className="space-y-1.5" aria-busy="true">
+              <Skeleton className="h-11 w-full rounded-lg" />
+              <Skeleton className="h-11 w-full rounded-lg" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {isAuthor && onAskBeatie ? (
                 <Button
                   type="button"
+                  variant="outline"
                   size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={onSubmitComment}
+                  className="h-7 gap-1 rounded-full px-2.5 text-[11px]"
+                  disabled={askBeatieBusy}
+                  onClick={onAskBeatie}
                 >
-                  Reply
+                  {askBeatieBusy ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                      Beatie is writing…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      Ask Beatie (educational)
+                    </>
+                  )}
                 </Button>
-              </div>
+              ) : null}
+              {comments.length > 0 ? (
+                <ul className="space-y-1" role="list">
+                  {comments.map((c) => (
+                    <FeedCommentItem
+                      key={c.id}
+                      commentId={c.id}
+                      authorId={c.author_id}
+                      body={c.body}
+                      createdAt={c.created_at}
+                      mentionMap={c.mention_map}
+                      meta={commentMeta(c.author_id)}
+                      beatieFeedBotUserId={beatieFeedBotUserId}
+                      viewerId={viewerId}
+                      onReport={() => onReportComment(c.id)}
+                      onDelete={() => setPendingDeleteCommentId(c.id)}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-0.5 text-[11px] text-muted-foreground">No comments yet.</p>
+              )}
             </div>
           )}
+          <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-muted/15 py-1 pl-3 pr-1">
+            <div className="min-w-0 flex-1">
+              <MentionTextarea
+                textareaRef={commentInputRef}
+                value={commentDraft}
+                onChange={onCommentDraftChange}
+                currentUserId={viewerId}
+                rows={1}
+                maxLength={4000}
+                hideHint
+                placeholder="Add a comment…"
+                className="min-h-8 resize-none border-0 bg-transparent px-0 py-1.5 text-base shadow-none focus-visible:ring-0"
+              />
+            </div>
+            <Button type="button" size="sm" className="h-8 shrink-0 rounded-full px-3 text-xs" onClick={onSubmitComment}>
+              Post
+            </Button>
+          </div>
         </div>
-      </CardContent>
+      ) : null}
+    </article>
 
       <Dialog open={likersOpen} onOpenChange={setLikersOpen}>
         <DialogContent className="sm:max-w-md flex flex-col max-h-[min(70vh,28rem)]">
@@ -1088,6 +1087,6 @@ export function FeedPostCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </>
   );
 }

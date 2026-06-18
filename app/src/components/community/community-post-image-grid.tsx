@@ -209,7 +209,7 @@ export function CommunityPostImageGrid({ paths, altTexts, className, variant = "
                 <img
                   src={urls[loadedIndices[0]!]!}
                   alt={altTexts?.[loadedIndices[0]!]?.trim() || "Photo attached to post"}
-                  className="aspect-[4/5] max-h-[min(72vw,28rem)] w-full object-cover"
+                  className="aspect-[4/5] max-h-[min(85vw,32rem)] w-full object-cover"
                   loading="lazy"
                 />
               </button>
