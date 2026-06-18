@@ -42,6 +42,7 @@ export * from "./posts-supabase";
 export * from "./dm-supabase";
 export { DM_INBOX_CHANGED, notifyDmInboxChanged } from "./dm-inbox-events";
 export * from "./follows-supabase";
+export * from "./stories-supabase";
 export {
   fetchFollowSuggestions,
   type FollowSuggestion,

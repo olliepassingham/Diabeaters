@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ChevronRight, Grid3X3, LayoutList, MessageCircle, UserCheck, UserPlus } from "lucide-react";
+import { ChevronRight, Grid3X3, LayoutList, MessageCircle, Plus, UserCheck, UserPlus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +36,12 @@ import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { FeedPostList } from "@/components/community/feed-post-list";
 import { ProfilePostMediaGrid } from "@/components/community/profile-post-media-grid";
+import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
+import { StoryCreateSheet } from "@/components/community/story-create-sheet";
+import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
 import { ProfileStreakBadges } from "@/components/achievements/achievements-panel";
 import { useResolvedProfileImageUrl } from "@/hooks/use-resolved-profile-image-url";
+import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { getPrimaryAppRole } from "@/lib/carer-session";
@@ -126,6 +130,16 @@ export default function CommunityProfilePage() {
 
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [postsView, setPostsView] = useState<ProfilePostsView>(() => readStoredProfilePostsView());
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [storyCreateOpen, setStoryCreateOpen] = useState(false);
+
+  const profileStoryAuthorIds = useMemo(() => (userId ? [userId] : []), [userId]);
+  const { storiesByAuthor, refresh: refreshStories, ringState: profileRingState } = useCommunityStories(
+    user?.id,
+    profileStoryAuthorIds,
+  );
+  const activeStory = userId ? storiesByAuthor.get(userId) : undefined;
+  const storyRing = profileRingState(userId ?? "");
 
   const isSelf = Boolean(user?.id && userId && user.id === userId);
   /** Diabetes journey line: show to others when present; on your own profile only if you use the app as a patient. */
@@ -398,12 +412,33 @@ export default function CommunityProfilePage() {
           <div className="flex flex-col gap-3">
             <ProfileHeroRow
               avatar={
-                <ProfileAvatarTile
-                  imageUrl={profileHeaderImageSrc}
-                  initials={profileInitials(displayName)}
-                  alt={displayName}
-                  size="md"
-                />
+                storyRing !== "none" && activeStory ? (
+                  <StoryAvatarRing
+                    state={storyRing}
+                    onClick={() => setStoryViewerOpen(true)}
+                    label={
+                      isSelf
+                        ? activeStory.viewed_by_me
+                          ? "Rewatch your story"
+                          : "Your story"
+                        : `Watch ${displayName}'s story`
+                    }
+                  >
+                    <ProfileAvatarTile
+                      imageUrl={profileHeaderImageSrc}
+                      initials={profileInitials(displayName)}
+                      alt={displayName}
+                      size="md"
+                    />
+                  </StoryAvatarRing>
+                ) : (
+                  <ProfileAvatarTile
+                    imageUrl={profileHeaderImageSrc}
+                    initials={profileInitials(displayName)}
+                    alt={displayName}
+                    size="md"
+                  />
+                )
               }
             >
               <ProfileDisplayName compact name={displayName} />
@@ -430,6 +465,18 @@ export default function CommunityProfilePage() {
               />
               {profile.supported_person ? (
                 <ProfileSupportedPersonBadge person={profile.supported_person} />
+              ) : null}
+              {isSelf && storyRing === "none" && user ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 w-fit gap-1.5 rounded-full"
+                  onClick={() => setStoryCreateOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Add story
+                </Button>
               ) : null}
             </ProfileHeroRow>
 
@@ -596,6 +643,20 @@ export default function CommunityProfilePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <StoryViewerDialog
+        open={storyViewerOpen}
+        onOpenChange={setStoryViewerOpen}
+        authorId={userId}
+        story={activeStory}
+        authorDisplayName={displayName}
+        onViewed={() => refreshStories()}
+      />
+      <StoryCreateSheet
+        open={storyCreateOpen}
+        onOpenChange={setStoryCreateOpen}
+        onPosted={() => refreshStories()}
+      />
     </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Ban, MoreHorizontal } from "lucide-react";
 import { BlockedUsersPanel } from "@/components/community/blocked-users-panel";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -9,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const blockedUsersDescription =
@@ -46,17 +46,16 @@ export function FeedMoreMenu() {
       </DropdownMenu>
 
       {isMobile ? (
-        <Sheet open={blockedOpen} onOpenChange={setBlockedOpen}>
-          <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-2xl">
-            <SheetHeader>
-              <SheetTitle>Blocked users</SheetTitle>
-              <SheetDescription>{blockedUsersDescription}</SheetDescription>
-            </SheetHeader>
-            <div className="mt-4 min-h-0 overflow-y-auto overscroll-contain pb-4">
-              <BlockedUsersPanel active={blockedOpen} />
-            </div>
-          </SheetContent>
-        </Sheet>
+        <BottomSheet
+          open={blockedOpen}
+          onOpenChange={setBlockedOpen}
+          title="Blocked users"
+          description={blockedUsersDescription}
+          className="max-h-[85dvh]"
+          bodyClassName="overflow-y-auto overscroll-contain px-4 pb-4"
+        >
+          <BlockedUsersPanel active={blockedOpen} />
+        </BottomSheet>
       ) : (
         <Dialog open={blockedOpen} onOpenChange={setBlockedOpen}>
           <DialogContent className="sm:max-w-md max-h-[85dvh] !flex flex-col overflow-hidden">

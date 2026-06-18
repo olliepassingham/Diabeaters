@@ -3,7 +3,7 @@
  */
 import { getSupabase } from "@/lib/supabase";
 
-export type ReportTargetType = "post" | "comment" | "profile";
+export type ReportTargetType = "post" | "comment" | "profile" | "story";
 
 export async function submitContentReport(params: {
   targetType: ReportTargetType;

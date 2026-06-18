@@ -22,6 +22,8 @@ const DrawerPortal = DrawerPrimitive.Portal
 
 const DrawerClose = DrawerPrimitive.Close
 
+const DrawerHandle = DrawerPrimitive.Handle
+
 const DrawerOverlay = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
@@ -48,7 +50,12 @@ const DrawerContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      <div className="flex shrink-0 justify-center pt-3">
+        <DrawerHandle
+          className="!h-1 !w-10 shrink-0 !rounded-full !bg-muted-foreground/25"
+          aria-label="Drag down to close"
+        />
+      </div>
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
@@ -110,6 +117,7 @@ export {
   DrawerOverlay,
   DrawerTrigger,
   DrawerClose,
+  DrawerHandle,
   DrawerContent,
   DrawerHeader,
   DrawerFooter,

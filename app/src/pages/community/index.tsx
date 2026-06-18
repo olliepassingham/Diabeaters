@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
-import { Bookmark, ChevronDown, MessageCircle, Plus, Search as SearchIcon } from "lucide-react";
+import { Bookmark, MessageCircle, Search as SearchIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { FeedFollowSuggestionsStrip } from "@/components/community/feed-follow-suggestions-strip";
+import {
+  FeedStoriesComposerHeader,
+  FeedStoriesComposerHeaderForm,
+} from "@/components/community/feed-stories-composer-header";
 import { FeedPostList } from "@/components/community/feed-post-list";
+import { StoryCreateSheet } from "@/components/community/story-create-sheet";
+import { StoryViewerDialog } from "@/components/community/story-viewer-dialog";
 import { PageHeader, PageShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FeedComposerFormBody } from "@/components/community/feed-composer-form-body";
 import { FeedComposerSheet } from "@/components/community/feed-composer-sheet";
 import { FindPeoplePanel } from "@/components/community/find-people-panel";
 import { FeedMoreMenu } from "@/components/community/feed-more-menu";
+import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useFeedComposer } from "@/hooks/use-feed-composer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -26,6 +32,7 @@ import {
   listFolloweeIdsForCurrentUser,
   type CommunityTopicId,
   type FeedCursor,
+  type CommunityStoryRow,
   type FollowSuggestion,
 } from "@/lib/community";
 import { cn } from "@/lib/utils";
@@ -33,7 +40,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { getProfilesByIds, searchPublicProfilesForFeedQuery, useProfile } from "@/lib/profile";
 import { CommunityProfileReminderCard } from "@/components/community-profile-reminder-card";
 import { CommunityProfileSetupPrompt } from "@/components/community-profile-setup-prompt";
@@ -122,6 +128,15 @@ export default function CommunityHomePage() {
   const [scrollByTab, setScrollByTab] = useState<Record<FeedTab, number>>({ everyone: 0, following: 0 });
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const [storyFolloweeIds, setStoryFolloweeIds] = useState<string[]>([]);
+  const [storyPeople, setStoryPeople] = useState<
+    { id: string; name: string; avatar_url: string | null }[]
+  >([]);
+  const [storyViewerOpen, setStoryViewerOpen] = useState(false);
+  const [storyViewerAuthorId, setStoryViewerAuthorId] = useState<string | null>(null);
+  const [storyViewerStory, setStoryViewerStory] = useState<CommunityStoryRow | null>(null);
+  const [storyViewerName, setStoryViewerName] = useState<string | undefined>();
+  const [storyCreateOpen, setStoryCreateOpen] = useState(false);
 
   useEffect(() => {
     if (!user?.id || profileLoading) {
@@ -234,6 +249,83 @@ export default function CommunityHomePage() {
       cancelled = true;
     };
   }, [user?.id, feedTab]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setStoryFolloweeIds([]);
+      return;
+    }
+    let cancelled = false;
+    void listFolloweeIdsForCurrentUser().then((res) => {
+      if (cancelled) return;
+      if (res.error) {
+        setStoryFolloweeIds([user.id]);
+        return;
+      }
+      setStoryFolloweeIds([...new Set([user.id, ...(res.ids ?? [])])]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const { storiesByAuthor, loading: storiesLoading, refresh: refreshStories } = useCommunityStories(
+    user?.id,
+    storyFolloweeIds,
+  );
+
+  const selfStoryPerson = useMemo(() => {
+    if (!user?.id || !profile) return null;
+    return {
+      id: user.id,
+      name: profile.full_name?.trim() || "You",
+      avatar_url: profile.avatar_url ?? null,
+    };
+  }, [user?.id, profile?.full_name, profile?.avatar_url]);
+
+  const storyFolloweeIdsOnly = useMemo(
+    () => storyFolloweeIds.filter((id) => id !== user?.id),
+    [storyFolloweeIds, user?.id],
+  );
+
+  useEffect(() => {
+    if (storyFolloweeIdsOnly.length === 0) {
+      setStoryPeople([]);
+      return;
+    }
+    let cancelled = false;
+    void getProfilesByIds(storyFolloweeIdsOnly).then((map) => {
+      if (cancelled) return;
+      setStoryPeople(
+        storyFolloweeIdsOnly
+          .map((id) => {
+            const p = map.get(id);
+            if (!p) return null;
+            return {
+              id,
+              name: p.full_name?.trim() || id.slice(0, 8),
+              avatar_url: p.avatar_url ?? null,
+            };
+          })
+          .filter((x): x is { id: string; name: string; avatar_url: string | null } => x != null),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyFolloweeIdsOnly.join(",")]);
+
+  const openStory = useCallback(
+    (authorId: string, story?: CommunityStoryRow) => {
+      const person =
+        authorId === user?.id ? selfStoryPerson : storyPeople.find((p) => p.id === authorId);
+      setStoryViewerAuthorId(authorId);
+      setStoryViewerStory(story ?? storiesByAuthor.get(authorId) ?? null);
+      setStoryViewerName(person?.name);
+      setStoryViewerOpen(true);
+    },
+    [user?.id, selfStoryPerson, storyPeople, storiesByAuthor],
+  );
 
   useEffect(() => {
     const q = feedSearch.trim();
@@ -383,10 +475,10 @@ export default function CommunityHomePage() {
   if (!isSupabaseConfigured()) {
     return (
       <PageShell variant="standard" className="mx-auto max-w-lg space-y-6">
-        <PageHeader title="Feed" />
+        <PageHeader title="Community" screenReaderOnly />
         <EmptyState
-          title="Feed needs Supabase"
-          description="Connect Supabase in your environment to use the community feed."
+          title="Community needs Supabase"
+          description="Connect Supabase in your environment to use the community."
         />
       </PageShell>
     );
@@ -394,47 +486,71 @@ export default function CommunityHomePage() {
 
   const needsPublicSetup = !profileLoading && profile && !profile.is_public;
 
+  const feedHeaderActions = !needsPublicSetup ? (
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        className="h-9 shrink-0 rounded-xl px-2.5 sm:px-3"
+        onClick={() => setPeopleOpen(true)}
+        data-testid="button-find-people"
+        aria-label="Find people"
+      >
+        <SearchIcon className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="text-xs font-medium sm:text-sm">Find people</span>
+      </Button>
+      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-xl sm:hidden" asChild>
+        <Link href="/community/messages" aria-label="Messages" title="Messages">
+          <MessageCircle className="h-4 w-4" aria-hidden />
+        </Link>
+      </Button>
+      <Button variant="outline" size="sm" className="hidden h-9 shrink-0 rounded-xl sm:inline-flex" asChild>
+        <Link href="/community/messages" aria-label="Messages" title="Open messages">
+          <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
+          <span>Messages</span>
+        </Link>
+      </Button>
+      {user ? <FeedMoreMenu /> : null}
+    </div>
+  ) : null;
+
   return (
     <PageShell variant="full" density="compact" className="pb-2">
-      <PageHeader
-        title="Feed"
-        stackActionsMaxSm
-        actions={
-          !needsPublicSetup ? (
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              type="button"
-              className="h-9 shrink-0 rounded-xl px-2.5 sm:px-3"
-              onClick={() => setPeopleOpen(true)}
-              data-testid="button-find-people"
-              aria-label="Find people"
-            >
-              <SearchIcon className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="text-xs font-medium sm:text-sm">Find people</span>
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 rounded-xl sm:hidden" asChild>
-              <Link href="/community/messages" aria-label="Messages" title="Messages">
-                <MessageCircle className="h-4 w-4" aria-hidden />
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" className="hidden h-9 shrink-0 rounded-xl sm:inline-flex" asChild>
-              <Link href="/community/messages" aria-label="Messages" title="Open messages">
-                <MessageCircle className="h-4 w-4 mr-1.5" aria-hidden />
-                <span>Messages</span>
-              </Link>
-            </Button>
-            {user ? <FeedMoreMenu /> : null}
-          </div>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Community" screenReaderOnly />
 
       {needsPublicSetup ? (
         <CommunityProfileSetupPrompt compact />
       ) : (
         <>
+      {user && !savedOnly && !feedSearch.trim() ? (
+        <FeedStoriesComposerHeader
+          self={selfStoryPerson}
+          people={storyPeople}
+          storiesByAuthor={storiesByAuthor}
+          loading={storiesLoading}
+          onOpenStory={openStory}
+          onAddStory={() => setStoryCreateOpen(true)}
+          composerPreview={feedComposer.pillPreview}
+          avatarDisplayName={feedComposer.avatarDisplayName}
+          avatarPath={feedComposer.avatarPath}
+          profileHref={feedComposer.profileHref}
+          onComposerClick={() => feedComposer.setSheetOpen(true)}
+          composerDisabled={!canComposeToFeed}
+          isMobile={isMobile}
+          composerExpanded={composerPanelOpen}
+          onComposerExpandedChange={setComposerPanelOpen}
+          composerForm={
+            <FeedStoriesComposerHeaderForm onSubmit={feedComposer.handlePost}>
+              <FeedComposerFormBody {...feedComposer.formBodyProps} />
+            </FeedStoriesComposerHeaderForm>
+          }
+          headerActions={feedHeaderActions}
+        />
+      ) : feedHeaderActions ? (
+        <div className="mb-2 flex justify-end">{feedHeaderActions}</div>
+      ) : null}
+
       {showProfileReminder && user?.id ? (
         <CommunityProfileReminderCard
           onDismiss={() => {
@@ -455,6 +571,21 @@ export default function CommunityHomePage() {
         suggested={suggested}
         suggestedLoading={suggestedLoading}
         onRefreshSuggested={refreshSuggestedForFindPeople}
+        onStoryClick={(id) => openStory(id)}
+      />
+
+      <StoryViewerDialog
+        open={storyViewerOpen}
+        onOpenChange={setStoryViewerOpen}
+        authorId={storyViewerAuthorId}
+        story={storyViewerStory}
+        authorDisplayName={storyViewerName}
+        onViewed={() => refreshStories()}
+      />
+      <StoryCreateSheet
+        open={storyCreateOpen}
+        onOpenChange={setStoryCreateOpen}
+        onPosted={() => refreshStories()}
       />
 
       <FeedComposerSheet
@@ -466,7 +597,7 @@ export default function CommunityHomePage() {
         profileHref={feedComposer.profileHref}
         formBodyProps={feedComposer.formBodyProps}
         onSubmit={feedComposer.handlePost}
-        showPill={isMobile}
+        showPill={false}
         pillTestId="feed-composer-mobile-pill"
         formTestId="feed-composer-form-sheet"
       />
@@ -786,51 +917,6 @@ export default function CommunityHomePage() {
             setSuggestionsDismissed(true);
           }}
         />
-      ) : null}
-
-      {!isMobile ? (
-      <Collapsible open={composerPanelOpen} onOpenChange={setComposerPanelOpen}>
-        <Card variant="glass" className={cn(!canComposeToFeed && user ? "opacity-90" : undefined)} data-testid="feed-composer-card">
-          <CardHeader className="space-y-0 pb-2">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-start justify-between gap-3 rounded-xl text-left outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-expanded={composerPanelOpen}
-                data-testid="feed-composer-trigger"
-              >
-                <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                  <Plus
-                    className="mt-0.5 h-5 w-5 shrink-0 text-primary"
-                    aria-hidden
-                    strokeWidth={2.25}
-                  />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <span className="font-display text-base font-semibold text-foreground tracking-tight">New post</span>
-                    {!composerPanelOpen && feedComposer.composer.trim() ? (
-                      <p className="line-clamp-2 text-sm text-muted-foreground">{feedComposer.composer}</p>
-                    ) : null}
-                  </div>
-                </div>
-                <ChevronDown
-                  className={cn(
-                    "h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200",
-                    composerPanelOpen && "rotate-180",
-                  )}
-                  aria-hidden
-                />
-              </button>
-            </CollapsibleTrigger>
-          </CardHeader>
-          <CollapsibleContent className="overflow-hidden">
-            <CardContent className="pt-0">
-              <form onSubmit={feedComposer.handlePost} className="space-y-3 text-foreground" data-testid="feed-composer-form">
-                <FeedComposerFormBody {...feedComposer.formBodyProps} />
-              </form>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
       ) : null}
 
       <div className="-mx-4 min-w-0 md:-mx-6">

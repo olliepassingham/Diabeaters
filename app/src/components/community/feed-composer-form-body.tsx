@@ -349,7 +349,7 @@ export function FeedComposerFormBody({
           onChange={setComposer}
           currentUserId={user?.id}
           hideHint={false}
-          placeholder="Share something on the feed…"
+          placeholder="Share something…"
           rows={3}
           maxLength={8000}
           disabled={submitting || !user || !canComposeToFeed}

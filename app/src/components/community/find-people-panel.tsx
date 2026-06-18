@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { Search, UserCheck, UserPlus } from "lucide-react";
 
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
+import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCommunityStories } from "@/hooks/use-community-stories";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { type FollowSuggestion } from "@/lib/community";
+import type { StoryRingState } from "@/lib/community/stories-supabase";
 import { searchProfilesByHandlePrefix } from "@/lib/profile";
 
 type FindPeoplePerson = {
@@ -33,6 +36,8 @@ function FindPeoplePersonRow({
   hasUser,
   showReason,
   onFollow,
+  storyRing,
+  onStoryClick,
 }: {
   person: FindPeoplePerson;
   alreadyFollowing: boolean;
@@ -42,6 +47,8 @@ function FindPeoplePersonRow({
   hasUser: boolean;
   showReason?: boolean;
   onFollow: () => void;
+  storyRing?: StoryRingState;
+  onStoryClick?: () => void;
 }) {
   const followLabel = !hasUser
     ? "Follow"
@@ -56,16 +63,36 @@ function FindPeoplePersonRow({
   return (
     <li>
       <div className="flex items-center gap-3 rounded-2xl border border-border/45 bg-card/60 px-3 py-2.5 shadow-sm">
+        {storyRing && storyRing !== "none" && onStoryClick ? (
+          <StoryAvatarRing
+            state={storyRing}
+            onClick={onStoryClick}
+            label={`Watch ${person.name}'s story`}
+          >
+            <CommunityAuthorAvatar
+              displayName={person.name}
+              avatarPath={person.avatar_url}
+              size="sm"
+              profileHref={undefined}
+            />
+          </StoryAvatarRing>
+        ) : (
+          <Link
+            href={`/community/profile/${encodeURIComponent(person.id)}`}
+            className="shrink-0 active:opacity-80"
+          >
+            <CommunityAuthorAvatar
+              displayName={person.name}
+              avatarPath={person.avatar_url}
+              size="sm"
+              profileHref={undefined}
+            />
+          </Link>
+        )}
         <Link
           href={`/community/profile/${encodeURIComponent(person.id)}`}
           className="flex min-w-0 flex-1 items-center gap-3 active:opacity-80"
         >
-          <CommunityAuthorAvatar
-            displayName={person.name}
-            avatarPath={person.avatar_url}
-            size="sm"
-            profileHref={undefined}
-          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold leading-tight text-foreground">{person.name}</p>
             <p className="truncate text-xs text-muted-foreground">@{person.handle}</p>
@@ -120,6 +147,8 @@ function FindPeoplePanelBody({
   peopleResults,
   suggested,
   suggestedLoading,
+  ringState,
+  onStoryClick,
 }: {
   userId: string | undefined;
   followeeIds: Set<string>;
@@ -133,6 +162,8 @@ function FindPeoplePanelBody({
   peopleResults: FindPeoplePerson[];
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
+  ringState: (authorId: string) => StoryRingState;
+  onStoryClick?: (authorId: string) => void;
 }) {
   const trimmed = query.trim();
   const searching = Boolean(trimmed);
@@ -196,6 +227,8 @@ function FindPeoplePanelBody({
                     waitFollowees={Boolean(userId && followeesLoading)}
                     hasUser={Boolean(userId)}
                     onFollow={() => onFollow(p.id)}
+                    storyRing={ringState(p.id)}
+                    onStoryClick={onStoryClick ? () => onStoryClick(p.id) : undefined}
                   />
                 ))}
               </ul>
@@ -242,6 +275,8 @@ function FindPeoplePanelBody({
                     waitFollowees={Boolean(userId && followeesLoading)}
                     hasUser={Boolean(userId)}
                     onFollow={() => onFollow(p.id)}
+                    storyRing={ringState(p.id)}
+                    onStoryClick={onStoryClick ? () => onStoryClick(p.id) : undefined}
                   />
                 ))}
               </ul>
@@ -264,6 +299,7 @@ type FindPeoplePanelProps = {
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
   onRefreshSuggested: () => void;
+  onStoryClick?: (authorId: string) => void;
 };
 
 export function FindPeoplePanel({
@@ -277,12 +313,22 @@ export function FindPeoplePanel({
   suggested,
   suggestedLoading,
   onRefreshSuggested,
+  onStoryClick,
 }: FindPeoplePanelProps) {
   const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [peopleResults, setPeopleResults] = useState<FindPeoplePerson[]>([]);
+
+  const visibleAuthorIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of peopleResults) ids.add(p.id);
+    for (const p of suggested) ids.add(p.id);
+    return [...ids];
+  }, [peopleResults, suggested]);
+
+  const { ringState } = useCommunityStories(userId, visibleAuthorIds);
 
   useEffect(() => {
     if (!open) {
@@ -343,6 +389,8 @@ export function FindPeoplePanel({
     peopleResults,
     suggested,
     suggestedLoading,
+    ringState,
+    onStoryClick,
   };
 
   const title = "Find people";
@@ -350,20 +398,15 @@ export function FindPeoplePanel({
 
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          side="bottom"
-          className="flex max-h-[min(92dvh,720px)] flex-col gap-0 overflow-hidden rounded-t-[1.35rem] border-t p-0 pb-[env(safe-area-inset-bottom)]"
-          onOpenAutoFocus={preventDialogAutoFocus}
-        >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25" aria-hidden />
-          <SheetHeader className="shrink-0 space-y-1 px-4 pb-2 pt-3 text-left">
-            <SheetTitle className="text-lg">{title}</SheetTitle>
-            <SheetDescription className="text-sm">{description}</SheetDescription>
-          </SheetHeader>
-          <FindPeoplePanelBody {...shellProps} />
-        </SheetContent>
-      </Sheet>
+      <BottomSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={title}
+        description={description}
+        onOpenAutoFocus={preventDialogAutoFocus}
+      >
+        <FindPeoplePanelBody {...shellProps} />
+      </BottomSheet>
     );
   }
 
