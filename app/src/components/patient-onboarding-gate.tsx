@@ -3,13 +3,22 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getProfile } from "@/lib/profile";
-import { getOnboardingAccountPath, getPrimaryAppRole, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import {
+  getOnboardingAccountPath,
+  getPrimaryAppRole,
+  hasCarerIntent,
+  hasPendingCarer,
+  setActiveAppMode,
+} from "@/lib/carer-session";
 import Onboarding from "@/pages/onboarding";
 import { getPostOnboardingPath } from "@/lib/onboarding-routes";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import {
+  ensureCommunityMemberSessionReady,
+  resolvesAsCommunityMemberAccount,
+  shouldUseCommunityMemberSession,
+} from "@/lib/community-member-session";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
-
-const ONBOARDING_LS = "diabeater_onboarding_completed";
 
 type PatientOnboardingGateProps = {
   onPatientComplete: () => void;
@@ -38,6 +47,25 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/carer-setup");
         return;
       }
+
+      const { profile } = await getProfile(user.id);
+      if (cancelled) return;
+
+      if (
+        resolvesAsCommunityMemberAccount({
+          profile,
+          linkedCarer: isCarer,
+          primaryAppRole: getPrimaryAppRole(),
+        }) ||
+        shouldUseCommunityMemberSession(profile) ||
+        accountPath === "community"
+      ) {
+        await ensureCommunityMemberSessionReady(user.id);
+        setActiveAppMode("community");
+        setLocation(getCommunityMemberLandingPath());
+        return;
+      }
+
       if (getPrimaryAppRole() === null) {
         setLocation("/welcome");
         return;
@@ -48,6 +76,7 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation(wrongPath.destination);
         return;
       }
+
       const upgradeWizard = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1";
       if (upgradeWizard) {
         setShowWizard(true);
@@ -55,16 +84,10 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         return;
       }
 
-      const { profile } = await getProfile(user.id);
-      if (cancelled) return;
       const done =
         profile?.onboarding_complete === true ||
-        (typeof localStorage !== "undefined" && localStorage.getItem(ONBOARDING_LS) === "true");
+        (typeof localStorage !== "undefined" && localStorage.getItem("diabeater_onboarding_completed") === "true");
       if (done) {
-        if (profile?.account_type === "community") {
-          setLocation(getCommunityMemberLandingPath());
-          return;
-        }
         setLocation("/");
         return;
       }

@@ -90,6 +90,7 @@ import {
 } from "@/lib/offline-messaging";
 import { reconcileAfterBackOnline } from "@/lib/offline-reconcile";
 import { isCommunityMemberSession, scheduleCommunityWarmup } from "@/lib/community-feed-cache";
+import { resolvesAsCommunityMemberAccount } from "@/lib/community-member-session";
 import {
   clearCarerClientSessionKeys,
   getActiveAppMode,
@@ -1557,6 +1558,11 @@ function AppContent() {
         onboardingCompleteFromDb: profileQuery.data?.onboarding_complete === true,
         onboardingCompleteFromLocalStorage: readOnboardingCompleteFromLocalStorage(),
         online,
+        isCommunityMemberAccount: resolvesAsCommunityMemberAccount({
+          profile: profileQuery.data ?? null,
+          linkedCarer,
+          primaryAppRole: getPrimaryAppRole(),
+        }),
       }),
     [
       userId,

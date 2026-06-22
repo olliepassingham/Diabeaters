@@ -100,6 +100,17 @@ describe("isPatientOnboardingSatisfied", () => {
       }),
     ).toBe(false);
   });
+
+  it("treats community members as satisfied without clinical onboarding", () => {
+    expect(
+      isPatientOnboardingSatisfied({
+        ...base,
+        isCommunityMemberAccount: true,
+        onboardingCompleteFromDb: false,
+        onboardingCompleteFromLocalStorage: false,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("offline cloud UI filters", () => {

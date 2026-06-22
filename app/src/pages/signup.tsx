@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   describeAuthErrorForDisplay,
@@ -13,8 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { getOnboardingAccountPath, hasCarerIntent, hasPendingCarer } from "@/lib/carer-session";
+import { Disclaimer } from "@/components/disclaimer";
 import { PageShell } from "@/components/layout";
 import {
   authInlineLinkClass,
@@ -34,6 +36,9 @@ export default function Signup() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const communitySignup = useMemo(() => getOnboardingAccountPath() === "community", []);
 
   const turnstileSiteKey = String(
     import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "",
@@ -43,6 +48,7 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (captchaRequired && !captchaToken) return;
+    if (communitySignup && !acceptedTerms) return;
 
     setSubmitting(true);
     setError(null);
@@ -155,10 +161,30 @@ export default function Signup() {
                 onToken={(t) => setCaptchaToken(t)}
               />
             )}
+            {communitySignup && (
+              <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
+                <Checkbox
+                  id="community-terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  data-testid="checkbox-community-signup-terms"
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="community-terms" className="cursor-pointer font-medium">
+                    I understand and accept
+                  </Label>
+                  <Disclaimer />
+                </div>
+              </div>
+            )}
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting || (captchaRequired && !captchaToken)}
+              disabled={
+                submitting ||
+                (captchaRequired && !captchaToken) ||
+                (communitySignup && !acceptedTerms)
+              }
             >
               {submitting ? "Creating account..." : "Create account"}
             </Button>

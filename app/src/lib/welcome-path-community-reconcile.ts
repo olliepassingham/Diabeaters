@@ -22,6 +22,7 @@ export const EXISTING_COMMUNITY_ON_USER_PATH_TOAST: PostLoginToastMessage = {
 export function profileIndicatesExistingCommunityAccount(profile: ProfileRow | null | undefined): boolean {
   if (profileIndicatesExistingPatientAccount(profile)) return false;
   if (profile?.account_type === "community") return true;
+  if (profile?.primary_app_role === "community") return true;
   return isPersistedCommunityAccount();
 }
 

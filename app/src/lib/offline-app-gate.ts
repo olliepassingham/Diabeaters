@@ -50,8 +50,11 @@ export function isPatientOnboardingSatisfied(params: {
   onboardingCompleteFromDb: boolean;
   onboardingCompleteFromLocalStorage: boolean;
   online: boolean;
+  /** Community Member accounts skip the clinical onboarding wizard. */
+  isCommunityMemberAccount?: boolean;
 }): boolean {
   if (!params.userId) return true;
+  if (params.isCommunityMemberAccount) return true;
   if (params.linkedCarer) return true;
   if (params.carerPendingBlocksOnboarding) return true;
   if (!params.online) {

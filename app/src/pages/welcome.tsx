@@ -4,12 +4,15 @@ import { FaceLogo } from "@/components/face-logo";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   clearOnboardingAccountPath,
+  setActiveAppMode,
   setOnboardingAccountPath,
   setPendingCarer,
   setPendingCommunity,
   setPendingPatient,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
+import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { finalizeCommunityMemberSession } from "@/lib/community-member-session";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
@@ -61,7 +64,9 @@ export default function Welcome() {
     if (alreadySignedIn && user?.id) {
       void (async () => {
         if (await reconcileSignedInWrongPath()) return;
-        setLocation("/onboarding");
+        await finalizeCommunityMemberSession(user.id);
+        setActiveAppMode("community");
+        setLocation(getCommunityMemberLandingPath());
       })();
       return;
     }

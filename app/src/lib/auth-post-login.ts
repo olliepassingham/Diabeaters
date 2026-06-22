@@ -10,6 +10,7 @@ import {
   setActiveAppMode,
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
+import { ensureCommunityMemberSessionReady } from "@/lib/community-member-session";
 import { cacheCloudPrimaryAppRoleFromProfile } from "@/lib/carer-session";
 import { getProfile } from "@/lib/profile";
 import { resolveSupporterOnlyAccount, syncLocalPrimaryAppRoleToCloud } from "@/lib/profile-primary-role";
@@ -59,6 +60,7 @@ export async function navigateAfterLoginSuccess(
       applyWelcomeReconcileDestination(setLocation, wrongPath.destination);
       return;
     }
+    await ensureCommunityMemberSessionReady(userId);
   }
 
   const link = await getLinkedPatientForCarer();
@@ -119,6 +121,9 @@ export async function completeAuthAndNavigate(
     if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
     const { profile } = await getProfile(userId);
     cacheCloudPrimaryAppRoleFromProfile(profile);
+    await ensureCommunityMemberSessionReady(userId, {
+      email: session?.user?.email ?? undefined,
+    });
     void syncLocalPrimaryAppRoleToCloud(userId);
   }
   prepareAuthSessionBeforeNavigation(syncAuthSession, session);
