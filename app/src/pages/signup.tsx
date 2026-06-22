@@ -23,6 +23,8 @@ import {
   authMutedNavLinkClass,
 } from "@/components/auth/auth-link-styles";
 import { TurnstileCaptcha } from "@/components/auth/Turnstile";
+import { PasswordRequirements } from "@/components/auth/password-requirements";
+import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/password-policy";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
@@ -49,6 +51,12 @@ export default function Signup() {
     e.preventDefault();
     if (captchaRequired && !captchaToken) return;
     if (communitySignup && !acceptedTerms) return;
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.ok) {
+      setError(passwordCheck.message);
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -139,6 +147,7 @@ export default function Signup() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  minLength={PASSWORD_MIN_LENGTH}
                   className="pr-10"
                 />
                 <button
@@ -154,6 +163,7 @@ export default function Signup() {
                   )}
                 </button>
               </div>
+              <PasswordRequirements password={password} />
             </div>
             {captchaRequired && (
               <TurnstileCaptcha

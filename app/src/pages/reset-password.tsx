@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { getSupabase } from "@/lib/supabase";
+import { PasswordRequirements } from "@/components/auth/password-requirements";
 import { establishPasswordRecoverySession, updatePassword } from "@/lib/auth";
+import { PASSWORD_MIN_LENGTH, validatePassword } from "@/lib/password-policy";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -68,8 +70,9 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.ok) {
+      setError(passwordCheck.message);
       return;
     }
 
@@ -157,7 +160,7 @@ export default function ResetPassword() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={PASSWORD_MIN_LENGTH}
                   className="pr-10"
                 />
                 <button
@@ -173,6 +176,7 @@ export default function ResetPassword() {
                   )}
                 </button>
               </div>
+              <PasswordRequirements password={password} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="confirm">Confirm password</Label>
@@ -184,7 +188,7 @@ export default function ResetPassword() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  minLength={6}
+                  minLength={PASSWORD_MIN_LENGTH}
                   className="pr-10"
                 />
                 <button

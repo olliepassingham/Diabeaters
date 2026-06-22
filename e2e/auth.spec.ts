@@ -21,6 +21,9 @@ test.describe("Auth routes and verification", () => {
     await expect(page.getByText("Create your Diabeaters account")).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.locator("input#password")).toBeVisible();
+    await expect(page.getByTestId("password-requirements")).toContainText(
+      "At least 6 characters",
+    );
     await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
     // When CAPTCHA is enabled, the app renders a Turnstile widget and the button stays disabled until solved.
     // In local/CI preview (no site key), the widget is not shown and the button is enabled.
