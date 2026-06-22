@@ -50,12 +50,13 @@ describe("carer-session supporter-only accounts", () => {
     expect(isCarerSessionMode(true, "carer")).toBe(true);
   });
 
-  it("restores primary role from localStorage after session clears", () => {
+  it("clears session role markers on logout", () => {
     setPrimaryAppRole("carer");
     setOnboardingAccountPath("supporter");
     clearCarerClientSessionKeys();
-    expect(getPrimaryAppRole()).toBe("carer");
-    expect(isSupporterOnlyAccount()).toBe(true);
+    expect(getPrimaryAppRole()).toBeNull();
+    expect(getOnboardingAccountPath()).toBeNull();
+    expect(isSupporterOnlyAccount()).toBe(false);
   });
 
   it("treats onboarding supporter path as supporter-only even when cloud role is patient", () => {
@@ -88,13 +89,26 @@ describe("carer-session community-only accounts", () => {
     expect(isCommunitySessionMode(false, "community")).toBe(true);
   });
 
-  it("restores community role from localStorage after session clears", () => {
+  it("clears community session markers on logout", () => {
     setPrimaryAppRole("community");
     setOnboardingAccountPath("community");
     clearCarerClientSessionKeys();
-    expect(getPrimaryAppRole()).toBe("community");
-    expect(isCommunityOnlyAccount()).toBe(true);
-    expect(isCommunitySessionMode(false, null)).toBe(true);
+    expect(getPrimaryAppRole()).toBeNull();
+    expect(isCommunityOnlyAccount()).toBe(false);
+    expect(isCommunitySessionMode(false, null)).toBe(false);
+  });
+
+  it("clears device-global role markers on logout so the next account is not affected", () => {
+    setPrimaryAppRole("community");
+    setOnboardingAccountPath("community");
+    localStorage.setItem("diabeater_primary_app_role_v1", "community");
+    localStorage.setItem("diabeater_onboarding_account_path_v1", "community");
+    localStorage.setItem("diabeater_community_account_v1", "1");
+    clearCarerClientSessionKeys();
+    expect(localStorage.getItem("diabeater_primary_app_role_v1")).toBeNull();
+    expect(localStorage.getItem("diabeater_onboarding_account_path_v1")).toBeNull();
+    expect(localStorage.getItem("diabeater_community_account_v1")).toBeNull();
+    expect(getPrimaryAppRole()).toBeNull();
   });
 
   it("converts community members to supporter-only after linking", () => {

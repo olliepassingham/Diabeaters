@@ -11,6 +11,7 @@ import {
 } from "@/lib/carer-session";
 import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { ensureCommunityMemberSessionReady } from "@/lib/community-member-session";
+import { restoreAccountSessionFromCloud } from "@/lib/account-session-restore";
 import { cacheCloudPrimaryAppRoleFromProfile } from "@/lib/carer-session";
 import { getProfile } from "@/lib/profile";
 import { resolveSupporterOnlyAccount, syncLocalPrimaryAppRoleToCloud } from "@/lib/profile-primary-role";
@@ -119,6 +120,7 @@ export async function completeAuthAndNavigate(
   if (userId) {
     const wrongPath = await reconcileWrongWelcomePathForSignedInUser(userId);
     if (wrongPath.reconciled) welcomeReconcileDestination = wrongPath.destination;
+    else await restoreAccountSessionFromCloud(userId);
     const { profile } = await getProfile(userId);
     cacheCloudPrimaryAppRoleFromProfile(profile);
     await ensureCommunityMemberSessionReady(userId, {

@@ -7,24 +7,37 @@ const CARER_LINK_JUST_COMPLETED_AT_KEY = "diabeater_carer_link_just_completed_at
 const ACTIVE_CARER_PATIENT_ID_KEY = "diabeater_active_carer_patient_id";
 const ACTIVE_APP_MODE_KEY = "diabeater_active_app_mode";
 const PRIMARY_APP_ROLE_KEY = "diabeater_primary_app_role";
+/** Legacy device-global keys — cleared on logout; role comes from cloud when signed in. */
 const PRIMARY_APP_ROLE_PERSIST_KEY = "diabeater_primary_app_role_v1";
-/** Chosen on /welcome: patient-only, supporter-only, or both (patient tools + supporter linking). */
+/** Chosen on /welcome before auth, or derived from cloud profile after login. */
 const ONBOARDING_ACCOUNT_PATH_KEY = "diabeater_onboarding_account_path_v1";
-/** Survives mistaken User/Community welcome taps — marks a supporter-only account. */
+/** Session marker for supporter-only accounts (current login session). */
+const SUPPORTER_ACCOUNT_SESSION_KEY = "diabeater_supporter_account_session";
+/** Session marker for community-only accounts (current login session). */
+const COMMUNITY_ACCOUNT_SESSION_KEY = "diabeater_community_account_session";
+/** @deprecated Cleared on logout — do not write. */
 const SUPPORTER_ACCOUNT_PERSIST_KEY = "diabeater_supporter_account_v1";
-/** Survives mistaken User/Supporter welcome taps — marks a community-only account. */
+/** @deprecated Cleared on logout — do not write. */
 const COMMUNITY_ACCOUNT_PERSIST_KEY = "diabeater_community_account_v1";
 /** Session cache of `profiles.primary_app_role` — survives navigation within a login session. */
 const CLOUD_PRIMARY_APP_ROLE_KEY = "diabeater_cloud_primary_app_role";
 
-function readPersistedPrimaryAppRole(): PrimaryAppRole | null {
+/** Remove legacy device-global role markers so the next login uses the account's cloud profile. */
+export function clearPersistedAccountRoleMarkers(): void {
   try {
-    const raw = localStorage.getItem(PRIMARY_APP_ROLE_PERSIST_KEY);
-    if (raw === "patient" || raw === "carer" || raw === "community") return raw;
+    localStorage.removeItem(PRIMARY_APP_ROLE_PERSIST_KEY);
+    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+    localStorage.removeItem(SUPPORTER_ACCOUNT_PERSIST_KEY);
+    localStorage.removeItem(COMMUNITY_ACCOUNT_PERSIST_KEY);
   } catch {
     // ignore
   }
-  return null;
+  try {
+    sessionStorage.removeItem(SUPPORTER_ACCOUNT_SESSION_KEY);
+    sessionStorage.removeItem(COMMUNITY_ACCOUNT_SESSION_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function primaryRoleFromOnboardingPath(path: OnboardingAccountPath): PrimaryAppRole | null {
@@ -86,18 +99,14 @@ export function clearCarerClientSessionKeys(): void {
   sessionStorage.removeItem(ACTIVE_APP_MODE_KEY);
   sessionStorage.removeItem(PRIMARY_APP_ROLE_KEY);
   sessionStorage.removeItem(CLOUD_PRIMARY_APP_ROLE_KEY);
-  // Legacy location (older builds); safe to clear if present.
-  try {
-    sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
-  } catch {
-    // ignore
-  }
+  sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+  clearPersistedAccountRoleMarkers();
   emitModeChanged(null);
 }
 
 export function markPersistedSupporterAccount(): void {
   try {
-    localStorage.setItem(SUPPORTER_ACCOUNT_PERSIST_KEY, "1");
+    sessionStorage.setItem(SUPPORTER_ACCOUNT_SESSION_KEY, "1");
   } catch {
     // ignore
   }
@@ -105,6 +114,7 @@ export function markPersistedSupporterAccount(): void {
 
 export function clearPersistedSupporterAccount(): void {
   try {
+    sessionStorage.removeItem(SUPPORTER_ACCOUNT_SESSION_KEY);
     localStorage.removeItem(SUPPORTER_ACCOUNT_PERSIST_KEY);
   } catch {
     // ignore
@@ -113,8 +123,8 @@ export function clearPersistedSupporterAccount(): void {
 
 export function isPersistedSupporterAccount(): boolean {
   try {
-    if (localStorage.getItem(SUPPORTER_ACCOUNT_PERSIST_KEY) === "1") return true;
-    return localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY) === "supporter";
+    if (sessionStorage.getItem(SUPPORTER_ACCOUNT_SESSION_KEY) === "1") return true;
+    return getOnboardingAccountPath() === "supporter";
   } catch {
     return false;
   }
@@ -122,7 +132,7 @@ export function isPersistedSupporterAccount(): boolean {
 
 export function markPersistedCommunityAccount(): void {
   try {
-    localStorage.setItem(COMMUNITY_ACCOUNT_PERSIST_KEY, "1");
+    sessionStorage.setItem(COMMUNITY_ACCOUNT_SESSION_KEY, "1");
   } catch {
     // ignore
   }
@@ -130,6 +140,7 @@ export function markPersistedCommunityAccount(): void {
 
 export function clearPersistedCommunityAccount(): void {
   try {
+    sessionStorage.removeItem(COMMUNITY_ACCOUNT_SESSION_KEY);
     localStorage.removeItem(COMMUNITY_ACCOUNT_PERSIST_KEY);
   } catch {
     // ignore
@@ -138,8 +149,8 @@ export function clearPersistedCommunityAccount(): void {
 
 export function isPersistedCommunityAccount(): boolean {
   try {
-    if (localStorage.getItem(COMMUNITY_ACCOUNT_PERSIST_KEY) === "1") return true;
-    return localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY) === "community";
+    if (sessionStorage.getItem(COMMUNITY_ACCOUNT_SESSION_KEY) === "1") return true;
+    return getOnboardingAccountPath() === "community";
   } catch {
     return false;
   }
@@ -147,7 +158,7 @@ export function isPersistedCommunityAccount(): boolean {
 
 export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
   try {
-    localStorage.setItem(ONBOARDING_ACCOUNT_PATH_KEY, path);
+    sessionStorage.setItem(ONBOARDING_ACCOUNT_PATH_KEY, path);
     if (path === "supporter") markPersistedSupporterAccount();
     if (path === "community") markPersistedCommunityAccount();
   } catch {
@@ -157,14 +168,8 @@ export function setOnboardingAccountPath(path: OnboardingAccountPath): void {
 
 export function getOnboardingAccountPath(): OnboardingAccountPath | null {
   try {
-    const raw = localStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
+    const raw = sessionStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
     if (raw === "patient" || raw === "supporter" || raw === "both" || raw === "community") return raw;
-  } catch {
-    // ignore
-  }
-  try {
-    const legacy = sessionStorage.getItem(ONBOARDING_ACCOUNT_PATH_KEY);
-    if (legacy === "patient" || legacy === "supporter" || legacy === "both" || legacy === "community") return legacy;
   } catch {
     // ignore
   }
@@ -173,12 +178,8 @@ export function getOnboardingAccountPath(): OnboardingAccountPath | null {
 
 export function clearOnboardingAccountPath(): void {
   try {
-    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
-  } catch {
-    // ignore
-  }
-  try {
     sessionStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
+    localStorage.removeItem(ONBOARDING_ACCOUNT_PATH_KEY);
   } catch {
     // ignore
   }
@@ -186,21 +187,16 @@ export function clearOnboardingAccountPath(): void {
 
 export function setPrimaryAppRole(role: PrimaryAppRole): void {
   sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, role);
-  try {
-    localStorage.setItem(PRIMARY_APP_ROLE_PERSIST_KEY, role);
-  } catch {
-    // ignore
-  }
 }
 
 export function getPrimaryAppRole(): PrimaryAppRole | null {
   const raw = sessionStorage.getItem(PRIMARY_APP_ROLE_KEY);
   if (raw === "patient" || raw === "carer" || raw === "community") return raw;
 
-  const persisted = readPersistedPrimaryAppRole();
-  if (persisted) {
-    sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, persisted);
-    return persisted;
+  const cloud = getCachedCloudPrimaryAppRole();
+  if (cloud) {
+    sessionStorage.setItem(PRIMARY_APP_ROLE_KEY, cloud);
+    return cloud;
   }
 
   const path = getOnboardingAccountPath();
