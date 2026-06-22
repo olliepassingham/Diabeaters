@@ -300,7 +300,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const showBothPath = accountPath === "both";
   const showCommunityPath = accountPath === "community";
   const [minimalSetup, setMinimalSetup] = useState(false);
-  const [focusPreselected] = useState(() => getInitialOnboardingStruggle() === "overview");
   const steps: Step[] = useMemo(
     () =>
       buildOnboardingSteps({
@@ -660,7 +659,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       case "care_context":
         return <CareContextStep data={data} updateData={updateData} />;
       case "struggle":
-        return <StruggleStep data={data} updateData={updateData} onMinimalSetup={handleMinimalSetup} focusPreselected={focusPreselected} />;
+        return <StruggleStep data={data} updateData={updateData} onMinimalSetup={handleMinimalSetup} />;
       case "region":
         return <RegionStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />;
       case "details":
@@ -962,12 +961,10 @@ function StruggleStep({
   data,
   updateData,
   onMinimalSetup,
-  focusPreselected = false,
 }: {
   data: OnboardingData;
   updateData: (field: keyof OnboardingData, value: any) => void;
   onMinimalSetup: () => void;
-  focusPreselected?: boolean;
 }) {
   const supporterAngle = data.careContext === "mostly_them" || data.careContext === "both_equally";
   const strugglePresentationContext: CareContext = useMemo(() => {
@@ -983,18 +980,9 @@ function StruggleStep({
         subtitle={
           supporterAngle
             ? "Pick what you want to open first — we’ll send you there when setup finishes."
-            : "Pick what you want to open first — you can add clinical details whenever you’re ready."
+            : undefined
         }
       />
-
-      {focusPreselected && !supporterAngle && data.struggle === "overview" ? (
-        <p
-          className="text-center text-sm text-muted-foreground"
-          data-testid="onboarding-focus-default-hint"
-        >
-          Most people start with the all-in-one hub — tap another option if you prefer.
-        </p>
-      ) : null}
 
       <div className="space-y-3">
         {struggleOptions.map((option) => (
