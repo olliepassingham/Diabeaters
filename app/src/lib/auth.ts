@@ -395,6 +395,65 @@ async function establishAuthSessionFromEmailLinkOnce(): Promise<AuthLinkSessionR
   return waited;
 }
 
+const EMAIL_CONFIRMATION_TYPES = new Set(["signup", "email", "invite", "magiclink"]);
+
+/**
+ * Confirm a signup / verification email link without keeping the user signed in.
+ * The verification is persisted server-side; the user should return to the app and log in.
+ */
+export async function handleEmailVerificationOnly(): Promise<{
+  verified: boolean;
+  message?: string;
+}> {
+  const supabase = getSupabase();
+  if (!supabase) return { verified: false, message: NOT_CONFIGURED.message };
+
+  const urlError = authUrlParamError();
+  if (urlError) return { verified: false, message: urlError };
+
+  const tokenType = authQueryParams().get("type");
+  if (tokenType === "recovery") {
+    return {
+      verified: false,
+      message: "This link is for resetting your password. Use Forgot password on the log in screen.",
+    };
+  }
+  if (tokenType && !EMAIL_CONFIRMATION_TYPES.has(tokenType)) {
+    return { verified: false, message: `Unsupported verification link type: ${tokenType}` };
+  }
+
+  const linkResult = await establishAuthSessionFromEmailLink();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError && !linkResult.ok) {
+    return { verified: false, message: linkResult.message ?? userError.message };
+  }
+
+  const verified = isUserVerified(user);
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // Best-effort — verification already persisted when link succeeded.
+  }
+
+  if (verified) return { verified: true };
+  if (!linkResult.ok) {
+    return {
+      verified: false,
+      message:
+        linkResult.message ??
+        "Could not verify your email. The link may have expired — open the app and request a new one.",
+    };
+  }
+  return {
+    verified: false,
+    message: "Your email could not be confirmed. Open the Diabeaters app and try logging in, or request a new link.",
+  };
+}
+
 function waitForAuthLinkSession(
   supabase: NonNullable<ReturnType<typeof getSupabase>>,
   hasSession: () => Promise<boolean>,

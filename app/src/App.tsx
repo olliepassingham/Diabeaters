@@ -56,6 +56,7 @@ const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
 const AuthCallback = lazy(() => import("@/pages/auth-callback"));
 const AuthConfirm = lazy(() => import("@/pages/auth-confirm"));
+const EmailVerify = lazy(() => import("@/pages/email-verify"));
 const ResetRequest = lazy(() => import("@/pages/reset-request"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const CheckEmail = lazy(() => import("@/pages/check-email"));
@@ -1476,7 +1477,7 @@ function MainRouter() {
       </Route>
       <Route path="/auth/email-verify">
         <Suspense fallback={<RouteFallback />}>
-          <AuthCallback />
+          <EmailVerify />
         </Suspense>
       </Route>
       <Route path="/verified-return">

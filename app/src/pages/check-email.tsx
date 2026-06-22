@@ -92,15 +92,19 @@ export default function CheckEmail() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            We&apos;ve sent a verification link to your email. Click the link to
-            verify your account. Once verified, return to the app.
+            We&apos;ve sent a verification link to your email. Tap the link to confirm your address,
+            then return to the Diabeaters app and log in.
           </p>
           <Alert className="rounded-2xl border-border/80 bg-muted/30">
             <AlertTitle className="text-sm">Not seeing the email?</AlertTitle>
             <AlertDescription className="text-xs text-muted-foreground space-y-2 pt-1">
               <ul className="list-disc pl-4 space-y-1.5">
-                <li>Check spam, junk, and the Promotions tab (if you use Gmail).</li>
-                <li>Wait a few minutes — it can take a little while to arrive.</li>
+                <li>
+                  <strong className="font-medium text-foreground">Check junk, spam, and trash</strong>{" "}
+                  — verification emails often land there.
+                </li>
+                <li>On Gmail, also check the Promotions tab.</li>
+                <li>Wait a few minutes — delivery can take a little while.</li>
                 <li>Confirm the email address above is correct, then tap resend if needed.</li>
               </ul>
               {getSupportEmail() ? (

@@ -7,7 +7,7 @@ import {
   login,
 } from "@/lib/auth";
 import { useAuth } from "@/lib/auth-context";
-import { navigateAfterLoginSuccess, completeAuthAndNavigate } from "@/lib/auth-post-login";
+import { completeAuthAndNavigate } from "@/lib/auth-post-login";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,7 @@ function clearLastLoginEmail(): void {
 
 export default function Login() {
   const { toast } = useToast();
-  const { user, loading: authLoading, syncAuthSession } = useAuth();
+  const { syncAuthSession } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,14 +91,9 @@ export default function Login() {
           description: "You can log in with your email and password.",
         });
       }
-      if (authLoading) return;
-      if (user && isUserVerified(user)) {
-        void navigateAfterLoginSuccess(setLocation, user.id);
-        return;
-      }
       window.history.replaceState({}, "", "/login");
     }
-  }, [toast, authLoading, user, setLocation]);
+  }, [toast, setLocation]);
 
   useEffect(() => {
     // Prefill remembered email for returning users (email only, never password).

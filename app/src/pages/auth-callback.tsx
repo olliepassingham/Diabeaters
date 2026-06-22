@@ -8,16 +8,13 @@ export default function AuthCallback() {
 
   useEffect(() => {
     let cancelled = false;
-    const pathOnly =
-      typeof window !== "undefined" ? window.location.pathname.split("?")[0] ?? "" : "";
-    const isEmailVerifyRoute = pathOnly === "/auth/email-verify";
 
     (async () => {
       try {
         const { user } = await handleAuthCallback();
         if (!cancelled) {
           if (isUserVerified(user)) {
-            setLocation(isEmailVerifyRoute ? "/login?verified=1" : "/welcome?verified=1");
+            setLocation("/welcome?verified=1");
           } else {
             setLocation("/check-email");
           }
@@ -26,11 +23,6 @@ export default function AuthCallback() {
         if (!cancelled) {
           setStatus("error");
           const message = err instanceof Error ? err.message : "Sign in failed. Please try again.";
-          const isTimeout = message.toLowerCase().includes("could not complete sign in");
-          if (isTimeout) {
-            setLocation("/verified-return");
-            return;
-          }
           setLocation(`/login?error=${encodeURIComponent(message)}`);
         }
       }
