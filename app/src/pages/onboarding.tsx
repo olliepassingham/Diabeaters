@@ -25,10 +25,7 @@ import {
 import { FaceLogo } from "@/components/face-logo";
 import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
-import { DIABETES_TERMS } from "@/components/info-tooltip";
 import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
-import { validateTDD, validateCorrectionFactor, validateCarbRatio } from "@/lib/clinical-validation";
-import { ClinicalWarningHint } from "@/components/clinical-warning";
 import { Disclaimer } from "@/components/disclaimer";
 import { Link, useSearch } from "wouter";
 import { cn } from "@/lib/utils";
@@ -43,7 +40,6 @@ import { normalizeDateOfBirthInput } from "@/lib/user-age";
 import { withReconciledTdd } from "@/lib/tdd";
 import { PageShell } from "@/components/layout/page-shell";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildOnboardingSteps,
   getOnboardingSecondaryCta,
@@ -70,13 +66,6 @@ import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { reschedulePumpChangeReminders } from "@/lib/pump-change-reminders";
 import { seedPumpSuppliesIfNeeded } from "@/lib/pump-supplies";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   APP_REGION_OPTIONS,
   applyRegionUnitDefaults,
   type AppRegion,
@@ -100,18 +89,6 @@ import {
 } from "@/components/onboarding/onboarding-ui";
 
 type Struggle = "supplies" | "meals" | "exercise" | "overview" | null;
-
-const ONBOARDING_RATIO_FORMAT_LABEL = "units:10g";
-
-function diabetesTermInfo(term: { explanation: string; example?: string }, extra?: string) {
-  return (
-    <div className="space-y-2">
-      <p>{term.explanation}</p>
-      {term.example ? <p className="italic text-primary/80">Example: {term.example}</p> : null}
-      {extra ? <p>{extra}</p> : null}
-    </div>
-  );
-}
 
 type CareContext = "mostly_me" | "mostly_them" | "both_equally" | null;
 
@@ -162,10 +139,8 @@ const BASE_STRUGGLE_OPTIONS: StruggleOptionDef[] = [
 ];
 
 function getStruggleOptionOrder(careContext: CareContext): Array<Exclude<Struggle, null>> {
-  if (careContext === "mostly_me") return ["supplies", "overview", "meals", "exercise"];
-  if (careContext === "mostly_them") return ["supplies", "overview", "meals", "exercise"];
-  if (careContext === "both_equally") return ["supplies", "overview", "meals", "exercise"];
-  return ["supplies", "overview", "meals", "exercise"];
+  void careContext;
+  return ["overview", "exercise", "supplies", "meals"];
 }
 
 function getStruggleCopy(id: Exclude<Struggle, null>, careContext: CareContext): { title: string; description: string } {
@@ -683,7 +658,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div className="space-y-10">
             <EssentialsStep data={data} updateData={updateData} pathCare={getPathDataCareContext(data)} />
             <div className="h-px bg-gradient-to-r from-transparent via-border/80 to-transparent" aria-hidden />
-            <PathDataStep data={data} updateData={updateData} />
+            <PathDataStep data={data} />
           </div>
         );
       case "disclaimer":
@@ -1281,22 +1256,8 @@ function RegionStep({
   );
 }
 
-type PathDataUpdate = (field: keyof OnboardingData, value: any) => void;
-
-function PathDataSuppliesStep({
-  data,
-  updateData,
-  pathCare,
-}: {
-  data: OnboardingData;
-  updateData: PathDataUpdate;
-  pathCare: CareContext;
-}) {
+function PathDataSuppliesStep({ pathCare }: { pathCare: CareContext }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
-  const isPump = isPumpDeliveryMethod(data.insulinDeliveryMethod);
-  const defaultSuppliesTab = isPump ? "basics" : "usage";
-  const [suppliesTab, setSuppliesTab] = useState(defaultSuppliesTab);
-  const optionalTone = cn("text-xs sm:text-sm", supporterHeavy && "opacity-80");
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-supplies">
@@ -1306,200 +1267,24 @@ function PathDataSuppliesStep({
         title={pathCare === "mostly_them" ? "Let’s sort their supplies" : "Let’s sort your supplies"}
         subtitle={
           supporterHeavy
-            ? "A couple of numbers so forecasts match their real usage — you can refine later in Supplies."
-            : "A couple of numbers so we can predict when you'll run out"
+            ? "Track what’s on hand and when to reorder — add details in Supplies whenever you’re ready."
+            : "Track what’s on hand and when to reorder — you can add stock levels after setup."
         }
       />
 
       <OnboardingCard accent="blue" contentClassName="pt-6">
-          <Tabs value={suppliesTab} onValueChange={setSuppliesTab} className="w-full">
-            <TabsList className="grid h-auto min-h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1">
-              <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-basics">
-                {isPump ? "Pump basics" : "Basics"}
-              </TabsTrigger>
-              <TabsTrigger value="usage" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-usage">
-                {isPump ? "Pump usage" : "Daily totals"}
-              </TabsTrigger>
-              <TabsTrigger value="optional" className={optionalTone} data-testid="onboarding-path-tab-optional">
-                CGM (optional)
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="basics" className="mt-4 space-y-4">
-              {isPump ? (
-                <div className="space-y-1.5">
-                  <FieldLabelWithInfo
-                    htmlFor="path-tdd"
-                    info={diabetesTermInfo(DIABETES_TERMS.tdd, "All insulin the pump delivers in a day.")}
-                  >
-                    Total Daily Dose (units)
-                  </FieldLabelWithInfo>
-                  <Input
-                    id="path-tdd"
-                    type="number"
-                    placeholder="e.g., 40"
-                    value={data.tdd}
-                    onChange={(e) => updateData("tdd", e.target.value)}
-                    data-testid="input-onboarding-tdd"
-                  />
-                  <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-                </div>
-              ) : (
-                <div className="flex justify-end">
-                  <InlineInfoHint
-                    ariaLabel="About supply basics"
-                    content={
-                      <p>
-                        {supporterHeavy
-                          ? "We’ll use daily insulin totals in the next tab to estimate how quickly they go through pens and vials. Add sensor duration under CGM (optional) if they use a CGM."
-                          : "We’ll use your daily insulin totals in the next tab to estimate how quickly you go through pens and vials. Add sensor duration under CGM (optional) if you use a CGM."}
-                      </p>
-                    }
-                  />
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="usage" className="mt-4 space-y-4">
-              {isPump ? (
-                <div className="space-y-4">
-                  <p className="text-xs text-muted-foreground">
-                    {supporterHeavy
-                      ? "We’ll add starter rows for infusion sets, reservoirs, insulin, and backup pens — adjust stock after your next pickup."
-                      : "We’ll add starter rows for infusion sets, reservoirs, insulin, and backup pens — adjust stock after your next pickup."}
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <FieldLabelWithInfo htmlFor="path-site-days" info={<p>How often they change infusion sets.</p>}>
-                        Site change (days)
-                      </FieldLabelWithInfo>
-                      <Select
-                        value={data.siteChangeDays}
-                        onValueChange={(v) => updateData("siteChangeDays", v)}
-                      >
-                        <SelectTrigger id="path-site-days" data-testid="select-onboarding-site-days">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">Every 2 days</SelectItem>
-                          <SelectItem value="3">Every 3 days</SelectItem>
-                          <SelectItem value="4">Every 4 days</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <FieldLabelWithInfo htmlFor="path-reservoir-days" info={<p>How often they change reservoirs.</p>}>
-                        Reservoir change (days)
-                      </FieldLabelWithInfo>
-                      <Select
-                        value={data.reservoirChangeDays}
-                        onValueChange={(v) => updateData("reservoirChangeDays", v)}
-                      >
-                        <SelectTrigger id="path-reservoir-days" data-testid="select-onboarding-reservoir-days">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="2">Every 2 days</SelectItem>
-                          <SelectItem value="3">Every 3 days</SelectItem>
-                          <SelectItem value="4">Every 4 days</SelectItem>
-                          <SelectItem value="5">Every 5 days</SelectItem>
-                          <SelectItem value="7">Every 7 days</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <FieldLabelWithInfo htmlFor="path-reservoir-cap" info={<p>Units per cartridge or reservoir fill.</p>}>
-                        Reservoir capacity (units)
-                      </FieldLabelWithInfo>
-                      <Input
-                        id="path-reservoir-cap"
-                        type="number"
-                        placeholder="e.g., 300"
-                        value={data.reservoirCapacity}
-                        onChange={(e) => updateData("reservoirCapacity", e.target.value)}
-                        data-testid="input-onboarding-reservoir-capacity"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <FieldLabelWithInfo htmlFor="path-short" info={diabetesTermInfo(DIABETES_TERMS.shortActing)}>
-                      Short-Acting (units/day)
-                    </FieldLabelWithInfo>
-                    <Input
-                      id="path-short"
-                      type="number"
-                      placeholder="e.g., 25"
-                      value={data.shortActingUnitsPerDay}
-                      onChange={(e) => updateData("shortActingUnitsPerDay", e.target.value)}
-                      data-testid="input-onboarding-short-acting"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <FieldLabelWithInfo htmlFor="path-long" info={diabetesTermInfo(DIABETES_TERMS.longActing)}>
-                      Long-Acting (units/day)
-                    </FieldLabelWithInfo>
-                    <Input
-                      id="path-long"
-                      type="number"
-                      placeholder="e.g., 20"
-                      value={data.longActingUnitsPerDay}
-                      onChange={(e) => updateData("longActingUnitsPerDay", e.target.value)}
-                      data-testid="input-onboarding-long-acting"
-                    />
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="optional" className="mt-4 space-y-4">
-              <div className="flex justify-end">
-                <InlineInfoHint
-                  ariaLabel="About CGM settings"
-                  content={
-                    <div className="space-y-2">
-                      <p>
-                        {supporterHeavy
-                          ? "Only needed if they use a CGM/sensor. Skip if you’re not sure."
-                          : "Optional — only needed if you use a CGM/sensor."}
-                      </p>
-                      <p>You can update these anytime in Settings.</p>
-                    </div>
-                  }
-                />
-              </div>
-              <div className="space-y-1.5">
-                <FieldLabelWithInfo htmlFor="path-cgm" info={diabetesTermInfo(DIABETES_TERMS.cgmDuration)}>
-                  Sensor Duration (days)
-                </FieldLabelWithInfo>
-                <Input
-                  id="path-cgm"
-                  type="number"
-                  placeholder="e.g., 10 or 14"
-                  value={data.cgmDays}
-                  onChange={(e) => updateData("cgmDays", e.target.value)}
-                  data-testid="input-onboarding-cgm"
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+        <p className="text-sm text-muted-foreground">
+          {supporterHeavy
+            ? "When you finish, we’ll open Supply Tracker. No insulin totals or sensor settings needed now — add those later if you want sharper forecasts."
+            : "When you finish, we’ll open Supply Tracker. No insulin totals or sensor settings needed now — add those later if you want sharper forecasts."}
+        </p>
       </OnboardingCard>
     </div>
   );
 }
 
-function PathDataMealsStep({
-  data,
-  updateData,
-  pathCare,
-}: {
-  data: OnboardingData;
-  updateData: PathDataUpdate;
-  pathCare: CareContext;
-}) {
+function PathDataMealsStep({ pathCare }: { pathCare: CareContext }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
-  const defaultMealsTab = pathCare === "mostly_them" ? "corrections" : "ratios";
-  const [mealsTab, setMealsTab] = useState(defaultMealsTab);
-  const mealsOptionalTone = cn("text-xs sm:text-sm", supporterHeavy && "opacity-80");
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-meals">
@@ -1509,143 +1294,23 @@ function PathDataMealsStep({
         title={pathCare === "mostly_them" ? "Let’s simplify their mealtimes" : "Let’s simplify mealtimes"}
         subtitle={
           supporterHeavy
-            ? "Know a ratio? Add it now. Not sure? We’ll open the Ratio Adviser when you finish."
-            : "Know a ratio? Add one now. Not sure? We’ll guide you through the Ratio Adviser next."
+            ? "Meal tools work even before ratios are settled — we’ll guide you when you’re ready."
+            : "Meal tools work even before ratios are settled — we’ll guide you when you’re ready."
         }
       />
 
       <OnboardingCard accent="amber" contentClassName="pt-6">
-          <Tabs value={mealsTab} onValueChange={setMealsTab} className="w-full">
-            <TabsList className="grid h-auto min-h-11 w-full grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1">
-              <TabsTrigger value="ratios" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ratios">
-                Ratios
-              </TabsTrigger>
-              <TabsTrigger value="corrections" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-corrections">
-                Corrections
-              </TabsTrigger>
-              <TabsTrigger value="optional" className={mealsOptionalTone} data-testid="onboarding-path-tab-optional-meals">
-                Tips (optional)
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="ratios" className="mt-4 space-y-4">
-              {data.mealRatiosUnknown ? (
-                <div
-                  className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground"
-                  data-testid="onboarding-meals-ratios-unknown-banner"
-                >
-                  No problem — after setup we&apos;ll open the Ratio Adviser to help you find starting numbers.
-                </div>
-              ) : null}
-              <StaticLabelWithInfo
-                labelClassName="text-sm font-medium"
-                ariaLabel="About carb ratios"
-                info={
-                  <div className="space-y-2">
-                    {diabetesTermInfo(DIABETES_TERMS.carbRatio)}
-                    <p>
-                      Enter values as <strong>{ONBOARDING_RATIO_FORMAT_LABEL}</strong> carbs. One meal is enough to
-                      start — add the rest in Settings later.
-                    </p>
-                  </div>
-                }
-              >
-                Carb ratios ({ONBOARDING_RATIO_FORMAT_LABEL} carbs)
-              </StaticLabelWithInfo>
-              <div className="grid grid-cols-3 gap-3">
-                {(
-                  [
-                    { label: "Breakfast", key: "breakfastRatio" as const, placeholder: "e.g., 1.0", testId: "breakfast" },
-                    { label: "Lunch", key: "lunchRatio" as const, placeholder: "e.g., 0.8", testId: "lunch", hint: "A good one to start with" },
-                    { label: "Dinner", key: "dinnerRatio" as const, placeholder: "e.g., 1.0", testId: "dinner" },
-                  ] as const
-                ).map((meal) => (
-                  <div key={meal.key} className="space-y-1.5">
-                    <Label className="text-sm">{meal.label}</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder={meal.placeholder}
-                      value={data[meal.key]}
-                      onChange={(e) => {
-                        updateData(meal.key, e.target.value);
-                        if (e.target.value.trim()) updateData("mealRatiosUnknown", false);
-                      }}
-                      data-testid={`input-onboarding-${meal.testId}-ratio`}
-                    />
-                    <ClinicalWarningHint
-                      warning={validateCarbRatio(parseInputToGramsPerUnit(data[meal.key], "per10g"))}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {ONBOARDING_RATIO_FORMAT_LABEL}
-                      {"hint" in meal && meal.hint ? ` · ${meal.hint}` : ""}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant={data.mealRatiosUnknown ? "default" : "outline"}
-                className="w-full rounded-xl"
-                onClick={() => {
-                  updateData("mealRatiosUnknown", true);
-                  updateData("breakfastRatio", "");
-                  updateData("lunchRatio", "");
-                  updateData("dinnerRatio", "");
-                }}
-                data-testid="button-onboarding-meals-ratios-unknown"
-              >
-                I don&apos;t know my ratios yet
-              </Button>
-            </TabsContent>
-            <TabsContent value="corrections" className="mt-4 space-y-1.5">
-              <FieldLabelWithInfo
-                htmlFor="path-correction"
-                info={diabetesTermInfo(
-                  DIABETES_TERMS.correctionFactor,
-                  pathCare === "mostly_them"
-                    ? `How much 1 unit lowers their blood sugar (${data.bgUnits}).`
-                    : `How much 1 unit lowers your blood sugar (${data.bgUnits}).`,
-                )}
-              >
-                Correction Factor
-              </FieldLabelWithInfo>
-              <Input
-                id="path-correction"
-                type="number"
-                step="0.1"
-                placeholder={data.bgUnits === "mmol/L" ? "e.g., 3" : "e.g., 50"}
-                value={data.correctionFactor}
-                onChange={(e) => updateData("correctionFactor", e.target.value)}
-                data-testid="input-onboarding-correction"
-              />
-              <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-            </TabsContent>
-            <TabsContent value="optional" className="mt-4 flex justify-center py-4">
-              <InlineInfoHint
-                ariaLabel="About optional meal settings"
-                content={
-                  <p>
-                    Not sure? You can add ratios and corrections later in Settings, or use the Ratio Adviser to work
-                    them out.
-                  </p>
-                }
-              />
-            </TabsContent>
-          </Tabs>
+        <p className="text-sm text-muted-foreground">
+          {supporterHeavy
+            ? "After setup we’ll open the Ratio Adviser for a short guided flow, or you can explore meal planning at your own pace."
+            : "After setup we’ll open the Ratio Adviser for a short guided flow, or you can explore meal planning at your own pace."}
+        </p>
       </OnboardingCard>
     </div>
   );
 }
 
-function PathDataExerciseStep({
-  data,
-  updateData,
-  pathCare,
-}: {
-  data: OnboardingData;
-  updateData: PathDataUpdate;
-  pathCare: CareContext;
-}) {
+function PathDataExerciseStep({ pathCare }: { pathCare: CareContext }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
 
   return (
@@ -1661,51 +1326,17 @@ function PathDataExerciseStep({
         }
       />
 
-      <OnboardingCard accent="green" contentClassName="space-y-4 pt-6">
-          <p className="text-sm text-muted-foreground">
-            After setup we&apos;ll open a sample 30-minute walk so you can see carb and timing guidance right away.
-          </p>
-          <div className="space-y-1.5">
-            <FieldLabelWithInfo
-              htmlFor="path-correction-ex"
-              info={
-                <div className="space-y-2">
-                  {diabetesTermInfo(DIABETES_TERMS.correctionFactor)}
-                  <p>Optional — add later in Settings if you prefer.</p>
-                </div>
-              }
-            >
-              Correction factor (optional)
-            </FieldLabelWithInfo>
-            <Input
-              id="path-correction-ex"
-              type="number"
-              step="0.1"
-              placeholder={data.bgUnits === "mmol/L" ? "e.g., 3 — skip if unsure" : "e.g., 50 — skip if unsure"}
-              value={data.correctionFactor}
-              onChange={(e) => updateData("correctionFactor", e.target.value)}
-              data-testid="input-onboarding-correction"
-            />
-            <ClinicalWarningHint warning={validateCorrectionFactor(data.correctionFactor, data.bgUnits)} />
-          </div>
+      <OnboardingCard accent="green" contentClassName="pt-6">
+        <p className="text-sm text-muted-foreground">
+          After setup we&apos;ll open a sample 30-minute walk so you can see carb and timing guidance right away.
+        </p>
       </OnboardingCard>
     </div>
   );
 }
 
-function PathDataOverviewStep({
-  data,
-  updateData,
-  pathCare,
-}: {
-  data: OnboardingData;
-  updateData: PathDataUpdate;
-  pathCare: CareContext;
-}) {
+function PathDataOverviewStep({ pathCare }: { pathCare: CareContext }) {
   const supporterHeavy = pathCare === "mostly_them" || pathCare === "both_equally";
-  const defaultOverviewTab = pathCare === "mostly_them" ? "sensors" : "basics";
-  const [overviewTab, setOverviewTab] = useState(defaultOverviewTab);
-  const sensorsTone = cn("text-xs sm:text-sm", supporterHeavy && pathCare !== "mostly_them" && "opacity-90");
 
   return (
     <div className="space-y-6" data-testid="onboarding-path-overview">
@@ -1715,65 +1346,23 @@ function PathDataOverviewStep({
         title={pathCare === "mostly_them" ? "A calmer overview for their care" : "Your all-in-one hub"}
         subtitle={
           supporterHeavy
-            ? "Start with what you know now — you can layer in detail later."
-            : "A few details so we can make everything work together"
+            ? "Supplies, meals, and activity in one place — layer in detail whenever you like."
+            : "Supplies, meals, and activity in one place — layer in detail whenever you like."
         }
       />
 
       <OnboardingCard accent="purple" contentClassName="pt-6">
-          <Tabs value={overviewTab} onValueChange={setOverviewTab} className="w-full">
-            <TabsList className="grid h-auto min-h-11 w-full grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1">
-              <TabsTrigger value="basics" className="text-xs sm:text-sm" data-testid="onboarding-path-tab-ov-basics">
-                Basics
-              </TabsTrigger>
-              <TabsTrigger value="sensors" className={sensorsTone} data-testid="onboarding-path-tab-sensors">
-                Sensors
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="basics" className="mt-4 space-y-4">
-              <div className="space-y-1.5">
-                <FieldLabelWithInfo
-                  htmlFor="path-tdd-ov"
-                  info={
-                    <div className="space-y-2">
-                      {diabetesTermInfo(DIABETES_TERMS.tdd)}
-                      <p>You can add more detail later in Settings — we&apos;ll prompt you when it&apos;s needed.</p>
-                    </div>
-                  }
-                >
-                  Total Daily Dose (units)
-                </FieldLabelWithInfo>
-                <Input
-                  id="path-tdd-ov"
-                  type="number"
-                  placeholder="e.g., 40"
-                  value={data.tdd}
-                  onChange={(e) => updateData("tdd", e.target.value)}
-                  data-testid="input-onboarding-tdd"
-                />
-                <ClinicalWarningHint warning={validateTDD(data.tdd)} />
-              </div>
-            </TabsContent>
-            <TabsContent value="sensors" className="mt-4 space-y-1.5">
-              <FieldLabelWithInfo htmlFor="path-cgm-ov" info={diabetesTermInfo(DIABETES_TERMS.cgmDuration)}>
-                Sensor Duration (days)
-              </FieldLabelWithInfo>
-              <Input
-                id="path-cgm-ov"
-                type="number"
-                placeholder="e.g., 10 or 14"
-                value={data.cgmDays}
-                onChange={(e) => updateData("cgmDays", e.target.value)}
-                data-testid="input-onboarding-cgm"
-              />
-            </TabsContent>
-          </Tabs>
+        <p className="text-sm text-muted-foreground">
+          {supporterHeavy
+            ? "When you finish, we’ll open the dashboard so you can see what matters next without bouncing between screens."
+            : "When you finish, we’ll open the dashboard so you can see what matters next without bouncing between screens."}
+        </p>
       </OnboardingCard>
     </div>
   );
 }
 
-function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: PathDataUpdate }) {
+function PathDataStep({ data }: { data: OnboardingData }) {
   const struggle = data.struggle;
   const pathCare = getPathDataCareContext(data);
 
@@ -1781,13 +1370,13 @@ function PathDataStep({ data, updateData }: { data: OnboardingData; updateData: 
 
   switch (struggle) {
     case "supplies":
-      return <PathDataSuppliesStep data={data} updateData={updateData} pathCare={pathCare} />;
+      return <PathDataSuppliesStep pathCare={pathCare} />;
     case "meals":
-      return <PathDataMealsStep data={data} updateData={updateData} pathCare={pathCare} />;
+      return <PathDataMealsStep pathCare={pathCare} />;
     case "exercise":
-      return <PathDataExerciseStep data={data} updateData={updateData} pathCare={pathCare} />;
+      return <PathDataExerciseStep pathCare={pathCare} />;
     case "overview":
-      return <PathDataOverviewStep data={data} updateData={updateData} pathCare={pathCare} />;
+      return <PathDataOverviewStep pathCare={pathCare} />;
     default:
       return null;
   }
