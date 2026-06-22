@@ -9,6 +9,7 @@ import {
   type OnboardingAccountPath,
   type PrimaryAppRole,
 } from "@/lib/carer-session";
+import { applyClinicalPrefsFromCloudRow } from "@/lib/clinical-prefs-cloud-sync";
 import { profileIndicatesExistingPatientAccount } from "@/lib/community-path-patient-reconcile";
 import { getLinkedPatientForCarer } from "@/lib/carers";
 import {
@@ -101,4 +102,5 @@ export async function restoreAccountSessionFromCloud(userId: string): Promise<vo
 
   const [{ profile }, link] = await Promise.all([getProfile(userId), getLinkedPatientForCarer()]);
   applySessionMarkersFromProfile(profile, Boolean(link.data));
+  if (profile) applyClinicalPrefsFromCloudRow(profile);
 }

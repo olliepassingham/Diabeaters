@@ -11,7 +11,6 @@ import {
   setPendingPatient,
   setPrimaryAppRole,
 } from "@/lib/carer-session";
-import { getCommunityMemberLandingPath } from "@/lib/community-landing";
 import { finalizeCommunityMemberSession } from "@/lib/community-member-session";
 import { useAuth } from "@/lib/auth-context";
 import { isUserVerified } from "@/lib/auth";
@@ -168,7 +167,10 @@ export default function Welcome() {
           <Button
             variant="ghost"
             className="w-full text-muted-foreground hover:text-foreground"
-            onClick={() => setLocation("/login")}
+            onClick={() => {
+              clearOnboardingAccountPath();
+              setLocation("/login");
+            }}
           >
             Already have an account? Log in
           </Button>

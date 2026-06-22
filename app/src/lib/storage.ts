@@ -236,6 +236,28 @@ function clearStorageKeys(keys: Iterable<StorageLogicalKey>): void {
   }
 }
 
+/**
+ * Wipe local clinical, settings, community drafts, and messages when the signed-in
+ * account changes or logs out. Prevents one user's dashboard data appearing for another
+ * on a shared device (cloud profile + clinical sync repopulate after login).
+ */
+export function clearLocalCacheForAccountSwitch(): void {
+  if (typeof window === "undefined") return;
+  clearStorageKeys(clinicalKeys());
+  clearStorageKeys(BACKUP_SCOPE_KEYS.app_settings);
+  clearStorageKeys(BACKUP_SCOPE_KEYS.community);
+  clearStorageKeys(BACKUP_SCOPE_KEYS.messages);
+  try {
+    localStorage.removeItem(STORAGE_KEYS.ONBOARDING);
+    localStorage.removeItem("diabeater_onboarding_completed");
+    localStorage.removeItem("diabeater_onboarding_struggle");
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new Event(DIABEATER_PROFILE_CHANGED_EVENT));
+  window.dispatchEvent(new Event(DIABEATER_SETTINGS_CHANGED_EVENT));
+}
+
 export function backupDeclaredScopesMismatchFile(
   declared: BackupScope[] | null,
   data: Record<string, unknown>,
@@ -391,10 +413,16 @@ export function getAppointmentsStorageKeyForUserId(userId: string): string {
 export function setActiveUserIdForLocalStorage(uid: string | null): void {
   if (typeof window === "undefined") return;
   const prev = localStorage.getItem(ACTIVE_USER_ID_KEY);
+  const next = uid ?? null;
+  const isLogout = prev != null && next === null;
+  const isAccountSwitch = prev != null && next != null && prev !== next;
+  const isLegacyUnscopedHandoff = prev == null && next != null && localStorage.getItem(STORAGE_KEYS.PROFILE) != null;
+  if (isLogout || isAccountSwitch || isLegacyUnscopedHandoff) {
+    clearLocalCacheForAccountSwitch();
+  }
   if (uid) {
     localStorage.setItem(ACTIVE_USER_ID_KEY, uid);
     try {
-      // Legacy unscoped key would leak prior-account data into new sessions.
       localStorage.removeItem(STORAGE_KEYS.APPOINTMENTS);
     } catch {
       /* ignore */
@@ -402,7 +430,7 @@ export function setActiveUserIdForLocalStorage(uid: string | null): void {
   } else {
     localStorage.removeItem(ACTIVE_USER_ID_KEY);
   }
-  if (prev !== (uid ?? null)) {
+  if (prev !== next) {
     window.dispatchEvent(new Event(DIABEATER_ACTIVE_USER_CHANGED_EVENT));
   }
 }

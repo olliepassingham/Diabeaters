@@ -27,8 +27,13 @@ export function isCommunityWelcomePathChosen(): boolean {
 /** Cloud or local markers show a completed patient account (not community-only). */
 export function profileIndicatesExistingPatientAccount(profile: ProfileRow | null | undefined): boolean {
   if (profile?.account_type === "community") return false;
+  if (profile?.primary_app_role === "community") return false;
   if (profile?.account_type === "patient") return true;
-  if (profile?.onboarding_complete === true) return true;
+  if (profile?.primary_app_role === "patient" && profile?.onboarding_complete === true) return true;
+  if (profile?.onboarding_complete === true) {
+    return profile?.primary_app_role !== "community";
+  }
+  if (profile) return false;
   return localIndicatesPatientAccount();
 }
 

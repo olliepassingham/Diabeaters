@@ -58,7 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    setActiveUserIdForLocalStorage(null);
 
     (async () => {
       if (initialE2EUser) {

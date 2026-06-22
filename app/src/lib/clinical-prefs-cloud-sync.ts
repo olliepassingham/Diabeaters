@@ -141,9 +141,10 @@ export function applyClinicalPrefsFromCloudRow(row: ProfileRow | null): void {
   if (!row?.id) return;
 
   if (row.account_type === "community") {
+    const cloudName = row.full_name?.trim();
     const localProfile = storage.getProfile();
     storage.saveProfile({
-      name: localProfile?.name ?? "",
+      name: cloudName && !isEmailLike(cloudName) ? cloudName : localProfile?.name ?? "",
       email: localProfile?.email ?? "",
       dateOfBirth: localProfile?.dateOfBirth ?? "",
       bgUnits: localProfile?.bgUnits ?? "mmol/L",
