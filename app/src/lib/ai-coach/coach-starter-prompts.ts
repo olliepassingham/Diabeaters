@@ -29,6 +29,18 @@ type StarterEntry = {
 const STARTER_COUNT = 3;
 
 const STARTER_POOLS: Record<CoachTopicSlug, StarterEntry[]> = {
+  community: [
+    { text: "What is hypoglycaemia in simple, educational terms?" },
+    { text: "How can I talk about type 1 diabetes with friends or at work?" },
+    { text: "What is dawn phenomenon in broad, educational terms?", boost: ["morning"] },
+    { text: "What's useful to know before a first diabetes clinic appointment?", boost: ["morning", "afternoon"] },
+    { text: "What questions help when I'm still learning diabetes vocabulary?", boost: ["afternoon"] },
+    { text: "What is a CGM, and how is it different from finger-prick checks in general terms?" },
+    { text: "How can I explain type 1 versus type 2 when people get them confused?" },
+    { text: "When should I contact a diabetes team urgently versus read and learn more?", boost: ["sick-day"] },
+    { text: "What safety principles do educators often mention around alcohol and diabetes?", boost: ["evening", "night"] },
+    { text: "How might supporters help during a hypo without taking over someone's plan?", boost: ["evening"] },
+  ],
   general: [
     { text: "What should I bring to a routine diabetes clinic appointment?", boost: ["morning", "afternoon"] },
     { text: "How can I describe glucose patterns to my team without focusing on exact numbers?" },

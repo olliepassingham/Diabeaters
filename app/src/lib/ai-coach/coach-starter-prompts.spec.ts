@@ -87,4 +87,21 @@ describe("coach-starter-prompts", () => {
     });
     expect(day1).not.toEqual(day2);
   });
+
+  it("community starters avoid supply-tracker wording", () => {
+    const ctx = {
+      timeBand: "afternoon" as const,
+      sickDayActive: false,
+      travelModeActive: false,
+      pumpFailureActive: false,
+      suppliesLow: true,
+      hasTrackedSupplies: true,
+    };
+    const picks = pickCoachStarterPrompts("community", ctx, {
+      userId: "u1",
+      now: new Date(2026, 5, 9, 14, 0, 0),
+    });
+    expect(picks.some((q) => /supplies running low|supply tracker/i.test(q))).toBe(false);
+    expect(picks).toHaveLength(3);
+  });
 });

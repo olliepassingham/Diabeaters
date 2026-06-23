@@ -10,6 +10,10 @@ describe("buildCoachHref", () => {
     expect(buildCoachHref({ audience: "supporter" })).toBe("/coach?audience=supporter");
   });
 
+  it("adds community topic", () => {
+    expect(buildCoachHref({ topic: "community" })).toBe("/coach?topic=community");
+  });
+
   it("adds topic and encodes q", () => {
     expect(buildCoachHref({ topic: "sick-day", q: "hello world" })).toBe(
       "/coach?topic=sick-day&q=hello+world",

@@ -2,6 +2,7 @@ import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 
 export const COACH_TOPIC_SLUGS = [
   "general",
+  "community",
   "exercise",
   "sick-day",
   "travel",
@@ -28,6 +29,16 @@ const TOPIC_CONFIG: Record<
       "What should I bring to a routine diabetes clinic appointment?",
       "How can I describe glucose patterns to my team without focusing on exact numbers?",
       "What questions are useful to ask about sick day rules before I need them?",
+    ],
+  },
+  community: {
+    label: "Community & learning",
+    emptyHint:
+      "General type 1 education for exploring the community — not personal dosing advice. Helpful if you're new, connecting with others, or brushing up on basics.",
+    starters: [
+      "What is hypoglycaemia in simple, educational terms?",
+      "How can I talk about type 1 diabetes with friends or at work?",
+      "What is dawn phenomenon in broad, educational terms?",
     ],
   },
   exercise: {
@@ -141,4 +152,14 @@ export function normalizeCoachTopicParam(raw: string | null | undefined): CoachT
 
 export function getCoachTopicConfig(slug: CoachTopicSlug) {
   return TOPIC_CONFIG[slug];
+}
+
+/** Default Beatie topic when no `?topic=` is present on the coach URL. */
+export function defaultCoachTopicForSession(opts: {
+  isSupporter: boolean;
+  isCommunityMode: boolean;
+}): CoachTopicSlug {
+  if (opts.isSupporter) return "supporter";
+  if (opts.isCommunityMode) return "community";
+  return "general";
 }

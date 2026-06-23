@@ -30,6 +30,7 @@ import { useCommunityPushPromptAfterOnboarding } from "@/hooks/use-community-pus
 import { cn } from "@/lib/utils";
 import { isAiCoachEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
+import { buildCoachHref } from "@/lib/ai-coach/links";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { prefetchToolsDestinationHref, prefetchToolsHubLinkedChunks } from "@/lib/tools-route-prefetch";
 import { RatiosSetupNotice } from "@/components/ratios-setup-notice";
@@ -201,7 +202,7 @@ export function communityToolsForHub(): ToolDef[] {
   if (!isAiCoachEnabled) return COMMUNITY_TOOLS;
   const coach: ToolDef = {
     id: "ai-coach",
-    href: "/coach",
+    href: buildCoachHref({ topic: "community" }),
     icon: MessageCircle,
     title: AI_ASSISTANT_NAME,
     description: `${AI_ASSISTANT_NAME} is an educational guide for type 1 diabetes in the UK. Not medical advice.`,

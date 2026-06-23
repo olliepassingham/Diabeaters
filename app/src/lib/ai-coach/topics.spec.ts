@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COACH_TOPIC_SLUGS, getCoachTopicConfig, normalizeCoachTopicParam } from "./topics";
+import { COACH_TOPIC_SLUGS, defaultCoachTopicForSession, getCoachTopicConfig, normalizeCoachTopicParam } from "./topics";
 
 describe("normalizeCoachTopicParam", () => {
   it("returns null for empty or unknown", () => {
@@ -19,6 +19,11 @@ describe("normalizeCoachTopicParam", () => {
     expect(normalizeCoachTopicParam("Supporter")).toBe("supporter");
   });
 
+  it("accepts the community slug", () => {
+    expect(normalizeCoachTopicParam("community")).toBe("community");
+    expect(normalizeCoachTopicParam("COMMUNITY")).toBe("community");
+  });
+
   it("every slug has config", () => {
     for (const slug of COACH_TOPIC_SLUGS) {
       const c = getCoachTopicConfig(slug);
@@ -33,5 +38,18 @@ describe("normalizeCoachTopicParam", () => {
     expect(c.label).toMatch(/Supporter/i);
     expect(c.emptyHint.toLowerCase()).toContain("supporting");
     expect(c.starters.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("community config has learning-focused copy", () => {
+    const c = getCoachTopicConfig("community");
+    expect(c.label).toMatch(/Community/i);
+    expect(c.emptyHint.toLowerCase()).toContain("community");
+    expect(c.starters.some((s) => /hypoglycaemia|hypo/i.test(s))).toBe(true);
+  });
+
+  it("defaultCoachTopicForSession prefers supporter, then community, then general", () => {
+    expect(defaultCoachTopicForSession({ isSupporter: true, isCommunityMode: true })).toBe("supporter");
+    expect(defaultCoachTopicForSession({ isSupporter: false, isCommunityMode: true })).toBe("community");
+    expect(defaultCoachTopicForSession({ isSupporter: false, isCommunityMode: false })).toBe("general");
   });
 });

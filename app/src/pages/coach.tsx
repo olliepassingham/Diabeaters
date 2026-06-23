@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
 import { useLinkedCarer } from "@/hooks/use-linked-carer";
 import { getPatientClinicalPrefsForCarer } from "@/lib/carers";
+import { getActiveAppMode, isCommunitySessionMode } from "@/lib/carer-session";
 import { getSupabase } from "@/lib/supabase";
-import { storage } from "@/lib/storage";
+import { storage, isCommunityAccountProfile } from "@/lib/storage";
+import { useProfile } from "@/lib/profile";
 import { getAgeBand } from "@/lib/user-age";
 import { acceptAiCoachConsent, AI_COACH_CONSENT_VERSION, fetchAiCoachConsentAt } from "@/lib/ai-coach/consent";
 import { sendCoachMessage, AiCoachHttpError } from "@/lib/ai-coach/client";
@@ -22,7 +24,7 @@ import type { CoachAudience, CoachResponse, CoachTurn } from "@/lib/ai-coach/typ
 import { buildCoachStarterContext, pickCoachStarterPrompts } from "@/lib/ai-coach/coach-starter-prompts";
 import { describeCoachProfileVisibility } from "@/lib/ai-coach/contextSummary";
 import { syncClinicalPrefsToCloud } from "@/lib/clinical-prefs-cloud-sync";
-import { getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
+import { defaultCoachTopicForSession, getCoachTopicConfig, normalizeCoachTopicParam } from "@/lib/ai-coach/topics";
 import {
   AI_ASSISTANT_NAME,
   coachPageSubtitle,
@@ -200,8 +202,22 @@ export default function CoachPage() {
     [search],
   );
   const isSupporter = audience === "supporter";
+  const { profile } = useProfile();
+  const { linked, isCarer } = useLinkedCarer();
+  const [activeMode, setActiveMode] = useState(() => getActiveAppMode());
+  const isCommunityMode = useMemo(
+    () =>
+      isCommunitySessionMode(isCarer, activeMode, {
+        localCommunityProfile: isCommunityAccountProfile(storage.getProfile()),
+        cloudCommunityProfile: profile?.account_type === "community",
+      }),
+    [isCarer, activeMode, profile?.account_type],
+  );
   const topicSlug = useMemo(() => normalizeCoachTopicParam(new URLSearchParams(search).get("topic")), [search]);
-  const effectiveTopic = topicSlug ?? (isSupporter ? "supporter" : "general");
+  const effectiveTopic = useMemo(
+    () => topicSlug ?? defaultCoachTopicForSession({ isSupporter, isCommunityMode }),
+    [topicSlug, isSupporter, isCommunityMode],
+  );
   const topicCfg = useMemo(() => getCoachTopicConfig(effectiveTopic), [effectiveTopic]);
   const starterContext = useMemo(() => buildCoachStarterContext(), []);
   const displayedStarters = useMemo(
@@ -210,7 +226,14 @@ export default function CoachPage() {
   );
   const pageTitle = coachPageTitle(isSupporter ? "supporter" : "patient");
 
-  const { linked, isCarer } = useLinkedCarer();
+  useEffect(() => {
+    const onMode = (ev: Event) => {
+      const ce = ev as CustomEvent<{ mode?: "patient" | "carer" | "community" | null }>;
+      setActiveMode(ce.detail?.mode ?? getActiveAppMode());
+    };
+    window.addEventListener("diabeater:app-mode", onMode);
+    return () => window.removeEventListener("diabeater:app-mode", onMode);
+  }, []);
 
   const patientDobForSupporterCoach = useQuery({
     queryKey: ["coachSupporterPatientDob", linked?.patientId],
