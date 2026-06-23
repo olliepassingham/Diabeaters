@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, Package, Syringe, Activity, Settings, Calendar, R
 import { UsualPrescriptionDialog } from "@/components/usual-prescription-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { storage, Supply, LastPrescription, UsualPrescription, UsualPrescriptionItem, PrescriptionCycle, ScenarioState, getSupplyIncrement, getUnitsPerPen, getInsulinContainerLabel, DIABEATER_SCENARIO_STATE_CHANGED_EVENT, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
+import { INSULIN_STOCK_QUANTITY_HINT } from "@/lib/insulin-pen-units";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { FaceLogoWatermark } from "@/components/face-logo";
 import { Link, useSearch } from "wouter";
@@ -1281,11 +1282,18 @@ function SupplyDialog({
                             : "Current quantity"
                     }
                     htmlFor="quantity"
+                    hint={isInsulinType(type) ? INSULIN_STOCK_QUANTITY_HINT : undefined}
                   >
                     <Input
                       id="quantity"
                       type="number"
-                      placeholder={type === "cgm" || type === "infusion_set" || type === "reservoir" ? "e.g., 10" : "e.g., 50"}
+                      placeholder={
+                        isInsulinType(type)
+                          ? `e.g., ${getUnitsPerPen() * 2} (2 pens)`
+                          : type === "cgm" || type === "infusion_set" || type === "reservoir"
+                            ? "e.g., 10"
+                            : "e.g., 50"
+                      }
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
                       data-testid="input-supply-quantity"

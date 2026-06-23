@@ -28,6 +28,6 @@ describe("formatCarerSupplyQuantity", () => {
 
   it("defaults to UK pack sizes when prefs missing", () => {
     const s = row({ name: "Novorapid", quantity: 2400, category: "insulin_short" });
-    expect(formatCarerSupplyQuantity(s, null)).toBe("24 pens");
+    expect(formatCarerSupplyQuantity(s, null)).toBe("8 pens");
   });
 });

@@ -17,6 +17,7 @@ import {
 import { format, startOfDay } from "date-fns";
 
 import { isPumpDeliveryMethod } from "./insulin-delivery-method";
+import { UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "./insulin-pen-units";
 import { getEffectiveTdd, hasConfiguredTdd } from "./tdd";
 import appPkg from "../../package.json";
 
@@ -659,7 +660,7 @@ export interface HypoTreatment {
 type SupplyPackDefaultDef = { increment: number; label: string; settingsKey?: keyof UserSettings };
 
 /** Disposable pen fill and pen needle box — common UK pack sizes (units / count per pack). */
-export const UK_DEFAULT_UNITS_PER_INSULIN_PEN = 100;
+export { UK_DEFAULT_UNITS_PER_INSULIN_PEN } from "./insulin-pen-units";
 export const UK_DEFAULT_NEEDLES_PER_BOX = 100;
 
 export const SUPPLY_PACK_DEFAULTS: Record<SupplyType, SupplyPackDefaultDef> = {

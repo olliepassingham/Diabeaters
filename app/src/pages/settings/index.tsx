@@ -14,6 +14,7 @@ import {
   UK_DEFAULT_NEEDLES_PER_BOX,
   UK_DEFAULT_UNITS_PER_INSULIN_PEN,
 } from "@/lib/storage";
+import { INSULIN_PEN_UNITS_PER_PEN_INFO_LINES } from "@/lib/insulin-pen-units";
 import {
   Syringe,
   Activity,
@@ -916,7 +917,16 @@ function UsageTab({
             ) : (
               <>
                 <div className="space-y-1.5">
-                  <FieldLabelWithInfo htmlFor="units-per-pen" info={<p>Units in one disposable pen.</p>}>
+                  <FieldLabelWithInfo
+                    htmlFor="units-per-pen"
+                    info={
+                      <div className="space-y-2">
+                        {INSULIN_PEN_UNITS_PER_PEN_INFO_LINES.map((line) => (
+                          <p key={line}>{line}</p>
+                        ))}
+                      </div>
+                    }
+                  >
                     Units per Insulin Pen
                   </FieldLabelWithInfo>
                   <Input
