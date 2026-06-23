@@ -18,7 +18,7 @@ function androidChannel(): { channelId?: string } {
 }
 
 export async function rescheduleBedtimeReminders(
-  options?: { hasCarerLink?: boolean },
+  options?: { hasCarerLink?: boolean; cloudCommunityProfile?: boolean },
 ): Promise<void> {
   if (!supportsNativeLocalNotifications()) return;
 
@@ -26,7 +26,10 @@ export async function rescheduleBedtimeReminders(
   const time = settings.bedtimeReminderTime || DEFAULT_BEDTIME_REMINDER_TIME;
 
   if (
-    !shouldReceiveBedtimeCheckReminders({ hasCarerLink: options?.hasCarerLink }) ||
+    !shouldReceiveBedtimeCheckReminders({
+      hasCarerLink: options?.hasCarerLink,
+      cloudCommunityProfile: options?.cloudCommunityProfile,
+    }) ||
     !settings.enabled ||
     settings.bedtimeCheckReminders === false
   ) {

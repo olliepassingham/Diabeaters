@@ -38,7 +38,7 @@ function saveSentKeys(keys: Set<string>) {
 /** In-app (+ optional iOS banner) reminder once per evening after the chosen time. */
 export async function ensureBedtimeInAppRemindersForUser(
   userId: string,
-  options?: { hasCarerLink?: boolean },
+  options?: { hasCarerLink?: boolean; cloudCommunityProfile?: boolean },
 ): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -47,7 +47,13 @@ export async function ensureBedtimeInAppRemindersForUser(
   const sessionUid = sessionData.session?.user?.id;
   if (!sessionUid || sessionUid !== userId) return;
 
-  if (!shouldReceiveBedtimeCheckReminders({ hasCarerLink: options?.hasCarerLink })) return;
+  if (
+    !shouldReceiveBedtimeCheckReminders({
+      hasCarerLink: options?.hasCarerLink,
+      cloudCommunityProfile: options?.cloudCommunityProfile,
+    })
+  )
+    return;
 
   const settings = storage.getNotificationSettings();
   if (!settings.enabled || settings.bedtimeCheckReminders === false) return;

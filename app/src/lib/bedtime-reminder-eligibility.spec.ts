@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  clearActiveAppMode,
   cacheCloudPrimaryAppRole,
+  clearActiveAppMode,
   clearCarerClientSessionKeys,
   setActiveAppMode,
   setOnboardingAccountPath,
@@ -64,5 +64,28 @@ describe("shouldReceiveBedtimeCheckReminders", () => {
     setPrimaryAppRole("patient");
     storage.saveProfile({ accountType: "community" });
     expect(shouldReceiveBedtimeCheckReminders()).toBe(false);
+  });
+
+  it("blocks when active mode is community even with patient onboarding path", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    setActiveAppMode("community");
+    expect(shouldReceiveBedtimeCheckReminders()).toBe(false);
+  });
+
+  it("blocks when cloud profile is community", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    expect(shouldReceiveBedtimeCheckReminders({ cloudCommunityProfile: true })).toBe(false);
+  });
+
+  it("blocks ambiguous sessions without a clear User Mode marker", () => {
+    expect(shouldReceiveBedtimeCheckReminders()).toBe(false);
+  });
+
+  it("allows patient path when session mode is unset", () => {
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    expect(shouldReceiveBedtimeCheckReminders()).toBe(true);
   });
 });

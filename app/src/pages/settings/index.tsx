@@ -979,7 +979,10 @@ export default function Settings() {
   const { profile: cloudProfile } = useProfile();
   const [location, setLocation] = useLocation();
   const { hasCarerLink, inSupporterSession } = useSupporterSession();
-  const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({ hasCarerLink });
+  const showBedtimeCheckReminders = shouldReceiveBedtimeCheckReminders({
+    hasCarerLink,
+    cloudCommunityProfile: cloudProfile?.account_type === "community",
+  });
   const pathOnly = (location.split("?")[0] ?? "/settings").replace(/\/$/, "") || "/settings";
   const skipSettingsHashScrollRef = useRef(false);
 
@@ -1664,7 +1667,10 @@ export default function Settings() {
       }
     }
     if (key === "bedtimeCheckReminders" || key === "enabled") {
-      void rescheduleBedtimeReminders({ hasCarerLink });
+      void rescheduleBedtimeReminders({
+        hasCarerLink,
+        cloudCommunityProfile: cloudProfile?.account_type === "community",
+      });
     }
     if (key === "pumpChangeReminders" || key === "enabled") {
       void reschedulePumpChangeReminders();
@@ -1676,7 +1682,10 @@ export default function Settings() {
     setNotifSettings(updated);
     storage.saveNotificationSettings(updated);
     void syncNotificationPreferences(updated);
-    void rescheduleBedtimeReminders({ hasCarerLink });
+    void rescheduleBedtimeReminders({
+      hasCarerLink,
+      cloudCommunityProfile: cloudProfile?.account_type === "community",
+    });
   };
 
   const handleNotifThreshold = (key: "criticalThresholdDays" | "lowThresholdDays", value: string) => {

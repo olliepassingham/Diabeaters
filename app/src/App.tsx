@@ -75,7 +75,7 @@ import {
   invalidateLinkedPatientQuery,
   useLinkedPatientQuery,
 } from "@/lib/carer-link-query";
-import { getProfile, profileQueryKey } from "@/lib/profile";
+import { getProfile, profileQueryKey, useProfile } from "@/lib/profile";
 import { scheduleDemoRoutePrefetch } from "@/lib/demo-route-prefetch";
 import {
   isPatientOnboardingSatisfied,
@@ -1133,6 +1133,7 @@ function UnverifiedAccountShell({
 function AuthenticatedShell() {
   const [location, setLocation] = useLocation();
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { toast } = useToast();
   const { isCarer: hasCarerLink } = useLinkedCarer();
   const pathOnly = location.split("?")[0] ?? location;
@@ -1196,8 +1197,11 @@ function AuthenticatedShell() {
       void cancelAllBedtimeReminders();
       return;
     }
-    void rescheduleBedtimeReminders({ hasCarerLink });
-  }, [suppressClinicalPollers, hasCarerLink]);
+    void rescheduleBedtimeReminders({
+      hasCarerLink,
+      cloudCommunityProfile: profile?.account_type === "community",
+    });
+  }, [suppressClinicalPollers, hasCarerLink, activeMode, profile?.account_type]);
 
   useEffect(() => {
     if (suppressClinicalPollers) return;
