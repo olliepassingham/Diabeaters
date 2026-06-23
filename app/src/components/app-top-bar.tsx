@@ -143,13 +143,12 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
       ? pathOnly === "/community"
       : pathOnly === "/";
 
-  const modeLabel = isCarer ? "Supporter" : isCommunityMode ? "Community" : null;
+  const modeLabel = isCarer ? "Supporter" : isCommunityMode ? "Community" : "User";
 
   return (
     <header
       className={cn(
-        "surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
-        modeLabel && "pb-2",
+        "surface-chrome sticky top-0 z-50 flex min-h-14 items-center border-b border-border/40 px-4 pb-2 pt-[env(safe-area-inset-top)] [padding-left:max(1rem,env(safe-area-inset-left))] [padding-right:max(1rem,env(safe-area-inset-right))]",
       )}
     >
       <div className="relative flex w-full min-w-0 items-center">
@@ -178,14 +177,12 @@ export function AppTopBar({ isCarer, isCommunityMode = false, pathOnly, onBrandC
           </button>
         </div>
 
-        {modeLabel ? (
-          <span
-            className="pointer-events-none absolute left-1/2 top-[calc(50%+1.375rem)] -translate-x-1/2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
-            data-testid="header-mode-chip"
-          >
-            {modeLabel}
-          </span>
-        ) : null}
+        <span
+          className="pointer-events-none absolute left-1/2 top-[calc(50%+1.375rem)] -translate-x-1/2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary"
+          data-testid="header-mode-chip"
+        >
+          {modeLabel}
+        </span>
 
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
           {isCommunityEnabled && <MessagesInboxNavButton />}
