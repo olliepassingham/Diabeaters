@@ -1,4 +1,4 @@
-import { Home, MessageCircle, Shapes, Users, Wrench, User } from "lucide-react";
+import { Home, MessageCircle, Shapes, Sparkles, Users, Wrench, User } from "lucide-react";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { AI_ASSISTANT_NAME } from "@/lib/ai-coach/persona";
 import { useLocation } from "wouter";
@@ -185,7 +185,7 @@ function communityMemberTabs(showFeedTab: boolean, showMessagesTab: boolean): Ta
     tabs.push({
       title: AI_ASSISTANT_NAME,
       href: "/coach",
-      icon: MessageCircle,
+      icon: Sparkles,
       testId: "bottomnav-coach",
       isActive: (pathname) => pathname === "/coach",
     });

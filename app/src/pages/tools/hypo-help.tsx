@@ -364,18 +364,6 @@ export default function HypoHelpPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {weightRequired && (
-            <Alert data-testid="alert-hypo-minor-weight">
-              <AlertDescription className="text-sm">
-                Add your real weight in{" "}
-                <Link href="/settings#settings-personal" className="font-medium text-primary underline-offset-4 hover:underline">
-                  Settings
-                </Link>{" "}
-                or below — we won&apos;t guess an adult default.
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="current-bg" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Current BG ({bgUnits})
@@ -444,6 +432,11 @@ export default function HypoHelpPage() {
               <Label htmlFor="user-weight" className="text-xs text-muted-foreground">
                 Weight {weightRequired ? "(required)" : "(optional)"}
               </Label>
+              {weightRequired ? (
+                <p className="text-[11px] leading-snug text-muted-foreground" data-testid="text-hypo-weight-required-hint">
+                  Enter your weight here — we won&apos;t guess an adult default.
+                </p>
+              ) : null}
               {showingProfileWeight ? (
                 <div
                   className="flex min-h-11 items-center justify-between gap-2 rounded-xl border border-border/50 bg-muted/20 px-3"
