@@ -18,6 +18,7 @@ import {
   resolvesAsCommunityMemberAccount,
   shouldUseCommunityMemberSession,
 } from "@/lib/community-member-session";
+import { isPatientUpgradeOnboarding } from "@/lib/patient-upgrade-onboarding";
 import { reconcileWrongWelcomePathForSignedInUser } from "@/lib/welcome-path-reconcile";
 
 type PatientOnboardingGateProps = {
@@ -39,6 +40,16 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
         setLocation("/welcome");
         return;
       }
+
+      const upgradeWizard = isPatientUpgradeOnboarding(
+        typeof window !== "undefined" ? window.location.search : "",
+      );
+      if (upgradeWizard) {
+        setShowWizard(true);
+        setReady(true);
+        return;
+      }
+
       const accountPath = getOnboardingAccountPath();
       const shouldSkipPatientOnboardingForCarerFlow =
         accountPath !== "both" && (isCarer || hasCarerIntent() || hasPendingCarer());
@@ -74,13 +85,6 @@ export function PatientOnboardingGate({ onPatientComplete }: PatientOnboardingGa
       if (cancelled) return;
       if (wrongPath.reconciled && wrongPath.destination) {
         setLocation(wrongPath.destination);
-        return;
-      }
-
-      const upgradeWizard = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("upgrade") === "1";
-      if (upgradeWizard) {
-        setShowWizard(true);
-        setReady(true);
         return;
       }
 

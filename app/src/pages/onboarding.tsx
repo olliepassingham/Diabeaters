@@ -27,7 +27,7 @@ import { recordOnboardingFinishedAt, storage } from "@/lib/storage";
 import { parseInputToGramsPerUnit, formatRatioForStorage } from "@/lib/ratio-utils";
 import { FieldLabelWithInfo, InlineInfoHint, StaticLabelWithInfo } from "@/components/ui/field-label-with-info";
 import { Disclaimer } from "@/components/disclaimer";
-import { Link, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { upsertProfile } from "@/lib/profile";
@@ -50,6 +50,7 @@ import {
 } from "@/lib/onboarding-routes";
 import {
   clearOnboardingAccountPath,
+  clearPersistedCommunityAccount,
   getOnboardingAccountPath,
   setActiveAppMode,
   setOnboardingAccountPath,
@@ -295,6 +296,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const search = useSearch();
+  const [, setLocation] = useLocation();
   const upgradeFlow = useMemo(() => new URLSearchParams(search).get("upgrade") === "1", [search]);
   const accountPath = useMemo(() => getOnboardingAccountPath(), []);
   const showBothPath = accountPath === "both";
@@ -470,6 +472,10 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     const stepIndex = steps.indexOf(currentStep);
     if (stepIndex > 0) {
       setCurrentStep(steps[stepIndex - 1]);
+      return;
+    }
+    if (upgradeFlow) {
+      setLocation("/settings");
     }
   };
 
@@ -572,6 +578,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     }
     if (upgradeFlow) {
       setActiveAppMode("patient");
+      clearPersistedCommunityAccount();
       clearOnboardingAccountPath();
       setOnboardingAccountPath("patient");
     }
