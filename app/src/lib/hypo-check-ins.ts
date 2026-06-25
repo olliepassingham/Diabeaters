@@ -9,7 +9,10 @@ import { logEdgeInvokeFailure } from "./dev-log";
 import { notifyInAppNotificationsChanged } from "./in-app-notifications-events";
 import { getSupabase } from "./supabase";
 
-export type HypoCheckInStatus = "pending" | "ok" | "treating" | "hypo_logged";
+export type HypoCheckInStatus = "pending" | "ok" | "treating" | "hypo_logged" | "expired";
+
+/** Pending check-ins expire server-side after this many minutes without a reply. */
+export const HYPO_CHECK_IN_PENDING_MINUTES = 30;
 
 export type HypoCheckInRow = {
   id: string;
@@ -66,6 +69,8 @@ export function formatHypoCheckInStatusLabel(status: HypoCheckInStatus): string 
       return "They're treating it";
     case "hypo_logged":
       return "They logged a hypo";
+    case "expired":
+      return "No reply (timed out)";
     default:
       return status;
   }
@@ -85,6 +90,9 @@ export function consumePendingHypoCheckInForLog(): string | null {
 
 export function friendlyCreateCheckInError(message: string): string {
   const m = message.toLowerCase();
+  if (m.includes("check_in_expired")) {
+    return `This check-in has timed out after ${HYPO_CHECK_IN_PENDING_MINUTES} minutes.`;
+  }
   if (m.includes("pending_exists")) {
     return "You already have a check-in waiting for a reply.";
   }

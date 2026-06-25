@@ -21,11 +21,13 @@ describe("hypo-check-ins", () => {
     expect(formatHypoCheckInStatusLabel("pending")).toBe("Waiting for reply");
     expect(formatHypoCheckInStatusLabel("ok")).toBe("They replied they're OK");
     expect(formatHypoCheckInStatusLabel("hypo_logged")).toBe("They logged a hypo");
+    expect(formatHypoCheckInStatusLabel("expired")).toBe("No reply (timed out)");
   });
 
   it("maps create errors to friendly copy", () => {
     expect(friendlyCreateCheckInError("rate_limited")).toContain("15 minutes");
     expect(friendlyCreateCheckInError("pending_exists")).toContain("waiting");
+    expect(friendlyCreateCheckInError("check_in_expired")).toContain("30 minutes");
     expect(friendlyCreateCheckInError("Could not find the function public.create_hypo_check_in")).toContain(
       "not set up on the server",
     );

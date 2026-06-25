@@ -33,7 +33,7 @@ export function SupporterHypoCheckInButton({
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 30_000);
+    const id = window.setInterval(() => void refresh(), 15_000);
     return () => window.clearInterval(id);
   }, [refresh]);
 
