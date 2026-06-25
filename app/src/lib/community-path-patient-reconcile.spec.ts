@@ -69,6 +69,19 @@ describe("community-path-patient-reconcile", () => {
         primary_app_role: "community",
       }),
     ).toBe(false);
+    expect(
+      profileIndicatesExistingPatientAccount({
+        id: "u3",
+        full_name: "Sup",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: "patient",
+        primary_app_role: "carer",
+      }),
+    ).toBe(false);
   });
 
   it("reconciles community welcome with an existing patient profile", async () => {

@@ -4,6 +4,9 @@
 
 export type BedtimeReadinessLevel = "steady" | "monitor" | "alert";
 export type BedtimeBgTrend = "rising" | "steady" | "falling" | "not_sure";
+export type OvernightUsualTrend = "rise" | "steady" | "fall" | "not_sure";
+
+export const BEDTIME_OVERNIGHT_TREND_STORAGE_KEY = "diabeater_bedtime_overnight_usual_trend";
 
 export interface BedtimePersonalizedCopyInput {
   level: BedtimeReadinessLevel;
@@ -34,6 +37,7 @@ export interface BedtimePersonalizedCopyInput {
   travelTimezoneShift?: number | null;
   mdiBasalForBed: "morning" | "evening" | null;
   basalClockSummary: string | null;
+  overnightUsualTrend: OvernightUsualTrend;
 }
 
 export interface BedtimeBgGlance {
@@ -94,8 +98,73 @@ export function buildBedtimeBgGlance(ctx: BedtimePersonalizedCopyInput): Bedtime
   return { display: ctx.bgDisplay, trendLabel, rangeLabel };
 }
 
+export function isBedtimeBgAboveTarget(bgMmol: number, targetHighMmol: number): boolean {
+  return bgMmol > targetHighMmol;
+}
+
+export function isBedtimeBgWellAboveTarget(bgMmol: number, targetHighMmol: number): boolean {
+  return bgMmol > targetHighMmol + 2;
+}
+
+/** True when overnight rise is plausible from trend, pattern, or morning MDI. */
+export function isOvernightRiseLikely(ctx: {
+  bgMmol: number;
+  targetHighMmol: number;
+  bgTrend: BedtimeBgTrend;
+  overnightUsualTrend: OvernightUsualTrend;
+  mdiBasalForBed: "morning" | "evening" | null;
+  isPumpUser: boolean;
+}): boolean {
+  const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+  if (ctx.overnightUsualTrend === "rise") return true;
+  if (ctx.bgTrend === "rising" && aboveTarget) return true;
+  if (!ctx.isPumpUser && ctx.mdiBasalForBed === "morning" && ctx.bgTrend !== "falling") return true;
+  return false;
+}
+
+/**
+ * Factor counts are a base; this applies bedtime-specific floors and combos
+ * (e.g. above-target BG should not read as fully "ready").
+ */
+export function resolveBedtimeReadinessLevel(input: {
+  concernCount: number;
+  cautionCount: number;
+  bgMmol: number;
+  targetHighMmol: number;
+  bgTrend: BedtimeBgTrend;
+  mdiBasalForBed: "morning" | "evening" | null;
+  overnightUsualTrend: OvernightUsualTrend;
+  isPumpUser: boolean;
+}): BedtimeReadinessLevel {
+  let level: BedtimeReadinessLevel;
+  if (input.concernCount >= 2 || (input.concernCount >= 1 && input.cautionCount >= 2)) {
+    level = "alert";
+  } else if (input.cautionCount >= 2 || input.concernCount >= 1) {
+    level = "monitor";
+  } else {
+    level = "steady";
+  }
+
+  const aboveTarget = isBedtimeBgAboveTarget(input.bgMmol, input.targetHighMmol);
+  const wellAbove = isBedtimeBgWellAboveTarget(input.bgMmol, input.targetHighMmol);
+  const riseLikely = isOvernightRiseLikely(input);
+
+  if (aboveTarget && level === "steady") level = "monitor";
+  if (wellAbove && riseLikely && level === "monitor") level = "alert";
+  if (aboveTarget && riseLikely && level === "steady") level = "monitor";
+
+  return level;
+}
+
 function buildHeadline(ctx: BedtimePersonalizedCopyInput): string {
+  const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+  const wellAbove = isBedtimeBgWellAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+  const riseLikely = isOvernightRiseLikely(ctx);
+
   if (ctx.level === "alert") {
+    if (aboveTarget && riseLikely) {
+      return "Glucose is above target and may climb further overnight — plan before sleep.";
+    }
     if (ctx.bgMmol >= ctx.targetLowMmol && ctx.bgMmol <= ctx.targetHighMmol) {
       return "Glucose looks fine now, but overnight risk is elevated from what you shared.";
     }
@@ -105,6 +174,12 @@ function buildHeadline(ctx: BedtimePersonalizedCopyInput): string {
     return "Several overnight risks are in play — extra caution is sensible tonight.";
   }
   if (ctx.level === "monitor") {
+    if (aboveTarget && riseLikely) {
+      return "Above target now, with signs you may drift higher overnight.";
+    }
+    if (aboveTarget) {
+      return "Above your target range — worth a plan before you sleep.";
+    }
     if (ctx.recentHypos && ctx.concernCount === 1 && ctx.cautionCount === 0) {
       return "A recent hypo warrants caution overnight, even with glucose in range now.";
     }
@@ -121,6 +196,18 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
   const lines: string[] = [];
 
   if (ctx.level === "alert") {
+    const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+    if (aboveTarget) {
+      pushUnique(lines, "Glucose is above target — consider whether a cautious bedtime correction fits your plan.");
+      if (isOvernightRiseLikely(ctx)) {
+        pushUnique(
+          lines,
+          ctx.mdiBasalForBed === "morning" && !ctx.isPumpUser
+            ? "Morning long-acting may leave less overnight coverage — many people on MDI correct before bed when levels are already high."
+            : "Levels may keep rising overnight — a recheck before sleep is sensible.",
+        );
+      }
+    }
     if (ctx.recentHypos && ctx.exercisedToday) {
       pushUnique(lines, "Exercise and a recent hypo both raise the chance of lows overnight.");
     } else if (ctx.recentHypos) {
@@ -153,6 +240,29 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
   }
 
   if (ctx.level === "monitor") {
+    const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+    const riseLikely = isOvernightRiseLikely(ctx);
+
+    if (aboveTarget) {
+      pushUnique(
+        lines,
+        "You are above target before sleep — staying in range overnight usually needs a plan, not waiting it out.",
+      );
+      if (riseLikely) {
+        pushUnique(
+          lines,
+          ctx.mdiBasalForBed === "morning" && !ctx.isPumpUser
+            ? "Morning long-acting can mean less coverage overnight for many people on MDI — a cautious correction may fit your plan."
+            : "Your trend or usual overnight pattern suggests levels may climb — recheck before sleep.",
+        );
+      } else {
+        pushUnique(lines, "If you usually correct at bedtime, use your care team's approach — we show a cautious estimate when your settings allow.");
+      }
+      if (ctx.bgTrend === "rising") {
+        pushUnique(lines, "Glucose is still rising — a recheck in 30–60 minutes can confirm the direction.");
+      }
+    }
+
     if (ctx.recentHypos) {
       pushUnique(lines, "Keep hypo treatment within reach — a recent hypo increases overnight risk.");
     }
@@ -179,13 +289,18 @@ function buildGuidance(ctx: BedtimePersonalizedCopyInput): string[] {
     }
     if (lines.length === 0) {
       pushUnique(lines, "Stay mindful overnight and follow your usual plan if you feel unwell.");
-    } else {
+    } else if (!aboveTarget) {
       pushUnique(lines, "Follow your care plan if you feel low — this is guidance, not dosing advice.");
     }
     return lines.slice(0, 4);
   }
 
-  pushUnique(lines, "Nothing major flagged from this check — trust how you feel.");
+  const aboveTarget = isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol);
+  if (aboveTarget) {
+    pushUnique(lines, "Glucose is above target — this check would normally flag a bedtime plan.");
+  } else {
+    pushUnique(lines, "Nothing major flagged from this check — trust how you feel.");
+  }
   if (ctx.bgTrend === "rising") {
     pushUnique(lines, "Glucose is rising — a quick recheck before sleep is sensible.");
   }
@@ -269,7 +384,9 @@ export function buildBedtimePersonalizedCopy(ctx: BedtimePersonalizedCopyInput):
     ctx.level === "alert"
       ? "Extra attention overnight"
       : ctx.level === "monitor"
-        ? "Worth keeping an eye on"
+        ? isBedtimeBgAboveTarget(ctx.bgMmol, ctx.targetHighMmol)
+          ? "Above target before bed"
+          : "Worth keeping an eye on"
         : "Looking good for sleep";
 
   return {

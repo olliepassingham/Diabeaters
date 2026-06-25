@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { Moon, Utensils, Syringe, Activity, Wine, CheckCircle2, AlertCircle, AlertTriangle, Sparkles, Plane, Thermometer, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { BedtimeReminderPromptDialog } from "@/components/bedtime-reminder-prompt-dialog";
@@ -16,12 +16,12 @@ import { shouldOfferBedtimeReminderSecondChance } from "@/lib/bedtime-reminder-p
 import { rescheduleBedtimeReminders } from "@/lib/bedtime-reminders";
 import { storage, UserSettings, ScenarioState, BedtimeLog, DIABEATER_PROFILE_CHANGED_EVENT, type UserProfile } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { PumpDosingBanner } from "@/components/pump-dosing-banner";
 import { InfoTooltip, DIABETES_TERMS } from "@/components/info-tooltip";
 import { FieldLabelWithInfo, InlineInfoHint } from "@/components/ui/field-label-with-info";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { PageBackButton, PageHeader, PageShell } from "@/components/layout";
+import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { ScenarioCoachLink } from "@/components/ai-coach/ScenarioCoachLink";
 import { BedtimeCorrectionPanel } from "@/components/scenarios/bedtime-correction-panel";
 import { MedicalSourcesLink } from "@/components/medical-sources-link";
@@ -31,6 +31,9 @@ import {
   buildBedtimePersonalizedCopy,
   formatBedtimeBgDisplay,
   hoursSinceSelectPhrase,
+  resolveBedtimeReadinessLevel,
+  BEDTIME_OVERNIGHT_TREND_STORAGE_KEY,
+  type OvernightUsualTrend,
 } from "@/lib/bedtime-readiness";
 import {
   getMdiBedtimePostExerciseLine,
@@ -68,6 +71,9 @@ interface ReadinessResult {
   tips: string[];
   factors: { label: string; status: "good" | "caution" | "concern"; note: string; detail?: string }[];
   correction: CorrectionSuggestion | null;
+  /** True when BG is above target but no correction dose could be calculated (e.g. missing ISF). */
+  correctionUnavailable: boolean;
+  bgAboveTarget: boolean;
   snack: { grams: number; reason: string } | null;
 }
 
@@ -122,6 +128,8 @@ const BEDTIME_SECTION_INFO = {
   foodInsulin:
     "How long since you ate and took rapid insulin helps estimate food still digesting and insulin still working overnight.",
   sleep: "If bed is still a while away, we may suggest rechecking closer to sleep — glucose can change.",
+  overnightPattern:
+    "Your usual pattern while asleep — we combine this with tonight's reading and, on MDI, when you take long-acting insulin.",
   extras: "Optional switches that shape your summary and are included when you check bedtime.",
   exercise: "Workouts can raise hypo risk for many hours overnight.",
   alcohol: "Alcohol can delay lows — we weigh this more heavily than hypos alone.",
@@ -148,6 +156,15 @@ export default function Bedtime() {
   const [mealCarbs, setMealCarbs] = useState("");
   const [hoursSinceInsulin, setHoursSinceInsulin] = useState("");
   const [hoursUntilSleep, setHoursUntilSleep] = useState("");
+  const [overnightUsualTrend, setOvernightUsualTrend] = useState<OvernightUsualTrend>(() => {
+    try {
+      const saved = localStorage.getItem(BEDTIME_OVERNIGHT_TREND_STORAGE_KEY);
+      if (saved === "rise" || saved === "steady" || saved === "fall" || saved === "not_sure") return saved;
+    } catch {
+      // ignore
+    }
+    return "not_sure";
+  });
   const [exercisedToday, setExercisedToday] = useState(false);
   const [lastExerciseLabel, setLastExerciseLabel] = useState<string | null>(null);
   const [hadAlcohol, setHadAlcohol] = useState(false);
@@ -157,7 +174,6 @@ export default function Bedtime() {
   const [scenarioState, setScenarioState] = useState<ScenarioState>({ travelModeActive: false, sickDayActive: false });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [aboutCheckOpen, setAboutCheckOpen] = useState(false);
   const [bedtimeLogs, setBedtimeLogs] = useState<BedtimeLog[]>([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [quickCheckOpen, setQuickCheckOpen] = useState(true);
@@ -371,12 +387,16 @@ export default function Bedtime() {
       });
       cautionCount++;
     } else if (bgTrend === "rising") {
+      const aboveTarget = bgMmol > targetHighMmol;
       factors.push({
         label: "Trend",
-        status: "good",
+        status: aboveTarget ? "caution" : "good",
         note: "Rising",
-        detail: "Worth rechecking before you fully settle.",
+        detail: aboveTarget
+          ? "Already above target and still rising — overnight levels may climb further."
+          : "Worth rechecking before you fully settle.",
       });
+      if (aboveTarget) cautionCount++;
     } else if (bgTrend === "not_sure") {
       factors.push({
         label: "Trend",
@@ -603,14 +623,43 @@ export default function Bedtime() {
       });
     }
 
-    let level: ReadinessLevel;
-    if (concernCount >= 2 || (concernCount >= 1 && cautionCount >= 2)) {
-      level = "alert";
-    } else if (cautionCount >= 2 || concernCount >= 1) {
-      level = "monitor";
-    } else {
-      level = "steady";
+    if (overnightUsualTrend !== "not_sure") {
+      const overnightLabel =
+        overnightUsualTrend === "rise"
+          ? "Usually rise overnight"
+          : overnightUsualTrend === "fall"
+            ? "Usually fall overnight"
+            : "Usually stay similar overnight";
+      const overnightStatus =
+        overnightUsualTrend === "rise" && bgMmol > targetHighMmol
+          ? "caution"
+          : overnightUsualTrend === "fall" && bgMmol < targetLowMmol + 1
+            ? "caution"
+            : "good";
+      factors.push({
+        label: "Your overnight pattern",
+        status: overnightStatus,
+        note: overnightLabel,
+        detail:
+          overnightUsualTrend === "rise"
+            ? "We weigh this when judging whether tonight may drift higher."
+            : overnightUsualTrend === "fall"
+              ? "We weigh this when judging hypo risk overnight."
+              : "Helps us judge whether tonight is likely to match your usual steady nights.",
+      });
+      if (overnightStatus === "caution") cautionCount++;
     }
+
+    let level = resolveBedtimeReadinessLevel({
+      concernCount,
+      cautionCount,
+      bgMmol,
+      targetHighMmol,
+      bgTrend,
+      mdiBasalForBed,
+      overnightUsualTrend,
+      isPumpUser,
+    });
 
     const concernLabels = factors.filter((f) => f.status === "concern").map((f) => f.label);
     const cautionLabels = factors.filter((f) => f.status === "caution").map((f) => f.label);
@@ -644,6 +693,7 @@ export default function Bedtime() {
       travelTimezoneShift: scenarioState.travelTimezoneShift,
       mdiBasalForBed,
       basalClockSummary: basalClockSummary,
+      overnightUsualTrend,
     });
 
     const tips = [...personalized.tips];
@@ -680,6 +730,8 @@ export default function Bedtime() {
     }
 
     const correction = calculateCorrectionDose(bgMmol, targetHighMmol, insulinHoursForIOB);
+    const correctionUnavailable = bgMmol > targetHighMmol && correction == null;
+    const bgAboveTarget = bgMmol > targetHighMmol;
     const messageBullets = personalized.messageBullets;
     const message = messageBullets.join(" ");
 
@@ -694,8 +746,15 @@ export default function Bedtime() {
       tips,
       factors,
       correction,
+      correctionUnavailable,
+      bgAboveTarget,
       snack: personalized.snack,
     });
+    try {
+      localStorage.setItem(BEDTIME_OVERNIGHT_TREND_STORAGE_KEY, overnightUsualTrend);
+    } catch {
+      // ignore
+    }
     persistBedtimeCheck(level, correction?.suggestedDose ?? null);
     setDetailsOpen(false);
     setQuickCheckOpen(false);
@@ -776,8 +835,14 @@ export default function Bedtime() {
 
   const canCalculate = currentBg && !isNaN(parseFloat(currentBg));
 
-  const verdictLabel = (level: ReadinessLevel) =>
-    level === "steady" ? "Ready" : level === "monitor" ? "Caution" : "Needs attention";
+  const verdictLabel = (level: ReadinessLevel, aboveTarget?: boolean) =>
+    level === "steady"
+      ? "Ready"
+      : level === "monitor"
+        ? aboveTarget
+          ? "Plan"
+          : "Caution"
+        : "Needs attention";
 
   const getRecentLogs = () => {
     const fourteenDaysAgo = new Date();
@@ -825,10 +890,40 @@ export default function Bedtime() {
       <PageHeader
         leading={<PageBackButton />}
         title="Bedtime"
-        actions={<ScenarioCoachLink topic="bedtime" />}
+        actions={
+          <>
+            <ScenarioCoachLink topic="bedtime" />
+            <PageInfoDialog title="About this check" description="Overnight glucose awareness — not medical advice">
+              <InfoSection title="What this does">
+                <p>
+                  This tool looks at common factors that affect overnight glucose stability. It is designed to help you
+                  build awareness and confidence, not to replace your own judgement or medical advice.
+                </p>
+              </InfoSection>
+              <InfoSection title="Your patterns">
+                <p>
+                  Everyone&apos;s diabetes is different. Over time, you&apos;ll learn which factors matter most for your
+                  own steady nights.
+                </p>
+              </InfoSection>
+              {isPumpUser ? (
+                <InfoSection title="Pump users">
+                  <p>
+                    Program boluses on your pump and check IOB before any correction. Any dose numbers are planning aids
+                    only — follow your pump and care team.
+                  </p>
+                </InfoSection>
+              ) : null}
+              <InfoSection title="Not medical advice">
+                <p className="text-xs italic" data-testid="text-bedtime-disclaimer">
+                  Educational guidance only. Always follow your healthcare team&apos;s guidance for overnight management.
+                </p>
+                <MedicalSourcesLink anchor="insulin" compact />
+              </InfoSection>
+            </PageInfoDialog>
+          </>
+        }
       />
-      {isPumpUser ? <PumpDosingBanner compact /> : null}
-
       {(scenarioState.sickDayActive || scenarioState.travelModeActive) && (
         <div className="flex flex-wrap gap-2" data-testid="container-active-scenarios">
           {scenarioState.sickDayActive && (
@@ -860,14 +955,14 @@ export default function Bedtime() {
                   variant="secondary"
                   className={cn("absolute right-3 top-3 rounded-full font-medium", colors.chip)}
                 >
-                  {verdictLabel(result.level)}
+                  {verdictLabel(result.level, result.bgAboveTarget)}
                 </Badge>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-primary/90">Tonight&apos;s check</p>
                 <p
                   className={cn("mt-1 font-display text-5xl font-bold tracking-tight", colors.title)}
                   data-testid="text-bedtime-verdict"
                 >
-                  {verdictLabel(result.level)}
+                  {verdictLabel(result.level, result.bgAboveTarget)}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">{result.headline}</p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -917,6 +1012,21 @@ export default function Bedtime() {
           isPumpUser={isPumpUser}
           hoursUntilSleep={hoursUntilSleep}
         />
+      ) : null}
+
+      {result?.correctionUnavailable ? (
+        <Card className="rounded-2xl border-amber-500/30 bg-amber-500/[0.06]" data-testid="card-correction-unavailable">
+          <CardContent className="space-y-2 px-4 py-4 text-sm text-foreground/90">
+            <p className="font-medium text-foreground">Above target — correction not calculated</p>
+            <p className="text-muted-foreground">
+              Add your correction factor under Settings → Ratios so we can suggest a cautious bedtime dose, or follow
+              your usual team plan if you correct before sleep.
+            </p>
+            <Button variant="link" size="sm" className="h-auto px-0" asChild>
+              <Link href="/settings/ratios">Open ratios settings</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : null}
 
       {result ? (
@@ -1283,6 +1393,42 @@ export default function Bedtime() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <BedtimeSectionTitle
+                    id="bedtime-section-overnight-pattern"
+                    title="Usually overnight"
+                    info={BEDTIME_SECTION_INFO.overnightPattern}
+                  />
+                  <div
+                    className="flex gap-1 rounded-lg border border-border/60 bg-muted/30 p-0.5"
+                    role="group"
+                    aria-labelledby="bedtime-section-overnight-pattern"
+                  >
+                    {(
+                      [
+                        { value: "rise" as const, label: "Rise" },
+                        { value: "steady" as const, label: "Similar" },
+                        { value: "fall" as const, label: "Fall" },
+                        { value: "not_sure" as const, label: "Unsure" },
+                      ] as const
+                    ).map((opt) => (
+                      <Button
+                        key={opt.value}
+                        type="button"
+                        variant={overnightUsualTrend === opt.value ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "h-9 min-h-0 flex-1 rounded-md px-1 text-xs shadow-none sm:text-sm",
+                          overnightUsualTrend === opt.value ? "" : "text-muted-foreground",
+                        )}
+                        onClick={() => setOvernightUsualTrend(opt.value)}
+                        data-testid={`button-bedtime-overnight-${opt.value}`}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </section>
 
               <Collapsible open={extrasOpen} onOpenChange={setExtrasOpen} className="group rounded-xl border border-border/50">
@@ -1363,37 +1509,6 @@ export default function Bedtime() {
                 <Moon className="mr-2 h-4 w-4" aria-hidden />
                 Check bedtime
               </Button>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      <Collapsible open={aboutCheckOpen} onOpenChange={setAboutCheckOpen}>
-        <Card className="border-border/60 shadow-sm" data-testid="card-bedtime-disclaimer">
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              className="w-full flex items-center justify-between gap-2 p-4 h-auto font-normal hover:bg-muted/50"
-              data-testid="button-toggle-bedtime-about"
-            >
-              <div className="flex items-center gap-2 text-left min-w-0">
-                <Info className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="font-medium text-foreground">About this check</span>
-              </div>
-              {aboutCheckOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0 pb-5 space-y-2 text-sm text-muted-foreground">
-              <p>
-                This tool looks at common factors that affect overnight glucose stability. It is designed to help you build
-                awareness and confidence, not to replace your own judgement or medical advice.
-              </p>
-              <p>Everyone&apos;s diabetes is different. Over time, you&apos;ll learn which factors matter most for your own steady nights.</p>
-              <p className="text-xs italic" data-testid="text-bedtime-disclaimer">
-                [Not medical advice. Always follow your healthcare team&apos;s guidance for overnight management.]
-              </p>
-              <MedicalSourcesLink anchor="insulin" compact />
             </CardContent>
           </CollapsibleContent>
         </Card>

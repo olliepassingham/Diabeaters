@@ -26,10 +26,12 @@ export function restoreDualRolePatientSessionMarkers(): void {
 async function isDualRolePatientSupporter(userId: string): Promise<boolean> {
   const link = await getLinkedPatientForCarer();
   if (!link.data) return false;
+  const { profile } = await getProfile(userId);
+  /** Cloud `carer` is authoritative supporter-only — do not heal back to dual-role patient. */
+  if (cloudPrimaryAppRoleFromProfile(profile) === "carer") return false;
   if (localIndicatesPatientAccount()) return true;
   const path = getOnboardingAccountPath();
   if (path === "patient" || path === "both") return true;
-  const { profile } = await getProfile(userId);
   if (profileIndicatesExistingPatientAccount(profile)) return true;
   if (cloudPrimaryAppRoleFromProfile(profile) === "patient") return true;
   return false;

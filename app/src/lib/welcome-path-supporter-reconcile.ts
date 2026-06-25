@@ -58,11 +58,11 @@ async function indicatesExistingSupporterOnlyAccount(userId: string): Promise<bo
   const [{ profile }, link] = await Promise.all([getProfile(userId), getLinkedPatientForCarer()]);
   const hasCarerLink = Boolean(link.data);
 
+  if (profileIsSupporterOnlyRole(profile)) return true;
+
   if (profileIndicatesExistingPatientAccount(profile) || localIndicatesPatientAccount()) {
     return false;
   }
-
-  if (profileIsSupporterOnlyRole(profile)) return true;
 
   if (
     resolveSupporterOnlyAccount({

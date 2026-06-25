@@ -135,14 +135,18 @@ describe("welcome-path-supporter-reconcile", () => {
     expect(result.reconciled).toBe(false);
   });
 
-  it("does not lock dual-role patients when cloud role was wrongly set to carer", async () => {
+  it("reconciles supporter-only accounts when cloud role is carer even after mistaken patient onboarding", async () => {
     const { setOnboardingAccountPath } = await import("@/lib/carer-session");
     setOnboardingAccountPath("patient");
 
+    getLinkedPatientForCarer.mockResolvedValue({
+      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
+      error: null,
+    });
     getProfile.mockResolvedValue({
       profile: {
         id: "u1",
-        full_name: "Pat",
+        full_name: "Sup",
         avatar_url: null,
         bio: null,
         public_handle: null,
@@ -152,16 +156,14 @@ describe("welcome-path-supporter-reconcile", () => {
         primary_app_role: "carer",
       },
     });
-    getLinkedPatientForCarer.mockResolvedValue({
-      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
-      error: null,
-    });
 
     const { reconcileSupporterWelcomeWithExistingAccount } = await import(
       "@/lib/welcome-path-supporter-reconcile"
     );
 
     const result = await reconcileSupporterWelcomeWithExistingAccount("u1");
-    expect(result.reconciled).toBe(false);
+    expect(result.reconciled).toBe(true);
+    if (!result.reconciled) return;
+    expect(result.destination).toBe("/carer-view");
   });
 });

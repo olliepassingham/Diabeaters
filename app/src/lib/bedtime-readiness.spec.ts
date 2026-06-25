@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBedtimePersonalizedCopy, resolveBedtimeSnack } from "./bedtime-readiness";
+import {
+  buildBedtimePersonalizedCopy,
+  resolveBedtimeSnack,
+  resolveBedtimeReadinessLevel,
+  isOvernightRiseLikely,
+} from "./bedtime-readiness";
 
 const baseCtx = {
   bgDisplay: "7.0 mmol/L",
@@ -28,6 +33,7 @@ const baseCtx = {
   travelModeActive: false,
   mdiBasalForBed: null,
   basalClockSummary: null,
+  overnightUsualTrend: "not_sure" as const,
 };
 
 describe("bedtime-readiness", () => {
@@ -79,5 +85,64 @@ describe("bedtime-readiness", () => {
     const snack = resolveBedtimeSnack({ ...baseCtx, recentHypos: true, bgTrend: "falling" });
     expect(snack?.grams).toBe(5);
     expect(snack?.reason).toBe("Falling trend overnight");
+  });
+
+  it("above-target BG alone is at least monitor, not steady", () => {
+    const level = resolveBedtimeReadinessLevel({
+      concernCount: 0,
+      cautionCount: 0,
+      bgMmol: 12.4,
+      targetHighMmol: 10,
+      bgTrend: "steady",
+      mdiBasalForBed: null,
+      overnightUsualTrend: "not_sure",
+      isPumpUser: false,
+    });
+    expect(level).toBe("monitor");
+  });
+
+  it("morning MDI with well-above BG and stable trend escalates to alert", () => {
+    const level = resolveBedtimeReadinessLevel({
+      concernCount: 0,
+      cautionCount: 1,
+      bgMmol: 12.4,
+      targetHighMmol: 8,
+      bgTrend: "steady",
+      mdiBasalForBed: "morning",
+      overnightUsualTrend: "not_sure",
+      isPumpUser: false,
+    });
+    expect(level).toBe("alert");
+  });
+
+  it("monitor copy for high BG mentions planning before sleep", () => {
+    const copy = buildBedtimePersonalizedCopy({
+      ...baseCtx,
+      level: "monitor",
+      bgMmol: 12.4,
+      bgDisplay: "12.4 mmol/L",
+      targetHighMmol: 10,
+      bgTrend: "steady",
+      mdiBasalForBed: "morning",
+      overnightUsualTrend: "not_sure",
+      cautionCount: 2,
+      cautionLabels: ["Blood glucose", "Long-acting timing"],
+    });
+    expect(copy.headline).toMatch(/above target/i);
+    expect(copy.guidance.some((g) => /plan/i.test(g))).toBe(true);
+    expect(copy.title).toMatch(/above target/i);
+  });
+
+  it("detects overnight rise likelihood from morning MDI", () => {
+    expect(
+      isOvernightRiseLikely({
+        bgMmol: 12,
+        targetHighMmol: 10,
+        bgTrend: "steady",
+        overnightUsualTrend: "not_sure",
+        mdiBasalForBed: "morning",
+        isPumpUser: false,
+      }),
+    ).toBe(true);
   });
 });

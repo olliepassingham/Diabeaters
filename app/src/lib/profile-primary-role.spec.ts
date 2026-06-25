@@ -54,6 +54,18 @@ describe("profile-primary-role", () => {
     ).toBe(true);
   });
 
+  it("resolveSupporterOnlyAccount trusts cloud carer over local patient onboarding markers", async () => {
+    localStorage.setItem("diabeater_onboarding_completed", "true");
+    const { resolveSupporterOnlyAccount } = await import("@/lib/profile-primary-role");
+    expect(
+      resolveSupporterOnlyAccount({
+        profile: supporterProfile({ onboarding_complete: true, account_type: "patient" }),
+        hasCarerLink: true,
+        localIsSupporterOnly: false,
+      }),
+    ).toBe(true);
+  });
+
   it("resolveSupporterOnlyAccount rejects cloud patient role even with a carer link", async () => {
     const { resolveSupporterOnlyAccount } = await import("@/lib/profile-primary-role");
     expect(

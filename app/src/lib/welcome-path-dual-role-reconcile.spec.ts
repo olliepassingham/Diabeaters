@@ -57,4 +57,38 @@ describe("welcome-path-dual-role-reconcile", () => {
     expect(getOnboardingAccountPath()).toBe("both");
     expect(isPersistedSupporterAccount()).toBe(false);
   });
+
+  it("does not heal back to dual-role when cloud role is supporter-only carer", async () => {
+    const { setOnboardingAccountPath, setPrimaryAppRole, markPersistedSupporterAccount } = await import(
+      "@/lib/carer-session"
+    );
+    setOnboardingAccountPath("patient");
+    setPrimaryAppRole("patient");
+    markPersistedSupporterAccount();
+
+    getLinkedPatientForCarer.mockResolvedValue({
+      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
+      error: null,
+    });
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: "Sup",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: "patient",
+        primary_app_role: "carer",
+      },
+    });
+
+    const { healDualRolePatientSessionIfNeeded } = await import("@/lib/welcome-path-dual-role-reconcile");
+    const { getOnboardingAccountPath } = await import("@/lib/carer-session");
+
+    const result = await healDualRolePatientSessionIfNeeded("u1");
+    expect(result.healed).toBe(false);
+    expect(getOnboardingAccountPath()).toBe("patient");
+  });
 });

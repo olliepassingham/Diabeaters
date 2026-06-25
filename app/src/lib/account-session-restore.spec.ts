@@ -101,4 +101,34 @@ describe("account-session-restore", () => {
     expect(getPrimaryAppRole()).toBe("patient");
     expect(getOnboardingAccountPath()).toBe("patient");
   });
+
+  it("restores supporter-only mode when cloud role is carer despite completed patient onboarding", async () => {
+    getLinkedPatientForCarer.mockResolvedValue({
+      data: { linkId: "l1", patientId: "p1", carerId: "u1", scopes: {} },
+      error: null,
+    });
+    getProfile.mockResolvedValue({
+      profile: {
+        id: "u1",
+        full_name: "Sup",
+        avatar_url: null,
+        bio: null,
+        public_handle: null,
+        is_public: false,
+        onboarding_complete: true,
+        account_type: "patient",
+        primary_app_role: "carer",
+      },
+    });
+
+    const { restoreAccountSessionFromCloud } = await import("@/lib/account-session-restore");
+    const { getPrimaryAppRole, getOnboardingAccountPath, getActiveAppMode, isSupporterOnlyAccount } =
+      await import("@/lib/carer-session");
+
+    await restoreAccountSessionFromCloud("u1");
+    expect(getPrimaryAppRole()).toBe("carer");
+    expect(getOnboardingAccountPath()).toBe("supporter");
+    expect(getActiveAppMode()).toBe("carer");
+    expect(isSupporterOnlyAccount()).toBe(true);
+  });
 });

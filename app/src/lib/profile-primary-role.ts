@@ -39,12 +39,12 @@ export function resolveSupporterOnlyAccount(opts: {
   hasCarerLink: boolean;
   localIsSupporterOnly: boolean;
 }): boolean {
-  if (profileIndicatesExistingPatientAccount(opts.profile) || localIndicatesPatientAccount()) {
-    return false;
-  }
   const cloud = cloudPrimaryAppRoleFromProfile(opts.profile);
   if (cloud === "carer") return true;
   if (cloud === "patient" || cloud === "community") return false;
+  if (profileIndicatesExistingPatientAccount(opts.profile) || localIndicatesPatientAccount()) {
+    return false;
+  }
   if (opts.localIsSupporterOnly) return true;
   return inferSupporterOnlyFromLegacySignals(opts.profile, opts.hasCarerLink);
 }

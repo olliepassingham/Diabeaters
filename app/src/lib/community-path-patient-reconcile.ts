@@ -28,6 +28,8 @@ export function isCommunityWelcomePathChosen(): boolean {
 export function profileIndicatesExistingPatientAccount(profile: ProfileRow | null | undefined): boolean {
   if (profile?.account_type === "community") return false;
   if (profile?.primary_app_role === "community") return false;
+  /** Authoritative supporter-only persona — not a Type 1 user account for routing. */
+  if (profile?.primary_app_role === "carer") return false;
   if (profile?.account_type === "patient") return true;
   if (profile?.primary_app_role === "patient" && profile?.onboarding_complete === true) return true;
   if (profile?.onboarding_complete === true) {

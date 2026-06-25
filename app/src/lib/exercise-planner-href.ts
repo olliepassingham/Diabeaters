@@ -62,10 +62,13 @@ export type ExercisePlannerHrefParams = {
   durationMinutes: number;
   intensity: string;
   routineId?: string;
+  exerciseName?: string;
   /** When set, planner hydrates BG from matching active session */
   sync?: "active";
   phase?: ExercisePhase;
-  from?: "widget" | "travel";
+  /** Auto-start guided session on the exercise page */
+  autoStart?: boolean;
+  from?: "widget" | "travel" | "routines";
 };
 
 /**
@@ -77,10 +80,28 @@ export function buildExerciseScenarioPlannerHref(p: ExercisePlannerHrefParams): 
   q.set("duration", String(p.durationMinutes));
   q.set("intensity", p.intensity);
   if (p.routineId) q.set("routineId", p.routineId);
+  if (p.exerciseName) q.set("name", p.exerciseName);
   if (p.sync) q.set("sync", p.sync);
   if (p.phase) q.set("phase", p.phase);
+  if (p.autoStart) q.set("start", "1");
   if (p.from) q.set("from", p.from);
   return `/scenarios/exercise?${q.toString()}`;
+}
+
+/** Deep link to restart a recent workout in guided coach (BG/meal still entered fresh). */
+export function buildExerciseScenarioRepeatHref(
+  session: Pick<ExercisePlannerHrefParams, "exerciseType" | "durationMinutes" | "intensity" | "exerciseName" | "routineId">,
+  options?: { from?: ExercisePlannerHrefParams["from"] },
+): string {
+  return buildExerciseScenarioPlannerHref({
+    exerciseType: session.exerciseType,
+    durationMinutes: session.durationMinutes,
+    intensity: session.intensity,
+    routineId: session.routineId,
+    exerciseName: session.exerciseName,
+    autoStart: true,
+    from: options?.from,
+  });
 }
 
 export function buildExerciseScenarioPlannerHrefFromSession(

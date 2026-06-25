@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearch } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   Activity,
   AlertTriangle,
@@ -49,10 +49,13 @@ import {
   closedLoopExercisePrePrompt,
   pumpTipsForPhase,
 } from "@/lib/exercise-closed-loop";
-import { findLastRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { normalizePlannerExerciseTypeQueryParam } from "@/lib/exercise-planner-href";
+import { applyCoachDefaultsFromLastExercise, startGuidedExerciseSession, type GuidedExerciseStartParams } from "@/lib/exercise-guided-start";
 import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
 import {
   storage,
+  DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT,
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_SETTINGS_CHANGED_EVENT,
   type ActiveExerciseSession,
@@ -84,6 +87,7 @@ import {
   scheduleExercisePreReminders,
 } from "@/lib/exercise-reminders";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
+import { format } from "date-fns";
 import {
   ExerciseFuelPlanSummary,
   ExerciseHypoTreatmentHint,
@@ -187,35 +191,6 @@ function deriveHistoryBias(session: ActiveExerciseSession | null): ExerciseHisto
   };
 }
 
-function applyCoachDefaultsFromLastExercise(session: ActiveExerciseSession): ActiveExerciseSession {
-  const last = storage.getLastExerciseSummary?.();
-  const ctx = last?.context;
-  if (!ctx) return session;
-
-  const updates: Partial<ActiveExerciseSession> = {};
-  if (
-    (!session.preEnvironments || session.preEnvironments.length === 0) &&
-    ctx.environments &&
-    ctx.environments.length > 0
-  ) {
-    updates.preEnvironments = [...ctx.environments];
-  } else if (
-    (!session.preEnvironments || session.preEnvironments.length === 0) &&
-    ctx.environment
-  ) {
-    updates.preEnvironments = [ctx.environment];
-  }
-  if (session.preCompetitive == null && ctx.competitive != null) updates.preCompetitive = ctx.competitive;
-  if (session.preFasted == null && ctx.fasted != null) updates.preFasted = ctx.fasted;
-
-  // If we have a sleep hint from last session and user hasn’t set it for this one yet.
-  if (session.preSleepHours == null && ctx.sleepHoursLastNight != null) updates.preSleepHours = ctx.sleepHoursLastNight;
-
-  // Only write if something is actually missing.
-  if (Object.keys(updates).length === 0) return session;
-  return storage.updateActiveExercise(updates) ?? session;
-}
-
 // ----- Component -----
 
 function scrollToActiveGuidedCoach(): void {
@@ -231,6 +206,8 @@ function scrollToActiveGuidedCoach(): void {
 export function ExerciseGuidedCoach() {
   const { toast } = useToast();
   const search = useSearch();
+  const [, navigate] = useLocation();
+  const autostartHandled = useRef(false);
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
   const [settings, setSettings] = useState<UserSettings>(() => storage.getSettings());
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
@@ -251,22 +228,23 @@ export function ExerciseGuidedCoach() {
   const bgUnits = (profile.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
   const isPump = isPumpDeliveryMethod(profile.insulinDeliveryMethod);
   const closedLoop = usesClosedLoop(settings);
+  const [recentWorkoutsVersion, setRecentWorkoutsVersion] = useState(0);
 
-  const repeatableSession = useMemo(() => {
+  const recentWorkouts = useMemo(() => {
     let outcomes: ReturnType<typeof storage.getExerciseOutcomes> = [];
-    let lastSummary: ReturnType<typeof storage.getLastExerciseSummary> = null;
     try {
       outcomes = storage.getExerciseOutcomes();
     } catch {
       outcomes = [];
     }
-    try {
-      lastSummary = storage.getLastExerciseSummary();
-    } catch {
-      lastSummary = null;
-    }
-    return findLastRepeatableExerciseSession({ outcomes, lastSummary });
-  }, [activeSession, routines.length]);
+    return listRecentRepeatableExerciseSessions({ outcomes, limit: 5 });
+  }, [recentWorkoutsVersion, activeSession]);
+
+  useEffect(() => {
+    const onOutcomes = () => setRecentWorkoutsVersion((v) => v + 1);
+    window.addEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onOutcomes);
+    return () => window.removeEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onOutcomes);
+  }, []);
 
   // ----- Mount: load profile, settings, and listen for session changes -----
   useEffect(() => {
@@ -335,13 +313,74 @@ export function ExerciseGuidedCoach() {
     const duration = params.get("duration");
 
     if (!storage.getActiveExercise()) {
-      if (type && EXERCISE_TYPE_OPTIONS.some((o) => o.value === type)) setStartType(type as ExerciseType);
+      if (type && EXERCISE_TYPE_OPTIONS.some((o) => o.value === (normalizePlannerExerciseTypeQueryParam(type) ?? type))) {
+        setStartType((normalizePlannerExerciseTypeQueryParam(type) ?? type) as ExerciseType);
+      }
       if (intensity && (INTENSITY_OPTIONS as readonly string[]).includes(intensity)) {
         setStartIntensity(intensity as ExerciseIntensity);
       }
       if (duration && /^\d{1,3}$/.test(duration)) setStartDuration(duration);
     }
   }, [search]);
+
+  useEffect(() => {
+    if (activeSession) return;
+
+    const q = search.startsWith("?") ? search.slice(1) : search;
+    const params = new URLSearchParams(q);
+    if (params.get("start") !== "1") {
+      autostartHandled.current = false;
+      return;
+    }
+    if (autostartHandled.current) return;
+
+    const type = normalizePlannerExerciseTypeQueryParam(params.get("type")) ?? params.get("type");
+    const intensity = params.get("intensity");
+    const duration = Number.parseInt(params.get("duration") ?? "", 10);
+    const exerciseName = params.get("name") ?? undefined;
+    const routineId = params.get("routineId") ?? undefined;
+
+    if (!type || !intensity || !Number.isFinite(duration)) return;
+    if (!EXERCISE_TYPE_OPTIONS.some((o) => o.value === type)) return;
+    if (!(INTENSITY_OPTIONS as readonly string[]).includes(intensity)) return;
+
+    autostartHandled.current = true;
+
+    const result = startGuidedExerciseSession({
+      exerciseType: type as ExerciseType,
+      intensity: intensity as ExerciseIntensity,
+      durationMinutes: duration,
+      exerciseName,
+      routineId,
+    });
+
+    if (!result.ok) {
+      if (result.reason === "severe_sick_day") {
+        toast({
+          title: "Sick day mode is active",
+          description: "Severe illness — focus on rest. End sick day mode to start a session.",
+          variant: "destructive",
+        });
+      } else if (result.reason === "active_session") {
+        toast({
+          title: "Exercise already active",
+          description: "Finish your current session first.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    setActiveSession(result.session);
+    setRoutines(storage.getRecentExercises?.(8) ?? []);
+    storage.recordExerciseToolUse("guided_start");
+    void scheduleExercisePreReminders(result.session, 0);
+    scrollToActiveGuidedCoach();
+
+    params.delete("start");
+    const next = params.toString();
+    navigate(next ? `/scenarios/exercise?${next}` : "/scenarios/exercise", { replace: true });
+  }, [activeSession, navigate, search, toast]);
 
   // ----- Derived recommendation context -----
   const trendForReadiness: ExerciseBgTrend | null = useMemo(() => {
@@ -460,66 +499,87 @@ export function ExerciseGuidedCoach() {
     else update({ recoveryTrend: t });
   };
 
-  const onRepeatLastSession = () => {
-    if (!repeatableSession) return;
-    setStartType(repeatableSession.exerciseType);
-    setStartIntensity(repeatableSession.intensity);
-    setStartDuration(String(repeatableSession.durationMinutes));
-    setPlanWorkoutOpen(true);
-    toast({
-      title: "Last session loaded",
-      description: repeatableSession.label,
-    });
+  const beginGuidedSession = (
+    params: GuidedExerciseStartParams,
+    options?: { toastLabel?: string },
+  ) => {
+    const result = startGuidedExerciseSession(params);
+    if (!result.ok) {
+      if (result.reason === "active_session") {
+        toast({
+          title: "Exercise already active",
+          description: "Finish your current session first.",
+          variant: "destructive",
+        });
+      } else if (result.reason === "severe_sick_day") {
+        toast({
+          title: "Sick day mode is active",
+          description: "Severe illness — focus on rest. End sick day mode to start a session.",
+          variant: "destructive",
+        });
+      } else if (result.reason === "invalid_duration") {
+        toast({
+          title: "Set a duration",
+          description: "Enter how long you'll exercise (5–300 min).",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    setActiveSession(result.session);
+    setPlanWorkoutOpen(false);
+    setRoutines(storage.getRecentExercises?.(8) ?? []);
+    storage.recordExerciseToolUse("guided_start");
+    void scheduleExercisePreReminders(result.session, 0);
+    scrollToActiveGuidedCoach();
+
+    if (options?.toastLabel) {
+      toast({
+        title: "Session ready",
+        description: options.toastLabel,
+      });
+    }
+  };
+
+  const onStartFromRepeatable = (session: RecentRepeatableExerciseSession) => {
+    beginGuidedSession(
+      {
+        exerciseType: session.exerciseType,
+        intensity: session.intensity,
+        durationMinutes: session.durationMinutes,
+        exerciseName: session.exerciseName,
+      },
+      { toastLabel: session.label },
+    );
   };
 
   const onStartFromForm = () => {
-    if (storage.getActiveExercise()) return;
-    const sc = storage.getScenarioState();
-    if (sc.sickDayActive && sc.sickDaySeverity === "severe") {
+    const dur = clampInt(startDuration, 5, 300);
+    if (dur == null) {
       toast({
-        title: "Sick day mode is active",
-        description: "Severe illness — focus on rest. End sick day mode to start a session.",
+        title: "Set a duration",
+        description: "Enter how long you'll exercise (5–300 min).",
         variant: "destructive",
       });
       return;
     }
-    const dur = clampInt(startDuration, 5, 300);
-    if (dur == null) {
-      toast({ title: "Set a duration", description: "Enter how long you’ll exercise (5–300 min).", variant: "destructive" });
-      return;
-    }
-    const session = storage.startExerciseSession({
+    beginGuidedSession({
       exerciseName: EXERCISE_TYPE_OPTIONS.find((o) => o.value === startType)?.label ?? "Exercise",
       exerciseType: startType,
       intensity: startIntensity,
       durationMinutes: dur,
     });
-    const withDefaults = applyCoachDefaultsFromLastExercise(session);
-    setActiveSession(withDefaults);
-    setPlanWorkoutOpen(false);
-    setRoutines(storage.getRecentExercises?.(8) ?? []);
-    storage.recordExerciseToolUse("guided_start");
-    void scheduleExercisePreReminders(session, 0);
-    scrollToActiveGuidedCoach();
   };
 
   const onStartFromRoutine = (routine: ExerciseRoutine) => {
-    if (storage.getActiveExercise()) return;
-    storage.useExerciseRoutine(routine.id);
-    const session = storage.startExerciseSession({
+    beginGuidedSession({
       routineId: routine.id,
       exerciseName: routine.name,
       exerciseType: routine.exerciseType,
       intensity: routine.intensity,
       durationMinutes: routine.durationMinutes,
     });
-    const withDefaults = applyCoachDefaultsFromLastExercise(session);
-    setActiveSession(withDefaults);
-    setPlanWorkoutOpen(false);
-    setRoutines(storage.getRecentExercises?.(8) ?? []);
-    storage.recordExerciseToolUse("guided_start");
-    void scheduleExercisePreReminders(session, 0);
-    scrollToActiveGuidedCoach();
   };
 
   const onStartWorkout = () => {
@@ -567,30 +627,50 @@ export function ExerciseGuidedCoach() {
   if (!activeSession) {
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
-        {repeatableSession ? (
-          <div
-            className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/15 px-3 py-3"
-            data-testid="exercise-repeat-last-session"
+        {recentWorkouts.length > 0 ? (
+          <Card
+            className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30"
+            data-testid="exercise-recent-workouts"
           >
-            <div className="flex items-start gap-2 min-w-0">
-              <History className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Repeat last session</p>
-                <p className="text-xs text-muted-foreground leading-snug truncate">{repeatableSession.label}</p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-h-9 shrink-0"
-              onClick={onRepeatLastSession}
-              data-testid="button-repeat-last-exercise"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
-              Use again
-            </Button>
-          </div>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-h3 flex items-center gap-2">
+                <History className="h-5 w-5 text-muted-foreground" aria-hidden />
+                Recent workouts
+              </CardTitle>
+              <CardDescription>
+                Restart a completed session — update today&apos;s BG and meal details before you start.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2 pt-0">
+              {recentWorkouts.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/10 px-3 py-3"
+                  data-testid={`exercise-recent-workout-${session.id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {session.exerciseName?.trim() || session.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      {format(new Date(session.completedAt), "d MMM")} · {session.label}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-9 shrink-0"
+                    onClick={() => onStartFromRepeatable(session)}
+                    data-testid={`button-restart-recent-${session.id}`}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
+                    Restart
+                  </Button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         ) : null}
 
         <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">

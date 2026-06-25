@@ -8,8 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Sparkles, Star, TrendingUp, History, Info, Tag, Dumbbell, Play } from "lucide-react";
-import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity } from "@/lib/storage";
+import { Link, useLocation } from "wouter";
+import { Repeat, Plus, Utensils, Coffee, Sun, Moon, Cookie, Clock, Syringe, Check, Trash2, Pencil, Star, TrendingUp, History, Tag, Dumbbell, Play, RotateCcw, BookmarkPlus } from "lucide-react";
+import { storage, Routine, RoutineMealType, RoutineOutcome, UserSettings, ExerciseRoutine, ExerciseType, ExerciseIntensity, DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT } from "@/lib/storage";
+import { listRecentRepeatableExerciseSessions, type RecentRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { buildExerciseScenarioRepeatHref } from "@/lib/exercise-planner-href";
 import { format } from "date-fns";
 import { PageInfoDialog, InfoSection } from "@/components/page-info-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +87,7 @@ function getIntensityStyle(intensity: ExerciseIntensity): string {
 
 export function RoutinesContent() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [activeSection, setActiveSection] = useState<"meals" | "exercise">(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get("section") === "exercise" ? "exercise" : "meals";
@@ -115,11 +119,23 @@ export function RoutinesContent() {
   const [exIntensity, setExIntensity] = useState<ExerciseIntensity>("moderate");
   const [exDuration, setExDuration] = useState("");
   const [exNotes, setExNotes] = useState("");
+  const [recentWorkouts, setRecentWorkouts] = useState<RecentRepeatableExerciseSession[]>([]);
+
+  const loadRecentWorkouts = () => {
+    setRecentWorkouts(listRecentRepeatableExerciseSessions({ outcomes: storage.getExerciseOutcomes(), limit: 5 }));
+  };
 
   useEffect(() => {
     setRoutines(storage.getRoutines());
     setSettings(storage.getSettings());
     setExerciseRoutines(storage.getExerciseRoutines());
+    loadRecentWorkouts();
+  }, []);
+
+  useEffect(() => {
+    const onOutcomes = () => loadRecentWorkouts();
+    window.addEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onOutcomes);
+    return () => window.removeEventListener(DIABEATER_EXERCISE_OUTCOMES_CHANGED_EVENT, onOutcomes);
   }, []);
 
   const resetForm = () => {
@@ -247,22 +263,33 @@ export function RoutinesContent() {
       });
       return;
     }
-    const routine = storage.useExerciseRoutine(id);
-    if (routine) {
-      storage.startExerciseSession({
-        routineId: routine.id,
-        exerciseName: routine.name,
-        exerciseType: routine.exerciseType,
-        intensity: routine.intensity,
-        durationMinutes: routine.durationMinutes,
-      });
-      toast({
-        title: "Exercise mode started",
-        description: `${routine.name} — check the banner for your pre-exercise checklist`,
-      });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-    setExerciseRoutines(storage.getExerciseRoutines());
+    const routine = storage.getExerciseRoutines().find((r) => r.id === id);
+    if (!routine) return;
+
+    navigate(
+      buildExerciseScenarioRepeatHref(
+        {
+          exerciseType: routine.exerciseType,
+          durationMinutes: routine.durationMinutes,
+          intensity: routine.intensity,
+          exerciseName: routine.name,
+          routineId: routine.id,
+        },
+        { from: "routines" },
+      ),
+    );
+  };
+
+  const handleSaveRecentAsRoutine = (session: RecentRepeatableExerciseSession) => {
+    resetExerciseForm();
+    setExName(
+      session.exerciseName?.trim() ||
+        `${EXERCISE_TYPES.find((t) => t.value === session.exerciseType)?.label ?? "Exercise"} routine`,
+    );
+    setExType(session.exerciseType);
+    setExIntensity(session.intensity);
+    setExDuration(String(session.durationMinutes));
+    setIsExerciseAddOpen(true);
   };
 
   const filteredRoutines = filterMealType === "all" 
@@ -344,18 +371,18 @@ export function RoutinesContent() {
               </span>
             }
             actions={
-              <PageInfoDialog title="About Routines" description="Save and recall your successful meals and moments">
+              <PageInfoDialog title="About Routines" description="Save meals and workouts that worked for you">
                 <InfoSection title="What are Routines?">
-                  <p>Routines are your personal collection of meals and moments that went well. Save the details of what worked so you can confidently repeat success.</p>
+                  <p>Your personal library of meals and workouts that went well. Save the details so you can repeat success with confidence.</p>
                 </InfoSection>
-                <InfoSection title="Pattern Recall">
-                  <p>This isn't about calculating doses - it's about remembering what worked. When you face a similar meal or situation, you can recall exactly what you did before.</p>
+                <InfoSection title="Pattern recall">
+                  <p>This is not about calculating doses — it is about remembering what worked. When you face a similar meal or workout, you can recall what you did before.</p>
                 </InfoSection>
-                <InfoSection title="Building Confidence">
-                  <p>Every successful routine you save builds your confidence and reduces the mental load of daily decisions. Over time, you'll develop a reliable library of go-to approaches.</p>
+                <InfoSection title="Exercise">
+                  <p>Completed workouts appear under Recent. Restart them in the exercise guide and only update today&apos;s BG and meal details.</p>
                 </InfoSection>
-                <InfoSection title="Not Medical Advice">
-                  <p className="text-xs italic">[This feature helps you track patterns. It does not provide medical recommendations. Always use your own judgement and follow your healthcare team's guidance.]</p>
+                <InfoSection title="Not medical advice">
+                  <p className="text-xs italic">Educational pattern tracking only. Always use your own judgement and follow your healthcare team&apos;s guidance.</p>
                 </InfoSection>
               </PageInfoDialog>
             }
@@ -383,22 +410,6 @@ export function RoutinesContent() {
 
         {activeSection === "meals" && (
         <>
-        <Card className="rounded-2xl border-border/60 bg-card shadow-none">
-          <CardContent className="pt-5">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                <Sparkles className="h-5 w-5" aria-hidden />
-              </span>
-              <div>
-                <p className="font-medium text-foreground">Your Success Library</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Save meals that went well so you can repeat them with confidence. No calculations, no recommendations — just your own patterns that work for you.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {logHints.meal && (
           <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-meal-log-hint">
             <CardContent className="pt-4 pb-4">
@@ -752,22 +763,6 @@ export function RoutinesContent() {
 
         {activeSection === "exercise" && (
         <>
-        <Card className="rounded-2xl border-border/60 bg-card shadow-none">
-          <CardContent className="pt-5">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                <Dumbbell className="h-5 w-5" aria-hidden />
-              </span>
-              <div>
-                <p className="font-medium text-foreground">Exercise schedule</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Plan and track your exercise routines. Set your schedule and log when you complete workouts.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {logHints.exercise && (
           <Card className="rounded-2xl border-border/60 bg-muted/15 shadow-none" data-testid="card-exercise-log-hint">
             <CardContent className="pt-4 pb-4">
@@ -796,6 +791,74 @@ export function RoutinesContent() {
             </CardContent>
           </Card>
         )}
+
+        {recentWorkouts.length > 0 ? (
+          <div className="space-y-3" data-testid="section-recent-workouts">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" aria-hidden />
+              <h3 className="font-medium text-foreground">Recent workouts</h3>
+            </div>
+            <p className="text-sm text-muted-foreground -mt-1">
+              Restart a completed session in the exercise guide — only update today&apos;s BG and meal details.
+            </p>
+            <div className="space-y-3">
+              {recentWorkouts.map((session) => (
+                <Card key={session.id} data-testid={`card-recent-workout-${session.id}`}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <div className="p-2 rounded-lg bg-muted shrink-0">
+                          <History className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-medium truncate">
+                              {session.exerciseName?.trim() || session.label}
+                            </h3>
+                            <Badge variant="outline" className="text-xs">
+                              {EXERCISE_TYPES.find((t) => t.value === session.exerciseType)?.label}
+                            </Badge>
+                            <Badge className={`text-xs ${getIntensityStyle(session.intensity)}`}>
+                              {EXERCISE_INTENSITIES.find((i) => i.value === session.intensity)?.label}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {session.durationMinutes} min
+                            </span>
+                            <span>{format(new Date(session.completedAt), "d MMM yyyy")}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          asChild
+                          data-testid={`button-restart-recent-${session.id}`}
+                        >
+                          <Link href={buildExerciseScenarioRepeatHref(session, { from: "routines" })}>
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Restart
+                          </Link>
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleSaveRecentAsRoutine(session)}
+                          title="Save as routine"
+                          data-testid={`button-save-recent-${session.id}`}
+                        >
+                          <BookmarkPlus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <Dialog open={isExerciseAddOpen} onOpenChange={(open) => { setIsExerciseAddOpen(open); if (!open) resetExerciseForm(); }}>
@@ -897,15 +960,18 @@ export function RoutinesContent() {
             <CardContent className="pt-6">
               <div className="text-center py-8">
                 <Dumbbell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-medium text-lg mb-2">No exercise routines yet</h3>
+                <h3 className="font-medium text-lg mb-2">No saved exercise routines yet</h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                  Add your first exercise routine to start tracking your workouts and building healthy habits.
+                  {recentWorkouts.length > 0
+                    ? "Restart a recent workout above, or save one as a routine for quicker access."
+                    : "Add your first exercise routine to start tracking your workouts and building healthy habits."}
                 </p>
               </div>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
+            <h3 className="font-medium text-foreground">Saved routines</h3>
             {exerciseRoutines.map((routine) => (
               <Card key={routine.id} data-testid={`card-exercise-routine-${routine.id}`}>
                 <CardContent className="pt-4">
@@ -976,27 +1042,6 @@ export function RoutinesContent() {
         )}
         </>
         )}
-
-        <Card data-testid="card-routines-disclaimer">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  <strong>About Routines:</strong> This is your personal library of what works for you. 
-                  It's about pattern recall and building confidence, not calculations or recommendations.
-                </p>
-                <p>
-                  Everyone's diabetes is different. A routine that works once might need adjusting based on 
-                  activity, stress, illness, or other factors.
-                </p>
-                <p className="text-xs italic" data-testid="text-routines-disclaimer">
-                  [Not medical advice. Use your own judgement and follow your healthcare team's guidance.]
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
     </PageShell>
   );
 }
