@@ -337,18 +337,23 @@ export default function CommunityHomePage() {
         setStoryViewerInitialIndex(queueIdx);
       } else {
         const person = storyPeople.find((p) => p.id === authorId);
+        const authorAvatarUrl =
+          authorId === user?.id
+            ? selfStoryPerson?.avatar_url ?? profile?.avatar_url ?? null
+            : person?.avatar_url ?? null;
         setStoryViewerEntriesOverride([
           {
             authorId,
             story: story ?? storiesByAuthor.get(authorId) ?? null,
             authorDisplayName: displayName ?? person?.name ?? undefined,
+            authorAvatarUrl,
           },
         ]);
         setStoryViewerInitialIndex(0);
       }
       setStoryViewerOpen(true);
     },
-    [user?.id, storyFolloweeIds, storyViewerQueue, storyPeople, storiesByAuthor],
+    [user?.id, storyFolloweeIds, storyViewerQueue, storyPeople, storiesByAuthor, selfStoryPerson, profile?.avatar_url],
   );
 
   useEffect(() => {
@@ -581,10 +586,7 @@ export default function CommunityHomePage() {
               <FeedComposerFormBody {...feedComposer.formBodyProps} />
             </FeedStoriesComposerHeaderForm>
           }
-          headerActions={feedHeaderActions}
         />
-      ) : feedHeaderActions ? (
-        <div className="mb-2 flex justify-end">{feedHeaderActions}</div>
       ) : null}
 
       {showProfileReminder && user?.id ? (
@@ -644,6 +646,12 @@ export default function CommunityHomePage() {
           "sticky top-0 z-20 md:static md:z-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none",
         )}
       >
+        {feedHeaderActions ? (
+          <div className="flex justify-end" data-testid="feed-toolbar-actions">
+            {feedHeaderActions}
+          </div>
+        ) : null}
+
         <Tabs
           value={feedTab}
           onValueChange={(v) => {

@@ -666,7 +666,14 @@ export default function CommunityProfilePage() {
         onOpenChange={setStoryViewerOpen}
         entries={
           activeStory && userId && canViewStory
-            ? [{ authorId: userId, story: activeStory, authorDisplayName: displayName }]
+            ? [
+                {
+                  authorId: userId,
+                  story: activeStory,
+                  authorDisplayName: displayName,
+                  authorAvatarUrl: profile?.avatar_url ?? null,
+                },
+              ]
             : []
         }
         initialIndex={0}

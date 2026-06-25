@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Flag, Loader2, X } from "lucide-react";
+import { Link } from "wouter";
+import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +19,7 @@ export type StoryViewerEntry = {
   authorId: string;
   story?: CommunityStoryRow | null;
   authorDisplayName?: string;
+  authorAvatarUrl?: string | null;
 };
 
 type Props = {
@@ -29,18 +33,27 @@ type Props = {
   story?: CommunityStoryRow | null;
   /** @deprecated Prefer `entries`. */
   authorDisplayName?: string;
+  /** @deprecated Prefer `entries`. */
+  authorAvatarUrl?: string | null;
   onViewed?: () => void;
 };
 
 export function buildStoryViewerQueue(
-  self: { id: string; name: string } | null,
-  people: { id: string; name: string }[],
+  self: { id: string; name: string; avatar_url: string | null } | null,
+  people: { id: string; name: string; avatar_url: string | null }[],
   storiesByAuthor: Map<string, CommunityStoryRow>,
 ): StoryViewerEntry[] {
   const out: StoryViewerEntry[] = [];
   if (self) {
     const story = storiesByAuthor.get(self.id);
-    if (story) out.push({ authorId: self.id, story, authorDisplayName: self.name });
+    if (story) {
+      out.push({
+        authorId: self.id,
+        story,
+        authorDisplayName: self.name,
+        authorAvatarUrl: self.avatar_url,
+      });
+    }
   }
   const others = people
     .map((person) => ({ person, story: storiesByAuthor.get(person.id) }))
@@ -52,7 +65,12 @@ export function buildStoryViewerQueue(
       return a.person.name.localeCompare(b.person.name);
     });
   for (const { person, story } of others) {
-    out.push({ authorId: person.id, story, authorDisplayName: person.name });
+    out.push({
+      authorId: person.id,
+      story,
+      authorDisplayName: person.name,
+      authorAvatarUrl: person.avatar_url,
+    });
   }
   return out;
 }
@@ -65,16 +83,17 @@ export function StoryViewerDialog({
   authorId,
   story: storyProp,
   authorDisplayName,
+  authorAvatarUrl,
   onViewed,
 }: Props) {
   const { toast } = useToast();
   const queue = useMemo(() => {
     if (entriesProp && entriesProp.length > 0) return entriesProp;
     if (authorId) {
-      return [{ authorId, story: storyProp, authorDisplayName }];
+      return [{ authorId, story: storyProp, authorDisplayName, authorAvatarUrl }];
     }
     return [];
-  }, [entriesProp, authorId, storyProp, authorDisplayName]);
+  }, [entriesProp, authorId, storyProp, authorDisplayName, authorAvatarUrl]);
 
   const [index, setIndex] = useState(initialIndex);
   const [resolvedStory, setResolvedStory] = useState<CommunityStoryRow | null>(null);
@@ -86,6 +105,9 @@ export function StoryViewerDialog({
   const current = queue[index];
   const isLast = index >= queue.length - 1;
   const displayName = current?.authorDisplayName?.trim() || "Story";
+  const profileHref = current ? `/community/profile/${encodeURIComponent(current.authorId)}` : "#";
+
+  const closeViewer = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   useEffect(() => {
     if (!open) {
@@ -179,6 +201,11 @@ export function StoryViewerDialog({
         aria-describedby={undefined}
       >
         <div className="relative flex min-h-[min(100dvh,720px)] flex-1 flex-col bg-black">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-10 h-32 bg-gradient-to-b from-black/80 via-black/40 to-transparent"
+            aria-hidden
+          />
+
           {queue.length > 1 ? (
             <div
               className="absolute left-0 right-0 top-0 z-30 flex gap-1 px-3 pt-[max(0.6rem,env(safe-area-inset-top))]"
@@ -197,14 +224,47 @@ export function StoryViewerDialog({
             </div>
           ) : null}
 
-          <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between gap-2 p-3 pt-[max(2rem,env(safe-area-inset-top))]">
-            <p className="truncate text-sm font-semibold text-white drop-shadow">{displayName}</p>
-            <div className="flex shrink-0 items-center gap-1">
+          <div className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between gap-2 px-3 pb-2 pt-[max(2.25rem,env(safe-area-inset-top))]">
+            {current ? (
+              <Link
+                href={profileHref}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeViewer();
+                }}
+                className="flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-2.5 rounded-full py-1 pr-3 pl-1 outline-none ring-offset-background transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/35"
+                data-testid="story-viewer-author-link"
+              >
+                <CommunityAuthorAvatar
+                  displayName={displayName}
+                  avatarPath={current.authorAvatarUrl}
+                  size="sm"
+                  className="!h-9 !w-9 shrink-0 ring-2 ring-white/20 shadow-md"
+                />
+                <span className="min-w-0 text-left">
+                  <span className="block truncate text-sm font-semibold leading-tight text-white">{displayName}</span>
+                  {resolvedStory?.created_at ? (
+                    <time
+                      className="block truncate text-[11px] leading-tight text-white/65"
+                      dateTime={resolvedStory.created_at}
+                      title={resolvedStory.created_at}
+                    >
+                      {formatDistanceToNow(new Date(resolvedStory.created_at), { addSuffix: true })}
+                    </time>
+                  ) : (
+                    <span className="block text-[11px] leading-tight text-white/55">View profile</span>
+                  )}
+                </span>
+              </Link>
+            ) : (
+              <div className="min-w-0 flex-1" />
+            )}
+            <div className="flex shrink-0 items-center gap-0.5">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-white hover:bg-white/15 hover:text-white"
+                className="h-9 w-9 rounded-full text-white/90 hover:bg-white/15 hover:text-white"
                 disabled={reportBusy || !resolvedStory}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -218,10 +278,10 @@ export function StoryViewerDialog({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-white hover:bg-white/15 hover:text-white"
+                className="h-9 w-9 rounded-full text-white/90 hover:bg-white/15 hover:text-white"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onOpenChange(false);
+                  closeViewer();
                 }}
                 aria-label="Close story"
               >

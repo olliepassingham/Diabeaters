@@ -1,4 +1,4 @@
-import { useMemo, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ChevronDown, Plus } from "lucide-react";
 import { CommunityAuthorAvatar } from "@/components/community-author-avatar";
 import { StoryAvatarRing } from "@/components/community/story-avatar-ring";
@@ -32,12 +32,13 @@ type Props = {
   composerExpanded?: boolean;
   onComposerExpandedChange?: (open: boolean) => void;
   composerForm?: ReactNode;
-  headerActions?: ReactNode;
   className?: string;
 };
 
-const AVATAR_CLASS = "!h-10 !w-10";
-const ITEM_WIDTH = "w-12";
+/** Match feed post author avatars (`feed-post-card` uses `!h-9 !w-9`). */
+const AVATAR_CLASS = "!h-9 !w-9";
+const ITEM_WIDTH = "w-11";
+const NAME_CLASS = "w-full truncate text-center text-[9px] leading-none text-muted-foreground/70";
 
 function SelfStoryCell({
   self,
@@ -51,13 +52,13 @@ function SelfStoryCell({
   onAddStory: () => void;
 }) {
   return (
-    <div className={cn("flex shrink-0 flex-col items-center gap-1", ITEM_WIDTH)}>
+    <div className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
       {selfStory ? (
         <StoryAvatarRing
           state={storyRingStateForRow(selfStory)}
           label={selfStory.viewed_by_me ? "Rewatch your story" : "Your story"}
           onClick={() => onOpenStory(self.id, selfStory)}
-          subtle
+          compact
         >
           <CommunityAuthorAvatar
             displayName={self.name}
@@ -73,7 +74,7 @@ function SelfStoryCell({
           className="relative shrink-0 rounded-full outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label="Add your story"
         >
-          <span className="block rounded-full border border-dashed border-border/45 p-[1.5px]">
+          <span className="block rounded-full border border-dashed border-border/45 p-px">
             <CommunityAuthorAvatar
               displayName={self.name}
               avatarPath={self.avatar_url}
@@ -86,7 +87,52 @@ function SelfStoryCell({
           </span>
         </button>
       )}
-      <span className="w-full truncate text-center text-[9px] text-muted-foreground/80">You</span>
+      <span className={NAME_CLASS}>You</span>
+    </div>
+  );
+}
+
+function FeedStoriesStrip({ children }: { children: ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showEndFade, setShowEndFade] = useState(false);
+
+  const updateFade = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 2;
+    const notAtEnd = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setShowEndFade(hasOverflow && notAtEnd);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateFade();
+    el.addEventListener("scroll", updateFade, { passive: true });
+    const observer = new ResizeObserver(updateFade);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateFade);
+      observer.disconnect();
+    };
+  }, [updateFade, children]);
+
+  return (
+    <div className="relative -mx-1">
+      <div
+        ref={scrollRef}
+        className="flex gap-1.5 overflow-x-auto px-0.5 py-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        data-testid="feed-stories-strip"
+        aria-label="Stories"
+      >
+        {children}
+      </div>
+      {showEndFade ? (
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-10 bg-gradient-to-l from-background via-background/80 to-transparent"
+          aria-hidden
+        />
+      ) : null}
     </div>
   );
 }
@@ -108,7 +154,6 @@ export function FeedStoriesComposerHeader({
   composerExpanded,
   onComposerExpandedChange,
   composerForm,
-  headerActions,
   className,
 }: Props) {
   const storyEntries = useMemo(() => {
@@ -128,23 +173,29 @@ export function FeedStoriesComposerHeader({
 
   const selfStory = self ? storiesByAuthor.get(self.id) : undefined;
   const showStoriesRow = Boolean(self) || loading || storyEntries.length > 0;
+  const hideComposerAvatar = showStoriesRow && Boolean(self);
 
   const composerTrigger = (
     <button
       type="button"
-      className="flex w-full min-h-[2.75rem] items-center gap-2.5 px-3.5 py-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+      className={cn(
+        "flex w-full min-h-[2.75rem] items-center gap-2.5 text-left outline-none ring-offset-background transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+        hideComposerAvatar ? "px-4 py-2.5" : "px-3.5 py-2.5",
+      )}
       onClick={isMobile ? onComposerClick : undefined}
       disabled={composerDisabled}
       data-testid={isMobile ? "feed-composer-mobile-pill" : "feed-composer-trigger"}
       aria-haspopup={isMobile ? "dialog" : undefined}
       aria-expanded={!isMobile ? composerExpanded : undefined}
     >
-      <CommunityAuthorAvatar
-        displayName={avatarDisplayName}
-        avatarPath={avatarPath}
-        size="sm"
-        profileHref={profileHref}
-      />
+      {!hideComposerAvatar ? (
+        <CommunityAuthorAvatar
+          displayName={avatarDisplayName}
+          avatarPath={avatarPath}
+          size="sm"
+          profileHref={profileHref}
+        />
+      ) : null}
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{composerPreview}</span>
       {!isMobile ? (
         <ChevronDown
@@ -159,54 +210,41 @@ export function FeedStoriesComposerHeader({
   );
 
   return (
-    <div className={cn("space-y-2", className)} data-testid="feed-stories-composer-header">
-      {showStoriesRow || headerActions ? (
-        <div className="flex items-start gap-2">
-          {showStoriesRow ? (
-            <div
-              className="min-w-0 flex-1 -mx-1 flex gap-2 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              data-testid="feed-stories-strip"
-              aria-label="Stories"
-            >
-              {self ? (
-                <SelfStoryCell
-                  self={self}
-                  selfStory={selfStory}
-                  onOpenStory={onOpenStory}
-                  onAddStory={onAddStory}
-                />
-              ) : null}
+    <div className={cn("space-y-1.5", className)} data-testid="feed-stories-composer-header">
+      {showStoriesRow ? (
+        <FeedStoriesStrip>
+          {self ? (
+            <SelfStoryCell
+              self={self}
+              selfStory={selfStory}
+              onOpenStory={onOpenStory}
+              onAddStory={onAddStory}
+            />
+          ) : null}
 
-              {loading
-                ? Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-muted/25" />
-                  ))
-                : storyEntries.map(({ person, story }) => (
-                    <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-1", ITEM_WIDTH)}>
-                      <StoryAvatarRing
-                        state={storyRingStateForRow(story)}
-                        onClick={() => onOpenStory(person.id, story)}
-                        label={`Watch ${person.name}'s story`}
-                        subtle
-                      >
-                        <CommunityAuthorAvatar
-                          displayName={person.name}
-                          avatarPath={person.avatar_url}
-                          size="sm"
-                          className={AVATAR_CLASS}
-                        />
-                      </StoryAvatarRing>
-                      <span className="w-full truncate text-center text-[9px] text-muted-foreground/70">
-                        {person.name.split(" ")[0]}
-                      </span>
-                    </div>
-                  ))}
-            </div>
-          ) : (
-            <div className="min-w-0 flex-1" />
-          )}
-          {headerActions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">{headerActions}</div> : null}
-        </div>
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-muted/25" />
+              ))
+            : storyEntries.map(({ person, story }) => (
+                <div key={person.id} className={cn("flex shrink-0 flex-col items-center gap-0.5", ITEM_WIDTH)}>
+                  <StoryAvatarRing
+                    state={storyRingStateForRow(story)}
+                    onClick={() => onOpenStory(person.id, story)}
+                    label={`Watch ${person.name}'s story`}
+                    compact
+                  >
+                    <CommunityAuthorAvatar
+                      displayName={person.name}
+                      avatarPath={person.avatar_url}
+                      size="sm"
+                      className={AVATAR_CLASS}
+                    />
+                  </StoryAvatarRing>
+                  <span className={NAME_CLASS}>{person.name.split(" ")[0]}</span>
+                </div>
+              ))}
+        </FeedStoriesStrip>
       ) : null}
 
       <section

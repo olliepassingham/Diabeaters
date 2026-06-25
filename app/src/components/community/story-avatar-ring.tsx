@@ -12,6 +12,8 @@ type Props = {
   interactive?: boolean;
   /** Thinner ring and softer colours — for compact feed strip. */
   subtle?: boolean;
+  /** Minimal ring padding for dense feed story strip. */
+  compact?: boolean;
 };
 
 export function StoryAvatarRing({
@@ -22,21 +24,25 @@ export function StoryAvatarRing({
   label,
   interactive = true,
   subtle = false,
+  compact = false,
 }: Props) {
   if (state === "none") return <>{children}</>;
 
   const ringClass =
     state === "unseen"
-      ? subtle
+      ? subtle || compact
         ? "bg-gradient-to-tr from-primary/50 via-primary/35 to-primary/25"
         : "bg-gradient-to-tr from-primary via-rose-400 to-amber-400"
-      : subtle
+      : subtle || compact
         ? "bg-muted-foreground/30"
         : "bg-muted-foreground/45";
 
+  const ringPad = compact ? "p-[1px]" : subtle ? "p-[1.5px]" : "p-[2.5px]";
+  const innerPad = compact ? "p-0" : subtle ? "p-px" : "p-[2px]";
+
   const inner = (
-    <div className={cn("rounded-full", subtle ? "p-[1.5px]" : "p-[2.5px]", ringClass, className)}>
-      <div className={cn("rounded-full bg-background", subtle ? "p-px" : "p-[2px]")}>{children}</div>
+    <div className={cn("rounded-full", ringPad, ringClass, className)}>
+      <div className={cn("rounded-full bg-background", innerPad)}>{children}</div>
     </div>
   );
 
