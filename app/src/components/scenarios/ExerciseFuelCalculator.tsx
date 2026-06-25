@@ -31,6 +31,7 @@ import {
   type CarbSourceScenario,
 } from "@/lib/carb-source-preferences";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { pumpTipsCardTitle } from "@/lib/exercise-closed-loop";
 import {
   storage,
   DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT,
@@ -400,7 +401,7 @@ function ExerciseFuelPlanDetails({
       </PlanDetailSection>
 
       {result.pumpTip ? (
-        <PlanDetailSection title="Pump">
+        <PlanDetailSection title={pumpTipsCardTitle(settings)}>
           <p>{result.pumpTip}</p>
         </PlanDetailSection>
       ) : null}

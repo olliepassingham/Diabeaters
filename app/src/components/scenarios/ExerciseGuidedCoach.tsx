@@ -22,9 +22,12 @@ import {
   Pill,
   Play,
   Power,
+  History,
+  RotateCcw,
   Snowflake,
   Sparkles,
   Sun,
+  Syringe,
   Thermometer,
   TrendingDown,
   TrendingUp,
@@ -42,9 +45,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { usesClosedLoop } from "@/lib/closed-loop";
+import {
+  CLOSED_LOOP_PRE_START_CHECKLIST,
+  closedLoopExercisePrePrompt,
+  pumpTipsForPhase,
+} from "@/lib/exercise-closed-loop";
+import { findLastRepeatableExerciseSession } from "@/lib/exercise-session-repeat";
+import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
 import {
   storage,
   DIABEATER_PROFILE_CHANGED_EVENT,
+  DIABEATER_SETTINGS_CHANGED_EVENT,
   type ActiveExerciseSession,
   type ExerciseBgTrend,
   type ExerciseEnvironmentChoice,
@@ -222,7 +234,7 @@ export function ExerciseGuidedCoach() {
   const { toast } = useToast();
   const search = useSearch();
   const [profile, setProfile] = useState<Partial<UserProfile>>({});
-  const [, setSettings] = useState<UserSettings>(() => storage.getSettings());
+  const [settings, setSettings] = useState<UserSettings>(() => storage.getSettings());
   const [activeSession, setActiveSession] = useState<ActiveExerciseSession | null>(() => storage.getActiveExercise());
   const [now, setNow] = useState<number>(() => Date.now());
   const [routines, setRoutines] = useState<ExerciseRoutine[]>(() => storage.getRecentExercises?.(8) ?? []);
@@ -240,12 +252,36 @@ export function ExerciseGuidedCoach() {
 
   const bgUnits = (profile.bgUnits === "mg/dL" ? "mg/dL" : "mmol/L") as "mmol/L" | "mg/dL";
   const isPump = isPumpDeliveryMethod(profile.insulinDeliveryMethod);
+  const closedLoop = usesClosedLoop(settings);
+
+  const repeatableSession = useMemo(() => {
+    let outcomes: ReturnType<typeof storage.getExerciseOutcomes> = [];
+    let lastSummary: ReturnType<typeof storage.getLastExerciseSummary> = null;
+    try {
+      outcomes = storage.getExerciseOutcomes();
+    } catch {
+      outcomes = [];
+    }
+    try {
+      lastSummary = storage.getLastExerciseSummary();
+    } catch {
+      lastSummary = null;
+    }
+    return findLastRepeatableExerciseSession({ outcomes, lastSummary });
+  }, [activeSession, routines.length]);
 
   // ----- Mount: load profile, settings, and listen for session changes -----
   useEffect(() => {
-    const onProfile = () => setProfile(storage.getProfile() ?? {});
+    const onProfile = () => {
+      setProfile(storage.getProfile() ?? {});
+      setSettings(storage.getSettings());
+    };
     window.addEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
-    return () => window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+    window.addEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onProfile);
+    return () => {
+      window.removeEventListener(DIABEATER_PROFILE_CHANGED_EVENT, onProfile);
+      window.removeEventListener(DIABEATER_SETTINGS_CHANGED_EVENT, onProfile);
+    };
   }, []);
 
   useEffect(() => {
@@ -333,11 +369,18 @@ export function ExerciseGuidedCoach() {
       if (activeSession.phase !== "pre") {
         ctx.minutesUntilStart = 0;
       }
-      return calculateExercisePlan(ctx);
+      return calculateExercisePlan(ctx, settings);
     } catch {
       return null;
     }
-  }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness]);
+  }, [activeSession, bgInput, bgUnits, historyBias, trendForReadiness, settings]);
+
+  const phasePumpTips = useMemo(() => {
+    if (!exercisePlan || !isPump || !activeSession) return [];
+    if (activeSession.phase === "pre") return pumpTipsForPhase(exercisePlan.pumpTips, "pre");
+    if (activeSession.phase === "active") return pumpTipsForPhase(exercisePlan.pumpTips, "during");
+    return pumpTipsForPhase(exercisePlan.pumpTips, "recovery");
+  }, [exercisePlan, isPump, activeSession]);
 
   const readiness: ExerciseReadinessResult | null = useMemo(() => {
     if (!activeSession || !exercisePlan) return null;
@@ -417,6 +460,18 @@ export function ExerciseGuidedCoach() {
     if (activeSession.phase === "pre") update({ preTrend: t });
     else if (activeSession.phase === "active") update({ midTrend: t });
     else update({ recoveryTrend: t });
+  };
+
+  const onRepeatLastSession = () => {
+    if (!repeatableSession) return;
+    setStartType(repeatableSession.exerciseType);
+    setStartIntensity(repeatableSession.intensity);
+    setStartDuration(String(repeatableSession.durationMinutes));
+    setPlanWorkoutOpen(true);
+    toast({
+      title: "Last session loaded",
+      description: repeatableSession.label,
+    });
   };
 
   const onStartFromForm = () => {
@@ -514,6 +569,59 @@ export function ExerciseGuidedCoach() {
   if (!activeSession) {
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
+        {closedLoop ? (
+          <Card
+            className="overflow-hidden rounded-2xl border-indigo-200/60 dark:border-indigo-900/40 shadow-sm"
+            data-testid="closed-loop-exercise-checklist"
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                Closed-loop pre-workout check
+              </CardTitle>
+              <CardDescription>
+                Quick checks before you start — your pump handles basal; focus on IOB, trend, and carbs.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {CLOSED_LOOP_PRE_START_CHECKLIST.map((item) => (
+                  <li key={item.id} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <CircleCheck className="h-4 w-4 shrink-0 text-indigo-500/80 mt-0.5" aria-hidden />
+                    <span>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {repeatableSession ? (
+          <div
+            className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/15 px-3 py-3"
+            data-testid="exercise-repeat-last-session"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <History className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" aria-hidden />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Repeat last session</p>
+                <p className="text-xs text-muted-foreground leading-snug truncate">{repeatableSession.label}</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-9 shrink-0"
+              onClick={onRepeatLastSession}
+              data-testid="button-repeat-last-exercise"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" aria-hidden />
+              Use again
+            </Button>
+          </div>
+        ) : null}
+
         <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm ring-1 ring-border/40 dark:ring-border/30">
           <Collapsible open={planWorkoutOpen} onOpenChange={setPlanWorkoutOpen} className="group">
             <CollapsibleTrigger asChild>
@@ -530,7 +638,9 @@ export function ExerciseGuidedCoach() {
                   </CardTitle>
                   <CardDescription>
                     {planWorkoutOpen
-                      ? "Start a guided pre / during / recovery session."
+                      ? closedLoop
+                        ? "Guided pre / during / recovery — check IOB and loop settings before you go."
+                        : "Start a guided pre / during / recovery session."
                       : `${startDuration || "—"} min · ${startIntensity} · ${startType.replace(/_/g, " ")}`}
                   </CardDescription>
                 </div>
@@ -751,6 +861,19 @@ export function ExerciseGuidedCoach() {
               ) : null}
 
               {hypoCoachSuggestion ? <ExerciseHypoTreatmentHint suggestion={hypoCoachSuggestion} /> : null}
+
+              {isPump && phasePumpTips.length > 0 ? (
+                <ExercisePumpTipsCard
+                  tips={phasePumpTips}
+                  data-testid={`coach-pump-tips-${phase}`}
+                />
+              ) : null}
+
+              {closedLoop && phase === "pre" && closedLoopExercisePrePrompt(true) ? (
+                <p className="text-xs text-muted-foreground leading-relaxed" data-testid="coach-closed-loop-pre-prompt">
+                  {closedLoopExercisePrePrompt(true)}
+                </p>
+              ) : null}
             </div>
 
             <TabsContent value="pre" className="space-y-4 pt-2">
@@ -844,9 +967,12 @@ export function ExerciseGuidedCoach() {
                   ))}
                 </ul>
                 {isPump && exercisePlan.pumpTips.recovery.length > 0 ? (
-                  <p className="text-xs text-muted-foreground pt-2 border-t border-border/40 mt-3">
-                    Pump: {exercisePlan.pumpTips.recovery[0]}
-                  </p>
+                  <div className="pt-3 mt-3 border-t border-border/40">
+                    <ExercisePumpTipsCard
+                      tips={exercisePlan.pumpTips.recovery}
+                      data-testid="coach-pump-tips-recovery-notes"
+                    />
+                  </div>
                 ) : null}
               </CardContent>
             </Card>

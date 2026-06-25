@@ -39,6 +39,7 @@ import {
   type UserProfile,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { usesClosedLoop } from "@/lib/closed-loop";
 import { cn } from "@/lib/utils";
 import { computeExerciseHypoSuggestion, resolveExerciseBgForHypo } from "@/lib/exercise-hypo-auto";
 import { ExerciseFuelPlanSummary, ExerciseHypoTreatmentHint, ExerciseWorkoutProgressBar, formatExerciseElapsedShort } from "@/components/exercise-active-session-extras";
@@ -1198,7 +1199,11 @@ export function AppStatusStrip() {
                           <ul className="space-y-1 text-xs text-muted-foreground">
                             {needsCarbPrompt ? <li>Have fast carbs within reach.</li> : null}
                             {needsInsulinPrompt ? (
-                              <li>Consider insulin on board / recent bolus before you push intensity.</li>
+                              <li>
+                                {usesClosedLoop(storage.getSettings())
+                                  ? "Review IOB and your loop's exercise settings before you push intensity."
+                                  : "Consider insulin on board / recent bolus before you push intensity."}
+                              </li>
                             ) : null}
                           </ul>
                         </div>

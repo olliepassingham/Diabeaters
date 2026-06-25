@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { storage, type UserProfile, type ExerciseIntensity, type ExerciseBgTrend, type ExerciseType } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
-import { filterPumpTipsForClosedLoop } from "@/lib/closed-loop";
+import { ExercisePumpTipsCard } from "@/components/scenarios/ExercisePumpTipsCard";
 import {
   calculateExercisePlan,
   type ExercisePlanResult,
@@ -1053,7 +1053,7 @@ export function ExercisePlanner() {
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
-                      <PumpTipBlock tips={exerciseResult.pumpTips.pre} data-testid="pump-tip-before" />
+                      <ExercisePumpTipsCard tips={exerciseResult.pumpTips.pre} data-testid="pump-tip-before" />
                     </div>
                   </details>
                 )}
@@ -1096,7 +1096,7 @@ export function ExercisePlanner() {
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
-                      <PumpTipBlock tips={exerciseResult.pumpTips.during} data-testid="pump-tip-during" />
+                      <ExercisePumpTipsCard tips={exerciseResult.pumpTips.during} data-testid="pump-tip-during" />
                     </div>
                   </details>
                 )}
@@ -1129,7 +1129,7 @@ export function ExercisePlanner() {
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
-                      <PumpTipBlock tips={exerciseResult.pumpTips.post} data-testid="pump-tip-after" />
+                      <ExercisePumpTipsCard tips={exerciseResult.pumpTips.post} data-testid="pump-tip-after" />
                     </div>
                   </details>
                 )}
@@ -1172,7 +1172,7 @@ export function ExercisePlanner() {
                   <details className="rounded-xl border border-border/60 bg-muted/10 px-3 py-3">
                     <summary className="cursor-pointer select-none text-sm font-medium text-foreground">Pump tips</summary>
                     <div className="mt-3">
-                      <PumpTipBlock tips={exerciseResult.pumpTips.recovery} data-testid="pump-tip-recovery" />
+                      <ExercisePumpTipsCard tips={exerciseResult.pumpTips.recovery} data-testid="pump-tip-recovery" />
                     </div>
                   </details>
                 )}
@@ -1210,22 +1210,6 @@ function TipRow({ children }: { children: React.ReactNode }) {
     <div className="flex items-start gap-2">
       <ArrowRight className="h-3.5 w-3.5 mt-0.5 shrink-0 opacity-70" />
       <p className="text-small text-foreground">{children}</p>
-    </div>
-  );
-}
-
-function PumpTipBlock({ tips, "data-testid": testId }: { tips: string[]; "data-testid"?: string }) {
-  const filtered = filterPumpTipsForClosedLoop(tips, storage.getSettings());
-  if (filtered.length === 0) return null;
-  return (
-    <div className="p-3 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg border border-indigo-200 dark:border-indigo-800 mt-3" data-testid={testId}>
-      <p className="text-tiny font-medium text-indigo-600 dark:text-indigo-400 uppercase mb-2">Pump users</p>
-      {filtered.map((tip, i) => (
-        <div key={i} className="flex items-start gap-2">
-          <ArrowRight className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
-          <p className="text-small text-indigo-800 dark:text-indigo-200">{tip}</p>
-        </div>
-      ))}
     </div>
   );
 }

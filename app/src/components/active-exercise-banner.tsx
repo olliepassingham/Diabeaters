@@ -19,6 +19,8 @@ import {
   DIABEATER_PROFILE_CHANGED_EVENT,
 } from "@/lib/storage";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
+import { usesClosedLoop } from "@/lib/closed-loop";
+import { exerciseChecklistBasalLabel } from "@/lib/exercise-closed-loop";
 import { getExerciseGuidanceForReading } from "@/lib/exercise-reading-guidance";
 import {
   calculateExercisePlan,
@@ -404,7 +406,8 @@ function ExerciseEducationDialog({
   planResult: ExercisePlanResult | null;
 }) {
   const typeConfig = getTypeConfig(session.exerciseType);
-  const baseTips = getPreExerciseTips(session, isPump);
+  const closedLoop = usesClosedLoop(storage.getSettings());
+  const baseTips = getPreExerciseTips(session, isPump, closedLoop);
   const guidance =
     session.phase === "pre" && session.preBg != null
       ? getExerciseGuidanceForReading({
@@ -539,7 +542,7 @@ function ExerciseEducationDialog({
                     >
                       {session.preChecklist.basalAdjusted && <Check className="h-3 w-3" />}
                     </div>
-                    <span>{typeConfig.checklistLabels.basal}</span>
+                    <span>{exerciseChecklistBasalLabel(closedLoop, typeConfig.checklistLabels.basal)}</span>
                   </button>
                 )}
               </div>
@@ -570,10 +573,14 @@ function ExerciseEducationDialog({
   );
 }
 
-function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean): string[] {
+function getPreExerciseTips(session: ActiveExerciseSession, isPump: boolean, closedLoop = false): string[] {
   const config = EXERCISE_TYPE_CONFIG[session.exerciseType] ?? EXERCISE_TYPE_CONFIG.cardio;
   const dur = Number.isFinite(session.durationMinutes) ? session.durationMinutes : 45;
-  return config.preTips(isPump, dur);
+  const tips = config.preTips(isPump, dur);
+  if (!closedLoop || !isPump) return tips;
+  const filtered = tips.filter((t) => !/basal|temp basal|suspend pump/i.test(t));
+  if (filtered.length > 0) return filtered;
+  return ["Check IOB and trend — let your loop adjust basal unless your team advises otherwise."];
 }
 
 function getTypeConfig(type: ExerciseType): ExerciseTypeConfig {

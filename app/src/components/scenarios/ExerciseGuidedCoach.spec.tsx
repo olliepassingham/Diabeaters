@@ -19,6 +19,11 @@ vi.mock("@/lib/exercise-reminders", () => ({
 }));
 
 let mockSession: ActiveExerciseSession | null = null;
+let mockProfile: Partial<{ bgUnits: string; insulinDeliveryMethod: string }> = {
+  bgUnits: "mmol/L",
+  insulinDeliveryMethod: "pen",
+};
+let mockSettings: { usesClosedLoop?: boolean } = {};
 
 vi.mock("@/lib/storage", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/storage")>();
@@ -26,10 +31,12 @@ vi.mock("@/lib/storage", async (importOriginal) => {
     ...actual,
     storage: {
       ...actual.storage,
-      getProfile: () => ({ bgUnits: "mmol/L", insulinDeliveryMethod: "mdi" }),
-      getSettings: () => ({}),
+      getProfile: () => mockProfile,
+      getSettings: () => mockSettings,
       getActiveExercise: () => mockSession,
       getRecentExercises: () => [],
+      getExerciseOutcomes: () => [],
+      getLastExerciseSummary: () => null,
       getScenarioState: () => ({ travelModeActive: false, sickDayActive: false }),
       getExercisePatterns: () => ({
         totalSessions: 0,
@@ -75,7 +82,24 @@ function makeSession(phase: ActiveExerciseSession["phase"]): ActiveExerciseSessi
 describe("ExerciseGuidedCoach", () => {
   beforeEach(() => {
     mockSession = null;
+    mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pen" };
+    mockSettings = {};
     mockToast.mockClear();
+  });
+
+  it("shows closed-loop pre-workout checklist when hybrid loop is enabled", () => {
+    mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pump" };
+    mockSettings = { usesClosedLoop: true };
+    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    expect(queryByTestId("closed-loop-exercise-checklist")).not.toBeNull();
+  });
+
+  it("shows closed-loop pump tips during pre phase for pump users on hybrid loop", () => {
+    mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pump" };
+    mockSettings = { usesClosedLoop: true };
+    mockSession = makeSession("pre");
+    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
+    expect(queryByTestId("coach-pump-tips-pre")).not.toBeNull();
   });
 
   it("renders the start screen when no active session", () => {

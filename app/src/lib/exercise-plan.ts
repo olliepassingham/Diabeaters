@@ -4,6 +4,12 @@
  */
 
 import type { ExerciseBgTrend } from "@/lib/storage";
+import type { UserSettings } from "@/lib/storage";
+import {
+  closedLoopPrePumpLeadIn,
+  resolveExercisePumpTips,
+} from "@/lib/exercise-closed-loop";
+import { usesClosedLoop } from "@/lib/closed-loop";
 
 export interface ExercisePlanResult {
   duration: number;
@@ -452,7 +458,10 @@ function pumpTipsForIntensity(intensity: "light" | "moderate" | "intense"): Exer
 /**
  * Primary API: structured exercise + optional food/insulin context.
  */
-export function calculateExercisePlan(context: ExercisePlanContext, _settings?: unknown): ExercisePlanResult {
+export function calculateExercisePlan(
+  context: ExercisePlanContext,
+  settings?: UserSettings | null,
+): ExercisePlanResult {
   const bgUnits = context.bgUnits || "mmol/L";
   const duration = Math.max(5, Math.min(300, Math.round(context.durationMinutes || 45)));
   const intensity = context.intensity;
@@ -715,12 +724,20 @@ export function calculateExercisePlan(context: ExercisePlanContext, _settings?: 
     recoveryTips.unshift("Your routine has caused hypos before — keep treatment within reach for the next several hours, not just immediately after.");
   }
 
-  const pumpTips = pumpTipsForIntensity(intensity);
-  if (context.minutesUntilStart >= 90 && intensity !== "light") {
+  let pumpTips = pumpTipsForIntensity(intensity);
+  const closedLoop = usesClosedLoop(settings);
+  if (!closedLoop && context.minutesUntilStart >= 90 && intensity !== "light") {
     pumpTips.pre = [
       `With ~${context.minutesUntilStart} min until start, you have time to start or adjust a temporary basal as discussed with your team.`,
       ...pumpTips.pre,
     ];
+  }
+  pumpTips = resolveExercisePumpTips(pumpTips, intensity, settings);
+  if (closedLoop) {
+    const leadIn = closedLoopPrePumpLeadIn(context.minutesUntilStart, intensity);
+    if (leadIn) {
+      pumpTips = { ...pumpTips, pre: [leadIn, ...pumpTips.pre] };
+    }
   }
 
   const summaryParts = [`${duration} min`, intensity, displayType(typeKey)];

@@ -22,6 +22,18 @@ describe("getRecoveryInsulinHeadline", () => {
     expect(line.toLowerCase()).toContain("bolus");
   });
 
+  it("uses closed-loop pump copy when settings flag is on", () => {
+    const plan = calculateExercisePlan(baseCtx, { usesClosedLoop: true });
+    const joined = [
+      ...plan.pumpTips.pre,
+      ...plan.pumpTips.during,
+      ...plan.pumpTips.post,
+      ...plan.pumpTips.recovery,
+    ].join(" ");
+    expect(joined).not.toMatch(/temp basal|temporary basal/i);
+    expect(joined).toMatch(/IOB|30–60 min/i);
+  });
+
   it("uses pump post copy when isPump", () => {
     const plan = calculateExercisePlan({ ...baseCtx, intensity: "moderate" });
     const line = getRecoveryInsulinHeadline(plan, true, false);

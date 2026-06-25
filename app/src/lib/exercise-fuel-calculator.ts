@@ -680,7 +680,7 @@ function computeSessionFuel(
  * Personalized pre-exercise fuel + meal insulin estimate from all calculator inputs.
  */
 export function computeExerciseFuelPlan(input: ExerciseFuelCalculatorInput): ExerciseFuelCalculatorResult {
-  const plan = calculateExercisePlan(buildPlanContext(input));
+  const plan = calculateExercisePlan(buildPlanContext(input), input.settings);
 
   const userMealCarbs = input.mealCarbsGrams != null && input.mealCarbsGrams > 0 ? input.mealCarbsGrams : 0;
   const mealCarbsIsSuggested = userMealCarbs <= 0;
