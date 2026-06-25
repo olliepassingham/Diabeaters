@@ -420,7 +420,11 @@ export default function CommunityHomePage() {
     let cancelled = false;
     void listFolloweeIdsForCurrentUser().then((res) => {
       if (cancelled || res.error) return;
-      setFolloweeIds(new Set(res.ids));
+      setFolloweeIds((prev) => {
+        const next = new Set(res.ids);
+        if (prev.size === next.size && [...prev].every((id) => next.has(id))) return prev;
+        return next;
+      });
     });
     return () => {
       cancelled = true;
@@ -438,10 +442,9 @@ export default function CommunityHomePage() {
   }, [user?.id]);
 
   const refreshSuggestedForFindPeople = useCallback(() => {
-    if (!user?.id || suggestedLoading) return;
-    if (suggested.length > 0) return;
+    if (!user?.id || suggestedLoading || suggestionsFetched) return;
     void loadSuggestedPeople();
-  }, [user?.id, suggestedLoading, suggested.length, loadSuggestedPeople]);
+  }, [user?.id, suggestedLoading, suggestionsFetched, loadSuggestedPeople]);
 
   // Discovery — deferred until idle; fetch once so the strip does not flash repeatedly.
   useEffect(() => {
@@ -603,6 +606,7 @@ export default function CommunityHomePage() {
         onFollow={(id) => void handleFollow(id)}
         suggested={suggested}
         suggestedLoading={suggestedLoading}
+        suggestionsFetched={suggestionsFetched}
         onRefreshSuggested={refreshSuggestedForFindPeople}
         onStoryClick={(id, story, name) => openStory(id, story, name)}
       />

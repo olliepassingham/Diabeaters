@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Search, UserCheck, UserPlus } from "lucide-react";
 
@@ -134,6 +134,17 @@ function FindPeoplePersonSkeleton() {
   );
 }
 
+function FindPeopleEmptySuggestions() {
+  return (
+    <div className="rounded-2xl border border-dashed border-border/55 bg-muted/15 px-4 py-5 text-center">
+      <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        No new people to suggest right now. Search by @handle above to find someone specific.
+      </p>
+    </div>
+  );
+}
+
 function FindPeoplePanelBody({
   userId,
   followeeIds,
@@ -147,6 +158,7 @@ function FindPeoplePanelBody({
   peopleResults,
   suggested,
   suggestedLoading,
+  suggestionsFetched,
   ringState,
   onStoryClick,
 }: {
@@ -162,11 +174,19 @@ function FindPeoplePanelBody({
   peopleResults: FindPeoplePerson[];
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
+  suggestionsFetched: boolean;
   ringState: (authorId: string) => StoryRingState;
   onStoryClick?: (authorId: string, displayName: string) => void;
 }) {
   const trimmed = query.trim();
   const searching = Boolean(trimmed);
+  const visibleSuggested = useMemo(
+    () => suggested.filter((p) => !followeeIds.has(p.id)),
+    [suggested, followeeIds],
+  );
+  const showSuggestedSkeleton = suggestedLoading && !suggestionsFetched;
+  const showSuggestedEmpty =
+    suggestionsFetched && !showSuggestedSkeleton && visibleSuggested.length === 0;
 
   return (
     <>
@@ -202,7 +222,7 @@ function FindPeoplePanelBody({
       >
         {searching ? (
           <div className="space-y-2">
-            {peopleLoading ? (
+            {peopleLoading && peopleResults.length === 0 ? (
               <ul className="space-y-2" aria-busy="true">
                 {Array.from({ length: 4 }, (_, i) => (
                   <FindPeoplePersonSkeleton key={i} />
@@ -216,7 +236,7 @@ function FindPeoplePanelBody({
               </p>
             ) : null}
             {peopleResults.length > 0 ? (
-              <ul className="space-y-2">
+              <ul className="space-y-2" aria-busy={peopleLoading}>
                 {peopleResults.map((p) => {
                   const isFollowing = Boolean(userId && followeeIds.has(p.id));
                   return (
@@ -243,27 +263,25 @@ function FindPeoplePanelBody({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2 px-0.5">
               <p className="text-sm font-semibold text-foreground">Suggested for you</p>
-              {suggestedLoading ? (
+              {showSuggestedSkeleton ? (
                 <span className="text-xs text-muted-foreground">Loading…</span>
-              ) : suggested.length > 0 ? (
+              ) : visibleSuggested.length > 0 ? (
                 <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
-                  {suggested.length}
+                  {visibleSuggested.length}
                 </span>
               ) : null}
             </div>
-            {suggestedLoading ? (
+            {showSuggestedSkeleton ? (
               <ul className="space-y-2" aria-busy="true">
                 {Array.from({ length: 5 }, (_, i) => (
                   <FindPeoplePersonSkeleton key={i} />
                 ))}
               </ul>
-            ) : suggested.length === 0 ? (
-              <p className="px-1 py-4 text-center text-sm text-muted-foreground">
-                No suggestions yet. Search by @handle above to find people.
-              </p>
+            ) : showSuggestedEmpty ? (
+              <FindPeopleEmptySuggestions />
             ) : (
               <ul className="space-y-2">
-                {suggested.map((p) => {
+                {visibleSuggested.map((p) => {
                   const isFollowing = Boolean(userId && followeeIds.has(p.id));
                   return (
                     <FindPeoplePersonRow
@@ -308,6 +326,7 @@ type FindPeoplePanelProps = {
   onFollow: (id: string) => void;
   suggested: FollowSuggestion[];
   suggestedLoading: boolean;
+  suggestionsFetched: boolean;
   onRefreshSuggested: () => void;
   onStoryClick?: (authorId: string, story?: CommunityStoryRow, displayName?: string) => void;
 };
@@ -322,6 +341,7 @@ export function FindPeoplePanel({
   onFollow,
   suggested,
   suggestedLoading,
+  suggestionsFetched,
   onRefreshSuggested,
   onStoryClick,
 }: FindPeoplePanelProps) {
@@ -330,13 +350,18 @@ export function FindPeoplePanel({
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [peopleResults, setPeopleResults] = useState<FindPeoplePerson[]>([]);
+  const searchRequestRef = useRef(0);
 
   const visibleAuthorIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const p of peopleResults) ids.add(p.id);
-    for (const p of suggested) ids.add(p.id);
+    for (const p of peopleResults) {
+      if (followeeIds.has(p.id)) ids.add(p.id);
+    }
+    for (const p of suggested) {
+      if (followeeIds.has(p.id)) ids.add(p.id);
+    }
     return [...ids];
-  }, [peopleResults, suggested]);
+  }, [peopleResults, suggested, followeeIds]);
 
   const { ringState, storiesByAuthor } = useCommunityStories(userId, open ? visibleAuthorIds : []);
 
@@ -346,6 +371,7 @@ export function FindPeoplePanel({
       setPeopleLoading(false);
       setPeopleError(null);
       setPeopleResults([]);
+      searchRequestRef.current += 1;
       return;
     }
     onRefreshSuggested();
@@ -356,14 +382,18 @@ export function FindPeoplePanel({
     const t = window.setTimeout(() => {
       const q = query.trim().replace(/^@/, "");
       if (!q) {
+        searchRequestRef.current += 1;
         setPeopleLoading(false);
         setPeopleError(null);
         setPeopleResults([]);
         return;
       }
+      const requestId = searchRequestRef.current + 1;
+      searchRequestRef.current = requestId;
       setPeopleLoading(true);
       setPeopleError(null);
       void searchProfilesByHandlePrefix(q, 12).then((res) => {
+        if (requestId !== searchRequestRef.current) return;
         setPeopleLoading(false);
         if (res.error) {
           setPeopleError(res.error.message);
@@ -399,6 +429,7 @@ export function FindPeoplePanel({
     peopleResults,
     suggested,
     suggestedLoading,
+    suggestionsFetched,
     ringState,
     onStoryClick: onStoryClick
       ? (authorId: string, displayName: string) =>
