@@ -4,7 +4,7 @@ import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
 } from "@/lib/notification-inbox-deep-link";
-import { DIABEATER_OPEN_HYPO_DIALOG_EVENT } from "@/lib/storage";
+import { DIABEATER_OPEN_HYPO_DIALOG_EVENT } from "@/lib/hypo-check-in-events";
 
 /** Opens the dashboard hypo log dialog (home + `?hypo_log=1`). */
 export const HYPO_LOG_DEEP_LINK = "/?hypo_log=1";

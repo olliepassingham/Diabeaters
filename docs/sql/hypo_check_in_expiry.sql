@@ -271,7 +271,6 @@ RETURNS TABLE (
   created_at timestamptz
 )
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -310,7 +309,6 @@ RETURNS TABLE (
   responded_at timestamptz
 )
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$

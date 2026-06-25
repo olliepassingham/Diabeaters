@@ -13,8 +13,12 @@ export function PendingHypoCheckInBanner() {
       setPending([]);
       return;
     }
-    const res = await fetchPendingHypoCheckIns();
-    if (!res.error) setPending(res.data);
+    try {
+      const res = await fetchPendingHypoCheckIns();
+      if (!res.error) setPending(res.data);
+    } catch {
+      setPending([]);
+    }
   }, []);
 
   useEffect(() => {

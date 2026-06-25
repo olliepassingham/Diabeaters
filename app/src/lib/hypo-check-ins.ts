@@ -88,6 +88,13 @@ export function consumePendingHypoCheckInForLog(): string | null {
   return id;
 }
 
+export function isActivePendingHypoCheckIn(row: { status: string; created_at: string }): boolean {
+  if (row.status !== "pending") return false;
+  const created = new Date(row.created_at).getTime();
+  if (Number.isNaN(created)) return true;
+  return Date.now() - created < HYPO_CHECK_IN_PENDING_MINUTES * 60 * 1000;
+}
+
 export function friendlyCreateCheckInError(message: string): string {
   const m = message.toLowerCase();
   if (m.includes("check_in_expired")) {
@@ -179,12 +186,14 @@ export async function fetchPendingHypoCheckIns(): Promise<{
   const { data, error } = await supabase.rpc("list_pending_hypo_check_ins");
   if (error) return { data: [], error: new Error(error.message) };
 
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
-    id: String(row.id),
-    carer_id: String(row.carer_id),
-    carer_name: String(row.carer_name ?? "Your supporter"),
-    created_at: String(row.created_at),
-  }));
+  const rows = ((data ?? []) as Record<string, unknown>[])
+    .map((row) => ({
+      id: String(row.id),
+      carer_id: String(row.carer_id),
+      carer_name: String(row.carer_name ?? "Your supporter"),
+      created_at: String(row.created_at),
+    }))
+    .filter((row) => isActivePendingHypoCheckIn({ status: "pending", created_at: row.created_at }));
   return { data: rows, error: null };
 }
 

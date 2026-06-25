@@ -10,9 +10,13 @@ export function usePendingHypoCheckInIds(userId: string | undefined) {
       setPendingIds(new Set());
       return;
     }
-    const res = await fetchPendingHypoCheckIns();
-    if (res.error) return;
-    setPendingIds(new Set(res.data.map((row) => row.id)));
+    try {
+      const res = await fetchPendingHypoCheckIns();
+      if (res.error) return;
+      setPendingIds(new Set(res.data.map((row) => row.id)));
+    } catch {
+      // Ignore — hypo check-ins are optional; never break notifications UI.
+    }
   }, [userId]);
 
   useEffect(() => {

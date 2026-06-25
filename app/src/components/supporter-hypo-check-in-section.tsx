@@ -6,6 +6,7 @@ import {
   createHypoCheckIn,
   fetchHypoCheckInsForCarer,
   friendlyCreateCheckInError,
+  isActivePendingHypoCheckIn,
 } from "@/lib/hypo-check-ins";
 import { cn } from "@/lib/utils";
 
@@ -25,9 +26,13 @@ export function SupporterHypoCheckInButton({
   const [hasPending, setHasPending] = useState(false);
 
   const refresh = useCallback(async () => {
-    const res = await fetchHypoCheckInsForCarer(patientId, 3);
-    if (!res.error) {
-      setHasPending(res.data.some((row) => row.status === "pending"));
+    try {
+      const res = await fetchHypoCheckInsForCarer(patientId, 3);
+      if (!res.error) {
+        setHasPending(res.data.some((row) => isActivePendingHypoCheckIn(row)));
+      }
+    } catch {
+      setHasPending(false);
     }
   }, [patientId]);
 

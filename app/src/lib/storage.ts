@@ -327,7 +327,7 @@ function emitPostExerciseNudgeChanged(): void {
 export const DIABEATER_SCENARIO_STATE_CHANGED_EVENT = "diabeater-scenario-state-changed";
 
 /** Dashboard quick action: open the hero hypo log dialog. */
-export const DIABEATER_OPEN_HYPO_DIALOG_EVENT = "diabeater-open-hypo-dialog";
+export { DIABEATER_OPEN_HYPO_DIALOG_EVENT } from "./hypo-check-in-events";
 
 export const DIABEATER_HYPO_CLOUD_LOGGED_EVENT = "diabeater-hypo-cloud-logged";
 

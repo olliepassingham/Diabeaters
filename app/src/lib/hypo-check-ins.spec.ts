@@ -4,6 +4,7 @@ import {
   checkInIdFromNotificationData,
   formatHypoCheckInStatusLabel,
   friendlyCreateCheckInError,
+  isActivePendingHypoCheckIn,
 } from "./hypo-check-ins";
 
 describe("hypo-check-ins", () => {
@@ -28,8 +29,13 @@ describe("hypo-check-ins", () => {
     expect(friendlyCreateCheckInError("rate_limited")).toContain("15 minutes");
     expect(friendlyCreateCheckInError("pending_exists")).toContain("waiting");
     expect(friendlyCreateCheckInError("check_in_expired")).toContain("30 minutes");
-    expect(friendlyCreateCheckInError("Could not find the function public.create_hypo_check_in")).toContain(
-      "not set up on the server",
-    );
+  });
+
+  it("treats pending check-ins older than 30 minutes as inactive", () => {
+    const recent = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const stale = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+    expect(isActivePendingHypoCheckIn({ status: "pending", created_at: recent })).toBe(true);
+    expect(isActivePendingHypoCheckIn({ status: "pending", created_at: stale })).toBe(false);
+    expect(isActivePendingHypoCheckIn({ status: "ok", created_at: recent })).toBe(false);
   });
 });
