@@ -9,6 +9,7 @@ import {
   isSafeInAppPath,
   storePendingPushDeepLink,
 } from "./push-notification-deep-link";
+import { HYPO_LOG_DEEP_LINK } from "./in-app-notifications-nav";
 import { NOTIFICATION_BELL_DEEP_LINK } from "./notification-inbox-deep-link";
 
 const OPEN_NOTIFICATION_BELL_EVENT = "diabeaters:open-notification-bell";
@@ -80,5 +81,29 @@ describe("push-notification-deep-link", () => {
     });
     expect(navigated).toBeNull();
     expect(bellOpened).toBe(true);
+  });
+
+  it("opens hypo log screen for hypo check-in deep link", async () => {
+    let navigated: string | null = null;
+    let hypoOpened = false;
+    window.addEventListener("diabeater-open-hypo-dialog", () => {
+      hypoOpened = true;
+    });
+    applyPushDeepLinkPath(HYPO_LOG_DEEP_LINK, (path) => {
+      navigated = path;
+    });
+    expect(navigated).toBe(HYPO_LOG_DEEP_LINK);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    expect(hypoOpened).toBe(true);
+  });
+
+  it("resolves hypo check-in push data to hypo log deep link", () => {
+    expect(
+      getPathForPushNotificationData({
+        kind: "hypo_check_in",
+        check_in_id: "abc-123",
+        deep_link: "/",
+      }),
+    ).toBe(HYPO_LOG_DEEP_LINK);
   });
 });

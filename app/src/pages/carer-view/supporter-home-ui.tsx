@@ -6,6 +6,7 @@ import { isAiCoachEnabled } from "@/lib/flags";
 import { openAssistantCtaLabel } from "@/lib/ai-coach/persona";
 import { cn } from "@/lib/utils";
 import { scrollToCarerViewSection } from "@/pages/carer-view/carer-view-nav";
+import { SupporterHypoCheckInButton } from "@/components/supporter-hypo-check-in-section";
 import {
   HomeCardEmpty,
   HomeHypoTimelineItem,
@@ -61,26 +62,26 @@ export function SupporterHero({
       className="dashboard-card-hover animate-soft-in overflow-hidden border border-primary/15 bg-gradient-to-br from-primary/[0.06] via-transparent to-transparent shadow-md ring-1 ring-border/25 dark:border-primary/18 dark:from-primary/[0.09]"
       data-testid="carer-view-header"
     >
-      <CardContent className="p-4 md:p-5 flex flex-col gap-3 md:gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+      <CardContent className="flex flex-col gap-2.5 p-4 md:p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
             <div
-              className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden ring-2 ring-background shadow-sm"
+              className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10 ring-2 ring-background shadow-sm"
               aria-hidden={!avatarUrl}
             >
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Sparkles className="h-7 w-7 text-primary" aria-hidden />
+                <Sparkles className="h-6 w-6 text-primary" aria-hidden />
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">Supporter mode</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Supporter mode</p>
               <p
-                className="font-display text-xl font-semibold tracking-tight text-foreground truncate sm:text-2xl"
+                className="font-display text-lg font-semibold leading-tight tracking-tight text-foreground sm:text-xl"
                 data-testid="text-carer-view-name"
               >
-                {displayName}
+                Supporting {displayName}
               </p>
             </div>
           </div>
@@ -88,8 +89,8 @@ export function SupporterHero({
             <a
               href="#carer-emergency"
               className={cn(
-                "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-border/60 bg-background/70 px-3.5 text-xs font-semibold text-foreground shadow-sm",
-                "hover:bg-background hover:border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-destructive/25 bg-destructive/[0.06] px-2.5 text-[11px] font-semibold text-foreground",
+                "hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               )}
               aria-label="Jump to emergency details"
               onClick={(e) => {
@@ -97,7 +98,7 @@ export function SupporterHero({
                 scrollToCarerViewSection("carer-emergency");
               }}
             >
-              <Phone className="h-4 w-4 text-destructive/80" aria-hidden />
+              <Phone className="h-3.5 w-3.5 text-destructive" aria-hidden />
               Emergency
             </a>
           ) : null}
@@ -161,56 +162,101 @@ export function SupporterHero({
 export function SupporterQuickActions({
   showActivity,
   showUserModeSwitch = false,
+  showHypoCheckIn = false,
+  patientId,
+  patientName,
 }: {
   showActivity: boolean;
   showUserModeSwitch?: boolean;
+  showHypoCheckIn?: boolean;
+  patientId?: string;
+  patientName?: string;
 }) {
   const [, setLocation] = useLocation();
   const showCoach = isAiCoachEnabled;
-  if (!showCoach && !showActivity && !showUserModeSwitch) return null;
+  const hasSecondaryRow = showCoach || showActivity;
+  if (!hasSecondaryRow && !showUserModeSwitch && !showHypoCheckIn) return null;
+
+  const secondaryGridCols = showCoach && showActivity ? "grid-cols-2" : "grid-cols-1";
 
   return (
     <div
-      className="flex flex-col gap-2 sm:gap-3 animate-soft-in"
+      className="animate-soft-in space-y-2"
       style={{ animationDelay: "40ms" }}
       data-testid="carer-quick-actions"
     >
-      {showUserModeSwitch ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-11 w-full rounded-2xl shadow-none"
-          data-testid="button-switch-user-mode"
-          onClick={() => {
-            setActiveAppMode("patient");
-            setLocation("/");
-          }}
-        >
-          <UserIcon className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-          Switch to User Mode
-        </Button>
+      {showHypoCheckIn && patientId ? (
+        <SupporterHypoCheckInButton
+          patientId={patientId}
+          patientName={patientName ?? "them"}
+          prominence="primary"
+        />
       ) : null}
-      {showCoach ? (
-        <div className="coach-entry-glow w-full rounded-2xl" data-testid="link-carer-coach-open-glow">
-          <Button
-            asChild
-            variant="default"
-            className="min-h-11 w-full rounded-2xl font-semibold tracking-tight shadow-none"
-          >
-            <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
-              <MessageCircle className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-              {openAssistantCtaLabel()}
-            </Link>
-          </Button>
+
+      {hasSecondaryRow ? (
+        <div className={cn("grid gap-2", secondaryGridCols)}>
+          {showCoach ? (
+            showHypoCheckIn ? (
+              <Button
+                asChild
+                variant="outline"
+                className="min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm"
+              >
+                <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
+                  <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                  {openAssistantCtaLabel()}
+                </Link>
+              </Button>
+            ) : (
+              <div className="coach-entry-glow col-span-full w-full rounded-xl" data-testid="link-carer-coach-open-glow">
+                <Button
+                  asChild
+                  variant="default"
+                  className="min-h-10 w-full rounded-xl font-semibold tracking-tight shadow-none"
+                >
+                  <Link href="/coach?audience=supporter" data-testid="link-carer-coach-open">
+                    <MessageCircle className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                    {openAssistantCtaLabel()}
+                  </Link>
+                </Button>
+              </div>
+            )
+          ) : null}
+          {showActivity ? (
+            <Button
+              asChild
+              variant="outline"
+              className={cn(
+                "min-h-10 w-full rounded-xl px-2 text-xs font-medium shadow-none sm:text-sm",
+                !showCoach && "col-span-full",
+              )}
+            >
+              <Link href="/carer-view/activity" data-testid="link-carer-activity">
+                <History className="mr-1.5 h-4 w-4 shrink-0" aria-hidden />
+                Activity
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : null}
-      {showActivity ? (
-        <Button asChild variant="outline" className="min-h-11 w-full rounded-2xl shadow-none">
-          <Link href="/carer-view/activity" data-testid="link-carer-activity">
-            <History className="h-4 w-4 mr-2 shrink-0" aria-hidden />
-            Activity log
-          </Link>
-        </Button>
+
+      {showUserModeSwitch ? (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 rounded-full px-3 text-xs font-medium text-muted-foreground no-underline hover:bg-muted/40 hover:text-foreground active:bg-muted/55"
+            data-testid="button-switch-user-mode"
+            onClick={() => {
+              setActiveAppMode("patient");
+              setLocation("/");
+            }}
+          >
+            <UserIcon className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            Switch to User Mode
+          </Button>
+        </div>
       ) : null}
     </div>
   );

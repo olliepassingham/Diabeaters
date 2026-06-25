@@ -28,7 +28,7 @@ import {
   type InAppNotificationsChangedDetail,
   notifyInAppNotificationsChanged,
 } from "@/lib/in-app-notifications-events";
-import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { navigateForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getProfilesByIds } from "@/lib/profile";
 import { resolveProfileImageUrlResult } from "@/lib/storage-profile";
@@ -48,6 +48,11 @@ import {
   HypoNotificationAckFooter,
   hypoLogIdFromInAppNotification,
 } from "@/components/hypo-notification-ack-footer";
+import {
+  HypoCheckInNotificationFooter,
+  hypoCheckInIdFromInAppNotification,
+} from "@/components/hypo-check-in-notification-footer";
+import { usePendingHypoCheckInIds } from "@/hooks/use-pending-hypo-check-ins";
 
 export default function NotificationsPage() {
   const { toast } = useToast();
@@ -74,6 +79,7 @@ export default function NotificationsPage() {
     [rows],
   );
   const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
+  const { isPending: isCheckInPending, refresh: refreshCheckIns } = usePendingHypoCheckInIds(user?.id);
 
   const refresh = useCallback(async () => {
     if (!configured) {
@@ -172,8 +178,7 @@ export default function NotificationsPage() {
       }
     }
 
-    const path = getPathForInAppNotification(row);
-    if (path) setLocation(path);
+    navigateForInAppNotification(row, setLocation);
   };
 
   const handleDeleteOne = async (row: InAppNotificationRow) => {
@@ -286,6 +291,7 @@ export default function NotificationsPage() {
                 const actorId = profileUserIdForInAppNotification(r);
                 const actor = actorId ? senderMeta.get(actorId) : undefined;
                 const hypoLogId = hypoLogIdFromInAppNotification(r);
+                const checkInId = hypoCheckInIdFromInAppNotification(r);
                 return (
                   <NotificationInboxRow
                     key={r.id}
@@ -303,6 +309,12 @@ export default function NotificationsPage() {
                           row={r}
                           acknowledged={hasAcked(hypoLogId)}
                           onAcknowledged={() => void refreshHypoAcks()}
+                        />
+                      ) : checkInId ? (
+                        <HypoCheckInNotificationFooter
+                          row={r}
+                          responded={!isCheckInPending(checkInId)}
+                          onResponded={() => void refreshCheckIns()}
                         />
                       ) : undefined
                     }

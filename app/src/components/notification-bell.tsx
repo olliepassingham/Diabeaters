@@ -29,7 +29,7 @@ import {
   markAllInAppNotificationsRead,
   markInAppNotificationRead,
 } from "@/lib/in-app-notifications-supabase";
-import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { getPathForInAppNotification, navigateForInAppNotification } from "@/lib/in-app-notifications-nav";
 import { consumePendingOpenNotificationBell } from "@/lib/notification-inbox-deep-link";
 import type { InAppNotificationRow } from "@/lib/carer-notify-types";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -51,6 +51,11 @@ import {
   HypoNotificationAckFooter,
   hypoLogIdFromInAppNotification,
 } from "@/components/hypo-notification-ack-footer";
+import {
+  HypoCheckInNotificationFooter,
+  hypoCheckInIdFromInAppNotification,
+} from "@/components/hypo-check-in-notification-footer";
+import { usePendingHypoCheckInIds } from "@/hooks/use-pending-hypo-check-ins";
 
 function InAppToastContent(props: {
   title: string;
@@ -101,6 +106,7 @@ export function NotificationBell() {
       [rows],
     );
     const { hasAcked, refresh: refreshHypoAcks } = useHypoAcknowledgementIndex(hypoIdsForAck, user?.id);
+    const { isPending: isCheckInPending, refresh: refreshCheckIns } = usePendingHypoCheckInIds(user?.id);
 
     const sortedRows = useMemo(() => {
       return [...rows].sort((a, b) => Number(a.read) - Number(b.read));
@@ -240,7 +246,18 @@ export function NotificationBell() {
                     altText="Open"
                     onClick={() => {
                       setOpen(false);
-                      setLocation(href);
+                      navigateForInAppNotification(
+                        {
+                          id: String(row.id ?? ""),
+                          user_id: String(row.user_id ?? ""),
+                          title: rowTitle,
+                          body: bodyText,
+                          data: data as InAppNotificationRow["data"],
+                          created_at: String(row.created_at ?? ""),
+                          read: Boolean(row.read),
+                        },
+                        setLocation,
+                      );
                     }}
                     className="h-8 px-2 text-xs"
                   >
@@ -471,6 +488,7 @@ export function NotificationBell() {
                       ? formatDistanceToNow(new Date(n.created_at), { addSuffix: true })
                       : "";
                     const hypoLogId = hypoLogIdFromInAppNotification(n);
+                    const checkInId = hypoCheckInIdFromInAppNotification(n);
                     return (
                       <NotificationInboxRow
                         key={n.id}
@@ -486,6 +504,12 @@ export function NotificationBell() {
                               acknowledged={hasAcked(hypoLogId)}
                               onAcknowledged={() => void refreshHypoAcks()}
                             />
+                          ) : checkInId ? (
+                            <HypoCheckInNotificationFooter
+                              row={n}
+                              responded={!isCheckInPending(checkInId)}
+                              onResponded={() => void refreshCheckIns()}
+                            />
                           ) : undefined
                         }
                         onOpen={() => {
@@ -498,8 +522,12 @@ export function NotificationBell() {
                               }
                             }
                             setOpen(false);
-                            const path = getPathForInAppNotification(n) ?? "/notifications";
-                            setLocation(path);
+                            const path = getPathForInAppNotification(n);
+                            if (path) {
+                              navigateForInAppNotification(n, setLocation);
+                            } else {
+                              setLocation("/notifications");
+                            }
                           })();
                         }}
                       />

@@ -59,6 +59,27 @@ export type HypoAcknowledgedNotificationPayload = {
   deep_link?: string;
 };
 
+/** Patient inbox when a supporter asks if they are aware of a possible hypo. */
+export type HypoCheckInNotificationPayload = {
+  kind: "hypo_check_in";
+  check_in_id: string;
+  carer_id?: string;
+  carer_name?: string;
+  patient_user_id?: string;
+  deep_link?: string;
+};
+
+/** Supporter inbox when the patient responds to a hypo check-in. */
+export type HypoCheckInResponseNotificationPayload = {
+  kind: "hypo_check_in_response";
+  check_in_id: string;
+  response?: string;
+  patient_user_id?: string;
+  patient_name?: string;
+  hypo_id?: string;
+  deep_link?: string;
+};
+
 /** Alias matching product language (“in-app notification”). */
 export type Notification = InAppNotificationRow;
 

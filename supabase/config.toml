@@ -46,6 +46,15 @@ verify_jwt = false
 [functions.notify_supporter_appointment_reminders]
 verify_jwt = false
 
+[functions.notify_patient_hypo_acknowledged]
+verify_jwt = false
+
+[functions.notify_patient_hypo_check_in]
+verify_jwt = false
+
+[functions.notify_carer_hypo_check_in_response]
+verify_jwt = false
+
 # AI Coach: user JWT verified at the gateway (default). Handler also validates with auth.getUser.
 [functions.ai_coach]
 verify_jwt = true

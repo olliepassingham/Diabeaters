@@ -3,6 +3,7 @@
 1. **Migrations** — run in the SQL editor or via CLI (`supabase db push` linked to your project):
    - `supabase/migrations/20250325120000_carers_hypo_logs_notifications.sql`
    - **Feed topic filters** require `supabase/migrations/20260409120000_community_post_topics.sql` (or paste [`docs/sql/community_post_topics.sql`](../docs/sql/community_post_topics.sql)). If the app errors on topic chips with `fetch_community_posts_page` / `schema cache`, apply that migration, then in **Dashboard → Settings → API** use **Reload schema** (or wait a minute) so PostgREST picks up the new RPC.
+   - **Supporter hypo check-ins** (“Check they’re OK”) require `supabase/migrations/20260617120000_hypo_check_ins.sql` (or paste [`docs/sql/hypo_check_ins.sql`](../docs/sql/hypo_check_ins.sql)). If the app errors with `create_hypo_check_in` / `schema cache`, run that SQL, **Reload schema**, then deploy `notify_patient_hypo_check_in` and `notify_carer_hypo_check_in_response` (`npm run supabase:deploy-notify-functions`).
 
 2. **Secrets** (Dashboard → Edge Functions → Secrets) for the notify functions:
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (often auto-injected)

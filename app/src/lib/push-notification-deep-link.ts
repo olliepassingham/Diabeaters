@@ -1,6 +1,11 @@
 import type { PushNotificationSchema } from "@capacitor/push-notifications";
 
-import { getPathForInAppNotification } from "@/lib/in-app-notifications-nav";
+import { setPendingHypoCheckInForLog } from "@/lib/hypo-check-ins";
+import {
+  getPathForInAppNotification,
+  isHypoLogDeepLink,
+  requestOpenHypoLogScreen,
+} from "@/lib/in-app-notifications-nav";
 import {
   isNotificationBellDeepLink,
   requestOpenNotificationBell,
@@ -78,6 +83,10 @@ export function applyPushDeepLinkPath(path: string, navigateTo: (path: string) =
     requestOpenNotificationBell();
     return;
   }
+  if (isHypoLogDeepLink(path)) {
+    requestOpenHypoLogScreen(navigateTo);
+    return;
+  }
   navigateTo(path.trim());
 }
 
@@ -90,8 +99,12 @@ export function setPushDeepLinkNavigationReady(ready: boolean): void {
 }
 
 export function handlePushDeepLinkFromNotification(notification: PushNotificationSchema): void {
+  const data = notificationDataRecord(notification);
   const path = getPathFromPushNotification(notification);
   if (!path) return;
+  if (data.kind === "hypo_check_in" && typeof data.check_in_id === "string" && data.check_in_id.trim()) {
+    setPendingHypoCheckInForLog(data.check_in_id);
+  }
   storePendingPushDeepLink(path);
   if (navigationReady && navigate) {
     const pending = consumePendingPushDeepLink();

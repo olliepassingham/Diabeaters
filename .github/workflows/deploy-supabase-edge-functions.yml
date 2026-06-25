@@ -49,6 +49,9 @@ jobs:
           supabase functions deploy notify_supporter_appointment_reminders --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_dm_push --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_feed_push --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy notify_patient_hypo_acknowledged --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy notify_patient_hypo_check_in --project-ref "$REF" --no-verify-jwt
+          supabase functions deploy notify_carer_hypo_check_in_response --project-ref "$REF" --no-verify-jwt
           supabase functions deploy notify_push_test --project-ref "$REF" --no-verify-jwt
           # JWT verified at gateway + in handler (see supabase/config.toml). Do not pass --no-verify-jwt.
           supabase functions deploy ai_coach --project-ref "$REF"

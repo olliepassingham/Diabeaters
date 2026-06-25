@@ -23,6 +23,7 @@ import {
   DIABEATER_PROFILE_CHANGED_EVENT,
   DIABEATER_ACTIVE_USER_CHANGED_EVENT,
   DIABEATER_OPEN_HYPO_DIALOG_EVENT,
+  notifyHypoCloudLogged,
   dismissSoftSetupNudge,
   isCommunityAccountProfile,
   isSoftSetupNudgeDismissed,
@@ -66,6 +67,7 @@ import { insertHypoLog } from "@/lib/hypo-logs-supabase";
 import { invokeNotifyCarersOnHypo } from "@/lib/invoke-notify-carers-hypo";
 import { NOTIFY_EDGE_FAILURE_TITLE, notifyEdgeFailureDescription } from "@/lib/notify-toast-messages";
 import { PageHeader, PageShell } from "@/components/layout";
+import { PendingHypoCheckInBanner } from "@/components/pending-hypo-check-in-banner";
 import { SupplyTrackerTodaySection } from "@/components/dashboard/SupplyTrackerTodaySection";
 import { isAiCoachEnabled, isCommunityEnabled } from "@/lib/flags";
 import { useOffline } from "@/hooks/use-offline";
@@ -121,6 +123,7 @@ async function runHypoTreatmentPipeline(
 
     if (cloud.data) {
       storage.patchHypoTreatment(created.id, { supabaseHypoLogId: cloud.data.id });
+      notifyHypoCloudLogged({ hypoLogId: cloud.data.id });
       const notify = await invokeNotifyCarersOnHypo({
         hypoId: cloud.data.id,
         userId: ctx.userId,
@@ -342,6 +345,16 @@ function HeroCard({
     const openHypo = () => setHypoDialogOpen(true);
     window.addEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
     return () => window.removeEventListener(DIABEATER_OPEN_HYPO_DIALOG_EVENT, openHypo);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("hypo_log") !== "1") return;
+    setHypoDialogOpen(true);
+    params.delete("hypo_log");
+    const query = params.toString();
+    const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, "", next);
   }, []);
 
   const handleLogHypo = () => {
@@ -983,6 +996,10 @@ export default function Dashboard() {
             </div>
           </Alert>
         )}
+
+        {!isCommunityDash && user ? (
+          <PendingHypoCheckInBanner />
+        ) : null}
 
         {!isCommunityDash ? (
           <div className="animate-fade-in" style={{ animationDelay: "30ms" }}>

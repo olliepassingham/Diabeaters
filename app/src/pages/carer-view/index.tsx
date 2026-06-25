@@ -73,7 +73,6 @@ import {
   CarerCardEmpty,
   CarerHypoTimelineItem,
   CarerMutedCard,
-  CarerSectionHeading,
   CarerUrgentCard,
   sortSuppliesByUrgency,
   SupporterHero,
@@ -1658,7 +1657,7 @@ export default function CarerViewPage() {
         className="max-w-3xl space-y-6 py-4"
         aria-busy={patientBundleLoading || undefined}
       >
-        <div className="flex flex-col gap-3 sm:gap-4 animate-stagger">
+        <div className="flex flex-col gap-2.5 sm:gap-3 animate-stagger">
           <SupporterHero
             displayName={displayName}
             avatarUrl={avatarUrl}
@@ -1674,6 +1673,9 @@ export default function CarerViewPage() {
           <SupporterQuickActions
             showActivity={showCarerActivityLog}
             showUserModeSwitch={canSwitchAppMode() || localIndicatesPatientAccount()}
+            showHypoCheckIn={scopes.hypo_alerts ?? false}
+            patientId={activeLink?.patientId}
+            patientName={displayName}
           />
 
           {activeLink?.patientId ? (
@@ -1711,11 +1713,6 @@ export default function CarerViewPage() {
       )}
 
         <div className="space-y-4 sm:space-y-5 animate-stagger">
-          <CarerSectionHeading
-            title="Now"
-            subtitle="What may need your attention today."
-            icon={Heart}
-          />
           {(scopes.hypo_alerts ?? false) && (
             <CarerUrgentCard
               testId="carer-view-hypos"
@@ -1912,12 +1909,6 @@ export default function CarerViewPage() {
           )}
 
           {showCarerActivityLog ? (
-            <>
-              <CarerSectionHeading
-                title="History"
-                subtitle="Browse shared activity over time."
-                icon={History}
-              />
               <CarerMutedCard testId="carer-view-activity">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -1951,13 +1942,9 @@ export default function CarerViewPage() {
                   </Button>
                 </CardContent>
               </CarerMutedCard>
-            </>
           ) : null}
-        </div>
 
-        {(scopes.appointments ?? false) && (
-          <div className="space-y-4 sm:space-y-5">
-            <CarerSectionHeading title="Upcoming" subtitle="Appointments coming up next." icon={Calendar} />
+          {(scopes.appointments ?? false) && (
             <Card variant="glass-strong" className="dashboard-card-hover border border-border/60 shadow-sm" data-testid="carer-view-appointments">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2">
@@ -2007,12 +1994,9 @@ export default function CarerViewPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
 
-        {(scopes.emergency_info ?? false) && (
-          <div className="space-y-4 sm:space-y-5">
-            <CarerSectionHeading title="Reference" subtitle="Details for coordination and emergencies." icon={Phone} />
+          {(scopes.emergency_info ?? false) && (
             <Card
               id="carer-emergency"
               variant="glass-strong"
@@ -2063,8 +2047,8 @@ export default function CarerViewPage() {
                   !profile?.emergency_notes && <p className="text-muted-foreground">They have not added emergency details yet.</p>}
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
+        </div>
 
       <SupporterPageFooter />
       <p className="text-xs text-center text-muted-foreground px-2 pb-2">

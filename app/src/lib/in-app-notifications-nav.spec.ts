@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getPathForInAppNotification } from "./in-app-notifications-nav";
+import {
+  HYPO_LOG_DEEP_LINK,
+  getPathForInAppNotification,
+} from "./in-app-notifications-nav";
 import type { InAppNotificationRow } from "./carer-notify-types";
 import { NOTIFICATION_BELL_DEEP_LINK } from "./notification-inbox-deep-link";
 
@@ -70,6 +73,17 @@ describe("getPathForInAppNotification", () => {
     expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_acknowledged" } }))).toBe(
       "/tools/hypo-history",
     );
+    expect(getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_check_in" } }))).toBe(
+      "/?hypo_log=1",
+    );
+    expect(
+      getPathForInAppNotification(
+        row({ id: "1", user_id: "u", data: { kind: "hypo_check_in", deep_link: "/" } }),
+      ),
+    ).toBe("/?hypo_log=1");
+    expect(
+      getPathForInAppNotification(row({ id: "1", user_id: "u", data: { kind: "hypo_check_in_response" } })),
+    ).toBe("/carer-view");
   });
 
   it("maps scenario_started to carer view", () => {

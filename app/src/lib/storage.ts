@@ -329,6 +329,15 @@ export const DIABEATER_SCENARIO_STATE_CHANGED_EVENT = "diabeater-scenario-state-
 /** Dashboard quick action: open the hero hypo log dialog. */
 export const DIABEATER_OPEN_HYPO_DIALOG_EVENT = "diabeater-open-hypo-dialog";
 
+export const DIABEATER_HYPO_CLOUD_LOGGED_EVENT = "diabeater-hypo-cloud-logged";
+
+export type HypoCloudLoggedDetail = { hypoLogId: string };
+
+export function notifyHypoCloudLogged(detail: HypoCloudLoggedDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(DIABEATER_HYPO_CLOUD_LOGGED_EVENT, { detail }));
+}
+
 export function notifyActiveExerciseChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(DIABEATER_ACTIVE_EXERCISE_CHANGED_EVENT));

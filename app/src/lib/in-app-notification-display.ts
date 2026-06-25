@@ -37,6 +37,9 @@ export function profileUserIdForInAppNotification(row: InAppNotificationRow): st
   ) {
     return d.actor_user_id;
   }
+  if (kind === "hypo_check_in" && typeof d.carer_id === "string" && d.carer_id.trim()) {
+    return d.carer_id;
+  }
   return null;
 }
 

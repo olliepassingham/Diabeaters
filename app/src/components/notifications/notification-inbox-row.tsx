@@ -40,6 +40,7 @@ function iconForKind(kind: string): LucideIcon {
   if (kind === "feed_post_mention") return AtSign;
   if (kind === "hypo_logged" || kind === "hypo_logged_self") return Droplet;
   if (kind === "hypo_acknowledged") return ThumbsUp;
+  if (kind === "hypo_check_in" || kind === "hypo_check_in_response") return Heart;
   if (kind === "scenario_started") return Activity;
   if (kind === "alcohol_night_mode") return Moon;
   if (kind === "appointment_reminder_support") return Calendar;
