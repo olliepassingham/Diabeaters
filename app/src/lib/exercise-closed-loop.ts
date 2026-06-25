@@ -3,14 +3,6 @@ import type { UserSettings } from "@/lib/storage";
 
 export type ClosedLoopExercisePhase = "pre" | "during" | "post" | "recovery";
 
-/** Checklist shown before starting a guided session (informational). */
-export const CLOSED_LOOP_PRE_START_CHECKLIST = [
-  { id: "bg", label: "BG and trend checked" },
-  { id: "iob", label: "IOB / last meal bolus considered" },
-  { id: "carbs", label: "Fast carbs packed" },
-  { id: "loop", label: "Exercise or temp target set on pump (if you use it)" },
-] as const;
-
 export function exerciseChecklistBasalLabel(usesLoop: boolean, fallback = "Reduced basal rate"): string {
   return usesLoop ? "Reviewed loop / exercise plan on pump" : fallback;
 }

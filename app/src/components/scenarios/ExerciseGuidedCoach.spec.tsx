@@ -87,13 +87,6 @@ describe("ExerciseGuidedCoach", () => {
     mockToast.mockClear();
   });
 
-  it("shows closed-loop pre-workout checklist when hybrid loop is enabled", () => {
-    mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pump" };
-    mockSettings = { usesClosedLoop: true };
-    const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
-    expect(queryByTestId("closed-loop-exercise-checklist")).not.toBeNull();
-  });
-
   it("shows closed-loop pump tips during pre phase for pump users on hybrid loop", () => {
     mockProfile = { bgUnits: "mmol/L", insulinDeliveryMethod: "pump" };
     mockSettings = { usesClosedLoop: true };
@@ -105,6 +98,7 @@ describe("ExerciseGuidedCoach", () => {
   it("renders the start screen when no active session", () => {
     const { queryByTestId } = renderWithRouter(<ExerciseGuidedCoach />);
     expect(queryByTestId("exercise-guided-coach-start")).not.toBeNull();
+    fireEvent.click(queryByTestId("coach-plan-workout-trigger")!);
     expect(queryByTestId("button-start-coach")).not.toBeNull();
   });
 

@@ -27,7 +27,6 @@ import {
   Snowflake,
   Sparkles,
   Sun,
-  Syringe,
   Thermometer,
   TrendingDown,
   TrendingUp,
@@ -47,7 +46,6 @@ import { cn } from "@/lib/utils";
 import { isPumpDeliveryMethod } from "@/lib/insulin-delivery-method";
 import { usesClosedLoop } from "@/lib/closed-loop";
 import {
-  CLOSED_LOOP_PRE_START_CHECKLIST,
   closedLoopExercisePrePrompt,
   pumpTipsForPhase,
 } from "@/lib/exercise-closed-loop";
@@ -569,33 +567,6 @@ export function ExerciseGuidedCoach() {
   if (!activeSession) {
     return (
       <div className="space-y-4 max-sm:space-y-3" data-testid="exercise-guided-coach-start">
-        {closedLoop ? (
-          <Card
-            className="overflow-hidden rounded-2xl border-indigo-200/60 dark:border-indigo-900/40 shadow-sm"
-            data-testid="closed-loop-exercise-checklist"
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Syringe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" aria-hidden />
-                Closed-loop pre-workout check
-              </CardTitle>
-              <CardDescription>
-                Quick checks before you start — your pump handles basal; focus on IOB, trend, and carbs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {CLOSED_LOOP_PRE_START_CHECKLIST.map((item) => (
-                  <li key={item.id} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <CircleCheck className="h-4 w-4 shrink-0 text-indigo-500/80 mt-0.5" aria-hidden />
-                    <span>{item.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        ) : null}
-
         {repeatableSession ? (
           <div
             className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border/60 bg-muted/15 px-3 py-3"
